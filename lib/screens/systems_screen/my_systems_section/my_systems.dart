@@ -733,9 +733,22 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   int? _cachedGridCols;
   int? _cachedGridSystemCount;
 
+  /// Cached conversion of widget.systems to SystemInfo list, rebuilt only on systems change.
+  late List<SystemInfo> _systemCards;
+
+  /// Cached ThemeData with scrollbar overrides — rebuilt only in didChangeDependencies.
+  ThemeData? _cachedThemeData;
+  ScrollBehavior? _cachedScrollBehavior;
+
+  List<SystemInfo> _toSystemCards(List<dynamic> systems) => systems.map((s) {
+    if (s is SystemInfo) return s;
+    return SystemInfo.fromSystemMetadata(s);
+  }).toList();
+
   @override
   void initState() {
     super.initState();
+    _systemCards = _toSystemCards(widget.systems);
     _initializeGamepad();
 
     if (Platform.isAndroid) {
@@ -882,11 +895,32 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final theme = Theme.of(context);
+    _cachedThemeData = theme.copyWith(
+      scrollbarTheme: ScrollbarThemeData(
+        thumbColor: WidgetStateProperty.all(
+          theme.colorScheme.onSurface.withValues(alpha: 0.1),
+        ),
+        trackColor: WidgetStateProperty.all(
+          theme.colorScheme.onSurface.withValues(alpha: 0.05),
+        ),
+        thickness: WidgetStateProperty.all(6),
+        radius: const Radius.circular(3),
+      ),
+    );
+    _cachedScrollBehavior =
+        ScrollConfiguration.of(context).copyWith(scrollbars: false);
+  }
+
+  @override
   void didUpdateWidget(SystemCardGridView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.systems != widget.systems ||
         oldWidget.crossAxisCount != widget.crossAxisCount) {
       _cachedVirtualGrid = null;
+      _systemCards = _toSystemCards(widget.systems);
     }
     if (oldWidget.selectedIndex != widget.selectedIndex) {
       if (mounted && _scrollController.hasClients) {
@@ -1038,9 +1072,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
 
   /// Resolve the next focused index based on the virtual spatial grid.
   void _navigateVirtual(String direction) {
-    final cards = widget.systems.map((s) {
-      return s is SystemInfo ? s : SystemInfo.fromSystemMetadata(s);
-    }).toList();
+    final cards = _systemCards;
     final cols = widget.crossAxisCount;
     final current = widget.selectedIndex;
 
@@ -1173,11 +1205,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   void _ensureSelectedItemVisibleUniversal() {
     if (!_scrollController.hasClients || widget.systems.isEmpty) return;
 
-    final cards = widget.systems.map((system) {
-      return system is SystemInfo
-          ? system
-          : SystemInfo.fromSystemMetadata(system);
-    }).toList();
+    final cards = _systemCards;
     final cols = widget.crossAxisCount;
     final grid = _buildVirtualGrid(cards, cols);
 
@@ -1233,27 +1261,12 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
       });
     }
 
-    final systemCards = widget.systems.map((system) {
-      if (system is SystemInfo) return system;
-      return SystemInfo.fromSystemMetadata(system);
-    }).toList();
-
     return Theme(
-      data: Theme.of(context).copyWith(
-        scrollbarTheme: ScrollbarThemeData(
-          thumbColor: WidgetStateProperty.all(
-            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-          ),
-          trackColor: WidgetStateProperty.all(
-            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-          ),
-          thickness: WidgetStateProperty.all(6),
-          radius: const Radius.circular(3),
-        ),
-      ),
+      data: _cachedThemeData ?? Theme.of(context),
       child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-        child: _buildWideCardGrid(context, systemCards),
+        behavior: _cachedScrollBehavior ??
+            ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: _buildWideCardGrid(context, _systemCards),
       ),
     );
   }
@@ -1370,14 +1383,16 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
                     top: highlightTop!,
                     width: highlightWidth!,
                     height: highlightHeight!,
-                    child: IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.secondary,
-                            width: 4.r,
+                    child: RepaintBoundary(
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.secondary,
+                              width: 4.r,
+                            ),
+                            borderRadius: BorderRadius.circular(16.r),
                           ),
-                          borderRadius: BorderRadius.circular(16.r),
                         ),
                       ),
                     ),

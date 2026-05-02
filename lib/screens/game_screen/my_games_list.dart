@@ -126,9 +126,11 @@ class SystemGamesList extends StatefulWidget {
 
 class _SystemGamesListState extends State<SystemGamesList> {
   static final _log = LoggerService.instance;
+  static final _letterRegex = RegExp(r'[A-Z0-9]');
 
   // Dataset management.
   List<GameModel> _games = [];
+  Map<GameModel, int> _gameIndexMap = {};
   GameModel? _selectedGame;
 
   // Navigation & State orchestration.
@@ -205,6 +207,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
   late SqliteConfigProvider _configProvider;
   late SqliteDatabaseProvider _databaseProvider;
 
+  // Cached theme-dependent colors for letter indicator — updated in didChangeDependencies.
+  Color _letterIndicatorBg = Colors.black.withValues(alpha: 0.7);
+  Color _letterIndicatorBorder = Colors.transparent;
+  Color _letterIndicatorShadow = Colors.transparent;
+  Color _letterIndicatorTextShadow = Colors.transparent;
+
   @override
   void initState() {
     super.initState();
@@ -233,6 +241,16 @@ class _SystemGamesListState extends State<SystemGamesList> {
         }
       });
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final primary = Theme.of(context).colorScheme.primary;
+    _letterIndicatorBg = Colors.black.withValues(alpha: 0.7);
+    _letterIndicatorBorder = primary.withValues(alpha: 0.5);
+    _letterIndicatorShadow = primary.withValues(alpha: 0.3);
+    _letterIndicatorTextShadow = primary;
   }
 
   @override
@@ -559,7 +577,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
       if (cleanName.isNotEmpty) {
         final firstChar = cleanName[0];
-        if (RegExp(r'[A-Z0-9]').hasMatch(firstChar)) {
+        if (_letterRegex.hasMatch(firstChar)) {
           letter = firstChar;
         } else {
           letter = '#';
@@ -1605,6 +1623,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
       }
       setState(() {
         _games = games;
+        _gameIndexMap = {for (int i = 0; i < games.length; i++) games[i]: i};
 
         // Music system specialization: Anchor initial focus to the currently active track.
         if (widget.system.folderName == 'music') {
@@ -1663,7 +1682,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
   /// Selects a game via interaction (touch or click) and triggers resource resolution.
   Future<void> _selectGame(GameModel game) async {
-    final index = _games.indexOf(game);
+    final index = _gameIndexMap[game] ?? _games.indexOf(game);
     if (index != -1) {
       _resetVideoState();
       setState(() {
@@ -1819,7 +1838,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
   @override
   Widget build(BuildContext context) {
-    final isOled = context.watch<ThemeProvider>().currentThemeName == 'oled';
+    final isOled = context.select<ThemeProvider, bool>(
+      (t) => t.currentThemeName == 'oled',
+    );
 
     return PopScope(
       canPop: _canPop,
@@ -1868,42 +1889,40 @@ class _SystemGamesListState extends State<SystemGamesList> {
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 150),
       opacity: _isNavigatingFast ? 1.0 : 0.0,
-      child: Center(
-        child: Container(
-          width: 120.r,
-          height: 120.r,
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(24.r),
-            border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.5),
-              width: 2.r,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.3),
-                blurRadius: 30.r,
-                spreadRadius: 5.r,
+      child: RepaintBoundary(
+        child: Center(
+          child: Container(
+            width: 120.r,
+            height: 120.r,
+            decoration: BoxDecoration(
+              color: _letterIndicatorBg,
+              borderRadius: BorderRadius.circular(24.r),
+              border: Border.all(
+                color: _letterIndicatorBorder,
+                width: 2.r,
               ),
-            ],
-          ),
-          child: Center(
-            child: Text(
-              _currentLetter!,
-              style: TextStyle(
-                fontSize: 72.r,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                shadows: [
-                  Shadow(
-                    color: Theme.of(context).colorScheme.primary,
-                    blurRadius: 10.r,
-                  ),
-                ],
+              boxShadow: [
+                BoxShadow(
+                  color: _letterIndicatorShadow,
+                  blurRadius: 30.r,
+                  spreadRadius: 5.r,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                _currentLetter!,
+                style: TextStyle(
+                  fontSize: 72.r,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  shadows: [
+                    Shadow(
+                      color: _letterIndicatorTextShadow,
+                      blurRadius: 10.r,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
