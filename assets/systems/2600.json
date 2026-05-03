@@ -151,7 +151,7 @@
       "description": "Supported extensions: a26, bin.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.explusalpha.A2600Emu/com.imagine.BaseActivity -a android.intent.action.VIEW -d \"{file.path}\""
+          "launch_arguments": "-n com.explusalpha.A2600Emu/com.imagine.BaseActivity -a android.intent.action.VIEW -d \"{file.uri}\""
         }
       }
     },
@@ -162,7 +162,7 @@
       "description": "Supported extensions: a26, bin.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.androidemu.atari/com.androidemu.atari.EmulatorActivity -a android.intent.action.VIEW -d \"{file.path}\""
+          "launch_arguments": "-n com.androidemu.atari/com.androidemu.atari.EmulatorActivity -a android.intent.action.VIEW -d \"{file.uri}\""
         }
       }
     },

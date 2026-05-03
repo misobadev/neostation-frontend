@@ -73,7 +73,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n paulscode.android.mupen64plusae/.MainActivity -a android.intent.action.VIEW -d {file.path}"
+          "launch_arguments": "-n paulscode.android.mupen64plusae/.MainActivity -a android.intent.action.VIEW -d {file.uri}"
         }
       }
     },

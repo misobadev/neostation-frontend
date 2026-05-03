@@ -49,7 +49,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.reicast.emulator/.MainActivity -a android.intent.action.VIEW -d \"{file.path}\""
+          "launch_arguments": "-n com.reicast.emulator/.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\""
         }
       }
     },

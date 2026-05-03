@@ -299,6 +299,12 @@ class LauncherService {
           'value': parts[++i],
           'type': 'string_array',
         });
+      } else if (part.startsWith('--activity-')) {
+        final flagName = part.substring('--activity-'.length);
+        if (result['activity_flags'] == null) {
+          result['activity_flags'] = <String>[];
+        }
+        (result['activity_flags'] as List<String>).add(flagName);
       }
     }
     return result;
@@ -329,9 +335,15 @@ class LauncherService {
 
     String result = template;
     if (game.romPath != null) {
-      result = result.replaceAll('{file.path}', game.romPath!);
+      final String romPath = game.romPath!;
+      result = result.replaceAll('{file.path}', romPath);
 
-      final uri = Uri.file(game.romPath!).toString();
+      // SAF content:// URIs and file:// URIs pass through as-is.
+      // Only convert bare filesystem paths to file:// scheme.
+      final String uri =
+          (romPath.startsWith('content://') || romPath.startsWith('file://'))
+              ? romPath
+              : Uri.file(romPath).toString();
       result = result.replaceAll('{file.uri}', uri);
 
       if (game.titleId != null) {

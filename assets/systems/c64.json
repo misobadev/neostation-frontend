@@ -57,7 +57,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.explusalpha.C64Emu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.path} -t application/zip"
+          "launch_arguments": "-n com.explusalpha.C64Emu/com.imagine.BaseActivity -a android.intent.action.VIEW -d "{file.uri}" -t application/zip --activity-clear-task --activity-clear-top --activity-no-history"
         }
       }
     },

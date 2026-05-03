@@ -1012,6 +1012,11 @@ class GameService {
                     'data': data,
                     'type': type,
                     'extras': extrasList,
+                    'activity_flags': launchCmd['activity_flags'] != null
+                        ? List<String>.from(
+                            launchCmd['activity_flags'] as List,
+                          )
+                        : <String>[],
                   });
 
               if (result == true) {

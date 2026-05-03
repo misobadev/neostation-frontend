@@ -50,7 +50,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.explusalpha.NesEmu/com.imagine.BaseActivity   -a android.intent.action.VIEW   -d {file.uri}"
+          "launch_arguments": "-n com.explusalpha.NesEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d "{file.uri}" --activity-clear-task --activity-clear-top --activity-no-history"
         }
       }
     },
@@ -61,7 +61,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.androidemu.nes/.EmulatorActivity   -a android.intent.action.VIEW   -d {file.path}"
+          "launch_arguments": "-n com.androidemu.nes/.EmulatorActivity -a android.intent.action.VIEW -d "{file.uri}" --activity-clear-task --activity-clear-top --activity-no-history"
         }
       }
     },
