@@ -421,7 +421,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 77;
+  static const int _databaseVersion = 78;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -2186,6 +2186,7 @@ class SqliteService {
     String? activeTheme,
     int? hideRecentCard,
     String? activeSyncProvider,
+    String? systemsVersion,
   }) async {
     final db = await instance.database;
 
@@ -2242,6 +2243,9 @@ class SqliteService {
     }
     if (activeSyncProvider != null) {
       newConfig['active_sync_provider'] = activeSyncProvider;
+    }
+    if (systemsVersion != null) {
+      newConfig['systems_version'] = systemsVersion;
     }
 
     await db.insert(
@@ -2452,6 +2456,17 @@ class SqliteService {
   /// Updates the active asset theme.
   static Future<void> updateActiveTheme(String themeFolder) async {
     await saveUserConfig(activeTheme: themeFolder);
+  }
+
+  /// Retrieves the locally stored systems manifest version.
+  static Future<String> getSystemsVersion() async {
+    final config = await getUserConfig();
+    return config?['systems_version']?.toString() ?? '';
+  }
+
+  /// Persists the systems manifest version after a successful update.
+  static Future<void> updateSystemsVersion(String version) async {
+    await saveUserConfig(systemsVersion: version);
   }
 
   /// Updates the video/sound configuration setting.

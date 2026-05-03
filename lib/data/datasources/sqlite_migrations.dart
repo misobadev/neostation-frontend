@@ -237,6 +237,8 @@ class SqliteMigrations {
         break;
       case 77:
         await _migrateToVersion77(db);
+      case 78:
+        await _migrateToVersion78(db);
         break;
       default:
         _log.w('No migration defined for version $version');
@@ -4171,6 +4173,25 @@ class SqliteMigrations {
 
   // Migration v77: Defensive catch-up for user_config columns that may be
   // missing on DBs that were at version >=72 before migration 72 was corrected.
+  static Future<void> _migrateToVersion78(Database db) async {
+    _log.i('Migration v78: Add systems_version to user_config');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+      if (!columns.contains('systems_version')) {
+        db.execute(
+          "ALTER TABLE user_config ADD COLUMN systems_version TEXT DEFAULT ''",
+        );
+        _log.i('Column systems_version added to user_config');
+      }
+      _log.i('Migration v78 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v78: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
   static Future<void> _migrateToVersion77(Database db) async {
     _log.i('Migration v77: Ensure all user_config columns exist');
 

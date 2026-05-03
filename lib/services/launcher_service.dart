@@ -5,6 +5,7 @@ import '../models/system_model.dart';
 import '../models/game_model.dart';
 import 'logger_service.dart';
 import 'config_service.dart';
+import 'systems_update_service.dart';
 
 /// Service responsible for mapping system and game metadata to platform-specific
 /// launch commands and intent arguments.
@@ -25,9 +26,14 @@ class LauncherService {
   /// Returns true if the configuration was successfully loaded and cached.
   Future<bool> loadSystemConfig(String jsonFileName) async {
     try {
-      final jsonString = await rootBundle.loadString(
-        'assets/systems/$jsonFileName',
-      );
+      // Prefer locally cached version downloaded from GitHub (newer than bundled).
+      String jsonString;
+      final cachedPath = await SystemsUpdateService.getCachedSystemPath(jsonFileName);
+      if (cachedPath != null) {
+        jsonString = await File(cachedPath).readAsString();
+      } else {
+        jsonString = await rootBundle.loadString('assets/systems/$jsonFileName');
+      }
       final config = jsonDecode(jsonString) as Map<String, dynamic>;
 
       final systemId = config['system']['id'].toString();

@@ -4,6 +4,7 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:neostation/data/datasources/sqlite_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'settings_title.dart';
 
@@ -28,11 +29,13 @@ class AboutSettingsContent extends StatefulWidget {
 class AboutSettingsContentState extends State<AboutSettingsContent> {
   final ScrollController _scrollController = ScrollController();
   String _appVersion = '';
+  String _systemsVersion = '';
 
   @override
   void initState() {
     super.initState();
     _loadAppVersion();
+    _loadSystemsVersion();
   }
 
   @override
@@ -49,6 +52,17 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
     );
+  }
+
+  Future<void> _loadSystemsVersion() async {
+    try {
+      final version = await SqliteService.getSystemsVersion();
+      if (mounted) {
+        setState(() {
+          _systemsVersion = version.isNotEmpty ? version : 'bundled';
+        });
+      }
+    } catch (_) {}
   }
 
   /// Extracts the application version string from the platform package info.
@@ -140,6 +154,16 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                           alpha: 0.6,
                         ),
                         fontSize: 9.r,
+                      ),
+                    ),
+                    SizedBox(height: 1.h),
+                    Text(
+                      'Systems v$_systemsVersion',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.4,
+                        ),
+                        fontSize: 8.r,
                       ),
                     ),
                   ],

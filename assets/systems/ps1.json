@@ -73,7 +73,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.emulator.fpse/.Main -a android.intent.action.VIEW -d "{file.uri}" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n com.emulator.fpse/.Main -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
         }
       }
     },
@@ -84,7 +84,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.emulator.fpse64/.Main -a android.intent.action.VIEW -d "{file.uri}" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n com.emulator.fpse64/.Main -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
         }
       }
     },
