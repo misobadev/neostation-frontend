@@ -395,7 +395,7 @@ class _GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(6.r),
-          clipBehavior: Clip.antiAliasWithSaveLayer,
+          clipBehavior: Clip.antiAlias,
           child: AspectRatio(
             aspectRatio: mediaAspectRatio,
             child: Stack(

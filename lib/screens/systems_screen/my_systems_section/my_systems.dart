@@ -395,7 +395,7 @@ class MySystems extends StatelessWidget {
             ),
             child: SystemCardGridView(
               crossAxisCount: Responsive.getSystemsCrossAxisCount(context),
-              childAspectRatio: 1.14,
+              childAspectRatio: 8 / 7,
               selectedIndex: selectedIndex,
               onCardTapped: onCardTapped,
               systems: allSystems,
@@ -704,7 +704,7 @@ class SystemCardGridView extends StatefulWidget {
   const SystemCardGridView({
     super.key,
     required this.crossAxisCount,
-    this.childAspectRatio = 1.14,
+    this.childAspectRatio = 8 / 7,
     this.selectedIndex = 0,
     this.onCardTapped,
     this.onEnterPressed,

@@ -312,7 +312,7 @@ class _SystemCardState extends State<SystemCard> {
                 key: ValueKey('${activeBgPath}_${widget.info.imageVersion}'),
                 fit: BoxFit.cover,
                 filterQuality: FilterQuality.medium,
-                cacheWidth: widget.info.isGame ? 1024 : 512,
+                cacheWidth: widget.info.isGame ? 512 : 256,
                 isAntiAlias: true,
                 errorBuilder: (context, error, stackTrace) => Stack(
                   children: [
@@ -470,7 +470,7 @@ class _SystemCardState extends State<SystemCard> {
                       _cachedWheelFile!,
                       fit: BoxFit.contain,
                       filterQuality: FilterQuality.medium,
-                      cacheWidth: 512,
+                      cacheWidth: 256,
                       isAntiAlias: true,
                       errorBuilder: (context, error, stackTrace) =>
                           const SizedBox.shrink(),
