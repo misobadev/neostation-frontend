@@ -195,12 +195,14 @@ class GameDetailsSettingsTabState extends State<GameDetailsSettingsTab> {
       } else {
         // Desktop: RetroArch cores are considered installed when the global
         // RetroArch executable has been detected/configured by the user.
-        final retroArchPath = await EmulatorRepository.getRetroArchExecutablePath();
+        final retroArchPath =
+            await EmulatorRepository.getRetroArchExecutablePath();
         if (retroArchPath != null && retroArchPath.isNotEmpty) {
           final updated = <CoreEmulatorModel>[];
           for (final e in emulators) {
             final uid = e.uniqueId;
-            final isRaCore = uid.contains('.ra.') ||
+            final isRaCore =
+                uid.contains('.ra.') ||
                 uid.contains('.ra32.') ||
                 uid.contains('.ra64.');
             if (isRaCore && !e.isInstalled) {

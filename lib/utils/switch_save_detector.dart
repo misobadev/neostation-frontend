@@ -481,8 +481,9 @@ class SwitchSaveDetector {
       for (var userIdEntity in userIdEntries) {
         String userIdPath;
         if (nandDirectory.startsWith('content://')) {
-          if (userIdEntity is! Map || userIdEntity['is_directory'] != true)
+          if (userIdEntity is! Map || userIdEntity['is_directory'] != true) {
             continue;
+          }
           userIdPath = userIdEntity['uri']!.toString();
         } else {
           if (userIdEntity is! Directory) continue;
@@ -555,8 +556,9 @@ class SwitchSaveDetector {
         String userIdPath;
         String userId;
         if (nandDirectory.startsWith('content://')) {
-          if (userIdEntity is! Map || userIdEntity['is_directory'] != true)
+          if (userIdEntity is! Map || userIdEntity['is_directory'] != true) {
             continue;
+          }
           userIdPath = userIdEntity['uri']!.toString();
           userId = userIdEntity['name']!.toString();
         } else {
@@ -571,8 +573,10 @@ class SwitchSaveDetector {
           String titleIdPath;
           String titleId;
           if (nandDirectory.startsWith('content://')) {
-            if (titleIdEntity is! Map || titleIdEntity['is_directory'] != true)
+            if (titleIdEntity is! Map ||
+                titleIdEntity['is_directory'] != true) {
               continue;
+            }
             titleIdPath = titleIdEntity['uri']!.toString();
             titleId = titleIdEntity['name']!.toString();
           } else {
