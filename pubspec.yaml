@@ -13,7 +13,7 @@ workspace:
   - packages/gamepads_platform_interface
   - packages/gamepads_windows
 
-version: 0.7.5+90
+version: 0.7.6+91
 
 environment:
   sdk: '>=3.9.2'
@@ -105,4 +105,3 @@ flutter:
     - assets/shaders/gif_player.frag
     - assets/shaders/music_visualizer.frag
     - assets/shaders/music_card_background.frag
-#refresh2

@@ -47,6 +47,21 @@ class SystemsUpdateService {
     return null;
   }
 
+  /// Must be called on every app start. Ensures `systems_version` in SQLite
+  /// always has a meaningful value so the About screen and any version
+  /// checks have a baseline even without internet.
+  static Future<void> initialize() async {
+    try {
+      final current = await SqliteService.getSystemsVersion();
+      if (current.isEmpty) {
+        await SqliteService.updateSystemsVersion('bundled');
+        _log.i('SystemsUpdateService: initialized systems_version=bundled');
+      }
+    } catch (e) {
+      _log.w('SystemsUpdateService: failed to initialize version: $e');
+    }
+  }
+
   /// Checks the remote manifest and downloads any updated system files.
   /// Returns a [SystemsUpdateResult] if files were updated, null otherwise.
   static Future<SystemsUpdateResult?> checkAndUpdate() async {

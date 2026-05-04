@@ -122,7 +122,7 @@ class AppScreenState extends State<AppScreen> {
       );
 
       _checkForUpdates();
-      _checkForSystemsUpdate();
+      _initAndCheckSystemsUpdate();
     });
 
     // Synchronize theme changes with secondary displays (e.g., dual-screen hardware).
@@ -159,8 +159,11 @@ class AppScreenState extends State<AppScreen> {
     }
   }
 
-  /// Checks the neostation-systems GitHub repo for updated system JSON configs.
-  Future<void> _checkForSystemsUpdate() async {
+  /// Initializes the systems version baseline then checks for GitHub updates.
+  Future<void> _initAndCheckSystemsUpdate() async {
+    // Always runs — ensures systems_version is set in SQLite even without internet.
+    await SystemsUpdateService.initialize();
+    // Then attempt to pull newer configs from GitHub.
     try {
       final result = await SystemsUpdateService.checkAndUpdate();
       if (result != null && mounted) {
