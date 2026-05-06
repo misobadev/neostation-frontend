@@ -58,7 +58,7 @@ dependencies:
   flutter_soloud:
     path: packages/flutter_soloud
   audio_metadata_reader: ^1.4.2
-  wakelock_plus: ^1.5.1
+  wakelock_plus: ^1.5.2
   flutter_localization: ^0.4.0
 
 dev_dependencies:
