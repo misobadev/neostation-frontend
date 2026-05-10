@@ -81,6 +81,7 @@ class DatabaseTestHelper {
         last_scan TEXT,
         system_view_mode TEXT,
         theme_name TEXT,
+        palette_name TEXT,
         video_sound INTEGER,
         ra_user TEXT,
         show_game_info INTEGER,
@@ -97,7 +98,11 @@ class DatabaseTestHelper {
         hide_recent_card INTEGER,
         active_sync_provider TEXT,
         game_view_mode TEXT,
-        rom_folders TEXT
+        rom_folders TEXT,
+        systems_version TEXT,
+        neostation_app_version TEXT,
+        auto_update_app INTEGER,
+        auto_update_systems INTEGER
       )
     ''');
 
