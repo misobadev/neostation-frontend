@@ -165,6 +165,8 @@ static unsigned Lzma2Dec_UpdateState(CLzma2Dec *p, Byte b)
 
 static void LzmaDec_UpdateWithUncompressed(CLzmaDec *p, const Byte *src, SizeT size)
 {
+  if (size == 0 || size > p->dicBufSize - p->dicPos)
+    return;
   memcpy(p->dic + p->dicPos, src, size);
   p->dicPos += size;
   if (p->checkDicSize == 0 && p->prop.dicSize - p->processedPos <= size)
