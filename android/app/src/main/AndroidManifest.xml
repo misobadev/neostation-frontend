@@ -82,7 +82,6 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize"
             android:screenOrientation="landscape"
-            android:keepScreenOn="true"
             android:resizeableActivity="false"
             android:alwaysRetainTaskState="true"
             android:excludeFromRecents="false">

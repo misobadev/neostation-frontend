@@ -157,6 +157,7 @@ class NotificationService extends ChangeNotifier {
   /// Authenticates using the stored JWT and initiates health monitoring and
   /// missed notification retrieval.
   Future<void> connect() async {
+    _shouldAutoReconnect = true;
     if (_isConnected || _isConnecting) {
       return;
     }
@@ -244,9 +245,10 @@ class NotificationService extends ChangeNotifier {
   }
 
   /// Closes the WebSocket and cancels timers when the app enters background.
-  /// Unlike [disconnect], auto-reconnect stays enabled so [connect] works on resume.
+  /// Disables auto-reconnect to prevent background activity; [connect] re-enables it on resume.
   void suspend() {
     _log.d('NotificationService: suspended (app backgrounded)');
+    _shouldAutoReconnect = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _reconnectAttempts = 0;
