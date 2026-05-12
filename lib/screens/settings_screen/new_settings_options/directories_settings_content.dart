@@ -317,10 +317,7 @@ class DirectoriesSettingsContentState
       // (e.g. SD card) is temporarily unavailable on next boot, the wizard
       // is not shown again.
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(
-        PermissionCheckWrapper.setupCompletedKey,
-        true,
-      );
+      await prefs.setBool(PermissionCheckWrapper.setupCompletedKey, true);
     } catch (e) {
       migrationError = e.toString();
       _log.e('Migration failed: $e');

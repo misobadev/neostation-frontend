@@ -27,13 +27,11 @@ class JsonConfigService {
       final bundledFiles = manifest
           .listAssets()
           .where(
-            (key) =>
-                key.startsWith('assets/systems/') && key.endsWith('.json'),
+            (key) => key.startsWith('assets/systems/') && key.endsWith('.json'),
           )
           .toList();
 
-      final bundledFileNames =
-          bundledFiles.map((f) => p.basename(f)).toSet();
+      final bundledFileNames = bundledFiles.map((f) => p.basename(f)).toSet();
 
       // Discover extra files in the cache not present in the bundle.
       final cachedOnlyFileNames = <String>{};
@@ -59,13 +57,13 @@ class JsonConfigService {
       for (final fileName in allFileNames) {
         try {
           final String content;
-          final cachedPath =
-              await SystemsUpdateService.getCachedSystemPath(fileName);
+          final cachedPath = await SystemsUpdateService.getCachedSystemPath(
+            fileName,
+          );
           if (cachedPath != null) {
             content = await File(cachedPath).readAsString();
           } else {
-            content =
-                await rootBundle.loadString('assets/systems/$fileName');
+            content = await rootBundle.loadString('assets/systems/$fileName');
           }
 
           final Map<String, dynamic> jsonMap = json.decode(content);
@@ -84,8 +82,7 @@ class JsonConfigService {
               'type': systemData['details']?['type'],
               'screenscraperId': systemData['ids']?['screenscraper'],
               'raId': systemData['ids']?['retroachievements'],
-              'iconImage':
-                  'assets/images/systems/${systemData['id']}-icon.png',
+              'iconImage': 'assets/images/systems/${systemData['id']}-icon.png',
               'backgroundImage':
                   'assets/images/systems/${systemData['id']}-bg.jpg',
               'color1':

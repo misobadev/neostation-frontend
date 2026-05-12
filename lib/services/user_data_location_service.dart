@@ -75,7 +75,8 @@ class UserDataLocationService {
 
     if (hasAllFilesAccess) {
       // MANAGE_EXTERNAL_STORAGE granted — user's chosen path is fully accessible.
-      if (direct != null) _log.i('UserDataLocationService: direct path → $direct');
+      if (direct != null)
+        _log.i('UserDataLocationService: direct path → $direct');
       return direct;
     }
 
@@ -84,8 +85,9 @@ class UserDataLocationService {
     // Identify SD card dirs by absence of "/emulated/" (primary storage).
     try {
       final externalDirs = await getExternalStorageDirectories();
-      final sdDirs =
-          externalDirs?.where((d) => !d.path.contains('/emulated/')).toList();
+      final sdDirs = externalDirs
+          ?.where((d) => !d.path.contains('/emulated/'))
+          .toList();
 
       if (sdDirs != null && sdDirs.isNotEmpty) {
         // Extract volume ID from SAF URI for best match.
@@ -118,11 +120,14 @@ class UserDataLocationService {
         return resolved;
       }
     } catch (e) {
-      _log.w('UserDataLocationService: getExternalStorageDirectories error: $e');
+      _log.w(
+        'UserDataLocationService: getExternalStorageDirectories error: $e',
+      );
     }
 
     // Last resort: try direct path anyway.
-    if (direct != null) _log.i('UserDataLocationService: last-resort direct → $direct');
+    if (direct != null)
+      _log.i('UserDataLocationService: last-resort direct → $direct');
     return direct;
   }
 
