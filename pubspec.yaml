@@ -31,7 +31,7 @@ dependencies:
     path: packages/gamepads
   flutter_7zip:
     path: packages/flutter_7zip
-  file_picker: ^10.3.3
+  file_picker: ^11.0.2
   path: ^1.9.1
   path_provider: ^2.1.5
   video_player: ^2.10.0
