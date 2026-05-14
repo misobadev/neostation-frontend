@@ -48,7 +48,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_lynx\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_lynx\""
         }
       }
     },
@@ -59,7 +59,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"handy\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"handy\""
         }
       }
     },
@@ -70,7 +70,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"holani\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"holani\""
         }
       }
     },
@@ -81,7 +81,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_lynx\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_lynx\""
         }
       }
     },
@@ -92,7 +92,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"handy\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"handy\""
         }
       }
     },
@@ -103,7 +103,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"holani\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"holani\""
         }
       }
     },
@@ -114,7 +114,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_lynx\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_lynx\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -138,7 +138,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"handy\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"handy\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -161,7 +161,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"holani\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"holani\""
         },
         "windows": {
           "executable": "retroarch.exe",

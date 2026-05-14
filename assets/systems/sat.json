@@ -97,7 +97,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_saturn\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_saturn\""
         }
       }
     },
@@ -108,7 +108,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"yabasanshiro\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"yabasanshiro\""
         }
       }
     },
@@ -119,7 +119,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"yabause\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"yabause\""
         }
       }
     },
@@ -130,7 +130,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_saturn\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_saturn\""
         }
       }
     },
@@ -141,7 +141,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"yabasanshiro\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"yabasanshiro\""
         }
       }
     },
@@ -152,7 +152,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"yabause\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"yabause\""
         }
       }
     },
@@ -164,7 +164,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_saturn\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_saturn\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -187,7 +187,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"yabasanshiro\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"yabasanshiro\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -210,7 +210,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"yabause\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"yabause\""
         },
         "windows": {
           "executable": "retroarch.exe",

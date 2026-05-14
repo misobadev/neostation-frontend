@@ -59,7 +59,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x\""
         }
       }
     },
@@ -70,7 +70,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"higan_sfc\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"higan_sfc\""
         }
       }
     },
@@ -81,7 +81,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"higan_sfc_balanced\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"higan_sfc_balanced\""
         }
       }
     },
@@ -92,7 +92,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_supafaust\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_supafaust\""
         }
       }
     },
@@ -103,7 +103,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_snes\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_snes\""
         }
       }
     },
@@ -114,7 +114,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2002\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2002\""
         }
       }
     },
@@ -125,7 +125,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2005_plus\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2005_plus\""
         }
       }
     },
@@ -136,7 +136,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2005\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2005\""
         }
       }
     },
@@ -147,7 +147,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2010\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2010\""
         }
       }
     },
@@ -158,7 +158,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes2014_accuracy\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes2014_accuracy\""
         }
       }
     },
@@ -169,7 +169,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes2014_balanced\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes2014_balanced\""
         }
       }
     },
@@ -180,7 +180,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes2014_performance\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes2014_performance\""
         }
       }
     },
@@ -191,7 +191,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_cplusplus98\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_cplusplus98\""
         }
       }
     },
@@ -202,7 +202,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes\""
         }
       }
     },
@@ -213,7 +213,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_hd_beta\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_hd_beta\""
         }
       }
     },
@@ -224,7 +224,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_mercury_accuracy\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_mercury_accuracy\""
         }
       }
     },
@@ -235,7 +235,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_mercury_balanced\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_mercury_balanced\""
         }
       }
     },
@@ -246,7 +246,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_mercury_performance\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_mercury_performance\""
         }
       }
     },
@@ -257,7 +257,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mesen-s\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mesen-s\""
         }
       }
     },
@@ -268,7 +268,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x\""
         }
       }
     },
@@ -279,7 +279,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"higan_sfc\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"higan_sfc\""
         }
       }
     },
@@ -290,7 +290,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"higan_sfc_balanced\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"higan_sfc_balanced\""
         }
       }
     },
@@ -301,7 +301,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_supafaust\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_supafaust\""
         }
       }
     },
@@ -312,7 +312,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_snes\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_snes\""
         }
       }
     },
@@ -323,7 +323,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2002\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2002\""
         }
       }
     },
@@ -334,7 +334,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2005_plus\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2005_plus\""
         }
       }
     },
@@ -345,7 +345,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2005\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2005\""
         }
       }
     },
@@ -356,7 +356,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2010\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2010\""
         }
       }
     },
@@ -367,7 +367,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes2014_accuracy\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes2014_accuracy\""
         }
       }
     },
@@ -378,7 +378,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes2014_balanced\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes2014_balanced\""
         }
       }
     },
@@ -389,7 +389,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes2014_performance\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes2014_performance\""
         }
       }
     },
@@ -400,7 +400,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_cplusplus98\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_cplusplus98\""
         }
       }
     },
@@ -411,7 +411,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes\""
         }
       }
     },
@@ -422,7 +422,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_hd_beta\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_hd_beta\""
         }
       }
     },
@@ -433,7 +433,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_mercury_accuracy\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_mercury_accuracy\""
         }
       }
     },
@@ -444,7 +444,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_mercury_balanced\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_mercury_balanced\""
         }
       }
     },
@@ -455,7 +455,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_mercury_performance\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_mercury_performance\""
         }
       }
     },
@@ -466,7 +466,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mesen-s\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mesen-s\""
         }
       }
     },
@@ -478,7 +478,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -501,7 +501,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"higan_sfc\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"higan_sfc\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -524,7 +524,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"higan_sfc_balanced\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"higan_sfc_balanced\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -547,7 +547,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_supafaust\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_supafaust\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -570,7 +570,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mednafen_snes\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mednafen_snes\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -593,7 +593,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2002\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2002\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -616,7 +616,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2005_plus\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2005_plus\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -639,7 +639,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2005\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2005\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -662,7 +662,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"snes9x2010\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"snes9x2010\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -685,7 +685,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes2014_accuracy\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes2014_accuracy\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -708,7 +708,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes2014_balanced\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes2014_balanced\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -731,7 +731,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes2014_performance\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes2014_performance\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -754,7 +754,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_cplusplus98\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_cplusplus98\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -777,7 +777,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -800,7 +800,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_hd_beta\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_hd_beta\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -823,7 +823,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_mercury_accuracy\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_mercury_accuracy\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -846,7 +846,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_mercury_balanced\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_mercury_balanced\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -869,7 +869,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"bsnes_mercury_performance\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"bsnes_mercury_performance\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -892,7 +892,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"mesen-s\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"mesen-s\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -915,7 +915,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"fbneo\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"fbneo\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -938,7 +938,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"fbneo\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"fbneo\""
         }
       }
     },
@@ -949,7 +949,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"fbneo\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"fbneo\""
         }
       }
     }

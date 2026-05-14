@@ -63,7 +63,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"genesis_plus_gx\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"genesis_plus_gx\""
         }
       }
     },
@@ -74,7 +74,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"genesis_plus_gx_wide\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"genesis_plus_gx_wide\""
         }
       }
     },
@@ -85,7 +85,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"picodrive\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"picodrive\""
         }
       }
     },
@@ -96,7 +96,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"genesis_plus_gx\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"genesis_plus_gx\""
         }
       }
     },
@@ -107,7 +107,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"genesis_plus_gx_wide\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"genesis_plus_gx_wide\""
         }
       }
     },
@@ -118,7 +118,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"picodrive\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"picodrive\""
         }
       }
     },
@@ -130,7 +130,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"genesis_plus_gx\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"genesis_plus_gx\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -153,7 +153,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"genesis_plus_gx_wide\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"genesis_plus_gx_wide\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -176,7 +176,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"picodrive\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"picodrive\""
         },
         "windows": {
           "executable": "retroarch.exe",

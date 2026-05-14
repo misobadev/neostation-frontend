@@ -38,7 +38,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"potator\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"potator\""
         }
       }
     },
@@ -49,7 +49,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"potator\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"potator\""
         }
       }
     },
@@ -61,7 +61,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"potator\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"potator\""
         },
         "windows": {
           "executable": "retroarch.exe",

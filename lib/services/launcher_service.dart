@@ -363,13 +363,12 @@ class LauncherService {
 
       // Marker-based resolution: Kotlin's EmulatorLauncher detects these prefixes
       // and resolves the embedded path at launch time — no package-name checks needed.
-      // {file.realpath}    → resolve content:// to real filesystem path (no cache fallback)
-      // {file.fileuri}     → resolve content:// to file:// URI (no cache fallback)
-      // {file.cachedpath}  → resolve content:// to real path; copy to cache if provider
-      //                      cannot be resolved (e.g. network/NAS storage)
+      // {file.realpath} → best-effort real filesystem path: resolves SAF content://
+      //                   directly when possible, falls back to a local cache copy
+      //                   for network/NAS providers that have no filesystem mapping.
+      // {file.fileuri}  → same resolution as realpath but returned as a file:// URI.
       result = result.replaceAll('{file.realpath}', 'neostation-realpath:$romPath');
       result = result.replaceAll('{file.fileuri}', 'neostation-fileuri:$romPath');
-      result = result.replaceAll('{file.cachedpath}', 'neostation-cachedpath:$romPath');
 
       if (game.titleId != null) {
         result = result.replaceAll('{tags.steamappid}', game.titleId!);

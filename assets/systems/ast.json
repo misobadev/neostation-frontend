@@ -41,7 +41,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"hatari\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"hatari\""
         }
       }
     },
@@ -52,7 +52,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"hatari\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"hatari\""
         }
       }
     },
@@ -64,7 +64,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"hatari\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"hatari\""
         },
         "windows": {
           "executable": "retroarch.exe",

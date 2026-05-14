@@ -53,7 +53,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"puae\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"puae\""
         }
       }
     },
@@ -64,7 +64,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"puae2021\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"puae2021\""
         }
       }
     },
@@ -75,7 +75,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"puae\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"puae\""
         }
       }
     },
@@ -86,7 +86,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"puae2021\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"puae2021\""
         }
       }
     },
@@ -98,7 +98,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"puae\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"puae\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -121,7 +121,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"puae2021\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"puae2021\""
         },
         "windows": {
           "executable": "retroarch.exe",

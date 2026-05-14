@@ -72,7 +72,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"nestopia\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"nestopia\""
         }
       }
     },
@@ -83,7 +83,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"fceumm\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"fceumm\""
         }
       }
     },
@@ -94,7 +94,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"mesen\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"mesen\""
         }
       }
     },
@@ -105,7 +105,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"nestopi\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"nestopi\""
         }
       }
     },
@@ -116,7 +116,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"fceumm\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"fceumm\""
         }
       }
     },
@@ -127,7 +127,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"mesen\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"mesen\""
         }
       }
     },
@@ -138,7 +138,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"nestopia\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"nestopia\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -161,7 +161,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"fceumm\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"fceumm\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -184,7 +184,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"mesen\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"mesen\""
         },
         "windows": {
           "executable": "retroarch.exe",

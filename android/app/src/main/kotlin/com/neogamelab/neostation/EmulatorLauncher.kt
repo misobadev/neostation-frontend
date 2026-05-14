@@ -45,8 +45,8 @@ object EmulatorLauncher {
             }
 
             // Resolve neostation-* markers before building the intent. Markers are
-            // injected by the Dart launcher when the JSON config uses {file.realpath},
-            // {file.fileuri}, or {file.cachedpath} placeholders. All other values pass
+            // injected by the Dart launcher when the JSON config uses {file.realpath}
+            // or {file.fileuri} placeholders. All other values pass
             // through unchanged, so this step is a no-op for emulators that don't opt in.
             val resolvedData = data?.let { resolveMarkedValue(context, it) }
             val resolvedExtras: List<Map<String, Any>>? = extras?.map { extra ->
@@ -184,29 +184,15 @@ object EmulatorLauncher {
     // Resolves neostation-* markers injected by the Dart launcher for placeholders that
     // require Android SAF access at launch time. Unknown or plain values pass through.
     //
-    //  neostation-realpath:<uri>   → SAF content:// → real filesystem path (no cache)
-    //  neostation-fileuri:<uri>    → SAF content:// → file:// URI       (no cache)
-    //  neostation-cachedpath:<uri> → SAF content:// → real path; falls back to a local
-    //                                copy when the provider can't map to the filesystem
-    //                                (e.g. network/NAS via Round Sync, CIFS, etc.)
+    //  neostation-realpath:<uri> → best-effort real filesystem path: resolves SAF
+    //                              content:// directly; falls back to a local cache
+    //                              copy for network/NAS providers (Round Sync, CIFS…)
+    //                              that have no filesystem mapping.
+    //  neostation-fileuri:<uri>  → same resolution as realpath, returned as file:// URI.
     private fun resolveMarkedValue(context: Context, value: String): String {
         return when {
             value.startsWith("neostation-realpath:") -> {
                 val raw = value.removePrefix("neostation-realpath:")
-                if (raw.startsWith("content://")) {
-                    resolveSafUriToPath(context, Uri.parse(raw)) ?: raw
-                } else raw
-            }
-            value.startsWith("neostation-fileuri:") -> {
-                val raw = value.removePrefix("neostation-fileuri:")
-                if (raw.startsWith("content://")) {
-                    val path = resolveSafUriToPath(context, Uri.parse(raw))
-                    if (path != null) "file://$path" else raw
-                } else if (raw.startsWith("file://")) raw
-                else "file://$raw"
-            }
-            value.startsWith("neostation-cachedpath:") -> {
-                val raw = value.removePrefix("neostation-cachedpath:")
                 if (raw.startsWith("content://")) {
                     val uri = Uri.parse(raw)
                     resolveSafUriToPath(context, uri) ?: run {
@@ -214,6 +200,18 @@ object EmulatorLauncher {
                         cacheContentUriToFile(context, uri, fileName)?.absolutePath ?: raw
                     }
                 } else raw
+            }
+            value.startsWith("neostation-fileuri:") -> {
+                val raw = value.removePrefix("neostation-fileuri:")
+                if (raw.startsWith("content://")) {
+                    val uri = Uri.parse(raw)
+                    val path = resolveSafUriToPath(context, uri) ?: run {
+                        val fileName = getFileNameFromUri(context, uri) ?: "rom"
+                        cacheContentUriToFile(context, uri, fileName)?.absolutePath
+                    }
+                    if (path != null) "file://$path" else raw
+                } else if (raw.startsWith("file://")) raw
+                else "file://$raw"
             }
             else -> value
         }

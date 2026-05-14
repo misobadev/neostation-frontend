@@ -48,7 +48,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"dosbox_pure\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"dosbox_pure\""
         }
       }
     },
@@ -59,7 +59,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"dosbox_svn\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"dosbox_svn\""
         }
       }
     },
@@ -70,7 +70,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"dosbox_core\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"dosbox_core\""
         }
       }
     },
@@ -81,7 +81,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"dosbox_pure\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"dosbox_pure\""
         }
       }
     },
@@ -92,7 +92,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"dosbox_svn\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"dosbox_svn\""
         }
       }
     },
@@ -103,7 +103,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"dosbox_core\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"dosbox_core\""
         }
       }
     },
@@ -115,7 +115,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"dosbox_pure\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"dosbox_pure\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -138,7 +138,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"dosbox_svn\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"dosbox_svn\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -161,7 +161,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.cachedpath}\"  --es LIBRETRO \"dosbox_core\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture  --es ROM \"{file.realpath}\"  --es LIBRETRO \"dosbox_core\""
         },
         "windows": {
           "executable": "retroarch.exe",

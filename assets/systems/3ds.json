@@ -43,7 +43,7 @@
       "description": "Supported extensions: 3ds, 3dsx, app, axf, cci, cxi, elf.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"citra\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"citra\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -66,7 +66,7 @@
       "description": "Supported extensions: 3ds, 3dsx, app, axf, cci, cxi, elf.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"citra2018\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"citra2018\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -89,7 +89,7 @@
       "description": "Supported extensions: 3ds, 3dsx, app, axf, cci, cxi, elf.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"citra_canary\""
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"citra_canary\""
         },
         "windows": {
           "executable": "retroarch.exe",
@@ -112,7 +112,7 @@
       "description": "Supported extensions: 3ds, 3dsx, app, axf, cci, cxi, elf.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"citra\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"citra\""
         }
       }
     },
@@ -123,7 +123,7 @@
       "description": "Supported extensions: 3ds, 3dsx, app, axf, cci, cxi, elf.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"citra2018\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"citra2018\""
         }
       }
     },
@@ -134,7 +134,7 @@
       "description": "Supported extensions: 3ds, 3dsx, app, axf, cci, cxi, elf.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"citra_canary\""
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"citra_canary\""
         }
       }
     },
@@ -145,7 +145,7 @@
       "description": "Supported extensions: 3ds, 3dsx, app, axf, cci, cxi, elf.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"citra\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"citra\""
         }
       }
     },
@@ -156,7 +156,7 @@
       "description": "Supported extensions: 3ds, 3dsx, app, axf, cci, cxi, elf.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"citra2018\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"citra2018\""
         }
       }
     },
@@ -167,7 +167,7 @@
       "description": "Supported extensions: 3ds, 3dsx, app, axf, cci, cxi, elf.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.cachedpath}\" --es LIBRETRO \"citra_canary\""
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.realpath}\" --es LIBRETRO \"citra_canary\""
         }
       }
     },
