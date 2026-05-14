@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/services/game_service.dart';
@@ -103,7 +104,7 @@ class _NeoSyncTabState extends State<NeoSyncTab> {
               _ProviderCard(
                 index: 0,
                 selectedIndex: _selectedIndex,
-                icon: Icons.cloud_sync_rounded,
+                icon: Symbols.cloud_sync_rounded,
                 name: 'NeoSync',
                 subtitle: 'Cloud save backup',
                 isActive: true,
@@ -116,7 +117,7 @@ class _NeoSyncTabState extends State<NeoSyncTab> {
               _ProviderCard(
                 index: 1,
                 selectedIndex: _selectedIndex,
-                icon: Icons.storage_rounded,
+                icon: Symbols.storage_rounded,
                 name: 'Romm.app',
                 subtitle: 'ROM manager',
                 isActive: false,
@@ -126,7 +127,7 @@ class _NeoSyncTabState extends State<NeoSyncTab> {
               _ProviderCard(
                 index: 2,
                 selectedIndex: _selectedIndex,
-                icon: Icons.add_to_drive_rounded,
+                icon: Symbols.add_to_drive_rounded,
                 name: 'Google Drive',
                 subtitle: 'Google storage',
                 isActive: false,

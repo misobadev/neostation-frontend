@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -209,7 +210,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.settings,
+                    Symbols.settings_rounded,
                     color: Theme.of(context).colorScheme.primary,
                     size: 24.r,
                   ),
@@ -226,7 +227,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
+                    icon: const Icon(Symbols.close_rounded, color: Colors.white),
                   ),
                 ],
               ),
@@ -278,7 +279,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                               borderRadius: BorderRadius.circular(20.r),
                             ),
                             child: Icon(
-                              Icons.videogame_asset,
+                              Symbols.videogame_asset_rounded,
                               color: Colors.white,
                               size: 16.r,
                             ),
@@ -340,8 +341,8 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                               ),
                               child: Icon(
                                 _cloudSyncEnabled
-                                    ? Icons.cloud_done
-                                    : Icons.cloud_off,
+                                    ? Symbols.cloud_done_rounded
+                                    : Symbols.cloud_off_rounded,
                                 color: Colors.white,
                                 size: 18.r,
                               ),

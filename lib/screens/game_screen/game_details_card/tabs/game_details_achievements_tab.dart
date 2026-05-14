@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -184,7 +185,7 @@ class GameDetailsAchievementsTabState
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  Icons.videogame_asset_off,
+                  Symbols.videogame_asset_off_rounded,
                   size: 48.r,
                   color: Theme.of(context).colorScheme.onSurface,
                 ),
@@ -245,7 +246,7 @@ class GameDetailsAchievementsTabState
                       Row(
                         children: [
                           Icon(
-                            Icons.emoji_events,
+                            Symbols.emoji_events_rounded,
                             color: Colors.orange,
                             size: 13.r,
                           ),

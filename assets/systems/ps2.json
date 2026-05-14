@@ -213,6 +213,28 @@
       }
     },
     {
+      "name": "Standalone NetherSX2 Turnip",
+      "unique_id": "ps2.xyz.aethersx2.tturnip",
+      "description": "Supported extensions: iso, chd, gz.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n xyz.aethersx2.tturnip/xyz.aethersx2.android.EmulationActivity -a android.intent.action.MAIN -e bootPath \"{file.path}\" --activity-clear-task --activity-clear-top"
+        }
+      }
+    },
+    {
+      "name": "Standalone NetherSX2 Classic Turnip",
+      "unique_id": "ps2.xyz.aethersx2.cturnip",
+      "description": "Supported extensions: iso, chd, gz.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n xyz.aethersx2.cturnip/xyz.aethersx2.android.EmulationActivity -a android.intent.action.MAIN -e bootPath \"{file.path}\" --activity-clear-task --activity-clear-top"
+        }
+      }
+    },
+    {
       "name": "Standalone ARMSX2",
       "unique_id": "ps2.come.nanodata.armsx2",
       "description": "Supported extensions: iso, chd, gz, mdf, bin, ciso, img.",

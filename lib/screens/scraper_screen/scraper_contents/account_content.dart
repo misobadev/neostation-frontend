@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -83,7 +84,7 @@ class AccountContent extends StatelessWidget {
                   theme,
                   AppLocale.maxThreads.getString(context),
                   userInfo!['maxthreads'] ?? '1',
-                  Icons.lan_outlined,
+                  Symbols.lan_rounded,
                 ),
               ),
             ],
@@ -118,7 +119,7 @@ class AccountContent extends StatelessWidget {
               ),
               child: ElevatedButton.icon(
                 onPressed: onLogout,
-                icon: Icon(Icons.logout, size: 14.r, color: Colors.white),
+                icon: Icon(Symbols.logout_rounded, size: 14.r, color: Colors.white),
                 label: Text(
                   AppLocale.disconnectAccount.getString(context),
                   style: TextStyle(

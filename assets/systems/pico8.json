@@ -15,7 +15,8 @@
     },
     "folders": [
       "pico8",
-      "PICO-8"
+      "PICO-8",
+      "p8"
     ],
     "colors": [
       "#1D2B53",
@@ -34,7 +35,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n io.wip.pico8/com.godot.game.GodotApp  -d \"{file.uri}\""
+          "launch_arguments": "-n io.wip.pico8/com.godot.game.GodotAppLauncher -d \"{file.uri}\""
         }
       }
     },

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -64,7 +65,7 @@ class ExitSettingsContentState extends State<ExitSettingsContent> {
                 width: 120.r,
                 child: ElevatedButton.icon(
                   onPressed: widget.onExitPressed,
-                  icon: Icon(Icons.power_settings_new, size: 16.r),
+                  icon: Icon(Symbols.power_settings_new_rounded, size: 16.r),
                   label: Text(
                     AppLocale.confirmExit.getString(context),
                     style: TextStyle(

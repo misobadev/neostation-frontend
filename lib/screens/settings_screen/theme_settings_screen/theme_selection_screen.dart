@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/providers/palette_provider.dart';
@@ -150,7 +151,7 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back),
+                    icon: const Icon(Symbols.arrow_back_rounded),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   SizedBox(width: 8.r),

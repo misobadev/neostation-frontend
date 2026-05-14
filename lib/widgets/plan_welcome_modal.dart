@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -123,7 +124,7 @@ class PlanWelcomeModalState extends State<PlanWelcomeModal> {
                   color: planColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20.w),
                 ),
-                child: Icon(Icons.celebration, size: 20.sp, color: planColor),
+                child: Icon(Symbols.celebration_rounded, size: 20.sp, color: planColor),
               ),
 
               SizedBox(height: 12.h),
@@ -175,7 +176,7 @@ class PlanWelcomeModalState extends State<PlanWelcomeModal> {
                   // Close button
                   ElevatedButton.icon(
                     onPressed: _handleClose,
-                    icon: Icon(Icons.close, size: 14.sp),
+                    icon: Icon(Symbols.close_rounded, size: 14.sp),
                     label: Text(
                       AppLocale.close.getString(context),
                       style: TextStyle(fontSize: 11.sp),

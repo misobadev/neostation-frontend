@@ -31,13 +31,13 @@
   "emulators": [
     {
       "name": "Standalone GameNative",
-      "unique_id": "epic.gamenative",
+      "unique_id": "windows.app.gamenative.epic",
       "default": true,
       "is_retroachievements_compatible": false,
       "description": "Supported extensions: epic",
       "platforms": {
         "android": {
-          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.steamappid}\" --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id {tags.epicgame} --es game_source EPIC --activity-clear-task --activity-clear-top"
         }
       }
     }

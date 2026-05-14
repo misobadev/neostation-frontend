@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:provider/provider.dart';
@@ -36,7 +37,7 @@ class SystemScanProgressWidget extends StatelessWidget {
                     height: 20,
                     child: configProvider.scanCompleted
                         ? Icon(
-                            Icons.check_circle,
+                            Symbols.check_circle_rounded,
                             color: Theme.of(context).colorScheme.primary,
                             size: 20,
                           )

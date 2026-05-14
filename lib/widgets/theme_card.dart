@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/app_palettes.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -117,7 +118,7 @@ class _ThemeCardState extends State<ThemeCard> {
                           color: Colors.greenAccent,
                         ),
                         child: Icon(
-                          Icons.check_rounded,
+                          Symbols.check_rounded,
                           color: Colors.black,
                           size: 24.r,
                         ),

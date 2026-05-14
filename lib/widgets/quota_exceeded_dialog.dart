@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/neo_sync_models.dart';
@@ -21,7 +22,7 @@ class QuotaExceededDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      icon: Icon(Icons.storage, color: Colors.orange, size: 48),
+      icon: Icon(Symbols.storage_rounded, color: Colors.orange, size: 48),
       title: Text(
         AppLocale.storageQuotaExceeded.getString(context),
         textAlign: TextAlign.center,
@@ -44,7 +45,7 @@ class QuotaExceededDialog extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.warning, color: Colors.orange, size: 20),
+                      Icon(Symbols.warning_rounded, color: Colors.orange, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -149,7 +150,7 @@ class QuotaExceededDialog extends StatelessWidget {
             const SizedBox(height: 8),
 
             _buildSolutionItem(
-              icon: Icons.upgrade,
+              icon: Symbols.upgrade_rounded,
               title: AppLocale.upgradePlan.getString(context),
               description: AppLocale.upgradePlanDesc.getString(context),
               color: Colors.blue,
@@ -157,7 +158,7 @@ class QuotaExceededDialog extends StatelessWidget {
             const SizedBox(height: 8),
 
             _buildSolutionItem(
-              icon: Icons.delete_outline,
+              icon: Symbols.delete_outline_rounded,
               title: AppLocale.deleteOldSaves.getString(context),
               description: AppLocale.deleteOldSavesDesc.getString(context),
               color: Colors.red,
@@ -165,7 +166,7 @@ class QuotaExceededDialog extends StatelessWidget {
             const SizedBox(height: 8),
 
             _buildSolutionItem(
-              icon: Icons.download,
+              icon: Symbols.download_rounded,
               title: AppLocale.downloadAndDelete.getString(context),
               description: AppLocale.downloadAndDeleteDesc.getString(context),
               color: Colors.green,

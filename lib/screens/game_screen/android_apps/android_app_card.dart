@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../models/game_model.dart';
 import '../../../services/android_service.dart';
@@ -128,7 +129,7 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
         else
           Opacity(
             opacity: 0.5,
-            child: Icon(Icons.android, size: iconSize, color: Colors.white),
+            child: Icon(Symbols.android_rounded, size: iconSize, color: Colors.white),
           ),
       ],
     );

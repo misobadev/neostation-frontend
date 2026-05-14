@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/repositories/emulator_repository.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
@@ -146,11 +147,11 @@ class _StandaloneEmulatorsScreenState extends State<StandaloneEmulatorsScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
+                    icon: Icon(Symbols.arrow_back_rounded, color: colorScheme.onSurface),
                     onPressed: () => Navigator.pop(context),
                   ),
                   SizedBox(width: 8.r),
-                  Icon(Icons.gamepad, color: colorScheme.primary, size: 32.r),
+                  Icon(Symbols.gamepad_rounded, color: colorScheme.primary, size: 32.r),
                   SizedBox(width: 16.r),
                   Text(
                     'Standalone Emulators',
@@ -178,7 +179,7 @@ class _StandaloneEmulatorsScreenState extends State<StandaloneEmulatorsScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.info_outline,
+                            Symbols.info_rounded,
                             size: 64.r,
                             color: colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
@@ -242,7 +243,7 @@ class _StandaloneEmulatorsScreenState extends State<StandaloneEmulatorsScreen> {
                                     borderRadius: BorderRadius.circular(12.r),
                                   ),
                                   child: Icon(
-                                    Icons.videogame_asset,
+                                    Symbols.videogame_asset_rounded,
                                     color: colorScheme.primary,
                                     size: 32.r,
                                   ),
@@ -279,7 +280,7 @@ class _StandaloneEmulatorsScreenState extends State<StandaloneEmulatorsScreen> {
 
                                 // Selection Sentinel.
                                 Icon(
-                                  Icons.chevron_right,
+                                  Symbols.chevron_right_rounded,
                                   color: isSelected
                                       ? colorScheme.primary
                                       : colorScheme.onSurface.withValues(

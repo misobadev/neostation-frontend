@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -219,7 +220,7 @@ class GameDetailsFooter extends StatelessWidget {
         onToggleFavorite();
       },
       iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
-      iconData: isFav ? Icons.favorite : Icons.favorite_border,
+      iconData: isFav ? Symbols.favorite_rounded : Symbols.favorite_border_rounded,
       iconColor: isFav
           ? Colors.redAccent
           : Theme.of(context).colorScheme.onSurface,
@@ -337,7 +338,7 @@ class GameDetailsFooter extends StatelessWidget {
         onScrapeGame();
       },
       iconPath: 'assets/images/gamepad/Xbox_X_button.png',
-      iconData: isDescriptionMissing ? Icons.search : Icons.refresh,
+      iconData: isDescriptionMissing ? Symbols.search_rounded : Symbols.refresh_rounded,
       label: isDescriptionMissing
           ? AppLocale.scrape.getString(context)
           : AppLocale.rescrape.getString(context),
@@ -369,73 +370,73 @@ class GameDetailsFooter extends StatelessWidget {
 
     if (isCloudSyncDisabled) {
       statusColor = Theme.of(context).colorScheme.onSurface;
-      statusIcon = Icons.cloud_off;
+      statusIcon = Symbols.cloud_off_rounded;
       statusText = AppLocale.cloudSyncDisabled.getString(context);
     } else if (isSyncing) {
       statusColor = Colors.lightBlue;
-      statusIcon = Icons.sync;
+      statusIcon = Symbols.sync_rounded;
       statusText = AppLocale.syncing.getString(context);
     } else if (syncProvider.lastError != null) {
       statusColor = const Color(0xFFE53E3E);
-      statusIcon = Icons.error_outline;
+      statusIcon = Symbols.error_outline_rounded;
       statusText = AppLocale.error.getString(context);
     } else if (gameState != null) {
       switch (gameState.status) {
         case GameSyncStatus.upToDate:
           statusColor = const Color(0xFF79AA41);
-          statusIcon = Icons.check_circle_outline;
+          statusIcon = Symbols.check_circle_outline_rounded;
           statusText = AppLocale.synced.getString(context);
           break;
         case GameSyncStatus.localOnly:
           statusColor = Colors.orange;
-          statusIcon = Icons.cloud_upload;
+          statusIcon = Symbols.cloud_upload_rounded;
           statusText = AppLocale.upload.getString(context);
           break;
         case GameSyncStatus.cloudOnly:
           statusColor = Colors.lightBlue;
-          statusIcon = Icons.cloud_download;
+          statusIcon = Symbols.cloud_download_rounded;
           statusText = AppLocale.download.getString(context);
           break;
         case GameSyncStatus.syncing:
           statusColor = Colors.lightBlue;
-          statusIcon = Icons.sync;
+          statusIcon = Symbols.sync_rounded;
           statusText = AppLocale.syncing.getString(context);
           break;
         case GameSyncStatus.disabled:
           if (!isCloudSyncDisabled) {
             statusColor = Colors.lightBlue;
-            statusIcon = Icons.sync;
+            statusIcon = Symbols.sync_rounded;
             statusText = AppLocale.ready.getString(context);
           } else {
             statusColor = Colors.grey;
-            statusIcon = Icons.cloud_off;
+            statusIcon = Symbols.cloud_off_rounded;
             statusText = AppLocale.cloudSyncDisabled.getString(context);
           }
           break;
         case GameSyncStatus.quotaExceeded:
           statusColor = Colors.redAccent;
-          statusIcon = Icons.storage;
+          statusIcon = Symbols.storage_rounded;
           statusText = AppLocale.quota.getString(context);
           break;
         case GameSyncStatus.noSaveFound:
           statusColor = Colors.grey;
-          statusIcon = Icons.save_alt;
+          statusIcon = Symbols.save_alt_rounded;
           statusText = AppLocale.noSave.getString(context);
           break;
         case GameSyncStatus.missingEmulator:
           statusColor = Colors.orange;
-          statusIcon = Icons.videogame_asset_off;
+          statusIcon = Symbols.videogame_asset_off_rounded;
           statusText = AppLocale.noEmulator.getString(context);
           break;
         case GameSyncStatus.error:
           statusColor = Colors.red;
-          statusIcon = Icons.error_outline;
+          statusIcon = Symbols.error_outline_rounded;
           statusText = AppLocale.error.getString(context);
           break;
       }
     } else {
       statusColor = Colors.lightBlue;
-      statusIcon = Icons.sync;
+      statusIcon = Symbols.sync_rounded;
       statusText = AppLocale.ready.getString(context);
     }
 
@@ -463,7 +464,7 @@ class GameDetailsFooter extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Render a rotating sync icon during active I/O.
-                statusIcon == Icons.sync && syncIconController != null
+                statusIcon == Symbols.sync_rounded && syncIconController != null
                     ? AnimatedBuilder(
                         animation: syncIconController!,
                         builder: (context, child) {
@@ -486,7 +487,7 @@ class GameDetailsFooter extends StatelessWidget {
                     height: 16.r,
                     color: Theme.of(context).colorScheme.onSurface,
                     errorBuilder: (context, error, stackTrace) => Icon(
-                      Icons.radio_button_checked,
+                      Symbols.radio_button_checked_rounded,
                       color: Theme.of(context).colorScheme.onSurface,
                       size: 16.r,
                     ),
@@ -574,7 +575,7 @@ class GameDetailsFooter extends StatelessWidget {
                     ),
                   )
                 else
-                  Icon(Icons.emoji_events, color: statusColor, size: 16.r),
+                  Icon(Symbols.emoji_events_rounded, color: statusColor, size: 16.r),
                 SizedBox(height: 2.r),
                 Text(
                   progressText.toUpperCase(),
@@ -629,7 +630,7 @@ class _SteamStyleRating extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.star, color: ratingColor, size: 24.r),
+          Icon(Symbols.star_rounded, color: ratingColor, size: 24.r),
           SizedBox(width: 6.r),
           Text(
             ratingValue.toStringAsFixed(1),

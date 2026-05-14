@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -399,7 +400,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
       child: Row(
         children: [
           Icon(
-            _showVolumePicker ? Icons.storage : Icons.folder_open,
+            _showVolumePicker ? Symbols.storage_rounded : Symbols.folder_open_rounded,
             color: theme.colorScheme.primary,
             size: 20.r,
           ),
@@ -436,7 +437,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.lock_outline,
+                Symbols.lock_outline_rounded,
                 color: theme.colorScheme.error,
                 size: 32.r,
               ),
@@ -480,7 +481,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.error_outline,
+                Symbols.error_outline_rounded,
                 color: theme.colorScheme.error,
                 size: 32.r,
               ),
@@ -545,7 +546,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
             child: Row(
               children: [
                 Icon(
-                  vol.isInternal ? Icons.phone_android : Icons.sd_card,
+                  vol.isInternal ? Symbols.phone_android_rounded : Symbols.sd_card_rounded,
                   color: focused
                       ? theme.colorScheme.primary
                       : theme.colorScheme.onSurface.withValues(alpha: 0.7),
@@ -582,7 +583,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
                   ),
                 ),
                 Icon(
-                  Icons.chevron_right,
+                  Symbols.chevron_right_rounded,
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                   size: 16.r,
                 ),
@@ -639,7 +640,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.image,
+                      Symbols.image_rounded,
                       color: focused
                           ? theme.colorScheme.secondary
                           : theme.colorScheme.onSurface.withValues(alpha: 0.6),
@@ -662,7 +663,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
                       ),
                     ),
                     Icon(
-                      Icons.check_circle_outline,
+                      Symbols.check_circle_outline_rounded,
                       color: focused
                           ? theme.colorScheme.secondary
                           : theme.colorScheme.onSurface.withValues(alpha: 0.3),
@@ -716,7 +717,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.check_circle_outline,
+                    Symbols.check_circle_outline_rounded,
                     color: theme.colorScheme.primary,
                     size: 18.r,
                   ),
@@ -771,7 +772,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
       child: Row(
         children: [
           Icon(
-            Icons.drive_folder_upload,
+            Symbols.drive_folder_upload_rounded,
             color: focused
                 ? theme.colorScheme.onSurface
                 : theme.colorScheme.onSurface.withValues(alpha: 0.5),
@@ -811,7 +812,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
       child: Row(
         children: [
           Icon(
-            Icons.folder,
+            Symbols.folder_rounded,
             color: focused
                 ? theme.colorScheme.primary
                 : theme.colorScheme.onSurface.withValues(alpha: 0.7),
@@ -832,7 +833,7 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
             ),
           ),
           Icon(
-            Icons.chevron_right,
+            Symbols.chevron_right_rounded,
             color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
             size: 16.r,
           ),

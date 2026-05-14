@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -97,7 +98,7 @@ class _RestartRequiredDialogState extends State<RestartRequiredDialog> {
                           borderRadius: BorderRadius.circular(8.r),
                         ),
                         child: Icon(
-                          Icons.restart_alt_rounded,
+                          Symbols.restart_alt_rounded,
                           color: theme.colorScheme.primary,
                           size: 16.r,
                         ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/services/sfx_service.dart';
@@ -287,8 +288,8 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                     SizedBox(width: 12.r),
                                     Icon(
                                       value.isVideoMuted
-                                          ? Icons.volume_off
-                                          : Icons.volume_up,
+                                          ? Symbols.volume_off_rounded
+                                          : Symbols.volume_up_rounded,
                                       color: Colors.white,
                                       size: 24.r,
                                     ),

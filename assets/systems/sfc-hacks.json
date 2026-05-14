@@ -945,7 +945,7 @@
     },
     {
       "name": "RetroArch32 FBNeo",
-      "unique_id": "sfc.ra32.fbneo",
+      "unique_id": "sfc-hacks.ra32.fbneo",
       "description": "Supported extensions: 7z, ccd, cue, zip.",
       "is_retroachievements_compatible": false,
       "platforms": {

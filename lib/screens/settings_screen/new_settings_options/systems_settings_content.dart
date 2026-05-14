@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -92,14 +93,14 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
         // Construct the row models for the current application state.
         final items = <_SettingsRow>[
           _SettingsRow(
-            icon: Icons.access_time,
+            icon: Symbols.access_time_rounded,
             title: AppLocale.hideRecentCard.getString(context),
             subtitle: AppLocale.hideRecentCardSubtitle.getString(context),
             isEnabled: !provider.config.hideRecentCard,
           ),
           ...systems.map(
             (s) => _SettingsRow(
-              icon: Icons.videogame_asset_outlined,
+              icon: Symbols.videogame_asset_rounded,
               title: s.realName,
               subtitle: s.folderName,
               isEnabled: hiddenFolders.contains(s.folderName),

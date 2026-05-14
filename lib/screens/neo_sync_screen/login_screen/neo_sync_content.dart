@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/sfx_service.dart';
@@ -290,15 +291,15 @@ class NeoSyncContentState extends State<NeoSyncContent>
   IconData _getPlanIcon(String planName) {
     switch (planName) {
       case 'micro':
-        return Icons.storage_rounded;
+        return Symbols.storage_rounded;
       case 'mini':
-        return Icons.storage_rounded;
+        return Symbols.storage_rounded;
       case 'mega':
-        return Icons.storage_rounded;
+        return Symbols.storage_rounded;
       case 'ultra':
-        return Icons.storage_rounded;
+        return Symbols.storage_rounded;
       default:
-        return Icons.storage_rounded;
+        return Symbols.storage_rounded;
     }
   }
 
@@ -460,7 +461,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
                   IconButton(
                     onPressed: _onLogout,
                     icon: Icon(
-                      Icons.logout,
+                      Symbols.logout_rounded,
                       size: 12.r,
                       color: Theme.of(context).colorScheme.error,
                     ),
@@ -498,7 +499,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
                         borderRadius: BorderRadius.circular(6.r),
                       ),
                       child: Icon(
-                        Icons.cloud_done,
+                        Symbols.cloud_done_rounded,
                         color: Theme.of(context).colorScheme.primary,
                         size: 14.r,
                       ),
@@ -567,7 +568,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
                       Row(
                         children: [
                           Icon(
-                            Icons.storage,
+                            Symbols.storage_rounded,
                             color: Theme.of(context).colorScheme.primary,
                             size: 16.r,
                           ),
@@ -1209,7 +1210,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
                 children: [
                   SizedBox(width: 8.r),
                   Icon(
-                    Icons.cloud,
+                    Symbols.cloud_rounded,
                     color: Theme.of(context).colorScheme.primary,
                     size: 16.r,
                   ),
@@ -1242,11 +1243,11 @@ class NeoSyncContentState extends State<NeoSyncContent>
                           )
                         : _refreshCompleted
                         ? Icon(
-                            Icons.check_circle,
+                            Symbols.check_circle_rounded,
                             color: Theme.of(context).colorScheme.primary,
                             size: 16.r,
                           )
-                        : Icon(Icons.refresh, size: 16.r),
+                        : Icon(Symbols.refresh_rounded, size: 16.r),
                     tooltip: _isRefreshingOnlineFiles
                         ? AppLocale.refreshing.getString(context)
                         : _refreshCompleted
@@ -1292,7 +1293,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
         child: Column(
           children: [
             Icon(
-              Icons.cloud_off,
+              Symbols.cloud_off_rounded,
               size: 48.sp,
               color: Theme.of(
                 context,
@@ -1333,7 +1334,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
         children: [
           Row(
             children: [
-              Icon(Icons.cloud, color: theme.colorScheme.primary, size: 24.r),
+              Icon(Symbols.cloud_rounded, color: theme.colorScheme.primary, size: 24.r),
               SizedBox(width: 12.r),
               Text(
                 AppLocale.whatIsNeoSync.getString(context),
@@ -1357,21 +1358,21 @@ class NeoSyncContentState extends State<NeoSyncContent>
           SizedBox(height: 6.r),
           _buildInfoItem(
             context,
-            Icons.cloud_upload_outlined,
+            Symbols.cloud_upload_rounded,
             AppLocale.cloudSaveTitle.getString(context),
             AppLocale.neoSyncSavesSync.getString(context),
           ),
           SizedBox(height: 6.r),
           _buildInfoItem(
             context,
-            Icons.devices_outlined,
+            Symbols.devices_rounded,
             AppLocale.crossPlatform.getString(context),
             AppLocale.crossPlatformDesc.getString(context),
           ),
           SizedBox(height: 6.r),
           _buildInfoItem(
             context,
-            Icons.security_outlined,
+            Symbols.security_rounded,
             AppLocale.securePrivate.getString(context),
             AppLocale.securePrivateDesc.getString(context),
           ),
@@ -1695,7 +1696,7 @@ class _UpgradeModalDialogState extends State<_UpgradeModalDialog> {
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
                       icon: Icon(
-                        Icons.close_rounded,
+                        Symbols.close_rounded,
                         color: theme.colorScheme.onSurface.withValues(
                           alpha: 0.6,
                         ),
@@ -1741,7 +1742,7 @@ class _UpgradeModalDialogState extends State<_UpgradeModalDialog> {
                               Row(
                                 children: [
                                   Icon(
-                                    Icons.error_outline_rounded,
+                                    Symbols.error_outline_rounded,
                                     color: theme.colorScheme.error,
                                     size: 24.r,
                                   ),
@@ -1763,7 +1764,7 @@ class _UpgradeModalDialogState extends State<_UpgradeModalDialog> {
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
                                   onPressed: _loadPlans,
-                                  icon: Icon(Icons.refresh_rounded),
+                                  icon: Icon(Symbols.refresh_rounded),
                                   label: Text(
                                     AppLocale.retry.getString(context),
                                   ),
@@ -1834,7 +1835,7 @@ class _UpgradeModalDialogState extends State<_UpgradeModalDialog> {
                                     borderRadius: BorderRadius.circular(20.r),
                                   ),
                                   child: Icon(
-                                    Icons.payment_rounded,
+                                    Symbols.payment_rounded,
                                     size: 48.r,
                                     color: theme.colorScheme.onSurface
                                         .withValues(alpha: 0.5),
@@ -1864,7 +1865,7 @@ class _UpgradeModalDialogState extends State<_UpgradeModalDialog> {
                                 SizedBox(height: 8.r),
                                 ElevatedButton.icon(
                                   onPressed: _loadPlans,
-                                  icon: Icon(Icons.refresh_rounded),
+                                  icon: Icon(Symbols.refresh_rounded),
                                   label: Text(
                                     AppLocale.retry.getString(context),
                                   ),
@@ -2020,7 +2021,7 @@ class _UpgradeModalDialogState extends State<_UpgradeModalDialog> {
                                             Row(
                                               children: [
                                                 Icon(
-                                                  Icons.cloud_outlined,
+                                                  Symbols.cloud_rounded,
                                                   size: 10.r,
                                                   color: theme
                                                       .colorScheme
@@ -2338,7 +2339,7 @@ class _UpgradeModalDialogState extends State<_UpgradeModalDialog> {
                   children: [
                     TextButton.icon(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: Icon(Icons.arrow_back_rounded, size: 16.r),
+                      icon: Icon(Symbols.arrow_back_rounded, size: 16.r),
                       label: Text(
                         AppLocale.backWithB.getString(context),
                         style: TextStyle(fontSize: 10.r),
@@ -2414,7 +2415,7 @@ class _CancelSubscriptionDialogState extends State<_CancelSubscriptionDialog> {
       title: Row(
         children: [
           Icon(
-            Icons.cancel_rounded,
+            Symbols.cancel_rounded,
             color: theme.colorScheme.error,
             size: 24.r,
           ),
@@ -2543,7 +2544,7 @@ class _DeleteCloudSaveDialogState extends State<_DeleteCloudSaveDialog> {
       title: Row(
         children: [
           Icon(
-            Icons.delete_forever,
+            Symbols.delete_forever_rounded,
             color: Theme.of(context).colorScheme.error,
             size: 18.r,
           ),
@@ -2590,7 +2591,7 @@ class _DeleteCloudSaveDialogState extends State<_DeleteCloudSaveDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.save,
+                  Symbols.save_rounded,
                   color: Theme.of(context).colorScheme.primary,
                   size: 16.r,
                 ),
@@ -2807,7 +2808,7 @@ class _SuccessDialogState extends State<_SuccessDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
       title: Row(
         children: [
-          Icon(Icons.check_circle_rounded, color: Colors.green, size: 24.r),
+          Icon(Symbols.check_circle_rounded, color: Colors.green, size: 24.r),
           SizedBox(width: 12.r),
           Text(
             widget.title,
@@ -2920,7 +2921,7 @@ class _ErrorDialogState extends State<_ErrorDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
       title: Row(
         children: [
-          Icon(Icons.error_rounded, color: theme.colorScheme.error, size: 24.r),
+          Icon(Symbols.error_rounded, color: theme.colorScheme.error, size: 24.r),
           SizedBox(width: 12.r),
           Text(
             widget.title,
@@ -3207,7 +3208,7 @@ class OnlineSavesListViewState extends State<OnlineSavesListView>
               borderRadius: BorderRadius.circular(8.r),
             ),
             child: Icon(
-              Icons.save,
+              Symbols.save_rounded,
               color: isSelected
                   ? Theme.of(context).colorScheme.onSecondary
                   : Theme.of(context).colorScheme.primary,
@@ -3266,7 +3267,7 @@ class OnlineSavesListViewState extends State<OnlineSavesListView>
           IconButton(
             onPressed: () => widget.onDeleteRequest(file, index),
             icon: Icon(
-              Icons.delete,
+              Symbols.delete_rounded,
               color: isSelected
                   ? Theme.of(context).colorScheme.onSecondary
                   : Theme.of(context).colorScheme.error,

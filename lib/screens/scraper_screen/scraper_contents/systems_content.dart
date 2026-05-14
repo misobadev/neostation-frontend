@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -345,8 +346,8 @@ class SystemsContentState extends State<SystemsContent> {
                     _availableSystems.every(
                           (s) => _selectedSystems[s['id']] == true,
                         )
-                        ? Icons.deselect
-                        : Icons.select_all,
+                        ? Symbols.deselect_rounded
+                        : Symbols.select_all_rounded,
                     size: 18.r,
                   ),
                   label: Text(
@@ -454,7 +455,7 @@ class SystemsContentState extends State<SystemsContent> {
               ),
               child: Center(
                 child: Icon(
-                  isEnabled ? Icons.check_rounded : Icons.add_rounded,
+                  isEnabled ? Symbols.check_rounded : Symbols.add_rounded,
                   color: isEnabled
                       ? Colors.greenAccent
                       : theme.colorScheme.onSurface.withValues(alpha: 0.5),

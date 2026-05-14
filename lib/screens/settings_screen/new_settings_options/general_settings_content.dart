@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -702,7 +703,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                           ),
                           SizedBox(width: 2.r),
                           Icon(
-                            Icons.arrow_drop_down,
+                            Symbols.arrow_drop_down_rounded,
                             size: 14.r,
                             color: theme.colorScheme.primary,
                           ),
@@ -1325,7 +1326,7 @@ class _LanguagePickerOverlayState extends State<_LanguagePickerOverlay> {
                                 ),
                                 if (isSelected)
                                   Icon(
-                                    Icons.check,
+                                    Symbols.check_rounded,
                                     size: 12.r,
                                     color: theme.colorScheme.secondary,
                                   ),

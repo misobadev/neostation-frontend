@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -1083,7 +1084,7 @@ class _SystemEmulatorSettingsDialogState
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.error_outline,
+              Symbols.error_outline_rounded,
               size: 48.r,
               color: Theme.of(context).colorScheme.error,
             ),
@@ -1174,7 +1175,7 @@ class _SystemEmulatorSettingsDialogState
               child: Container(
                 padding: EdgeInsets.all(6.r),
                 child: Icon(
-                  Icons.close,
+                  Symbols.close_rounded,
                   size: 18.r,
                   color: Theme.of(
                     context,
@@ -1378,7 +1379,7 @@ class _SystemEmulatorSettingsDialogState
             ),
             child: currentPath.isEmpty
                 ? Icon(
-                    Icons.image_not_supported,
+                    Symbols.image_not_supported_rounded,
                     size: 16.r,
                     color: Colors.white54,
                   )
@@ -1420,7 +1421,7 @@ class _SystemEmulatorSettingsDialogState
             children: [
               IconButton(
                 onPressed: onPick,
-                icon: Icon(Icons.upload_file, size: 16.r),
+                icon: Icon(Symbols.upload_file_rounded, size: 16.r),
                 tooltip: AppLocale.upload.getString(context),
                 padding: EdgeInsets.zero,
                 constraints: BoxConstraints(minWidth: 24.r, minHeight: 24.r),
@@ -1430,7 +1431,7 @@ class _SystemEmulatorSettingsDialogState
                 SizedBox(width: 4.r),
                 IconButton(
                   onPressed: onReset,
-                  icon: Icon(Icons.delete_outline, size: 16.r),
+                  icon: Icon(Symbols.delete_outline_rounded, size: 16.r),
                   tooltip: AppLocale.reset.getString(context),
                   padding: EdgeInsets.zero,
                   constraints: BoxConstraints(minWidth: 24.r, minHeight: 24.r),
@@ -1690,21 +1691,21 @@ class _SystemEmulatorSettingsDialogState
         File(path),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) =>
-            Icon(Icons.broken_image, size: 16.r, color: Colors.white24),
+            Icon(Symbols.broken_image_rounded, size: 16.r, color: Colors.white24),
       );
     } else if (path.startsWith('assets')) {
       return Image.asset(
         path,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) =>
-            Icon(Icons.broken_image, size: 16.r, color: Colors.white24),
+            Icon(Symbols.broken_image_rounded, size: 16.r, color: Colors.white24),
       );
     } else {
       return Image.network(
         path,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) =>
-            Icon(Icons.broken_image, size: 16.r, color: Colors.white24),
+            Icon(Symbols.broken_image_rounded, size: 16.r, color: Colors.white24),
       );
     }
   }
@@ -1855,7 +1856,7 @@ class _SystemEmulatorSettingsDialogState
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.gamepad_outlined,
+                Symbols.gamepad_rounded,
                 size: 28.r,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
@@ -1984,7 +1985,7 @@ class _SystemEmulatorSettingsDialogState
                               colorBlendMode: BlendMode.srcIn,
                               errorBuilder: (context, error, stackTrace) =>
                                   Icon(
-                                    Icons.gamepad,
+                                    Symbols.gamepad_rounded,
                                     size: 14.r,
                                     color: isSelected
                                         ? theme.colorScheme.secondary
@@ -2013,11 +2014,11 @@ class _SystemEmulatorSettingsDialogState
                                   Icon(
                                     Platform.isAndroid
                                         ? (item.isInstalled
-                                              ? Icons.check_circle
-                                              : Icons.error_outline)
+                                              ? Symbols.check_circle_rounded
+                                              : Symbols.error_outline_rounded)
                                         : (item.retroArchConfigured
-                                              ? Icons.check_circle
-                                              : Icons.warning),
+                                              ? Symbols.check_circle_rounded
+                                              : Symbols.warning_rounded),
                                     size: 11.r,
                                     color: Platform.isAndroid
                                         ? (item.isInstalled
@@ -2157,7 +2158,7 @@ class _SystemEmulatorSettingsDialogState
                                       if (core
                                           .isretroAchievementsCompatible) ...[
                                         Icon(
-                                          Icons.emoji_events,
+                                          Symbols.emoji_events_rounded,
                                           size: 12.r,
                                           color: const Color(0xFFFFD700),
                                         ),
@@ -2178,7 +2179,7 @@ class _SystemEmulatorSettingsDialogState
                                       if (core.isDefault) ...[
                                         SizedBox(width: 8.r),
                                         Icon(
-                                          Icons.check_circle,
+                                          Symbols.check_circle_rounded,
                                           size: 12.r,
                                           color: const Color(0xFF56C288),
                                         ),
@@ -2211,7 +2212,7 @@ class _SystemEmulatorSettingsDialogState
                                               ?.isretroAchievementsCompatible ==
                                           true) ...[
                                         Icon(
-                                          Icons.emoji_events,
+                                          Symbols.emoji_events_rounded,
                                           size: 11.r,
                                           color: const Color(0xFFFFD700),
                                         ),
@@ -2236,7 +2237,7 @@ class _SystemEmulatorSettingsDialogState
                                         ),
                                       ),
                                       Icon(
-                                        Icons.arrow_drop_down,
+                                        Symbols.arrow_drop_down_rounded,
                                         size: 16.r,
                                         color: selectedCore != null
                                             ? Colors.white
@@ -2280,7 +2281,7 @@ class _SystemEmulatorSettingsDialogState
                           child: Padding(
                             padding: EdgeInsets.all(6.r),
                             child: Icon(
-                              Icons.folder_open,
+                              Symbols.folder_open_rounded,
                               size: 14.r,
                               color: Colors.white,
                             ),
@@ -2363,7 +2364,7 @@ class _SystemEmulatorSettingsDialogState
                           : Theme.of(context).colorScheme.onSurface,
                       colorBlendMode: BlendMode.srcIn,
                       errorBuilder: (context, error, stackTrace) => Icon(
-                        Icons.gamepad,
+                        Symbols.gamepad_rounded,
                         size: 14.r,
                         color: isSelected
                             ? Theme.of(context).colorScheme.secondary
@@ -2415,7 +2416,7 @@ class _SystemEmulatorSettingsDialogState
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    Icons.emoji_events,
+                                    Symbols.emoji_events_rounded,
                                     size: 10.r,
                                     color: const Color(0xFF00387D),
                                   ),
@@ -2428,11 +2429,11 @@ class _SystemEmulatorSettingsDialogState
                               Icon(
                                 Platform.isAndroid
                                     ? (core.isInstalled
-                                          ? Icons.check_circle
-                                          : Icons.error_outline)
+                                          ? Symbols.check_circle_rounded
+                                          : Symbols.error_outline_rounded)
                                     : (retroArchConfigured
-                                          ? Icons.check_circle
-                                          : Icons.warning),
+                                          ? Symbols.check_circle_rounded
+                                          : Symbols.warning_rounded),
                                 size: 12.r,
                                 color: Platform.isAndroid
                                     ? (core.isInstalled
@@ -2517,7 +2518,7 @@ class _SystemEmulatorSettingsDialogState
                           child: Padding(
                             padding: EdgeInsets.all(6.r),
                             child: Icon(
-                              Icons.folder_open,
+                              Symbols.folder_open_rounded,
                               size: 14.r,
                               color: Colors.white,
                             ),
@@ -2574,7 +2575,7 @@ class _SystemEmulatorSettingsDialogState
                                 children: [
                                   if (core.isDefault)
                                     Icon(
-                                      Icons.check_circle,
+                                      Symbols.check_circle_rounded,
                                       size: 12.r,
                                       color: Colors.white,
                                     )
@@ -2691,7 +2692,7 @@ class _SystemEmulatorSettingsDialogState
                           child: Padding(
                             padding: EdgeInsets.all(4.r),
                             child: Icon(
-                              Icons.apps,
+                              Symbols.apps_rounded,
                               size: 14.r,
                               color: isSelected
                                   ? theme.colorScheme.secondary
@@ -2737,7 +2738,7 @@ class _SystemEmulatorSettingsDialogState
                                         ),
                                       ),
                                       child: Icon(
-                                        Icons.emoji_events,
+                                        Symbols.emoji_events_rounded,
                                         size: 10.r,
                                         color: const Color(0xFF00387D),
                                       ),
@@ -2745,11 +2746,11 @@ class _SystemEmulatorSettingsDialogState
                                   Icon(
                                     Platform.isAndroid
                                         ? (isInstalled
-                                              ? Icons.check_circle
-                                              : Icons.error_outline)
+                                              ? Symbols.check_circle_rounded
+                                              : Symbols.error_outline_rounded)
                                         : (standalone.isConfigured
-                                              ? Icons.check_circle
-                                              : Icons.warning),
+                                              ? Symbols.check_circle_rounded
+                                              : Symbols.warning_rounded),
                                     size: 12.r,
                                     color: isConfigured
                                         ? const Color(0xFF56C288)
@@ -2840,7 +2841,7 @@ class _SystemEmulatorSettingsDialogState
                             children: [
                               if (standalone.isUserDefault == true)
                                 Icon(
-                                  Icons.check_circle,
+                                  Symbols.check_circle_rounded,
                                   size: 12.r,
                                   color: Colors.white,
                                 )
@@ -2901,7 +2902,7 @@ class _SystemEmulatorSettingsDialogState
                           child: Padding(
                             padding: EdgeInsets.all(6.r),
                             child: Icon(
-                              Icons.folder_open,
+                              Symbols.folder_open_rounded,
                               size: 14.r,
                               color: Colors.white,
                             ),

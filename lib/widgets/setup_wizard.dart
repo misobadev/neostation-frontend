@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -357,7 +358,7 @@ class _SetupWizardState extends State<SetupWizard> {
               ),
               child: Center(
                 child: isCompleted
-                    ? Icon(Icons.check, color: Colors.white, size: 14.r)
+                    ? Icon(Symbols.check_rounded, color: Colors.white, size: 14.r)
                     : Text(
                         '${index + 1}',
                         style: TextStyle(
@@ -412,7 +413,7 @@ class _SetupWizardState extends State<SetupWizard> {
               ),
               child: Center(
                 child: isCompleted
-                    ? Icon(Icons.check, color: Colors.white, size: 24.r)
+                    ? Icon(Symbols.check_rounded, color: Colors.white, size: 24.r)
                     : Text(
                         '${index + 1}',
                         style: TextStyle(
@@ -481,7 +482,7 @@ class _SetupWizardState extends State<SetupWizard> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.folder_special,
+            Symbols.folder_special_rounded,
             size: iconSize,
             color: _selectedUserDataPath != null
                 ? theme.colorScheme.primary
@@ -524,7 +525,7 @@ class _SetupWizardState extends State<SetupWizard> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.folder,
+                    Symbols.folder_rounded,
                     size: 16.r,
                     color: theme.colorScheme.primary,
                   ),
@@ -659,7 +660,7 @@ class _SetupWizardState extends State<SetupWizard> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.security,
+            Symbols.security_rounded,
             size: iconSize,
             color: theme.colorScheme.primary,
           ),
@@ -700,7 +701,7 @@ class _SetupWizardState extends State<SetupWizard> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.folder_open,
+            Symbols.folder_open_rounded,
             size: iconSize,
             color: _selectedFolder != null
                 ? Colors.green
@@ -759,7 +760,7 @@ class _SetupWizardState extends State<SetupWizard> {
                 child: Center(
                   child: provider.scanCompleted
                       ? Icon(
-                          Icons.check_circle,
+                          Symbols.check_circle_rounded,
                           color: Colors.green,
                           size: iconSize,
                         )
@@ -865,7 +866,7 @@ class _SetupWizardState extends State<SetupWizard> {
                   child: Row(
                     children: [
                       Icon(
-                        Icons.check_circle,
+                        Symbols.check_circle_rounded,
                         color: Colors.green,
                         size: isLandscape ? 20.r : 24.r,
                       ),

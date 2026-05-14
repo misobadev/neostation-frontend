@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/responsive.dart';
 import 'package:neostation/services/android_service.dart';
 import 'package:neostation/services/logger_service.dart';
@@ -287,7 +288,7 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
           Opacity(
             opacity: 0.8,
             child: Icon(
-              Icons.grid_view,
+              Symbols.grid_view_rounded,
               size: 16.r,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
@@ -418,7 +419,7 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
       child: Opacity(
         opacity: 0.2,
         child: Icon(
-          Icons.apps_rounded,
+          Symbols.apps_rounded,
           size: 48.r,
           color: Theme.of(context).colorScheme.onSurface,
         ),

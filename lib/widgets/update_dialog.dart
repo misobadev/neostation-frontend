@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -111,7 +112,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                           borderRadius: BorderRadius.circular(8.r),
                         ),
                         child: Icon(
-                          Icons.system_update_alt_rounded,
+                          Symbols.system_update_alt_rounded,
                           color: theme.colorScheme.primary,
                           size: 16.r,
                         ),
@@ -182,7 +183,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                       Row(
                         children: [
                           Icon(
-                            Icons.info_outline,
+                            Symbols.info_rounded,
                             size: 12.r,
                             color: theme.colorScheme.onSurface.withValues(
                               alpha: 0.5,

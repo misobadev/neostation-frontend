@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -90,7 +91,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       SettingsMenuItem(
         title: '',
         localeKey: AppLocale.general,
-        icon: Icons.settings,
+        icon: Symbols.settings_rounded,
         isVisible: true,
       ),
     );
@@ -99,7 +100,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       SettingsMenuItem(
         title: '',
         localeKey: AppLocale.directories,
-        icon: Icons.folder,
+        icon: Symbols.folder_rounded,
         isVisible: true,
       ),
     );
@@ -108,7 +109,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       SettingsMenuItem(
         title: '',
         localeKey: AppLocale.systemsSettings,
-        icon: Icons.sports_esports_outlined,
+        icon: Symbols.sports_esports_rounded,
         isVisible: true,
       ),
     );
@@ -117,7 +118,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       SettingsMenuItem(
         title: '',
         localeKey: AppLocale.palettes,
-        icon: Icons.palette,
+        icon: Symbols.palette_rounded,
         isVisible: true,
       ),
     );
@@ -126,7 +127,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       SettingsMenuItem(
         title: '',
         localeKey: AppLocale.neoThemes,
-        icon: Icons.image_outlined,
+        icon: Symbols.image_rounded,
         isVisible: true,
       ),
     );
@@ -135,7 +136,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       SettingsMenuItem(
         title: '',
         localeKey: AppLocale.about,
-        icon: Icons.info,
+        icon: Symbols.info_rounded,
         isVisible: true,
       ),
     );
@@ -144,7 +145,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       SettingsMenuItem(
         title: '',
         localeKey: AppLocale.exit,
-        icon: Icons.exit_to_app,
+        icon: Symbols.exit_to_app_rounded,
         isVisible: true,
       ),
     );

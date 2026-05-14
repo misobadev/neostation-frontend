@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -351,7 +352,7 @@ class GameDetailsSettingsTabState extends State<GameDetailsSettingsTab> {
                   Row(
                     children: [
                       Icon(
-                        Icons.settings,
+                        Symbols.settings_rounded,
                         color: Theme.of(context).colorScheme.onSurface,
                         size: 13.r,
                       ),
@@ -391,7 +392,7 @@ class GameDetailsSettingsTabState extends State<GameDetailsSettingsTab> {
                           key: _settingsKey(_settingsCloudSyncIdx),
                           isSelected:
                               _settingsSelectedIndex == _settingsCloudSyncIdx,
-                          icon: Icons.cloud,
+                          icon: Symbols.cloud_rounded,
                           label: AppLocale.cloudSync.getString(context),
                           subtitle: _cloudSyncEnabled
                               ? AppLocale.cloudSyncOn.getString(context)
@@ -434,7 +435,7 @@ class GameDetailsSettingsTabState extends State<GameDetailsSettingsTab> {
                         key: _settingsKey(_settingsPlayTimeIdx),
                         isSelected:
                             _settingsSelectedIndex == _settingsPlayTimeIdx,
-                        icon: Icons.timer_off,
+                        icon: Symbols.timer_off_rounded,
                         label: AppLocale.playTime.getString(context),
                         subtitle: GameUtils.formatPlayTime(_game.playTime ?? 0),
                         onTap: () {
@@ -516,7 +517,7 @@ class GameDetailsSettingsTabState extends State<GameDetailsSettingsTab> {
                           child: Row(
                             children: [
                               Icon(
-                                Icons.sports_esports,
+                                Symbols.sports_esports_rounded,
                                 size: 12.r,
                                 color: Theme.of(
                                   context,
@@ -745,7 +746,7 @@ class _EmulatorRow extends StatelessWidget {
                           : theme.colorScheme.onSurface,
                       colorBlendMode: BlendMode.srcIn,
                       errorBuilder: (_, _, _) => Icon(
-                        Icons.gamepad,
+                        Symbols.gamepad_rounded,
                         size: 12.r,
                         color: isSelected
                             ? theme.colorScheme.secondary
@@ -791,7 +792,7 @@ class _EmulatorRow extends StatelessWidget {
                                 ),
                               ),
                               child: Icon(
-                                Icons.emoji_events,
+                                Symbols.emoji_events_rounded,
                                 size: 9.r,
                                 color: const Color(0xFF00387D),
                               ),
@@ -802,8 +803,8 @@ class _EmulatorRow extends StatelessWidget {
                               children: [
                                 Icon(
                                   installed
-                                      ? Icons.check_circle
-                                      : Icons.error_outline,
+                                      ? Symbols.check_circle_rounded
+                                      : Symbols.error_outline_rounded,
                                   size: 10.r,
                                   color: installed
                                       ? const Color(0xFF56C288)
@@ -829,7 +830,7 @@ class _EmulatorRow extends StatelessWidget {
                 // Active Override Indicator.
                 if (isActive)
                   Icon(
-                    Icons.check_circle,
+                    Symbols.check_circle_rounded,
                     size: 14.r,
                     color: theme.colorScheme.secondary,
                   ),

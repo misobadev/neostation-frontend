@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/repositories/config_repository.dart';
@@ -154,7 +155,7 @@ class _GameViewSettingsScreenState extends State<GameViewSettingsScreen> {
             Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back),
+                  icon: const Icon(Symbols.arrow_back_rounded),
                   onPressed: () => Navigator.of(context).pop(),
                   tooltip: 'Back',
                 ),
@@ -250,7 +251,7 @@ class _GameViewSettingsScreenState extends State<GameViewSettingsScreen> {
                                       if (isCurrent) ...[
                                         const SizedBox(width: 8),
                                         Icon(
-                                          Icons.check_circle,
+                                          Symbols.check_circle_rounded,
                                           size: 20,
                                           color: theme.colorScheme.primary,
                                         ),

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
@@ -225,7 +226,7 @@ class _MusicListState extends State<MusicList> with TickerProviderStateMixin {
                                 ],
                                 if (isLooping) ...[
                                   Icon(
-                                    Icons.repeat_one_rounded,
+                                    Symbols.repeat_one_rounded,
                                     size: 11.r,
                                     color: Colors.white.withValues(alpha: 0.8),
                                   ),
@@ -233,7 +234,7 @@ class _MusicListState extends State<MusicList> with TickerProviderStateMixin {
                                 ],
                                 if (track.isFavorite == true) ...[
                                   Icon(
-                                    Icons.favorite_rounded,
+                                    Symbols.favorite_rounded,
                                     size: 10.r,
                                     color: Colors.redAccent.withValues(
                                       alpha: 0.9,
@@ -407,7 +408,7 @@ class _PulsatingIndicatorState extends State<_PulsatingIndicator>
           scale: _animation.value,
           child: Opacity(
             opacity: _animation.value,
-            child: Icon(Icons.headphones, size: 14.r, color: Colors.white),
+            child: Icon(Symbols.headphones_rounded, size: 14.r, color: Colors.white),
           ),
         );
       },

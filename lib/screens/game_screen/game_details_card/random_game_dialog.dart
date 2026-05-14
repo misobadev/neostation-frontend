@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -275,7 +276,7 @@ class _RandomGameDialogState extends State<RandomGameDialog>
       child: Row(
         children: [
           Icon(
-            _isAnimating ? Icons.casino_rounded : Icons.stars_rounded,
+            _isAnimating ? Symbols.casino_rounded : Symbols.stars_rounded,
             size: 13.r,
             color: _isAnimating
                 ? theme.colorScheme.primary
@@ -324,7 +325,7 @@ class _RandomGameDialogState extends State<RandomGameDialog>
                         width: 14.r,
                         height: 14.r,
                         errorBuilder: (context, e, s) => Icon(
-                          Icons.casino_rounded,
+                          Symbols.casino_rounded,
                           size: 14.r,
                           color: theme.colorScheme.tertiary,
                         ),
@@ -379,7 +380,7 @@ class _RandomGameDialogState extends State<RandomGameDialog>
                       width: 14.r,
                       height: 14.r,
                       errorBuilder: (context, e, s) =>
-                          Icon(Icons.close, size: 14.r, color: Colors.white),
+                          Icon(Symbols.close_rounded, size: 14.r, color: Colors.white),
                     ),
                   ),
                   SizedBox(width: 2.r),
@@ -463,7 +464,7 @@ class _RandomGameDialogState extends State<RandomGameDialog>
   Widget _screenshotFallback(ThemeData theme) {
     return Center(
       child: Icon(
-        Icons.image_not_supported_rounded,
+        Symbols.image_not_supported_rounded,
         color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
         size: 28.r,
       ),
@@ -493,14 +494,14 @@ class _RandomGameDialogState extends State<RandomGameDialog>
             height: 36.r,
             fit: BoxFit.contain,
             errorBuilder: (context, e, s) => Icon(
-              Icons.videogame_asset_rounded,
+              Symbols.videogame_asset_rounded,
               size: 28.r,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
             ),
           )
         else
           Icon(
-            Icons.videogame_asset_rounded,
+            Symbols.videogame_asset_rounded,
             size: 28.r,
             color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
           ),
@@ -595,7 +596,7 @@ class _RandomGameDialogState extends State<RandomGameDialog>
                         height: 14.r,
                         color: Colors.white,
                         errorBuilder: (context, e, s) => Icon(
-                          Icons.play_arrow_rounded,
+                          Symbols.play_arrow_rounded,
                           size: 14.r,
                           color: Colors.white,
                         ),
@@ -658,7 +659,7 @@ class _RandomGameDialogState extends State<RandomGameDialog>
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.casino_rounded,
+              Symbols.casino_rounded,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
               size: 28.r,
             ),

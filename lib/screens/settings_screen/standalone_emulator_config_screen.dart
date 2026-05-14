@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/services/sfx_service.dart';
@@ -238,7 +239,7 @@ class _StandaloneEmulatorConfigScreenState
               child: Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
+                    icon: Icon(Symbols.arrow_back_rounded, color: colorScheme.onSurface),
                     onPressed: () => Navigator.pop(context),
                   ),
                   SizedBox(width: 16.w),
@@ -282,7 +283,7 @@ class _StandaloneEmulatorConfigScreenState
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.info_outline,
+                            Symbols.info_rounded,
                             size: 64.sp,
                             color: colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
@@ -352,7 +353,7 @@ class _StandaloneEmulatorConfigScreenState
                                         ),
                                       ),
                                       child: Icon(
-                                        Icons.computer,
+                                        Symbols.computer_rounded,
                                         color: _getStatusColor(emulator),
                                         size: 24.sp,
                                       ),
@@ -406,7 +407,7 @@ class _StandaloneEmulatorConfigScreenState
 
                                     // Interaction Sentinel.
                                     Icon(
-                                      Icons.settings,
+                                      Symbols.settings_rounded,
                                       color: isSelected
                                           ? colorScheme.primary
                                           : colorScheme.onSurface.withValues(
@@ -431,7 +432,7 @@ class _StandaloneEmulatorConfigScreenState
                                     child: Row(
                                       children: [
                                         Icon(
-                                          Icons.folder,
+                                          Symbols.folder_rounded,
                                           size: 16.sp,
                                           color: colorScheme.onSurface
                                               .withValues(alpha: 0.6),

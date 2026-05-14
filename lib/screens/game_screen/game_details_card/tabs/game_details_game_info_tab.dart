@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -149,7 +150,7 @@ class _GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
                   Row(
                     children: [
                       Icon(
-                        Icons.info_outline,
+                        Symbols.info_rounded,
                         color: Theme.of(context).colorScheme.onSurface,
                         size: 13.r,
                       ),
@@ -172,17 +173,17 @@ class _GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
                           children: [
                             if (widget.game.developer.isNotEmpty)
                               _InfoPill(
-                                icon: Icons.business,
+                                icon: Symbols.business_rounded,
                                 text: widget.game.developer,
                               ),
                             if (widget.game.players.isNotEmpty)
                               _InfoPill(
-                                icon: Icons.people,
+                                icon: Symbols.people_rounded,
                                 text: widget.game.players,
                               ),
                             if (widget.game.year.isNotEmpty)
                               _InfoPill(
-                                icon: Icons.calendar_today,
+                                icon: Symbols.calendar_today_rounded,
                                 text:
                                     RegExp(
                                       r'\d{4}',
@@ -454,7 +455,7 @@ class _GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
                 ] else
                   Center(
                     child: Icon(
-                      Icons.videogame_asset,
+                      Symbols.videogame_asset_rounded,
                       size: 48.r,
                       color: Colors.white24,
                     ),
@@ -501,8 +502,8 @@ class _GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
                                     SizedBox(width: 4.r),
                                     Icon(
                                       isMuted
-                                          ? Icons.volume_off
-                                          : Icons.volume_up,
+                                          ? Symbols.volume_off_rounded
+                                          : Symbols.volume_up_rounded,
                                       size: 12.r,
                                       color: Colors.white,
                                     ),

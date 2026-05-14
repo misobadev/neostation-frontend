@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/music_player_service.dart';
@@ -46,7 +47,7 @@ class _MusicNotificationListenerState extends State<MusicNotificationListener> {
         "${_service.activeTitle} • ${_service.activeArtist ?? AppLocale.unknownArtist.getString(context)}",
         title: AppLocale.nowPlaying.getString(context),
         imageBytes: _service.activePicture,
-        icon: Icons.music_note,
+        icon: Symbols.music_note_rounded,
         notificationId: 'music_change',
         duration: const Duration(seconds: 4),
       );

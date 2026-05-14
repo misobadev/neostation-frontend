@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 /// Available notification types
@@ -94,19 +95,19 @@ class _CustomNotificationState extends State<CustomNotification>
           case NotificationType.success:
             backgroundColor = Colors.green.shade700;
             textColor = Colors.white;
-            icon = Icons.check_circle;
+            icon = Symbols.check_circle_rounded;
             break;
           case NotificationType.error:
             backgroundColor = Theme.of(context).colorScheme.error;
             textColor = Theme.of(context).colorScheme.onError;
-            icon = Icons.error;
+            icon = Symbols.error_rounded;
             break;
           case NotificationType.info:
             backgroundColor = Theme.of(
               context,
             ).colorScheme.surfaceContainerHighest;
             textColor = Theme.of(context).colorScheme.onSurface;
-            icon = Icons.info;
+            icon = Symbols.info_rounded;
             break;
         }
 

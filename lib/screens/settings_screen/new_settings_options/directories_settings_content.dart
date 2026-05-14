@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -714,26 +715,26 @@ class DirectoriesSettingsContentState
                                   _buildActionButton(
                                     theme,
                                     isSelected,
-                                    Icons.delete_outline,
+                                    Symbols.delete_outline_rounded,
                                     isDestructive: true,
                                   )
                                 else if (item['action'] == 'add_rom')
                                   _buildActionButton(
                                     theme,
                                     isSelected,
-                                    Icons.add,
+                                    Symbols.add_rounded,
                                   )
                                 else if (item['action'] == 'rescan')
                                   _buildActionButton(
                                     theme,
                                     isSelected,
-                                    Icons.refresh,
+                                    Symbols.refresh_rounded,
                                   )
                                 else if (isUserData)
                                   _buildActionButton(
                                     theme,
                                     isSelected,
-                                    Icons.edit,
+                                    Symbols.edit_rounded,
                                   ),
                               ],
                             ),
@@ -754,7 +755,7 @@ class DirectoriesSettingsContentState
                                 child: Row(
                                   children: [
                                     Icon(
-                                      Icons.folder,
+                                      Symbols.folder_rounded,
                                       size: 11.r,
                                       color: theme.colorScheme.primary
                                           .withValues(alpha: 0.5),
@@ -794,15 +795,15 @@ class DirectoriesSettingsContentState
   IconData _iconFor(String action) {
     switch (action) {
       case 'user_data':
-        return Icons.folder_special;
+        return Symbols.folder_special_rounded;
       case 'rescan':
-        return Icons.refresh;
+        return Symbols.refresh_rounded;
       case 'add_rom':
-        return Icons.folder_outlined;
+        return Symbols.folder_rounded;
       case 'remove_rom':
-        return Icons.folder;
+        return Symbols.folder_rounded;
       default:
-        return Icons.folder;
+        return Symbols.folder_rounded;
     }
   }
 }

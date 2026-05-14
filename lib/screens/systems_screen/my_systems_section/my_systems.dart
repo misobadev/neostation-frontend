@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/responsive.dart';
@@ -179,7 +180,7 @@ class MySystems extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.sync, color: Colors.white, size: 32),
+              child: const Icon(Symbols.sync_rounded, color: Colors.white, size: 32),
             ),
             const SizedBox(height: 24),
             Text(
@@ -322,7 +323,7 @@ class MySystems extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.folder, color: Colors.white, size: 20),
+                        const Icon(Symbols.folder_rounded, color: Colors.white, size: 20),
                         const SizedBox(width: 8),
                         Text(
                           AppLocale.selectRomFolderButton.getString(context),

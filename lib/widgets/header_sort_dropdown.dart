@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
@@ -201,49 +202,49 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
       _DropdownOption(
         'view_grid',
         AppLocale.gridView.getString(context),
-        Icons.grid_view,
+        Symbols.grid_view_rounded,
         group: AppLocale.viewModeGroup.getString(context),
       ),
       _DropdownOption(
         'view_carousel',
         AppLocale.carouselView.getString(context),
-        Icons.view_carousel,
+        Symbols.view_carousel_rounded,
         group: AppLocale.viewModeGroup.getString(context),
       ),
       _DropdownOption(
         'sort_alpha',
         AppLocale.alphabetical.getString(context),
-        Icons.sort_by_alpha,
+        Symbols.sort_by_alpha_rounded,
         group: AppLocale.sortByGroup.getString(context),
       ),
       _DropdownOption(
         'sort_year',
         AppLocale.releaseYear.getString(context),
-        Icons.calendar_today,
+        Symbols.calendar_today_rounded,
         group: AppLocale.sortByGroup.getString(context),
       ),
       _DropdownOption(
         'sort_manufacturer',
         AppLocale.manufacturer.getString(context),
-        Icons.business,
+        Symbols.business_rounded,
         group: AppLocale.sortByGroup.getString(context),
       ),
       _DropdownOption(
         'sort_manufacturer_type',
         AppLocale.manufacturerType.getString(context),
-        Icons.category,
+        Symbols.category_rounded,
         group: AppLocale.sortByGroup.getString(context),
       ),
       _DropdownOption(
         'order_asc',
         AppLocale.ascending.getString(context),
-        Icons.arrow_upward,
+        Symbols.arrow_upward_rounded,
         group: AppLocale.orderGroup.getString(context),
       ),
       _DropdownOption(
         'order_desc',
         AppLocale.descending.getString(context),
-        Icons.arrow_downward,
+        Symbols.arrow_downward_rounded,
         group: AppLocale.orderGroup.getString(context),
       ),
     ];
@@ -358,7 +359,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
                   ),
                   if (isSelected)
                     Icon(
-                      Icons.check,
+                      Symbols.check_rounded,
                       size: 14.r,
                       color: Theme.of(context).colorScheme.secondary,
                     ),

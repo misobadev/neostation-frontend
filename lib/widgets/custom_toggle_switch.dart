@@ -1,5 +1,6 @@
 import 'package:animated_toggle_switch/animated_toggle_switch.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/services/sfx_service.dart';
 
@@ -62,7 +63,7 @@ class CustomToggleSwitch extends StatelessWidget {
         backgroundColor: b ? effectiveActiveColor : theme.colorScheme.surface,
       ),
       iconBuilder: (value) => Icon(
-        value ? Icons.check : Icons.close,
+        value ? Symbols.check_rounded : Symbols.close_rounded,
         size: 12.r,
         color: onActiveColor,
       ),

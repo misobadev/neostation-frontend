@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/services/screenscraper_service.dart';
@@ -261,7 +262,7 @@ class _ScraperLoginScreenState extends State<ScraperLoginScreen> {
           Row(
             children: [
               Icon(
-                Icons.info_outline,
+                Symbols.info_rounded,
                 color: theme.colorScheme.primary,
                 size: 24.r,
               ),
@@ -290,17 +291,17 @@ class _ScraperLoginScreenState extends State<ScraperLoginScreen> {
           SizedBox(height: 6.r),
           _buildInfoItem(
             context,
-            Icons.auto_awesome,
+            Symbols.auto_awesome_rounded,
             AppLocale.automaticMetadataMedia.getString(context),
           ),
           _buildInfoItem(
             context,
-            Icons.storage,
+            Symbols.storage_rounded,
             AppLocale.massiveDatabase.getString(context),
           ),
           _buildInfoItem(
             context,
-            Icons.verified_user,
+            Symbols.verified_user_rounded,
             AppLocale.requiresFreeAccount.getString(context),
           ),
           SizedBox(height: 6.r),
@@ -544,8 +545,8 @@ class _ScraperLoginScreenState extends State<ScraperLoginScreen> {
                     icon: Icon(
                       size: 18.r,
                       _obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
+                          ? Symbols.visibility_rounded
+                          : Symbols.visibility_off_rounded,
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     onPressed: () {

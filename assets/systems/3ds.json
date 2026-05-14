@@ -178,7 +178,7 @@
       "description": "Supported extensions: cci, cxi, zcci, zcxi.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n io.github.lime3ds.android/org.citra.citra_emu.activities.EmulationActivity\n  -a android.intent.action.VIEW\n  -d {file.uri}\n  --activity-clear-task\n  --activity-clear-top\n"
+          "launch_arguments": "-n org.azahar_emu.azahar/org.citra.citra_emu.activities.EmulationActivity\n  -a android.intent.action.VIEW\n  -d {file.uri}\n  --activity-clear-task\n  --activity-clear-top\n"
         },
         "windows": {
           "executable": "azahar.exe",
@@ -191,6 +191,28 @@
         "macos": {
           "executable": "Azahar.app",
           "args": "\"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone Azahar Plus",
+      "unique_id": "3ds.azahar.plus",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: cci, cxi, zcci, zcxi.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n io.github.azaharplus.android/org.citra.citra_emu.activities.EmulationActivity\n  -a android.intent.action.VIEW\n  -d {file.uri}\n  --activity-clear-task\n  --activity-clear-top\n"
+        }
+      }
+    },
+    {
+      "name": "Standalone Azahar GooglePlay",
+      "unique_id": "3ds.azahar.googleplay",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: cci, cxi, zcci, zcxi.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n io.github.lime3ds.android/org.citra.citra_emu.activities.EmulationActivity\n  -a android.intent.action.VIEW\n  -d {file.uri}\n  --activity-clear-task\n  --activity-clear-top\n"
         }
       }
     }

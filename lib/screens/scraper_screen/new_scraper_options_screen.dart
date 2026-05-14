@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -85,7 +86,7 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
       ScraperMenuItem(
         title: AppLocale.account.getString(context),
         localeKey: AppLocale.account,
-        icon: Icons.person,
+        icon: Symbols.person_rounded,
         isVisible: true,
       ),
     );
@@ -93,7 +94,7 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
       ScraperMenuItem(
         title: AppLocale.scraping.getString(context),
         localeKey: AppLocale.scraping,
-        icon: Icons.download,
+        icon: Symbols.download_rounded,
         isVisible: true,
       ),
     );
@@ -101,7 +102,7 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
       ScraperMenuItem(
         title: AppLocale.scrapeMode.getString(context),
         localeKey: AppLocale.scrapeMode,
-        icon: Icons.filter_list,
+        icon: Symbols.filter_list_rounded,
         isVisible: true,
       ),
     );
@@ -109,7 +110,7 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
       ScraperMenuItem(
         title: AppLocale.media.getString(context),
         localeKey: AppLocale.media,
-        icon: Icons.perm_media,
+        icon: Symbols.perm_media_rounded,
         isVisible: true,
       ),
     );
@@ -117,7 +118,7 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
       ScraperMenuItem(
         title: AppLocale.language.getString(context),
         localeKey: AppLocale.language,
-        icon: Icons.language,
+        icon: Symbols.language_rounded,
         isVisible: true,
       ),
     );
@@ -125,7 +126,7 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
       ScraperMenuItem(
         title: AppLocale.systems.getString(context),
         localeKey: AppLocale.systems,
-        icon: Icons.videogame_asset,
+        icon: Symbols.videogame_asset_rounded,
         isVisible: true,
       ),
     );

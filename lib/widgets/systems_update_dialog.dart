@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -109,7 +110,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                           borderRadius: BorderRadius.circular(8.r),
                         ),
                         child: Icon(
-                          Icons.system_update_alt_rounded,
+                          Symbols.system_update_alt_rounded,
                           color: theme.colorScheme.primary,
                           size: 16.r,
                         ),
@@ -156,7 +157,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                       Row(
                         children: [
                           Icon(
-                            Icons.info_outline,
+                            Symbols.info_rounded,
                             size: 12.r,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -297,7 +298,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
         context,
         AppLocale.systemsUpdateComplete.getString(context),
         type: NotificationType.success,
-        icon: Icons.system_update_alt,
+        icon: Symbols.system_update_alt_rounded,
       );
     } else {
       setState(() => _isDownloading = false);

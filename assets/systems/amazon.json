@@ -31,13 +31,13 @@
   "emulators": [
     {
       "name": "Standalone GameNative",
-      "unique_id": "steam.gamenative",
+      "unique_id": "windows.app.gamenative.amazon",
       "default": true,
       "is_retroachievements_compatible": false,
       "description": "Supported extensions: amazon",
       "platforms": {
         "android": {
-          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.steamappid}\" --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id {tags.customgame} --es game_source AMAZON --activity-clear-task --activity-clear-top"
         }
       }
     }

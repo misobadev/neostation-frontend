@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -87,7 +88,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                     ),
                     borderRadius: BorderRadius.circular(24.w),
                   ),
-                  child: Icon(Icons.settings, color: Colors.white, size: 24.sp),
+                  child: Icon(Symbols.settings_rounded, color: Colors.white, size: 24.sp),
                 ),
                 SizedBox(width: 16.w),
                 Expanded(
@@ -127,7 +128,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
                   icon: Icon(
-                    Icons.close,
+                    Symbols.close_rounded,
                     color: Theme.of(
                       context,
                     ).colorScheme.surface.withValues(alpha: 0.5),
@@ -178,7 +179,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                       borderRadius: BorderRadius.circular(20.w),
                     ),
                     child: Icon(
-                      _cloudSyncEnabled ? Icons.cloud_done : Icons.cloud_off,
+                      _cloudSyncEnabled ? Symbols.cloud_done_rounded : Symbols.cloud_off_rounded,
                       color: Colors.white,
                       size: 20.sp,
                     ),
@@ -263,7 +264,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.check_circle,
+                      Symbols.check_circle_rounded,
                       color: Theme.of(
                         context,
                       ).colorScheme.primary.withValues(alpha: 0.5),
@@ -310,7 +311,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.cloud_off,
+                      Symbols.cloud_off_rounded,
                       color: Theme.of(
                         context,
                       ).colorScheme.surface.withValues(alpha: 0.5),

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:isolate';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
@@ -1636,7 +1637,7 @@ class _ScrapingSummaryDialogContentState
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.check_circle_rounded,
+                      Symbols.check_circle_rounded,
                       size: 16.r,
                       color: Colors.green,
                     ),

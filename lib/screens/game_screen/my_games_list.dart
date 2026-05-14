@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -1307,7 +1308,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
                   title: Row(
                     children: [
                       Icon(
-                        Icons.error_outline,
+                        Symbols.error_outline_rounded,
                         color: Colors.red[400],
                         size: 32.r,
                       ),
@@ -1460,7 +1461,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
               title: Row(
                 children: [
                   Icon(
-                    Icons.warning_amber_rounded,
+                    Symbols.warning_amber_rounded,
                     color: Colors.orange[400],
                     size: 32,
                   ),
@@ -2096,7 +2097,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.folder_shared_outlined,
+                            Symbols.folder_shared_rounded,
                             color: Colors.white.withValues(alpha: 0.7),
                             size: 16.r,
                           ),
@@ -2430,7 +2431,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
                 ),
               ),
               child: Icon(
-                Icons.videogame_asset_outlined,
+                Symbols.videogame_asset_rounded,
                 size: 32.r,
                 color: Colors.white.withValues(alpha: 0.5),
               ),
@@ -2833,7 +2834,7 @@ class _GameListViewState extends State<GameListView>
                                   Container(
                                     margin: EdgeInsets.only(right: 4.r),
                                     child: Icon(
-                                      Icons.favorite,
+                                      Symbols.favorite_rounded,
                                       size: 11.r,
                                       color: isSelected
                                           ? theme.colorScheme.onPrimary

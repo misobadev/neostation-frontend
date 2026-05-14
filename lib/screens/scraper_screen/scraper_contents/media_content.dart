@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -47,13 +48,13 @@ class MediaContentState extends State<MediaContent> {
         'key': 'scrape_images',
         'title': AppLocale.scrapeImages.getString(context),
         'description': AppLocale.scrapeImagesDesc.getString(context),
-        'icon': Icons.image,
+        'icon': Symbols.image_rounded,
       },
       {
         'key': 'scrape_videos',
         'title': AppLocale.scrapeVideos.getString(context),
         'description': AppLocale.scrapeVideosDesc.getString(context),
-        'icon': Icons.videocam,
+        'icon': Symbols.videocam_rounded,
       },
     ];
 

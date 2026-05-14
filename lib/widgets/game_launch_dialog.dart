@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -315,7 +316,7 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
                           cacheWidth: 300,
                           errorBuilder: (context, err, stack) {
                             return Icon(
-                              Icons.videogame_asset,
+                              Symbols.videogame_asset_rounded,
                               size: 40.r,
                               color: Theme.of(
                                 context,
@@ -380,13 +381,13 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
                     else
                       Icon(
                         _neoSyncStatus == AppLocale.error.getString(context)
-                            ? Icons.error_outline
+                            ? Symbols.error_outline_rounded
                             : _neoSyncStatus ==
                                   AppLocale.neoSyncNotConnected.getString(
                                     context,
                                   )
-                            ? Icons.cloud_off
-                            : Icons.check_circle,
+                            ? Symbols.cloud_off_rounded
+                            : Symbols.check_circle_rounded,
                         size: 24.r,
                         color:
                             _neoSyncStatus == AppLocale.error.getString(context)

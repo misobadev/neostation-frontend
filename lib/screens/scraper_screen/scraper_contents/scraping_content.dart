@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -210,8 +211,8 @@ class ScrapingContentState extends State<ScrapingContent> {
                       },
                       icon: Icon(
                         scrapingProvider.isScraping
-                            ? Icons.stop
-                            : Icons.play_arrow,
+                            ? Symbols.stop_rounded
+                            : Symbols.play_arrow_rounded,
                         size: 16.r,
                       ),
                       label: Text(
@@ -256,7 +257,7 @@ class ScrapingContentState extends State<ScrapingContent> {
                     Expanded(
                       child: _buildStatCard(
                         context,
-                        icon: Icons.games,
+                        icon: Symbols.games_rounded,
                         title: AppLocale.totalGames.getString(context),
                         value:
                             '${scrapingProvider.processedGames} / ${scrapingProvider.totalGames}',
@@ -270,7 +271,7 @@ class ScrapingContentState extends State<ScrapingContent> {
                     Expanded(
                       child: _buildStatCard(
                         context,
-                        icon: Icons.check_circle_outline,
+                        icon: Symbols.check_circle_outline_rounded,
                         title: AppLocale.successFailed.getString(context),
                         value:
                             '${scrapingProvider.successfulGames} / ${scrapingProvider.failedGames}',
@@ -284,7 +285,7 @@ class ScrapingContentState extends State<ScrapingContent> {
                     Expanded(
                       child: _buildStatCard(
                         context,
-                        icon: Icons.cloud_sync,
+                        icon: Symbols.cloud_sync_rounded,
                         title: AppLocale.request.getString(context),
                         value:
                             '${scrapingProvider.totalRequests} / ${scrapingProvider.maxDailyRequests}',

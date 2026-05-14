@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
@@ -621,7 +622,7 @@ class AuthFormState extends State<AuthForm> {
                       context,
                       AppLocale.verificationToken.getString(context),
                       AppLocale.enterTokenFromEmail.getString(context),
-                      Icons.mark_email_read_outlined,
+                      Symbols.mark_email_read_rounded,
                       isTvHighlighted: _isTvSelected(0),
                     ),
                     validator: (value) {
@@ -683,7 +684,7 @@ class AuthFormState extends State<AuthForm> {
                         context,
                         AppLocale.username.getString(context),
                         AppLocale.chooseUsername.getString(context),
-                        Icons.person_outline,
+                        Symbols.person_outline_rounded,
                         isTvHighlighted: _isTvSelected(0),
                       ),
                       validator: (value) {
@@ -713,7 +714,7 @@ class AuthFormState extends State<AuthForm> {
                       context,
                       AppLocale.email.getString(context),
                       'you@example.com',
-                      Icons.email_outlined,
+                      Symbols.email_rounded,
                       isTvHighlighted: _isTvSelected(_isLogin ? 0 : 1),
                     ),
                     validator: (value) {
@@ -747,14 +748,14 @@ class AuthFormState extends State<AuthForm> {
                           context,
                           AppLocale.password.getString(context),
                           AppLocale.enterPassword.getString(context),
-                          Icons.lock_outline,
+                          Symbols.lock_outline_rounded,
                           isTvHighlighted: _isTvSelected(_isLogin ? 1 : 2),
                         ).copyWith(
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
+                                  ? Symbols.visibility_rounded
+                                  : Symbols.visibility_off_rounded,
                               size: 16.r,
                               color: theme.colorScheme.primary.withValues(
                                 alpha: 0.5,
@@ -1046,7 +1047,7 @@ class AuthFormState extends State<AuthForm> {
               context,
               AppLocale.email.getString(context),
               AppLocale.enterRegisteredEmail.getString(context),
-              Icons.email_outlined,
+              Symbols.email_rounded,
               isTvHighlighted: _isTvSelected(0),
             ),
             validator: (value) {
@@ -1088,7 +1089,7 @@ class AuthFormState extends State<AuthForm> {
               context,
               AppLocale.resetTokenLabel.getString(context),
               AppLocale.enterTokenFromEmail.getString(context),
-              Icons.vpn_key_outlined,
+              Symbols.vpn_key_rounded,
               isTvHighlighted: _isTvSelected(0),
             ),
           ),
@@ -1108,14 +1109,14 @@ class AuthFormState extends State<AuthForm> {
                   context,
                   AppLocale.newPassword.getString(context),
                   AppLocale.atLeast8Characters.getString(context),
-                  Icons.lock_outline,
+                  Symbols.lock_outline_rounded,
                   isTvHighlighted: _isTvSelected(1),
                 ).copyWith(
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
+                          ? Symbols.visibility_rounded
+                          : Symbols.visibility_off_rounded,
                       size: 16.r,
                       color: theme.colorScheme.primary.withValues(alpha: 0.5),
                     ),

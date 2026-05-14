@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/services/sfx_service.dart';
@@ -121,8 +122,8 @@ class _MusicPlayerState extends State<MusicPlayer> {
                                   gamepadIcon:
                                       'assets/images/gamepad/Xbox_View_button.png',
                                   symbol: isShuffle
-                                      ? Icons.shuffle_on_outlined
-                                      : Icons.shuffle_rounded,
+                                      ? Symbols.shuffle_on_rounded
+                                      : Symbols.shuffle_rounded,
                                   onTap: () {
                                     SfxService().playNavSound();
                                     service.toggleShuffle();
@@ -138,8 +139,8 @@ class _MusicPlayerState extends State<MusicPlayer> {
                                       'assets/images/gamepad/Xbox_X_button.png',
                                   symbol:
                                       isLooping && service.isCurrentTrackLooping
-                                      ? Icons.repeat_one_rounded
-                                      : Icons.repeat_rounded,
+                                      ? Symbols.repeat_one_rounded
+                                      : Symbols.repeat_rounded,
                                   onTap: () {
                                     SfxService().playNavSound();
                                     service.setLoop(
@@ -161,8 +162,8 @@ class _MusicPlayerState extends State<MusicPlayer> {
                                       (isPlaying &&
                                           service.activeTrack?.romPath ==
                                               service.currentTrack?.romPath)
-                                      ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
+                                      ? Symbols.pause_rounded
+                                      : Symbols.play_arrow_rounded,
                                   onTap: () {
                                     final isHearingCurrent =
                                         service.activeTrack?.romPath ==
@@ -204,8 +205,8 @@ class _MusicPlayerState extends State<MusicPlayer> {
                                       'assets/images/gamepad/Xbox_Y_button.png',
                                   symbol:
                                       service.currentTrack?.isFavorite == true
-                                      ? Icons.favorite_rounded
-                                      : Icons.favorite_border_rounded,
+                                      ? Symbols.favorite_rounded
+                                      : Symbols.favorite_border_rounded,
                                   onTap: () async {
                                     SfxService().playNavSound();
                                     await service.toggleFavorite();
@@ -294,7 +295,7 @@ class _MusicPlayerState extends State<MusicPlayer> {
                                     fit: BoxFit.cover,
                                   )
                                 : Icon(
-                                    Icons.music_note_rounded,
+                                    Symbols.music_note_rounded,
                                     color: Theme.of(
                                       context,
                                     ).colorScheme.primary,

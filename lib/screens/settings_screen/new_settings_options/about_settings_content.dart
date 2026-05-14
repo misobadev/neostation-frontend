@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -132,7 +133,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                         'assets/images/logo_transparent.png',
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => Icon(
-                          Icons.games,
+                          Symbols.games_rounded,
                           size: 64.r,
                           color: theme.colorScheme.primary,
                         ),
@@ -176,7 +177,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildInfoCard(
-                        icon: Icons.language,
+                        icon: Symbols.language_rounded,
                         title: AppLocale.visitWebsite.getString(context),
                         value: 'neostation.dev',
                         url: 'https://neostation.dev/',
@@ -187,7 +188,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                       ),
                       SizedBox(height: 8.h),
                       _buildInfoCard(
-                        icon: Icons.chat_bubble_outline,
+                        icon: Symbols.chat_bubble_outline_rounded,
                         title: AppLocale.joinCommunity.getString(context),
                         value: 'discord.gg/xE2kgKsRVq',
                         url: 'https://discord.gg/xE2kgKsRVq',
@@ -230,7 +231,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                   borderRadius: BorderRadius.circular(8.r),
                 ),
                 child: Icon(
-                  Icons.favorite,
+                  Symbols.favorite_rounded,
                   size: 16.r,
                   color: theme.colorScheme.primary,
                 ),
@@ -266,7 +267,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
           Padding(
             padding: EdgeInsets.only(top: 3.h),
             child: Icon(
-              Icons.check_circle,
+              Symbols.check_circle_rounded,
               size: 12.r,
               color: theme.colorScheme.primary.withValues(alpha: 0.7),
             ),
@@ -359,7 +360,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
               ),
             ),
             Icon(
-              Icons.open_in_new,
+              Symbols.open_in_new_rounded,
               size: 14.r,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
             ),

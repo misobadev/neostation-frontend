@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
@@ -388,7 +389,7 @@ class _RAContentState extends State<RAContent> {
           Row(
             children: [
               Icon(
-                Icons.emoji_events,
+                Symbols.emoji_events_rounded,
                 color: theme.colorScheme.primary,
                 size: 24.r,
               ),
@@ -417,17 +418,17 @@ class _RAContentState extends State<RAContent> {
           SizedBox(height: 6.r),
           _buildInfoItem(
             context,
-            Icons.star_outline,
+            Symbols.star_outline_rounded,
             AppLocale.raEarnPoints.getString(context),
           ),
           _buildInfoItem(
             context,
-            Icons.public,
+            Symbols.public_rounded,
             AppLocale.raGlobalLeaderboards.getString(context),
           ),
           _buildInfoItem(
             context,
-            Icons.history,
+            Symbols.history_rounded,
             AppLocale.raGameplayHistory.getString(context),
           ),
           SizedBox(height: 6.r),
@@ -517,7 +518,7 @@ class _RAContentState extends State<RAContent> {
           // Header: USER PROFILE + Logout
           Row(
             children: [
-              Icon(Icons.person, color: theme.colorScheme.primary, size: 20.r),
+              Icon(Symbols.person_rounded, color: theme.colorScheme.primary, size: 20.r),
               SizedBox(width: 8.r),
               Text(
                 AppLocale.userProfile.getString(context),
@@ -544,7 +545,7 @@ class _RAContentState extends State<RAContent> {
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: Icon(
-                    Icons.logout,
+                    Symbols.logout_rounded,
                     color: theme.colorScheme.error.withValues(alpha: 0.8),
                     size: 16.r,
                   ),
@@ -574,13 +575,13 @@ class _RAContentState extends State<RAContent> {
                           'https://retroachievements.org${user.userPic}',
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) => Icon(
-                            Icons.account_circle,
+                            Symbols.account_circle_rounded,
                             size: 32.r,
                             color: theme.colorScheme.primary,
                           ),
                         )
                       : Icon(
-                          Icons.account_circle,
+                          Symbols.account_circle_rounded,
                           size: 32.r,
                           color: theme.colorScheme.primary,
                         ),
@@ -679,7 +680,7 @@ class _RAContentState extends State<RAContent> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.stars,
+                          Symbols.stars_rounded,
                           size: 10.r,
                           color: theme.colorScheme.primary,
                         ),
@@ -735,7 +736,7 @@ class _RAContentState extends State<RAContent> {
           Row(
             children: [
               Icon(
-                Icons.emoji_events,
+                Symbols.emoji_events_rounded,
                 color: theme.colorScheme.primary,
                 size: 20.r,
               ),
@@ -799,7 +800,7 @@ class _RAContentState extends State<RAContent> {
                       'https://media.retroachievements.org${gotw.achievement.badgeUrl}',
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) => Icon(
-                        Icons.emoji_events_outlined,
+                        Symbols.emoji_events_rounded,
                         color: theme.colorScheme.primary,
                         size: 24.r,
                       ),
@@ -860,7 +861,7 @@ class _RAContentState extends State<RAContent> {
                       child: Row(
                         children: [
                           Icon(
-                            Icons.stars,
+                            Symbols.stars_rounded,
                             size: 10.r,
                             color: theme.colorScheme.primary,
                           ),
@@ -933,7 +934,7 @@ class _RAContentState extends State<RAContent> {
           // Header
           Row(
             children: [
-              Icon(Icons.history, color: theme.colorScheme.primary, size: 20.r),
+              Icon(Symbols.history_rounded, color: theme.colorScheme.primary, size: 20.r),
               SizedBox(width: 8.r),
               Text(
                 AppLocale.recentlyPlayed.getString(context),
@@ -971,13 +972,13 @@ class _RAContentState extends State<RAContent> {
                             'https://media.retroachievements.org${lastGame.imageIcon}',
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) => Icon(
-                              Icons.videogame_asset,
+                              Symbols.videogame_asset_rounded,
                               color: theme.colorScheme.primary,
                               size: 24.r,
                             ),
                           )
                         : Icon(
-                            Icons.videogame_asset,
+                            Symbols.videogame_asset_rounded,
                             color: theme.colorScheme.primary,
                             size: 24.r,
                           ),
@@ -1123,7 +1124,7 @@ class _RAContentState extends State<RAContent> {
           Row(
             children: [
               Icon(
-                Icons.emoji_events,
+                Symbols.emoji_events_rounded,
                 color: theme.colorScheme.primary,
                 size: 20.r,
               ),
@@ -1170,13 +1171,13 @@ class _RAContentState extends State<RAContent> {
                           'https://media.retroachievements.org${latestAward.imageIcon}',
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) => Icon(
-                            Icons.emoji_events_outlined,
+                            Symbols.emoji_events_rounded,
                             color: theme.colorScheme.primary,
                             size: 24.r,
                           ),
                         )
                       : Icon(
-                          Icons.emoji_events_outlined,
+                          Symbols.emoji_events_rounded,
                           color: theme.colorScheme.primary,
                           size: 24.r,
                         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -399,7 +400,7 @@ class _NeoThemeCard extends StatelessWidget {
                             color: Colors.greenAccent,
                           ),
                           child: Icon(
-                            Icons.check_rounded,
+                            Symbols.check_rounded,
                             color: Colors.black,
                             size: 24.r,
                           ),
@@ -564,7 +565,7 @@ class _NeoThemeCard extends StatelessWidget {
       color: theme.colorScheme.surface,
       child: Center(
         child: Icon(
-          item.folder.isEmpty ? Icons.block_outlined : Icons.image_outlined,
+          item.folder.isEmpty ? Symbols.block_rounded : Symbols.image_rounded,
           size: 28.r,
           color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
         ),
@@ -629,7 +630,7 @@ class _ThemeConfirmDialogState extends State<_ThemeConfirmDialog> {
       ),
       title: Row(
         children: [
-          Icon(Icons.image_outlined, color: primary, size: 20.r),
+          Icon(Symbols.image_rounded, color: primary, size: 20.r),
           SizedBox(width: 8.r),
           Text(
             AppLocale.neoThemesApplyTitle.getString(context),
