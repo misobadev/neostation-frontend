@@ -98,9 +98,9 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.scanOnStartup: 'Scan folders on Startup',
   AppLocale.scanOnStartupSubtitle:
       'Automatically scan ROM folders when the application starts',
-  AppLocale.includeHiddenFiles: 'Ignore hidden files in scan',
+  AppLocale.includeHiddenFiles: 'Ignore hidden items',
   AppLocale.includeHiddenFilesSubtitle:
-      'Hide files and folders that start with "." (including ._* AppleDouble sidecars)',
+      'Hide hidden files and folders during ROM scans',
   AppLocale.autoUpdateApp: 'Auto-update App',
   AppLocale.autoUpdateAppSubtitle:
       'Check for new app versions on startup and prompt to update',

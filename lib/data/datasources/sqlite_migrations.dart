@@ -252,9 +252,6 @@ class SqliteMigrations {
       case 82:
         await _migrateToVersion82(db);
         break;
-      case 83:
-        await _migrateToVersion83(db);
-        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -4324,32 +4321,9 @@ class SqliteMigrations {
     }
   }
 
-  /// Migration to version 82: Add include_hidden_files column to user_config.
+  /// Migration to version 82: Add ignore_hidden_files column to user_config.
   static Future<void> _migrateToVersion82(Database db) async {
-    _log.i('Migration v82: Adding include_hidden_files to user_config');
-
-    try {
-      final tableInfo = db.select('PRAGMA table_info(user_config)');
-      final columns = tableInfo.map((c) => c['name'].toString()).toList();
-
-      if (!columns.contains('include_hidden_files')) {
-        db.execute(
-          'ALTER TABLE user_config ADD COLUMN include_hidden_files INTEGER DEFAULT 0',
-        );
-        _log.i('Column include_hidden_files added');
-      } else {
-        _log.i('Column include_hidden_files already exists');
-      }
-    } catch (e, stackTrace) {
-      _log.e('Error in migration v82: $e');
-      _log.e('   StackTrace: $stackTrace');
-      rethrow;
-    }
-  }
-
-  /// Migration to version 83: Add ignore_hidden_files column to user_config.
-  static Future<void> _migrateToVersion83(Database db) async {
-    _log.i('Migration v83: Adding ignore_hidden_files to user_config');
+    _log.i('Migration v82: Adding ignore_hidden_files to user_config');
 
     try {
       final tableInfo = db.select('PRAGMA table_info(user_config)');
@@ -4364,7 +4338,7 @@ class SqliteMigrations {
         _log.i('Column ignore_hidden_files already exists');
       }
     } catch (e, stackTrace) {
-      _log.e('Error in migration v83: $e');
+      _log.e('Error in migration v82: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }
