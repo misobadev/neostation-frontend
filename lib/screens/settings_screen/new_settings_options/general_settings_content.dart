@@ -434,7 +434,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          AppLocale.includeHiddenFiles.getString(context),
+                          AppLocale.ignoreHiddenFiles.getString(context),
                           style: theme.textTheme.bodyLarge?.copyWith(
                             fontSize: 12.r,
                             fontWeight: FontWeight.w500,
@@ -447,7 +447,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                         ),
                         SizedBox(height: 4.r),
                         Text(
-                          AppLocale.includeHiddenFilesSubtitle.getString(
+                          AppLocale.ignoreHiddenFilesSubtitle.getString(
                             context,
                           ),
                           style: theme.textTheme.bodyMedium?.copyWith(

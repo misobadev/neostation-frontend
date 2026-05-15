@@ -117,9 +117,9 @@ mixin AppLocale {
       'error_configuring_retroarch_path';
   static const String scanOnStartup = 'scan_on_startup';
   static const String scanOnStartupSubtitle = 'scan_on_startup_subtitle';
-  static const String includeHiddenFiles = 'include_hidden_files';
-  static const String includeHiddenFilesSubtitle =
-      'include_hidden_files_subtitle';
+  static const String ignoreHiddenFiles = 'ignore_hidden_files';
+  static const String ignoreHiddenFilesSubtitle =
+      'ignore_hidden_files_subtitle';
   static const String autoUpdateApp = 'auto_update_app';
   static const String autoUpdateAppSubtitle = 'auto_update_app_subtitle';
   static const String autoUpdateSystems = 'auto_update_systems';
