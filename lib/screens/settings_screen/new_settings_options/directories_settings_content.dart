@@ -593,8 +593,8 @@ class DirectoriesSettingsContentState
                 // Visual items = navigable items + 1 section header after index 1
                 itemCount: _directoryItems.length + 1,
                 itemBuilder: (context, visualIndex) {
-                  // Insert "ROM Directories" section header after user_data + rescan (nav 0,1).
-                  // Visual index 2 = section header; visual index > 2 maps to nav index - 1.
+                  // Insert "ROM Directories" section header after user_data + rescan (nav indices 0,1)
+                  // Visual index 2 = section header; visual index > 2 maps to nav index - 1
                   if (visualIndex == 2) {
                     return _buildSectionHeader(
                       theme,
