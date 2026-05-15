@@ -35,7 +35,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n org.vita3k.emulator/org.vita3k.emulator.Emulator  --esa AppStartParameters -r,\"{tags.vita_game_id}\""
+          "launch_arguments": "-n org.vita3k.emulator/org.vita3k.emulator.Emulator --esa AppStartParameters \"-r,{tags.vita_game_id}\""
         },
         "windows": {
           "executable": "vita3k.exe",
@@ -58,7 +58,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n org.vita3k.emulator.ikhoeyZX/org.vita3k.emulator.Emulator  --esa AppStartParameters -r,\"{tags.vita_game_id}\""
+          "launch_arguments": "-n org.vita3k.emulator.ikhoeyZX/org.vita3k.emulator.Emulator --esa AppStartParameters \"-r,{tags.vita_game_id}\""
         }
       }
     }
