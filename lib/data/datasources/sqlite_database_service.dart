@@ -104,6 +104,7 @@ class SqliteDatabaseService {
   static Future<ScanSummary> scanSystemRoms(
     SystemModel system,
     List<String> romFolders, {
+    bool includeHiddenFiles = false,
     Map<String, Map<String, String>>? rootFoldersMap,
   }) async {
     if (system.id == null) {
@@ -131,6 +132,7 @@ class SqliteDatabaseService {
         system,
         romFolders,
         validExtensionsSet,
+        includeHiddenFiles: includeHiddenFiles,
         rootFoldersMap: rootFoldersMap,
       ),
       Future.delayed(const Duration(minutes: 10), () {
@@ -152,6 +154,7 @@ class SqliteDatabaseService {
     SystemModel system,
     List<String> romFolders,
     Set<String> validExtensionsSet, {
+    bool includeHiddenFiles = false,
     Map<String, Map<String, String>>? rootFoldersMap,
   }) async {
     final initialCount = await SqliteService.getRomCountForSystem(system.id!);
@@ -192,12 +195,14 @@ class SqliteDatabaseService {
                   resolvedPath,
                   validExtensionsSet,
                   system.recursiveScan,
+                  includeHiddenFiles: includeHiddenFiles,
                 );
               } else {
                 entries = await _scanStandardPath(
                   resolvedPath,
                   validExtensionsSet,
                   system.recursiveScan,
+                  includeHiddenFiles: includeHiddenFiles,
                 );
               }
             } else {
@@ -210,6 +215,7 @@ class SqliteDatabaseService {
                 folderToScan,
                 validExtensionsSet,
                 system.recursiveScan,
+                includeHiddenFiles: includeHiddenFiles,
               );
             } else {
               entries = await _scanStandardFolder(
@@ -217,6 +223,7 @@ class SqliteDatabaseService {
                 folderToScan,
                 validExtensionsSet,
                 system.recursiveScan,
+                includeHiddenFiles: includeHiddenFiles,
               );
             }
           }
@@ -783,13 +790,20 @@ class SqliteDatabaseService {
     String romFolderUri,
     String folderName,
     Set<String> validExtensions,
-    bool recursive,
-  ) async {
+    bool recursive, {
+    bool includeHiddenFiles = false,
+  }) async {
     try {
       final children = await SafDirectoryService.listFiles(romFolderUri);
       if (children.isEmpty) return [];
       String? systemTargetUri;
       for (final child in children) {
+        if (_shouldSkipSafEntry(
+          child,
+          includeHiddenFiles: includeHiddenFiles,
+        )) {
+          continue;
+        }
         if (child['isDirectory'] == true &&
             child['name'].toString().toLowerCase() ==
                 folderName.toLowerCase()) {
@@ -798,7 +812,12 @@ class SqliteDatabaseService {
         }
       }
       if (systemTargetUri == null) return [];
-      return await _scanSafUri(systemTargetUri, validExtensions, recursive);
+      return await _scanSafUri(
+        systemTargetUri,
+        validExtensions,
+        recursive,
+        includeHiddenFiles: includeHiddenFiles,
+      );
     } catch (_) {
       return [];
     }
@@ -808,18 +827,27 @@ class SqliteDatabaseService {
   static Future<List<RomEntry>> _scanSafUri(
     String uri,
     Set<String> validExtensions,
-    bool recursive,
-  ) async {
+    bool recursive, {
+    bool includeHiddenFiles = false,
+  }) async {
     final entries = <RomEntry>[];
     try {
       final content = await SafDirectoryService.listFiles(uri);
       for (final item in content) {
         final name = item['name'].toString();
         final itemUri = item['uri'].toString();
+        if (_shouldSkipSafEntry(item, includeHiddenFiles: includeHiddenFiles)) {
+          continue;
+        }
         if (item['isDirectory'] == true) {
           if (recursive) {
             entries.addAll(
-              await _scanSafUri(itemUri, validExtensions, recursive),
+              await _scanSafUri(
+                itemUri,
+                validExtensions,
+                recursive,
+                includeHiddenFiles: includeHiddenFiles,
+              ),
             );
           }
         } else {
@@ -845,8 +873,9 @@ class SqliteDatabaseService {
     String romFolderPath,
     String folderName,
     Set<String> validExtensions,
-    bool recursive,
-  ) async {
+    bool recursive, {
+    bool includeHiddenFiles = false,
+  }) async {
     try {
       final rootDir = Directory(romFolderPath);
       if (!await rootDir.exists()) return [];
@@ -854,6 +883,12 @@ class SqliteDatabaseService {
       try {
         final List<FileSystemEntity> children = await rootDir.list().toList();
         for (final child in children) {
+          if (await _shouldSkipStandardEntity(
+            child,
+            includeHiddenFiles: includeHiddenFiles,
+          )) {
+            continue;
+          }
           if (child is Directory &&
               path.basename(child.path).toLowerCase() ==
                   folderName.toLowerCase()) {
@@ -866,7 +901,12 @@ class SqliteDatabaseService {
         if (await Directory(directPath).exists()) systemPath = directPath;
       }
       if (systemPath == null) return [];
-      return await _scanStandardPath(systemPath, validExtensions, recursive);
+      return await _scanStandardPath(
+        systemPath,
+        validExtensions,
+        recursive,
+        includeHiddenFiles: includeHiddenFiles,
+      );
     } catch (_) {
       return [];
     }
@@ -876,14 +916,21 @@ class SqliteDatabaseService {
   static Future<List<RomEntry>> _scanStandardPath(
     String pathStr,
     Set<String> validExtensions,
-    bool recursive,
-  ) async {
+    bool recursive, {
+    bool includeHiddenFiles = false,
+  }) async {
     final entries = <RomEntry>[];
     try {
       final entities = await Directory(
         pathStr,
       ).list(recursive: recursive, followLinks: false).toList();
       for (final entity in entities) {
+        if (await _shouldSkipStandardEntity(
+          entity,
+          includeHiddenFiles: includeHiddenFiles,
+        )) {
+          continue;
+        }
         if (entity is File) {
           final filename = path.basename(entity.path);
           final ext = path.extension(filename).toLowerCase();
@@ -901,5 +948,32 @@ class SqliteDatabaseService {
       }
     } catch (_) {}
     return entries;
+  }
+
+  static bool _isDotEntryName(String name) {
+    final trimmed = name.trim();
+    return trimmed.isNotEmpty && trimmed.startsWith('.');
+  }
+
+  static bool _shouldSkipSafEntry(
+    Map<String, dynamic> item, {
+    required bool includeHiddenFiles,
+  }) {
+    if (includeHiddenFiles) return false;
+    final name = item['name']?.toString() ?? '';
+    if (_isDotEntryName(name)) return true;
+    if (item['isHidden'] == true) return true;
+    return false;
+  }
+
+  static Future<bool> _shouldSkipStandardEntity(
+    FileSystemEntity entity, {
+    required bool includeHiddenFiles,
+  }) async {
+    if (includeHiddenFiles) return false;
+
+    final name = path.basename(entity.path);
+    if (_isDotEntryName(name)) return true;
+    return false;
   }
 }

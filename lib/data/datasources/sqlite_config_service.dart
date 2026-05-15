@@ -117,6 +117,12 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['scan_on_startup']?.toString() ?? '1') ??
                 1) ==
             1,
+        includeHiddenFiles:
+            !((int.tryParse(
+                      userConfig?['ignore_hidden_files']?.toString() ?? '1',
+                    ) ??
+                    1) ==
+                1),
         setupCompleted:
             (int.tryParse(userConfig?['setup_completed']?.toString() ?? '0') ??
                 0) ==
@@ -173,6 +179,7 @@ class SqliteConfigService {
         isFullscreen: config.isFullscreen ? 1 : 0,
         bartopExitPoweroff: config.bartopExitPoweroff ? 1 : 0,
         scanOnStartup: config.scanOnStartup ? 1 : 0,
+        ignoreHiddenFiles: config.includeHiddenFiles ? 0 : 1,
         setupCompleted: config.setupCompleted ? 1 : 0,
         hideBottomScreen: config.hideBottomScreen ? 1 : 0,
         videoSound: config.videoSound ? 1 : 0,

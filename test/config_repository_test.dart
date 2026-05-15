@@ -65,5 +65,12 @@ void main() {
       expect(config, isNotNull);
       expect(config!['last_scan'], '2024-01-01');
     });
+
+    test('ignore_hidden_files defaults to enabled (1)', () async {
+      await ConfigRepository.saveUserConfig(lastScan: '2024-01-01');
+      final config = await ConfigRepository.getUserConfig();
+      expect(config, isNotNull);
+      expect(config!['ignore_hidden_files'], anyOf(1, '1'));
+    });
   });
 }
