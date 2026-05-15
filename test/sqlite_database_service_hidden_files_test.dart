@@ -50,7 +50,7 @@ void main() {
 
       await SqliteDatabaseService.scanSystemRoms(system, [
         root.path,
-      ], includeHiddenFiles: false);
+      ], ignoreHiddenFiles: true);
 
       final rows = await db.rawQuery(
         "SELECT filename FROM user_roms WHERE app_system_id = 'snes' ORDER BY filename",
@@ -60,7 +60,7 @@ void main() {
       expect(names, ['good.smc']);
     });
 
-    test('includes dotfiles when includeHiddenFiles is true', () async {
+    test('includes dotfiles when ignoreHiddenFiles is false', () async {
       final root = await Directory.systemTemp.createTemp('neostation_scan_');
       addTearDown(() async {
         if (await root.exists()) {
@@ -85,7 +85,7 @@ void main() {
 
       await SqliteDatabaseService.scanSystemRoms(system, [
         root.path,
-      ], includeHiddenFiles: true);
+      ], ignoreHiddenFiles: false);
 
       final rows = await db.rawQuery(
         "SELECT filename FROM user_roms WHERE app_system_id = 'snes' ORDER BY filename",

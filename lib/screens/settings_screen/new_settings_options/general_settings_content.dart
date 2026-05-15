@@ -461,7 +461,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                     ),
                   ),
                   CustomToggleSwitch(
-                    value: !config.includeHiddenFiles,
+                    value: config.ignoreHiddenFiles,
                     onChanged: (value) {
                       context
                           .read<SqliteConfigProvider>()
