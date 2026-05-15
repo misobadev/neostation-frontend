@@ -213,6 +213,17 @@
       }
     },
     {
+      "name": "Standalone MelonDualDS",
+      "unique_id": "ds.standalone.melonds.dual",
+      "is_retroachievements_compatible": false,
+      "description": "MelonDS (Dual Screen Fork) build.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n me.magnum.melondualds/me.magnum.melonds.ui.emulator.EmulatorActivity -a me.magnum.melonds.dev.LAUNCH_ROM -d \"{file.uri}\""
+        }
+      }
+    },
+    {
       "name": "Standalone NooDS",
       "unique_id": "ds.standalone.noods",
       "is_retroachievements_compatible": false,

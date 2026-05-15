@@ -30,14 +30,14 @@
   },
   "emulators": [
     {
-      "name": "Standalone GameNative",
-      "unique_id": "windows.app.gamenative.amazon",
+      "name": "Standalone GameNative (Amazon)",
+      "unique_id": "amazon.app.gamenative.amazon",
       "default": true,
       "is_retroachievements_compatible": false,
-      "description": "Supported extensions: amazon",
+      "description": "Supported extensions: amazon.",
       "platforms": {
         "android": {
-          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id {tags.customgame} --es game_source AMAZON --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.amazon}\" --es game_source AMAZON"
         }
       }
     }

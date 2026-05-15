@@ -371,6 +371,10 @@ class LauncherService {
         result = result.replaceAll('{tags.steamappid}', game.titleId!);
         result = result.replaceAll('{tags.localgameid}', game.titleId!);
         result = result.replaceAll('{tags.vita_game_id}', game.titleId!);
+        result = result.replaceAll('{tags.gog}', game.titleId!);
+        result = result.replaceAll('{tags.epicgame}', game.titleId!);
+        result = result.replaceAll('{tags.customgame}', game.titleId!);
+        result = result.replaceAll('{tags.amazon}', game.titleId!);
       }
     }
     return result;
@@ -396,6 +400,12 @@ class LauncherService {
 
       if (game.titleId != null) {
         result = result.replaceAll('{tags.vita_game_id}', game.titleId!);
+        result = result.replaceAll('{tags.steamappid}', game.titleId!);
+        result = result.replaceAll('{tags.localgameid}', game.titleId!);
+        result = result.replaceAll('{tags.gog}', game.titleId!);
+        result = result.replaceAll('{tags.epicgame}', game.titleId!);
+        result = result.replaceAll('{tags.customgame}', game.titleId!);
+        result = result.replaceAll('{tags.amazon}', game.titleId!);
       }
     }
     return result;

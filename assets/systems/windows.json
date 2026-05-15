@@ -1,0 +1,213 @@
+{
+  "system": {
+    "id": "windows",
+    "name": "Windows",
+    "neosync": {
+      "sync": false,
+      "sync_folder": null
+    },
+    "short_name": "Windows",
+    "details": {
+      "manufacturer": "Microsoft",
+      "release_date": "1985-11-20",
+      "description": "Microsoft Windows PC games and applications.",
+      "type": "computer"
+    },
+    "ids": {
+      "screenscraper": null,
+      "retroachievements": null
+    },
+    "folders": [
+      "windows",
+      "Windows"
+    ],
+    "colors": [
+      "#0078D4",
+      "#106EBE"
+    ],
+    "extensions": [
+      "desktop",
+      "lnk",
+      "pcgame",
+      "gog",
+      "epic",
+      "customgame",
+      "amazon",
+      "steam"
+    ]
+  },
+  "emulators": [
+    {
+      "name": "Standalone Winlator CMod",
+      "unique_id": "windows.winlator.cmod",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: desktop.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.winlator.cmod/.XServerDisplayActivity -e shortcut_path \"{file.path}\" --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone Winlator CMod Proot",
+      "unique_id": "windows.winlator.cmodproot",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: desktop.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.cmodded.winlator/com.winlator.XServerDisplayActivity -e shortcut_path \"{file.path}\" --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone Winlator Cmod (Old)",
+      "unique_id": "windows.winlator.cmod.old",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: desktop.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.winlator/.XServerDisplayActivity -e shortcut_path \"{file.path}\" --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone MiceWine",
+      "unique_id": "windows.micewine.emu",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: lnk.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.micewine.emu/com.micewine.emu.activities.MainActivity -e exePath \"{file.path}\" --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone GameHub Lite (Local Games)",
+      "unique_id": "windows.gamehub.lite.local",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a gamehub.lite.LAUNCH_GAME -n gamehub.lite/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true"
+        }
+      }
+    },
+    {
+      "name": "Standalone GameHub Lite (Local Games - Antutu)",
+      "unique_id": "windows.gamehub.lite.local.antutu",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a gamehub.lite.LAUNCH_GAME -n com.antutu.ABenchMark/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true"
+        }
+      }
+    },
+    {
+      "name": "Standalone GameHub Lite (Local Games - PUBG)",
+      "unique_id": "windows.gamehub.lite.local.pubg",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a gamehub.lite.LAUNCH_GAME -n com.tencent.ig/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true"
+        }
+      }
+    },
+    {
+      "name": "Standalone GameHub Lite (Local Games - Ludashi)",
+      "unique_id": "windows.gamehub.lite.ludashi",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a gamehub.lite.LAUNCH_GAME -n com.ludashi.aibench/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub (Normal - Local Games)",
+      "unique_id": "windows.banner.hub.local",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a banner.hub.LAUNCH_GAME -n banner.hub/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub Lite (Normal - Local Games)",
+      "unique_id": "windows.banner.hub.lite.local",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a banner.hub.lite.LAUNCH_GAME -n banner.hub.lite/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true"
+        }
+      }
+    },
+    {
+      "name": "Standalone GameNative (GOG)",
+      "unique_id": "windows.app.gamenative.gog",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: gog.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.gog}\" --es game_source GOG"
+        }
+      }
+    },
+    {
+      "name": "Standalone GameNative (Epic Games)",
+      "unique_id": "windows.app.gamenative.epic",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: epic.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.epicgame}\" --es game_source EPIC"
+        }
+      }
+    },
+    {
+      "name": "Standalone GameNative (Custom Game)",
+      "unique_id": "windows.app.gamenative.custom",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: pcgame.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.customgame}\" --es game_source CUSTOM_GAME"
+        }
+      }
+    },
+    {
+      "name": "Standalone GameNative (Amazon)",
+      "unique_id": "windows.app.gamenative.amazon",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: amazon.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.amazon}\" --es game_source AMAZON"
+        }
+      }
+    },
+    {
+      "name": "Standalone GameNative (Steam)",
+      "unique_id": "windows.app.gamenative.steam",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: steam.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.steamappid}\" --es game_source STEAM"
+        }
+      }
+    }
+  ],
+  "neosync": {
+    "sync": false,
+    "android_sync_folder": [],
+    "windows_sync_folder": [],
+    "linux_sync_folder": [],
+    "macos_sync_folder": []
+  }
+}

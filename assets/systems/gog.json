@@ -30,14 +30,14 @@
   },
   "emulators": [
     {
-      "name": "Standalone GameNative",
-      "unique_id": "windows.app.gamenative.gog",
+      "name": "Standalone GameNative (GOG)",
+      "unique_id": "gog.app.gamenative.gog",
       "default": true,
       "is_retroachievements_compatible": false,
-      "description": "Supported extensions: gog",
+      "description": "Supported extensions: gog.",
       "platforms": {
         "android": {
-          "launch_arguments": "-a app.gamenative.LAUNCH_GAME-n app.gamenative/.MainActivity --ei app_id {tags.gog} --es game_source GOG --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.gog}\" --es game_source GOG"
         }
       }
     }

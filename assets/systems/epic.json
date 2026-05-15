@@ -6,7 +6,7 @@
       "sync": false,
       "sync_folder": null
     },
-    "short_name": "EpicGames",
+    "short_name": "Epic",
     "details": {
       "manufacturer": "Epic",
       "release_date": "2018-12-06",
@@ -30,14 +30,14 @@
   },
   "emulators": [
     {
-      "name": "Standalone GameNative",
-      "unique_id": "windows.app.gamenative.epic",
+      "name": "Standalone GameNative (Epic Games)",
+      "unique_id": "epic.app.gamenative.epic",
       "default": true,
       "is_retroachievements_compatible": false,
-      "description": "Supported extensions: epic",
+      "description": "Supported extensions: epicgame.",
       "platforms": {
         "android": {
-          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id {tags.epicgame} --es game_source EPIC --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.epicgame}\" --es game_source EPIC"
         }
       }
     }

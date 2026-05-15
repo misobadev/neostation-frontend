@@ -493,6 +493,37 @@ class SqliteDatabaseService {
           } catch (_) {}
         }
 
+        const windowsIdExts = {
+          '.localgameid',
+          '.steam',
+          '.epic',
+          '.gog',
+          '.amazon',
+          '.pcgame',
+          '.customgame',
+        };
+        if (titleId == null &&
+            windowsIdExts.any(entry.filename.toLowerCase().endsWith)) {
+          try {
+            final bool isSaf = entry.path.startsWith('content://');
+            String? content;
+            if (isSaf) {
+              final bytes = await SafDirectoryService.readRange(
+                entry.path,
+                0,
+                1024,
+              );
+              if (bytes != null) content = utf8.decode(bytes);
+            } else {
+              final file = File(entry.path);
+              if (await file.exists()) content = await file.readAsString();
+            }
+            if (content != null && content.trim().isNotEmpty) {
+              titleId = content.trim();
+            }
+          } catch (_) {}
+        }
+
         batch.rawInsert(sql, [
           systemId,
           systemId,
