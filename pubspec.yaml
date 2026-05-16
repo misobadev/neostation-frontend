@@ -24,7 +24,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  google_fonts: ^8.0.2
+  google_fonts: ^8.1.0
   material_symbols_icons: ^4.2928.1
   provider: ^6.1.5+1
   battery_plus: ^7.0.0
