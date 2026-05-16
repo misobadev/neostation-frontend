@@ -1226,7 +1226,13 @@ class GameService {
         'action': 'android.intent.action.MAIN',
         'category': 'android.intent.category.LAUNCHER',
         'extras': [
-          {'key': 'ROM', 'value': game.romPath, 'type': 'string'},
+          {
+            'key': 'ROM',
+            'value': (game.romPath?.startsWith('content://') == true)
+                ? 'neostation-realpath:${game.romPath}'
+                : game.romPath ?? '',
+            'type': 'string',
+          },
           {'key': 'LIBRETRO', 'value': coreName, 'type': 'string'},
         ],
       });

@@ -35,6 +35,9 @@ class ConfigModel {
   /// Whether to automatically trigger a ROM scan when the application starts.
   final bool scanOnStartup;
 
+  /// Whether hidden files/folders (dot-prefixed) should be ignored during ROM scan.
+  final bool ignoreHiddenFiles;
+
   /// Whether the initial onboarding/setup process has been finished.
   final bool setupCompleted;
 
@@ -80,6 +83,7 @@ class ConfigModel {
     this.isFullscreen = true,
     this.bartopExitPoweroff = false,
     this.scanOnStartup = true,
+    this.ignoreHiddenFiles = true,
     this.setupCompleted = false,
     this.hideBottomScreen = false,
     this.videoSound = false,
@@ -141,6 +145,12 @@ class ConfigModel {
           'true',
       scanOnStartup:
           (json['scanOnStartup'] ?? true).toString().toLowerCase() == 'true',
+      ignoreHiddenFiles:
+          ((json['ignoreHiddenFiles'] ?? json['ignore_hidden_files'] ?? 1)
+                  .toString() ==
+              '1') ||
+          (json['ignoreHiddenFiles'] ?? true).toString().toLowerCase() ==
+              'true',
       setupCompleted:
           (json['setupCompleted'] ?? false).toString().toLowerCase() ==
               'true' ||
@@ -205,6 +215,7 @@ class ConfigModel {
       'isFullscreen': isFullscreen,
       'bartopExitPoweroff': bartopExitPoweroff,
       'scanOnStartup': scanOnStartup,
+      'ignoreHiddenFiles': ignoreHiddenFiles,
       'setupCompleted': setupCompleted,
       'hideBottomScreen': hideBottomScreen,
       'videoSound': videoSound,
@@ -232,6 +243,7 @@ class ConfigModel {
     bool? isFullscreen,
     bool? bartopExitPoweroff,
     bool? scanOnStartup,
+    bool? ignoreHiddenFiles,
     bool? setupCompleted,
     bool? hideBottomScreen,
     bool? videoSound,
@@ -256,6 +268,7 @@ class ConfigModel {
       isFullscreen: isFullscreen ?? this.isFullscreen,
       bartopExitPoweroff: bartopExitPoweroff ?? this.bartopExitPoweroff,
       scanOnStartup: scanOnStartup ?? this.scanOnStartup,
+      ignoreHiddenFiles: ignoreHiddenFiles ?? this.ignoreHiddenFiles,
       setupCompleted: setupCompleted ?? this.setupCompleted,
       hideBottomScreen: hideBottomScreen ?? this.hideBottomScreen,
       videoSound: videoSound ?? this.videoSound,
@@ -275,6 +288,6 @@ class ConfigModel {
 
   @override
   String toString() {
-    return 'ConfigModel(romFolders: ${romFolders.length}, detectedSystems: ${detectedSystems.length}, emulators: ${emulators.length}, showGameInfo: $showGameInfo, isFullscreen: $isFullscreen, bartopExitPoweroff: $bartopExitPoweroff, scanOnStartup: $scanOnStartup, setupCompleted: $setupCompleted, hideBottomScreen: $hideBottomScreen, videoSound: $videoSound)';
+    return 'ConfigModel(romFolders: ${romFolders.length}, detectedSystems: ${detectedSystems.length}, emulators: ${emulators.length}, showGameInfo: $showGameInfo, isFullscreen: $isFullscreen, bartopExitPoweroff: $bartopExitPoweroff, scanOnStartup: $scanOnStartup, ignoreHiddenFiles: $ignoreHiddenFiles, setupCompleted: $setupCompleted, hideBottomScreen: $hideBottomScreen, videoSound: $videoSound)';
   }
 }

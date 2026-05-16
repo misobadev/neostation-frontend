@@ -421,7 +421,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 81;
+  static const int _databaseVersion = 82;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1484,6 +1484,7 @@ class SqliteService {
         is_fullscreen INTEGER DEFAULT 1,
         bartop_exit_poweroff INTEGER DEFAULT 0,
         scan_on_startup INTEGER DEFAULT 1,
+        ignore_hidden_files INTEGER DEFAULT 1,
         setup_completed INTEGER DEFAULT 0,
         hide_bottom_screen INTEGER DEFAULT 0,
         sfx_enabled INTEGER DEFAULT 1,
@@ -2182,6 +2183,7 @@ class SqliteService {
     int? isFullscreen,
     int? bartopExitPoweroff,
     int? scanOnStartup,
+    int? ignoreHiddenFiles,
     int? setupCompleted,
     int? hideBottomScreen,
     int? sfxEnabled,
@@ -2224,6 +2226,9 @@ class SqliteService {
     }
     if (scanOnStartup != null) {
       newConfig['scan_on_startup'] = scanOnStartup;
+    }
+    if (ignoreHiddenFiles != null) {
+      newConfig['ignore_hidden_files'] = ignoreHiddenFiles;
     }
     if (setupCompleted != null) {
       newConfig['setup_completed'] = setupCompleted;

@@ -30,14 +30,14 @@
   },
   "emulators": [
     {
-      "name": "Standalone GameNative",
-      "unique_id": "steam.gamenative",
+      "name": "Standalone GameNative (Steam)",
+      "unique_id": "steam.app.gamenative.steam",
       "default": true,
       "is_retroachievements_compatible": false,
-      "description": "Supported extensions: steam",
+      "description": "Supported extensions: steamappid.",
       "platforms": {
         "android": {
-          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.steamappid}\" --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.steamappid}\" --es game_source STEAM"
         }
       }
     }

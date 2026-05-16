@@ -249,6 +249,9 @@ class SqliteMigrations {
       case 81:
         await _migrateToVersion81(db);
         break;
+      case 82:
+        await _migrateToVersion82(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -4313,6 +4316,29 @@ class SqliteMigrations {
       _log.i('Migration v77 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v77: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration to version 82: Add ignore_hidden_files column to user_config.
+  static Future<void> _migrateToVersion82(Database db) async {
+    _log.i('Migration v82: Adding ignore_hidden_files to user_config');
+
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+
+      if (!columns.contains('ignore_hidden_files')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN ignore_hidden_files INTEGER DEFAULT 1',
+        );
+        _log.i('Column ignore_hidden_files added');
+      } else {
+        _log.i('Column ignore_hidden_files already exists');
+      }
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v82: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

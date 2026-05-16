@@ -13,7 +13,7 @@ workspace:
   - packages/gamepads_platform_interface
   - packages/gamepads_windows
 
-version: 0.8.2+97
+version: 0.8.4+99
 
 environment:
   sdk: '>=3.9.2'
@@ -24,7 +24,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  google_fonts: ^8.0.2
+  google_fonts: ^8.1.0
   material_symbols_icons: ^4.2928.1
   provider: ^6.1.5+1
   battery_plus: ^7.0.0
@@ -37,7 +37,7 @@ dependencies:
   path_provider: ^2.1.5
   video_player: ^2.10.0
   fvp: ^0.36.2
-  flutter_secure_storage: ^10.0.0
+  flutter_secure_storage: ^10.2.0
   shared_preferences: ^2.5.3
   http: ^1.5.0
   crypto: ^3.0.6
@@ -52,7 +52,7 @@ dependencies:
   package_info_plus: ^9.0.1
   pointycastle: ^4.0.0
   carousel_slider: ^5.1.1
-  sqlite3: ^3.1.2
+  sqlite3: ^3.3.1
   fullscreen_window: ^1.2.1
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
@@ -99,6 +99,7 @@ flutter:
     - assets/images/gamepad/
     - assets/images/icons/
     - assets/images/music/
+    - assets/manifest.json
     - assets/data/
     - assets/systems/
     - assets/sounds/

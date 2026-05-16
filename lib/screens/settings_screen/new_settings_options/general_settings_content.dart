@@ -171,7 +171,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
 
   /// Platform: Android - Triggers the system-default launcher selection activity.
   Future<void> _toggleLauncher(bool value) async {
-    if (Platform.isAndroid && value) {
+    if (Platform.isAndroid) {
       try {
         const platform = MethodChannel('com.neogamelab.neostation/launcher');
         await platform.invokeMethod('openLauncherSettings');
@@ -394,6 +394,78 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                       context.read<SqliteConfigProvider>().updateScanOnStartup(
                         value,
                       );
+                    },
+                    activeColor: theme.colorScheme.primary,
+                  ),
+                ],
+              ),
+            );
+          }(),
+
+          // Setting: Ignore hidden files in scan.
+          SizedBox(height: 12.r),
+          () {
+            final index = currentItemIdx++;
+            return Container(
+              key: _itemKeys[index],
+              padding: EdgeInsets.only(
+                left: 12.r,
+                right: 12.r,
+                top: 6.r,
+                bottom: 6.r,
+              ),
+              decoration: BoxDecoration(
+                color: theme.cardColor.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(
+                  color:
+                      widget.isContentFocused &&
+                          widget.selectedContentIndex == index
+                      ? theme.colorScheme.primary
+                      : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppLocale.ignoreHiddenFiles.getString(context),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 12.r,
+                            fontWeight: FontWeight.w500,
+                            color:
+                                widget.isContentFocused &&
+                                    widget.selectedContentIndex == index
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        SizedBox(height: 4.r),
+                        Text(
+                          AppLocale.ignoreHiddenFilesSubtitle.getString(
+                            context,
+                          ),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 9.r,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  CustomToggleSwitch(
+                    value: config.ignoreHiddenFiles,
+                    onChanged: (value) {
+                      context
+                          .read<SqliteConfigProvider>()
+                          .updateIgnoreHiddenFiles(value);
                     },
                     activeColor: theme.colorScheme.primary,
                   ),

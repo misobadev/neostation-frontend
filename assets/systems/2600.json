@@ -151,7 +151,7 @@
       "description": "Supported extensions: a26, bin.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.explusalpha.A2600Emu/com.imagine.BaseActivity -a android.intent.action.VIEW -d \"{file.uri}\""
+          "launch_arguments": "-n com.explusalpha.A2600Emu/com.imagine.BaseActivity -a android.intent.action.VIEW -d \"{file.localuri}\""
         }
       }
     },

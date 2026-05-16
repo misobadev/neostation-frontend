@@ -89,6 +89,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.errorConfiguringRetroArchPath: '配置 RetroArch 路径时出错: {error}',
   AppLocale.scanOnStartup: '启动时扫描文件夹',
   AppLocale.scanOnStartupSubtitle: '应用程序启动时自动扫描 ROM 文件夹',
+  AppLocale.ignoreHiddenFiles: '忽略隐藏项目',
+  AppLocale.ignoreHiddenFilesSubtitle: 'ROM 扫描期间隐藏隐藏文件和文件夹',
   AppLocale.autoUpdateApp: '自动更新应用',
   AppLocale.autoUpdateAppSubtitle: '启动时检查新版本并提示更新',
   AppLocale.autoUpdateSystems: '自动更新系统和模拟器',

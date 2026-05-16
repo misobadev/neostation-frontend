@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:neostation/data/datasources/sqlite_service.dart';
 
@@ -8,6 +9,7 @@ class DatabaseTestHelper {
 
   /// Initializes a fresh in-memory database and injects it into [SqliteService].
   Future<DatabaseAdapter> setUp() async {
+    SharedPreferences.setMockInitialValues({});
     _db = sqlite.sqlite3.openInMemory();
     _adapter = DatabaseAdapter(_db);
     SqliteService.setTestingDatabase(_adapter);
@@ -77,6 +79,8 @@ class DatabaseTestHelper {
         play_time INTEGER DEFAULT 0,
         last_played TEXT,
         cloud_sync_enabled INTEGER DEFAULT 0,
+        created_at TEXT,
+        updated_at TEXT,
         app_emulator_unique_id TEXT,
         app_emulator_os_id INTEGER
       )
@@ -95,6 +99,7 @@ class DatabaseTestHelper {
         is_fullscreen INTEGER,
         bartop_exit_poweroff INTEGER,
         scan_on_startup INTEGER,
+        ignore_hidden_files INTEGER DEFAULT 1,
         setup_completed INTEGER,
         hide_bottom_screen INTEGER,
         sfx_enabled INTEGER,

@@ -9,9 +9,7 @@ import '../sync/i_sync_provider.dart';
 import '../providers/file_provider.dart';
 import '../models/system_model.dart';
 import '../models/game_model.dart';
-import '../models/neo_sync_models.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:neostation/services/logger_service.dart';
 import '../services/game_service.dart';
 import '../services/game_launch_manager.dart';
 import '../utils/gamepad_nav.dart';
@@ -38,21 +36,15 @@ class GameLaunchDialog extends StatefulWidget {
 
 class _GameLaunchDialogState extends State<GameLaunchDialog> {
   late GamepadNavigation _dialogGamepadNav;
-  static final _log = LoggerService.instance;
 
   bool _closeCalled = false;
   bool _onGameClosedFired = false;
   bool _postSyncStarted = false;
-  bool _postSyncComplete = false;
-  String _neoSyncStatus = '';
   String _gameStatus = '';
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_neoSyncStatus.isEmpty) {
-      _neoSyncStatus = AppLocale.neoSyncSynchronizing.getString(context);
-    }
     if (_gameStatus.isEmpty) {
       _gameStatus = AppLocale.launchingGame.getString(context);
     }
@@ -76,7 +68,6 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
         onActivate: () => _dialogGamepadNav.activate(),
         onDeactivate: () => _dialogGamepadNav.deactivate(),
       );
-      _performPreSync();
     });
   }
 
@@ -140,57 +131,12 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
   }
 
   // ---------------------------------------------------------------------------
-  // Sync
+  // Post-game cleanup
   // ---------------------------------------------------------------------------
-
-  Future<void> _performPreSync() async {
-    if (!widget.syncProvider.isAuthenticated) {
-      if (mounted) {
-        setState(
-          () =>
-              _neoSyncStatus = AppLocale.neoSyncNotConnected.getString(context),
-        );
-      }
-      return;
-    }
-    try {
-      await widget.syncProvider.syncGameSavesBeforeLaunch(widget.game);
-      if (mounted) setState(() => _neoSyncStatus = _getNeoSyncStatusText());
-    } catch (e) {
-      _log.e('GameLaunchDialog: Pre-sync failed: $e');
-      if (mounted) {
-        setState(
-          () =>
-              _neoSyncStatus = AppLocale.neoSyncSynchronized.getString(context),
-        );
-      }
-    }
-  }
 
   Future<void> _performPostSync() async {
     // End game session (saves playtime, unblocks Android native gamepad, clears state).
     await GameService.endGameSession();
-
-    if (mounted) {
-      setState(
-        () =>
-            _neoSyncStatus = AppLocale.neoSyncSynchronizing.getString(context),
-      );
-    }
-
-    try {
-      await widget.syncProvider.syncGameSavesAfterClose(widget.game);
-    } catch (e) {
-      _log.e('GameLaunchDialog: Post-sync failed: $e');
-    }
-
-    if (mounted) {
-      setState(() {
-        _neoSyncStatus = _getNeoSyncStatusText();
-        _postSyncComplete = true;
-      });
-    }
-
     // Signal manager that everything is done → triggers closed phase → _closeDialog.
     GameLaunchManager().completeClose();
   }
@@ -209,38 +155,6 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
         widget.onGameClosed();
       }
     });
-  }
-
-  // ---------------------------------------------------------------------------
-  // NeoSync text helper
-  // ---------------------------------------------------------------------------
-
-  String _getNeoSyncStatusText() {
-    if (!widget.syncProvider.isAuthenticated) {
-      return AppLocale.neoSyncNotConnected.getString(context);
-    }
-
-    final gameState = widget.syncProvider.getGameSyncState(widget.game.romname);
-    if (gameState != null) {
-      switch (gameState.status) {
-        case GameSyncStatus.upToDate:
-          return AppLocale.neoSyncSynchronized.getString(context);
-        case GameSyncStatus.localOnly:
-          return AppLocale.neoSyncLocalSavesOnly.getString(context);
-        case GameSyncStatus.cloudOnly:
-          return AppLocale.neoSyncCloudSavesOnly.getString(context);
-
-        case GameSyncStatus.noSaveFound:
-          return AppLocale.neoSyncNoSave.getString(context);
-        case GameSyncStatus.disabled:
-          return AppLocale.neoSyncCloudSyncDisabled.getString(context);
-        case GameSyncStatus.quotaExceeded:
-          return AppLocale.neoSyncQuotaExceeded.getString(context);
-        default:
-          return AppLocale.neoSyncSynchronized.getString(context);
-      }
-    }
-    return AppLocale.neoSyncSynchronized.getString(context);
   }
 
   // ---------------------------------------------------------------------------
@@ -358,61 +272,6 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-
-              SizedBox(height: 4.r),
-
-              if (widget.syncProvider.isAuthenticated)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_neoSyncStatus ==
-                            AppLocale.neoSyncSynchronizing.getString(context) &&
-                        !_postSyncComplete)
-                      SizedBox(
-                        width: 16.r,
-                        height: 16.r,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.r,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      )
-                    else
-                      Icon(
-                        _neoSyncStatus == AppLocale.error.getString(context)
-                            ? Symbols.error_outline_rounded
-                            : _neoSyncStatus ==
-                                  AppLocale.neoSyncNotConnected.getString(
-                                    context,
-                                  )
-                            ? Symbols.cloud_off_rounded
-                            : Symbols.check_circle_rounded,
-                        size: 24.r,
-                        color:
-                            _neoSyncStatus == AppLocale.error.getString(context)
-                            ? Colors.red
-                            : _neoSyncStatus ==
-                                  AppLocale.neoSyncNotConnected.getString(
-                                    context,
-                                  )
-                            ? Colors.orange
-                            : Colors.green,
-                      ),
-
-                    SizedBox(width: 4.r),
-
-                    Text(
-                      _neoSyncStatus,
-                      style: TextStyle(
-                        fontSize: 14.r,
-                        fontWeight: FontWeight.w400,
-                        color: Theme.of(context).colorScheme.onSurface,
-                        letterSpacing: 0.2.r,
-                      ),
-                    ),
-                  ],
-                ),
             ],
           ),
         ),

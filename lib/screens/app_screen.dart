@@ -128,33 +128,18 @@ class AppScreenState extends State<AppScreen> {
     _themeProvider?.addListener(_onThemeChanged);
   }
 
-  /// Runs the sequenced update flow: app update first, then systems update.
+  /// Runs the sequenced update flow: updates first, then one ROM scan.
   ///
-  /// Defers until any active ROM scan completes to avoid resource contention.
+  /// The initial scan is deferred by SqliteConfigProvider so updates and scan
+  /// happen in a single pass — no double-scan on systems update acceptance.
   Future<void> _runUpdateSequence() async {
-    await SystemsUpdateService.initialize();
     if (!mounted) return;
     try {
       final configProvider = Provider.of<SqliteConfigProvider>(
         context,
         listen: false,
       );
-
-      if (configProvider.isScanning) {
-        void checkScanStatus() {
-          if (!configProvider.isScanning && mounted) {
-            configProvider.removeListener(checkScanStatus);
-            _performUpdateSequence(configProvider);
-          }
-        }
-
-        configProvider.addListener(checkScanStatus);
-        Future.delayed(const Duration(minutes: 5), () {
-          configProvider.removeListener(checkScanStatus);
-        });
-      } else {
-        _performUpdateSequence(configProvider);
-      }
+      _performUpdateSequence(configProvider);
     } catch (e) {
       _log.e('AppScreen: Failed to initiate update sequence', error: e);
     }
@@ -163,14 +148,27 @@ class AppScreenState extends State<AppScreen> {
   Future<void> _performUpdateSequence(
     SqliteConfigProvider configProvider,
   ) async {
-    bool appUpdateShown = false;
+    bool systemsUpdated = false;
 
     if (configProvider.config.autoUpdateApp) {
-      appUpdateShown = await _checkAndShowAppUpdate();
+      final appUpdateShown = await _checkAndShowAppUpdate();
+      if (appUpdateShown) {
+        // App update dialog is active — consume scan flag but don't scan now.
+        // User will restart after updating.
+        configProvider.consumeStartupScan();
+        return;
+      }
     }
 
-    if (!appUpdateShown && configProvider.config.autoUpdateSystems) {
-      await _checkAndShowSystemsUpdate(configProvider);
+    if (configProvider.config.autoUpdateSystems) {
+      systemsUpdated = await _checkAndShowSystemsUpdate(configProvider);
+    }
+
+    final startupScanPending = configProvider.consumeStartupScan();
+    if ((systemsUpdated || startupScanPending) &&
+        configProvider.hasRomFolder &&
+        mounted) {
+      configProvider.scanSystems();
     }
   }
 
@@ -194,13 +192,13 @@ class AppScreenState extends State<AppScreen> {
   }
 
   /// Checks for systems/emulator config updates and shows the dialog if found.
-  /// If the user confirms and the update succeeds, reloads definitions and scans ROMs.
-  Future<void> _checkAndShowSystemsUpdate(
+  /// Returns true if the update was accepted and applied (caller triggers scan).
+  Future<bool> _checkAndShowSystemsUpdate(
     SqliteConfigProvider configProvider,
   ) async {
     try {
       final updateInfo = await SystemsUpdateService.checkForUpdate();
-      if (updateInfo == null || !mounted) return;
+      if (updateInfo == null || !mounted) return false;
 
       final updated = await showDialog<bool>(
         context: context,
@@ -210,13 +208,12 @@ class AppScreenState extends State<AppScreen> {
 
       if (updated == true && mounted) {
         await configProvider.reloadSystemDefinitions();
-        if (mounted && configProvider.hasRomFolder) {
-          configProvider.scanSystems();
-        }
+        return true;
       }
     } catch (e) {
       _log.e('AppScreen: Systems update check failure', error: e);
     }
+    return false;
   }
 
   @override

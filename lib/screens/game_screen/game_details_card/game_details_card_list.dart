@@ -78,6 +78,7 @@ class GameDetailsCardList extends StatefulWidget {
   final VoidCallback? onPlayGame;
   final VoidCallback? onShowRandomGame;
   final VoidCallback? onGameUpdated;
+  final VoidCallback? onFavoriteToggled;
 
   /// Callback to register the primary trigger action (standard Gamepad A).
   final Function(VoidCallback)? onRegisterTriggerAction;
@@ -123,6 +124,7 @@ class GameDetailsCardList extends StatefulWidget {
     this.onPlayGame,
     this.onShowRandomGame,
     this.onGameUpdated,
+    this.onFavoriteToggled,
     this.onRegisterTriggerAction,
     this.onRegisterSecondaryAction,
     this.onRegisterIsPlayingGameBlocked,
@@ -879,7 +881,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     setState(() {
       _game = _game.copyWith(isFavorite: !(_game.isFavorite ?? false));
     });
-    widget.onGameUpdated?.call();
+    widget.onFavoriteToggled?.call();
   }
 
   /// Orchestrates a quick-access metadata scrape.

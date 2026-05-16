@@ -1,0 +1,63 @@
+{
+  "system": {
+    "id": "triforce",
+    "name": "Triforce",
+    "short_name": "Triforce",
+    "details": {
+      "manufacturer": "Nintendo / Sega / Namco",
+      "release_date": "2002-01-01",
+      "description": "Arcade system board developed by Nintendo, Sega, and Namco.",
+      "type": "arcade"
+    },
+    "ids": {
+      "screenscraper": 155,
+      "retroachievements": null
+    },
+    "folders": [
+      "triforce",
+      "Triforce"
+    ],
+    "colors": [
+      "#E60012",
+      "#0055D4"
+    ],
+    "extensions": [
+      "gcz",
+      "iso",
+      "wia",
+      "gcm"
+    ]
+  },
+  "emulators": [
+    {
+      "name": "Standalone Dolphin",
+      "unique_id": "triforce.org.dolphinemu.dolphinemu",
+      "default": true,
+      "description": "Supported extensions: gcz, iso, wia, gcm.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n org.dolphinemu.dolphinemu/.ui.main.MainActivity -a android.intent.action.MAIN -e AutoStartFile \"{file.uri}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone Dolphin (Debug Build)",
+      "unique_id": "triforce.org.dolphinemu.dolphinemu.debug",
+      "description": "Supported extensions: gcz, iso, wia, gcm.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n org.dolphinemu.dolphinemu.debug/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.MAIN -e AutoStartFile \"{file.uri}\""
+        }
+      }
+    }
+  ],
+  "neosync": {
+    "sync": false,
+    "android_sync_folder": [],
+    "windows_sync_folder": [],
+    "linux_sync_folder": [],
+    "macos_sync_folder": []
+  }
+}

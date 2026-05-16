@@ -104,8 +104,11 @@ const Map<String, dynamic> appLocaleIt = {
       'Errore durante la configurazione del percorso RetroArch: {error}',
   AppLocale.scanOnStartup: 'Scansiona cartelle all’avvio',
   AppLocale.scanOnStartupSubtitle:
-      'Scansiona automaticamente le cartelle ROM all’apertura dell’app',
-  AppLocale.autoUpdateApp: 'Aggiornamento automatico App',
+      ‘Scansiona automaticamente le cartelle ROM all’apertura dell’app’,
+  AppLocale.ignoreHiddenFiles: ‘Ignora elementi nascosti’,
+  AppLocale.ignoreHiddenFilesSubtitle:
+      ‘Nascondi file e cartelle nascosti durante la scansione delle ROM’,
+  AppLocale.autoUpdateApp: ‘Aggiornamento automatico App’,
   AppLocale.autoUpdateAppSubtitle:
       'Cerca nuove versioni all’avvio e chiedi di aggiornare',
   AppLocale.autoUpdateSystems: 'Aggiorna Sistemi ed Emulatori',

@@ -82,7 +82,31 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       final nands = await SwitchSaveDetector.detectEmulatorNandPaths();
       final List<String> paths = [];
 
-      final titleId = game?.titleId;
+      String? titleId = game?.titleId;
+
+      // If titleId not in DB, try extracting from ROM file and persist it.
+      if ((titleId == null || titleId.isEmpty) && game?.romPath != null) {
+        try {
+          final info = await SwitchTitleExtractor.extractGameInfo(
+            game!.romPath!,
+          );
+          if (info != null && info.titleId.isNotEmpty) {
+            titleId = info.titleId;
+            await GameRepository.updateGameTitleId(game.romname, titleId);
+          }
+        } catch (_) {}
+      }
+
+      // Last resort: scan NAND save dirs and reverse-lookup by titleId in DB.
+      // Needed on Android when ROM file is inaccessible (installed titles, etc.).
+      if ((titleId == null || titleId.isEmpty) &&
+          game != null &&
+          nands.isNotEmpty) {
+        titleId = await _findTitleIdByNandScan(nands, game.romname);
+        if (titleId != null) {
+          await GameRepository.updateGameTitleId(game.romname, titleId);
+        }
+      }
 
       for (final nand in nands) {
         final placeholder = pathStr.contains('{SWITCH_NAND}')
@@ -595,6 +619,48 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       } catch (e) {
         /* ignore */
       }
+    }
+    return null;
+  }
+
+  /// Scans NAND save directories across detected emulators to find which titleId
+  /// belongs to the given ROM. Used as last resort when titleId is not in the DB
+  /// and cannot be extracted from the ROM file (e.g., installed titles on Android).
+  Future<String?> _findTitleIdByNandScan(
+    List<EmulatorNandInfo> nands,
+    String romname,
+  ) async {
+    for (final nand in nands) {
+      try {
+        final saveBasePath = path.join(
+          nand.nandDirectory,
+          'user',
+          'save',
+          '0000000000000000',
+        );
+        final saveBaseDir = Directory(saveBasePath);
+        if (!saveBaseDir.existsSync()) continue;
+
+        // List userId dirs (one level deep — fast)
+        final userIdDirs = saveBaseDir.listSync().whereType<Directory>();
+        for (final userIdDir in userIdDirs) {
+          final titleIdDirs = userIdDir.listSync().whereType<Directory>();
+          for (final titleIdDir in titleIdDirs) {
+            final candidate = path.basename(titleIdDir.path);
+            try {
+              final row = await GameRepository.findSwitchGameByTitleId(
+                candidate,
+              );
+              if (row != null && row['filename'].toString() == romname) {
+                NeoSyncProvider._log.i(
+                  'Resolved titleId "$candidate" for $romname via NAND scan',
+                );
+                return candidate;
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
     }
     return null;
   }

@@ -84,7 +84,7 @@
       }
     },
     {
-      "name": "Standalone Dolphin Official",
+      "name": "Standalone Dolphin",
       "unique_id": "gc.org.dolphinemu.dolphinemu",
       "description": "Supported extensions: ciso, dff, dol, elf, gcm, gcz, iso, tgc, wad, wbfs, rvz, m3u.",
       "is_retroachievements_compatible": true,

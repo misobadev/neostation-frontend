@@ -235,17 +235,11 @@ class SwitchSaveDetector {
     String emulatorName,
   ) async {
     try {
-      _log.i('Mirroring NAND for $packageName ($emulatorName) via native...');
       const platform = MethodChannel('com.neogamelab.neostation/game');
       final mirrorPath = await platform.invokeMethod<String>(
         'mirrorEmulatorNand',
         {'packageName': packageName, 'emulatorName': emulatorName},
       );
-      if (mirrorPath != null) {
-        _log.i('Native mirror success for $emulatorName: $mirrorPath');
-      } else {
-        _log.w('Native mirror failed for $emulatorName');
-      }
       return mirrorPath;
     } catch (e) {
       _log.d('Native mirror error for $packageName: $e');
@@ -490,13 +484,33 @@ class SwitchSaveDetector {
           userIdPath = userIdEntity.path;
         }
 
-        final titleIdPath = path.join(userIdPath, titleId);
+        // Try exact match first, then case-insensitive (Android FS is case-sensitive
+        // but DB may store titleId with different casing than NAND directory name).
+        String? resolvedTitleIdPath;
 
-        if (await _directoryExistsSafe(titleIdPath) &&
-            await _isDirectoryNonEmpty(titleIdPath)) {
+        final exactPath = path.join(userIdPath, titleId);
+        if (await _directoryExistsSafe(exactPath)) {
+          resolvedTitleIdPath = exactPath;
+        } else {
+          // List children and find case-insensitive match
+          try {
+            final titleIdEntries = await _listDirectory(userIdPath);
+            for (var entry in titleIdEntries) {
+              if (entry is! Directory) continue;
+              final dirName = path.basename(entry.path);
+              if (dirName.toUpperCase() == titleId.toUpperCase()) {
+                resolvedTitleIdPath = entry.path;
+                break;
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (resolvedTitleIdPath != null &&
+            await _isDirectoryNonEmpty(resolvedTitleIdPath)) {
           return SwitchSaveInfo(
-            titleId: titleId,
-            savePath: titleIdPath,
+            titleId: path.basename(resolvedTitleIdPath),
+            savePath: resolvedTitleIdPath,
             userId: path.basename(userIdPath),
             nandDirectory: nandDirectory,
           );

@@ -146,7 +146,7 @@ class GameRepository {
       SELECT ur.filename, ur.title_name
       FROM user_roms ur
       JOIN app_systems s ON ur.app_system_id = s.id
-      WHERE ur.title_id = ? AND s.folder_name = ?
+      WHERE UPPER(ur.title_id) = UPPER(?) AND s.folder_name = ?
       LIMIT 1
       ''',
       [titleId, 'switch'],

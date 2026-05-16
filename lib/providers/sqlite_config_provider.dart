@@ -36,6 +36,7 @@ class SqliteConfigProvider extends ChangeNotifier {
   /// Flag to prevent concurrent ROM scanning operations.
   bool _isScanningRoms = false;
   bool _isSilentScanning = false;
+  bool _pendingStartupScan = false;
   SystemModel? _silentScannedSystem;
   ScanSummary? _lastScanSummary;
   String? _error;
@@ -76,6 +77,16 @@ class SqliteConfigProvider extends ChangeNotifier {
   String? get error => _error;
   bool get isScanningRoms => _isScanningRoms;
   bool get isSilentScanning => _isSilentScanning;
+
+  /// True when a startup scan was requested but deferred for update checks.
+  bool get pendingStartupScan => _pendingStartupScan;
+
+  /// Consumes (clears) the pending startup scan flag and returns its value.
+  bool consumeStartupScan() {
+    final v = _pendingStartupScan;
+    _pendingStartupScan = false;
+    return v;
+  }
 
   /// Indicates whether a blocking global scan is currently active.
   ///
@@ -170,10 +181,9 @@ class SqliteConfigProvider extends ChangeNotifier {
         }
 
         if (canScan && _config.scanOnStartup) {
-          // Use addPostFrameCallback to avoid modifying the state during build
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            scanSystems();
-          });
+          // Defer scan — AppScreen triggers it after update checks complete,
+          // so updates and scan happen in one pass instead of two.
+          _pendingStartupScan = true;
         } else {
           _scanCompleted = true;
         }
@@ -715,6 +725,7 @@ class SqliteConfigProvider extends ChangeNotifier {
       final summary = await SqliteDatabaseService.scanSystemRoms(
         system,
         _config.romFolders,
+        ignoreHiddenFiles: _config.ignoreHiddenFiles,
         rootFoldersMap: rootFoldersMap,
       );
 
@@ -1137,6 +1148,13 @@ class SqliteConfigProvider extends ChangeNotifier {
   /// Updates whether startup scan is enabled
   Future<void> updateScanOnStartup(bool value) async {
     _config = _config.copyWith(scanOnStartup: value);
+    await SqliteConfigService.saveConfig(_config);
+    notifyListeners();
+  }
+
+  /// Updates whether hidden files/folders are ignored during ROM scans.
+  Future<void> updateIgnoreHiddenFiles(bool ignoreHiddenFiles) async {
+    _config = _config.copyWith(ignoreHiddenFiles: ignoreHiddenFiles);
     await SqliteConfigService.saveConfig(_config);
     notifyListeners();
   }

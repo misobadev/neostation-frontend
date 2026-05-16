@@ -49,7 +49,16 @@ extension NeoSyncUpload on NeoSyncProvider {
                 '$nandPath${Platform.pathSeparator}user${Platform.pathSeparator}save${Platform.pathSeparator}0000000000000000';
             final saveDir = Directory(savePath);
 
+            if (!await saveDir.exists()) {
+              NeoSyncProvider._log.w(
+                'Switch save dir not found for ${emulator.emulatorName}: $savePath',
+              );
+            }
+
             if (await saveDir.exists()) {
+              NeoSyncProvider._log.d(
+                'Scanning Switch saves for ${emulator.emulatorName}: $savePath',
+              );
               final switchFiles = saveDir
                   .listSync(recursive: true)
                   .whereType<File>()
@@ -278,7 +287,17 @@ extension NeoSyncUpload on NeoSyncProvider {
 
         final row = await GameRepository.findSwitchGameByTitleId(titleId);
 
-        if (row != null) {
+        if (row == null) {
+          NeoSyncProvider._log.w(
+            'Switch upload skipped: titleId "$titleId" not found in DB (${file.path})',
+          );
+          _processedItems.add(
+            '⚠️ No game matched titleId $titleId — skipping upload',
+          );
+          return;
+        }
+
+        {
           final romname = row['filename'].toString();
           final titleName = row['title_name']?.toString();
           final game = GameModel(

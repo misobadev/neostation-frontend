@@ -1064,6 +1064,18 @@ class _SystemGamesListState extends State<SystemGamesList> {
     if (_refreshAchievementsCallback != null) {
       _refreshAchievementsCallback!();
     }
+
+    // Trigger sync after returning from game so local save gets uploaded.
+    if (_selectedGame != null && mounted) {
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      try {
+        final syncProvider = context.read<SyncManager>().active!;
+        await syncProvider.detectGameSaveFiles(_selectedGame!);
+      } catch (e) {
+        _log.e('Post-game save sync failed: $e');
+      }
+    }
   }
 
   /// Toggles the 'favorite' status for the selected game and re-sorts the list.
@@ -1154,6 +1166,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
       });
 
       _games = sortedGames;
+      _gameIndexMap = {for (int i = 0; i < _games.length; i++) _games[i]: i};
 
       if (oldIndex >= 0 && oldIndex < _games.length) {
         _selectedGameIndex = oldIndex;
@@ -1182,6 +1195,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
         return a.name.compareTo(b.name);
       });
       _games = sortedGames;
+      _gameIndexMap = {for (int i = 0; i < _games.length; i++) _games[i]: i};
 
       final newIndex = _games.indexWhere((g) => g.romname == romname);
       if (newIndex != -1) {
@@ -1808,10 +1822,13 @@ class _SystemGamesListState extends State<SystemGamesList> {
           _isVideoLoading = false;
         });
 
-        // Initialize playback state: Start muted to prevent sudden audio spikes.
+        // Guard each await: navigation can dispose _videoController between calls.
         await mainController.setVolume(0.0);
+        if (!mounted || _videoController != mainController) return;
         await mainController.setLooping(true);
+        if (!mounted || _videoController != mainController) return;
         await mainController.play();
+        if (!mounted || _videoController != mainController) return;
 
         _updateMusicDucking();
       } else {
@@ -2529,8 +2546,28 @@ class _SystemGamesListState extends State<SystemGamesList> {
         onShowRandomGame: _showRandomGameDialog,
         onBack: _goBack,
         onGameUpdated: _handleGameUpdated, // Sync UI after metadata edits.
+        onFavoriteToggled: _handleFavoriteToggledFromCard,
       ),
     );
+  }
+
+  /// Called when the card's touch favorite button is pressed.
+  /// The DB toggle already happened in the card; mirror it into _games then resort.
+  void _handleFavoriteToggledFromCard() {
+    if (_selectedGame == null) return;
+    setState(() {
+      final gameIndex = _games.indexWhere(
+        (g) => g.romname == _selectedGame!.romname,
+      );
+      if (gameIndex != -1) {
+        final currentFavorite = _games[gameIndex].isFavorite ?? false;
+        _games[gameIndex] = _games[gameIndex].copyWith(
+          isFavorite: !currentFavorite,
+        );
+        _selectedGame = _games[gameIndex];
+      }
+    });
+    _reorderGamesListKeepingVisualPosition();
   }
 
   /// Synchronizes the selected game's metadata and refreshes the list sorting.

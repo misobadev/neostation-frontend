@@ -44,22 +44,24 @@ object EmulatorLauncher {
                 intent.addCategory(Intent.CATEGORY_LAUNCHER)
             }
 
-            var uriData: Uri? = null
-            if (data != null) {
-                uriData = if (!data.contains("://") && data.startsWith("/")) {
-                    Uri.parse("file://$data")
-                } else {
-                    Uri.parse(data)
-                }
+            // Resolve neostation-* markers before building the intent. Markers are
+            // injected by the Dart launcher when the JSON config uses {file.path}
+            // or {file.localuri} placeholders. All other values pass
+            // through unchanged, so this step is a no-op for emulators that don't opt in.
+            val resolvedData = data?.let { resolveMarkedValue(context, it) }
+            val resolvedExtras: List<Map<String, Any>>? = extras?.map { extra ->
+                val rawValue = extra["value"]?.toString() ?: return@map extra
+                val resolved = resolveMarkedValue(context, rawValue)
+                if (resolved == rawValue) extra
+                else extra.toMutableMap().also { m -> m["value"] = resolved }
             }
 
-            // Imagine-engine emulators (com.explusalpha.*) derive save-state and BIOS
-            // paths from the ROM's filesystem location. A content:// URI lets them read
-            // the ROM but breaks save-state lookup. Resolve to file:// when possible.
-            if (uriData?.scheme == "content" && packageName.startsWith("com.explusalpha")) {
-                val resolved = resolveSafUriToPath(context, uriData!!)
-                if (resolved != null) {
-                    uriData = Uri.parse("file://$resolved")
+            var uriData: Uri? = null
+            if (resolvedData != null) {
+                uriData = if (!resolvedData.contains("://") && resolvedData.startsWith("/")) {
+                    Uri.parse("file://$resolvedData")
+                } else {
+                    Uri.parse(resolvedData)
                 }
             }
 
@@ -76,54 +78,23 @@ object EmulatorLauncher {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             activityFlags.forEach { flag -> flagStringToIntent(flag)?.let { intent.addFlags(it) } }
 
-            // Resolve SAF content:// to real file path for RetroArch (needs filesystem access, not content URIs)
-            var resolvedRomPath: String? = null
-            if (packageName.startsWith("com.retroarch") && extras != null) {
-                for (extra in extras) {
-                    val key = extra["key"] as? String
-                    val value = extra["value"]
-                    if (key == "ROM" && value != null) {
-                        val romPath = value.toString()
-                        if (romPath.startsWith("content://")) {
-                            resolvedRomPath = resolveSafUriToPath(context, Uri.parse(romPath))
-                            if (resolvedRomPath == null) {
-                                // Network/NAS document providers (e.g., Round Sync, CIFS) cannot be
-                                // resolved to local filesystem paths. RetroArch requires a real path
-                                // to read the ROM, so we copy it to the app's temporary cache.
-                                val romUri = Uri.parse(romPath)
-                                val fileName = getFileNameFromUri(context, romUri) ?: "rom"
-                                cacheContentUriToFile(context, romUri, fileName)?.let {
-                                    resolvedRomPath = it.absolutePath
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             // Set extras
-            if (extras != null) {
-                for (extra in extras) {
+            if (resolvedExtras != null) {
+                for (extra in resolvedExtras) {
                     val key = extra["key"] as? String ?: continue
                     val value = extra["value"] ?: continue
                     val valueType = extra["type"] as? String ?: continue
-                    var finalValue = value.toString()
+                    val finalValue = value.toString()
 
-                    if (packageName.startsWith("com.retroarch")) {
-                        when (key) {
-                            "ROM" -> {
-                                intent.putExtra(key, resolvedRomPath ?: finalValue)
-                                continue
-                            }
-                            "LIBRETRO" -> if (!finalValue.startsWith("/")) {
-                                val libretroDir = getDefaultLibretroDirectory(packageName)
-                                val base = finalValue
-                                    .removeSuffix("_libretro_android.so")
-                                    .removeSuffix("_libretro.so")
-                                intent.putExtra(key, "$libretroDir${base}_libretro_android.so")
-                                continue
-                            }
-                        }
+                    // RetroArch-specific: LIBRETRO core path construction uses the package name
+                    // to locate the correct cores directory. CONFIGFILE default is set below.
+                    if (packageName.startsWith("com.retroarch") && key == "LIBRETRO" && !finalValue.startsWith("/")) {
+                        val libretroDir = getDefaultLibretroDirectory(context, packageName)
+                        val base = finalValue
+                            .removeSuffix("_libretro_android.so")
+                            .removeSuffix("_libretro.so")
+                        intent.putExtra(key, "$libretroDir${base}_libretro_android.so")
+                        continue
                     }
 
                     when (valueType) {
@@ -140,12 +111,21 @@ object EmulatorLauncher {
                 }
             }
 
-            // Generic SAF permission grant: any content:// URI in data or extras gets
-            // ClipData + permissions so Android propagates the grant correctly.
-            // PREFIX is included so apps (e.g. aPS3e) that access URI subtrees also work.
+            // RetroArch: inject CONFIGFILE default if the JSON didn't supply one.
+            // The path is package-specific (each RetroArch variant has its own data dir).
+            if (packageName.startsWith("com.retroarch") && !intent.hasExtra("CONFIGFILE")) {
+                intent.putExtra(
+                    "CONFIGFILE",
+                    "/storage/emulated/0/Android/data/$packageName/files/retroarch.cfg"
+                )
+            }
+
+            // Generic SAF permission grant: any remaining content:// URI in data or extras
+            // (i.e. values that were NOT resolved by a neostation-* marker) gets ClipData +
+            // permissions so Android propagates the grant correctly before startActivity().
             val primaryContentUri: Uri? = when {
                 uriData?.scheme == "content" -> uriData
-                else -> extras?.firstOrNull { extra ->
+                else -> resolvedExtras?.firstOrNull { extra ->
                     extra["value"]?.toString()?.startsWith("content://") == true
                 }?.let { Uri.parse(it["value"].toString()) }
             }
@@ -181,31 +161,6 @@ object EmulatorLauncher {
                 }
             }
 
-            // RetroArch: ensure CONFIGFILE; if ROM couldn't resolve to real path, grant content URI permissions
-            if (packageName.startsWith("com.retroarch")) {
-                if (!intent.hasExtra("CONFIGFILE")) {
-                    intent.putExtra(
-                        "CONFIGFILE",
-                        "/storage/emulated/0/Android/data/$packageName/files/retroarch.cfg"
-                    )
-                }
-                if (resolvedRomPath == null && extras != null) {
-                    for (extra in extras) {
-                        if (extra["key"] == "ROM") {
-                            val romVal = extra["value"]?.toString() ?: continue
-                            if (romVal.startsWith("content://")) {
-                                val romUri = Uri.parse(romVal)
-                                intent.addFlags(
-                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                                )
-                                intent.clipData = ClipData.newRawUri("ROM", romUri)
-                            }
-                        }
-                    }
-                }
-            }
-
             // StrictMode: allow file:// URIs in intent data for legacy emulators that need them
             try {
                 val m = android.os.StrictMode::class.java.getMethod("disableDeathOnFileUriExposure")
@@ -223,6 +178,42 @@ object EmulatorLauncher {
         } catch (e: Exception) {
             e.printStackTrace()
             result.error("LAUNCH_FAILED", e.message, e.toString())
+        }
+    }
+
+    // Resolves neostation-* markers injected by the Dart launcher for placeholders that
+    // require Android SAF access at launch time. Unknown or plain values pass through.
+    //
+    //  neostation-realpath:<uri>  → best-effort real filesystem path: resolves SAF
+    //                               content:// directly; falls back to a local cache
+    //                               copy for network/NAS providers (Round Sync, CIFS…)
+    //                               that have no filesystem mapping.
+    //  neostation-localuri:<uri> → same resolution as realpath, returned as file:// URI.
+    private fun resolveMarkedValue(context: Context, value: String): String {
+        return when {
+            value.startsWith("neostation-realpath:") -> {
+                val raw = value.removePrefix("neostation-realpath:")
+                if (raw.startsWith("content://")) {
+                    val uri = Uri.parse(raw)
+                    resolveSafUriToPath(context, uri) ?: run {
+                        val fileName = getFileNameFromUri(context, uri) ?: "rom"
+                        cacheContentUriToFile(context, uri, fileName)?.absolutePath ?: raw
+                    }
+                } else raw
+            }
+            value.startsWith("neostation-localuri:") -> {
+                val raw = value.removePrefix("neostation-localuri:")
+                if (raw.startsWith("content://")) {
+                    val uri = Uri.parse(raw)
+                    val path = resolveSafUriToPath(context, uri) ?: run {
+                        val fileName = getFileNameFromUri(context, uri) ?: "rom"
+                        cacheContentUriToFile(context, uri, fileName)?.absolutePath
+                    }
+                    if (path != null) "file://$path" else raw
+                } else if (raw.startsWith("file://")) raw
+                else "file://$raw"
+            }
+            else -> value
         }
     }
 
@@ -296,8 +287,13 @@ object EmulatorLauncher {
 
     private fun cacheContentUriToFile(context: Context, uri: Uri, fileName: String): File? {
         try {
-            val cacheDir = context.externalCacheDir ?: context.cacheDir
-            val importDir = File(cacheDir, ROM_IMPORT_DIR)
+            // Use public external storage so other apps (e.g. RetroArch) can read the cached ROM.
+            // Android 10+ blocks cross-app access to Android/data/<pkg>/cache/, but public
+            // directories under the root of external storage are accessible to any app with
+            // READ_EXTERNAL_STORAGE / MANAGE_EXTERNAL_STORAGE.
+            val publicDir = File(Environment.getExternalStorageDirectory(), "NeoStation/rom_import")
+            val importDir = if (publicDir.mkdirs() || publicDir.exists()) publicDir
+                            else File(context.externalCacheDir ?: context.cacheDir, ROM_IMPORT_DIR).also { it.mkdirs() }
             if (!importDir.exists()) {
                 importDir.mkdirs()
             }
@@ -361,8 +357,13 @@ object EmulatorLauncher {
         }
     }
 
-    private fun getDefaultLibretroDirectory(retroArchPackage: String): String {
-        return "/data/user/0/$retroArchPackage/cores/"
+    private fun getDefaultLibretroDirectory(context: Context, retroArchPackage: String): String {
+        return try {
+            val appInfo = context.packageManager.getApplicationInfo(retroArchPackage, 0)
+            "${appInfo.dataDir}/cores/"
+        } catch (_: Exception) {
+            "/data/user/0/$retroArchPackage/cores/"
+        }
     }
 
     private fun isExternalStorageDocument(uri: Uri): Boolean {
