@@ -30,6 +30,7 @@ class SystemsSettingsContent extends StatefulWidget {
 
 class SystemsSettingsContentState extends State<SystemsSettingsContent> {
   final ScrollController _scrollController = ScrollController();
+  static const int _fixedSettingsRowsCount = 2; // Recent + Favorites
 
   /// GlobalKeys for maintaining focal visibility during gamepad navigation.
   final List<GlobalKey> _itemKeys = [];
@@ -58,7 +59,7 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
 
   /// Calculates the total number of navigable settings (Global Card + Detected Systems).
   int getItemCount(SqliteConfigProvider provider) {
-    return _buildItems(provider).length;
+    return _fixedSettingsRowsCount + provider.detectedSystems.length;
   }
 
   /// Executes the toggle action for the specified system or feature.
