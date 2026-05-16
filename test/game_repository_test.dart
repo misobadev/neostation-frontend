@@ -119,5 +119,39 @@ void main() {
       );
       expect(remaining.first['c'], 0);
     });
+
+    test('getFavoriteGames returns only favorites excluding android and music', () async {
+      await db.execute(
+        "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('music', 'Music', 'music')",
+      );
+      await db.execute(
+        "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('android', 'Android', 'android')",
+      );
+
+      await db.execute(
+        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-switch.nsp', '/roms/switch/fav-switch.nsp', 'switch', 1)",
+      );
+      await db.execute(
+        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-snes.smc', '/roms/snes/fav-snes.smc', 'snes', 1)",
+      );
+      await db.execute(
+        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('not-fav.smc', '/roms/snes/not-fav.smc', 'snes', 0)",
+      );
+      await db.execute(
+        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-android.apk', 'com.example.app', 'android', 1)",
+      );
+      await db.execute(
+        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-music.mp3', '/roms/music/fav-music.mp3', 'music', 1)",
+      );
+
+      final results = await GameRepository.getFavoriteGames();
+      final filenames = results.map((g) => g.filename).toSet();
+
+      expect(filenames, contains('fav-switch.nsp'));
+      expect(filenames, contains('fav-snes.smc'));
+      expect(filenames, isNot(contains('not-fav.smc')));
+      expect(filenames, isNot(contains('fav-android.apk')));
+      expect(filenames, isNot(contains('fav-music.mp3')));
+    });
   });
 }

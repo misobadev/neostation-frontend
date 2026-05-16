@@ -332,9 +332,25 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
         .toList();
 
     final hiddenFolders = configProvider.hiddenSystemFolders;
+    final totalFavorites = dbProvider.totalFavorites;
+    final showFavorites =
+        totalFavorites > 0 && !hiddenFolders.contains('favorites');
+    final favoritesSystem = showFavorites
+        ? [
+            SystemInfo.fromSystemMetadata(
+              _createFavoritesSystem(configProvider.detectedSystems),
+            ).copyWith(
+              numOfRoms: totalFavorites,
+              totalStorage: AppLocale.gamesCount
+                  .getString(context)
+                  .replaceFirst('{count}', totalFavorites.toString()),
+            ),
+          ]
+        : <SystemInfo>[];
 
     return [
       ...recentGames, // Priority display for recent activity.
+      ...favoritesSystem,
       // Filter out systems hidden by user configuration.
       ...configProvider.detectedSystems
           .where((s) => !hiddenFolders.contains(s.folderName))
@@ -472,6 +488,19 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           context,
           MaterialPageRoute(builder: (context) => targetScreen),
         );
+      } else if (systemInfo.folderName == 'favorites') {
+        final favoritesSystem = _createFavoritesSystem(
+          configProvider.detectedSystems,
+        );
+        final targetScreen = SystemGamesList(
+          system: favoritesSystem,
+          fileProvider: fileProvider,
+        );
+
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => targetScreen),
+        );
       } else {
         final systemMeta = configProvider.detectedSystems.firstWhere(
           (system) => system.folderName == systemInfo.folderName,
@@ -526,6 +555,8 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
     final selectedSystem = selectedSystemInfo.folderName == 'all'
         ? _createAllGamesSystem(configProvider.detectedSystems)
+        : selectedSystemInfo.folderName == 'favorites'
+        ? _createFavoritesSystem(configProvider.detectedSystems)
         : configProvider.detectedSystems.cast<SystemModel?>().firstWhere(
             (system) => system?.folderName == selectedSystemInfo.folderName,
             orElse: () => null,
@@ -540,6 +571,30 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
             SystemEmulatorSettingsDialog(system: selectedSystem),
       );
     }
+  }
+
+  SystemModel _createFavoritesSystem(List<dynamic> detectedSystems) {
+    final existingFavorites = detectedSystems.cast<SystemModel?>().firstWhere(
+      (s) => s?.folderName == 'favorites',
+      orElse: () => null,
+    );
+
+    return SystemModel(
+      id: existingFavorites?.id ?? 'favorites',
+      folderName: 'favorites',
+      realName:
+          existingFavorites?.realName ?? AppLocale.favorite.getString(context),
+      iconImage:
+          existingFavorites?.iconImage ?? 'assets/images/icons/heart-bulk.png',
+      color: existingFavorites?.color ?? '#ff006a',
+      customBackgroundPath: existingFavorites?.customBackgroundPath,
+      customLogoPath: existingFavorites?.customLogoPath,
+      hideLogo: existingFavorites?.hideLogo ?? false,
+      imageVersion: existingFavorites?.imageVersion ?? 0,
+      romCount: existingFavorites?.romCount ?? 0,
+      detected: true,
+      isVirtual: true,
+    );
   }
 
   /// Internal utility to create the virtual 'All Games' model.

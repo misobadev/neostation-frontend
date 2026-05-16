@@ -57,7 +57,7 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
 
   /// Calculates the total number of navigable settings (Global Card + Detected Systems).
   int getItemCount(SqliteConfigProvider provider) {
-    return 1 + provider.detectedSystems.length;
+    return 2 + provider.detectedSystems.length;
   }
 
   /// Executes the toggle action for the specified system or feature.
@@ -67,9 +67,11 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
     // Index 0: Global 'Recent Games' card visibility.
     if (index == 0) {
       provider.updateHideRecentCard(!provider.config.hideRecentCard);
+    } else if (index == 1) {
+      provider.toggleSystemHidden('favorites');
     } else {
       // Indices >0: Specific system visibility filters.
-      final systemIndex = index - 1;
+      final systemIndex = index - 2;
       if (systemIndex < provider.detectedSystems.length) {
         final system = provider.detectedSystems[systemIndex];
         provider.toggleSystemHidden(system.folderName);
@@ -98,12 +100,19 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
             subtitle: AppLocale.hideRecentCardSubtitle.getString(context),
             isEnabled: !provider.config.hideRecentCard,
           ),
+          _SettingsRow(
+            icon: Symbols.favorite_rounded,
+            title: AppLocale.favorite.getString(context),
+            subtitle: 'favorites',
+            isEnabled: !hiddenFolders.contains('favorites'),
+            isHideToggle: true,
+          ),
           ...systems.map(
             (s) => _SettingsRow(
               icon: Symbols.videogame_asset_rounded,
               title: s.realName,
               subtitle: s.folderName,
-              isEnabled: hiddenFolders.contains(s.folderName),
+              isEnabled: !hiddenFolders.contains(s.folderName),
               isHideToggle: true,
             ),
           ),

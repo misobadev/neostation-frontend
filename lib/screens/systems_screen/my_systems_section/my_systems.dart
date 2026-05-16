@@ -372,9 +372,25 @@ class MySystems extends StatelessWidget {
         .toList();
 
     final hiddenFolders = configProvider.hiddenSystemFolders;
+    final totalFavorites = dbProvider.totalFavorites;
+    final showFavorites =
+        totalFavorites > 0 && !hiddenFolders.contains('favorites');
+    final favoritesSystem = showFavorites
+        ? [
+            SystemInfo.fromSystemMetadata(
+              _createFavoritesSystem(context, configProvider.detectedSystems),
+            ).copyWith(
+              numOfRoms: totalFavorites,
+              totalStorage: AppLocale.gamesCount
+                  .getString(context)
+                  .replaceFirst('{count}', totalFavorites.toString()),
+            ),
+          ]
+        : <SystemInfo>[];
 
     return [
       ...recentGames,
+      ...favoritesSystem,
       ...configProvider.detectedSystems
           .where((s) => !hiddenFolders.contains(s.folderName))
           .map((system) {
@@ -473,6 +489,8 @@ class MySystems extends StatelessWidget {
     try {
       final selectedSystem = system.folderName == 'all'
           ? _createAllGamesSystem(context, configProvider.detectedSystems)
+          : system.folderName == 'favorites'
+          ? _createFavoritesSystem(context, configProvider.detectedSystems)
           : configProvider.detectedSystems.firstWhere(
               (s) => s.folderName == system.folderName,
             );
@@ -603,6 +621,22 @@ class MySystems extends StatelessWidget {
             MaterialPageRoute(builder: (context) => targetScreen),
           );
         }
+      } else if (systemInfo.folderName == 'favorites') {
+        final favoritesSystem = _createFavoritesSystem(
+          context,
+          configProvider.detectedSystems,
+        );
+        final targetScreen = SystemGamesList(
+          system: favoritesSystem,
+          fileProvider: fileProvider,
+        );
+
+        if (context.mounted) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => targetScreen),
+          );
+        }
       } else if (systemInfo.folderName == 'android') {
         final systemMeta = configProvider.detectedSystems.firstWhere(
           (system) => system.folderName == 'android',
@@ -699,6 +733,31 @@ class MySystems extends StatelessWidget {
       isOled: isOled,
     );
   }
+}
+
+SystemModel _createFavoritesSystem(
+  BuildContext context,
+  List<dynamic> detectedSystems,
+) {
+  final existingFavorites = detectedSystems.cast<SystemModel?>().firstWhere(
+    (s) => s?.folderName == 'favorites',
+    orElse: () => null,
+  );
+
+  return SystemModel(
+    id: existingFavorites?.id ?? 'favorites',
+    folderName: 'favorites',
+    realName: existingFavorites?.realName ?? AppLocale.favorite.getString(context),
+    iconImage: existingFavorites?.iconImage ?? 'assets/images/icons/heart-bulk.png',
+    color: existingFavorites?.color ?? '#ff006a',
+    customBackgroundPath: existingFavorites?.customBackgroundPath,
+    customLogoPath: existingFavorites?.customLogoPath,
+    hideLogo: existingFavorites?.hideLogo ?? false,
+    imageVersion: existingFavorites?.imageVersion ?? 0,
+    romCount: existingFavorites?.romCount ?? 0,
+    detected: true,
+    isVirtual: true,
+  );
 }
 
 /// Creates a virtual 'All Games' system model by aggregating metadata from all detected systems.

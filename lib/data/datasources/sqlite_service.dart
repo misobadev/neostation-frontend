@@ -3496,6 +3496,39 @@ class SqliteService {
     return results.map((row) => DatabaseGameModel.fromJson(row)).toList();
   }
 
+  /// Retrieves only games marked as favorites across all registered systems.
+  ///
+  /// Excludes virtual/app systems that are not part of the standard ROM library.
+  static Future<List<DatabaseGameModel>> getFavoriteGames() async {
+    final db = await instance.database;
+    final results = await db.rawQuery('''
+      SELECT
+        ur.filename, ur.rom_path, ur.is_favorite, ur.play_time, ur.last_played,
+        ur.cloud_sync_enabled, ur.title_id, ur.title_name,
+        ur.app_emulator_unique_id as emulator_name,
+        s.id as system_id, s.real_name as system_real_name, s.folder_name as system_folder_name,
+        s.short_name as system_short_name,
+        COALESCE(usm.real_name, CASE WHEN s.folder_name IN ('android') THEN ur.title_name END, ur.filename) as game_display_name,
+        usm.real_name as ss_real_name,
+        COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
+        usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.rating,
+        COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
+        COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
+        COALESCE(usm.publisher, CASE WHEN s.folder_name IN ('android') THEN ur.publisher END) as publisher,
+        COALESCE(usm.genre, CASE WHEN s.folder_name IN ('android') THEN ur.genre END) as genre,
+        COALESCE(usm.players, CASE WHEN s.folder_name IN ('android') THEN ur.players END) as players,
+        usm.is_fully_scraped
+      FROM user_roms ur
+      JOIN app_systems s ON ur.app_system_id = s.id
+      LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
+      WHERE ur.is_favorite = 1
+        AND s.folder_name NOT IN ('android', 'music')
+      ORDER BY ur.is_favorite DESC, LOWER(game_display_name) ASC
+    ''');
+    return results.map((row) => DatabaseGameModel.fromJson(row)).toList();
+  }
+
   /// Retrieves a single game record based on its system and filename.
   static Future<DatabaseGameModel?> getSingleGame(
     String systemId,
