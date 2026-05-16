@@ -9,14 +9,12 @@ import 'core_footer.dart';
 class AndroidAppsFooter extends CoreFooter {
   final String appName;
   final VoidCallback onLaunch;
-  final VoidCallback onFavorite;
   final VoidCallback onBack;
 
   const AndroidAppsFooter({
     super.key,
     required this.appName,
     required this.onLaunch,
-    required this.onFavorite,
     required this.onBack,
   });
 
@@ -59,14 +57,6 @@ class AndroidAppsFooter extends CoreFooter {
         onTap: onLaunch,
         textColor: Colors.white,
         backgroundColor: const Color(0xFF2ECC71),
-      ),
-      SizedBox(width: 8.r),
-      GamepadControl(
-        iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
-        label: AppLocale.hintFavorite.getString(context),
-        onTap: onFavorite,
-        backgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.8),
-        textColor: Colors.white,
       ),
     ];
   }

@@ -5,7 +5,6 @@ import 'package:neostation/services/android_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_localization/flutter_localization.dart';
 import 'package:provider/provider.dart';
 import '../../../models/system_model.dart';
 import '../../../models/game_model.dart';
@@ -13,8 +12,6 @@ import '../../../services/game_service.dart';
 import '../../../utils/gamepad_nav.dart';
 import '../../../providers/palette_provider.dart';
 import '../../../widgets/android_apps_footer.dart';
-import '../../../widgets/custom_notification.dart';
-import '../../../l10n/app_locale.dart';
 import 'android_app_card.dart';
 
 /// A specialized grid view for browsing and launching native Android applications.
@@ -69,7 +66,6 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
       onNavigateLeft: _navigateLeft,
       onNavigateRight: _navigateRight,
       onSelectItem: _launchSelectedApp,
-      onFavorite: _toggleFavorite,
       onBack: _goBack,
     );
 
@@ -225,48 +221,6 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
     });
   }
 
-  Future<void> _toggleFavorite() async {
-    if (_apps.isEmpty) return;
-
-    final selectedApp = _apps[_selectedIndex];
-    try {
-      await GameService.toggleFavorite(selectedApp);
-      if (!mounted) return;
-
-      final updatedSelection = selectedApp.copyWith(
-        isFavorite: !(selectedApp.isFavorite ?? false),
-      );
-
-      setState(() {
-        _apps[_selectedIndex] = updatedSelection;
-        _apps.sort((a, b) {
-          if (a.isFavorite == true && b.isFavorite != true) return -1;
-          if (a.isFavorite != true && b.isFavorite == true) return 1;
-          return a.name.compareTo(b.name);
-        });
-        _selectedIndex = _apps.indexWhere(
-          (app) => app.romPath == updatedSelection.romPath,
-        );
-        if (_selectedIndex < 0) _selectedIndex = 0;
-      });
-
-      AppNotification.showNotification(
-        context,
-        AppLocale.favoriteUpdated.getString(context),
-        type: NotificationType.success,
-      );
-      _ensureSelectedItemVisible();
-    } catch (e) {
-      _log.e('Error toggling Android app favorite: $e');
-      if (!mounted) return;
-      AppNotification.showNotification(
-        context,
-        AppLocale.errorUpdatingFavorite.getString(context),
-        type: NotificationType.error,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -313,7 +267,6 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
                 AndroidAppsFooter(
                   appName: _apps.isNotEmpty ? _apps[_selectedIndex].name : '',
                   onLaunch: _launchSelectedApp,
-                  onFavorite: _toggleFavorite,
                   onBack: _goBack,
                 ),
               ],
