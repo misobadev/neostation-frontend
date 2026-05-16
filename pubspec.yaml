@@ -52,7 +52,7 @@ dependencies:
   package_info_plus: ^9.0.1
   pointycastle: ^4.0.0
   carousel_slider: ^5.1.1
-  sqlite3: ^3.1.2
+  sqlite3: ^3.3.1
   fullscreen_window: ^1.2.1
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
