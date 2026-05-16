@@ -13,7 +13,6 @@ import 'package:provider/provider.dart';
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../providers/file_provider.dart';
-import '../../../models/game_model.dart';
 import '../../../utils/gamepad_nav.dart';
 import '../../../services/game_service.dart';
 import '../../../utils/game_launch_utils.dart';
@@ -31,6 +30,8 @@ import 'package:neostation/models/secondary_display_state.dart';
 import 'package:neostation/widgets/header_sort_dropdown.dart';
 import '../../../widgets/system_logo_fallback.dart';
 import 'package:neostation/services/music_player_service.dart';
+import 'package:neostation/constants/system_folder_names.dart';
+import 'system_list_builder.dart';
 
 /// A premium carousel-based orchestrator for system and recent game selection.
 ///
@@ -319,65 +320,12 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
       listen: false,
     );
     final fileProvider = Provider.of<FileProvider>(context, listen: false);
-
-    const count = 1;
-    final hideRecent = configProvider.config.hideRecentCard;
-    final recentDbGames = hideRecent
-        ? dbProvider.getRecentlyPlayedGames(0)
-        : dbProvider.getRecentlyPlayedGames(count);
-
-    final recentGames = recentDbGames
-        .map((dbGame) => GameModel.fromDatabaseModel(dbGame))
-        .map((game) => SystemInfo.fromGameModel(game, fileProvider))
-        .toList();
-
-    final hiddenFolders = configProvider.hiddenSystemFolders;
-    final totalFavorites = dbProvider.totalFavorites;
-    final showFavorites =
-        totalFavorites > 0 && !hiddenFolders.contains('favorites');
-    final favoritesSystem = showFavorites
-        ? [
-            SystemInfo.fromSystemMetadata(
-              _createFavoritesSystem(configProvider.detectedSystems),
-            ).copyWith(
-              numOfRoms: totalFavorites,
-              totalStorage: AppLocale.gamesCount
-                  .getString(context)
-                  .replaceFirst('{count}', totalFavorites.toString()),
-            ),
-          ]
-        : <SystemInfo>[];
-
-    return [
-      ...recentGames, // Priority display for recent activity.
-      ...favoritesSystem,
-      // Filter out systems hidden by user configuration.
-      ...configProvider.detectedSystems
-          .where((s) => !hiddenFolders.contains(s.folderName))
-          .map((system) {
-            final info = SystemInfo.fromSystemMetadata(system);
-
-            // Metadata formatting for virtual systems.
-            if (system.folderName == 'all') {
-              return info.copyWith(
-                numOfRoms: configProvider.totalGames,
-                totalStorage: AppLocale.gamesCount
-                    .getString(context)
-                    .replaceFirst(
-                      '{count}',
-                      configProvider.totalGames.toString(),
-                    ),
-              );
-            } else if (system.folderName == 'android') {
-              return info.copyWith(
-                totalStorage: AppLocale.appsCount
-                    .getString(context)
-                    .replaceFirst('{count}', system.romCount.toString()),
-              );
-            }
-            return info;
-          }),
-    ];
+    return buildSystemsList(
+      context: context,
+      configProvider: configProvider,
+      dbProvider: dbProvider,
+      fileProvider: fileProvider,
+    );
   }
 
   /// Executes navigation for the currently focused carousel item.
@@ -488,8 +436,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           context,
           MaterialPageRoute(builder: (context) => targetScreen),
         );
-      } else if (systemInfo.folderName == 'favorites') {
-        final favoritesSystem = _createFavoritesSystem(
+      } else if (systemInfo.folderName == SystemFolderNames.favorites) {
+        final favoritesSystem = createFavoritesSystem(
+          context,
           configProvider.detectedSystems,
         );
         final targetScreen = SystemGamesList(
@@ -555,8 +504,8 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
     final selectedSystem = selectedSystemInfo.folderName == 'all'
         ? _createAllGamesSystem(configProvider.detectedSystems)
-        : selectedSystemInfo.folderName == 'favorites'
-        ? _createFavoritesSystem(configProvider.detectedSystems)
+        : selectedSystemInfo.folderName == SystemFolderNames.favorites
+        ? createFavoritesSystem(context, configProvider.detectedSystems)
         : configProvider.detectedSystems.cast<SystemModel?>().firstWhere(
             (system) => system?.folderName == selectedSystemInfo.folderName,
             orElse: () => null,
@@ -571,30 +520,6 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
             SystemEmulatorSettingsDialog(system: selectedSystem),
       );
     }
-  }
-
-  SystemModel _createFavoritesSystem(List<dynamic> detectedSystems) {
-    final existingFavorites = detectedSystems.cast<SystemModel?>().firstWhere(
-      (s) => s?.folderName == 'favorites',
-      orElse: () => null,
-    );
-
-    return SystemModel(
-      id: existingFavorites?.id ?? 'favorites',
-      folderName: 'favorites',
-      realName:
-          existingFavorites?.realName ?? AppLocale.favorite.getString(context),
-      iconImage:
-          existingFavorites?.iconImage ?? 'assets/images/icons/heart-bulk.png',
-      color: existingFavorites?.color ?? '#ff006a',
-      customBackgroundPath: existingFavorites?.customBackgroundPath,
-      customLogoPath: existingFavorites?.customLogoPath,
-      hideLogo: existingFavorites?.hideLogo ?? false,
-      imageVersion: existingFavorites?.imageVersion ?? 0,
-      romCount: existingFavorites?.romCount ?? 0,
-      detected: true,
-      isVirtual: true,
-    );
   }
 
   /// Internal utility to create the virtual 'All Games' model.

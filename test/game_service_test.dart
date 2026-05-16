@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/system_model.dart';
 import 'package:neostation/services/game_service.dart';
@@ -114,8 +115,8 @@ void main() {
       );
 
       final favoritesSystem = SystemModel(
-        id: 'favorites',
-        folderName: 'favorites',
+        id: SystemFolderNames.favorites,
+        folderName: SystemFolderNames.favorites,
         realName: 'Favorites',
         iconImage: 'assets/images/icons/heart-bulk.png',
         color: '#ff006a',

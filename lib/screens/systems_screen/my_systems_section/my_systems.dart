@@ -18,7 +18,6 @@ import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../providers/file_provider.dart';
 import '../../../widgets/system_scan_progress_widget.dart';
-import '../../../models/game_model.dart';
 import '../../game_screen/my_games_list.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'my_systems_carousel.dart';
@@ -34,6 +33,8 @@ import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/models/secondary_display_state.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/system_background_provider.dart';
+import 'package:neostation/constants/system_folder_names.dart';
+import 'system_list_builder.dart';
 
 /// Primary widget for the 'My Systems' view, supporting both Grid and Carousel layouts.
 ///
@@ -357,65 +358,14 @@ class MySystems extends StatelessWidget {
     BuildContext context,
     SqliteConfigProvider configProvider,
   ) {
-    final dbProvider = Provider.of<SqliteDatabaseProvider>(context);
     final fileProvider = Provider.of<FileProvider>(context, listen: false);
-
-    const count = 1;
-    final hideRecent = configProvider.config.hideRecentCard;
-    final recentDbGames = hideRecent
-        ? dbProvider.getRecentlyPlayedGames(0)
-        : dbProvider.getRecentlyPlayedGames(count);
-
-    final recentGames = recentDbGames
-        .map((dbGame) => GameModel.fromDatabaseModel(dbGame))
-        .map((game) => SystemInfo.fromGameModel(game, fileProvider))
-        .toList();
-
-    final hiddenFolders = configProvider.hiddenSystemFolders;
-    final totalFavorites = dbProvider.totalFavorites;
-    final showFavorites =
-        totalFavorites > 0 && !hiddenFolders.contains('favorites');
-    final favoritesSystem = showFavorites
-        ? [
-            SystemInfo.fromSystemMetadata(
-              _createFavoritesSystem(context, configProvider.detectedSystems),
-            ).copyWith(
-              numOfRoms: totalFavorites,
-              totalStorage: AppLocale.gamesCount
-                  .getString(context)
-                  .replaceFirst('{count}', totalFavorites.toString()),
-            ),
-          ]
-        : <SystemInfo>[];
-
-    return [
-      ...recentGames,
-      ...favoritesSystem,
-      ...configProvider.detectedSystems
-          .where((s) => !hiddenFolders.contains(s.folderName))
-          .map((system) {
-            final info = SystemInfo.fromSystemMetadata(system);
-
-            if (system.folderName == 'all') {
-              return info.copyWith(
-                numOfRoms: configProvider.totalGames,
-                totalStorage: AppLocale.gamesCount
-                    .getString(context)
-                    .replaceFirst(
-                      '{count}',
-                      configProvider.totalGames.toString(),
-                    ),
-              );
-            } else if (system.folderName == 'android') {
-              return info.copyWith(
-                totalStorage: AppLocale.appsCount
-                    .getString(context)
-                    .replaceFirst('{count}', system.romCount.toString()),
-              );
-            }
-            return info;
-          }),
-    ];
+    final dbProvider = Provider.of<SqliteDatabaseProvider>(context);
+    return buildSystemsList(
+      context: context,
+      configProvider: configProvider,
+      dbProvider: dbProvider,
+      fileProvider: fileProvider,
+    );
   }
 
   /// Builds the high-density grid layout for system selection.
@@ -489,8 +439,8 @@ class MySystems extends StatelessWidget {
     try {
       final selectedSystem = system.folderName == 'all'
           ? _createAllGamesSystem(context, configProvider.detectedSystems)
-          : system.folderName == 'favorites'
-          ? _createFavoritesSystem(context, configProvider.detectedSystems)
+          : system.folderName == SystemFolderNames.favorites
+          ? createFavoritesSystem(context, configProvider.detectedSystems)
           : configProvider.detectedSystems.firstWhere(
               (s) => s.folderName == system.folderName,
             );
@@ -621,8 +571,8 @@ class MySystems extends StatelessWidget {
             MaterialPageRoute(builder: (context) => targetScreen),
           );
         }
-      } else if (systemInfo.folderName == 'favorites') {
-        final favoritesSystem = _createFavoritesSystem(
+      } else if (systemInfo.folderName == SystemFolderNames.favorites) {
+        final favoritesSystem = createFavoritesSystem(
           context,
           configProvider.detectedSystems,
         );
@@ -733,31 +683,6 @@ class MySystems extends StatelessWidget {
       isOled: isOled,
     );
   }
-}
-
-SystemModel _createFavoritesSystem(
-  BuildContext context,
-  List<dynamic> detectedSystems,
-) {
-  final existingFavorites = detectedSystems.cast<SystemModel?>().firstWhere(
-    (s) => s?.folderName == 'favorites',
-    orElse: () => null,
-  );
-
-  return SystemModel(
-    id: existingFavorites?.id ?? 'favorites',
-    folderName: 'favorites',
-    realName: existingFavorites?.realName ?? AppLocale.favorite.getString(context),
-    iconImage: existingFavorites?.iconImage ?? 'assets/images/icons/heart-bulk.png',
-    color: existingFavorites?.color ?? '#ff006a',
-    customBackgroundPath: existingFavorites?.customBackgroundPath,
-    customLogoPath: existingFavorites?.customLogoPath,
-    hideLogo: existingFavorites?.hideLogo ?? false,
-    imageVersion: existingFavorites?.imageVersion ?? 0,
-    romCount: existingFavorites?.romCount ?? 0,
-    detected: true,
-    isVirtual: true,
-  );
 }
 
 /// Creates a virtual 'All Games' system model by aggregating metadata from all detected systems.
