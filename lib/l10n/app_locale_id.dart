@@ -102,6 +102,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.scanOnStartup: 'Pindai folder saat mulai',
   AppLocale.scanOnStartupSubtitle:
       'Pindai folder ROM secara otomatis saat membuka aplikasi',
+  AppLocale.ignoreHiddenFiles: 'Abaikan item tersembunyi',
+  AppLocale.ignoreHiddenFilesSubtitle:
+      'Sembunyikan file dan folder tersembunyi saat pemindaian ROM',
   AppLocale.autoUpdateApp: 'Perbarui App Otomatis',
   AppLocale.autoUpdateAppSubtitle:
       'Periksa versi baru saat mulai dan tawarkan pembaruan',

@@ -102,6 +102,9 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.scanOnStartup: 'Сканировать папки при запуске',
   AppLocale.scanOnStartupSubtitle:
       'Автоматически сканировать папки ROM при запуске приложения',
+  AppLocale.ignoreHiddenFiles: 'Игнорировать скрытые элементы',
+  AppLocale.ignoreHiddenFilesSubtitle:
+      'Скрывать скрытые файлы и папки при сканировании ROM',
   AppLocale.autoUpdateApp: 'Авто-обновление приложения',
   AppLocale.autoUpdateAppSubtitle:
       'Проверять новые версии при запуске и предлагать обновление',

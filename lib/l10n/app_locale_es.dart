@@ -105,6 +105,9 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.scanOnStartup: 'Escanear al Iniciar',
   AppLocale.scanOnStartupSubtitle:
       'Escanear carpetas de ROMs automáticamente al iniciar la app',
+  AppLocale.ignoreHiddenFiles: 'Ignorar elementos ocultos',
+  AppLocale.ignoreHiddenFilesSubtitle:
+      'Ocultar archivos y carpetas ocultos durante el escaneo de ROMs',
   AppLocale.autoUpdateApp: 'Actualización automática de la App',
   AppLocale.autoUpdateAppSubtitle:
       'Verificar nuevas versiones al iniciar y notificar para actualizar',

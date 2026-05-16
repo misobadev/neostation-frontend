@@ -104,6 +104,9 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.scanOnStartup: 'Varrer pastas ao iniciar',
   AppLocale.scanOnStartupSubtitle:
       'Varre automaticamente as pastas de ROMs ao abrir o aplicativo',
+  AppLocale.ignoreHiddenFiles: 'Ignorar itens ocultos',
+  AppLocale.ignoreHiddenFilesSubtitle:
+      'Ocultar arquivos e pastas ocultos durante a varredura de ROMs',
   AppLocale.autoUpdateApp: 'Atualização automática do App',
   AppLocale.autoUpdateAppSubtitle:
       'Verificar novas versões ao iniciar e notificar para atualizar',

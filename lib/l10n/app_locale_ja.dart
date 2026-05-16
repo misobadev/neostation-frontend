@@ -90,6 +90,8 @@ const Map<String, dynamic> appLocaleJa = {
       'RetroArchのパス設定中にエラーが発生しました: {error}',
   AppLocale.scanOnStartup: '起動時にフォルダをスキャン',
   AppLocale.scanOnStartupSubtitle: 'アプリ起動時にROMフォルダを自動的にスキャン',
+  AppLocale.ignoreHiddenFiles: '隠しアイテムを無視',
+  AppLocale.ignoreHiddenFilesSubtitle: 'ROMスキャン中に隠しファイルとフォルダを非表示にする',
   AppLocale.autoUpdateApp: 'アプリの自動更新',
   AppLocale.autoUpdateAppSubtitle: '起動時に新しいバージョンを確認して更新を提案',
   AppLocale.autoUpdateSystems: 'システム＆エミュレータを更新',
