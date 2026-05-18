@@ -30,6 +30,11 @@ List<SystemInfo> buildSystemsList({
 
   final detectedSystems = configProvider.detectedSystems
       .where((s) => !hiddenFolders.contains(s.folderName))
+      .where(
+        (s) =>
+            !(s.folderName == SystemFolderNames.favorites &&
+                totalFavorites == 0),
+      )
       .map((system) {
         final info = SystemInfo.fromSystemMetadata(system);
 

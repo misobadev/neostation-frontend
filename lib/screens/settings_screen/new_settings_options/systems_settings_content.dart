@@ -6,6 +6,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/sqlite_config_provider.dart';
+import '../../../providers/sqlite_database_provider.dart';
 import '../../../widgets/custom_toggle_switch.dart';
 import '../../../constants/system_folder_names.dart';
 import 'settings_title.dart';
@@ -58,8 +59,11 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
 
   /// Calculates the total number of navigable settings (Global Card + Detected Systems).
   int getItemCount(SqliteConfigProvider provider) {
-    return provider.hiddenSystemFolders.length +
-        provider.detectedSystems.length;
+    // hideRecent + favorites + detectedSystems (excluding favorites to avoid duplication)
+    return 2 +
+        provider.detectedSystems
+            .where((s) => s.folderName != SystemFolderNames.favorites)
+            .length;
   }
 
   /// Executes the toggle action for the specified system or feature.
@@ -67,13 +71,20 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
     SfxService().playNavSound();
     final items = _buildItems(provider);
     if (index >= 0 && index < items.length) {
-      items[index].onToggle();
+      final item = items[index];
+      if (!item.isDisabled) {
+        item.onToggle();
+      }
     }
   }
 
   List<_SettingsRow> _buildItems(SqliteConfigProvider provider) {
     final hiddenFolders = provider.hiddenSystemFolders;
     final systems = provider.detectedSystems;
+    final totalFavorites = context
+        .read<SqliteDatabaseProvider>()
+        .totalFavorites;
+    final hasFavorites = totalFavorites > 0;
 
     return <_SettingsRow>[
       _SettingsRow(
@@ -88,21 +99,27 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
         icon: Symbols.favorite_rounded,
         title: AppLocale.favorite.getString(context),
         subtitle: SystemFolderNames.favorites,
-        isEnabled: !hiddenFolders.contains(SystemFolderNames.favorites),
+        isEnabled:
+            hasFavorites &&
+            !hiddenFolders.contains(SystemFolderNames.favorites),
         isHideToggle: true,
-        onToggle: () =>
-            provider.toggleSystemHidden(SystemFolderNames.favorites),
+        isDisabled: !hasFavorites,
+        onToggle: hasFavorites
+            ? () => provider.toggleSystemHidden(SystemFolderNames.favorites)
+            : () {},
       ),
-      ...systems.map(
-        (s) => _SettingsRow(
-          icon: Symbols.videogame_asset_rounded,
-          title: s.realName,
-          subtitle: s.folderName,
-          isEnabled: !hiddenFolders.contains(s.folderName),
-          isHideToggle: true,
-          onToggle: () => provider.toggleSystemHidden(s.folderName),
-        ),
-      ),
+      ...systems
+          .where((s) => s.folderName != SystemFolderNames.favorites)
+          .map(
+            (s) => _SettingsRow(
+              icon: Symbols.videogame_asset_rounded,
+              title: s.realName,
+              subtitle: s.folderName,
+              isEnabled: !hiddenFolders.contains(s.folderName),
+              isHideToggle: true,
+              onToggle: () => provider.toggleSystemHidden(s.folderName),
+            ),
+          ),
     ];
   }
 
@@ -181,7 +198,7 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
       ),
       margin: EdgeInsets.only(bottom: 8.r),
       child: InkWell(
-        onTap: onTap,
+        onTap: item.isDisabled ? null : onTap,
         borderRadius: BorderRadius.circular(12.r),
         canRequestFocus: false,
         focusColor: Colors.transparent,
@@ -196,7 +213,9 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
                 item.icon,
                 color: isSelected
                     ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface,
+                    : theme.colorScheme.onSurface.withValues(
+                        alpha: item.isDisabled ? 0.4 : 1.0,
+                      ),
                 size: 20.r,
               ),
               SizedBox(width: 12.r),
@@ -211,7 +230,9 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
                         fontSize: 12.r,
                         color: isSelected
                             ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface,
+                            : theme.colorScheme.onSurface.withValues(
+                                alpha: item.isDisabled ? 0.4 : 1.0,
+                              ),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -223,7 +244,7 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 9.r,
                           color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
+                            alpha: item.isDisabled ? 0.25 : 0.6,
                           ),
                         ),
                         maxLines: 1,
@@ -234,8 +255,9 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
                 ),
               ),
               CustomToggleSwitch(
-                value: item.isHideToggle ? !item.isEnabled : item.isEnabled,
+                value: item.isEnabled,
                 onChanged: (_) => onTap(),
+                disabled: item.isDisabled,
               ),
             ],
           ),
@@ -252,6 +274,7 @@ class _SettingsRow {
   final String subtitle;
   final bool isEnabled;
   final bool isHideToggle;
+  final bool isDisabled;
   final VoidCallback onToggle;
 
   const _SettingsRow({
@@ -261,5 +284,6 @@ class _SettingsRow {
     required this.isEnabled,
     required this.onToggle,
     this.isHideToggle = false,
+    this.isDisabled = false,
   });
 }

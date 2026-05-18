@@ -61,8 +61,8 @@ class MySystems extends StatelessWidget {
     return PopScope(
       canPop:
           false, // Maintain application flow by preventing raw hardware back navigation.
-      child: Consumer<SqliteConfigProvider>(
-        builder: (context, configProvider, child) {
+      child: Consumer2<SqliteConfigProvider, SqliteDatabaseProvider>(
+        builder: (context, configProvider, dbProvider, child) {
           // PHASE 1: Blocking Initialization.
           // If a high-priority system scan is active (e.g., first run), show a blocking status.
           if (configProvider.isGlobalScanning) {

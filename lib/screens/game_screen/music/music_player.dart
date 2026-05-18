@@ -4,6 +4,8 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/sqlite_config_provider.dart';
 import '../../../services/music_player_service.dart';
 import '../../../utils/game_utils.dart';
 import '../../../widgets/marquee_text.dart';
@@ -209,8 +211,12 @@ class _MusicPlayerState extends State<MusicPlayer> {
                                       : Symbols.favorite_border_rounded,
                                   onTap: () async {
                                     SfxService().playNavSound();
+                                    final configProvider = context
+                                        .read<SqliteConfigProvider>();
                                     await service.toggleFavorite();
                                     if (mounted) {
+                                      await configProvider
+                                          .refreshDetectedSystems();
                                       widget.onFavoriteToggled?.call();
                                     }
                                   },

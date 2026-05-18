@@ -763,6 +763,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           config.totalGames,
           config.config.hideRecentCard,
           db.getRecentlyPlayedGames(1).firstOrNull?.romPath.hashCode,
+          db.totalFavorites,
         ),
         builder: (context, _, child) {
           final allSystems = _getSystemsList();

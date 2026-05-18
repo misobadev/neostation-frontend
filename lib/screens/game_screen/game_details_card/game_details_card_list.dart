@@ -878,6 +878,9 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
   /// Toggles the 'Favorite' status in the local database and notifies observers.
   Future<void> _toggleFavorite() async {
     await GameService.toggleFavorite(_game);
+    if (mounted) {
+      await context.read<SqliteConfigProvider>().refreshDetectedSystems();
+    }
     setState(() {
       _game = _game.copyWith(isFavorite: !(_game.isFavorite ?? false));
     });
@@ -1075,7 +1078,8 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       }
     }
 
-    if (widget.system.id == null) {
+    final scrapeSystemId = _effectiveSystem.id;
+    if (scrapeSystemId == null) {
       if (!mounted) return;
       AppNotification.showNotification(
         context,
@@ -1119,7 +1123,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
           : widget.system.primaryFolderName;
 
       final result = await ScreenScraperService.scrapeSingleGame(
-        appSystemId: widget.system.id!,
+        appSystemId: scrapeSystemId,
         romName: _game.romname,
         systemFolder: targetSystemFolder,
         romPath: _game.romPath ?? '',
@@ -1173,7 +1177,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
 
           // Hydrate updated entity from persistence.
           final updatedGame = await GameService.getGameDetails(
-            widget.system,
+            _effectiveSystem,
             _game.romname,
           );
 

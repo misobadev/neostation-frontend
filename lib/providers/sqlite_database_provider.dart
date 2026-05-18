@@ -346,10 +346,11 @@ class SqliteDatabaseProvider extends ChangeNotifier {
         .fold(0, (sum, count) => sum + count);
   }
 
-  /// Returns the total number of games marked as favorites.
+  /// Returns the total number of games marked as favorites (excluding music).
   int get totalFavorites {
-    return _database.values
-        .expand((games) => games)
+    return _database.entries
+        .where((entry) => entry.key != 'music')
+        .expand((entry) => entry.value)
         .where((game) => game.isFavorite)
         .length;
   }

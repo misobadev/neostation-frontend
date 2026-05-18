@@ -1094,8 +1094,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
     if (widget.system.folderName == 'music') {
       try {
+        final configProvider = context.read<SqliteConfigProvider>();
         await GameService.toggleFavorite(_selectedGame!);
         if (!mounted) return;
+        await configProvider.refreshDetectedSystems();
 
         setState(() {
           final gameIndex = _games.indexWhere(
@@ -1124,9 +1126,11 @@ class _SystemGamesListState extends State<SystemGamesList> {
     }
 
     try {
+      final configProvider = context.read<SqliteConfigProvider>();
       await GameService.toggleFavorite(_selectedGame!);
 
       if (!mounted) return;
+      await configProvider.refreshDetectedSystems();
 
       setState(() {
         final gameIndex = _games.indexWhere(

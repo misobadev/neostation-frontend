@@ -689,6 +689,24 @@ class SqliteConfigProvider extends ChangeNotifier {
         systemsToKeep.add(allSystem.copyWith(romCount: romCount));
       }
 
+      // Third pass: add 'favorites' virtual system if there are favorite games (excluding music)
+      final db = await SqliteService.getDatabase();
+      final favResult = await db.rawQuery(
+        "SELECT COUNT(*) as count FROM user_roms WHERE is_favorite = 1 AND app_system_id != 'music'",
+      );
+      final hasFavorites =
+          (int.tryParse(favResult.first['count'].toString()) ?? 0) > 0;
+      if (hasFavorites) {
+        try {
+          final favSystem = allSystems.firstWhere(
+            (s) => s.folderName == SystemFolderNames.favorites,
+          );
+          systemsToKeep.add(favSystem);
+        } catch (_) {
+          // favorites system not found in available systems, ignore
+        }
+      }
+
       final folderNames = systemsToKeep.map((s) => s.folderName).toList();
       await SystemRepository.updateDetectedSystems(folderNames);
 
@@ -1120,6 +1138,14 @@ class SqliteConfigProvider extends ChangeNotifier {
     } catch (e) {
       _log.e('Error loading detected systems: $e');
     }
+  }
+
+  /// Public method to refresh detected systems from the database.
+  ///
+  /// Called after external changes (e.g., toggling a favorite) that may affect
+  /// the presence of virtual systems like 'favorites'.
+  Future<void> refreshDetectedSystems() async {
+    await _loadDetectedSystems();
   }
 
   /// Synchronizes the list of detected systems with the current state of the database.

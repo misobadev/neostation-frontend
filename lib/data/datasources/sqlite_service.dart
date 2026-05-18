@@ -2546,7 +2546,7 @@ class SqliteService {
       LEFT JOIN user_system_settings ss ON s.id = ss.app_system_id
       WHERE uds.app_system_id IS NOT NULL
          OR (SELECT COUNT(*) FROM user_roms ur WHERE ur.app_system_id = s.id) > 0
-         OR (s.folder_name = 'favorites' AND (SELECT COUNT(*) FROM user_roms WHERE is_favorite = 1) > 0)
+         OR (s.folder_name = 'favorites' AND (SELECT COUNT(*) FROM user_roms WHERE is_favorite = 1 AND app_system_id != 'music') > 0)
       ORDER BY s.real_name ASC
     ''');
 
@@ -3616,6 +3616,10 @@ class SqliteService {
   }
 
   /// Toggles the favorite status for a given game path.
+  ///
+  /// Automatically synchronizes the 'favorites' virtual system in
+  /// [user_detected_systems] so the UI stays consistent without requiring
+  /// a full ROM scan.
   static Future<void> toggleRomFavorite(String romPath) async {
     final db = await instance.database;
     final current = await db.query(
@@ -3624,19 +3628,37 @@ class SqliteService {
       where: 'rom_path = ?',
       whereArgs: [romPath],
     );
-    if (current.isNotEmpty) {
-      final newVal =
-          (int.tryParse(current.first['is_favorite']?.toString() ?? '0') ??
-                  0) ==
-              1
-          ? 0
-          : 1;
-      await db.update(
-        'user_roms',
-        {'is_favorite': newVal},
-        where: 'rom_path = ?',
-        whereArgs: [romPath],
+    if (current.isEmpty) return;
+
+    final oldVal =
+        int.tryParse(current.first['is_favorite']?.toString() ?? '0') ?? 0;
+    final newVal = oldVal == 1 ? 0 : 1;
+
+    await db.update(
+      'user_roms',
+      {'is_favorite': newVal},
+      where: 'rom_path = ?',
+      whereArgs: [romPath],
+    );
+
+    if (newVal == 1) {
+      // A favorite was added — ensure the virtual system exists.
+      await db.rawInsert(
+        "INSERT OR IGNORE INTO user_detected_systems (app_system_id, actual_folder_name) VALUES ('favorites', 'favorites')",
       );
+    } else {
+      // A favorite was removed — check if any remain.
+      final countResult = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM user_roms WHERE is_favorite = 1 AND app_system_id != \'music\'',
+      );
+      final remaining =
+          int.tryParse(countResult.first['count'].toString()) ?? 0;
+      if (remaining == 0) {
+        await db.delete(
+          'user_detected_systems',
+          where: "app_system_id = 'favorites'",
+        );
+      }
     }
   }
 
