@@ -745,6 +745,11 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   double? _lastPinchDistance;
   DateTime? _lastPinchTime;
 
+  /// Pull-to-refresh progress notifier (0.0 to 1.0).
+  final ValueNotifier<double> _pullProgress = ValueNotifier(0.0);
+  static const double _maxPull = 75.0;
+  bool _pullReady = false;
+
   SecondaryDisplayState? _secondaryDisplayState;
 
   final Map<String, String?> _themeBackgrounds = {};
@@ -1303,6 +1308,28 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
         );
 
         if (Platform.isAndroid) {
+          grid = NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollUpdateNotification) {
+                final pixels = notification.metrics.pixels;
+                if (pixels < 0) {
+                  _pullProgress.value =
+                      (-pixels / _maxPull).clamp(0.0, 1.0);
+                  if (_pullProgress.value >= 1.0) {
+                    _pullReady = true;
+                  }
+                } else if (_pullProgress.value > 0 && !_pullReady) {
+                  _pullProgress.value = 0.0;
+                }
+              } else if (notification is ScrollEndNotification) {
+                _pullReady = false;
+                _pullProgress.value = 0.0;
+              }
+              return false;
+            },
+            child: grid,
+          );
+
           grid = Listener(
             onPointerDown: _handlePointerDown,
             onPointerMove: _handlePointerMove,
@@ -1313,7 +1340,34 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
           );
         }
 
-        return grid;
+        return Stack(
+          children: [
+            grid,
+            ValueListenableBuilder<double>(
+              valueListenable: _pullProgress,
+              builder: (context, progress, child) {
+                return AnimatedOpacity(
+                  opacity: progress > 0 ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 150),
+                  child: IgnorePointer(
+                    child: Container(
+                      alignment: Alignment.topCenter,
+                      padding: EdgeInsets.only(top: 16.r),
+                      child: SizedBox(
+                        width: 32.r,
+                        height: 32.r,
+                        child: CircularProgressIndicator(
+                          value: progress >= 1.0 ? null : progress,
+                          strokeWidth: 3,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
       },
     );
   }
@@ -1358,12 +1412,35 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
     if (_activePointers.length < 2) {
       _lastPinchDistance = null;
     }
+    if (_activePointers.isEmpty && _pullReady) {
+      _pullReady = false;
+      _pullProgress.value = 0.0;
+      _triggerRefresh();
+    }
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
     _activePointers.remove(event.pointer);
     if (_activePointers.length < 2) {
       _lastPinchDistance = null;
+    }
+    if (_activePointers.isEmpty && _pullReady) {
+      _pullReady = false;
+      _pullProgress.value = 0.0;
+      _triggerRefresh();
+    }
+  }
+
+  /// Triggers ROM directory rescan when pull-to-refresh reaches 100%.
+  void _triggerRefresh() {
+    try {
+      final configProvider = context.read<SqliteConfigProvider>();
+      if (!configProvider.isScanning) {
+        SfxService().playNavSound();
+        configProvider.scanSystems();
+      }
+    } catch (_) {
+      // Ignore if context/provider is no longer valid.
     }
   }
 

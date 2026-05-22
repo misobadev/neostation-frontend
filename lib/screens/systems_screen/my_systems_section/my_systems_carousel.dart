@@ -70,6 +70,12 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   /// Set while game launch dialog is active to hide carousel content and free RAM.
   bool _isGameLaunching = false;
 
+  // ── Pull-to-refresh (Android) ──────────────────────────────────────────
+  static const double _maxPull = 75.0;
+  final ValueNotifier<double> _pullOffsetNotifier = ValueNotifier(0.0);
+  final ValueNotifier<double> _pullProgress = ValueNotifier(0.0);
+  bool _pullReady = false;
+
   SecondaryDisplayState? _secondaryDisplayState;
 
   /// In-memory cache for resolved ID3v2 album art.
@@ -804,64 +810,102 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
               .map((s) => _calculateItemWidth(s, selectedTextStyle))
               .toList();
 
-          return Column(
+          Widget content = Column(
             children: [
               // Primary Horizontal Carousel.
               Expanded(
-                child: Focus(
-                  descendantsAreFocusable:
-                      false, // Intercept native Flutter focus to use custom gamepad logic.
-                  skipTraversal: true,
-                  child: RepaintBoundary(
-                    child: CarouselSlider.builder(
-                      carouselController: _controller,
-                      itemCount: allSystems.length,
-                      itemBuilder: (context, index, realIndex) {
-                        final system = allSystems[index];
-                        final isSelected = index == _currentIndex;
-                        return _buildSystemCard(
-                          context,
-                          system,
-                          isSelected,
-                          index,
-                        );
-                      },
-                      options: CarouselOptions(
-                        scrollDirection: Axis.horizontal,
-                        animateToClosest: false,
-                        pageSnapping: true,
-                        enableInfiniteScroll: true,
-                        viewportFraction:
-                            MediaQuery.of(context).size.width <= 640
-                            ? 0.666
-                            : 0.5,
-                        height: MediaQuery.of(context).size.height,
-                        aspectRatio: 4 / 3,
-                        enlargeCenterPage: true,
-                        enlargeFactor: 0.5,
-                        enlargeStrategy: CenterPageEnlargeStrategy.zoom,
-                        initialPage: _currentIndex,
-                        onPageChanged: (index, reason) {
-                          // Trigger navigation SFX only for manual swipe gestures.
-                          // Gamepad and tap interactions handle their own sound feedback
-                          // to avoid latency or double-triggering on high-performance devices.
-                          if (reason == CarouselPageChangedReason.manual) {
-                            SfxService().playNavSound();
-                          }
-                          setState(() {
-                            _currentIndex = index;
-                            _isNavigating = false; // Release navigation lock.
-                          });
-                          _scrollToIndex(index);
-                          _updateBackground(allSystems[index]);
-                          _updateSecondaryScreenName();
-                          widget.onCardTapped?.call(index);
+                child: GestureDetector(
+                  onVerticalDragStart: (_) {
+                    _pullOffsetNotifier.value = 0.0;
+                    _pullProgress.value = 0.0;
+                    _pullReady = false;
+                  },
+                  onVerticalDragUpdate: (details) {
+                    final deltaY = details.delta.dy;
+                    if (deltaY > 0) {
+                      final newOffset = (_pullOffsetNotifier.value + deltaY).clamp(0.0, _maxPull);
+                      _pullOffsetNotifier.value = newOffset;
+                      _pullProgress.value = (newOffset / _maxPull).clamp(0.0, 1.0);
+                      if (_pullProgress.value >= 1.0) _pullReady = true;
+                    }
+                  },
+                  onVerticalDragEnd: (_) {
+                    if (_pullReady) {
+                      _pullReady = false;
+                      _triggerRefresh();
+                    }
+                    _pullOffsetNotifier.value = 0.0;
+                    _pullProgress.value = 0.0;
+                  },
+                  onVerticalDragCancel: () {
+                    _pullReady = false;
+                    _pullOffsetNotifier.value = 0.0;
+                    _pullProgress.value = 0.0;
+                  },
+                  behavior: HitTestBehavior.translucent,
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: _pullOffsetNotifier,
+                    builder: (context, offset, child) {
+                      return Transform.translate(
+                        offset: Offset(0, offset),
+                        child: child!,
+                      );
+                    },
+                    child: Focus(
+                      descendantsAreFocusable:
+                          false, // Intercept native Flutter focus to use custom gamepad logic.
+                      skipTraversal: true,
+                      child: RepaintBoundary(
+                        child: CarouselSlider.builder(
+                        carouselController: _controller,
+                        itemCount: allSystems.length,
+                        itemBuilder: (context, index, realIndex) {
+                          final system = allSystems[index];
+                          final isSelected = index == _currentIndex;
+                          return _buildSystemCard(
+                            context,
+                            system,
+                            isSelected,
+                            index,
+                          );
                         },
+                        options: CarouselOptions(
+                          scrollDirection: Axis.horizontal,
+                          animateToClosest: true,
+                          pageSnapping: true,
+                          enableInfiniteScroll: true,
+                          //viewport fraction cannot be max of 0.8
+                          viewportFraction: 
+                              MediaQuery.of(context).devicePixelRatio / 1.8,
+                          height: MediaQuery.of(context).size.height,
+                          //aspectRatio: 4 / 3,
+                          enlargeCenterPage: true,
+                          enlargeFactor: 0.5,
+                          enlargeStrategy: CenterPageEnlargeStrategy.zoom,
+                          initialPage: _currentIndex,
+                          onPageChanged: (index, reason) {
+                            // Trigger navigation SFX only for manual swipe gestures.
+                            // Gamepad and tap interactions handle their own sound feedback
+                            // to avoid latency or double-triggering on high-performance devices.
+                            if (reason == CarouselPageChangedReason.manual) {
+                              SfxService().playNavSound();
+                            }
+                            setState(() {
+                              _currentIndex = index;
+                              _isNavigating = false; // Release navigation lock.
+                            });
+                            _scrollToIndex(index);
+                            _updateBackground(allSystems[index]);
+                            _updateSecondaryScreenName();
+                            widget.onCardTapped?.call(index);
+                          },
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
+            ),
 
               // Secondary Systems Indicator List (Bottom).
               SizedBox(
@@ -934,6 +978,39 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
               ),
             ],
           );
+
+          if (Platform.isAndroid) {
+            content = Stack(
+              children: [
+                content,
+                ValueListenableBuilder<double>(
+                  valueListenable: _pullProgress,
+                  builder: (context, progress, child) {
+                    return AnimatedOpacity(
+                      opacity: progress > 0 ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 150),
+                      child: IgnorePointer(
+                        child: Container(
+                          alignment: Alignment.topCenter,
+                          padding: EdgeInsets.only(top: 16.r),
+                          child: SizedBox(
+                            width: 32.r,
+                            height: 32.r,
+                            child: CircularProgressIndicator(
+                              value: progress >= 1.0 ? null : progress,
+                              strokeWidth: 3,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            );
+          }
+
+          return content;
         },
       ),
     );
@@ -1176,6 +1253,14 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
         useFluidShader: false,
         isOled: isOled,
       );
+    }
+  }
+
+  void _triggerRefresh() {
+    final configProvider = context.read<SqliteConfigProvider>();
+    if (!configProvider.isScanning) {
+      SfxService().playNavSound();
+      configProvider.scanSystems();
     }
   }
 }
