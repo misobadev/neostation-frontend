@@ -63,6 +63,19 @@ class ScreenScraperService {
   static const String _baseUrl = 'https://api.screenscraper.fr/api2';
   static final _log = LoggerService.instance;
 
+  static const Map<String, int> _regionPriority = {
+    'wor': 100,
+    'us': 80,
+    'eu': 60,
+    'fr': 40,
+    'sp': 40,
+    'it': 40,
+    'de': 40,
+    'jp': 20,
+    'kr': 10,
+    'cn': 10,
+  };
+
   // Developer credentials — provided at build time via --dart-define.
   static const String _devId = String.fromEnvironment('SCREENSCRAPER_DEV_ID');
   static const String _devPassword = String.fromEnvironment(
@@ -632,7 +645,8 @@ class ScreenScraperService {
 
   /// Maps a raw API response to the NeoStation metadata schema.
   ///
-  /// Handles language localization priority and region selection (US > EU > SS).
+  /// Handles language localization priority and region-based selection
+  /// using the global priority map (World > US > EU > FR/SP/IT/DE > JP > KR/CN).
   static Future<Map<String, dynamic>> _mapGameInfoToMetadata(
     String filename,
     String romPath,
@@ -644,17 +658,15 @@ class ScreenScraperService {
 
     final noms = gameInfo['noms'] as List<dynamic>? ?? [];
     String? realName;
+    int bestNamePriority = -1;
     for (final nom in noms) {
       final region = nom['region']?.toString();
       final text = nom['text']?.toString();
-      if (text != null) {
-        if (region == 'us') {
+      if (text != null && text.isNotEmpty) {
+        final priority = _regionPriority[region] ?? 0;
+        if (priority > bestNamePriority) {
+          bestNamePriority = priority;
           realName = text;
-          break;
-        } else if (region == 'eu') {
-          realName ??= text;
-        } else if (region == 'ss') {
-          realName ??= text;
         }
       }
     }
@@ -724,19 +736,17 @@ class ScreenScraperService {
 
     final dates = gameInfo['dates'] as List<dynamic>? ?? [];
     DateTime? releaseDate;
+    int bestDatePriority = -1;
     for (final date in dates) {
       final region = date['region']?.toString();
       final dateText = date['text']?.toString();
       if (dateText != null) {
         try {
           final parsedDate = DateTime.parse(dateText);
-          if (region == 'us') {
+          final priority = _regionPriority[region] ?? 0;
+          if (priority > bestDatePriority) {
+            bestDatePriority = priority;
             releaseDate = parsedDate;
-            break;
-          } else if (region == 'eu') {
-            releaseDate ??= parsedDate;
-          } else {
-            releaseDate ??= parsedDate;
           }
         } catch (_) {}
       }
@@ -814,6 +824,8 @@ class ScreenScraperService {
         return 'videos';
       case 'wheel':
         return 'wheels';
+      case 'box2D':
+        return 'box2d';
       default:
         return mediaType;
     }
@@ -831,20 +843,9 @@ class ScreenScraperService {
 
     final typesToSearch = mediaType == 'wheel'
         ? ['wheel-hd', 'wheel']
-        : (mediaType == 'ss' ? ['ss-hd', 'ss'] : [mediaType]);
-
-    const regionPriority = {
-      'wor': 100,
-      'us': 80,
-      'eu': 60,
-      'fr': 40,
-      'sp': 40,
-      'it': 40,
-      'de': 40,
-      'jp': 20,
-      'kr': 10,
-      'cn': 10,
-    };
+        : (mediaType == 'ss'
+            ? ['ss-hd', 'ss']
+            : (mediaType == 'box2D' ? ['box-2D'] : [mediaType]));
 
     const defaultLanguageHierarchy = ['en', 'es', 'fr', 'de', 'it', 'pt', 'jp'];
 
@@ -857,7 +858,7 @@ class ScreenScraperService {
 
     for (final media in candidates) {
       final region = media['region']?.toString() ?? '';
-      final regionValue = regionPriority[region] ?? 5;
+      final regionValue = _regionPriority[region] ?? 5;
 
       int languageBonus = 0;
       final mediaLang = media['langue']?.toString() ?? '';
@@ -947,7 +948,7 @@ class ScreenScraperService {
     }
 
     final userDataDir = await _getMediaDirectory();
-    final mediaTypes = allowedMediaTypes ?? ['fanart', 'ss', 'video', 'wheel'];
+    final mediaTypes = allowedMediaTypes ?? ['fanart', 'ss', 'video', 'wheel', 'box2D'];
 
     final downloadTasks = <Map<String, dynamic>>[];
     for (final mediaType in mediaTypes) {
@@ -1116,7 +1117,7 @@ class ScreenScraperService {
 
       final allowedMediaTypes = <String>[];
       if (scraperConfig['scrape_images'] as bool? ?? true) {
-        allowedMediaTypes.addAll(['fanart', 'ss', 'wheel']);
+        allowedMediaTypes.addAll(['fanart', 'ss', 'wheel', 'box2D']);
       }
       if (scraperConfig['scrape_videos'] as bool? ?? true) {
         allowedMediaTypes.add('video');
@@ -1414,7 +1415,7 @@ class ScreenScraperService {
 
         final allowedTypes = <String>[];
         if (scraperConfig['scrape_images'] as bool? ?? true) {
-          allowedTypes.addAll(['fanart', 'ss', 'wheel']);
+          allowedTypes.addAll(['fanart', 'ss', 'wheel', 'box2D']);
         }
         if (scraperConfig['scrape_videos'] as bool? ?? true) {
           allowedTypes.add('video');
@@ -1482,7 +1483,7 @@ class ScreenScraperService {
         return {'hasAllMedia': false, 'error': 'System not found'};
       }
       final userDataDir = await _getMediaDirectory();
-      const expectedTypes = ['fanarts', 'screenshots', 'videos'];
+      const expectedTypes = ['fanarts', 'screenshots', 'videos', 'box2d'];
       final romBaseName = await _getCleanRomName(romName, appSystemId);
       final missing = <String>[];
       final existing = <String>[];
