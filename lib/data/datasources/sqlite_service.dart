@@ -421,7 +421,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 84;
+  static const int _databaseVersion = 86;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1306,6 +1306,16 @@ class SqliteService {
           'ALTER TABLE user_screenscraper_config ADD COLUMN scrape_videos INTEGER DEFAULT 1',
         );
       }
+      if (!columns.contains('region_priority')) {
+        await db.execute(
+          "ALTER TABLE user_screenscraper_config ADD COLUMN region_priority TEXT DEFAULT '[\"wor\",\"us\",\"eu\",\"jp\",\"sp\",\"fr\",\"de\",\"it\",\"kr\",\"cn\"]'",
+        );
+      }
+      if (!columns.contains('scrape_media_types')) {
+        await db.execute(
+          "ALTER TABLE user_screenscraper_config ADD COLUMN scrape_media_types TEXT DEFAULT '[\"fanart\",\"ss\",\"wheel\",\"box2D\",\"video\"]'",
+        );
+      }
 
       // Ensure default configuration entry exists.
       final config = await db.query(
@@ -1590,6 +1600,8 @@ class SqliteService {
         scrape_metadata INTEGER DEFAULT 1,
         scrape_images INTEGER DEFAULT 1,
         scrape_videos INTEGER DEFAULT 1,
+        region_priority TEXT DEFAULT '[\"wor\",\"us\",\"eu\",\"jp\",\"sp\",\"fr\",\"de\",\"it\",\"kr\",\"cn\"]',
+        scrape_media_types TEXT DEFAULT '[\"fanart\",\"ss\",\"wheel\",\"box2D\",\"video\"]',
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
       ''',

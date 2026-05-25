@@ -258,6 +258,12 @@ class SqliteMigrations {
       case 84:
         await _migrateToVersion84(db);
         break;
+      case 85:
+        await _migrateToVersion85(db);
+        break;
+      case 86:
+        await _migrateToVersion86(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -4393,6 +4399,50 @@ class SqliteMigrations {
       }
     } catch (e, stackTrace) {
       _log.e('Error in migration v82: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  static Future<void> _migrateToVersion85(Database db) async {
+    _log.i('Migration v85: Adding region_priority to user_screenscraper_config');
+
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_screenscraper_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+
+      if (!columns.contains('region_priority')) {
+        db.execute(
+          "ALTER TABLE user_screenscraper_config ADD COLUMN region_priority TEXT DEFAULT '[\"wor\",\"us\",\"eu\",\"jp\",\"sp\",\"fr\",\"de\",\"it\",\"kr\",\"cn\"]'",
+        );
+        _log.i('Column region_priority added via v85');
+      } else {
+        _log.i('Column region_priority already exists');
+      }
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v85: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  static Future<void> _migrateToVersion86(Database db) async {
+    _log.i('Migration v86: Adding scrape_media_types to user_screenscraper_config');
+
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_screenscraper_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+
+      if (!columns.contains('scrape_media_types')) {
+        db.execute(
+          "ALTER TABLE user_screenscraper_config ADD COLUMN scrape_media_types TEXT DEFAULT '[\"fanart\",\"ss\",\"wheel\",\"box2D\",\"video\"]'",
+        );
+        _log.i('Column scrape_media_types added via v86');
+      } else {
+        _log.i('Column scrape_media_types already exists');
+      }
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v86: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

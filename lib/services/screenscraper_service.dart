@@ -63,18 +63,24 @@ class ScreenScraperService {
   static const String _baseUrl = 'https://api.screenscraper.fr/api2';
   static final _log = LoggerService.instance;
 
-  static const Map<String, int> _regionPriority = {
-    'wor': 100,
-    'us': 80,
-    'eu': 60,
-    'fr': 40,
-    'sp': 40,
-    'it': 40,
-    'de': 40,
-    'jp': 20,
-    'kr': 10,
-    'cn': 10,
-  };
+  static const List<String> _defaultRegionOrder = [
+    'wor', 'us', 'eu', 'jp', 'sp', 'fr', 'de', 'it', 'kr', 'cn',
+  ];
+
+  static Map<String, int> _buildRegionPriorityMap(List<String> orderedRegions) {
+    return {
+      for (var i = 0; i < orderedRegions.length; i++)
+        orderedRegions[i]: (orderedRegions.length - i) * 10,
+    };
+  }
+
+  static Future<Map<String, int>> _getRegionPriority() async {
+    try {
+      final regions = await ScraperRepository.getRegionPriority();
+      if (regions.isNotEmpty) return _buildRegionPriorityMap(regions);
+    } catch (_) {}
+    return _buildRegionPriorityMap(_defaultRegionOrder);
+  }
 
   // Developer credentials — provided at build time via --dart-define.
   static const String _devId = String.fromEnvironment('SCREENSCRAPER_DEV_ID');
@@ -653,6 +659,7 @@ class ScreenScraperService {
     Map<String, dynamic> gameInfo, {
     String? preferredLanguage,
   }) async {
+    final regionPriority = await _getRegionPriority();
     final metadata = <String, dynamic>{};
     metadata['filename'] = filename;
 
@@ -663,7 +670,7 @@ class ScreenScraperService {
       final region = nom['region']?.toString();
       final text = nom['text']?.toString();
       if (text != null && text.isNotEmpty) {
-        final priority = _regionPriority[region] ?? 0;
+        final priority = regionPriority[region] ?? 0;
         if (priority > bestNamePriority) {
           bestNamePriority = priority;
           realName = text;
@@ -743,7 +750,7 @@ class ScreenScraperService {
       if (dateText != null) {
         try {
           final parsedDate = DateTime.parse(dateText);
-          final priority = _regionPriority[region] ?? 0;
+          final priority = regionPriority[region] ?? 0;
           if (priority > bestDatePriority) {
             bestDatePriority = priority;
             releaseDate = parsedDate;
@@ -838,6 +845,7 @@ class ScreenScraperService {
     List<dynamic> medias,
     String mediaType, {
     String? preferredLanguage,
+    Map<String, int> regionPriority = const {},
   }) {
     if (medias.isEmpty) return null;
 
@@ -858,7 +866,7 @@ class ScreenScraperService {
 
     for (final media in candidates) {
       final region = media['region']?.toString() ?? '';
-      final regionValue = _regionPriority[region] ?? 5;
+      final regionValue = regionPriority[region] ?? 5;
 
       int languageBonus = 0;
       final mediaLang = media['langue']?.toString() ?? '';
@@ -948,6 +956,7 @@ class ScreenScraperService {
     }
 
     final userDataDir = await _getMediaDirectory();
+    final regionPriority = await _getRegionPriority();
     final mediaTypes = allowedMediaTypes ?? ['fanart', 'ss', 'video', 'wheel', 'box2D'];
 
     final downloadTasks = <Map<String, dynamic>>[];
@@ -956,6 +965,7 @@ class ScreenScraperService {
         medias,
         mediaType,
         preferredLanguage: preferredLanguage,
+        regionPriority: regionPriority,
       );
       if (bestMedia != null) {
         final folderName = _mapMediaTypeToFolder(mediaType);
@@ -1115,13 +1125,7 @@ class ScreenScraperService {
 
       onProgress?.call(AppLocale.downloadingImages, 0.2);
 
-      final allowedMediaTypes = <String>[];
-      if (scraperConfig['scrape_images'] as bool? ?? true) {
-        allowedMediaTypes.addAll(['fanart', 'ss', 'wheel', 'box2D']);
-      }
-      if (scraperConfig['scrape_videos'] as bool? ?? true) {
-        allowedMediaTypes.add('video');
-      }
+      final allowedMediaTypes = await ScraperRepository.getEnabledMediaTypes();
 
       if (allowedMediaTypes.isEmpty) {
         return {'success': true, 'message': AppLocale.scrapeSuccessful};
@@ -1413,13 +1417,7 @@ class ScreenScraperService {
           await _saveGameMetadata(metadata, appSystemId, isFullyScraped: false);
         }
 
-        final allowedTypes = <String>[];
-        if (scraperConfig['scrape_images'] as bool? ?? true) {
-          allowedTypes.addAll(['fanart', 'ss', 'wheel', 'box2D']);
-        }
-        if (scraperConfig['scrape_videos'] as bool? ?? true) {
-          allowedTypes.add('video');
-        }
+        final allowedTypes = await ScraperRepository.getEnabledMediaTypes();
 
         if (allowedTypes.isNotEmpty) {
           scrapingProvider.updateThreadProgress(
@@ -1483,7 +1481,7 @@ class ScreenScraperService {
         return {'hasAllMedia': false, 'error': 'System not found'};
       }
       final userDataDir = await _getMediaDirectory();
-      const expectedTypes = ['fanarts', 'screenshots', 'videos', 'box2d'];
+      const expectedTypes = ['fanarts', 'screenshots', 'wheels', 'box2d', 'videos'];
       final romBaseName = await _getCleanRomName(romName, appSystemId);
       final missing = <String>[];
       final existing = <String>[];

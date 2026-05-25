@@ -7,8 +7,10 @@ import 'package:neostation/services/screenscraper_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/repositories/scraper_repository.dart';
 import 'scraper_contents/account_content.dart';
 import 'scraper_contents/language_content.dart';
+import 'scraper_contents/region_content.dart';
 import 'scraper_contents/scrape_mode_content.dart';
 import 'scraper_contents/scraping_content.dart';
 import 'scraper_contents/systems_content.dart';
@@ -30,6 +32,7 @@ class NewScraperOptionsScreen extends StatefulWidget {
   static void navigateLeft() => _currentInstance?._navigateLeft();
   static void navigateRight() => _currentInstance?._navigateRight();
   static void selectCurrent() => _currentInstance?._selectItem();
+  static void backCurrent() => _currentInstance?._navigateBack();
 
   static _NewScraperOptionsScreenState? _currentInstance;
 }
@@ -48,6 +51,8 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
       GlobalKey<ScrapingContentState>();
   final GlobalKey<ScrapeModeContentState> _scrapeModeKey =
       GlobalKey<ScrapeModeContentState>();
+  final GlobalKey<RegionContentState> _regionKey =
+      GlobalKey<RegionContentState>();
   final GlobalKey<LanguageContentState> _languageKey =
       GlobalKey<LanguageContentState>();
   final GlobalKey<SystemsContentState> _systemsKey =
@@ -57,11 +62,8 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
   Map<String, String>? _userInfo;
   String? _currentScrapeMode;
   String? _currentLanguage;
-  Map<String, bool> _currentMediaConfig = {
-    'scrape_metadata': true,
-    'scrape_images': true,
-    'scrape_videos': true,
-  };
+  List<String> _currentEnabledMediaTypes = [];
+  List<String> _currentRegionPriority = [];
 
   @override
   void initState() {
@@ -72,6 +74,7 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
     _loadCurrentScrapeMode();
     _loadCurrentLanguage();
     _loadCurrentMediaConfig();
+    _loadCurrentRegionPriority();
   }
 
   @override
@@ -111,6 +114,14 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
         title: AppLocale.media.getString(context),
         localeKey: AppLocale.media,
         icon: Symbols.perm_media_rounded,
+        isVisible: true,
+      ),
+    );
+    _menuItems.add(
+      ScraperMenuItem(
+        title: AppLocale.region.getString(context),
+        localeKey: AppLocale.region,
+        icon: Symbols.public_rounded,
         isVisible: true,
       ),
     );
@@ -179,17 +190,27 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
 
   Future<void> _loadCurrentMediaConfig() async {
     try {
-      final config = await ScreenScraperService.getScraperConfig();
+      final types = await ScraperRepository.getEnabledMediaTypes();
       if (mounted) {
         setState(() {
-          _currentMediaConfig = {
-            'scrape_images': config['scrape_images'] as bool? ?? true,
-            'scrape_videos': config['scrape_videos'] as bool? ?? true,
-          };
+          _currentEnabledMediaTypes = types;
         });
       }
     } catch (e) {
       _log.e('Error loading media config: $e');
+    }
+  }
+
+  Future<void> _loadCurrentRegionPriority() async {
+    try {
+      final regions = await ScraperRepository.getRegionPriority();
+      if (mounted) {
+        setState(() {
+          _currentRegionPriority = regions;
+        });
+      }
+    } catch (e) {
+      _log.e('Error loading region priority: $e');
     }
   }
 
@@ -209,10 +230,11 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
             (_selectedMenuIndex - 1 + _menuItems.length) % _menuItems.length;
       });
     } else {
-      // Delegar navegación a Systems si está seleccionado
       final selectedKey = _menuItems[_selectedMenuIndex].localeKey;
       if (selectedKey == AppLocale.systems) {
         _systemsKey.currentState?.navigateUp();
+      } else if (selectedKey == AppLocale.region) {
+        _regionKey.currentState?.navigateUp();
       } else {
         setState(() {
           _selectedContentIndex = (_selectedContentIndex - 1).clamp(
@@ -234,10 +256,12 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
         _selectedMenuIndex = (_selectedMenuIndex + 1) % _menuItems.length;
       });
     } else {
-      // Delegar navegación a Systems si está seleccionado
+      // Delegar navegación a Systems/Region si está seleccionado
       final selectedKey = _menuItems[_selectedMenuIndex].localeKey;
       if (selectedKey == AppLocale.systems) {
         _systemsKey.currentState?.navigateDown();
+      } else if (selectedKey == AppLocale.region) {
+        _regionKey.currentState?.navigateDown();
       } else {
         setState(() {
           _selectedContentIndex = (_selectedContentIndex + 1).clamp(
@@ -255,7 +279,6 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
 
   void _navigateLeft() {
     if (!_focusOnMenu) {
-      // Si estamos en Systems, delegar navegación horizontal
       final selectedKey = _menuItems[_selectedMenuIndex].localeKey;
       if (selectedKey == AppLocale.systems) {
         final shouldReturnToMenu =
@@ -266,8 +289,16 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
             _selectedContentIndex = 0;
           });
         }
+      } else if (selectedKey == AppLocale.region) {
+        final shouldReturnToMenu =
+            _regionKey.currentState?.navigateLeft() ?? true;
+        if (shouldReturnToMenu) {
+          setState(() {
+            _focusOnMenu = true;
+            _selectedContentIndex = 0;
+          });
+        }
       } else {
-        // Para otros menús, volver al menú
         setState(() {
           _focusOnMenu = true;
           _selectedContentIndex = 0;
@@ -285,8 +316,9 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
     } else if (!_focusOnMenu) {
       final selectedKey = _menuItems[_selectedMenuIndex].localeKey;
       if (selectedKey == AppLocale.systems) {
-        // Si estamos en Systems, delegar navegación horizontal
         _systemsKey.currentState?.navigateRight();
+      } else if (selectedKey == AppLocale.region) {
+        _regionKey.currentState?.navigateRight();
       }
     }
   }
@@ -299,11 +331,24 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
     }
   }
 
+  void _navigateBack() {
+    if (!_focusOnMenu) {
+      final selectedKey = _menuItems[_selectedMenuIndex].localeKey;
+      if (selectedKey == AppLocale.region) {
+        _regionKey.currentState?.navigateBack();
+        return;
+      }
+    }
+  }
+
   int _getContentItemCount() {
     final selectedKey = _menuItems[_selectedMenuIndex].localeKey;
     if (selectedKey == AppLocale.scraping) return 1;
     if (selectedKey == AppLocale.scrapeMode) return 2;
-    if (selectedKey == AppLocale.media) return 3;
+    if (selectedKey == AppLocale.media) return 5;
+    if (selectedKey == AppLocale.region) {
+      return _regionKey.currentState?.getItemCount ?? 0;
+    }
     if (selectedKey == AppLocale.language) return 6;
     if (selectedKey == AppLocale.systems) {
       return _systemsKey.currentState?.getItemCount() ?? 0;
@@ -320,6 +365,8 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
       _scrapeModeKey.currentState?.selectItem(_selectedContentIndex);
     } else if (selectedKey == AppLocale.media) {
       _mediaKey.currentState?.selectItem(_selectedContentIndex);
+    } else if (selectedKey == AppLocale.region) {
+      _regionKey.currentState?.selectItem();
     } else if (selectedKey == AppLocale.language) {
       _languageKey.currentState?.selectItem(_selectedContentIndex);
     } else if (selectedKey == AppLocale.systems) {
@@ -430,32 +477,19 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
     }
   }
 
-  Future<void> _handleMediaConfigChange(Map<String, bool> newConfig) async {
-    // Convert Map<String, bool> to Map<String, dynamic> for saveScraperConfig
-    final configToSave = newConfig.map((key, value) => MapEntry(key, value));
-
-    // Always force metadata to be true, regardless of UI state
-    configToSave['scrape_metadata'] = true;
-
-    final success = await ScreenScraperService.saveScraperConfig(configToSave);
-
-    if (mounted) {
-      if (success) {
-        await _loadCurrentMediaConfig();
-        // Feedback sutil, no bloquear pantalla
-        /* AppNotification.showNotification(
-          context,
-          'Media settings saved',
-          type: NotificationType.success,
-        ); */
-      } else {
-        AppNotification.showNotification(
-          context,
-          AppLocale.mediaSettingsError.getString(context),
-          type: NotificationType.error,
-        );
-      }
+  Future<void> _handleMediaConfigChange(List<String> enabledTypes) async {
+    final success = await ScraperRepository.saveEnabledMediaTypes(enabledTypes);
+    if (mounted && success) {
+      setState(() {
+        _currentEnabledMediaTypes = List<String>.from(enabledTypes);
+      });
     }
+  }
+
+  Future<void> _handleRegionPriorityChange(List<String> newPriority) async {
+    setState(() {
+      _currentRegionPriority = newPriority;
+    });
   }
 
   @override
@@ -594,8 +628,15 @@ class _NewScraperOptionsScreenState extends State<NewScraperOptionsScreen> {
         key: _mediaKey,
         isContentFocused: !_focusOnMenu,
         selectedContentIndex: _selectedContentIndex,
-        currentConfig: _currentMediaConfig,
-        onConfigChanged: _handleMediaConfigChange,
+        enabledTypes: _currentEnabledMediaTypes,
+        onEnabledTypesChanged: _handleMediaConfigChange,
+      );
+    } else if (selectedKey == AppLocale.region) {
+      return RegionContent(
+        key: _regionKey,
+        isContentFocused: !_focusOnMenu,
+        selectedContentIndex: _selectedContentIndex,
+        onRegionPriorityChanged: _handleRegionPriorityChange,
       );
     } else if (selectedKey == AppLocale.language) {
       return LanguageContent(

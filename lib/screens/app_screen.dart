@@ -106,7 +106,7 @@ class AppScreenState extends State<AppScreen> {
       onNextTab: _navigateToNextTab,
       onSelectItem: _selectCurrentItem,
       onSettings: _handleSettings,
-      onBack: null, // Root level handles back navigation via PopScope.
+      onBack: _handleBackNavigation,
     );
 
     // Asynchronous initialization of navigation and update checking.
@@ -318,9 +318,14 @@ class AppScreenState extends State<AppScreen> {
   }
 
   void _handleSettings() {
-    // Context-sensitive settings/secondary-action button handler.
     if (_selectedTabIndex == 0) {
       return;
+    }
+  }
+
+  void _handleBackNavigation() {
+    if (_selectedTabIndex == 3) {
+      NewScraperOptionsScreen.backCurrent();
     }
   }
 

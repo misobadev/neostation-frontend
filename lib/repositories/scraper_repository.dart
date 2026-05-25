@@ -240,6 +240,9 @@ class ScraperRepository {
               (int.tryParse(row['scrape_images']?.toString() ?? '1') ?? 1) == 1,
           'scrape_videos':
               (int.tryParse(row['scrape_videos']?.toString() ?? '1') ?? 1) == 1,
+          'region_priority': row['region_priority']?.toString() ??
+              '["wor","us","eu","jp","sp","fr","de","it","kr","cn"]',
+          'scrape_media_types': _parseMediaTypes(row),
         };
       }
 
@@ -249,6 +252,7 @@ class ScraperRepository {
         'scrape_metadata': 1,
         'scrape_images': 1,
         'scrape_videos': 1,
+        'scrape_media_types': '["fanart","ss","wheel","box2D","video"]',
       });
 
       return {
@@ -256,6 +260,7 @@ class ScraperRepository {
         'scrape_metadata': true,
         'scrape_images': true,
         'scrape_videos': true,
+        'region_priority': '["wor","us","eu","jp","sp","fr","de","it","kr","cn"]',
       };
     } catch (e) {
       _log.e('Error getting scraper config: $e');
@@ -264,6 +269,8 @@ class ScraperRepository {
         'scrape_metadata': true,
         'scrape_images': true,
         'scrape_videos': true,
+        'region_priority': '["wor","us","eu","jp","sp","fr","de","it","kr","cn"]',
+        'scrape_media_types': '["fanart","ss","wheel","box2D","video"]',
       };
     }
   }
@@ -293,6 +300,12 @@ class ScraperRepository {
         dataToUpdate['scrape_videos'] = (config['scrape_videos'] as bool)
             ? 1
             : 0;
+      }
+      if (config.containsKey('region_priority')) {
+        dataToUpdate['region_priority'] = config['region_priority'];
+      }
+      if (config.containsKey('scrape_media_types')) {
+        dataToUpdate['scrape_media_types'] = config['scrape_media_types'];
       }
 
       await db.update(
@@ -559,5 +572,74 @@ class ScraperRepository {
       _log.e('Error getting preferred language: $e');
     }
     return 'en';
+  }
+
+  static const String defaultRegionPriority =
+      '["wor","us","eu","jp","sp","fr","de","it","kr","cn"]';
+
+  static Future<List<String>> getRegionPriority() async {
+    try {
+      final config = await getScraperConfig();
+      final jsonStr =
+          config['region_priority']?.toString() ?? defaultRegionPriority;
+      final List<dynamic> decoded = jsonDecode(jsonStr);
+      return decoded.cast<String>();
+    } catch (e) {
+      _log.e('Error getting region priority: $e');
+      return ['wor', 'us', 'eu', 'jp', 'sp', 'fr', 'de', 'it', 'kr', 'cn'];
+    }
+  }
+
+  static Future<bool> saveRegionPriority(List<String> regions) async {
+    try {
+      return await saveScraperConfig({
+        'region_priority': jsonEncode(regions),
+      });
+    } catch (e) {
+      _log.e('Error saving region priority: $e');
+      return false;
+    }
+  }
+
+  static const String defaultScrapeMediaTypes =
+      '["fanart","ss","wheel","box2D","video"]';
+
+  static String _parseMediaTypes(Map<String, dynamic> row) {
+    final jsonStr = row['scrape_media_types']?.toString();
+    if (jsonStr != null && jsonStr.isNotEmpty) return jsonStr;
+
+    final imagesEnabled =
+        (int.tryParse(row['scrape_images']?.toString() ?? '1') ?? 1) == 1;
+    final videosEnabled =
+        (int.tryParse(row['scrape_videos']?.toString() ?? '1') ?? 1) == 1;
+
+    final types = <String>[];
+    if (imagesEnabled) types.addAll(['fanart', 'ss', 'wheel', 'box2D']);
+    if (videosEnabled) types.add('video');
+    return jsonEncode(types);
+  }
+
+  static Future<List<String>> getEnabledMediaTypes() async {
+    try {
+      final config = await getScraperConfig();
+      final jsonStr = config['scrape_media_types']?.toString() ??
+          defaultScrapeMediaTypes;
+      final List<dynamic> decoded = jsonDecode(jsonStr);
+      return decoded.cast<String>();
+    } catch (e) {
+      _log.e('Error getting enabled media types: $e');
+      return ['fanart', 'ss', 'wheel', 'box2D', 'video'];
+    }
+  }
+
+  static Future<bool> saveEnabledMediaTypes(List<String> types) async {
+    try {
+      return await saveScraperConfig({
+        'scrape_media_types': jsonEncode(types),
+      });
+    } catch (e) {
+      _log.e('Error saving enabled media types: $e');
+      return false;
+    }
   }
 }
