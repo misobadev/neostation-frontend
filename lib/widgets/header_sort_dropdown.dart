@@ -389,7 +389,9 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
               padding: EdgeInsets.symmetric(horizontal: 12.r),
               decoration: BoxDecoration(
                 color: isFocused
-                    ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
+                    ? Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.15)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(8.r),
                 border: isFocused

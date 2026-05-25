@@ -823,9 +823,13 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                   onVerticalDragUpdate: (details) {
                     final deltaY = details.delta.dy;
                     if (deltaY > 0) {
-                      final newOffset = (_pullOffsetNotifier.value + deltaY).clamp(0.0, _maxPull);
+                      final newOffset = (_pullOffsetNotifier.value + deltaY)
+                          .clamp(0.0, _maxPull);
                       _pullOffsetNotifier.value = newOffset;
-                      _pullProgress.value = (newOffset / _maxPull).clamp(0.0, 1.0);
+                      _pullProgress.value = (newOffset / _maxPull).clamp(
+                        0.0,
+                        1.0,
+                      );
                       if (_pullProgress.value >= 1.0) _pullReady = true;
                     }
                   },
@@ -857,56 +861,60 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                       skipTraversal: true,
                       child: RepaintBoundary(
                         child: CarouselSlider.builder(
-                        carouselController: _controller,
-                        itemCount: allSystems.length,
-                        itemBuilder: (context, index, realIndex) {
-                          final system = allSystems[index];
-                          final isSelected = index == _currentIndex;
-                          return _buildSystemCard(
-                            context,
-                            system,
-                            isSelected,
-                            index,
-                          );
-                        },
-                        options: CarouselOptions(
-                          scrollDirection: Axis.horizontal,
-                          animateToClosest: true,
-                          pageSnapping: true,
-                          enableInfiniteScroll: true,
-                          padEnds: true,
-                          disableCenter: false,
-                          
-                          viewportFraction: MediaQuery.of(context).size.aspectRatio >= 1.5 ? 0.5 : 0.75,
-                          height: MediaQuery.of(context).size.height,
-                          //aspectRatio: 16 / 9,
-                          enlargeCenterPage: true,
-                          enlargeFactor: 0.5,
-                          enlargeStrategy: CenterPageEnlargeStrategy.zoom,
-                          initialPage: _currentIndex,
-                          onPageChanged: (index, reason) {
-                            // Trigger navigation SFX only for manual swipe gestures.
-                            // Gamepad and tap interactions handle their own sound feedback
-                            // to avoid latency or double-triggering on high-performance devices.
-                            if (reason == CarouselPageChangedReason.manual) {
-                              SfxService().playNavSound();
-                            }
-                            setState(() {
-                              _currentIndex = index;
-                              _isNavigating = false; // Release navigation lock.
-                            });
-                            _scrollToIndex(index);
-                            _updateBackground(allSystems[index]);
-                            _updateSecondaryScreenName();
-                            widget.onCardTapped?.call(index);
+                          carouselController: _controller,
+                          itemCount: allSystems.length,
+                          itemBuilder: (context, index, realIndex) {
+                            final system = allSystems[index];
+                            final isSelected = index == _currentIndex;
+                            return _buildSystemCard(
+                              context,
+                              system,
+                              isSelected,
+                              index,
+                            );
                           },
+                          options: CarouselOptions(
+                            scrollDirection: Axis.horizontal,
+                            animateToClosest: true,
+                            pageSnapping: true,
+                            enableInfiniteScroll: true,
+                            padEnds: true,
+                            disableCenter: false,
+
+                            viewportFraction:
+                                MediaQuery.of(context).size.aspectRatio >= 1.5
+                                ? 0.5
+                                : 0.75,
+                            height: MediaQuery.of(context).size.height,
+                            //aspectRatio: 16 / 9,
+                            enlargeCenterPage: true,
+                            enlargeFactor: 0.5,
+                            enlargeStrategy: CenterPageEnlargeStrategy.zoom,
+                            initialPage: _currentIndex,
+                            onPageChanged: (index, reason) {
+                              // Trigger navigation SFX only for manual swipe gestures.
+                              // Gamepad and tap interactions handle their own sound feedback
+                              // to avoid latency or double-triggering on high-performance devices.
+                              if (reason == CarouselPageChangedReason.manual) {
+                                SfxService().playNavSound();
+                              }
+                              setState(() {
+                                _currentIndex = index;
+                                _isNavigating =
+                                    false; // Release navigation lock.
+                              });
+                              _scrollToIndex(index);
+                              _updateBackground(allSystems[index]);
+                              _updateSecondaryScreenName();
+                              widget.onCardTapped?.call(index);
+                            },
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
 
               // Secondary Systems Indicator List (Bottom).
               SizedBox(

@@ -1313,8 +1313,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
               if (notification is ScrollUpdateNotification) {
                 final pixels = notification.metrics.pixels;
                 if (pixels < 0) {
-                  _pullProgress.value =
-                      (-pixels / _maxPull).clamp(0.0, 1.0);
+                  _pullProgress.value = (-pixels / _maxPull).clamp(0.0, 1.0);
                   if (_pullProgress.value >= 1.0) {
                     _pullReady = true;
                   }
