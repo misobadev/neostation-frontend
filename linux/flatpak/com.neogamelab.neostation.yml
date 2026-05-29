@@ -32,7 +32,8 @@ modules:
       - |
         for size in 64 128 256 512; do
           mkdir -p /app/share/icons/hicolor/${size}x${size}/apps
-          convert assets/images/logo.png -resize "${size}x${size}" /app/share/icons/hicolor/${size}x${size}/apps/com.neogamelab.neostation.png
+          ffmpeg -y -i assets/images/logo.png -vf scale=${size}:${size} \
+            /app/share/icons/hicolor/${size}x${size}/apps/com.neogamelab.neostation.png
         done
     sources:
       - type: dir
