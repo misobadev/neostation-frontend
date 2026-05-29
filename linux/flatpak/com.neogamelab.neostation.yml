@@ -36,12 +36,12 @@ modules:
         done
     sources:
       - type: dir
-        path: build/linux/x64/release/bundle
+        path: ../../build/linux/x64/release/bundle
         dest: neostation-bundle
       - type: file
-        path: linux/flatpak/com.neogamelab.neostation.desktop
+        path: com.neogamelab.neostation.desktop
       - type: file
-        path: linux/flatpak/com.neogamelab.neostation.metainfo.xml
+        path: com.neogamelab.neostation.metainfo.xml
       - type: file
-        path: assets/images/logo.png
+        path: ../../assets/images/logo.png
         dest: assets/images
