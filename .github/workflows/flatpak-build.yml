@@ -26,12 +26,23 @@ jobs:
   flatpak:
     name: Build Flatpak
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/flathub/flatpak-builder:latest
-      options: --privileged
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Install Flatpak and builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder appstream desktop-file-utils
+
+      - name: Add Flathub remote
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install GNOME SDK
+        run: |
+          flatpak install --user -y --noninteractive flathub org.gnome.Sdk//47
+          flatpak install --user -y --noninteractive flathub org.gnome.Platform//47
 
       - name: Update Flutter SHA256
         run: |
@@ -39,8 +50,7 @@ jobs:
 
       - name: Validate metainfo
         run: |
-          flatpak run org.freedesktop.appstream-glib validate \
-            linux/flatpak/com.neogamelab.neostation.metainfo.xml
+          appstreamcli validate linux/flatpak/com.neogamelab.neostation.metainfo.xml
 
       - name: Validate desktop file
         run: |
@@ -48,8 +58,7 @@ jobs:
 
       - name: Build Flatpak
         run: |
-          flatpak-builder --user --install-deps-from=flathub \
-            --repo=repo --force-clean \
+          flatpak-builder --user --repo=repo --force-clean \
             build-dir linux/flatpak/com.neogamelab.neostation.yml
 
       - name: Export Flatpak bundle
