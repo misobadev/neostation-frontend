@@ -29,7 +29,7 @@ modules:
     build-commands:
       - export PATH=$PWD/flutter/bin:$PATH
       - flutter config --no-analytics
-      - flutter precache --linux
+      - flutter precache --linux --no-android --no-web --no-ios --no-macos --no-windows
       - flutter pub get
       - flutter build linux --release
       - mkdir -p /app/bin
