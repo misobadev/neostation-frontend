@@ -9,15 +9,11 @@ finish-args:
   - --socket=fallback-x11
   - --share=ipc
   - --device=dri
-  - --device=all
+  - --device=input
   - --socket=pulseaudio
   - --share=network
   - --filesystem=home
-  - --filesystem=/dev/input:ro
   - --talk-name=org.freedesktop.secrets
-  - --env=RA_API_KEY
-  - --env=SCREENSCRAPER_DEV_ID
-  - --env=SCREENSCRAPER_DEV_PASSWORD
 
 cleanup:
   - /include
