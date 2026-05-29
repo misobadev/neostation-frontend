@@ -26,6 +26,7 @@ jobs:
   flatpak:
     name: Build Flatpak
     runs-on: ubuntu-latest
+    environment: Production
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -52,9 +53,32 @@ jobs:
           SCREENSCRAPER_DEV_PASSWORD: ${{ secrets.SCREENSCRAPER_DEV_PASSWORD }}
         run: |
           : > .env
-          [ -n "$RA_API_KEY" ] && echo "RA_API_KEY=$RA_API_KEY" >> .env
-          [ -n "$SCREENSCRAPER_DEV_ID" ] && echo "SCREENSCRAPER_DEV_ID=$SCREENSCRAPER_DEV_ID" >> .env
-          [ -n "$SCREENSCRAPER_DEV_PASSWORD" ] && echo "SCREENSCRAPER_DEV_PASSWORD=$SCREENSCRAPER_DEV_PASSWORD" >> .env
+          MISSING=0
+          if [ -n "$RA_API_KEY" ]; then
+            echo "RA_API_KEY=$RA_API_KEY" >> .env
+            echo "  RA_API_KEY: set"
+          else
+            echo "::warning::RA_API_KEY secret is not set — RetroAchievements will fail"
+            MISSING=1
+          fi
+          if [ -n "$SCREENSCRAPER_DEV_ID" ]; then
+            echo "SCREENSCRAPER_DEV_ID=$SCREENSCRAPER_DEV_ID" >> .env
+            echo "  SCREENSCRAPER_DEV_ID: set"
+          else
+            echo "::warning::SCREENSCRAPER_DEV_ID secret is not set — ScreenScraper will fail"
+            MISSING=1
+          fi
+          if [ -n "$SCREENSCRAPER_DEV_PASSWORD" ]; then
+            echo "SCREENSCRAPER_DEV_PASSWORD=$SCREENSCRAPER_DEV_PASSWORD" >> .env
+            echo "  SCREENSCRAPER_DEV_PASSWORD: set"
+          else
+            echo "::warning::SCREENSCRAPER_DEV_PASSWORD secret is not set — ScreenScraper will fail"
+            MISSING=1
+          fi
+          if [ "$MISSING" -eq 1 ]; then
+            echo "::warning::Some secrets are missing. Check Settings > Secrets and variables > Actions > Secrets."
+            echo "::warning::If secrets are under an Environment, ensure the job has 'environment:' matching that name."
+          fi
           echo ".env created with $(wc -l < .env) lines"
 
       - name: Build Flutter Linux app
