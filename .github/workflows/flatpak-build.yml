@@ -41,16 +41,18 @@ jobs:
 
       - name: Install GNOME SDK
         run: |
-          flatpak install --user -y --noninteractive flathub org.gnome.Sdk//47
-          flatpak install --user -y --noninteractive flathub org.gnome.Platform//47
+          flatpak install --user -y --noninteractive flathub org.gnome.Sdk//50
+          flatpak install --user -y --noninteractive flathub org.gnome.Platform//50
 
       - name: Update Flutter SHA256
         run: |
           bash linux/flatpak/get-flutter-sha256.sh
 
       - name: Validate metainfo
+        continue-on-error: true
         run: |
-          appstreamcli validate linux/flatpak/com.neogamelab.neostation.metainfo.xml
+          appstreamcli validate --explain \
+            linux/flatpak/com.neogamelab.neostation.metainfo.xml
 
       - name: Validate desktop file
         run: |

@@ -69,12 +69,6 @@
 
   <content_rating type="oars-1.1" />
 
-  <requires>
-    <display_length compare="ge">small</display_length>
-    <memory compare="ge">512M</memory>
-    <internet>offline-only</internet>
-  </requires>
-
   <provides>
     <binary>neostation</binary>
   </provides>
