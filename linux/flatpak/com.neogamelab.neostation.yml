@@ -30,9 +30,9 @@ modules:
       - install -Dm644 com.neogamelab.neostation.desktop /app/share/applications/com.neogamelab.neostation.desktop
       - install -Dm644 com.neogamelab.neostation.metainfo.xml /app/share/metainfo/com.neogamelab.neostation.metainfo.xml
       - |
-        for size in 64 128 256; do
+        for size in 64 128 256 512; do
           mkdir -p /app/share/icons/hicolor/${size}x${size}/apps
-          cp assets/images/logo.png /app/share/icons/hicolor/${size}x${size}/apps/com.neogamelab.neostation.png
+          convert assets/images/logo.png -resize "${size}x${size}" /app/share/icons/hicolor/${size}x${size}/apps/com.neogamelab.neostation.png
         done
     sources:
       - type: dir
