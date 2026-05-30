@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 
-/// A PageView-based native carousel with square cards (1:1) that supports
-/// peeking adjacent items and progressive scaling for depth effect.
-///
-/// The center card fills the available height and is always square.
-/// Adjacent cards are scaled down and semi-transparent.
+enum CarouselPageChangeReason { manual, controller }
+
 class NativeCarousel extends StatefulWidget {
   final int itemCount;
   final Widget Function(BuildContext context, int index) itemBuilder;
-  final ValueChanged<int>? onPageChanged;
+  final void Function(int index, CarouselPageChangeReason reason)?
+  onPageChanged;
   final ValueChanged<double>? onPageScrolled;
   final int initialIndex;
 
@@ -31,6 +29,8 @@ class NativeCarouselState extends State<NativeCarousel> {
   double _lastVpFraction = 0;
   int _lastReportedIndex = 0;
   final ValueNotifier<double> _pageNotifier = ValueNotifier(0.0);
+  CarouselPageChangeReason _pageChangeReason =
+      CarouselPageChangeReason.controller;
 
   @override
   void initState() {
@@ -70,7 +70,9 @@ class NativeCarouselState extends State<NativeCarousel> {
       final dist = (page - _currentIndex).abs();
       if (dist < 0.05) {
         _lastReportedIndex = _currentIndex;
-        widget.onPageChanged?.call(_currentIndex);
+        final reason = _pageChangeReason;
+        _pageChangeReason = CarouselPageChangeReason.controller;
+        widget.onPageChanged?.call(_currentIndex, reason);
       }
     }
   }
@@ -102,6 +104,7 @@ class NativeCarouselState extends State<NativeCarousel> {
   }
 
   void _animateToPage(int index) {
+    _pageChangeReason = CarouselPageChangeReason.controller;
     _pageController?.animateToPage(
       index,
       duration: const Duration(milliseconds: 260),
@@ -110,6 +113,7 @@ class NativeCarouselState extends State<NativeCarousel> {
   }
 
   void jumpToPage(int index) {
+    _pageChangeReason = CarouselPageChangeReason.controller;
     _pageController?.jumpToPage(index);
   }
 
@@ -137,34 +141,40 @@ class NativeCarouselState extends State<NativeCarousel> {
 
         return SizedBox(
           height: constraints.maxHeight,
-          child: PageView.builder(
-            controller: _pageController,
-            clipBehavior: Clip.none,
-            padEnds: true,
-            allowImplicitScrolling: true,
-            itemCount: widget.itemCount,
-            itemBuilder: (context, index) {
-              return ValueListenableBuilder<double>(
-                valueListenable: _pageNotifier,
-                builder: (context, page, _) {
-                  final distance = (index - page).abs() - 0.6;
-                  final scale = (1.0 - distance * 0.4).clamp(0.25, 1.0);
-                  final opacity = (0.6 - distance * 1).clamp(0.1, 1.0);
-
-                  return Opacity(
-                    opacity: opacity,
-                    child: Transform.scale(
-                      scale: scale,
-                      alignment: Alignment.center,
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: widget.itemBuilder(context, index),
-                      ),
-                    ),
-                  );
-                },
-              );
+          child: Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: (_) {
+              _pageChangeReason = CarouselPageChangeReason.manual;
             },
+            child: PageView.builder(
+              controller: _pageController,
+              clipBehavior: Clip.none,
+              padEnds: true,
+              allowImplicitScrolling: true,
+              itemCount: widget.itemCount,
+              itemBuilder: (context, index) {
+                return ValueListenableBuilder<double>(
+                  valueListenable: _pageNotifier,
+                  builder: (context, page, _) {
+                    final distance = (index - page).abs() - 0.6;
+                    final scale = (1.0 - distance * 0.4).clamp(0.25, 1.0);
+                    final opacity = (0.6 - distance * 1).clamp(0.1, 1.0);
+
+                    return Opacity(
+                      opacity: opacity,
+                      child: Transform.scale(
+                        scale: scale,
+                        alignment: Alignment.center,
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: widget.itemBuilder(context, index),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         );
       },

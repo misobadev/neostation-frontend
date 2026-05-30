@@ -64,9 +64,6 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   /// Hardware navigation manager for this specific view layer.
   late GamepadNavigation _gamepadNav;
 
-  /// State lock to prevent animation jank during rapid navigation.
-  bool _isNavigating = false;
-
   /// Set while game launch dialog is active to hide carousel content and free RAM.
   bool _isGameLaunching = false;
 
@@ -274,29 +271,13 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
   /// Logic for smooth previous item navigation.
   void _navigatePrevious() {
-    if (_isNavigating) return;
-    _isNavigating = true;
-
+    SfxService().playNavSound();
     _carouselKey.currentState?.previousPage();
-
-    Future.delayed(const Duration(milliseconds: 310), () {
-      if (mounted && _isNavigating) {
-        setState(() => _isNavigating = false);
-      }
-    });
   }
 
   void _navigateNext() {
-    if (_isNavigating) return;
-
-    _isNavigating = true;
+    SfxService().playNavSound();
     _carouselKey.currentState?.nextPage();
-
-    Future.delayed(const Duration(milliseconds: 310), () {
-      if (mounted && _isNavigating) {
-        setState(() => _isNavigating = false);
-      }
-    });
   }
 
   /// Aggregates all logical systems (including virtuals like 'Recent') for display.
@@ -565,7 +546,13 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
     offset = offset.clamp(0.0, _scrollController.position.maxScrollExtent);
 
-    _scrollController.jumpTo(offset);
+    if (_scrollController.position.maxScrollExtent > 0) {
+      _scrollController.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   /// Dynamically computes width for the system label indicator based on font metrics.
@@ -869,11 +856,12 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                           onPageScrolled: (page) {
                             _scrollToPage(page);
                           },
-                          onPageChanged: (index) {
-                            SfxService().playNavSound();
+                          onPageChanged: (index, reason) {
+                            if (reason == CarouselPageChangeReason.manual) {
+                              SfxService().playNavSound();
+                            }
                             setState(() {
                               _currentIndex = index;
-                              _isNavigating = false;
                             });
                             _updateBackground(allSystems[index]);
                             _updateSecondaryScreenName();
@@ -921,6 +909,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
                           return GestureDetector(
                             onTap: () {
+                              SfxService().playNavSound();
                               _carouselKey.currentState?.animateToPage(index);
                             },
                             child: Container(
@@ -1092,10 +1081,8 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
     return GestureDetector(
       onTap: () {
         if (!isSelected) {
+          SfxService().playNavSound();
           _carouselKey.currentState?.animateToPage(index);
-        } else {
-          // Intentional No-op: If already selected, taps do not trigger
-          // navigation to prevent accidental launches during grid exploration.
         }
       },
       child: RepaintBoundary(
