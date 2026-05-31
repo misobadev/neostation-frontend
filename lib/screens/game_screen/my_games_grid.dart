@@ -61,8 +61,10 @@ class _GamesGridState extends State<GamesGrid> {
 
   // Layout
   List<_CardRect> _cardRects = [];
-  double _contentHeight = 0;
+  List<_RowInfo> _rows = [];
   double _cardWidth = 0;
+  double _spX = 0;
+  double _spY = 0;
   double? _lastLayoutWidth;
   int? _lastLayoutCols;
   int? _lastLayoutGameCount;
@@ -72,6 +74,8 @@ class _GamesGridState extends State<GamesGrid> {
 
   // Visible index tracking for lazy dimension loading
   final Set<int> _loadedDims = {};
+  bool _needsDimReload = false;
+  bool _dimReloadScheduled = false;
 
   // Pinch gesture tracking
   final Map<int, Offset> _activePointers = {};
@@ -216,16 +220,20 @@ class _GamesGridState extends State<GamesGrid> {
   bool _needsLayout(double w) =>
       _lastLayoutWidth != w ||
       _lastLayoutCols != _cols ||
-      _lastLayoutGameCount != widget.games.length;
+      _lastLayoutGameCount != widget.games.length ||
+      _needsDimReload;
 
   void _computeLayout(double availableWidth) {
     if (!_needsLayout(availableWidth)) return;
     _lastLayoutWidth = availableWidth;
     _lastLayoutCols = _cols;
     _lastLayoutGameCount = widget.games.length;
+    _needsDimReload = false;
 
-    final spX = availableWidth * 0.016;
-    final spY = availableWidth * 0.016;
+    final spX = 6.0.r;
+    final spY = 6.0.r;
+    _spX = spX;
+    _spY = spY;
 
     final totalWidth = availableWidth - 32;
     _cardWidth = (totalWidth - (_cols - 1) * spX) / _cols;
@@ -238,40 +246,47 @@ class _GamesGridState extends State<GamesGrid> {
 
     if (_isFanart) {
       double y = 0;
-      final spY = availableWidth * 0.016;
+      final rows = <_RowInfo>[];
       for (int i = 0; i < n; i += _cols) {
         final end = (i + _cols).clamp(0, n);
+        final count = end - i;
+        rows.add(
+          _RowInfo(topY: y, height: _cardWidth, startIndex: i, count: count),
+        );
         for (int idx = i; idx < end; idx++) {
           final col = idx % _cols;
           _cardRects[idx] = _CardRect(
             left: col * (_cardWidth + spX),
-            top: y,
+            top: y + spY / 2,
             width: _cardWidth,
             height: _cardWidth,
           );
         }
         y += _cardWidth + spY;
       }
-      _contentHeight = y + 80;
-      return;
+      _rows = rows;
+      return; // fanart path done
     }
 
     // First pass: use the static cache to get known dimensions fast
     double y = 0;
     int i = 0;
+    final rows = <_RowInfo>[];
     while (i < n) {
       double maxH = 0;
       final end = (i + _cols).clamp(0, n);
+      final count = end - i;
       for (int idx = i; idx < end; idx++) {
         final h = _cardHeightFor(idx);
         if (h > maxH) maxH = h;
       }
+      rows.add(_RowInfo(topY: y, height: maxH, startIndex: i, count: count));
       for (int idx = i; idx < end; idx++) {
         final col = idx % _cols;
         final h = _cardHeightFor(idx);
         _cardRects[idx] = _CardRect(
           left: col * (_cardWidth + spX),
-          top: y + (maxH - h) / 2,
+          top: y + (maxH + spY - h) / 2,
           width: _cardWidth,
           height: h,
         );
@@ -280,7 +295,7 @@ class _GamesGridState extends State<GamesGrid> {
       y += maxH + spY;
       i = end;
     }
-    _contentHeight = y + 80;
+    _rows = rows;
   }
 
   // Lazy dimension loading for newly visible cards
@@ -288,8 +303,19 @@ class _GamesGridState extends State<GamesGrid> {
     if (_isFanart) return;
     if (_loadedDims.contains(index)) return;
     final path = _box2dPath(index);
-    _readImageSize(path); // touches cache, fills in dimension
+    final hadBefore = _imageSizeCache.containsKey(path);
+    final size = _readImageSize(path); // touches cache, fills in dimension
     _loadedDims.add(index);
+    if (!hadBefore && size != null && !_dimReloadScheduled) {
+      _needsDimReload = true;
+      _dimReloadScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _dimReloadScheduled = false;
+        if (mounted && _needsDimReload) {
+          setState(() {});
+        }
+      });
+    }
   }
 
   @override
@@ -301,7 +327,6 @@ class _GamesGridState extends State<GamesGrid> {
     );
     _updateCrossAxisCount();
     _initializeGamepad();
-    _scrollController.addListener(_onScroll);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -315,8 +340,6 @@ class _GamesGridState extends State<GamesGrid> {
       }
     });
   }
-
-  void _onScroll() => setState(() {});
 
   void _updateCrossAxisCount() {
     try {
@@ -362,6 +385,9 @@ class _GamesGridState extends State<GamesGrid> {
         _lastLayoutWidth = null;
         _showCardSizeLabel(newSize);
         setState(() {});
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _ensureSelectedVisible();
+        });
       }
     } catch (_) {}
   }
@@ -422,6 +448,15 @@ class _GamesGridState extends State<GamesGrid> {
     if (widget.games != oldWidget.games || _crossAxisCount != prevCols) {
       _lastLayoutWidth = null;
     }
+    if (widget.selectedIndex != oldWidget.selectedIndex) {
+      _selectedIndex = widget.selectedIndex.clamp(
+        0,
+        (widget.games.length - 1).clamp(0, 999999),
+      );
+      if (mounted && _scrollController.hasClients) {
+        _ensureSelectedVisible();
+      }
+    }
   }
 
   void _initializeGamepad() {
@@ -448,7 +483,6 @@ class _GamesGridState extends State<GamesGrid> {
   void dispose() {
     _cardSizeLabelTimer?.cancel();
     _cardSizeLabel.dispose();
-    _scrollController.removeListener(_onScroll);
     GamepadNavigationManager.popLayer('games_grid');
     _gamepadNav.dispose();
     _scrollController.dispose();
@@ -538,16 +572,15 @@ class _GamesGridState extends State<GamesGrid> {
   void _ensureSelectedVisible() {
     if (!_scrollController.hasClients || _cardRects.isEmpty) return;
     final rect = _cardRects[_selectedIndex.clamp(0, _cardRects.length - 1)];
-    final screenHeight = MediaQuery.of(context).size.height;
-    final viewportH = screenHeight - 120;
+    final viewportH = _scrollController.position.viewportDimension;
     final target = (rect.top - viewportH / 2 + rect.height / 2).clamp(
       0.0,
       _scrollController.position.maxScrollExtent,
     );
     _scrollController.animateTo(
       target,
-      duration: Duration(milliseconds: _isNavigatingFast ? 80 : 200),
-      curve: _isNavigatingFast ? Curves.linear : Curves.easeInOut,
+      duration: Duration(milliseconds: _isNavigatingFast ? 220 : 500),
+      curve: Curves.easeOutQuart,
     );
   }
 
@@ -588,31 +621,48 @@ class _GamesGridState extends State<GamesGrid> {
             builder: (context, constraints) {
               _computeLayout(constraints.maxWidth);
 
-              final selRect = _selectedIndex < _cardRects.length
-                  ? _cardRects[_selectedIndex]
-                  : _cardRects.first;
-              final hlDuration = Duration(
-                milliseconds: _isNavigatingFast ? 120 : 280,
-              );
               final theme = Theme.of(context);
               final systemFolder = widget.system.primaryFolderName;
               final fp = widget.fileProvider;
               final targetWidth = (_cardWidth * 1.5).toInt();
-              final viewportH = constraints.maxHeight;
-              final startY = _scrollController.hasClients
-                  ? _scrollController.offset - 300
-                  : 0.0;
-              final endY = startY + viewportH + 600;
 
-              final visibleCards = <Widget>[];
-              for (int i = 0; i < _cardRects.length; i++) {
-                final r = _cardRects[i];
-                if (r.top + r.height >= startY && r.top <= endY) {
-                  _ensureDims(i);
-                  visibleCards.add(
-                    _buildCard(i, r, systemFolder, fp, targetWidth, theme),
+              final selRect = _selectedIndex < _cardRects.length
+                  ? _cardRects[_selectedIndex]
+                  : _cardRects.first;
+              final hlDuration = Duration(
+                milliseconds: _isNavigatingFast ? 120 : 300,
+              );
+
+              Widget buildRow(BuildContext ctx, int rowIndex) {
+                final row = _rows[rowIndex];
+                final cards = <Widget>[];
+                for (int j = 0; j < row.count; j++) {
+                  final idx = row.startIndex + j;
+                  final rect = _cardRects[idx];
+                  _ensureDims(idx);
+                  final card = _buildCard(
+                    idx,
+                    rect,
+                    systemFolder,
+                    fp,
+                    targetWidth,
+                    theme,
+                  );
+                  cards.add(
+                    SizedBox(
+                      width: rect.width,
+                      height: rect.height,
+                      child: card,
+                    ),
                   );
                 }
+                return SizedBox(
+                  height: row.height + _spY,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: _interleaveSpacing(cards, _spX),
+                  ),
+                );
               }
 
               return Listener(
@@ -623,82 +673,86 @@ class _GamesGridState extends State<GamesGrid> {
                 behavior: HitTestBehavior.translucent,
                 child: Stack(
                   children: [
-                    SingleChildScrollView(
+                    CustomScrollView(
                       controller: _scrollController,
-                      padding: EdgeInsets.only(
-                        top: 12,
-                        bottom: 80,
-                        left: 16,
-                        right: 16,
-                      ),
-                      child: SizedBox(
-                        height: _contentHeight,
-                        child: Stack(
-                          children: [
-                            ...visibleCards,
-                            AnimatedPositioned(
-                              duration: hlDuration,
-                              curve: Curves.easeOutQuart,
-                              left: selRect.left,
-                              top: selRect.top,
-                              width: selRect.width,
-                              height: selRect.height,
-                              child: IgnorePointer(
-                                child: RepaintBoundary(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: theme.colorScheme.secondary,
-                                        width: 4.r,
-                                        strokeAlign:
-                                            BorderSide.strokeAlignCenter,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12.r),
-                                    ),
+                      slivers: [
+                        SliverPadding(
+                          padding: EdgeInsets.only(
+                            top: 12,
+                            bottom: 80,
+                            left: 16,
+                            right: 16,
+                          ),
+                          sliver: SliverList.builder(
+                            itemCount: _rows.length,
+                            itemBuilder: buildRow,
+                          ),
+                        ),
+                      ],
+                    ),
+                    AnimatedPositioned(
+                      key: const ValueKey('game_selector'),
+                      duration: hlDuration,
+                      curve: Curves.easeOutQuart,
+                      left: selRect.left + 16,
+                      top: selRect.top + 12,
+                      width: selRect.width,
+                      height: selRect.height,
+                      child: ListenableBuilder(
+                        listenable: _scrollController,
+                        builder: (_, child) {
+                          final offset = _scrollController.hasClients
+                              ? _scrollController.offset
+                              : 0.0;
+                          return Transform.translate(
+                            offset: Offset(0, -offset),
+                            child: IgnorePointer(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: theme.colorScheme.secondary,
+                                    width: 4.r,
                                   ),
+                                  borderRadius: BorderRadius.circular(12.r),
                                 ),
                               ),
                             ),
-                          ],
-                        ),
+                          );
+                        },
                       ),
                     ),
                     ValueListenableBuilder<String?>(
                       valueListenable: _cardSizeLabel,
-                      builder: (context, label, child) {
-                        return AnimatedOpacity(
-                          opacity: label != null ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: IgnorePointer(
-                            child: Center(
-                              child: label != null
-                                  ? Container(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 20.r,
-                                        vertical: 10.r,
+                      builder: (context, label, child) => AnimatedOpacity(
+                        opacity: label != null ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: IgnorePointer(
+                          child: Center(
+                            child: label != null
+                                ? Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 20.r,
+                                      vertical: 10.r,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary
+                                          .withValues(alpha: 0.9),
+                                      borderRadius: BorderRadius.circular(24.r),
+                                    ),
+                                    child: Text(
+                                      label,
+                                      style: TextStyle(
+                                        color: theme.colorScheme.onPrimary,
+                                        fontSize: 18.r,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 2.r,
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.primary
-                                            .withValues(alpha: 0.9),
-                                        borderRadius: BorderRadius.circular(
-                                          24.r,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        label,
-                                        style: TextStyle(
-                                          color: theme.colorScheme.onPrimary,
-                                          fontSize: 18.r,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 2.r,
-                                        ),
-                                      ),
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -708,6 +762,16 @@ class _GamesGridState extends State<GamesGrid> {
         ),
       ],
     );
+  }
+
+  List<Widget> _interleaveSpacing(List<Widget> items, double spacing) {
+    if (items.isEmpty) return items;
+    final result = <Widget>[items.first];
+    for (int i = 1; i < items.length; i++) {
+      result.add(SizedBox(width: spacing));
+      result.add(items[i]);
+    }
+    return result;
   }
 
   Widget _buildCard(
@@ -726,37 +790,31 @@ class _GamesGridState extends State<GamesGrid> {
 
     final box2dPath = game.getImagePath(systemFolder, 'box2d', fp);
 
-    return Positioned(
+    return GestureDetector(
       key: ValueKey('card_${game.romname}'),
-      left: rect.left,
-      top: rect.top,
-      width: rect.width,
-      height: rect.height,
-      child: GestureDetector(
-        onTap: () {
-          setState(() => _selectedIndex = index);
-          widget.onGameSelected(game);
-          SfxService().playNavSound();
-        },
-        child: RepaintBoundary(
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8.r),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 2.r,
-                  offset: Offset(2.r, 2.r),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: _GameCardImage(
-              key: ValueKey('img_${game.romname}'),
-              box2dPath: box2dPath,
-              game: game,
-              targetWidth: targetWidth,
-            ),
+      onTap: () {
+        setState(() => _selectedIndex = index);
+        widget.onGameSelected(game);
+        SfxService().playNavSound();
+      },
+      child: RepaintBoundary(
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 2.r,
+                offset: Offset(2.r, 2.r),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: _GameCardImage(
+            key: ValueKey('img_${game.romname}'),
+            box2dPath: box2dPath,
+            game: game,
+            targetWidth: targetWidth,
           ),
         ),
       ),
@@ -779,83 +837,77 @@ class _GamesGridState extends State<GamesGrid> {
         ? fanartPath
         : (hasScreenshot ? screenshotPath : '');
 
-    return Positioned(
+    return GestureDetector(
       key: ValueKey('fanart_${game.romname}'),
-      left: rect.left,
-      top: rect.top,
-      width: rect.width,
-      height: rect.height,
-      child: GestureDetector(
-        onTap: () {
-          setState(() => _selectedIndex = index);
-          widget.onGameSelected(game);
-          SfxService().playNavSound();
-        },
-        child: RepaintBoundary(
-          child: Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12.r),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 2.r,
-                  offset: Offset(2.r, 2.r),
+      onTap: () {
+        setState(() => _selectedIndex = index);
+        widget.onGameSelected(game);
+        SfxService().playNavSound();
+      },
+      child: RepaintBoundary(
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 2.r,
+                offset: Offset(2.r, 2.r),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12.r),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (bgPath.isNotEmpty)
+                  Image.file(
+                    File(bgPath),
+                    key: ValueKey('fanart_bg_${game.romname}'),
+                    fit: BoxFit.cover,
+                    filterQuality: FilterQuality.medium,
+                    cacheWidth: 512,
+                    errorBuilder: (ctx, e, s) => _fanartFallback(theme),
+                  )
+                else
+                  _fanartFallback(theme),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.5),
+                        Colors.black.withValues(alpha: 0.85),
+                      ],
+                      stops: const [0.5, 0.75, 1.0],
+                    ),
+                  ),
                 ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12.r),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (bgPath.isNotEmpty)
-                    Image.file(
-                      File(bgPath),
-                      key: ValueKey('fanart_bg_${game.romname}'),
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.medium,
-                      cacheWidth: 512,
-                      errorBuilder: (ctx, e, s) => _fanartFallback(theme),
-                    )
-                  else
-                    _fanartFallback(theme),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.333),
-                          Colors.black.withValues(alpha: 0.666),
-                        ],
-                        stops: const [0.5, 0.75, 1.0],
+                if (hasWheel)
+                  Positioned(
+                    left: 10.r,
+                    right: 10.r,
+                    bottom: 5.r,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 6.r,
+                        vertical: 4.r,
+                      ),
+                      child: Image.file(
+                        File(wheelsPath),
+                        key: ValueKey('wheel_${game.romname}'),
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.medium,
+                        cacheWidth: 512,
+                        errorBuilder: (ctx, e, s) => const SizedBox.shrink(),
                       ),
                     ),
                   ),
-                  if (hasWheel)
-                    Positioned(
-                      left: 10.r,
-                      right: 10.r,
-                      bottom: 5.r,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 6.r,
-                          vertical: 4.r,
-                        ),
-                        child: Image.file(
-                          File(wheelsPath),
-                          key: ValueKey('wheel_${game.romname}'),
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.medium,
-                          cacheWidth: 512,
-                          errorBuilder: (ctx, e, s) => const SizedBox.shrink(),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
           ),
         ),
@@ -1136,6 +1188,19 @@ class _Placeholder extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RowInfo {
+  final double topY;
+  final double height;
+  final int startIndex;
+  final int count;
+  const _RowInfo({
+    required this.topY,
+    required this.height,
+    required this.startIndex,
+    required this.count,
+  });
 }
 
 class _CardRect {
