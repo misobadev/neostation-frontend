@@ -36,7 +36,7 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.5
   video_player: ^2.11.1
-  fvp: ^0.37.0
+  fvp: ^0.37.2
   flutter_secure_storage: ^10.3.1
   shared_preferences: ^2.5.5
   http: ^1.6.0
