@@ -614,25 +614,27 @@ class _GamesGridState extends State<GamesGrid> {
       );
     }
 
-    return Column(
+    return Stack(
       children: [
-        _buildGridHeader(),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              _computeLayout(constraints.maxWidth);
+        Column(
+          children: [
+            SizedBox(height: 36.r),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _computeLayout(constraints.maxWidth);
 
-              final theme = Theme.of(context);
-              final systemFolder = widget.system.primaryFolderName;
-              final fp = widget.fileProvider;
-              final targetWidth = (_cardWidth * 1.5).toInt();
+                  final theme = Theme.of(context);
+                  final systemFolder = widget.system.primaryFolderName;
+                  final fp = widget.fileProvider;
+                  final targetWidth = (_cardWidth * 1.5).toInt();
 
-              final selRect = _selectedIndex < _cardRects.length
-                  ? _cardRects[_selectedIndex]
-                  : _cardRects.first;
-              final hlDuration = Duration(
-                milliseconds: _isNavigatingFast ? 120 : 300,
-              );
+                  final selRect = _selectedIndex < _cardRects.length
+                      ? _cardRects[_selectedIndex]
+                      : _cardRects.first;
+                  final hlDuration = Duration(
+                    milliseconds: _isNavigatingFast ? 120 : 300,
+                  );
 
               Widget buildRow(BuildContext ctx, int rowIndex) {
                 final row = _rows[rowIndex];
@@ -766,6 +768,14 @@ class _GamesGridState extends State<GamesGrid> {
           onPlay: widget.onPlay,
         ),
       ],
+    ),
+    Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: _buildGridHeader(),
+    ),
+  ],
     );
   }
 
@@ -981,7 +991,8 @@ class _GamesGridState extends State<GamesGrid> {
         ? widget.system.shortName!
         : widget.system.realName;
     return Container(
-      margin: EdgeInsets.only(left: 8.r, right: 8.r, top: 8.r, bottom: 4.r),
+      padding: EdgeInsets.only(left: 8.r, right: 8.r, top: 8.r, bottom: 4.r),
+      color: Scaffold.of(context).widget.backgroundColor,
       child: Row(
         children: [
           _buildIconButton(

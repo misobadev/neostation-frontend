@@ -399,7 +399,8 @@ class _GamesCarouselState extends State<GamesCarousel> {
         ? widget.system.shortName!
         : widget.system.realName;
     return Container(
-      margin: EdgeInsets.only(left: 8.r, right: 8.r, top: 8.r, bottom: 4.r),
+      padding: EdgeInsets.only(left: 8.r, right: 8.r, top: 8.r, bottom: 4.r),
+      color: Scaffold.of(context).widget.backgroundColor,
       child: Row(
         children: [
           _buildIconButton(
@@ -796,26 +797,28 @@ class _GamesCarouselState extends State<GamesCarousel> {
       fontWeight: FontWeight.w800,
     );
 
-    return Column(
+    return Stack(
       children: [
-        _buildGridHeader(),
-        Expanded(
-          child: NativeCarousel(
-            key: _carouselKey,
-            itemCount: widget.games.length,
-            initialIndex: _currentIndex.clamp(0, widget.games.length - 1),
-            itemBuilder: (context, index) {
-              final game = widget.games[index];
-              return KeyedSubtree(
-                key: ValueKey(game.romname),
-                child: isFanart
-                    ? _buildFanartCard(game, index == _currentIndex)
-                    : _buildBoxCard(game, index == _currentIndex),
-              );
-            },
-            onPageChanged: _onPageChanged,
-          ),
-        ),
+        Column(
+          children: [
+            SizedBox(height: 36.r),
+            Expanded(
+              child: NativeCarousel(
+                key: _carouselKey,
+                itemCount: widget.games.length,
+                initialIndex: _currentIndex.clamp(0, widget.games.length - 1),
+                itemBuilder: (context, index) {
+                  final game = widget.games[index];
+                  return KeyedSubtree(
+                    key: ValueKey(game.romname),
+                    child: isFanart
+                        ? _buildFanartCard(game, index == _currentIndex)
+                        : _buildBoxCard(game, index == _currentIndex),
+                  );
+                },
+                onPageChanged: _onPageChanged,
+              ),
+            ),
         SizedBox(
           height: 36.r,
           child: SingleChildScrollView(
@@ -886,6 +889,14 @@ class _GamesCarouselState extends State<GamesCarousel> {
         ),
         SizedBox(height: 8.r),
       ],
+    ),
+    Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: _buildGridHeader(),
+    ),
+  ],
     );
   }
 }
