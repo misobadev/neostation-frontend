@@ -401,10 +401,10 @@ packages:
     dependency: "direct main"
     description:
       name: fvp
-      sha256: "98af0fe7ea362b234d72f2907d7e6f8e885269b6421822aaa7379a8a6e36bdba"
+      sha256: "0f147516a2520bb37efc9027bce1f20a0aa4487428e9f1437ad7dfa449aa93bd"
       url: "https://pub.dev"
     source: hosted
-    version: "0.37.0"
+    version: "0.37.2"
   glob:
     dependency: transitive
     description:
