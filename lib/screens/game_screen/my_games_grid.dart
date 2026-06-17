@@ -953,24 +953,25 @@ class _GamesGridState extends State<GamesGrid> {
                     key: ValueKey('fanart_bg_${game.romname}'),
                     fit: BoxFit.cover,
                     cacheWidth: 388,
-                    errorBuilder: (ctx, e, s) => _fanartFallback(theme),
+                    errorBuilder: (ctx, e, s) => _buildFallbackCard(game, theme),
                   )
                 else
-                  _fanartFallback(theme),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.5),
-                        Colors.black.withValues(alpha: 0.85),
-                      ],
-                      stops: const [0.5, 0.75, 1.0],
+                  _buildFallbackCard(game, theme),
+                if (bgPath.isNotEmpty)
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.5),
+                          Colors.black.withValues(alpha: 0.85),
+                        ],
+                        stops: const [0.5, 0.75, 1.0],
+                      ),
                     ),
                   ),
-                ),
                 if (hasWheel)
                   Positioned(
                     left: 10.r,
@@ -1023,15 +1024,34 @@ class _GamesGridState extends State<GamesGrid> {
     );
   }
 
-  Widget _fanartFallback(ThemeData theme) {
+  Widget _buildFallbackCard(GameModel game, ThemeData theme) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.surfaceContainerHighest,
-            theme.colorScheme.surface,
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.videogame_asset_rounded,
+              size: 32.r,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
+            SizedBox(height: 4.r),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4.r),
+              child: Text(
+                GameUtils.formatGameName(
+                  game.name.isNotEmpty ? game.name : game.romname,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 7.r,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
           ],
         ),
       ),

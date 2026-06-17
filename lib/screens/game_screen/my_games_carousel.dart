@@ -571,25 +571,26 @@ class _GamesCarouselState extends State<GamesCarousel> {
                 key: ValueKey(bgPath),
                 fit: BoxFit.cover,
                 cacheWidth: 1024,
-                errorBuilder: (ctx, e, s) => _buildFallbackBg(game, theme),
+                errorBuilder: (ctx, e, s) => _buildFallbackCard(game, theme),
               )
             else
-              _buildFallbackBg(game, theme),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.6),
-                    Colors.black.withValues(alpha: 0.9),
-                  ],
-                  stops: const [0.0, 0.4, 0.7, 1.0],
+              _buildFallbackCard(game, theme),
+            if (bgPath.isNotEmpty)
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.6),
+                      Colors.black.withValues(alpha: 0.9),
+                    ],
+                    stops: const [0.0, 0.4, 0.7, 1.0],
+                  ),
                 ),
               ),
-            ),
             Positioned(
               left: 0,
               right: 0,
@@ -663,15 +664,33 @@ class _GamesCarouselState extends State<GamesCarousel> {
     );
   }
 
-  Widget _buildFallbackBg(GameModel game, ThemeData theme) {
+  Widget _buildFallbackCard(GameModel game, ThemeData theme) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.surfaceContainerHighest,
-            theme.colorScheme.surface,
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Symbols.videogame_asset_rounded,
+              size: 64.r,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
+            SizedBox(height: 12.r),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.r),
+              child: Text(
+                game.name.isNotEmpty ? game.name : game.realname,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  fontSize: 14.r,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),
@@ -810,36 +829,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
   }
 
   Widget _buildBoxFallback(GameModel game, ThemeData theme) {
-    return Container(
-      color: theme.colorScheme.surfaceContainerHighest,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Symbols.videogame_asset_rounded,
-              size: 64.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
-            SizedBox(height: 12.r),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.r),
-              child: Text(
-                game.name.isNotEmpty ? game.name : game.realname,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  fontSize: 14.r,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return _buildFallbackCard(game, theme);
   }
 
   @override
