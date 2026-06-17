@@ -192,6 +192,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
   // Media controllers.
   VideoPlayerController? _videoController;
 
+  // Scraping state.
+  final Set<String> _scrapingGameRomnames = {};
+  final Map<String, double> _scrapeProgress = {};
+
   // Localized metadata.
   String? _localizedDescription;
 
@@ -326,6 +330,80 @@ class _SystemGamesListState extends State<SystemGamesList> {
     if (_toggleInfoCallback != null) {
       _toggleInfoCallback!();
     }
+  }
+
+  void _onScrapeCurrentGame() {
+    final game = _selectedGame;
+    if (game == null) return;
+    final romname = game.romname;
+    final systemId = widget.system.id;
+    if (systemId == null) return;
+    final romPath = game.romPath;
+    if (romPath == null) return;
+    if (_scrapingGameRomnames.contains(romname)) return;
+
+    _scrapingGameRomnames.add(romname);
+    _scrapeProgress[romname] = 0.0;
+    setState(() {});
+
+    ScreenScraperService.scrapeSingleGame(
+      appSystemId: systemId,
+      romName: game.romname,
+      systemFolder: widget.system.primaryFolderName,
+      romPath: romPath,
+      gameName: game.name,
+      forceOverwrite: true,
+      onProgress: (status, progress) {
+        _scrapeProgress[romname] = progress;
+        setState(() {});
+      },
+    ).then((result) async {
+      final systemFolder = widget.system.primaryFolderName;
+      final imagesToEvict = [
+        game.getScreenshotPath(systemFolder),
+        game.getImagePath(systemFolder, 'wheels', widget.fileProvider),
+        game.getImagePath(systemFolder, 'fanarts', widget.fileProvider),
+        game.getImagePath(systemFolder, 'box2d', widget.fileProvider),
+      ];
+      for (final imagePath in imagesToEvict) {
+        final imageFile = File(imagePath);
+        if (await imageFile.exists()) {
+          await FileImage(imageFile).evict();
+        }
+      }
+
+      final updatedGame = await GameService.getGameDetails(
+        widget.system,
+        romname,
+      );
+      if (mounted && updatedGame != null) {
+        final gameIndex = _games.indexWhere((g) => g.romname == romname);
+        if (gameIndex >= 0) {
+          setState(() {
+            _games[gameIndex] = updatedGame;
+            if (_selectedGame?.romname == romname) {
+              _selectedGame = updatedGame;
+            }
+          });
+        }
+      }
+
+      if (mounted) {
+        AppNotification.showNotification(
+          context,
+          result['success'] == true
+              ? 'Scraping completed'
+              : 'Scraping failed: ${result['message']}',
+          type: result['success'] == true
+              ? NotificationType.success
+              : NotificationType.error,
+        );
+      }
+    }).whenComplete(() {
+      _scrapingGameRomnames.remove(romname);
+      _scrapeProgress.remove(romname);
+      if (mounted) setState(() {});
+    });
   }
 
   /// Responds to SQLite database updates by reloading the game list.
@@ -2424,6 +2502,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
       onFavorite: _toggleFavorite,
       onRandom: _showRandomGameDialog,
       onSettings: _handleStartButton,
+      onScrape: _onScrapeCurrentGame,
+      scrapingGameRomnames: _scrapingGameRomnames,
+      scrapeProgress: _scrapeProgress,
     );
   }
 
@@ -2446,13 +2527,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
       onFavorite: _toggleFavorite,
       onRandom: _showRandomGameDialog,
       onSettings: _handleStartButton,
-      onScrape: () {
-        if (_secondaryOverlayAction != null) {
-          _secondaryOverlayAction!();
-        } else {
-          _openGameInfo();
-        }
-      },
+      onScrape: _onScrapeCurrentGame,
+      scrapingGameRomnames: _scrapingGameRomnames,
+      scrapeProgress: _scrapeProgress,
     );
   }
 

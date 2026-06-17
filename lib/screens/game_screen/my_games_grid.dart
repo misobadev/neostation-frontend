@@ -31,6 +31,8 @@ class GamesGrid extends StatefulWidget {
   final VoidCallback onRandom;
   final VoidCallback? onSettings;
   final VoidCallback? onScrape;
+  final Set<String> scrapingGameRomnames;
+  final Map<String, double> scrapeProgress;
 
   const GamesGrid({
     super.key,
@@ -45,6 +47,8 @@ class GamesGrid extends StatefulWidget {
     required this.onRandom,
     this.onSettings,
     this.onScrape,
+    this.scrapingGameRomnames = const {},
+    this.scrapeProgress = const {},
   });
 
   @override
@@ -850,8 +854,51 @@ class _GamesGridState extends State<GamesGrid> {
                   ),
                 ),
               ),
+            if (widget.scrapingGameRomnames.contains(game.romname))
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildScrapeProgress(game),
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildScrapeProgress(GameModel game) {
+    final progress = widget.scrapeProgress[game.romname] ?? 0.0;
+    return Container(
+      height: 20.r,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(12.r)),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 8.r),
+      child: Row(
+        children: [
+          Icon(Symbols.search_rounded, size: 10.r, color: Colors.white70),
+          SizedBox(width: 4.r),
+          Expanded(
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white24,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          SizedBox(width: 4.r),
+          Text(
+            '${(progress * 100).toInt()}%',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 9.r,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -958,6 +1005,13 @@ class _GamesGridState extends State<GamesGrid> {
                       ),
                     ),
                   ),
+                if (widget.scrapingGameRomnames.contains(game.romname))
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildScrapeProgress(game),
+                  ),
               ],
             ),
           ),
@@ -1019,6 +1073,14 @@ class _GamesGridState extends State<GamesGrid> {
             color: Theme.of(context).colorScheme.tertiary,
             foregroundColor: Theme.of(context).colorScheme.onPrimary,
             onTap: widget.onRandom,
+          ),
+          SizedBox(width: 6.r),
+          _buildIconButton(
+            iconPath: 'assets/images/gamepad/Xbox_View_button.png',
+            symbol: Symbols.search_rounded,
+            color: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            onTap: () => widget.onScrape?.call(),
           ),
           SizedBox(width: 10.r),
           Container(

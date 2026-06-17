@@ -28,6 +28,9 @@ class GamesCarousel extends StatefulWidget {
   final VoidCallback? onFavorite;
   final VoidCallback? onRandom;
   final VoidCallback? onSettings;
+  final VoidCallback? onScrape;
+  final Set<String> scrapingGameRomnames;
+  final Map<String, double> scrapeProgress;
 
   const GamesCarousel({
     super.key,
@@ -41,6 +44,9 @@ class GamesCarousel extends StatefulWidget {
     this.onFavorite,
     this.onRandom,
     this.onSettings,
+    this.onScrape,
+    this.scrapingGameRomnames = const {},
+    this.scrapeProgress = const {},
   });
 
   @override
@@ -245,6 +251,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
         } catch (_) {}
       },
       onLeftTrigger: widget.onRandom,
+      onSelectButton: widget.onScrape,
       onSettings: widget.onSettings,
       onPreviousTab: AppNavigation.previousTab,
       onNextTab: AppNavigation.nextTab,
@@ -429,6 +436,14 @@ class _GamesCarouselState extends State<GamesCarousel> {
             foregroundColor: Theme.of(context).colorScheme.onPrimary,
             onTap: widget.onRandom,
           ),
+          SizedBox(width: 6.r),
+          _buildIconButton(
+            iconPath: 'assets/images/gamepad/Xbox_View_button.png',
+            symbol: Symbols.search_rounded,
+            color: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            onTap: widget.onScrape,
+          ),
           SizedBox(width: 10.r),
           Container(
             padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
@@ -591,8 +606,51 @@ class _GamesCarouselState extends State<GamesCarousel> {
                   ),
                 ),
               ),
+            if (widget.scrapingGameRomnames.contains(game.romname))
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildScrapeProgress(game),
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildScrapeProgress(GameModel game) {
+    final progress = widget.scrapeProgress[game.romname] ?? 0.0;
+    return Container(
+      height: 24.r,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24.r)),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 12.r),
+      child: Row(
+        children: [
+          Icon(Symbols.search_rounded, size: 14.r, color: Colors.white70),
+          SizedBox(width: 6.r),
+          Expanded(
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white24,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          SizedBox(width: 6.r),
+          Text(
+            '${(progress * 100).toInt()}%',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 11.r,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -659,6 +717,8 @@ class _GamesCarouselState extends State<GamesCarousel> {
                   ),
                 ),
               ),
+            if (widget.scrapingGameRomnames.contains(game.romname))
+              _buildScrapeProgress(game),
           ],
         ),
       );
@@ -724,6 +784,13 @@ class _GamesCarouselState extends State<GamesCarousel> {
                           color: Colors.redAccent,
                         ),
                       ),
+                    ),
+                  if (widget.scrapingGameRomnames.contains(game.romname))
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: _buildScrapeProgress(game),
                     ),
                 ],
               ),
