@@ -2025,6 +2025,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
                     ? _buildEmptyState()
                     : Consumer<SqliteConfigProvider>(
                         builder: (context, configProvider, child) {
+                          if (widget.system.folderName == 'music') {
+                            return _buildGamesList();
+                          }
                           if (configProvider.config.gameViewMode == 'grid') {
                             return _buildGamesGrid();
                           } else if (configProvider.config.gameViewMode ==
