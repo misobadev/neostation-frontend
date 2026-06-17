@@ -541,10 +541,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
   Widget _buildFanartCard(GameModel game, bool isSelected) {
     final theme = Theme.of(context);
     final folder = _folderForGame(game);
-    final screenshotPath = game.getScreenshotPath(
-      folder,
-      widget.fileProvider,
-    );
+    final screenshotPath = game.getScreenshotPath(folder, widget.fileProvider);
     final hasScreenshot = File(screenshotPath).existsSync();
     final fanartPath = game.getImagePath(
       folder,

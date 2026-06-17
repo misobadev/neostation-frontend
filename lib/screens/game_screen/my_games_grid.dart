@@ -189,10 +189,7 @@ class _GamesGridState extends State<GamesGrid> {
 
   String _screenshotPath(int index) {
     final game = widget.games[index];
-    return game.getScreenshotPath(
-      _folderForGame(game),
-      widget.fileProvider,
-    );
+    return game.getScreenshotPath(_folderForGame(game), widget.fileProvider);
   }
 
   bool get _isFanart =>
@@ -972,7 +969,8 @@ class _GamesGridState extends State<GamesGrid> {
                     key: ValueKey('fanart_bg_${game.romname}'),
                     fit: BoxFit.cover,
                     cacheWidth: 388,
-                    errorBuilder: (ctx, e, s) => _buildFallbackCard(game, theme),
+                    errorBuilder: (ctx, e, s) =>
+                        _buildFallbackCard(game, theme),
                   )
                 else
                   _buildFallbackCard(game, theme),

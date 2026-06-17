@@ -361,63 +361,65 @@ class _SystemGamesListState extends State<SystemGamesList> {
     setState(() {});
 
     ScreenScraperService.scrapeSingleGame(
-      appSystemId: systemId,
-      romName: game.romname,
-      systemFolder: targetSystem.primaryFolderName,
-      romPath: romPath,
-      gameName: game.name,
-      forceOverwrite: true,
-      onProgress: (status, progress) {
-        _scrapeProgress[romname] = progress;
-        setState(() {});
-      },
-    ).then((result) async {
-      final systemFolder = targetSystem.primaryFolderName;
-      final imagesToEvict = [
-        game.getScreenshotPath(systemFolder),
-        game.getImagePath(systemFolder, 'wheels', widget.fileProvider),
-        game.getImagePath(systemFolder, 'fanarts', widget.fileProvider),
-        game.getImagePath(systemFolder, 'box2d', widget.fileProvider),
-      ];
-      for (final imagePath in imagesToEvict) {
-        final imageFile = File(imagePath);
-        if (await imageFile.exists()) {
-          await FileImage(imageFile).evict();
-        }
-      }
-
-      final updatedGame = await GameService.getGameDetails(
-        targetSystem,
-        romname,
-      );
-      if (mounted && updatedGame != null) {
-        final gameIndex = _games.indexWhere((g) => g.romname == romname);
-        if (gameIndex >= 0) {
-          setState(() {
-            _games[gameIndex] = updatedGame;
-            if (_selectedGame?.romname == romname) {
-              _selectedGame = updatedGame;
+          appSystemId: systemId,
+          romName: game.romname,
+          systemFolder: targetSystem.primaryFolderName,
+          romPath: romPath,
+          gameName: game.name,
+          forceOverwrite: true,
+          onProgress: (status, progress) {
+            _scrapeProgress[romname] = progress;
+            setState(() {});
+          },
+        )
+        .then((result) async {
+          final systemFolder = targetSystem.primaryFolderName;
+          final imagesToEvict = [
+            game.getScreenshotPath(systemFolder),
+            game.getImagePath(systemFolder, 'wheels', widget.fileProvider),
+            game.getImagePath(systemFolder, 'fanarts', widget.fileProvider),
+            game.getImagePath(systemFolder, 'box2d', widget.fileProvider),
+          ];
+          for (final imagePath in imagesToEvict) {
+            final imageFile = File(imagePath);
+            if (await imageFile.exists()) {
+              await FileImage(imageFile).evict();
             }
-          });
-        }
-      }
+          }
 
-      if (mounted) {
-        AppNotification.showNotification(
-          context,
-          result['success'] == true
-              ? 'Scraping completed'
-              : 'Scraping failed: ${result['message']}',
-          type: result['success'] == true
-              ? NotificationType.success
-              : NotificationType.error,
-        );
-      }
-    }).whenComplete(() {
-      _scrapingGameRomnames.remove(romname);
-      _scrapeProgress.remove(romname);
-      if (mounted) setState(() {});
-    });
+          final updatedGame = await GameService.getGameDetails(
+            targetSystem,
+            romname,
+          );
+          if (mounted && updatedGame != null) {
+            final gameIndex = _games.indexWhere((g) => g.romname == romname);
+            if (gameIndex >= 0) {
+              setState(() {
+                _games[gameIndex] = updatedGame;
+                if (_selectedGame?.romname == romname) {
+                  _selectedGame = updatedGame;
+                }
+              });
+            }
+          }
+
+          if (mounted) {
+            AppNotification.showNotification(
+              context,
+              result['success'] == true
+                  ? 'Scraping completed'
+                  : 'Scraping failed: ${result['message']}',
+              type: result['success'] == true
+                  ? NotificationType.success
+                  : NotificationType.error,
+            );
+          }
+        })
+        .whenComplete(() {
+          _scrapingGameRomnames.remove(romname);
+          _scrapeProgress.remove(romname);
+          if (mounted) setState(() {});
+        });
   }
 
   /// Responds to SQLite database updates by reloading the game list.
