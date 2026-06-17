@@ -16,6 +16,7 @@ import 'package:neostation/screens/app_screen.dart';
 import 'package:neostation/widgets/game_view_mode_dropdown.dart';
 import 'package:neostation/widgets/native_carousel.dart';
 import 'package:neostation/widgets/game_view_footer.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 
 class GamesCarousel extends StatefulWidget {
   final SystemModel system;
@@ -295,10 +296,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
     _lastBgIndex = _currentIndex;
 
     final game = widget.games[_currentIndex];
-    final systemFolderName = widget.system.primaryFolderName;
+    final folder = _folderForGame(game);
 
     String imagePath = game.getImagePath(
-      systemFolderName,
+      folder,
       'fanarts',
       widget.fileProvider,
     );
@@ -308,7 +309,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
     );
 
     if (!exists) {
-      imagePath = game.getScreenshotPath(systemFolderName, widget.fileProvider);
+      imagePath = game.getScreenshotPath(folder, widget.fileProvider);
       exists = _fileExistsCache.putIfAbsent(
         imagePath,
         () => File(imagePath).existsSync(),
@@ -386,10 +387,17 @@ class _GamesCarouselState extends State<GamesCarousel> {
     return offset;
   }
 
+  String _folderForGame(GameModel game) {
+    if (widget.system.folderName == SystemFolderNames.favorites &&
+        game.systemFolderName != null) {
+      return game.systemFolderName!;
+    }
+    return widget.system.primaryFolderName;
+  }
+
   String _resolveImagePath(GameModel game, String imageType) {
-    final systemFolderName = widget.system.primaryFolderName;
     final path = game.getImagePath(
-      systemFolderName,
+      _folderForGame(game),
       imageType,
       widget.fileProvider,
     );
@@ -531,14 +539,14 @@ class _GamesCarouselState extends State<GamesCarousel> {
 
   Widget _buildFanartCard(GameModel game, bool isSelected) {
     final theme = Theme.of(context);
-    final systemFolderName = widget.system.primaryFolderName;
+    final folder = _folderForGame(game);
     final screenshotPath = game.getScreenshotPath(
-      systemFolderName,
+      folder,
       widget.fileProvider,
     );
     final hasScreenshot = File(screenshotPath).existsSync();
     final fanartPath = game.getImagePath(
-      systemFolderName,
+      folder,
       'fanarts',
       widget.fileProvider,
     );

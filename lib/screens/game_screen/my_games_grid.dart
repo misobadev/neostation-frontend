@@ -18,6 +18,7 @@ import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/widgets/game_view_footer.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 
 class GamesGrid extends StatefulWidget {
   final SystemModel system;
@@ -150,28 +151,48 @@ class _GamesGridState extends State<GamesGrid> {
       (bytes[offset + 2] << 8) |
       bytes[offset + 3];
 
-  String _box2dPath(int index) => widget.games[index].getImagePath(
-    widget.system.primaryFolderName,
-    'box2d',
-    widget.fileProvider,
-  );
+  String _folderForGame(GameModel game) {
+    if (widget.system.folderName == SystemFolderNames.favorites &&
+        game.systemFolderName != null) {
+      return game.systemFolderName!;
+    }
+    return widget.system.primaryFolderName;
+  }
 
-  String _fanartPath(int index) => widget.games[index].getImagePath(
-    widget.system.primaryFolderName,
-    'fanarts',
-    widget.fileProvider,
-  );
+  String _box2dPath(int index) {
+    final game = widget.games[index];
+    return game.getImagePath(
+      _folderForGame(game),
+      'box2d',
+      widget.fileProvider,
+    );
+  }
 
-  String _wheelsPath(int index) => widget.games[index].getImagePath(
-    widget.system.primaryFolderName,
-    'wheels',
-    widget.fileProvider,
-  );
+  String _fanartPath(int index) {
+    final game = widget.games[index];
+    return game.getImagePath(
+      _folderForGame(game),
+      'fanarts',
+      widget.fileProvider,
+    );
+  }
 
-  String _screenshotPath(int index) => widget.games[index].getScreenshotPath(
-    widget.system.primaryFolderName,
-    widget.fileProvider,
-  );
+  String _wheelsPath(int index) {
+    final game = widget.games[index];
+    return game.getImagePath(
+      _folderForGame(game),
+      'wheels',
+      widget.fileProvider,
+    );
+  }
+
+  String _screenshotPath(int index) {
+    final game = widget.games[index];
+    return game.getScreenshotPath(
+      _folderForGame(game),
+      widget.fileProvider,
+    );
+  }
 
   bool get _isFanart =>
       context.read<SqliteConfigProvider>().config.gameCarouselCardStyle ==
@@ -632,7 +653,6 @@ class _GamesGridState extends State<GamesGrid> {
                   _computeLayout(constraints.maxWidth);
 
                   final theme = Theme.of(context);
-                  final systemFolder = widget.system.primaryFolderName;
                   final fp = widget.fileProvider;
                   final targetWidth = (_cardWidth * 1.5).toInt();
 
@@ -653,7 +673,6 @@ class _GamesGridState extends State<GamesGrid> {
                       final card = _buildCard(
                         idx,
                         rect,
-                        systemFolder,
                         fp,
                         targetWidth,
                         theme,
@@ -797,7 +816,6 @@ class _GamesGridState extends State<GamesGrid> {
   Widget _buildCard(
     int index,
     _CardRect rect,
-    String systemFolder,
     FileProvider fp,
     int targetWidth,
     ThemeData theme,
@@ -808,7 +826,7 @@ class _GamesGridState extends State<GamesGrid> {
       return _buildFanartGridCard(index, rect, game, theme);
     }
 
-    final box2dPath = game.getImagePath(systemFolder, 'box2d', fp);
+    final box2dPath = game.getImagePath(_folderForGame(game), 'box2d', fp);
 
     return GestureDetector(
       key: ValueKey('game_${game.romname}'),

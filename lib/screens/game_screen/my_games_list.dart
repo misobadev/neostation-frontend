@@ -332,15 +332,29 @@ class _SystemGamesListState extends State<SystemGamesList> {
     }
   }
 
-  void _onScrapeCurrentGame() {
+  void _onScrapeCurrentGame() async {
     final game = _selectedGame;
     if (game == null) return;
     final romname = game.romname;
-    final systemId = widget.system.id;
-    if (systemId == null) return;
     final romPath = game.romPath;
     if (romPath == null) return;
     if (_scrapingGameRomnames.contains(romname)) return;
+
+    // Resolve the actual system (not favorites virtual system).
+    SystemModel targetSystem = widget.system;
+    if ((widget.system.folderName == 'all' ||
+            widget.system.folderName == SystemFolderNames.favorites) &&
+        game.systemFolderName != null) {
+      final original = await SystemRepository.getSystemByFolderName(
+        game.systemFolderName!,
+      );
+      if (original != null) {
+        targetSystem = original;
+      }
+    }
+
+    final systemId = targetSystem.id;
+    if (systemId == null) return;
 
     _scrapingGameRomnames.add(romname);
     _scrapeProgress[romname] = 0.0;
@@ -349,7 +363,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     ScreenScraperService.scrapeSingleGame(
       appSystemId: systemId,
       romName: game.romname,
-      systemFolder: widget.system.primaryFolderName,
+      systemFolder: targetSystem.primaryFolderName,
       romPath: romPath,
       gameName: game.name,
       forceOverwrite: true,
@@ -358,7 +372,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
         setState(() {});
       },
     ).then((result) async {
-      final systemFolder = widget.system.primaryFolderName;
+      final systemFolder = targetSystem.primaryFolderName;
       final imagesToEvict = [
         game.getScreenshotPath(systemFolder),
         game.getImagePath(systemFolder, 'wheels', widget.fileProvider),
@@ -373,7 +387,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
       }
 
       final updatedGame = await GameService.getGameDetails(
-        widget.system,
+        targetSystem,
         romname,
       );
       if (mounted && updatedGame != null) {
