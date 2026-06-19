@@ -10,6 +10,21 @@ Write-Host "Building Flutter Windows app..." -ForegroundColor Green
 # Verificar que estamos en el directorio correcto
 $projectRoot = Split-Path -Parent $PSScriptRoot
 
+# Resolve plugin symlinks - replace them with real directory copies
+# to avoid CMake extraction errors through symlinks (e.g. fvp mdk-sdk).
+$symlinksDir = "$projectRoot\windows\flutter\ephemeral\.plugin_symlinks"
+if (Test-Path $symlinksDir) {
+    Write-Host "Resolving plugin symlinks..." -ForegroundColor Yellow
+    Get-ChildItem $symlinksDir -Directory | Where-Object { $_.LinkType -ne $null } | ForEach-Object {
+        $target = $_.Target
+        if ($target -and (Test-Path $target)) {
+            Write-Host "  Resolving $($_.Name) -> $target" -ForegroundColor Gray
+            Remove-Item $_.FullName -Force -Recurse -ErrorAction SilentlyContinue
+            Copy-Item -Recurse $target $_.FullName -Force
+        }
+    }
+}
+
 # Limpiar build anterior si existe
 if (Test-Path "$projectRoot\build\windows\x64\runner\Release") {
     Write-Host "Cleaning previous build..." -ForegroundColor Yellow
