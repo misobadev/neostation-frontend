@@ -13,7 +13,7 @@ workspace:
   - packages/gamepads_platform_interface
   - packages/gamepads_windows
 
-version: 0.9.1+111
+version: 0.9.1+112
 
 environment:
   sdk: '>=3.9.2'
