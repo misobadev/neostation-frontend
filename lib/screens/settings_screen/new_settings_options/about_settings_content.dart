@@ -182,8 +182,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                         value: AppLocale.openSourceLicenseDesc.getString(
                           context,
                         ),
-                        url:
-                            'https://github.com/misobadev/neostation-frontend',
+                        url: 'https://github.com/misobadev/neostation-frontend',
                         theme: theme,
                         isFocused:
                             widget.isContentFocused &&
