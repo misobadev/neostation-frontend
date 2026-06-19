@@ -69,6 +69,9 @@ if(WIN32)
       RESULT_VARIABLE _ps_res
     )
   endif()
+  # Silence deprecated C++ coroutine warnings in permission_handler_windows.
+  # New MSVC toolchain treats <experimental/coroutine> as an error by default.
+  add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 endif()
 
 # Generated plugin build rules, which manage building the plugins and adding
