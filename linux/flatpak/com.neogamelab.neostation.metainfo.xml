@@ -27,16 +27,16 @@
   </description>
 
   <url type="homepage">https://neostation.dev</url>
-  <url type="bugtracker">https://github.com/miguelsotobaez/neostation-frontend/issues</url>
-  <url type="donation">https://github.com/sponsors/miguelsotobaez</url>
-  <url type="vcs-browser">https://github.com/miguelsotobaez/neostation-frontend</url>
+  <url type="bugtracker">https://github.com/misobadev/neostation-frontend/issues</url>
+  <url type="donation">https://github.com/sponsors/misobadev</url>
+  <url type="vcs-browser">https://github.com/misobadev/neostation-frontend</url>
 
   <launchable type="desktop-id">com.neogamelab.neostation.desktop</launchable>
 
   <screenshots>
     <screenshot type="default">
       <caption>NeoStation main interface</caption>
-      <image type="source">https://raw.githubusercontent.com/miguelsotobaez/neostation-frontend/main/assets/images/logo.png</image>
+      <image type="source">https://raw.githubusercontent.com/misobadev/neostation-frontend/main/assets/images/logo.png</image>
     </screenshot>
   </screenshots>
 
@@ -74,6 +74,6 @@
   </provides>
 
   <custom>
-    <value key="flathub::manifest">https://raw.githubusercontent.com/miguelsotobaez/neostation-frontend/main/linux/flatpak/com.neogamelab.neostation.yml</value>
+    <value key="flathub::manifest">https://raw.githubusercontent.com/misobadev/neostation-frontend/main/linux/flatpak/com.neogamelab.neostation.yml</value>
   </custom>
 </component>

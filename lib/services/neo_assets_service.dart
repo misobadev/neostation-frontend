@@ -6,7 +6,7 @@ import 'config_service.dart';
 import 'logger_service.dart';
 
 const _baseRaw =
-    'https://raw.githubusercontent.com/miguelsotobaez/neostation-assets/main';
+    'https://raw.githubusercontent.com/misobadev/neostation-assets/main';
 const _manifestUrl = '$_baseRaw/manifest.json';
 
 final _log = LoggerService.instance;

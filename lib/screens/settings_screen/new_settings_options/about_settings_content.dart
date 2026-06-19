@@ -92,7 +92,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
   void selectItem(int index) {
     switch (index) {
       case 0:
-        _launchUrl('https://github.com/miguelsotobaez/neostation-frontend');
+        _launchUrl('https://github.com/misobadev/neostation-frontend');
         break;
       case 1:
         _launchUrl('https://ko-fi.com/neostation');
@@ -183,7 +183,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                           context,
                         ),
                         url:
-                            'https://github.com/miguelsotobaez/neostation-frontend',
+                            'https://github.com/misobadev/neostation-frontend',
                         theme: theme,
                         isFocused:
                             widget.isContentFocused &&

@@ -4,7 +4,7 @@
 
 <h4>Modern, multi-platform emulation frontend built with Flutter</h4>
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![Discord](https://img.shields.io/discord/1088818368129273946?label=Discord&logo=discord&color=5865f2)](https://discord.gg/xE2kgKsRVq) ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/miguelsotobaez/neostation-frontend/total) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/miguelsotobaez/neostation-frontend/build-and-deploy.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![Discord](https://img.shields.io/discord/1088818368129273946?label=Discord&logo=discord&color=5865f2)](https://discord.gg/xE2kgKsRVq) ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/misobadev/neostation-frontend/total) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/misobadev/neostation-frontend/build-and-deploy.yml)
 
 ![NeoStation Hero](https://repository-images.githubusercontent.com/1223168847/145cb04c-3479-4eb5-bbb6-23d14d047a7c)
 
@@ -63,7 +63,7 @@ flatpak-builder --user --install-deps-from=flathub \
 
 ```bash
 # Clone the repository
-git clone https://github.com/miguelsotobaez/neostation-frontend.git
+git clone https://github.com/misobadev/neostation-frontend.git
 cd neostation-frontend
 
 # Install dependencies
@@ -193,7 +193,7 @@ These packages are "vendored" within the /packages directory to ensure long-term
 NeoStation's system configurations, emulator definitions, and launch arguments are maintained in a separate repository.  
 **If you want to add new emulators, fix launch arguments, or update system configurations, please open a pull request in the dedicated systems repository:**
 
-👉 [**miguelsotobaez/neostation-systems**](https://github.com/miguelsotobaez/neostation-systems)
+👉 [**misobadev/neostation-systems**](https://github.com/misobadev/neostation-systems)
 
 Changes to these files are not accepted in this frontend repository.
 

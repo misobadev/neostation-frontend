@@ -60,25 +60,25 @@ modules:
       - type: archive
         only-arches:
           - x86_64
-        url: https://github.com/miguelsotobaez/neostation-frontend/releases/download/v0.9.0/neostation-flatpak-x86_64-0.9.0.tar.xz
+        url: https://github.com/misobadev/neostation-frontend/releases/download/v0.9.0/neostation-flatpak-x86_64-0.9.0.tar.xz
         # sha256: FILL_ME — get from CI logs or the .sha256 artifact (REPLACE the zeros below)
         sha256: 0000000000000000000000000000000000000000000000000000000000000000
         dest: neostation-bundle
         x-checker-data:
           type: json
-          url: https://api.github.com/repos/miguelsotobaez/neostation-frontend/releases/latest
+          url: https://api.github.com/repos/misobadev/neostation-frontend/releases/latest
           version-query: .tag_name | sub("v"; "")
           url-query: .assets[] | select(.name | startswith("neostation-flatpak-x86_64")) | .browser_download_url
       - type: archive
         only-arches:
           - aarch64
-        url: https://github.com/miguelsotobaez/neostation-frontend/releases/download/v0.9.0/neostation-flatpak-arm64-0.9.0.tar.xz
+        url: https://github.com/misobadev/neostation-frontend/releases/download/v0.9.0/neostation-flatpak-arm64-0.9.0.tar.xz
         # sha256: FILL_ME — get from CI logs or the .sha256 artifact (REPLACE the zeros below)
         sha256: 0000000000000000000000000000000000000000000000000000000000000000
         dest: neostation-bundle
         x-checker-data:
           type: json
-          url: https://api.github.com/repos/miguelsotobaez/neostation-frontend/releases/latest
+          url: https://api.github.com/repos/misobadev/neostation-frontend/releases/latest
           version-query: .tag_name | sub("v"; "")
           url-query: .assets[] | select(.name | startswith("neostation-flatpak-arm64")) | .browser_download_url
       - type: file

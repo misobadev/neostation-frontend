@@ -19,7 +19,7 @@ import 'package:neostation/services/permission_service.dart';
 class UpdateService {
   /// GitHub Releases API endpoint for the latest production build.
   static const String _githubApiUrl =
-      'https://api.github.com/repos/miguelsotobaez/neostation-frontend/releases/latest';
+      'https://api.github.com/repos/misobadev/neostation-frontend/releases/latest';
 
   static final _log = LoggerService.instance;
 
