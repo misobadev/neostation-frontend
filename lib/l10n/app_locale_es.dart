@@ -116,6 +116,9 @@ const Map<String, dynamic> appLocaleEs = {
       'Verificar actualizaciones de sistemas y emuladores al iniciar',
   AppLocale.sfxSounds: 'Sonidos de Navegación',
   AppLocale.sfxSoundsSubtitle: 'Reproducir efectos de sonido al navegar',
+  AppLocale.use12HourClock: 'Reloj de 12 horas',
+  AppLocale.use12HourClockSubtitle:
+      'Mostrar la hora en formato de 12 horas con AM/PM en lugar de 24 horas',
   AppLocale.fullscreenMode: 'Modo Pantalla Completa',
   AppLocale.fullscreenModeSubtitle:
       'Mostrar la aplicación en pantalla completa',

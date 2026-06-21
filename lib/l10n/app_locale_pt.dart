@@ -116,6 +116,9 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.sfxSounds: 'Sons de Interface',
   AppLocale.sfxSoundsSubtitle:
       'Reproduz sons para navegação por controle, teclado e toque',
+  AppLocale.use12HourClock: 'Relógio de 12 horas',
+  AppLocale.use12HourClockSubtitle:
+      'Mostrar o relógio no formato de 12 horas com AM/PM em vez de 24 horas',
   AppLocale.fullscreenMode: 'Modo Tela Cheia',
   AppLocale.fullscreenModeSubtitle: 'Exibe o aplicativo em tela cheia',
   AppLocale.allFilesAccess: 'Acesso a Todos os Arquivos',

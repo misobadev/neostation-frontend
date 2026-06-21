@@ -1185,6 +1185,15 @@ class SqliteService {
     // FIX: Ensure user_screenscraper_config columns are up to date (v29).
     await _ensureScreenScraperConfigColumns(db);
 
+    // FIX: Ensure user_config includes the 12-hour clock column.
+    if (tableNames.contains('user_config')) {
+      try {
+        await _ensureUserConfigColumns(db);
+      } catch (e) {
+        _log.e('Minor fix for user_config columns failed: $e');
+      }
+    }
+
     // FIX: Resolve inconsistencies in default emulator assignments.
     if (tableNames.contains('app_systems') &&
         tableNames.contains('app_emulators')) {
@@ -1237,6 +1246,17 @@ class SqliteService {
       CREATE INDEX IF NOT EXISTS idx_neo_sync_state_file_path 
       ON app_neo_sync_state(file_path);
     ''');
+  }
+
+  /// Ensures the user_config table has columns added after its initial schema.
+  Future<void> _ensureUserConfigColumns(DatabaseAdapter db) async {
+    final tableInfo = await db.rawQuery('PRAGMA table_info(user_config)');
+    final columns = tableInfo.map((c) => c['name'].toString()).toList();
+    if (!columns.contains('use_12_hour_clock')) {
+      await db.execute(
+        'ALTER TABLE user_config ADD COLUMN use_12_hour_clock INTEGER DEFAULT 0',
+      );
+    }
   }
 
   /// Ensures the unique_identifier column exists in app_emulators.
@@ -1565,7 +1585,8 @@ class SqliteService {
         auto_update_app INTEGER DEFAULT 1,
         auto_update_systems INTEGER DEFAULT 1,
         system_grid_columns TEXT DEFAULT 'M',
-        game_grid_columns TEXT DEFAULT 'M'
+        game_grid_columns TEXT DEFAULT 'M',
+        use_12_hour_clock INTEGER DEFAULT 0
       );
       ''',
       '''
@@ -2258,6 +2279,7 @@ class SqliteService {
     int? setupCompleted,
     int? hideBottomScreen,
     int? sfxEnabled,
+    int? use12HourClock,
     String? systemSortBy,
     String? systemSortOrder,
     String? appLanguage,
@@ -2311,6 +2333,9 @@ class SqliteService {
     }
     if (sfxEnabled != null) {
       newConfig['sfx_enabled'] = sfxEnabled;
+    }
+    if (use12HourClock != null) {
+      newConfig['use_12_hour_clock'] = use12HourClock;
     }
     if (systemSortBy != null) {
       newConfig['system_sort_by'] = systemSortBy;
