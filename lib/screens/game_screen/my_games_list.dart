@@ -1464,9 +1464,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
       _log.e('Error refreshing game data after gameplay: $e');
     }
 
-    if (_refreshAchievementsCallback != null) {
-      _refreshAchievementsCallback!();
-    }
+    // Defer to after the games-list reload settles and the details card has
+    // re-registered its callback, otherwise this fires against the old/unmounted
+    // card and no-ops — which is why a manual refresh was previously needed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshAchievementsCallback?.call();
+    });
 
     // Trigger sync after returning from game so local save gets uploaded.
     if (_selectedGame != null && mounted) {
