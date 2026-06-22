@@ -21,6 +21,7 @@ import '../../services/music_player_service.dart';
 import '../../repositories/system_repository.dart';
 import '../../repositories/game_repository.dart';
 import '../../services/screenscraper_service.dart';
+import '../../services/retro_achievements_resolver.dart';
 import '../../utils/gamepad_nav.dart';
 import '../../utils/centered_scroll_controller.dart';
 import '../../providers/file_provider.dart';
@@ -161,6 +162,30 @@ class _SystemGamesListState extends State<SystemGamesList> {
   // Secondary display hardware management (OEM support).
   SecondaryDisplayState? _secondaryDisplayState;
 
+  /// Snapshot of achievement ids earned before the current launch, used to
+  /// detect freshly-earned achievements when the user returns (Tier 1).
+  Set<int> _preGameEarnedIds = <int>{};
+
+  /// RA game id whose achievement panel was pushed for the current launch, or
+  /// null when the launched game has no RetroAchievements data.
+  int? _achievementGameId;
+
+  /// While true, the secondary display keeps the achievement panel shown
+  /// instead of reverting to game art — used both in-game and during the
+  /// post-session celebration window so list/selection updates don't hide it.
+  bool _achievementCelebrationActive = false;
+
+  /// ROM path of the game being celebrated, so navigating to a different game
+  /// ends the celebration immediately.
+  String? _celebrationRomPath;
+
+  /// Reverts the secondary display from the celebration panel back to art.
+  Timer? _celebrationRevertTimer;
+
+  /// In-game live poll: periodically re-fetches RA progress while a game runs
+  /// so freshly-earned achievements surface on the secondary display live.
+  Timer? _livePollTimer;
+
   bool _canPop = false;
 
   // View keys for scroll synchronization.
@@ -266,6 +291,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
     MusicPlayerService().removeListener(_onMusicPlayerStateChanged);
 
     _secondaryDisplayState?.dispose();
+    _celebrationRevertTimer?.cancel();
+    _livePollTimer?.cancel();
 
     _cleanupResources();
     _backButtonFocusNode.dispose();
@@ -780,11 +807,19 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// re-scrape (forceOverwrite) rewrites the art in place: the paths stay the
   /// same, so the dedup below would otherwise skip the update and the secondary
   /// engine would keep showing the stale cached bitmap.
-  void _updateSecondaryDisplay(
+  Future<void> _updateSecondaryDisplay(
     GameModel game, {
     bool forceMediaRefresh = false,
   }) async {
     if (_secondaryDisplayState == null || _isNavigatingBack) return;
+
+    // Navigating to a different game ends any in-progress achievement
+    // celebration so the new game's art is shown instead of a stale panel.
+    if (_achievementCelebrationActive && game.romPath != _celebrationRomPath) {
+      _achievementCelebrationActive = false;
+      _celebrationRevertTimer?.cancel();
+      _achievementGameId = null;
+    }
 
     final systemFolderName =
         (widget.system.folderName == 'all' ||
@@ -851,7 +886,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
                 ? null
                 : (File(wheelPath).existsSync() ? wheelPath : null)) ||
         currentState.isVideoMuted != isVideoMuted ||
-        currentState.isGameLaunching != _isGameLaunching;
+        currentState.isGameLaunching != _isGameLaunching ||
+        currentState.showAchievementPanel != _achievementCelebrationActive;
 
     if (shouldUpdate && !_isNavigatingBack) {
       final bool hasFanart = !isMusicSystem && File(fanartPath).existsSync();
@@ -889,6 +925,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
         mediaRevision: forceMediaRefresh
             ? (currentState?.mediaRevision ?? 0) + 1
             : null,
+        // Browsing hides the in-game achievement panel; the launch push and the
+        // post-session celebration window keep it shown via this flag.
+        showAchievementPanel: _achievementCelebrationActive,
       );
     }
 
@@ -1200,14 +1239,202 @@ class _SystemGamesListState extends State<SystemGamesList> {
   }
 
   /// Restores UI state and input focus after an external emulator process terminates.
+  /// Resolves the effective system folder name for a game, accounting for the
+  /// aggregate "all"/favorites views where each game carries its own system.
+  String _resolveSystemFolderName(GameModel game) {
+    return (widget.system.folderName == 'all' ||
+                widget.system.folderName == SystemFolderNames.favorites) &&
+            game.systemFolderName != null
+        ? game.systemFolderName!
+        : widget.system.primaryFolderName;
+  }
+
+  /// Tier 0: resolves and pushes the launched game's achievement panel to the
+  /// secondary display, snapshotting earned ids for the return-diff. No-op when
+  /// RA is disconnected or the game has no achievement set.
+  Future<void> _pushAchievementsForLaunch(GameModel game) async {
+    if (!Platform.isAndroid || _secondaryDisplayState == null || !mounted) {
+      return;
+    }
+    _achievementGameId = null;
+    _preGameEarnedIds = <int>{};
+
+    final provider = _retroAchievementsProvider;
+    if (!provider.isConnected) return;
+
+    final snapshot = await RetroAchievementsResolver.fetchSnapshot(
+      game: game,
+      systemFolderName: _resolveSystemFolderName(game),
+      provider: provider,
+    );
+    if (snapshot == null) return;
+
+    _achievementGameId = snapshot.gameId;
+    _preGameEarnedIds = snapshot.earnedIds;
+
+    // ignore: unawaited_futures
+    _secondaryDisplayState?.updateState(
+      showAchievementPanel: true,
+      achievements: snapshot.achievements,
+      raEarned: snapshot.earned,
+      raTotal: snapshot.total,
+      raPoints: snapshot.points,
+      raPointsTotal: snapshot.pointsTotal,
+      raCompletionPct: snapshot.completionPct,
+      raGameTitle: snapshot.gameTitle,
+      clearNewlyEarnedIds: true,
+    );
+
+    _startLivePoll();
+  }
+
+  /// Poll interval for live in-game RA progress. RA only reflects an unlock
+  /// after the emulator submits it server-side, so finer granularity buys
+  /// little; this keeps the panel current without hammering the API.
+  static const Duration _livePollInterval = Duration(seconds: 30);
+
+  /// Starts the in-game live poll: re-fetches RA progress on each interval so
+  /// achievements earned during play surface on the secondary display.
+  void _startLivePoll() {
+    if (!Platform.isAndroid) return;
+    _livePollTimer?.cancel();
+    _livePollTimer = Timer.periodic(
+      _livePollInterval,
+      (_) => _onLivePollTick(),
+    );
+  }
+
+  void _stopLivePoll() {
+    _livePollTimer?.cancel();
+    _livePollTimer = null;
+  }
+
+  Future<void> _onLivePollTick() async {
+    if (_secondaryDisplayState == null || _achievementGameId == null) {
+      _stopLivePoll();
+      return;
+    }
+
+    final game = _selectedGame;
+    if (game == null || !mounted) return;
+    final provider = _retroAchievementsProvider;
+    if (!provider.isConnected) return;
+
+    final snapshot = await RetroAchievementsResolver.fetchSnapshot(
+      game: game,
+      systemFolderName: _resolveSystemFolderName(game),
+      provider: provider,
+      forceRefresh: true,
+    );
+    // Keep _preGameEarnedIds anchored to launch so the diff covers the whole
+    // session (both for the live highlight and the return celebration).
+    if (snapshot == null || _achievementGameId == null) return;
+    final newly = snapshot.earnedIds.difference(_preGameEarnedIds).toList();
+
+    // ignore: unawaited_futures
+    _secondaryDisplayState?.updateState(
+      showAchievementPanel: true,
+      achievements: snapshot.achievements,
+      raEarned: snapshot.earned,
+      raTotal: snapshot.total,
+      raPoints: snapshot.points,
+      raPointsTotal: snapshot.pointsTotal,
+      raCompletionPct: snapshot.completionPct,
+      raGameTitle: snapshot.gameTitle,
+      newlyEarnedIds: newly.isEmpty ? null : newly,
+      clearNewlyEarnedIds: newly.isEmpty,
+    );
+  }
+
+  /// Tier 1: after returning from the emulator, re-fetches progress, diffs it
+  /// against the pre-launch snapshot, and re-shows the panel with this
+  /// session's freshly-earned achievements highlighted.
+  Future<void> _refreshAchievementsAfterSession(GameModel game) async {
+    if (!Platform.isAndroid ||
+        _secondaryDisplayState == null ||
+        _achievementGameId == null ||
+        !mounted) {
+      return;
+    }
+
+    final provider = _retroAchievementsProvider;
+    if (!provider.isConnected) {
+      _endCelebration();
+      return;
+    }
+
+    final snapshot = await RetroAchievementsResolver.fetchSnapshot(
+      game: game,
+      systemFolderName: _resolveSystemFolderName(game),
+      provider: provider,
+      forceRefresh: true,
+    );
+    if (snapshot == null || !_achievementCelebrationActive) {
+      _endCelebration();
+      return;
+    }
+
+    final newly = snapshot.earnedIds.difference(_preGameEarnedIds).toList();
+    _preGameEarnedIds = snapshot.earnedIds;
+
+    // ignore: unawaited_futures
+    _secondaryDisplayState?.updateState(
+      showAchievementPanel: true,
+      achievements: snapshot.achievements,
+      raEarned: snapshot.earned,
+      raTotal: snapshot.total,
+      raPoints: snapshot.points,
+      raPointsTotal: snapshot.pointsTotal,
+      raCompletionPct: snapshot.completionPct,
+      raGameTitle: snapshot.gameTitle,
+      newlyEarnedIds: newly.isEmpty ? null : newly,
+      clearNewlyEarnedIds: newly.isEmpty,
+    );
+
+    // Hold the panel through the celebration window, then revert to game art.
+    _celebrationRevertTimer?.cancel();
+    _celebrationRevertTimer = Timer(
+      const Duration(seconds: 8),
+      _endCelebration,
+    );
+  }
+
+  /// Ends the post-session celebration and reverts the secondary display from
+  /// the achievement panel back to normal game art.
+  void _endCelebration() {
+    _celebrationRevertTimer?.cancel();
+    _celebrationRevertTimer = null;
+    if (!_achievementCelebrationActive) return;
+    _achievementCelebrationActive = false;
+    _achievementGameId = null;
+    _celebrationRomPath = null;
+    if (mounted && _selectedGame != null) {
+      // ignore: unawaited_futures
+      _updateSecondaryDisplay(_selectedGame!);
+    }
+  }
+
   void _reactivateGamepadNavigation() async {
     if (!mounted) return;
+
+    _stopLivePoll();
 
     if (mounted) {
       setState(() {
         _isGameLaunching = false;
       });
-      if (_selectedGame != null) _updateSecondaryDisplay(_selectedGame!);
+      if (_selectedGame != null) {
+        // Keep the panel up through the post-session celebration (set before
+        // the art update so it isn't hidden by the games-list reload below).
+        if (_achievementGameId != null) {
+          _achievementCelebrationActive = true;
+          _celebrationRomPath = _selectedGame!.romPath;
+        }
+        _updateSecondaryDisplay(_selectedGame!);
+        // Re-show the panel with this session's freshly-earned achievements.
+        // ignore: unawaited_futures
+        _refreshAchievementsAfterSession(_selectedGame!);
+      }
     }
 
     GamepadNavigationManager.reactivate();
@@ -1450,7 +1677,17 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
     // Resource termination and UI synchronization prior to process handoff.
     _stopVideoAndCleanup();
-    _updateSecondaryDisplay(_selectedGame!);
+    // Await the art push first so it can't land after the achievement push and
+    // re-hide the panel; the panel push is then the definitive last write.
+    await _updateSecondaryDisplay(_selectedGame!);
+    if (!mounted) return;
+
+    // Push the in-game RetroAchievements panel. Fired without awaiting so it
+    // never blocks the emulator handoff; it lands during launchGameWithDialog's
+    // ~2s foreground window, giving the secondary engine time to paint the
+    // panel and load badge art before the activity is backgrounded.
+    // ignore: unawaited_futures
+    _pushAchievementsForLaunch(_selectedGame!);
 
     // CRITICAL: Deactivate local input to avoid conflicts with external processes.
     _gamepadNav.deactivate();
