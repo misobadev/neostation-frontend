@@ -303,10 +303,28 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                             ],
                           ),
 
-                        // Achievement panel (in-game): covers the game art.
-                        if (value.showAchievementPanel &&
-                            value.achievements != null)
-                          _buildAchievementPanel(value),
+                        // Achievement panel (in-game): covers the game art,
+                        // fading in on launch and out on return.
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            ignoring:
+                                !(value.showAchievementPanel &&
+                                    value.achievements != null),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 400),
+                              child:
+                                  (value.showAchievementPanel &&
+                                      value.achievements != null)
+                                  ? KeyedSubtree(
+                                      key: const ValueKey('ra-panel'),
+                                      child: _buildAchievementPanel(value),
+                                    )
+                                  : const SizedBox.shrink(
+                                      key: ValueKey('ra-panel-empty'),
+                                    ),
+                            ),
+                          ),
+                        ),
 
                         // Center Content
                         if (!value.isGameSelected)
@@ -656,173 +674,170 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         ? value.raGameTitle!
         : value.systemName;
 
-    return Positioned.fill(
-      child: Container(
-        // Opaque background so the underlying game screenshot doesn't bleed
-        // through; matches the secondary display's themed background color.
-        color: value.backgroundColor != null
-            ? Color(value.backgroundColor!)
-            : Colors.black,
-        padding: EdgeInsets.symmetric(horizontal: 24.r, vertical: 20.r),
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header: title + earned/total + points.
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Symbols.trophy_rounded,
-                      color: const Color(0xFFFFC107),
-                      size: 26.r,
-                    ),
-                    SizedBox(width: 10.r),
-                    Expanded(
-                      child: Text(
-                        title.toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18.r,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.5.r,
-                          fontFamily: 'Anta',
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 12.r),
-                    Text(
-                      '${value.raEarned}/${value.raTotal}',
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      // Opaque background so the underlying game screenshot doesn't bleed
+      // through; matches the secondary display's themed background color.
+      color: value.backgroundColor != null
+          ? Color(value.backgroundColor!)
+          : Colors.black,
+      padding: EdgeInsets.symmetric(horizontal: 24.r, vertical: 20.r),
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header: title + earned/total + points.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    Symbols.trophy_rounded,
+                    color: const Color(0xFFFFC107),
+                    size: 26.r,
+                  ),
+                  SizedBox(width: 10.r),
+                  Expanded(
+                    child: Text(
+                      title.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18.r,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5.r,
                         fontFamily: 'Anta',
                       ),
                     ),
-                    SizedBox(width: 12.r),
+                  ),
+                  SizedBox(width: 12.r),
+                  Text(
+                    '${value.raEarned}/${value.raTotal}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18.r,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Anta',
+                    ),
+                  ),
+                  SizedBox(width: 12.r),
+                  Text(
+                    '${value.raPoints}/${value.raPointsTotal}p',
+                    style: TextStyle(
+                      color: const Color(0xFFFFC107),
+                      fontSize: 16.r,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Anta',
+                    ),
+                  ),
+                  SizedBox(width: 14.r),
+                  // Touch toggle: grid <-> list. Shows the icon of the view
+                  // you'll switch to. The bottom screen is touch-only since
+                  // the gamepad is driving the game on the main screen.
+                  GestureDetector(
+                    onTap: () {
+                      SfxService().playNavSound();
+                      setState(
+                        () => _achievementListView = !_achievementListView,
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.all(8.r),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Icon(
+                        _achievementListView
+                            ? Symbols.grid_view_rounded
+                            : Symbols.view_list_rounded,
+                        color: Colors.white,
+                        size: 22.r,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12.r),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4.r),
+                child: LinearProgressIndicator(
+                  value: progress.clamp(0.0, 1.0),
+                  minHeight: 6.r,
+                  backgroundColor: Colors.white10,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFFFFC107),
+                  ),
+                ),
+              ),
+              SizedBox(height: 16.r),
+              // Content: badge grid or list, both touch-scrollable. Unlocked
+              // achievements are sorted first.
+              Expanded(
+                child: _achievementListView
+                    ? _buildAchievementListView(achievements, newlyEarned)
+                    : SingleChildScrollView(
+                        child: Wrap(
+                          spacing: 8.r,
+                          runSpacing: 8.r,
+                          children: [
+                            for (final a in achievements)
+                              _buildAchievementBadge(
+                                a,
+                                isNew: newlyEarned.contains(a.id),
+                              ),
+                          ],
+                        ),
+                      ),
+              ),
+            ],
+          ),
+
+          // Celebration banner for freshly-earned achievements.
+          if (_celebrate && newlyEarned.isNotEmpty)
+            Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                margin: EdgeInsets.only(top: 2.r),
+                padding: EdgeInsets.symmetric(horizontal: 20.r, vertical: 10.r),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFC107),
+                  borderRadius: BorderRadius.circular(20.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFFC107).withValues(alpha: 0.5),
+                      blurRadius: 24.r,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Symbols.celebration_rounded,
+                      color: Colors.black,
+                      size: 22.r,
+                    ),
+                    SizedBox(width: 8.r),
                     Text(
-                      '${value.raPoints}/${value.raPointsTotal}p',
+                      '+${newlyEarned.length} this session',
                       style: TextStyle(
-                        color: const Color(0xFFFFC107),
+                        color: Colors.black,
                         fontSize: 16.r,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Anta',
                       ),
                     ),
-                    SizedBox(width: 14.r),
-                    // Touch toggle: grid <-> list. Shows the icon of the view
-                    // you'll switch to. The bottom screen is touch-only since
-                    // the gamepad is driving the game on the main screen.
-                    GestureDetector(
-                      onTap: () {
-                        SfxService().playNavSound();
-                        setState(
-                          () => _achievementListView = !_achievementListView,
-                        );
-                      },
-                      child: Container(
-                        padding: EdgeInsets.all(8.r),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10.r),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        child: Icon(
-                          _achievementListView
-                              ? Symbols.grid_view_rounded
-                              : Symbols.view_list_rounded,
-                          color: Colors.white,
-                          size: 22.r,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
-                SizedBox(height: 12.r),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4.r),
-                  child: LinearProgressIndicator(
-                    value: progress.clamp(0.0, 1.0),
-                    minHeight: 6.r,
-                    backgroundColor: Colors.white10,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFFFFC107),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 16.r),
-                // Content: badge grid or list, both touch-scrollable. Unlocked
-                // achievements are sorted first.
-                Expanded(
-                  child: _achievementListView
-                      ? _buildAchievementListView(achievements, newlyEarned)
-                      : SingleChildScrollView(
-                          child: Wrap(
-                            spacing: 8.r,
-                            runSpacing: 8.r,
-                            children: [
-                              for (final a in achievements)
-                                _buildAchievementBadge(
-                                  a,
-                                  isNew: newlyEarned.contains(a.id),
-                                ),
-                            ],
-                          ),
-                        ),
-                ),
-              ],
-            ),
-
-            // Celebration banner for freshly-earned achievements.
-            if (_celebrate && newlyEarned.isNotEmpty)
-              Align(
-                alignment: Alignment.topCenter,
-                child: Container(
-                  margin: EdgeInsets.only(top: 2.r),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 20.r,
-                    vertical: 10.r,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFC107),
-                    borderRadius: BorderRadius.circular(20.r),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFFC107).withValues(alpha: 0.5),
-                        blurRadius: 24.r,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Symbols.celebration_rounded,
-                        color: Colors.black,
-                        size: 22.r,
-                      ),
-                      SizedBox(width: 8.r),
-                      Text(
-                        '+${newlyEarned.length} this session',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16.r,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Anta',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

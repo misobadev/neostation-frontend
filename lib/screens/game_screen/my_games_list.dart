@@ -170,18 +170,6 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// null when the launched game has no RetroAchievements data.
   int? _achievementGameId;
 
-  /// While true, the secondary display keeps the achievement panel shown
-  /// instead of reverting to game art — used both in-game and during the
-  /// post-session celebration window so list/selection updates don't hide it.
-  bool _achievementCelebrationActive = false;
-
-  /// ROM path of the game being celebrated, so navigating to a different game
-  /// ends the celebration immediately.
-  String? _celebrationRomPath;
-
-  /// Reverts the secondary display from the celebration panel back to art.
-  Timer? _celebrationRevertTimer;
-
   /// In-game live poll: periodically re-fetches RA progress while a game runs
   /// so freshly-earned achievements surface on the secondary display live.
   Timer? _livePollTimer;
@@ -291,7 +279,6 @@ class _SystemGamesListState extends State<SystemGamesList> {
     MusicPlayerService().removeListener(_onMusicPlayerStateChanged);
 
     _secondaryDisplayState?.dispose();
-    _celebrationRevertTimer?.cancel();
     _livePollTimer?.cancel();
 
     _cleanupResources();
@@ -813,14 +800,6 @@ class _SystemGamesListState extends State<SystemGamesList> {
   }) async {
     if (_secondaryDisplayState == null || _isNavigatingBack) return;
 
-    // Navigating to a different game ends any in-progress achievement
-    // celebration so the new game's art is shown instead of a stale panel.
-    if (_achievementCelebrationActive && game.romPath != _celebrationRomPath) {
-      _achievementCelebrationActive = false;
-      _celebrationRevertTimer?.cancel();
-      _achievementGameId = null;
-    }
-
     final systemFolderName =
         (widget.system.folderName == 'all' ||
                 widget.system.folderName == SystemFolderNames.favorites) &&
@@ -886,8 +865,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
                 ? null
                 : (File(wheelPath).existsSync() ? wheelPath : null)) ||
         currentState.isVideoMuted != isVideoMuted ||
-        currentState.isGameLaunching != _isGameLaunching ||
-        currentState.showAchievementPanel != _achievementCelebrationActive;
+        currentState.isGameLaunching != _isGameLaunching;
 
     if (shouldUpdate && !_isNavigatingBack) {
       final bool hasFanart = !isMusicSystem && File(fanartPath).existsSync();
@@ -925,9 +903,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
         mediaRevision: forceMediaRefresh
             ? (currentState?.mediaRevision ?? 0) + 1
             : null,
-        // Browsing hides the in-game achievement panel; the launch push and the
-        // post-session celebration window keep it shown via this flag.
-        showAchievementPanel: _achievementCelebrationActive,
+        // Panel is shown only by the launch push / live poll; browsing and
+        // returning from a game hide it (it fades out on the secondary screen).
+        showAchievementPanel: false,
       );
     }
 
@@ -1249,11 +1227,21 @@ class _SystemGamesListState extends State<SystemGamesList> {
         : widget.system.primaryFolderName;
   }
 
+  /// Whether a secondary display is actually present and active. False on
+  /// single-screen devices and when the user has disabled the bottom screen,
+  /// in which case the achievement panel work is skipped entirely.
+  bool get _secondaryDisplayActive =>
+      _secondaryDisplayState?.value?.isSecondaryActive ?? false;
+
   /// Tier 0: resolves and pushes the launched game's achievement panel to the
   /// secondary display, snapshotting earned ids for the return-diff. No-op when
-  /// RA is disconnected or the game has no achievement set.
+  /// there is no active secondary display, RA is disconnected, or the game has
+  /// no achievement set.
   Future<void> _pushAchievementsForLaunch(GameModel game) async {
-    if (!Platform.isAndroid || _secondaryDisplayState == null || !mounted) {
+    if (!Platform.isAndroid ||
+        _secondaryDisplayState == null ||
+        !_secondaryDisplayActive ||
+        !mounted) {
       return;
     }
     _achievementGameId = null;
@@ -1310,7 +1298,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
   }
 
   Future<void> _onLivePollTick() async {
-    if (_secondaryDisplayState == null || _achievementGameId == null) {
+    if (_secondaryDisplayState == null ||
+        _achievementGameId == null ||
+        !_secondaryDisplayActive) {
       _stopLivePoll();
       return;
     }
@@ -1346,95 +1336,19 @@ class _SystemGamesListState extends State<SystemGamesList> {
     );
   }
 
-  /// Tier 1: after returning from the emulator, re-fetches progress, diffs it
-  /// against the pre-launch snapshot, and re-shows the panel with this
-  /// session's freshly-earned achievements highlighted.
-  Future<void> _refreshAchievementsAfterSession(GameModel game) async {
-    if (!Platform.isAndroid ||
-        _secondaryDisplayState == null ||
-        _achievementGameId == null ||
-        !mounted) {
-      return;
-    }
-
-    final provider = _retroAchievementsProvider;
-    if (!provider.isConnected) {
-      _endCelebration();
-      return;
-    }
-
-    final snapshot = await RetroAchievementsResolver.fetchSnapshot(
-      game: game,
-      systemFolderName: _resolveSystemFolderName(game),
-      provider: provider,
-      forceRefresh: true,
-    );
-    if (snapshot == null || !_achievementCelebrationActive) {
-      _endCelebration();
-      return;
-    }
-
-    final newly = snapshot.earnedIds.difference(_preGameEarnedIds).toList();
-    _preGameEarnedIds = snapshot.earnedIds;
-
-    // ignore: unawaited_futures
-    _secondaryDisplayState?.updateState(
-      showAchievementPanel: true,
-      achievements: snapshot.achievements,
-      raEarned: snapshot.earned,
-      raTotal: snapshot.total,
-      raPoints: snapshot.points,
-      raPointsTotal: snapshot.pointsTotal,
-      raCompletionPct: snapshot.completionPct,
-      raGameTitle: snapshot.gameTitle,
-      newlyEarnedIds: newly.isEmpty ? null : newly,
-      clearNewlyEarnedIds: newly.isEmpty,
-    );
-
-    // Hold the panel through the celebration window, then revert to game art.
-    _celebrationRevertTimer?.cancel();
-    _celebrationRevertTimer = Timer(
-      const Duration(seconds: 8),
-      _endCelebration,
-    );
-  }
-
-  /// Ends the post-session celebration and reverts the secondary display from
-  /// the achievement panel back to normal game art.
-  void _endCelebration() {
-    _celebrationRevertTimer?.cancel();
-    _celebrationRevertTimer = null;
-    if (!_achievementCelebrationActive) return;
-    _achievementCelebrationActive = false;
-    _achievementGameId = null;
-    _celebrationRomPath = null;
-    if (mounted && _selectedGame != null) {
-      // ignore: unawaited_futures
-      _updateSecondaryDisplay(_selectedGame!);
-    }
-  }
-
   void _reactivateGamepadNavigation() async {
     if (!mounted) return;
 
     _stopLivePoll();
+    _achievementGameId = null;
 
     if (mounted) {
       setState(() {
         _isGameLaunching = false;
       });
-      if (_selectedGame != null) {
-        // Keep the panel up through the post-session celebration (set before
-        // the art update so it isn't hidden by the games-list reload below).
-        if (_achievementGameId != null) {
-          _achievementCelebrationActive = true;
-          _celebrationRomPath = _selectedGame!.romPath;
-        }
-        _updateSecondaryDisplay(_selectedGame!);
-        // Re-show the panel with this session's freshly-earned achievements.
-        // ignore: unawaited_futures
-        _refreshAchievementsAfterSession(_selectedGame!);
-      }
+      // Returning from the game: hide the panel so it fades back to game art.
+      // Any unlocks were already surfaced live during play.
+      if (_selectedGame != null) _updateSecondaryDisplay(_selectedGame!);
     }
 
     GamepadNavigationManager.reactivate();
