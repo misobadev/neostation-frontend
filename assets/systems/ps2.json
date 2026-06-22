@@ -197,7 +197,7 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n xyz.aethersx2.android/.EmulationActivity -a android.intent.action.MAIN -e bootPath \"{file.path}\" --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-n xyz.aethersx2.android/.EmulationActivity -a android.intent.action.MAIN -e bootPath \"{file.localuri}\" --activity-clear-task --activity-clear-top"
         }
       }
     },
@@ -208,7 +208,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n xyz.aethersx2.custom/.EmulationActivity -a android.intent.action.MAIN -e bootPath \"{file.path}\" --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-n xyz.aethersx2.custom/.EmulationActivity -a android.intent.action.MAIN -e bootPath \"{file.localuri}\" --activity-clear-task --activity-clear-top"
         }
       }
     },
@@ -219,7 +219,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n xyz.aethersx2.tturnip/xyz.aethersx2.android.EmulationActivity -a android.intent.action.MAIN -e bootPath \"{file.path}\" --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-n xyz.aethersx2.tturnip/xyz.aethersx2.android.EmulationActivity -a android.intent.action.MAIN -e bootPath \"{file.localuri}\" --activity-clear-task --activity-clear-top"
         }
       }
     },
@@ -230,7 +230,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n xyz.aethersx2.cturnip/xyz.aethersx2.android.EmulationActivity -a android.intent.action.MAIN -e bootPath \"{file.path}\" --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-n xyz.aethersx2.cturnip/xyz.aethersx2.android.EmulationActivity -a android.intent.action.MAIN -e bootPath \"{file.localuri}\" --activity-clear-task --activity-clear-top"
         }
       }
     },
