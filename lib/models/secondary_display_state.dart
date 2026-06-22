@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:sub_screen/shared_state_manager.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'secondary_achievement_item.dart';
 
 /// Data structure representing the current state of the secondary/bottom display.
 ///
@@ -97,6 +98,34 @@ class SecondaryDisplayStateData {
   /// Whether to optimize the secondary display for OLED panels (e.g., using pure blacks).
   final bool isOled;
 
+  /// Whether the RetroAchievements panel should be rendered (in-game view).
+  final bool showAchievementPanel;
+
+  /// Condensed achievement list for the current game, or null when unavailable.
+  final List<SecondaryAchievementItem>? achievements;
+
+  /// Number of achievements the user has earned for the current game.
+  final int raEarned;
+
+  /// Total number of achievements available for the current game.
+  final int raTotal;
+
+  /// Points the user has earned for the current game.
+  final int raPoints;
+
+  /// Total points available for the current game.
+  final int raPointsTotal;
+
+  /// User completion percentage string for the current game (e.g. '50.00%').
+  final String? raCompletionPct;
+
+  /// Standardized RetroAchievements title for the current game.
+  final String? raGameTitle;
+
+  /// Ids of achievements earned during the most recent play session, used to
+  /// highlight/celebrate fresh unlocks when the user returns from the emulator.
+  final List<int>? newlyEarnedIds;
+
   SecondaryDisplayStateData({
     required this.systemName,
     this.gameFanart,
@@ -127,6 +156,15 @@ class SecondaryDisplayStateData {
     this.shaderColor2,
     this.useFluidShader = false,
     this.isOled = false,
+    this.showAchievementPanel = false,
+    this.achievements,
+    this.raEarned = 0,
+    this.raTotal = 0,
+    this.raPoints = 0,
+    this.raPointsTotal = 0,
+    this.raCompletionPct,
+    this.raGameTitle,
+    this.newlyEarnedIds,
   });
 
   /// Returns a new instance with the specified properties updated.
@@ -170,6 +208,19 @@ class SecondaryDisplayStateData {
     int? shaderColor2,
     bool? useFluidShader,
     bool? isOled,
+    bool? showAchievementPanel,
+    List<SecondaryAchievementItem>? achievements,
+    bool clearAchievements = false,
+    int? raEarned,
+    int? raTotal,
+    int? raPoints,
+    int? raPointsTotal,
+    String? raCompletionPct,
+    bool clearRaCompletionPct = false,
+    String? raGameTitle,
+    bool clearRaGameTitle = false,
+    List<int>? newlyEarnedIds,
+    bool clearNewlyEarnedIds = false,
   }) {
     return SecondaryDisplayStateData(
       systemName: systemName ?? this.systemName,
@@ -211,6 +262,21 @@ class SecondaryDisplayStateData {
       shaderColor2: shaderColor2 ?? this.shaderColor2,
       useFluidShader: useFluidShader ?? this.useFluidShader,
       isOled: isOled ?? this.isOled,
+      showAchievementPanel: showAchievementPanel ?? this.showAchievementPanel,
+      achievements: clearAchievements
+          ? null
+          : (achievements ?? this.achievements),
+      raEarned: raEarned ?? this.raEarned,
+      raTotal: raTotal ?? this.raTotal,
+      raPoints: raPoints ?? this.raPoints,
+      raPointsTotal: raPointsTotal ?? this.raPointsTotal,
+      raCompletionPct: clearRaCompletionPct
+          ? null
+          : (raCompletionPct ?? this.raCompletionPct),
+      raGameTitle: clearRaGameTitle ? null : (raGameTitle ?? this.raGameTitle),
+      newlyEarnedIds: clearNewlyEarnedIds
+          ? null
+          : (newlyEarnedIds ?? this.newlyEarnedIds),
     );
   }
 
@@ -248,6 +314,27 @@ class SecondaryDisplayStateData {
       shaderColor2: json['shaderColor2'] as int?,
       useFluidShader: json['useFluidShader'] as bool? ?? false,
       isOled: json['isOled'] as bool? ?? false,
+      showAchievementPanel: json['showAchievementPanel'] as bool? ?? false,
+      achievements: json['achievements'] != null
+          ? (json['achievements'] as List<dynamic>)
+                .map(
+                  (e) => SecondaryAchievementItem.fromJson(
+                    e as Map<String, dynamic>,
+                  ),
+                )
+                .toList()
+          : null,
+      raEarned: json['raEarned'] as int? ?? 0,
+      raTotal: json['raTotal'] as int? ?? 0,
+      raPoints: json['raPoints'] as int? ?? 0,
+      raPointsTotal: json['raPointsTotal'] as int? ?? 0,
+      raCompletionPct: json['raCompletionPct'] as String?,
+      raGameTitle: json['raGameTitle'] as String?,
+      newlyEarnedIds: json['newlyEarnedIds'] != null
+          ? (json['newlyEarnedIds'] as List<dynamic>)
+                .map((e) => (e as num).toInt())
+                .toList()
+          : null,
     );
   }
 
@@ -285,6 +372,15 @@ class SecondaryDisplayStateData {
       'shaderColor2': shaderColor2,
       'useFluidShader': useFluidShader,
       'isOled': isOled,
+      'showAchievementPanel': showAchievementPanel,
+      'achievements': achievements?.map((e) => e.toJson()).toList(),
+      'raEarned': raEarned,
+      'raTotal': raTotal,
+      'raPoints': raPoints,
+      'raPointsTotal': raPointsTotal,
+      'raCompletionPct': raCompletionPct,
+      'raGameTitle': raGameTitle,
+      'newlyEarnedIds': newlyEarnedIds,
     };
   }
 }
@@ -347,6 +443,19 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     int? shaderColor2,
     bool? useFluidShader,
     bool? isOled,
+    bool? showAchievementPanel,
+    List<SecondaryAchievementItem>? achievements,
+    bool clearAchievements = false,
+    int? raEarned,
+    int? raTotal,
+    int? raPoints,
+    int? raPointsTotal,
+    String? raCompletionPct,
+    bool clearRaCompletionPct = false,
+    String? raGameTitle,
+    bool clearRaGameTitle = false,
+    List<int>? newlyEarnedIds,
+    bool clearNewlyEarnedIds = false,
   }) async {
     if (!Platform.isAndroid) return;
 
@@ -395,6 +504,19 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
           shaderColor2: shaderColor2,
           useFluidShader: useFluidShader,
           isOled: isOled,
+          showAchievementPanel: showAchievementPanel,
+          achievements: achievements,
+          clearAchievements: clearAchievements,
+          raEarned: raEarned,
+          raTotal: raTotal,
+          raPoints: raPoints,
+          raPointsTotal: raPointsTotal,
+          raCompletionPct: raCompletionPct,
+          clearRaCompletionPct: clearRaCompletionPct,
+          raGameTitle: raGameTitle,
+          clearRaGameTitle: clearRaGameTitle,
+          newlyEarnedIds: newlyEarnedIds,
+          clearNewlyEarnedIds: clearNewlyEarnedIds,
         ),
       );
     } catch (e) {

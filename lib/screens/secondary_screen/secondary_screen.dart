@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:video_player/video_player.dart';
+import '../../models/secondary_achievement_item.dart';
 import '../../models/secondary_display_state.dart';
 import '../../widgets/shaders/shader_gif_widget.dart';
 import '../../utils/image_utils.dart' as image_utils;
@@ -23,6 +24,11 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   Timer? _videoTimer;
   bool _showVideo = false;
   String? _currentVideoPath;
+
+  /// Auto-clearing timer for the "newly earned this session" celebration.
+  Timer? _celebrationTimer;
+  bool _celebrate = false;
+  String? _celebrationKey;
 
   @override
   void initState() {
@@ -43,6 +49,8 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     final state = _secondaryDisplayState?.value;
     if (state == null) return;
 
+    _maybeStartCelebration(state);
+
     if (state.isGameLaunching) {
       _stopVideo();
       return;
@@ -62,6 +70,29 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         _videoController!.setVolume(state.isVideoMuted ? 0.0 : 1.0);
       }
     }
+  }
+
+  /// Triggers (or refreshes) the celebration banner when a new set of
+  /// session-earned achievements arrives, auto-clearing it after a few seconds.
+  void _maybeStartCelebration(SecondaryDisplayStateData state) {
+    final ids = state.newlyEarnedIds;
+    final key = (ids == null || ids.isEmpty)
+        ? null
+        : (List<int>.from(ids)..sort()).join(',');
+
+    if (key == _celebrationKey) return;
+    _celebrationKey = key;
+    _celebrationTimer?.cancel();
+
+    if (key == null) {
+      if (_celebrate && mounted) setState(() => _celebrate = false);
+      return;
+    }
+
+    if (mounted) setState(() => _celebrate = true);
+    _celebrationTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted) setState(() => _celebrate = false);
+    });
   }
 
   void _startVideoTimer(String path) {
@@ -126,6 +157,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   void dispose() {
     _secondaryDisplayState?.removeListener(_onStateChanged);
     _secondaryDisplayState?.dispose();
+    _celebrationTimer?.cancel();
     _stopVideo();
     super.dispose();
   }
@@ -246,6 +278,11 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                 ),
                             ],
                           ),
+
+                        // Achievement panel (in-game): covers the game art.
+                        if (value.showAchievementPanel &&
+                            value.achievements != null)
+                          _buildAchievementPanel(value),
 
                         // Center Content
                         if (!value.isGameSelected)
@@ -530,6 +567,215 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
           fontFamily: 'Anta',
         ),
       ),
+    );
+  }
+
+  /// Renders the in-game RetroAchievements panel: a progress header plus an
+  /// unlocked-first grid of achievement badges. View-only (no gamepad input
+  /// reaches the secondary engine), so there is no selection/scroll affordance.
+  Widget _buildAchievementPanel(SecondaryDisplayStateData value) {
+    final achievements =
+        List<SecondaryAchievementItem>.from(value.achievements!)..sort((a, b) {
+          if (a.earned != b.earned) return a.earned ? -1 : 1;
+          return a.displayOrder.compareTo(b.displayOrder);
+        });
+
+    final newlyEarned = value.newlyEarnedIds?.toSet() ?? const <int>{};
+    final progress = value.raTotal > 0 ? value.raEarned / value.raTotal : 0.0;
+    final title = (value.raGameTitle != null && value.raGameTitle!.isNotEmpty)
+        ? value.raGameTitle!
+        : value.systemName;
+
+    return Positioned.fill(
+      child: Container(
+        // Opaque background so the underlying game screenshot doesn't bleed
+        // through; matches the secondary display's themed background color.
+        color: value.backgroundColor != null
+            ? Color(value.backgroundColor!)
+            : Colors.black,
+        padding: EdgeInsets.symmetric(horizontal: 24.r, vertical: 20.r),
+        child: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header: title + earned/total + points.
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Symbols.trophy_rounded,
+                      color: const Color(0xFFFFC107),
+                      size: 26.r,
+                    ),
+                    SizedBox(width: 10.r),
+                    Expanded(
+                      child: Text(
+                        title.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18.r,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.5.r,
+                          fontFamily: 'Anta',
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12.r),
+                    Text(
+                      '${value.raEarned}/${value.raTotal}',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18.r,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Anta',
+                      ),
+                    ),
+                    SizedBox(width: 12.r),
+                    Text(
+                      '${value.raPoints}/${value.raPointsTotal}p',
+                      style: TextStyle(
+                        color: const Color(0xFFFFC107),
+                        fontSize: 16.r,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Anta',
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12.r),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4.r),
+                  child: LinearProgressIndicator(
+                    value: progress.clamp(0.0, 1.0),
+                    minHeight: 6.r,
+                    backgroundColor: Colors.white10,
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFFFFC107),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16.r),
+                // Badge grid. Unlocked-first; overflow is clipped (view-only).
+                Expanded(
+                  child: ClipRect(
+                    child: Wrap(
+                      spacing: 8.r,
+                      runSpacing: 8.r,
+                      children: [
+                        for (final a in achievements)
+                          _buildAchievementBadge(
+                            a,
+                            isNew: newlyEarned.contains(a.id),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Celebration banner for freshly-earned achievements.
+            if (_celebrate && newlyEarned.isNotEmpty)
+              Align(
+                alignment: Alignment.topCenter,
+                child: Container(
+                  margin: EdgeInsets.only(top: 2.r),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 20.r,
+                    vertical: 10.r,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFC107),
+                    borderRadius: BorderRadius.circular(20.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFC107).withValues(alpha: 0.5),
+                        blurRadius: 24.r,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Symbols.celebration_rounded,
+                        color: Colors.black,
+                        size: 22.r,
+                      ),
+                      SizedBox(width: 8.r),
+                      Text(
+                        '+${newlyEarned.length} this session',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 16.r,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Anta',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// A single achievement badge: full-color when earned, dimmed locked icon
+  /// otherwise, with a gold glow when earned during the current session.
+  Widget _buildAchievementBadge(
+    SecondaryAchievementItem a, {
+    required bool isNew,
+  }) {
+    final double size = 46.r;
+    final url = a.earned
+        ? 'https://media.retroachievements.org/Badge/${a.badgeName}.png'
+        : 'https://media.retroachievements.org/Badge/${a.badgeName}_lock.png';
+
+    Widget badge = ClipRRect(
+      borderRadius: BorderRadius.circular(8.r),
+      child: Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stackTrace) => Container(
+          width: size,
+          height: size,
+          color: Colors.white10,
+          child: Icon(
+            Symbols.trophy_rounded,
+            color: Colors.white24,
+            size: 24.r,
+          ),
+        ),
+      ),
+    );
+
+    if (!a.earned) {
+      badge = Opacity(opacity: 0.45, child: badge);
+    }
+
+    return Container(
+      decoration: isNew
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(10.r),
+              border: Border.all(color: const Color(0xFFFFC107), width: 2.r),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFFC107).withValues(alpha: 0.6),
+                  blurRadius: 12.r,
+                ),
+              ],
+            )
+          : null,
+      padding: EdgeInsets.all(isNew ? 2.r : 0),
+      child: badge,
     );
   }
 
