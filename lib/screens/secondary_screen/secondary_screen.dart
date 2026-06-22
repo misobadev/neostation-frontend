@@ -31,6 +31,10 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   bool _celebrate = false;
   String? _celebrationKey;
 
+  /// Whether the achievement panel renders the list view (vs the badge grid).
+  /// Toggled by touch on the secondary screen; local to this engine.
+  bool _achievementListView = false;
+
   @override
   void initState() {
     super.initState();
@@ -709,6 +713,35 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                         fontFamily: 'Anta',
                       ),
                     ),
+                    SizedBox(width: 14.r),
+                    // Touch toggle: grid <-> list. Shows the icon of the view
+                    // you'll switch to. The bottom screen is touch-only since
+                    // the gamepad is driving the game on the main screen.
+                    GestureDetector(
+                      onTap: () {
+                        SfxService().playNavSound();
+                        setState(
+                          () => _achievementListView = !_achievementListView,
+                        );
+                      },
+                      child: Container(
+                        padding: EdgeInsets.all(8.r),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Icon(
+                          _achievementListView
+                              ? Symbols.grid_view_rounded
+                              : Symbols.view_list_rounded,
+                          color: Colors.white,
+                          size: 22.r,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 SizedBox(height: 12.r),
@@ -724,21 +757,24 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                   ),
                 ),
                 SizedBox(height: 16.r),
-                // Badge grid. Unlocked-first; overflow is clipped (view-only).
+                // Content: badge grid or list, both touch-scrollable. Unlocked
+                // achievements are sorted first.
                 Expanded(
-                  child: ClipRect(
-                    child: Wrap(
-                      spacing: 8.r,
-                      runSpacing: 8.r,
-                      children: [
-                        for (final a in achievements)
-                          _buildAchievementBadge(
-                            a,
-                            isNew: newlyEarned.contains(a.id),
+                  child: _achievementListView
+                      ? _buildAchievementListView(achievements, newlyEarned)
+                      : SingleChildScrollView(
+                          child: Wrap(
+                            spacing: 8.r,
+                            runSpacing: 8.r,
+                            children: [
+                              for (final a in achievements)
+                                _buildAchievementBadge(
+                                  a,
+                                  isNew: newlyEarned.contains(a.id),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
-                  ),
+                        ),
                 ),
               ],
             ),
@@ -788,6 +824,91 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Touch-scrollable list of achievements: badge + title + description, with
+  /// points and an earned/locked indicator. Shows detail the grid can't.
+  Widget _buildAchievementListView(
+    List<SecondaryAchievementItem> achievements,
+    Set<int> newlyEarned,
+  ) {
+    return ListView.separated(
+      padding: EdgeInsets.only(bottom: 8.r),
+      itemCount: achievements.length,
+      separatorBuilder: (_, _) => SizedBox(height: 8.r),
+      itemBuilder: (context, i) {
+        final a = achievements[i];
+        final isNew = newlyEarned.contains(a.id);
+        return Container(
+          padding: EdgeInsets.all(8.r),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: a.earned ? 0.08 : 0.03),
+            borderRadius: BorderRadius.circular(10.r),
+            border: isNew
+                ? Border.all(color: const Color(0xFFFFC107), width: 1.5.r)
+                : null,
+          ),
+          child: Row(
+            children: [
+              _buildAchievementBadge(a, isNew: false),
+              SizedBox(width: 12.r),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      a.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15.r,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Anta',
+                      ),
+                    ),
+                    if (a.description.isNotEmpty) ...[
+                      SizedBox(height: 2.r),
+                      Text(
+                        a.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white60, fontSize: 12.r),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              SizedBox(width: 10.r),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${a.points}p',
+                    style: TextStyle(
+                      color: const Color(0xFFFFC107),
+                      fontSize: 13.r,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Anta',
+                    ),
+                  ),
+                  SizedBox(height: 4.r),
+                  Icon(
+                    a.earned
+                        ? Symbols.check_circle_rounded
+                        : Symbols.lock_rounded,
+                    color: a.earned ? const Color(0xFF66BB6A) : Colors.white24,
+                    size: 18.r,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

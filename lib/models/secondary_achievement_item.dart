@@ -13,6 +13,9 @@ class SecondaryAchievementItem {
   /// Display title of the achievement.
   final String title;
 
+  /// Short description of what is required to earn the achievement.
+  final String description;
+
   /// Point value awarded for earning the achievement.
   final int points;
 
@@ -31,6 +34,7 @@ class SecondaryAchievementItem {
   const SecondaryAchievementItem({
     required this.id,
     required this.title,
+    required this.description,
     required this.points,
     required this.badgeName,
     required this.displayOrder,
@@ -43,6 +47,7 @@ class SecondaryAchievementItem {
     return SecondaryAchievementItem(
       id: (json['id'] as num?)?.toInt() ?? 0,
       title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
       points: (json['points'] as num?)?.toInt() ?? 0,
       badgeName: json['badgeName'] as String? ?? '',
       displayOrder: (json['displayOrder'] as num?)?.toInt() ?? 0,
@@ -56,6 +61,7 @@ class SecondaryAchievementItem {
     return {
       'id': id,
       'title': title,
+      'description': description,
       'points': points,
       'badgeName': badgeName,
       'displayOrder': displayOrder,

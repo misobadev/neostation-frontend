@@ -192,6 +192,7 @@ class RetroAchievementsResolver {
         return SecondaryAchievementItem(
           id: a.id,
           title: a.title,
+          description: a.description,
           points: a.points,
           badgeName: a.badgeName,
           displayOrder: a.displayOrder,
