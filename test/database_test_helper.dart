@@ -115,7 +115,8 @@ class DatabaseTestHelper {
         neostation_app_version TEXT,
         auto_update_app INTEGER,
         auto_update_systems INTEGER,
-        system_grid_columns TEXT DEFAULT 'M'
+        system_grid_columns TEXT DEFAULT 'M',
+        use_12_hour_clock INTEGER DEFAULT 0
       )
     ''');
 

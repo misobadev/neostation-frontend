@@ -1218,6 +1218,13 @@ class SqliteConfigProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Updates whether the header clock uses a 12-hour (AM/PM) format.
+  Future<void> updateUse12HourClock(bool value) async {
+    _config = _config.copyWith(use12HourClock: value);
+    await SqliteConfigService.saveConfig(_config);
+    notifyListeners();
+  }
+
   /// Updates whether UI navigation SFX sounds are enabled
   Future<void> updateSfxEnabled(bool value) async {
     _config = _config.copyWith(sfxEnabled: value);

@@ -169,6 +169,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     count++; // Auto-update App
     count++; // Auto-update Systems
     count++; // SFX Sounds
+    count++; // 12-Hour Clock
     count++; // Language
     if (!kIsWeb &&
         (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
@@ -226,6 +227,15 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     if (index == currentItemIndex) {
       final sfxEnabled = configProvider.config.sfxEnabled;
       configProvider.updateSfxEnabled(!sfxEnabled);
+      return;
+    }
+    currentItemIndex++;
+
+    // Protocol: 12-Hour Clock Format.
+    if (index == currentItemIndex) {
+      configProvider.updateUse12HourClock(
+        !configProvider.config.use12HourClock,
+      );
       return;
     }
     currentItemIndex++;
@@ -659,6 +669,76 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                     value: config.sfxEnabled,
                     onChanged: (value) {
                       context.read<SqliteConfigProvider>().updateSfxEnabled(
+                        value,
+                      );
+                    },
+                    activeColor: theme.colorScheme.primary,
+                  ),
+                ],
+              ),
+            );
+          }(),
+
+          // Setting: 12-Hour Clock Format.
+          SizedBox(height: 12.r),
+          () {
+            final index = currentItemIdx++;
+            return Container(
+              key: _itemKeys[index],
+              padding: EdgeInsets.only(
+                left: 12.r,
+                right: 12.r,
+                top: 6.r,
+                bottom: 6.r,
+              ),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(
+                  color:
+                      widget.isContentFocused &&
+                          widget.selectedContentIndex == index
+                      ? theme.colorScheme.primary
+                      : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppLocale.use12HourClock.getString(context),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 12.r,
+                            fontWeight: FontWeight.w500,
+                            color:
+                                widget.isContentFocused &&
+                                    widget.selectedContentIndex == index
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        SizedBox(height: 4.r),
+                        Text(
+                          AppLocale.use12HourClockSubtitle.getString(context),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 9.r,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  CustomToggleSwitch(
+                    value: config.use12HourClock,
+                    onChanged: (value) {
+                      context.read<SqliteConfigProvider>().updateUse12HourClock(
                         value,
                       );
                     },
