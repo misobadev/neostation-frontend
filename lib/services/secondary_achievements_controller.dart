@@ -177,16 +177,19 @@ class SecondaryAchievementsController {
     _pollTimer = null;
   }
 
-  /// Stops the live poll when the game exits. When [hidePanel] is true the
-  /// panel is hidden here (it fades back to whatever art is underneath); leave
-  /// it false when the host re-pushes full display state itself.
+  /// Stops the live poll when the game exits. The in-game container is always
+  /// retired here (the session is over), so [nowPlayingActive] is cleared
+  /// unconditionally. When [hidePanel] is true the RA panel is also hidden here
+  /// (it fades back to whatever art is underneath); leave it false when the host
+  /// re-pushes full display state itself.
   void stop({bool hidePanel = false}) {
     _stopPoll();
     _gameId = null;
-    if (hidePanel) {
-      // ignore: unawaited_futures
-      _state?.updateState(showAchievementPanel: false, nowPlayingActive: false);
-    }
+    // ignore: unawaited_futures
+    _state?.updateState(
+      nowPlayingActive: false,
+      showAchievementPanel: hidePanel ? false : null,
+    );
   }
 
   void dispose() => stop();

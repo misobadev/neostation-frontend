@@ -702,6 +702,16 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
 
     return Stack(
       children: [
+        // Opaque backdrop: while the two pages cross-fade they are both
+        // briefly translucent, so without this the game-art layer underneath
+        // the container would bleed through during the transition.
+        Positioned.fill(
+          child: ColoredBox(
+            color: value.backgroundColor != null
+                ? Color(value.backgroundColor!)
+                : Colors.black,
+          ),
+        ),
         Positioned.fill(
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
