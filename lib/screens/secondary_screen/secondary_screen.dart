@@ -262,7 +262,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                     ),
                                 child: Stack(
                                   key: ValueKey(
-                                    'game_content_${value.systemName}_${value.gameId}_${value.gameScreenshot ?? 'none'}_${value.gameImageBytes != null ? value.gameImageBytes.hashCode : 'none'}',
+                                    'game_content_${value.systemName}_${value.gameId}_${value.gameScreenshot ?? 'none'}_${value.gameFanart ?? 'none'}_${value.gameWheel ?? 'none'}_${value.gameImageBytes != null ? value.gameImageBytes.hashCode : 'none'}',
                                   ),
                                   fit: StackFit.expand,
                                   children: [
@@ -280,7 +280,9 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                             value.gameScreenshot!,
                                             fit: BoxFit
                                                 .contain, // "se debe ver completo"
-                                          ),
+                                          )
+                                        else if (value.gameFanart != null)
+                                          _buildFanartWithLogo(value),
                                       ] else ...[
                                         if (value.gameImageBytes != null)
                                           _buildBackgroundBytes(
@@ -293,7 +295,9 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                             value.gameScreenshot!,
                                             fit: BoxFit
                                                 .contain, // "se debe ver completo"
-                                          ),
+                                          )
+                                        else if (value.gameFanart != null)
+                                          _buildFanartWithLogo(value),
                                       ],
                                     ],
                                   ],
@@ -427,6 +431,31 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
 
   Widget _buildDefaultBackground() {
     return const SizedBox.shrink();
+  }
+
+  /// Mirrors the main screen's game art as a fallback when no screenshot or
+  /// video is available: fanart filling the screen (cover) with the game's
+  /// wheel/logo centered on top.
+  Widget _buildFanartWithLogo(SecondaryDisplayStateData value) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _buildBackground(value.gameFanart!, fit: BoxFit.cover),
+        if (value.gameWheel != null)
+          Center(
+            child: Padding(
+              padding: EdgeInsets.all(48.r),
+              child: Image.file(
+                File(value.gameWheel!),
+                fit: BoxFit.contain,
+                width: 600.r,
+                errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox.shrink(),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildUnifiedAppBackground(SecondaryDisplayStateData value) {
