@@ -450,6 +450,11 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (context) => PaletteProvider()),
         ChangeNotifierProvider(create: (context) => ScrapingProvider()),
         ChangeNotifierProvider(
+          // Eager (not lazy): auto-login must run at startup so RA is connected
+          // regardless of which screen is shown first. Otherwise launching a
+          // game straight from the systems/recent screen (which never reads the
+          // provider) would find RA disconnected and skip the secondary panel.
+          lazy: false,
           create: (context) => RetroAchievementsProvider()..initialize(),
         ),
         ChangeNotifierProvider(create: (context) => SystemBackgroundProvider()),

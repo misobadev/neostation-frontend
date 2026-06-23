@@ -326,8 +326,12 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                           ),
                         ),
 
-                        // Center Content
-                        if (!value.isGameSelected)
+                        // Center Content (system/recent-game logo). Suppressed
+                        // while the achievement panel is up so the logo doesn't
+                        // draw on top of it (recent-game launches push state
+                        // with isGameSelected: false + the wheel as systemLogo).
+                        if (!value.isGameSelected &&
+                            !value.showAchievementPanel)
                           _buildCenterContent(
                             value,
                             isTab: value.useFluidShader,

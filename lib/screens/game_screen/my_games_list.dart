@@ -21,7 +21,7 @@ import '../../services/music_player_service.dart';
 import '../../repositories/system_repository.dart';
 import '../../repositories/game_repository.dart';
 import '../../services/screenscraper_service.dart';
-import '../../services/retro_achievements_resolver.dart';
+import '../../services/secondary_achievements_controller.dart';
 import '../../utils/gamepad_nav.dart';
 import '../../utils/centered_scroll_controller.dart';
 import '../../providers/file_provider.dart';
@@ -162,17 +162,11 @@ class _SystemGamesListState extends State<SystemGamesList> {
   // Secondary display hardware management (OEM support).
   SecondaryDisplayState? _secondaryDisplayState;
 
-  /// Snapshot of achievement ids earned before the current launch, used to
-  /// detect freshly-earned achievements when the user returns (Tier 1).
-  Set<int> _preGameEarnedIds = <int>{};
-
-  /// RA game id whose achievement panel was pushed for the current launch, or
-  /// null when the launched game has no RetroAchievements data.
-  int? _achievementGameId;
-
-  /// In-game live poll: periodically re-fetches RA progress while a game runs
-  /// so freshly-earned achievements surface on the secondary display live.
-  Timer? _livePollTimer;
+  /// Drives the live RetroAchievements panel on the secondary display for the
+  /// duration of a launched game (push at launch, poll during play, stop on
+  /// return). Shared with the systems carousel/grid "Recent Games" launches.
+  final SecondaryAchievementsController _achievementsController =
+      SecondaryAchievementsController();
 
   bool _canPop = false;
 
@@ -279,7 +273,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     MusicPlayerService().removeListener(_onMusicPlayerStateChanged);
 
     _secondaryDisplayState?.dispose();
-    _livePollTimer?.cancel();
+    _achievementsController.dispose();
 
     _cleanupResources();
     _backButtonFocusNode.dispose();
@@ -1227,120 +1221,25 @@ class _SystemGamesListState extends State<SystemGamesList> {
         : widget.system.primaryFolderName;
   }
 
-  /// Whether a secondary display is actually present and active. False on
-  /// single-screen devices and when the user has disabled the bottom screen,
-  /// in which case the achievement panel work is skipped entirely.
-  bool get _secondaryDisplayActive =>
-      _secondaryDisplayState?.value?.isSecondaryActive ?? false;
-
-  /// Tier 0: resolves and pushes the launched game's achievement panel to the
-  /// secondary display, snapshotting earned ids for the return-diff. No-op when
-  /// there is no active secondary display, RA is disconnected, or the game has
-  /// no achievement set.
-  Future<void> _pushAchievementsForLaunch(GameModel game) async {
-    if (!Platform.isAndroid ||
-        _secondaryDisplayState == null ||
-        !_secondaryDisplayActive ||
-        !mounted) {
-      return;
-    }
-    _achievementGameId = null;
-    _preGameEarnedIds = <int>{};
-
-    final provider = _retroAchievementsProvider;
-    if (!provider.isConnected) return;
-
-    final snapshot = await RetroAchievementsResolver.fetchSnapshot(
+  /// Resolves and pushes the launched game's achievement panel to the secondary
+  /// display, then keeps it live for the session. Delegates to the shared
+  /// [SecondaryAchievementsController]; no-op when there is no active secondary
+  /// display, RA is disconnected, or the game has no achievement set.
+  Future<void> _pushAchievementsForLaunch(GameModel game) {
+    return _achievementsController.pushForLaunch(
+      state: _secondaryDisplayState,
+      provider: _retroAchievementsProvider,
       game: game,
       systemFolderName: _resolveSystemFolderName(game),
-      provider: provider,
-    );
-    if (snapshot == null) return;
-
-    _achievementGameId = snapshot.gameId;
-    _preGameEarnedIds = snapshot.earnedIds;
-
-    // ignore: unawaited_futures
-    _secondaryDisplayState?.updateState(
-      showAchievementPanel: true,
-      achievements: snapshot.achievements,
-      raEarned: snapshot.earned,
-      raTotal: snapshot.total,
-      raPoints: snapshot.points,
-      raPointsTotal: snapshot.pointsTotal,
-      raCompletionPct: snapshot.completionPct,
-      raGameTitle: snapshot.gameTitle,
-      clearNewlyEarnedIds: true,
-    );
-
-    _startLivePoll();
-  }
-
-  /// Poll interval for live in-game RA progress. RA only reflects an unlock
-  /// after the emulator submits it server-side, so finer granularity buys
-  /// little; this keeps the panel current without hammering the API.
-  static const Duration _livePollInterval = Duration(seconds: 30);
-
-  /// Starts the in-game live poll: re-fetches RA progress on each interval so
-  /// achievements earned during play surface on the secondary display.
-  void _startLivePoll() {
-    if (!Platform.isAndroid) return;
-    _livePollTimer?.cancel();
-    _livePollTimer = Timer.periodic(
-      _livePollInterval,
-      (_) => _onLivePollTick(),
-    );
-  }
-
-  void _stopLivePoll() {
-    _livePollTimer?.cancel();
-    _livePollTimer = null;
-  }
-
-  Future<void> _onLivePollTick() async {
-    if (_secondaryDisplayState == null ||
-        _achievementGameId == null ||
-        !_secondaryDisplayActive) {
-      _stopLivePoll();
-      return;
-    }
-
-    final game = _selectedGame;
-    if (game == null || !mounted) return;
-    final provider = _retroAchievementsProvider;
-    if (!provider.isConnected) return;
-
-    final snapshot = await RetroAchievementsResolver.fetchSnapshot(
-      game: game,
-      systemFolderName: _resolveSystemFolderName(game),
-      provider: provider,
-      forceRefresh: true,
-    );
-    // Keep _preGameEarnedIds anchored to launch so the diff covers the whole
-    // session (both for the live highlight and the return celebration).
-    if (snapshot == null || _achievementGameId == null) return;
-    final newly = snapshot.earnedIds.difference(_preGameEarnedIds).toList();
-
-    // ignore: unawaited_futures
-    _secondaryDisplayState?.updateState(
-      showAchievementPanel: true,
-      achievements: snapshot.achievements,
-      raEarned: snapshot.earned,
-      raTotal: snapshot.total,
-      raPoints: snapshot.points,
-      raPointsTotal: snapshot.pointsTotal,
-      raCompletionPct: snapshot.completionPct,
-      raGameTitle: snapshot.gameTitle,
-      newlyEarnedIds: newly.isEmpty ? null : newly,
-      clearNewlyEarnedIds: newly.isEmpty,
     );
   }
 
   void _reactivateGamepadNavigation() async {
     if (!mounted) return;
 
-    _stopLivePoll();
-    _achievementGameId = null;
+    // Host re-pushes full game art below (hidePanel: false), which carries the
+    // panel-off flag, so the panel fades back to the art on return.
+    _achievementsController.stop();
 
     if (mounted) {
       setState(() {

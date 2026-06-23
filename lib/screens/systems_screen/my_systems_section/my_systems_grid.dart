@@ -33,6 +33,8 @@ import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/models/secondary_display_state.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/system_background_provider.dart';
+import 'package:neostation/providers/retro_achievements_provider.dart';
+import 'package:neostation/services/secondary_achievements_controller.dart';
 import 'system_list_builder.dart';
 
 /// Primary widget for the 'My Systems' view, supporting both Grid and Carousel layouts.
@@ -512,6 +514,21 @@ class MySystems extends StatelessWidget {
           context.read<SystemBackgroundProvider>().clear();
         }
 
+        // Drive the in-game RetroAchievements panel on the secondary display.
+        // This launch path lives on the stateless [MySystems] widget, so the
+        // controller is scoped to this session: the periodic poll keeps itself
+        // alive via the event loop, and the onGameClosed/onLaunchFailed
+        // callbacks stop it. The app-lifetime shared state lives on the config
+        // provider (the grid/footer have no per-widget instance of their own).
+        final achievementsController = SecondaryAchievementsController();
+        // ignore: unawaited_futures
+        achievementsController.pushForLaunch(
+          state: configProvider.secondaryDisplayState,
+          provider: context.read<RetroAchievementsProvider>(),
+          game: systemInfo.gameModel!,
+          systemFolderName: gameSystemModel.primaryFolderName,
+        );
+
         await launchGameWithDialog(
           context: context,
           game: systemInfo.gameModel!,
@@ -519,6 +536,8 @@ class MySystems extends StatelessWidget {
           fileProvider: fileProvider,
           syncProvider: syncProvider,
           onGameClosed: () {
+            // Stop the poll and hide the panel so it fades back to the art.
+            achievementsController.stop(hidePanel: true);
             MySystems.gridLaunchNotifier.value = false;
             GamepadNavigationManager.reactivate();
             Provider.of<SqliteDatabaseProvider>(
@@ -527,6 +546,7 @@ class MySystems extends StatelessWidget {
             ).refresh();
           },
           onLaunchFailed: (ctx, r) async {
+            achievementsController.stop(hidePanel: true);
             MySystems.gridLaunchNotifier.value = false;
             GamepadNavigationManager.reactivate();
           },
