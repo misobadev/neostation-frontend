@@ -35,6 +35,13 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   /// Toggled by touch on the secondary screen; local to this engine.
   bool _achievementListView = false;
 
+  /// Which page of the in-game container is showing: 0 = Now Playing,
+  /// 1 = RetroAchievements. Local to this engine, flipped by the edge chevrons;
+  /// resets to 0 on each new launch.
+  int _inGamePanelPage = 0;
+  bool _wasNowPlayingActive = false;
+  String? _panelGameId;
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +74,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       imageCache.clear();
       imageCache.clearLiveImages();
     }
+    _maybeResetInGamePage(state);
     _maybeStartCelebration(state);
 
     if (state.isGameLaunching) {
@@ -107,10 +115,33 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       return;
     }
 
-    if (mounted) setState(() => _celebrate = true);
+    // Surface the unlock: Now Playing is the default page, so jump to the
+    // achievements page (when present) where the celebration is visible.
+    final raAvailable =
+        state.showAchievementPanel && state.achievements != null;
+    if (mounted) {
+      setState(() {
+        _celebrate = true;
+        if (raAvailable) _inGamePanelPage = 1;
+      });
+    }
     _celebrationTimer = Timer(const Duration(seconds: 8), () {
       if (mounted) setState(() => _celebrate = false);
     });
+  }
+
+  /// Resets the in-game container to the Now Playing page (0) on each new
+  /// launch — detected by the session activating, or the game id changing while
+  /// it stays active.
+  void _maybeResetInGamePage(SecondaryDisplayStateData state) {
+    final freshLaunch =
+        state.nowPlayingActive &&
+        (!_wasNowPlayingActive || state.gameId != _panelGameId);
+    _wasNowPlayingActive = state.nowPlayingActive;
+    _panelGameId = state.gameId;
+    if (freshLaunch && _inGamePanelPage != 0 && mounted) {
+      setState(() => _inGamePanelPage = 0);
+    }
   }
 
   void _startVideoTimer(String path) {
@@ -303,35 +334,33 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                             ],
                           ),
 
-                        // Achievement panel (in-game): covers the game art,
-                        // fading in on launch and out on return.
+                        // In-game paged container: Now Playing (page 0) and,
+                        // when the game has a RetroAchievements set, the
+                        // achievements panel (page 1). Touch-paged via edge
+                        // chevrons; covers the game art, fading in on launch
+                        // and out on return.
                         Positioned.fill(
                           child: IgnorePointer(
-                            ignoring:
-                                !(value.showAchievementPanel &&
-                                    value.achievements != null),
+                            ignoring: !value.nowPlayingActive,
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 400),
-                              child:
-                                  (value.showAchievementPanel &&
-                                      value.achievements != null)
+                              child: value.nowPlayingActive
                                   ? KeyedSubtree(
-                                      key: const ValueKey('ra-panel'),
-                                      child: _buildAchievementPanel(value),
+                                      key: const ValueKey('in-game-panel'),
+                                      child: _buildInGamePanel(value),
                                     )
                                   : const SizedBox.shrink(
-                                      key: ValueKey('ra-panel-empty'),
+                                      key: ValueKey('in-game-panel-empty'),
                                     ),
                             ),
                           ),
                         ),
 
                         // Center Content (system/recent-game logo). Suppressed
-                        // while the achievement panel is up so the logo doesn't
+                        // while the in-game container is up so the logo doesn't
                         // draw on top of it (recent-game launches push state
                         // with isGameSelected: false + the wheel as systemLogo).
-                        if (!value.isGameSelected &&
-                            !value.showAchievementPanel)
+                        if (!value.isGameSelected && !value.nowPlayingActive)
                           _buildCenterContent(
                             value,
                             isTab: value.useFluidShader,
@@ -660,6 +689,234 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         ),
       ),
     );
+  }
+
+  /// The in-game container body: shows the Now Playing page or the
+  /// achievements page, with edge chevrons to flip between them when the game
+  /// has a RetroAchievements set. The page index is clamped so the RA page is
+  /// only shown when it actually exists.
+  Widget _buildInGamePanel(SecondaryDisplayStateData value) {
+    final raAvailable =
+        value.showAchievementPanel && value.achievements != null;
+    final page = (_inGamePanelPage == 1 && raAvailable) ? 1 : 0;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, animation) =>
+                FadeTransition(opacity: animation, child: child),
+            child: KeyedSubtree(
+              key: ValueKey('in-game-page-$page'),
+              child: page == 1
+                  ? _buildAchievementPanel(value)
+                  : _buildNowPlayingPanel(value),
+            ),
+          ),
+        ),
+        // Edge chevrons: only meaningful when there are two pages. The chevron
+        // points toward the page it reveals (right on Now Playing, left on RA).
+        if (raAvailable && page == 0) _buildPageChevron(left: false),
+        if (raAvailable && page == 1) _buildPageChevron(left: true),
+      ],
+    );
+  }
+
+  /// A translucent circular chevron pinned to the left/right edge that flips
+  /// the in-game page. Styled like the mute toggle.
+  Widget _buildPageChevron({required bool left}) {
+    return Positioned(
+      left: left ? 12.r : null,
+      right: left ? null : 12.r,
+      top: 0,
+      bottom: 0,
+      child: Center(
+        child: GestureDetector(
+          onTap: () {
+            SfxService().playNavSound();
+            setState(() => _inGamePanelPage = left ? 0 : 1);
+          },
+          child: Container(
+            padding: EdgeInsets.all(8.r),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.55),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.15),
+                width: 1.r,
+              ),
+            ),
+            child: Icon(
+              left
+                  ? Symbols.chevron_left_rounded
+                  : Symbols.chevron_right_rounded,
+              color: Colors.white,
+              size: 30.r,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Renders the "Now Playing" page: boxart, title, system, total play time
+  /// and last-played. Shown for every launched game (page 0). View-only.
+  Widget _buildNowPlayingPanel(SecondaryDisplayStateData value) {
+    final title = (value.gameTitle != null && value.gameTitle!.isNotEmpty)
+        ? value.gameTitle!
+        : value.systemName;
+
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: value.backgroundColor != null
+          ? Color(value.backgroundColor!)
+          : Colors.black,
+      padding: EdgeInsets.symmetric(horizontal: 44.r, vertical: 32.r),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildNowPlayingBoxart(value.gameBoxart),
+          SizedBox(width: 32.r),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'NOW PLAYING',
+                  style: TextStyle(
+                    color: const Color(0xFFFFC107),
+                    fontSize: 14.r,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 3.r,
+                  ),
+                ),
+                SizedBox(height: 12.r),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 30.r,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 8.r),
+                Text(
+                  value.systemName.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16.r,
+                    letterSpacing: 1.5.r,
+                  ),
+                ),
+                SizedBox(height: 26.r),
+                _buildNowPlayingStat(
+                  icon: Symbols.schedule_rounded,
+                  label: 'PLAY TIME',
+                  text: _formatPlayTime(value.playTimeSeconds),
+                ),
+                SizedBox(height: 12.r),
+                _buildNowPlayingStat(
+                  icon: Symbols.history_rounded,
+                  label: 'LAST PLAYED',
+                  text: _formatLastPlayed(value.lastPlayedMillis),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNowPlayingBoxart(String? path) {
+    Widget placeholder() => Container(
+      width: 184.r,
+      height: 264.r,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Icon(
+        Symbols.videogame_asset_rounded,
+        color: Colors.white24,
+        size: 64.r,
+      ),
+    );
+
+    if (path == null) return placeholder();
+    final file = File(path);
+    if (!file.existsSync()) return placeholder();
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12.r),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: 360.r, maxWidth: 200.r),
+        child: Image.file(
+          file,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => placeholder(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNowPlayingStat({
+    required IconData icon,
+    required String label,
+    required String text,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white54, size: 20.r),
+        SizedBox(width: 10.r),
+        Text(
+          '$label  ',
+          style: TextStyle(
+            color: Colors.white54,
+            fontSize: 14.r,
+            letterSpacing: 1.r,
+          ),
+        ),
+        Text(
+          text,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16.r,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatPlayTime(int? seconds) {
+    if (seconds == null || seconds <= 0) return '—';
+    final h = seconds ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    if (h > 0) return '${h}h ${m}m';
+    if (m > 0) return '${m}m';
+    return '<1m';
+  }
+
+  String _formatLastPlayed(int? millis) {
+    if (millis == null) return 'Never';
+    final then = DateTime.fromMillisecondsSinceEpoch(millis);
+    final diff = DateTime.now().difference(then);
+    if (diff.inDays >= 1) {
+      final d = diff.inDays;
+      return d == 1 ? 'Yesterday' : '$d days ago';
+    }
+    if (diff.inHours >= 1) return '${diff.inHours}h ago';
+    if (diff.inMinutes >= 1) return '${diff.inMinutes}m ago';
+    return 'Just now';
   }
 
   /// Renders the in-game RetroAchievements panel: a progress header plus an

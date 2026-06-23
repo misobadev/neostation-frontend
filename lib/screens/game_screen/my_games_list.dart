@@ -1226,11 +1226,17 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// [SecondaryAchievementsController]; no-op when there is no active secondary
   /// display, RA is disconnected, or the game has no achievement set.
   Future<void> _pushAchievementsForLaunch(GameModel game) {
+    final systemFolderName = _resolveSystemFolderName(game);
     return _achievementsController.pushForLaunch(
       state: _secondaryDisplayState,
       provider: _retroAchievementsProvider,
       game: game,
-      systemFolderName: _resolveSystemFolderName(game),
+      systemFolderName: systemFolderName,
+      boxartPath: SecondaryAchievementsController.resolveBoxart(
+        game,
+        systemFolderName,
+        _fileProvider,
+      ),
     );
   }
 

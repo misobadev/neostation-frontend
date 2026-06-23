@@ -527,6 +527,11 @@ class MySystems extends StatelessWidget {
           provider: context.read<RetroAchievementsProvider>(),
           game: systemInfo.gameModel!,
           systemFolderName: gameSystemModel.primaryFolderName,
+          boxartPath: SecondaryAchievementsController.resolveBoxart(
+            systemInfo.gameModel!,
+            gameSystemModel.primaryFolderName,
+            fileProvider,
+          ),
         );
 
         await launchGameWithDialog(

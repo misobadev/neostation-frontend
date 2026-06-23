@@ -376,12 +376,18 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
         // Fired without awaiting so it never blocks the emulator handoff; it
         // lands during launchGameWithDialog's foreground window, overlaying the
         // recent game's art until the game exits.
+        final boxartPath = SecondaryAchievementsController.resolveBoxart(
+          systemInfo.gameModel!,
+          gameSystemModel.primaryFolderName,
+          fileProvider,
+        );
         // ignore: unawaited_futures
         _achievementsController.pushForLaunch(
           state: _secondaryDisplayState,
           provider: context.read<RetroAchievementsProvider>(),
           game: systemInfo.gameModel!,
           systemFolderName: gameSystemModel.primaryFolderName,
+          boxartPath: boxartPath,
         );
 
         await launchGameWithDialog(

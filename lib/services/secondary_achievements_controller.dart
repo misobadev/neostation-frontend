@@ -3,6 +3,7 @@ import 'dart:io';
 
 import '../models/game_model.dart';
 import '../models/secondary_display_state.dart';
+import '../providers/file_provider.dart';
 import '../providers/retro_achievements_provider.dart';
 import 'retro_achievements_resolver.dart';
 
@@ -27,6 +28,18 @@ class SecondaryAchievementsController {
   /// little; this keeps the panel current without hammering the API.
   static const Duration pollInterval = Duration(seconds: 30);
 
+  /// Resolves a launched game's boxart for the "Now Playing" page, returning
+  /// null when no file exists ([GameModel.getImagePath] otherwise falls back to
+  /// a non-existent path). Static so every launch site shares one resolution.
+  static String? resolveBoxart(
+    GameModel game,
+    String systemFolderName,
+    FileProvider fileProvider,
+  ) {
+    final path = game.getImagePath(systemFolderName, 'box2d', fileProvider);
+    return (path.isNotEmpty && File(path).existsSync()) ? path : null;
+  }
+
   SecondaryDisplayState? _state;
   RetroAchievementsProvider? _provider;
   GameModel? _game;
@@ -46,6 +59,7 @@ class SecondaryAchievementsController {
     required RetroAchievementsProvider provider,
     required GameModel game,
     required String systemFolderName,
+    String? boxartPath,
   }) async {
     if (!Platform.isAndroid || state == null) return;
 
@@ -57,6 +71,22 @@ class SecondaryAchievementsController {
     _preGameEarnedIds = <int>{};
 
     if (!_active) return;
+
+    // Show the "Now Playing" page immediately for every launched game — this
+    // is independent of RetroAchievements, needs no network, and is the first
+    // page the secondary display shows. The RA fetch below may then add the
+    // achievements page on top.
+    // ignore: unawaited_futures
+    state.updateState(
+      nowPlayingActive: true,
+      gameTitle: game.name,
+      gameBoxart: boxartPath,
+      clearGameBoxart: boxartPath == null,
+      playTimeSeconds: game.playTime,
+      clearPlayTimeSeconds: game.playTime == null,
+      lastPlayedMillis: game.lastPlayed?.millisecondsSinceEpoch,
+      clearLastPlayed: game.lastPlayed == null,
+    );
 
     // Startup auto-login is async; on a quick launch straight from the systems/
     // recent screen it may still be in flight. Give it a short grace period
@@ -155,7 +185,7 @@ class SecondaryAchievementsController {
     _gameId = null;
     if (hidePanel) {
       // ignore: unawaited_futures
-      _state?.updateState(showAchievementPanel: false);
+      _state?.updateState(showAchievementPanel: false, nowPlayingActive: false);
     }
   }
 
