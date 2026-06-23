@@ -783,6 +783,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
       _fileProvider,
     );
 
+    final wheelPath = game.getImagePath(
+      systemFolderName,
+      'wheels',
+      _fileProvider,
+    );
+
     final videoPath = _getVideoPath(game);
     final videoExists = await _fileProvider.fileExists(videoPath);
 
@@ -815,6 +821,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
                       : null)) ||
         currentState.gameVideo !=
             (isMusicSystem ? null : (videoExists ? videoPath : null)) ||
+        currentState.gameWheel !=
+            (isMusicSystem
+                ? null
+                : (File(wheelPath).existsSync() ? wheelPath : null)) ||
         currentState.isVideoMuted != isVideoMuted ||
         currentState.isGameLaunching != _isGameLaunching;
 
@@ -822,6 +832,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
       final bool hasFanart = !isMusicSystem && File(fanartPath).existsSync();
       final bool hasScreenshot =
           !isMusicSystem && File(screenshotPath).existsSync();
+      final bool hasWheel = !isMusicSystem && File(wheelPath).existsSync();
 
       // ignore: unawaited_futures
       _secondaryDisplayState?.updateState(
@@ -830,8 +841,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
         gameScreenshot: hasScreenshot ? screenshotPath : null,
         clearFanart: !hasFanart,
         clearScreenshot: !hasScreenshot,
-        gameWheel: null,
-        clearWheel: true,
+        gameWheel: hasWheel ? wheelPath : null,
+        clearWheel: !hasWheel,
         gameVideo: null, // Reset video state during active scrolling.
         clearVideo: true,
         gameImageBytes: null,
