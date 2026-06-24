@@ -92,7 +92,7 @@ jobs:
           flutter precache --linux
 
       - name: Cache Flutter and Gradle
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.pub-cache
@@ -143,7 +143,7 @@ jobs:
 
       - name: Cache Linux build tools
         if: matrix.target == 'linux-x64' || matrix.target == 'linux-arm'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             .cache/build-tools
