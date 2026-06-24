@@ -815,10 +815,16 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   void _onSecondaryStateChanged() {
     if (!mounted) return;
     final isActive = _secondaryDisplayState?.value?.isSecondaryActive ?? false;
-    if (isActive && !_prevIsSecondaryActive) {
+    // Update the guard BEFORE pushing state. _updateSecondaryScreenName() calls
+    // updateState(), which synchronously re-enters this listener via
+    // notifyListeners(); if _prevIsSecondaryActive were still false the
+    // edge-condition below would stay true and recurse until the stack
+    // overflows (a CPU spike per tab switch on devices with a secondary screen).
+    final wasActive = _prevIsSecondaryActive;
+    _prevIsSecondaryActive = isActive;
+    if (isActive && !wasActive) {
       _updateSecondaryScreenName();
     }
-    _prevIsSecondaryActive = isActive;
   }
 
   void _loadThemeAssetsForSystems() {
