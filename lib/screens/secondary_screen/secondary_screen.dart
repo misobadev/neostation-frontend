@@ -476,14 +476,11 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   }
 
   Widget _buildSystemBackground(SecondaryDisplayStateData value) {
-    if (value.isOled) {
-      return Container(
-        color: value.backgroundColor != null
-            ? Color(value.backgroundColor!)
-            : Colors.black,
-      );
-    }
-
+    // Note: OLED is intentionally NOT short-circuited here. For a highlighted
+    // system the console artwork IS the background, so blacking it out would
+    // leave only the console name on screen. The black/background-color
+    // fallback below (via _buildShaderFallback) still applies when no system
+    // image is available, preserving the OLED look in the empty case.
     final bgPath = value.systemBackground;
     final hasBg = bgPath != null && bgPath.isNotEmpty;
 
