@@ -82,7 +82,8 @@ class DatabaseTestHelper {
         created_at TEXT,
         updated_at TEXT,
         app_emulator_unique_id TEXT,
-        app_emulator_os_id INTEGER
+        app_emulator_os_id INTEGER,
+        box2d_aspect_ratio TEXT
       )
     ''');
 
