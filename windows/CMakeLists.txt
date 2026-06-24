@@ -57,6 +57,23 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # Application build
 add_subdirectory("runner")
 
+# Resolve plugin symlinks before loading them.
+# Flutter creates symlinks in .plugin_symlinks, but CMake's libarchive cannot
+# extract archives through symlinks on Windows (e.g. fvp plugin's mdk-sdk).
+# Replace symlinks with real directory copies before plugins are loaded.
+if(WIN32)
+  set(PLUGIN_SYMLINKS_DIR "${FLUTTER_MANAGED_DIR}/ephemeral/.plugin_symlinks")
+  if(EXISTS ${PLUGIN_SYMLINKS_DIR})
+    execute_process(COMMAND powershell -NoProfile -Command
+      "$d = '${PLUGIN_SYMLINKS_DIR}'; if (Test-Path $d) { Get-ChildItem $d -Directory | ForEach-Object { if ($_.LinkType) { $t = $_.Target; if ($t -and (Test-Path $t)) { Remove-Item $_.FullName -Force -Recurse -ErrorAction SilentlyContinue; Copy-Item -Recurse $t $_.FullName -Force } } } }"
+      RESULT_VARIABLE _ps_res
+    )
+  endif()
+  # Silence deprecated C++ coroutine warnings in permission_handler_windows.
+  # New MSVC toolchain treats <experimental/coroutine> as an error by default.
+  add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+endif()
+
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)

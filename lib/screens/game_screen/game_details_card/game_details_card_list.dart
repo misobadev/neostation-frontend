@@ -796,8 +796,6 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
                 hasRetroAchievements: _hasRetroAchievements,
                 showSettings: _effectiveSystem.folderName != 'android',
                 currentTab: _currentTab,
-                onBack: widget.onBack,
-                onShowRandomGame: widget.onShowRandomGame,
                 onTabChanged: (tab) => _setTab(tab),
               ),
             ),

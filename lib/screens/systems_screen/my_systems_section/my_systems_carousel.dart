@@ -18,6 +18,7 @@ import '../../../utils/game_launch_utils.dart';
 import '../../../providers/system_background_provider.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
+import '../../game_screen/android_apps/android_apps_grid.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/palette_provider.dart';
@@ -406,6 +407,16 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
         await Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => targetScreen),
+        );
+      } else if (systemInfo.folderName == 'android') {
+        final systemMeta = configProvider.detectedSystems.firstWhere(
+          (system) => system.folderName == 'android',
+        );
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AndroidAppsGrid(system: systemMeta),
+          ),
         );
       } else {
         final systemMeta = configProvider.detectedSystems.firstWhere(

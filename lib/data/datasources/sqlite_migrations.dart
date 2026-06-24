@@ -273,6 +273,9 @@ class SqliteMigrations {
       case 89:
         await _migrateToVersion89(db);
         break;
+      case 90:
+        await _migrateToVersion90(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -4518,6 +4521,26 @@ class SqliteMigrations {
       }
     } catch (e, stackTrace) {
       _log.e('Error in migration v89: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  static Future<void> _migrateToVersion90(Database db) async {
+    _log.i('Migration v90: Adding use_12_hour_clock to user_config');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+      if (!columns.contains('use_12_hour_clock')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN use_12_hour_clock INTEGER DEFAULT 0',
+        );
+        _log.i('Column use_12_hour_clock added via v90');
+      } else {
+        _log.i('Column use_12_hour_clock already exists');
+      }
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v90: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

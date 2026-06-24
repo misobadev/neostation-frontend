@@ -63,7 +63,7 @@ flatpak-builder --user --install-deps-from=flathub \
 
 ```bash
 # Clone the repository
-git clone https://github.com/miguelsotobaez/neostation-frontend.git
+git clone https://github.com/misobadev/neostation-frontend.git
 cd neostation-frontend
 
 # Install dependencies
@@ -193,7 +193,7 @@ These packages are "vendored" within the /packages directory to ensure long-term
 NeoStation's system configurations, emulator definitions, and launch arguments are maintained in a separate repository.  
 **If you want to add new emulators, fix launch arguments, or update system configurations, please open a pull request in the dedicated systems repository:**
 
-👉 [**miguelsotobaez/neostation-systems**](https://github.com/miguelsotobaez/neostation-systems)
+👉 [**misobadev/neostation-systems**](https://github.com/misobadev/neostation-systems)
 
 Changes to these files are not accepted in this frontend repository.
 

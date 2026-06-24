@@ -160,8 +160,14 @@ class RetroAchievementsRepository {
       SELECT g.game_id
       FROM app_ra_game_list g
       WHERE g.console_id = ($consoleSubquery)
-        AND g.title LIKE ?
-      ORDER BY g.title DESC
+        AND g.title LIKE ? 
+      ORDER BY
+        CASE
+          WHEN g.title LIKE '~Hack~%' THEN 1
+          WHEN g.title LIKE '%Subset%' THEN 1
+          ELSE 0
+        END,
+        g.title ASC
       LIMIT 1
       ''',
       [systemFolderName, searchPattern],

@@ -17,6 +17,8 @@ import 'package:neostation/services/game_service.dart';
 import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import 'package:neostation/widgets/game_view_footer.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 
 class GamesGrid extends StatefulWidget {
   final SystemModel system;
@@ -30,6 +32,8 @@ class GamesGrid extends StatefulWidget {
   final VoidCallback onRandom;
   final VoidCallback? onSettings;
   final VoidCallback? onScrape;
+  final Set<String> scrapingGameRomnames;
+  final Map<String, double> scrapeProgress;
 
   const GamesGrid({
     super.key,
@@ -44,6 +48,8 @@ class GamesGrid extends StatefulWidget {
     required this.onRandom,
     this.onSettings,
     this.onScrape,
+    this.scrapingGameRomnames = const {},
+    this.scrapeProgress = const {},
   });
 
   @override
@@ -68,6 +74,7 @@ class _GamesGridState extends State<GamesGrid> {
   double? _lastLayoutWidth;
   int? _lastLayoutCols;
   int? _lastLayoutGameCount;
+  bool? _lastIsFanart;
 
   // Image dimension cache
   static final Map<String, Size?> _imageSizeCache = {};
@@ -144,28 +151,46 @@ class _GamesGridState extends State<GamesGrid> {
       (bytes[offset + 2] << 8) |
       bytes[offset + 3];
 
-  String _box2dPath(int index) => widget.games[index].getImagePath(
-    widget.system.primaryFolderName,
-    'box2d',
-    widget.fileProvider,
-  );
+  String _folderForGame(GameModel game) {
+    if ((widget.system.folderName == SystemFolderNames.all ||
+            widget.system.folderName == SystemFolderNames.favorites) &&
+        game.systemFolderName != null) {
+      return game.systemFolderName!;
+    }
+    return widget.system.primaryFolderName;
+  }
 
-  String _fanartPath(int index) => widget.games[index].getImagePath(
-    widget.system.primaryFolderName,
-    'fanarts',
-    widget.fileProvider,
-  );
+  String _box2dPath(int index) {
+    final game = widget.games[index];
+    return game.getImagePath(
+      _folderForGame(game),
+      'box2d',
+      widget.fileProvider,
+    );
+  }
 
-  String _wheelsPath(int index) => widget.games[index].getImagePath(
-    widget.system.primaryFolderName,
-    'wheels',
-    widget.fileProvider,
-  );
+  String _fanartPath(int index) {
+    final game = widget.games[index];
+    return game.getImagePath(
+      _folderForGame(game),
+      'fanarts',
+      widget.fileProvider,
+    );
+  }
 
-  String _screenshotPath(int index) => widget.games[index].getScreenshotPath(
-    widget.system.primaryFolderName,
-    widget.fileProvider,
-  );
+  String _wheelsPath(int index) {
+    final game = widget.games[index];
+    return game.getImagePath(
+      _folderForGame(game),
+      'wheels',
+      widget.fileProvider,
+    );
+  }
+
+  String _screenshotPath(int index) {
+    final game = widget.games[index];
+    return game.getScreenshotPath(_folderForGame(game), widget.fileProvider);
+  }
 
   bool get _isFanart =>
       context.read<SqliteConfigProvider>().config.gameCarouselCardStyle ==
@@ -221,6 +246,7 @@ class _GamesGridState extends State<GamesGrid> {
       _lastLayoutWidth != w ||
       _lastLayoutCols != _cols ||
       _lastLayoutGameCount != widget.games.length ||
+      _lastIsFanart != _isFanart ||
       _needsDimReload;
 
   void _computeLayout(double availableWidth) {
@@ -228,6 +254,7 @@ class _GamesGridState extends State<GamesGrid> {
     _lastLayoutWidth = availableWidth;
     _lastLayoutCols = _cols;
     _lastLayoutGameCount = widget.games.length;
+    _lastIsFanart = _isFanart;
     _needsDimReload = false;
 
     final spX = 6.0.r;
@@ -613,153 +640,163 @@ class _GamesGridState extends State<GamesGrid> {
       );
     }
 
-    return Column(
+    return Stack(
       children: [
-        _buildGridHeader(),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              _computeLayout(constraints.maxWidth);
+        Column(
+          children: [
+            SizedBox(height: 36.r),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _computeLayout(constraints.maxWidth);
 
-              final theme = Theme.of(context);
-              final systemFolder = widget.system.primaryFolderName;
-              final fp = widget.fileProvider;
-              final targetWidth = (_cardWidth * 1.5).toInt();
+                  final theme = Theme.of(context);
+                  final fp = widget.fileProvider;
+                  final targetWidth = (_cardWidth * 1.5).toInt();
 
-              final selRect = _selectedIndex < _cardRects.length
-                  ? _cardRects[_selectedIndex]
-                  : _cardRects.first;
-              final hlDuration = Duration(
-                milliseconds: _isNavigatingFast ? 120 : 300,
-              );
-
-              Widget buildRow(BuildContext ctx, int rowIndex) {
-                final row = _rows[rowIndex];
-                final cards = <Widget>[];
-                for (int j = 0; j < row.count; j++) {
-                  final idx = row.startIndex + j;
-                  final rect = _cardRects[idx];
-                  _ensureDims(idx);
-                  final card = _buildCard(
-                    idx,
-                    rect,
-                    systemFolder,
-                    fp,
-                    targetWidth,
-                    theme,
+                  final selRect = _selectedIndex < _cardRects.length
+                      ? _cardRects[_selectedIndex]
+                      : _cardRects.first;
+                  final hlDuration = Duration(
+                    milliseconds: _isNavigatingFast ? 120 : 300,
                   );
-                  cards.add(
-                    SizedBox(
-                      width: rect.width,
-                      height: rect.height,
-                      child: card,
-                    ),
-                  );
-                }
-                return SizedBox(
-                  height: row.height + _spY,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: _interleaveSpacing(cards, _spX),
-                  ),
-                );
-              }
 
-              return Listener(
-                onPointerDown: _handlePointerDown,
-                onPointerMove: _handlePointerMove,
-                onPointerUp: _handlePointerUp,
-                onPointerCancel: _handlePointerCancel,
-                behavior: HitTestBehavior.translucent,
-                child: Stack(
-                  children: [
-                    CustomScrollView(
-                      controller: _scrollController,
-                      slivers: [
-                        SliverPadding(
-                          padding: EdgeInsets.only(
-                            top: 12,
-                            bottom: 80,
-                            left: 16,
-                            right: 16,
+                  Widget buildRow(BuildContext ctx, int rowIndex) {
+                    final row = _rows[rowIndex];
+                    final cards = <Widget>[];
+                    for (int j = 0; j < row.count; j++) {
+                      final idx = row.startIndex + j;
+                      final rect = _cardRects[idx];
+                      _ensureDims(idx);
+                      final card = _buildCard(
+                        idx,
+                        rect,
+                        fp,
+                        targetWidth,
+                        theme,
+                      );
+                      cards.add(
+                        SizedBox(
+                          width: rect.width,
+                          height: rect.height,
+                          child: card,
+                        ),
+                      );
+                    }
+                    return SizedBox(
+                      height: row.height + _spY,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: _interleaveSpacing(cards, _spX),
+                      ),
+                    );
+                  }
+
+                  return Listener(
+                    onPointerDown: _handlePointerDown,
+                    onPointerMove: _handlePointerMove,
+                    onPointerUp: _handlePointerUp,
+                    onPointerCancel: _handlePointerCancel,
+                    behavior: HitTestBehavior.translucent,
+                    child: Stack(
+                      children: [
+                        CustomScrollView(
+                          controller: _scrollController,
+                          slivers: [
+                            SliverPadding(
+                              padding: EdgeInsets.only(
+                                top: 12,
+                                bottom: 80,
+                                left: 16,
+                                right: 16,
+                              ),
+                              sliver: SliverList.builder(
+                                itemCount: _rows.length,
+                                itemBuilder: buildRow,
+                              ),
+                            ),
+                          ],
+                        ),
+                        AnimatedPositioned(
+                          key: const ValueKey('game_selector'),
+                          duration: hlDuration,
+                          curve: Curves.easeOutQuart,
+                          left: selRect.left + 16,
+                          top: selRect.top + 12,
+                          width: selRect.width,
+                          height: selRect.height,
+                          child: ListenableBuilder(
+                            listenable: _scrollController,
+                            builder: (_, child) {
+                              final offset = _scrollController.hasClients
+                                  ? _scrollController.offset
+                                  : 0.0;
+                              return Transform.translate(
+                                offset: Offset(0, -offset),
+                                child: IgnorePointer(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: theme.colorScheme.secondary,
+                                        width: 4.r,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12.r),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                          sliver: SliverList.builder(
-                            itemCount: _rows.length,
-                            itemBuilder: buildRow,
+                        ),
+                        ValueListenableBuilder<String?>(
+                          valueListenable: _cardSizeLabel,
+                          builder: (context, label, child) => AnimatedOpacity(
+                            opacity: label != null ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: IgnorePointer(
+                              child: Center(
+                                child: label != null
+                                    ? Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 20.r,
+                                          vertical: 10.r,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primary
+                                              .withValues(alpha: 0.9),
+                                          borderRadius: BorderRadius.circular(
+                                            24.r,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          label,
+                                          style: TextStyle(
+                                            color: theme.colorScheme.onPrimary,
+                                            fontSize: 18.r,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 2.r,
+                                          ),
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    AnimatedPositioned(
-                      key: const ValueKey('game_selector'),
-                      duration: hlDuration,
-                      curve: Curves.easeOutQuart,
-                      left: selRect.left + 16,
-                      top: selRect.top + 12,
-                      width: selRect.width,
-                      height: selRect.height,
-                      child: ListenableBuilder(
-                        listenable: _scrollController,
-                        builder: (_, child) {
-                          final offset = _scrollController.hasClients
-                              ? _scrollController.offset
-                              : 0.0;
-                          return Transform.translate(
-                            offset: Offset(0, -offset),
-                            child: IgnorePointer(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: theme.colorScheme.secondary,
-                                    width: 4.r,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12.r),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    ValueListenableBuilder<String?>(
-                      valueListenable: _cardSizeLabel,
-                      builder: (context, label, child) => AnimatedOpacity(
-                        opacity: label != null ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: IgnorePointer(
-                          child: Center(
-                            child: label != null
-                                ? Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 20.r,
-                                      vertical: 10.r,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.primary
-                                          .withValues(alpha: 0.9),
-                                      borderRadius: BorderRadius.circular(24.r),
-                                    ),
-                                    child: Text(
-                                      label,
-                                      style: TextStyle(
-                                        color: theme.colorScheme.onPrimary,
-                                        fontSize: 18.r,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 2.r,
-                                      ),
-                                    ),
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
+                  );
+                },
+              ),
+            ),
+            GameViewFooter(
+              game: widget
+                  .games[_selectedIndex.clamp(0, widget.games.length - 1)],
+              onPlay: widget.onPlay,
+            ),
+          ],
         ),
+        Positioned(top: 0, left: 0, right: 0, child: _buildGridHeader()),
       ],
     );
   }
@@ -777,7 +814,6 @@ class _GamesGridState extends State<GamesGrid> {
   Widget _buildCard(
     int index,
     _CardRect rect,
-    String systemFolder,
     FileProvider fp,
     int targetWidth,
     ThemeData theme,
@@ -788,35 +824,100 @@ class _GamesGridState extends State<GamesGrid> {
       return _buildFanartGridCard(index, rect, game, theme);
     }
 
-    final box2dPath = game.getImagePath(systemFolder, 'box2d', fp);
+    final box2dPath = game.getImagePath(_folderForGame(game), 'box2d', fp);
 
     return GestureDetector(
-      key: ValueKey('card_${game.romname}'),
+      key: ValueKey('game_${game.romname}'),
       onTap: () {
         setState(() => _selectedIndex = index);
         widget.onGameSelected(game);
         SfxService().playNavSound();
       },
       child: RepaintBoundary(
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12.r),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 2.r,
-                offset: Offset(2.r, 2.r),
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 2.r,
+                    offset: Offset(2.r, 2.r),
+                  ),
+                ],
               ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: _GameCardImage(
-            key: ValueKey('img_${game.romname}'),
-            box2dPath: box2dPath,
-            game: game,
-            targetWidth: targetWidth,
-          ),
+              clipBehavior: Clip.antiAlias,
+              child: _GameCardImage(
+                key: ValueKey('img_${game.romname}'),
+                box2dPath: box2dPath,
+                game: game,
+                targetWidth: targetWidth,
+              ),
+            ),
+            if (game.isFavorite == true)
+              Positioned(
+                top: 6.r,
+                right: 6.r,
+                child: Container(
+                  width: 22.r,
+                  height: 22.r,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Symbols.favorite_rounded,
+                    size: 12.r,
+                    color: Colors.redAccent,
+                  ),
+                ),
+              ),
+            if (widget.scrapingGameRomnames.contains(game.romname))
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildScrapeProgress(game),
+              ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildScrapeProgress(GameModel game) {
+    final progress = widget.scrapeProgress[game.romname] ?? 0.0;
+    return Container(
+      height: 20.r,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(12.r)),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 8.r),
+      child: Row(
+        children: [
+          Icon(Symbols.search_rounded, size: 10.r, color: Colors.white70),
+          SizedBox(width: 4.r),
+          Expanded(
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white24,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          SizedBox(width: 4.r),
+          Text(
+            '${(progress * 100).toInt()}%',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 9.r,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -838,7 +939,7 @@ class _GamesGridState extends State<GamesGrid> {
         : (hasScreenshot ? screenshotPath : '');
 
     return GestureDetector(
-      key: ValueKey('fanart_${game.romname}'),
+      key: ValueKey('game_${game.romname}'),
       onTap: () {
         setState(() => _selectedIndex = index);
         widget.onGameSelected(game);
@@ -868,24 +969,26 @@ class _GamesGridState extends State<GamesGrid> {
                     key: ValueKey('fanart_bg_${game.romname}'),
                     fit: BoxFit.cover,
                     cacheWidth: 388,
-                    errorBuilder: (ctx, e, s) => _fanartFallback(theme),
+                    errorBuilder: (ctx, e, s) =>
+                        _buildFallbackCard(game, theme),
                   )
                 else
-                  _fanartFallback(theme),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.5),
-                        Colors.black.withValues(alpha: 0.85),
-                      ],
-                      stops: const [0.5, 0.75, 1.0],
+                  _buildFallbackCard(game, theme),
+                if (bgPath.isNotEmpty)
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.5),
+                          Colors.black.withValues(alpha: 0.85),
+                        ],
+                        stops: const [0.5, 0.75, 1.0],
+                      ),
                     ),
                   ),
-                ),
                 if (hasWheel)
                   Positioned(
                     left: 10.r,
@@ -905,6 +1008,31 @@ class _GamesGridState extends State<GamesGrid> {
                       ),
                     ),
                   ),
+                if (game.isFavorite == true)
+                  Positioned(
+                    top: 6.r,
+                    right: 6.r,
+                    child: Container(
+                      width: 22.r,
+                      height: 22.r,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Symbols.favorite_rounded,
+                        size: 12.r,
+                        color: Colors.redAccent,
+                      ),
+                    ),
+                  ),
+                if (widget.scrapingGameRomnames.contains(game.romname))
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildScrapeProgress(game),
+                  ),
               ],
             ),
           ),
@@ -913,15 +1041,34 @@ class _GamesGridState extends State<GamesGrid> {
     );
   }
 
-  Widget _fanartFallback(ThemeData theme) {
+  Widget _buildFallbackCard(GameModel game, ThemeData theme) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.surfaceContainerHighest,
-            theme.colorScheme.surface,
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.videogame_asset_rounded,
+              size: 32.r,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
+            SizedBox(height: 4.r),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4.r),
+              child: Text(
+                GameUtils.formatGameName(
+                  game.name.isNotEmpty ? game.name : game.romname,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 7.r,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -935,23 +1082,16 @@ class _GamesGridState extends State<GamesGrid> {
         (widget.system.shortName != null && widget.system.shortName!.isNotEmpty)
         ? widget.system.shortName!
         : widget.system.realName;
-    final selGame = _selectedIndex < widget.games.length
-        ? widget.games[_selectedIndex]
-        : null;
-    final selName = selGame != null
-        ? GameUtils.formatGameName(
-            selGame.name.isNotEmpty ? selGame.name : selGame.romname,
-          )
-        : '';
-
     return Container(
-      margin: EdgeInsets.only(left: 8.r, right: 8.r, top: 8.r, bottom: 4.r),
+      padding: EdgeInsets.only(left: 8.r, right: 8.r, top: 8.r, bottom: 4.r),
+      color: Scaffold.of(context).widget.backgroundColor,
       child: Row(
         children: [
           _buildIconButton(
             iconPath: 'assets/images/gamepad/Xbox_B_button.png',
             symbol: Symbols.arrow_back_rounded,
             color: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
             onTap: widget.onBack,
           ),
           SizedBox(width: 6.r),
@@ -959,7 +1099,8 @@ class _GamesGridState extends State<GamesGrid> {
             key: viewModeKey,
             iconPath: 'assets/images/gamepad/Xbox_X_button.png',
             symbol: Symbols.grid_view_rounded,
-            color: Theme.of(context).colorScheme.primary,
+            color: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
             onTap: () {
               SfxService().playNavSound();
               dropdownState?.showDropdownFrom(viewModeKey);
@@ -970,7 +1111,24 @@ class _GamesGridState extends State<GamesGrid> {
             iconPath: 'assets/images/gamepad/Left Stick Click.png',
             symbol: Symbols.casino_rounded,
             color: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
             onTap: widget.onRandom,
+          ),
+          SizedBox(width: 6.r),
+          _buildIconButton(
+            iconPath: 'assets/images/gamepad/Xbox_View_button.png',
+            symbol: Symbols.search_rounded,
+            color: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            onTap: () => widget.onScrape?.call(),
+          ),
+          SizedBox(width: 6.r),
+          _buildIconButton(
+            iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
+            symbol: Symbols.favorite_rounded,
+            color: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            onTap: widget.onFavorite,
           ),
           SizedBox(width: 10.r),
           Container(
@@ -997,20 +1155,6 @@ class _GamesGridState extends State<GamesGrid> {
               ),
             ),
           ),
-          if (selName.isNotEmpty) ...[
-            SizedBox(width: 10.r),
-            Expanded(
-              child: Text(
-                selName,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12.r,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1021,8 +1165,10 @@ class _GamesGridState extends State<GamesGrid> {
     required String iconPath,
     required IconData symbol,
     required Color color,
+    Color? foregroundColor,
     required VoidCallback onTap,
   }) {
+    final fg = foregroundColor ?? Colors.white;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1049,11 +1195,11 @@ class _GamesGridState extends State<GamesGrid> {
                 iconPath,
                 width: 16.r,
                 height: 16.r,
-                color: Colors.white,
+                color: fg,
                 colorBlendMode: BlendMode.srcIn,
               ),
               SizedBox(width: 4.r),
-              Icon(symbol, size: 16.r, color: Colors.white),
+              Icon(symbol, size: 16.r, color: fg),
             ],
           ),
         ),

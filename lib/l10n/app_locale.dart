@@ -127,6 +127,8 @@ mixin AppLocale {
       'auto_update_systems_subtitle';
   static const String sfxSounds = 'sfx_sounds';
   static const String sfxSoundsSubtitle = 'sfx_sounds_subtitle';
+  static const String use12HourClock = 'use_12_hour_clock';
+  static const String use12HourClockSubtitle = 'use_12_hour_clock_subtitle';
   static const String fullscreenMode = 'fullscreen_mode';
   static const String fullscreenModeSubtitle = 'fullscreen_mode_subtitle';
   static const String allFilesAccess = 'all_files_access';

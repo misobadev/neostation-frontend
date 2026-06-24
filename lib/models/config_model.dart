@@ -50,6 +50,9 @@ class ConfigModel {
   /// Whether UI sound effects (navigation, clicks) are enabled.
   final bool sfxEnabled;
 
+  /// Whether the header clock should use a 12-hour format with AM/PM (false = 24-hour).
+  final bool use12HourClock;
+
   /// The property used to sort the system list (e.g., 'alphabetical', 'release_year').
   final String systemSortBy;
 
@@ -97,6 +100,7 @@ class ConfigModel {
     this.hideBottomScreen = false,
     this.videoSound = false,
     this.sfxEnabled = true,
+    this.use12HourClock = false,
     this.systemSortBy = 'alphabetical',
     this.systemSortOrder = 'asc',
     this.appLanguage = 'es',
@@ -177,6 +181,11 @@ class ConfigModel {
       sfxEnabled:
           (json['sfxEnabled'] ?? true).toString().toLowerCase() == 'true' ||
           (json['sfx_enabled'] ?? 1).toString() == '1',
+      use12HourClock:
+          (json['use12HourClock'] ?? json['use_12_hour_clock'] ?? 0)
+                  .toString() ==
+              '1' ||
+          (json['use12HourClock'] ?? false).toString().toLowerCase() == 'true',
       systemSortBy:
           (json['systemSortBy'] ?? json['system_sort_by'] ?? 'alphabetical')
               .toString(),
@@ -243,6 +252,7 @@ class ConfigModel {
       'hideBottomScreen': hideBottomScreen,
       'videoSound': videoSound,
       'sfxEnabled': sfxEnabled,
+      'use12HourClock': use12HourClock,
       'systemSortBy': systemSortBy,
       'systemSortOrder': systemSortOrder,
       'appLanguage': appLanguage,
@@ -274,6 +284,7 @@ class ConfigModel {
     bool? hideBottomScreen,
     bool? videoSound,
     bool? sfxEnabled,
+    bool? use12HourClock,
     String? systemSortBy,
     String? systemSortOrder,
     String? appLanguage,
@@ -302,6 +313,7 @@ class ConfigModel {
       hideBottomScreen: hideBottomScreen ?? this.hideBottomScreen,
       videoSound: videoSound ?? this.videoSound,
       sfxEnabled: sfxEnabled ?? this.sfxEnabled,
+      use12HourClock: use12HourClock ?? this.use12HourClock,
       systemSortBy: systemSortBy ?? this.systemSortBy,
       systemSortOrder: systemSortOrder ?? this.systemSortOrder,
       appLanguage: appLanguage ?? this.appLanguage,

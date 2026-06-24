@@ -3,15 +3,37 @@ name: Build and Deploy NeoStation
 on:
   push:
     tags:
-      - 'v*' # Trigger when a new tag (e.g., v1.0.0) is pushed
-  workflow_dispatch: # Allow manual trigger
- 
+      - 'v*'
+  workflow_dispatch:
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  lint:
+    name: Lint & Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze project
+        run: flutter analyze
+
   build:
     name: Build ${{ matrix.target }}
+    needs: lint
     runs-on: ${{ matrix.os }}
     environment: Production
     strategy:
@@ -27,7 +49,7 @@ jobs:
           - target: linux-x64
             os: ubuntu-latest
           - target: linux-arm
-            os: ubuntu-24.04-arm # Runner ARM native
+            os: ubuntu-24.04-arm
 
     steps:
       - name: Checkout repository
@@ -45,7 +67,7 @@ jobs:
           [ -n "$SCREENSCRAPER_DEV_ID" ] && echo "SCREENSCRAPER_DEV_ID=$SCREENSCRAPER_DEV_ID" >> .env
           [ -n "$SCREENSCRAPER_DEV_PASSWORD" ] && echo "SCREENSCRAPER_DEV_PASSWORD=$SCREENSCRAPER_DEV_PASSWORD" >> .env
           echo ".env created with $(wc -l < .env) lines"
-      
+
       - name: Setup Java (for Android)
         if: matrix.target == 'android'
         uses: actions/setup-java@v5
@@ -147,28 +169,6 @@ jobs:
       - name: Build Linux ARM
         if: matrix.target == 'linux-arm'
         run: bash build-utils/build-linuxarm.sh
-
-      - name: Package Flatpak bundle (Linux x64)
-        if: matrix.target == 'linux-x64'
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}' | tr -d '\r')
-          BUNDLE_DIR=build/linux/x64/release/bundle
-          TARBALL=release/neostation-flatpak-x86_64-${VERSION}.tar.xz
-          mkdir -p release
-          tar -cJf "$TARBALL" -C "$BUNDLE_DIR" .
-          sha256sum "$TARBALL" | tee release/neostation-flatpak-x86_64.sha256
-          echo "Flatpak bundle: $TARBALL ($(du -h "$TARBALL" | cut -f1))"
-
-      - name: Package Flatpak bundle (Linux ARM)
-        if: matrix.target == 'linux-arm'
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}' | tr -d '\r')
-          BUNDLE_DIR=build/linux/arm64/release/bundle
-          TARBALL=release/neostation-flatpak-arm64-${VERSION}.tar.xz
-          mkdir -p release
-          tar -cJf "$TARBALL" -C "$BUNDLE_DIR" .
-          sha256sum "$TARBALL" | tee release/neostation-flatpak-arm64.sha256
-          echo "Flatpak bundle: $TARBALL ($(du -h "$TARBALL" | cut -f1))"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7

@@ -192,6 +192,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
   // Media controllers.
   VideoPlayerController? _videoController;
 
+  // Scraping state.
+  final Set<String> _scrapingGameRomnames = {};
+  final Map<String, double> _scrapeProgress = {};
+
   // Localized metadata.
   String? _localizedDescription;
 
@@ -326,6 +330,96 @@ class _SystemGamesListState extends State<SystemGamesList> {
     if (_toggleInfoCallback != null) {
       _toggleInfoCallback!();
     }
+  }
+
+  void _onScrapeCurrentGame() async {
+    final game = _selectedGame;
+    if (game == null) return;
+    final romname = game.romname;
+    final romPath = game.romPath;
+    if (romPath == null) return;
+    if (_scrapingGameRomnames.contains(romname)) return;
+
+    // Resolve the actual system (not favorites virtual system).
+    SystemModel targetSystem = widget.system;
+    if ((widget.system.folderName == SystemFolderNames.all ||
+            widget.system.folderName == SystemFolderNames.favorites) &&
+        game.systemFolderName != null) {
+      final original = await SystemRepository.getSystemByFolderName(
+        game.systemFolderName!,
+      );
+      if (original != null) {
+        targetSystem = original;
+      }
+    }
+
+    final systemId = targetSystem.id;
+    if (systemId == null) return;
+
+    _scrapingGameRomnames.add(romname);
+    _scrapeProgress[romname] = 0.0;
+    setState(() {});
+
+    ScreenScraperService.scrapeSingleGame(
+          appSystemId: systemId,
+          romName: game.romname,
+          systemFolder: targetSystem.primaryFolderName,
+          romPath: romPath,
+          gameName: game.name,
+          forceOverwrite: true,
+          onProgress: (status, progress) {
+            _scrapeProgress[romname] = progress;
+            setState(() {});
+          },
+        )
+        .then((result) async {
+          final systemFolder = targetSystem.primaryFolderName;
+          final imagesToEvict = [
+            game.getScreenshotPath(systemFolder),
+            game.getImagePath(systemFolder, 'wheels', widget.fileProvider),
+            game.getImagePath(systemFolder, 'fanarts', widget.fileProvider),
+            game.getImagePath(systemFolder, 'box2d', widget.fileProvider),
+          ];
+          for (final imagePath in imagesToEvict) {
+            final imageFile = File(imagePath);
+            if (await imageFile.exists()) {
+              await FileImage(imageFile).evict();
+            }
+          }
+
+          final updatedGame = await GameService.getGameDetails(
+            targetSystem,
+            romname,
+          );
+          if (mounted && updatedGame != null) {
+            final gameIndex = _games.indexWhere((g) => g.romname == romname);
+            if (gameIndex >= 0) {
+              setState(() {
+                _games[gameIndex] = updatedGame;
+                if (_selectedGame?.romname == romname) {
+                  _selectedGame = updatedGame;
+                }
+              });
+            }
+          }
+
+          if (mounted) {
+            AppNotification.showNotification(
+              context,
+              result['success'] == true
+                  ? 'Scraping completed'
+                  : 'Scraping failed: ${result['message']}',
+              type: result['success'] == true
+                  ? NotificationType.success
+                  : NotificationType.error,
+            );
+          }
+        })
+        .whenComplete(() {
+          _scrapingGameRomnames.remove(romname);
+          _scrapeProgress.remove(romname);
+          if (mounted) setState(() {});
+        });
   }
 
   /// Responds to SQLite database updates by reloading the game list.
@@ -1606,7 +1700,14 @@ class _SystemGamesListState extends State<SystemGamesList> {
       return;
     }
 
-    _gamepadNav.deactivate();
+    // Push a manager layer to deactivate the current active gamepad layer
+    // (games_grid / games_carousel / system_games_list) so the random dialog
+    // can capture back input without it leaking through to the parent.
+    GamepadNavigationManager.pushLayer(
+      'random_dialog',
+      onActivate: () {},
+      onDeactivate: () {},
+    );
 
     showDialog(
       context: context,
@@ -1643,8 +1744,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
       // Wait a bit to prevent the button press from being processed twice
       await Future.delayed(const Duration(milliseconds: 100));
       if (mounted) {
-        // Reactivar navegación
-        _gamepadNav.activate();
+        // Pop the dialog layer to reactivate the previous gamepad layer.
+        GamepadNavigationManager.popLayer('random_dialog');
       }
     });
   }
@@ -1926,6 +2027,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
                     ? _buildEmptyState()
                     : Consumer<SqliteConfigProvider>(
                         builder: (context, configProvider, child) {
+                          if (widget.system.folderName == 'music') {
+                            return _buildGamesList();
+                          }
                           if (configProvider.config.gameViewMode == 'grid') {
                             return _buildGamesGrid();
                           } else if (configProvider.config.gameViewMode ==
@@ -2414,19 +2518,18 @@ class _SystemGamesListState extends State<SystemGamesList> {
       },
       onBack: _goBack,
       onPlay: _selectCurrentGame,
+      onFavorite: _toggleFavorite,
       onRandom: _showRandomGameDialog,
       onSettings: _handleStartButton,
+      onScrape: _onScrapeCurrentGame,
+      scrapingGameRomnames: _scrapingGameRomnames,
+      scrapeProgress: _scrapeProgress,
     );
   }
 
   /// Builds the game grid view with box-2d images.
   Widget _buildGamesGrid() {
-    final cardStyle = context
-        .read<SqliteConfigProvider>()
-        .config
-        .gameCarouselCardStyle;
     return GamesGrid(
-      key: ValueKey('games_grid_$cardStyle'),
       system: widget.system,
       games: _games,
       selectedIndex: _selectedGameIndex,
@@ -2443,13 +2546,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
       onFavorite: _toggleFavorite,
       onRandom: _showRandomGameDialog,
       onSettings: _handleStartButton,
-      onScrape: () {
-        if (_secondaryOverlayAction != null) {
-          _secondaryOverlayAction!();
-        } else {
-          _openGameInfo();
-        }
-      },
+      onScrape: _onScrapeCurrentGame,
+      scrapingGameRomnames: _scrapingGameRomnames,
+      scrapeProgress: _scrapeProgress,
     );
   }
 
@@ -3063,6 +3162,7 @@ class _GameListViewState extends State<GameListView>
                 iconPath: 'assets/images/gamepad/Xbox_B_button.png',
                 symbol: Symbols.arrow_back_rounded,
                 color: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
                 onTap: widget.onBack,
               ),
               SizedBox(width: 6.r),
@@ -3070,7 +3170,8 @@ class _GameListViewState extends State<GameListView>
                 key: viewModeKey,
                 iconPath: 'assets/images/gamepad/Xbox_X_button.png',
                 symbol: Symbols.grid_view_rounded,
-                color: Theme.of(context).colorScheme.primary,
+                color: Theme.of(context).colorScheme.tertiary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 onTap: () {
                   SfxService().playNavSound();
                   dropdownState?.showDropdownFrom(viewModeKey);
@@ -3081,6 +3182,7 @@ class _GameListViewState extends State<GameListView>
                 iconPath: 'assets/images/gamepad/Left Stick Click.png',
                 symbol: Symbols.casino_rounded,
                 color: Theme.of(context).colorScheme.tertiary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 onTap: widget.onRandom,
               ),
             ],
@@ -3124,8 +3226,10 @@ class _GameListViewState extends State<GameListView>
     required String iconPath,
     required IconData symbol,
     required Color color,
+    Color? foregroundColor,
     required VoidCallback onTap,
   }) {
+    final fg = foregroundColor ?? Colors.white;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -3152,11 +3256,11 @@ class _GameListViewState extends State<GameListView>
                 iconPath,
                 width: 14.r,
                 height: 14.r,
-                color: Colors.white,
+                color: fg,
                 colorBlendMode: BlendMode.srcIn,
               ),
               SizedBox(width: 3.r),
-              Icon(symbol, size: 14.r, color: Colors.white),
+              Icon(symbol, size: 14.r, color: fg),
             ],
           ),
         ),

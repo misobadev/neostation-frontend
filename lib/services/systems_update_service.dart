@@ -9,11 +9,11 @@ import 'logger_service.dart';
 import '../data/datasources/sqlite_service.dart';
 
 const _manifestUrl =
-    'https://raw.githubusercontent.com/miguelsotobaez/neostation-systems/main/manifest.json';
+    'https://raw.githubusercontent.com/misobadev/neostation-systems/main/manifest.json';
 const _baseRawUrl =
-    'https://raw.githubusercontent.com/miguelsotobaez/neostation-systems/main/systems';
+    'https://raw.githubusercontent.com/misobadev/neostation-systems/main/systems';
 const _githubApiUrl =
-    'https://api.github.com/repos/miguelsotobaez/neostation-systems/contents/systems';
+    'https://api.github.com/repos/misobadev/neostation-systems/contents/systems';
 
 final _log = LoggerService.instance;
 

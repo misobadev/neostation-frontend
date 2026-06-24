@@ -110,6 +110,9 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.sfxSounds: 'UI Navigation Sounds',
   AppLocale.sfxSoundsSubtitle:
       'Play sound effects for gamepad, keyboard and touch navigation',
+  AppLocale.use12HourClock: 'Use 12-Hour Clock',
+  AppLocale.use12HourClockSubtitle:
+      'Show the clock in 12-hour format with AM/PM instead of 24-hour',
   AppLocale.fullscreenMode: 'Fullscreen Mode',
   AppLocale.fullscreenModeSubtitle: 'Display the app in fullscreen mode',
   AppLocale.allFilesAccess: 'All Files Access',

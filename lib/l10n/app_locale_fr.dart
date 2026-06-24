@@ -120,6 +120,9 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.sfxSounds: 'Sons de l’Interface',
   AppLocale.sfxSoundsSubtitle:
       'Joue des sons pour la navigation à la manette, au clavier et au tactile',
+  AppLocale.use12HourClock: 'Horloge 12 heures',
+  AppLocale.use12HourClockSubtitle:
+      'Afficher l\'heure au format 12 heures avec AM/PM au lieu de 24 heures',
   AppLocale.fullscreenMode: 'Mode Plein Écran',
   AppLocale.fullscreenModeSubtitle: 'Affiche l’application en plein écran',
   AppLocale.allFilesAccess: 'Accès à Tous les Fichiers',

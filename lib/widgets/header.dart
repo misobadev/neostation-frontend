@@ -12,6 +12,7 @@ import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/widgets/header_sort_dropdown.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/utils/time_format.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 
 class Header extends StatefulWidget {
@@ -32,7 +33,7 @@ class HeaderState extends State<Header> {
   final Battery _battery = Battery();
   int _batteryLevel = 100;
   bool _isTelevision = false;
-  String _currentTime = '';
+  DateTime _now = DateTime.now();
   Timer? _timeUpdateTimer;
   late final List<FocusNode> _tabFocusNodes;
 
@@ -60,10 +61,9 @@ class HeaderState extends State<Header> {
   }
 
   void _updateTime() {
-    final now = DateTime.now();
     if (mounted) {
       setState(() {
-        _currentTime = "${now.hour}:${now.minute.toString().padLeft(2, '0')}";
+        _now = DateTime.now();
       });
       // Also update battery every minute
       _getBatteryLevel();
@@ -298,7 +298,10 @@ class HeaderState extends State<Header> {
                       ),
                       SizedBox(width: 4.r),
                       Text(
-                        _currentTime,
+                        formatClockTime(
+                          _now,
+                          use12Hour: configProvider.config.use12HourClock,
+                        ),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 12.r,

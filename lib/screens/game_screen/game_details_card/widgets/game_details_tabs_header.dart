@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/sfx_service.dart';
 
 /// Defines the navigable sections within the game details card.
@@ -17,8 +15,6 @@ class GameDetailsTabsHeader extends StatelessWidget {
   final bool hasRetroAchievements;
   final bool showSettings;
   final DetailTab currentTab;
-  final VoidCallback? onBack;
-  final VoidCallback? onShowRandomGame;
   final ValueChanged<DetailTab> onTabChanged;
 
   const GameDetailsTabsHeader({
@@ -27,8 +23,6 @@ class GameDetailsTabsHeader extends StatelessWidget {
     required this.hasRetroAchievements,
     required this.showSettings,
     required this.currentTab,
-    this.onBack,
-    this.onShowRandomGame,
     required this.onTabChanged,
   });
 
@@ -61,35 +55,6 @@ class GameDetailsTabsHeader extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 12.r),
         child: Row(
           children: [
-            // Termination Action: Revert to previous screen.
-            if (onBack != null)
-              _HeaderActionButton(
-                icon: Image.asset(
-                  'assets/images/gamepad/Xbox_B_button.png',
-                  width: 14.r,
-                  height: 14.r,
-                ),
-                label: AppLocale.back.getString(context).toUpperCase(),
-                onTap: onBack!,
-                backgroundColor: theme.colorScheme.error,
-                foregroundColor: theme.colorScheme.onError,
-              ),
-            if (onBack != null) SizedBox(width: 8.r),
-
-            // Discovery Action: Trigger random selection.
-            if (onShowRandomGame != null)
-              _HeaderActionButton(
-                icon: Image.asset(
-                  'assets/images/gamepad/Xbox_View_button.png',
-                  width: 14.r,
-                  height: 14.r,
-                  color: theme.colorScheme.tertiary,
-                ),
-                label: AppLocale.random.getString(context).toUpperCase(),
-                onTap: onShowRandomGame!,
-                backgroundColor: theme.colorScheme.tertiary,
-                foregroundColor: theme.colorScheme.onPrimary,
-              ),
             const Spacer(),
 
             // Tab Navigation Group: Hardware-mapped navigation controls.
@@ -192,80 +157,6 @@ class GameDetailsTabsHeader extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// A button styled for the header bar that includes a gamepad button icon.
-class _HeaderActionButton extends StatelessWidget {
-  final Widget icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color? backgroundColor;
-  final Color? foregroundColor;
-
-  const _HeaderActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.backgroundColor,
-    this.foregroundColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          // Play specialized SFX based on the action's intent.
-          if (backgroundColor == theme.colorScheme.error) {
-            SfxService().playBackSound();
-          } else {
-            SfxService().playNavSound();
-          }
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(6.r),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 6.r),
-          decoration: BoxDecoration(
-            color: backgroundColor ?? theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(6.r),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 2.r,
-                offset: Offset(2.0.r, 2.0.r),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ColorFiltered(
-                colorFilter: ColorFilter.mode(
-                  foregroundColor ?? theme.colorScheme.onPrimary,
-                  BlendMode.srcIn,
-                ),
-                child: icon,
-              ),
-              SizedBox(width: 2.r),
-              Text(
-                label,
-                style: TextStyle(
-                  color: foregroundColor ?? theme.colorScheme.onPrimary,
-                  fontSize: 10.r,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              SizedBox(width: 2.r),
-            ],
-          ),
         ),
       ),
     );

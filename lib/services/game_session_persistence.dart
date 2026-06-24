@@ -10,6 +10,7 @@ class GameSessionPersistence {
   static const String _keySystemFolderName = 'game_session_system_folder';
   static const String _keyFilename = 'game_session_filename';
   static const String _keyStartTimestamp = 'game_session_start_timestamp';
+  static const String _keySkipStartupScan = 'game_session_skip_startup_scan';
 
   static final _log = LoggerService.instance;
 
@@ -25,6 +26,7 @@ class GameSessionPersistence {
       await prefs.setString(_keySystemFolderName, systemFolderName);
       await prefs.setString(_keyFilename, filename);
       await prefs.setInt(_keyStartTimestamp, startTimestamp);
+      await prefs.setBool(_keySkipStartupScan, true);
     } catch (e) {
       _log.e('Error saving game session: $e');
     }
@@ -71,6 +73,33 @@ class GameSessionPersistence {
       await prefs.remove(_keyStartTimestamp);
     } catch (e) {
       _log.e('Error clearing game session: $e');
+    }
+  }
+
+  /// Sets a flag indicating the next startup should skip ROM scanning.
+  /// Called alongside [saveGameSession] when a game is launched.
+  static Future<void> setSkipStartupScan() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keySkipStartupScan, true);
+    } catch (e) {
+      _log.e('Error setting skip startup scan flag: $e');
+    }
+  }
+
+  /// Checks and consumes the skip-startup-scan flag.
+  /// Returns true if the flag was set (scan should be skipped).
+  static Future<bool> consumeSkipStartupScan() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final shouldSkip = prefs.getBool(_keySkipStartupScan) ?? false;
+      if (shouldSkip) {
+        await prefs.remove(_keySkipStartupScan);
+      }
+      return shouldSkip;
+    } catch (e) {
+      _log.e('Error consuming skip startup scan flag: $e');
+      return false;
     }
   }
 

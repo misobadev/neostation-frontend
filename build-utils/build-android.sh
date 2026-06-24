@@ -31,6 +31,20 @@ fi
 
 # Build release APK
 echo "Building Android release..."
+
+# Create keystore properties from environment variables
+if [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEYSTORE_PATH" ]; then
+  echo "Creating android/key.properties from environment variables..."
+  cat > android/key.properties << EOF
+storePassword=$KEYSTORE_PASSWORD
+keyPassword=$KEY_PASSWORD
+keyAlias=$KEY_ALIAS
+storeFile=$KEYSTORE_PATH
+EOF
+else
+  echo "Warning: Keystore environment variables not set. Release build may use debug signing."
+fi
+
 flutter build apk --release $ENV_ARG
 
 # Get version from pubspec.yaml

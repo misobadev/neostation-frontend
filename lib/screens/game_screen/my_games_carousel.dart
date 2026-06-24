@@ -11,11 +11,12 @@ import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/providers/system_background_provider.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/services/sfx_service.dart';
-import 'package:neostation/utils/game_utils.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/screens/app_screen.dart';
 import 'package:neostation/widgets/game_view_mode_dropdown.dart';
 import 'package:neostation/widgets/native_carousel.dart';
+import 'package:neostation/widgets/game_view_footer.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 
 class GamesCarousel extends StatefulWidget {
   final SystemModel system;
@@ -25,8 +26,12 @@ class GamesCarousel extends StatefulWidget {
   final Function(GameModel) onGameSelected;
   final VoidCallback onBack;
   final VoidCallback onPlay;
+  final VoidCallback? onFavorite;
   final VoidCallback? onRandom;
   final VoidCallback? onSettings;
+  final VoidCallback? onScrape;
+  final Set<String> scrapingGameRomnames;
+  final Map<String, double> scrapeProgress;
 
   const GamesCarousel({
     super.key,
@@ -37,8 +42,12 @@ class GamesCarousel extends StatefulWidget {
     required this.onGameSelected,
     required this.onBack,
     required this.onPlay,
+    this.onFavorite,
     this.onRandom,
     this.onSettings,
+    this.onScrape,
+    this.scrapingGameRomnames = const {},
+    this.scrapeProgress = const {},
   });
 
   @override
@@ -133,9 +142,18 @@ class _GamesCarouselState extends State<GamesCarousel> {
     return null;
   }
 
+  static const String _favoritesLabel = '★';
+
+  bool get _hasFavoriteGames => widget.games.any((g) => g.isFavorite == true);
+
   List<String> get _uniqueLetters {
     final letters = <String>[];
+    if (_hasFavoriteGames) {
+      letters.add(_favoritesLabel);
+    }
     for (final game in widget.games) {
+      if (game.isFavorite == true) continue;
+
       final displayName = game.name.isNotEmpty ? game.name : game.realname;
       final letter = displayName.isNotEmpty
           ? displayName[0].toUpperCase()
@@ -148,12 +166,22 @@ class _GamesCarouselState extends State<GamesCarousel> {
   }
 
   String _getLetterForGame(GameModel game) {
+    if (game.isFavorite == true) return _favoritesLabel;
+
     final displayName = game.name.isNotEmpty ? game.name : game.realname;
     return displayName.isNotEmpty ? displayName[0].toUpperCase() : '#';
   }
 
   int _getFirstGameIndexForLetter(String letter) {
+    if (letter == _favoritesLabel) {
+      for (int i = 0; i < widget.games.length; i++) {
+        if (widget.games[i].isFavorite == true) return i;
+      }
+      return 0;
+    }
+
     for (int i = 0; i < widget.games.length; i++) {
+      if (widget.games[i].isFavorite == true) continue;
       if (_getLetterForGame(widget.games[i]) == letter) return i;
     }
     return 0;
@@ -217,12 +245,14 @@ class _GamesCarouselState extends State<GamesCarousel> {
         }
       },
       onBack: widget.onBack,
+      onFavorite: widget.onFavorite,
       onXButton: () {
         try {
           GameViewModeDropdown.globalKey.currentState?.showDropdown();
         } catch (_) {}
       },
       onLeftTrigger: widget.onRandom,
+      onSelectButton: widget.onScrape,
       onSettings: widget.onSettings,
       onPreviousTab: AppNavigation.previousTab,
       onNextTab: AppNavigation.nextTab,
@@ -266,10 +296,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
     _lastBgIndex = _currentIndex;
 
     final game = widget.games[_currentIndex];
-    final systemFolderName = widget.system.primaryFolderName;
+    final folder = _folderForGame(game);
 
     String imagePath = game.getImagePath(
-      systemFolderName,
+      folder,
       'fanarts',
       widget.fileProvider,
     );
@@ -279,7 +309,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
     );
 
     if (!exists) {
-      imagePath = game.getScreenshotPath(systemFolderName, widget.fileProvider);
+      imagePath = game.getScreenshotPath(folder, widget.fileProvider);
       exists = _fileExistsCache.putIfAbsent(
         imagePath,
         () => File(imagePath).existsSync(),
@@ -357,10 +387,18 @@ class _GamesCarouselState extends State<GamesCarousel> {
     return offset;
   }
 
+  String _folderForGame(GameModel game) {
+    if ((widget.system.folderName == SystemFolderNames.all ||
+            widget.system.folderName == SystemFolderNames.favorites) &&
+        game.systemFolderName != null) {
+      return game.systemFolderName!;
+    }
+    return widget.system.primaryFolderName;
+  }
+
   String _resolveImagePath(GameModel game, String imageType) {
-    final systemFolderName = widget.system.primaryFolderName;
     final path = game.getImagePath(
-      systemFolderName,
+      _folderForGame(game),
       imageType,
       widget.fileProvider,
     );
@@ -375,23 +413,16 @@ class _GamesCarouselState extends State<GamesCarousel> {
         (widget.system.shortName != null && widget.system.shortName!.isNotEmpty)
         ? widget.system.shortName!
         : widget.system.realName;
-    final selGame = _currentIndex < widget.games.length
-        ? widget.games[_currentIndex]
-        : null;
-    final selName = selGame != null
-        ? GameUtils.formatGameName(
-            selGame.name.isNotEmpty ? selGame.name : selGame.romname,
-          )
-        : '';
-
     return Container(
-      margin: EdgeInsets.only(left: 8.r, right: 8.r, top: 8.r, bottom: 4.r),
+      padding: EdgeInsets.only(left: 8.r, right: 8.r, top: 8.r, bottom: 4.r),
+      color: Scaffold.of(context).widget.backgroundColor,
       child: Row(
         children: [
           _buildIconButton(
             iconPath: 'assets/images/gamepad/Xbox_B_button.png',
             symbol: Symbols.arrow_back_rounded,
             color: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
             onTap: widget.onBack,
           ),
           SizedBox(width: 6.r),
@@ -399,7 +430,8 @@ class _GamesCarouselState extends State<GamesCarousel> {
             key: viewModeKey,
             iconPath: 'assets/images/gamepad/Xbox_X_button.png',
             symbol: Symbols.view_carousel_rounded,
-            color: Theme.of(context).colorScheme.primary,
+            color: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
             onTap: () {
               SfxService().playNavSound();
               dropdownState?.showDropdownFrom(viewModeKey);
@@ -410,7 +442,24 @@ class _GamesCarouselState extends State<GamesCarousel> {
             iconPath: 'assets/images/gamepad/Left Stick Click.png',
             symbol: Symbols.casino_rounded,
             color: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
             onTap: widget.onRandom,
+          ),
+          SizedBox(width: 6.r),
+          _buildIconButton(
+            iconPath: 'assets/images/gamepad/Xbox_View_button.png',
+            symbol: Symbols.search_rounded,
+            color: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            onTap: widget.onScrape,
+          ),
+          SizedBox(width: 6.r),
+          _buildIconButton(
+            iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
+            symbol: Symbols.favorite_rounded,
+            color: Theme.of(context).colorScheme.tertiary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            onTap: widget.onFavorite,
           ),
           SizedBox(width: 10.r),
           Container(
@@ -437,20 +486,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
               ),
             ),
           ),
-          if (selName.isNotEmpty) ...[
-            SizedBox(width: 10.r),
-            Expanded(
-              child: Text(
-                selName,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12.r,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -461,8 +496,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
     required String iconPath,
     required IconData symbol,
     required Color color,
+    Color? foregroundColor,
     required VoidCallback? onTap,
   }) {
+    final fg = foregroundColor ?? Colors.white;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -489,11 +526,11 @@ class _GamesCarouselState extends State<GamesCarousel> {
                 iconPath,
                 width: 16.r,
                 height: 16.r,
-                color: Colors.white,
+                color: fg,
                 colorBlendMode: BlendMode.srcIn,
               ),
               SizedBox(width: 4.r),
-              Icon(symbol, size: 16.r, color: Colors.white),
+              Icon(symbol, size: 16.r, color: fg),
             ],
           ),
         ),
@@ -503,14 +540,11 @@ class _GamesCarouselState extends State<GamesCarousel> {
 
   Widget _buildFanartCard(GameModel game, bool isSelected) {
     final theme = Theme.of(context);
-    final systemFolderName = widget.system.primaryFolderName;
-    final screenshotPath = game.getScreenshotPath(
-      systemFolderName,
-      widget.fileProvider,
-    );
+    final folder = _folderForGame(game);
+    final screenshotPath = game.getScreenshotPath(folder, widget.fileProvider);
     final hasScreenshot = File(screenshotPath).existsSync();
     final fanartPath = game.getImagePath(
-      systemFolderName,
+      folder,
       'fanarts',
       widget.fileProvider,
     );
@@ -543,46 +577,126 @@ class _GamesCarouselState extends State<GamesCarousel> {
                 key: ValueKey(bgPath),
                 fit: BoxFit.cover,
                 cacheWidth: 1024,
-                errorBuilder: (ctx, e, s) => _buildFallbackBg(game, theme),
+                errorBuilder: (ctx, e, s) => _buildFallbackCard(game, theme),
               )
             else
-              _buildFallbackBg(game, theme),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.6),
-                    Colors.black.withValues(alpha: 0.9),
-                  ],
-                  stops: const [0.0, 0.4, 0.7, 1.0],
+              _buildFallbackCard(game, theme),
+            if (bgPath.isNotEmpty)
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.6),
+                      Colors.black.withValues(alpha: 0.9),
+                    ],
+                    stops: const [0.0, 0.4, 0.7, 1.0],
+                  ),
                 ),
               ),
-            ),
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
               child: _buildWheelOverlay(game),
             ),
+            if (game.isFavorite == true)
+              Positioned(
+                top: 8.r,
+                right: 8.r,
+                child: Container(
+                  width: 32.r,
+                  height: 32.r,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Symbols.favorite_rounded,
+                    size: 18.r,
+                    color: Colors.redAccent,
+                  ),
+                ),
+              ),
+            if (widget.scrapingGameRomnames.contains(game.romname))
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildScrapeProgress(game),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFallbackBg(GameModel game, ThemeData theme) {
+  Widget _buildScrapeProgress(GameModel game) {
+    final progress = widget.scrapeProgress[game.romname] ?? 0.0;
     return Container(
+      height: 24.r,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.surfaceContainerHighest,
-            theme.colorScheme.surface,
+        color: Colors.black.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24.r)),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 12.r),
+      child: Row(
+        children: [
+          Icon(Symbols.search_rounded, size: 14.r, color: Colors.white70),
+          SizedBox(width: 6.r),
+          Expanded(
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white24,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          SizedBox(width: 6.r),
+          Text(
+            '${(progress * 100).toInt()}%',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 11.r,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFallbackCard(GameModel game, ThemeData theme) {
+    return Container(
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Symbols.videogame_asset_rounded,
+              size: 64.r,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
+            SizedBox(height: 12.r),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.r),
+              child: Text(
+                game.name.isNotEmpty ? game.name : game.realname,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  fontSize: 14.r,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),
@@ -614,7 +728,33 @@ class _GamesCarouselState extends State<GamesCarousel> {
     final ratio = _boxAspectRatio(game) ?? 1.0;
 
     if (!hasBox) {
-      return Center(child: _buildBoxFallback(game, theme));
+      return Center(
+        child: Stack(
+          children: [
+            _buildBoxFallback(game, theme),
+            if (game.isFavorite == true)
+              Positioned(
+                top: 8.r,
+                right: 8.r,
+                child: Container(
+                  width: 32.r,
+                  height: 32.r,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Symbols.favorite_rounded,
+                    size: 18.r,
+                    color: Colors.redAccent,
+                  ),
+                ),
+              ),
+            if (widget.scrapingGameRomnames.contains(game.romname))
+              _buildScrapeProgress(game),
+          ],
+        ),
+      );
     }
 
     return LayoutBuilder(
@@ -650,12 +790,42 @@ class _GamesCarouselState extends State<GamesCarousel> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8.r),
-              child: Image.file(
-                File(boxPath),
-                key: ValueKey(boxPath),
-                fit: BoxFit.cover,
-                cacheWidth: 1024,
-                errorBuilder: (ctx, e, s) => _buildBoxFallback(game, theme),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.file(
+                    File(boxPath),
+                    key: ValueKey(boxPath),
+                    fit: BoxFit.cover,
+                    cacheWidth: 1024,
+                    errorBuilder: (ctx, e, s) => _buildBoxFallback(game, theme),
+                  ),
+                  if (game.isFavorite == true)
+                    Positioned(
+                      top: 8.r,
+                      right: 8.r,
+                      child: Container(
+                        width: 32.r,
+                        height: 32.r,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Symbols.favorite_rounded,
+                          size: 18.r,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                    ),
+                  if (widget.scrapingGameRomnames.contains(game.romname))
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: _buildScrapeProgress(game),
+                    ),
+                ],
               ),
             ),
           ),
@@ -665,36 +835,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
   }
 
   Widget _buildBoxFallback(GameModel game, ThemeData theme) {
-    return Container(
-      color: theme.colorScheme.surfaceContainerHighest,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Symbols.videogame_asset_rounded,
-              size: 64.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
-            SizedBox(height: 12.r),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.r),
-              child: Text(
-                game.name.isNotEmpty ? game.name : game.realname,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  fontSize: 14.r,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return _buildFallbackCard(game, theme);
   }
 
   @override
@@ -726,90 +867,100 @@ class _GamesCarouselState extends State<GamesCarousel> {
       fontWeight: FontWeight.w800,
     );
 
-    return Column(
+    return Stack(
       children: [
-        _buildGridHeader(),
-        Expanded(
-          child: NativeCarousel(
-            key: _carouselKey,
-            itemCount: widget.games.length,
-            initialIndex: _currentIndex.clamp(0, widget.games.length - 1),
-            itemBuilder: (context, index) {
-              final game = widget.games[index];
-              if (isFanart) {
-                return _buildFanartCard(game, index == _currentIndex);
-              } else {
-                return _buildBoxCard(game, index == _currentIndex);
-              }
-            },
-            onPageChanged: _onPageChanged,
-          ),
-        ),
-        SizedBox(
-          height: 36.r,
-          child: SingleChildScrollView(
-            controller: _letterBarController,
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: 4.r, vertical: 2.r),
-            child: Stack(
-              children: [
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 120),
-                  curve: Curves.easeInOut,
-                  left: _getLetterBarOffset(
-                    currentLetter,
-                    letters,
-                    selectedTextStyle,
-                  ),
-                  top: 0,
-                  bottom: 0,
-                  width: _calculateLetterWidth(
-                    currentLetter,
-                    selectedTextStyle,
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.secondary,
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                  ),
-                ),
-                Row(
-                  children: letters.map((letter) {
-                    final isSelected = letter == currentLetter;
-                    final w = _calculateLetterWidth(letter, selectedTextStyle);
-                    return GestureDetector(
-                      onTap: () {
-                        SfxService().playNavSound();
-                        final gi = _getFirstGameIndexForLetter(letter);
-                        _carouselKey.currentState?.animateToPage(gi);
-                      },
+        Column(
+          children: [
+            SizedBox(height: 36.r),
+            Expanded(
+              child: NativeCarousel(
+                key: _carouselKey,
+                itemCount: widget.games.length,
+                initialIndex: _currentIndex.clamp(0, widget.games.length - 1),
+                itemBuilder: (context, index) {
+                  final game = widget.games[index];
+                  return KeyedSubtree(
+                    key: ValueKey(game.romname),
+                    child: isFanart
+                        ? _buildFanartCard(game, index == _currentIndex)
+                        : _buildBoxCard(game, index == _currentIndex),
+                  );
+                },
+                onPageChanged: _onPageChanged,
+              ),
+            ),
+            SizedBox(
+              height: 36.r,
+              child: SingleChildScrollView(
+                controller: _letterBarController,
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: 4.r, vertical: 2.r),
+                child: Stack(
+                  children: [
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 120),
+                      curve: Curves.easeInOut,
+                      left: _getLetterBarOffset(
+                        currentLetter,
+                        letters,
+                        selectedTextStyle,
+                      ),
+                      top: 0,
+                      bottom: 0,
+                      width: _calculateLetterWidth(
+                        currentLetter,
+                        selectedTextStyle,
+                      ),
                       child: Container(
-                        width: w,
-                        height: 30.r,
-                        margin: EdgeInsets.only(right: 6.r),
-                        alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.1,
-                          ),
+                          color: theme.colorScheme.secondary,
                           borderRadius: BorderRadius.circular(12.r),
                         ),
-                        child: Text(
-                          letter,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          style: isSelected ? selectedTextStyle : textStyle,
-                        ),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                    Row(
+                      children: letters.map((letter) {
+                        final isSelected = letter == currentLetter;
+                        final w = _calculateLetterWidth(
+                          letter,
+                          selectedTextStyle,
+                        );
+                        return GestureDetector(
+                          onTap: () {
+                            SfxService().playNavSound();
+                            final gi = _getFirstGameIndexForLetter(letter);
+                            _carouselKey.currentState?.animateToPage(gi);
+                          },
+                          child: Container(
+                            width: w,
+                            height: 30.r,
+                            margin: EdgeInsets.only(right: 6.r),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withValues(
+                                alpha: 0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            child: Text(
+                              letter,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              style: isSelected ? selectedTextStyle : textStyle,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+            GameViewFooter(game: currentGame, onPlay: widget.onPlay),
+            SizedBox(height: 8.r),
+          ],
         ),
-        SizedBox(height: 8.r),
+        Positioned(top: 0, left: 0, right: 0, child: _buildGridHeader()),
       ],
     );
   }

@@ -98,6 +98,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.autoUpdateSystemsSubtitle: '起動時にシステムとエミュレータの設定更新を確認',
   AppLocale.sfxSounds: 'インターフェース音',
   AppLocale.sfxSoundsSubtitle: 'コントローラ、キーボード、タッチ操作時の音を再生',
+  AppLocale.use12HourClock: '12時間表示',
+  AppLocale.use12HourClockSubtitle: '24時間表示ではなく、AM/PM付きの12時間表示で時刻を表示します',
   AppLocale.fullscreenMode: 'フルスクリーンモード',
   AppLocale.fullscreenModeSubtitle: 'アプリをフルスクリーンで表示',
   AppLocale.allFilesAccess: 'すべてのファイルへのアクセス',

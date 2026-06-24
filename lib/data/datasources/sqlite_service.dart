@@ -421,7 +421,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 89;
+  static const int _databaseVersion = 90;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1565,7 +1565,8 @@ class SqliteService {
         auto_update_app INTEGER DEFAULT 1,
         auto_update_systems INTEGER DEFAULT 1,
         system_grid_columns TEXT DEFAULT 'M',
-        game_grid_columns TEXT DEFAULT 'M'
+        game_grid_columns TEXT DEFAULT 'M',
+        use_12_hour_clock INTEGER DEFAULT 0
       );
       ''',
       '''
@@ -2258,6 +2259,7 @@ class SqliteService {
     int? setupCompleted,
     int? hideBottomScreen,
     int? sfxEnabled,
+    int? use12HourClock,
     String? systemSortBy,
     String? systemSortOrder,
     String? appLanguage,
@@ -2311,6 +2313,9 @@ class SqliteService {
     }
     if (sfxEnabled != null) {
       newConfig['sfx_enabled'] = sfxEnabled;
+    }
+    if (use12HourClock != null) {
+      newConfig['use_12_hour_clock'] = use12HourClock;
     }
     if (systemSortBy != null) {
       newConfig['system_sort_by'] = systemSortBy;

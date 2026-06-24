@@ -339,7 +339,7 @@ class GameDetailsFooter extends StatelessWidget {
         SfxService().playNavSound();
         onScrapeGame();
       },
-      iconPath: 'assets/images/gamepad/Xbox_X_button.png',
+      iconPath: 'assets/images/gamepad/Xbox_View_button.png',
       iconData: isDescriptionMissing
           ? Symbols.search_rounded
           : Symbols.refresh_rounded,

@@ -14,12 +14,11 @@
       "type": "computer"
     },
     "ids": {
-      "screenscraper": null,
+      "screenscraper": 138,
       "retroachievements": null
     },
     "folders": [
-      "windows",
-      "Windows"
+      "windows"
     ],
     "colors": [
       "#0078D4",
@@ -33,7 +32,8 @@
       "epic",
       "customgame",
       "amazon",
-      "steam"
+      "steam",
+      "localgameid"
     ]
   },
   "emulators": [
@@ -126,10 +126,10 @@
       }
     },
     {
-      "name": "Standalone BannerHub (Normal - Local Games)",
+      "name": "Standalone BannerHub v5 (Normal - Local Games) [legacy 5.3.5]",
       "unique_id": "windows.banner.hub.local",
       "is_retroachievements_compatible": false,
-      "description": "Supported extensions: localgameid.",
+      "description": "Supported extensions: localgameid. Legacy BannerHub v5 (GameHub 5.3.5 base). Use v6 entries below for current builds.",
       "platforms": {
         "android": {
           "launch_arguments": "-a banner.hub.LAUNCH_GAME -n banner.hub/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true"
@@ -137,13 +137,112 @@
       }
     },
     {
-      "name": "Standalone BannerHub Lite (Normal - Local Games)",
+      "name": "Standalone BannerHub v5 Lite (Normal - Local Games) [legacy 5.3.5]",
       "unique_id": "windows.banner.hub.lite.local",
       "is_retroachievements_compatible": false,
-      "description": "Supported extensions: localgameid.",
+      "description": "Supported extensions: localgameid. Legacy BannerHub v5 Lite (GameHub 5.3.5 base). Use v6 entries below for current builds.",
       "platforms": {
         "android": {
           "launch_arguments": "-a banner.hub.lite.LAUNCH_GAME -n banner.hub.lite/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub v6 (Normal)",
+      "unique_id": "windows.banner.hub.v6.normal",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid. BannerHub v6 (GameHub 6.0.4 base). Covers both Full and Lite — Lite uses the same package and replaces Full on install.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a banner.hub.LAUNCH_GAME -n banner.hub/com.xiaoji.egggame.DeepLinkActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub v6 (Normal - GameHub Lite pkg)",
+      "unique_id": "windows.banner.hub.v6.normal.ghl",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid. BannerHub v6 Normal-GHL variant — installs over the upstream gamehub.lite package.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a gamehub.lite.LAUNCH_GAME -n gamehub.lite/com.xiaoji.egggame.DeepLinkActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub v6 (PuBG)",
+      "unique_id": "windows.banner.hub.v6.pubg",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid. BannerHub v6 PuBG variant — installs over com.tencent.ig.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a com.tencent.ig.LAUNCH_GAME -n com.tencent.ig/com.xiaoji.egggame.DeepLinkActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub v6 (AnTuTu)",
+      "unique_id": "windows.banner.hub.v6.antutu",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid. BannerHub v6 AnTuTu variant — installs over com.antutu.ABenchMark.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a com.antutu.ABenchMark.LAUNCH_GAME -n com.antutu.ABenchMark/com.xiaoji.egggame.DeepLinkActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub v6 (alt-AnTuTu)",
+      "unique_id": "windows.banner.hub.v6.alt.antutu",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid. BannerHub v6 alt-AnTuTu variant — installs over com.antutu.benchmark.full.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a com.antutu.benchmark.full.LAUNCH_GAME -n com.antutu.benchmark.full/com.xiaoji.egggame.DeepLinkActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub v6 (PuBG CrossFire)",
+      "unique_id": "windows.banner.hub.v6.pubg.crossfire",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid. BannerHub v6 PuBG-CrossFire variant — installs over com.tencent.tmgp.cf.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a com.tencent.tmgp.cf.LAUNCH_GAME -n com.tencent.tmgp.cf/com.xiaoji.egggame.DeepLinkActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub v6 (Ludashi)",
+      "unique_id": "windows.banner.hub.v6.ludashi",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid. BannerHub v6 Ludashi variant — installs over com.ludashi.aibench.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a com.ludashi.aibench.LAUNCH_GAME -n com.ludashi.aibench/com.xiaoji.egggame.DeepLinkActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub v6 (Genshin)",
+      "unique_id": "windows.banner.hub.v6.genshin",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid. BannerHub v6 Genshin variant — installs over com.miHoYo.GenshinImpact.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a com.miHoYo.GenshinImpact.LAUNCH_GAME -n com.miHoYo.GenshinImpact/com.xiaoji.egggame.DeepLinkActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
+      "name": "Standalone BannerHub v6 (Original)",
+      "unique_id": "windows.banner.hub.v6.original",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: localgameid. BannerHub v6 Original variant — replaces stock XiaoJi GameHub (com.xiaoji.egggame).",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a com.xiaoji.egggame.LAUNCH_GAME -n com.xiaoji.egggame/com.xiaoji.egggame.DeepLinkActivity --es localGameId \"{tags.localgameid}\" --ez autoStartGame true --activity-clear-task --activity-clear-top --activity-no-history"
         }
       }
     },
