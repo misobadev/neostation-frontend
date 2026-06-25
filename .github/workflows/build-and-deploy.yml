@@ -11,7 +11,7 @@ env:
 
 jobs:
   lint:
-    name: Lint & Analysis
+    name: Lint, Analysis & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -30,6 +30,9 @@ jobs:
 
       - name: Analyze project
         run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
 
   build:
     name: Build ${{ matrix.target }}
