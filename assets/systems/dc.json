@@ -65,7 +65,8 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.flycast.emulator/com.flycast.emulator.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\""
+          "launch_arguments": "-n com.flycast.emulator/com.flycast.emulator.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\"",
+          "keep_saf_uri": true
         }
       }
     },

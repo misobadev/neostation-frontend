@@ -147,6 +147,11 @@ class LauncherService {
     final result = <String, dynamic>{'player_name': player['name']};
 
     if (Platform.isAndroid) {
+      // Per-emulator opt-out: emulators that need the original SAF content:// URI
+      // (instead of our FileProvider rewrap) declare `"keep_saf_uri": true` in
+      // their android config. Keeps the launcher free of hardcoded package names.
+      result['keep_saf_uri'] = platformConfig['keep_saf_uri'] == true;
+
       if (platformConfig.containsKey('launch_arguments')) {
         final args = platformConfig['launch_arguments'].toString();
         final parsed = _parseLaunchArguments(args);

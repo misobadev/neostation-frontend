@@ -137,9 +137,10 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                     val type = call.argument<String>("type")
                     val extras = call.argument<List<Map<String, Any>>>("extras")
                     val activityFlags = call.argument<List<String>>("activity_flags") ?: emptyList()
+                    val keepSafUri = call.argument<Boolean>("keep_saf_uri") ?: false
 
                     if (packageName != null) {
-                        launchGenericIntent(packageName, activityName, action, category, data, type, extras, activityFlags, result)
+                        launchGenericIntent(packageName, activityName, action, category, data, type, extras, activityFlags, keepSafUri, result)
                     } else {
                         result.error("INVALID_ARGUMENTS", "Package name is required", null)
                     }
@@ -426,6 +427,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         type: String?,
         extras: List<Map<String, Any>>?,
         activityFlags: List<String>,
+        keepSafUri: Boolean,
         result: MethodChannel.Result
     ) {
         EmulatorLauncher.launchGenericIntent(
@@ -438,6 +440,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             type = type,
             extras = extras,
             activityFlags = activityFlags,
+            keepSafUri = keepSafUri,
             result = result
         )
     }

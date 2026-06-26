@@ -28,6 +28,7 @@ object EmulatorLauncher {
         type: String?,
         extras: List<Map<String, Any>>?,
         activityFlags: List<String>,
+        keepSafUri: Boolean,
         result: MethodChannel.Result
     ) {
         try {
@@ -92,11 +93,12 @@ object EmulatorLauncher {
                 val masterExt = masterFileName.substringAfterLast('.', "").lowercase()
                 isMultiFile = masterExt in setOf("cue", "gdi", "m3u")
 
-                // Emulators that natively handle SAF content:// URIs for all ROMs.
-                // Flycast supports SAF directly; converting to FileProvider breaks .zip loading.
-                val keepsSafUri = packageName in setOf(
-                    "com.flycast.emulator"
-                )
+                // Whether this emulator must receive the original SAF content:// URI
+                // instead of our FileProvider rewrap. Driven by the per-emulator
+                // `keep_saf_uri` flag in the system JSON (Flycast needs it so .zip
+                // loading works; DraStic rejects our FileProvider URI). Config-driven
+                // so no emulator package names are hardcoded here.
+                val keepsSafUri = keepSafUri
                 if (masterRealPath != null && !isMultiFile && !keepsSafUri) {
                     // Single-file ROMs (.sfc, .gba, etc.): convert to FileProvider URI
                     // so .emu emulators save states in their private data dir.

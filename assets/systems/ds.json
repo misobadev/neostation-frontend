@@ -163,7 +163,8 @@
       "description": "Premium Nintendo DS emulator for Android.",
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.dsemu.drastic/.DraSticActivity -d \"{file.path}\" --activity-clear-task --activity-clear-top"
+          "launch_arguments": "-n com.dsemu.drastic/.DraSticActivity -d \"{file.localuri}\" --activity-clear-task --activity-clear-top",
+          "keep_saf_uri": true
         }
       }
     },
