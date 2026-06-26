@@ -18,7 +18,10 @@
       "Commodore Amiga",
       "amiga600",
       "amiga1200",
-      "amigacd32"
+      "amigacd32",
+      "amiga500",
+      "amiga4000",
+      "amigacdtv"
     ],
     "colors": [
       "#E57373",
