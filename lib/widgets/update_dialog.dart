@@ -22,8 +22,8 @@ class UpdateDialog extends StatefulWidget {
 }
 
 class _UpdateDialogState extends State<UpdateDialog> {
-  final bool _isDownloading = false;
-  final double _downloadProgress = 0.0;
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
   late final GamepadNavigation _gamepadNav;
 
   @override
@@ -291,14 +291,27 @@ class _UpdateDialogState extends State<UpdateDialog> {
   }
 
   Future<void> _startUpdate() async {
-    Navigator.of(context).pop(true);
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+    });
 
     final success = await UpdateService.downloadAndInstall(
       widget.updateInfo,
-      (progress) {},
+      (progress) {
+        if (mounted) setState(() => _downloadProgress = progress);
+      },
     );
 
-    if (!success && mounted) {
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.of(context).pop(true);
+    } else {
+      setState(() {
+        _isDownloading = false;
+        _downloadProgress = 0.0;
+      });
       AppNotification.showNotification(
         context,
         Platform.isAndroid
