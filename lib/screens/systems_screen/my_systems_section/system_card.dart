@@ -284,7 +284,7 @@ class _SystemCardState extends State<SystemCard> {
     final hasCustomBg = customBgPath != null && customBgPath.isNotEmpty;
 
     // SCENARIO A: Animated GIF (custom or theme-provided).
-    if (ImageUtils.isGif(customBgPath)) {
+    if (hasCustomBg && ImageUtils.isGif(customBgPath)) {
       return Positioned.fill(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12.r),

@@ -655,7 +655,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
     final hasCustomBg = customBgPath != null && customBgPath.isNotEmpty;
 
     // SCENARIO A: Animated GIF (custom or theme-provided).
-    if (ImageUtils.isGif(customBgPath)) {
+    if (hasCustomBg && ImageUtils.isGif(customBgPath)) {
       return Positioned.fill(
         child: Container(
           color: Theme.of(context).colorScheme.surface,
