@@ -613,12 +613,13 @@ class GamepadNavigation {
         }
         break;
 
-      case GamepadInputType.buttonLT:
+      // L3 (left stick click) only — the UI hint shows the Left-Stick-Click
+      // icon for this action. The physical L2 trigger (buttonLT) deliberately
+      // does NOT fire it.
       case GamepadInputType.leftStickButton:
         onLeftTrigger?.call();
         break;
 
-      case GamepadInputType.buttonRT:
       case GamepadInputType.rightStickButton:
         onRightTrigger?.call();
         break;
