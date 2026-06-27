@@ -85,7 +85,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             if (!dbFile.exists()) return false
 
             val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
-            val cursor = db.rawQuery("SELECT hide_bottom_screen FROM user_config WHERE id = 1", null)
+            val cursor = db.query("user_config", arrayOf("hide_bottom_screen"), "id = ?", arrayOf("1"), null, null, null)
             var hidden = false
             if (cursor.moveToFirst()) {
                 hidden = cursor.getInt(0) == 1
