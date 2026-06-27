@@ -881,7 +881,7 @@ class _SetupWizardState extends State<SetupWizard> {
                       SizedBox(width: 12.r),
                       Expanded(
                         child: Text(
-                          '${AppLocale.foundSystemsWithGames.getString(context).replaceFirst('{count}', provider.detectedSystems.length.toString())}\n${AppLocale.tapFinishToStart.getString(context)}',
+                          '${AppLocale.foundSystemsWithGames.getString(context).replaceFirst('{count}', provider.detectedRealSystems.length.toString())}\n${AppLocale.tapFinishToStart.getString(context)}',
                           style: TextStyle(
                             fontSize: textSize,
                             color: Colors.green[700],

@@ -114,7 +114,7 @@ class SystemScanProgressWidget extends StatelessWidget {
                       .getString(context)
                       .replaceFirst(
                         '{count}',
-                        configProvider.detectedSystems.length.toString(),
+                        configProvider.detectedRealSystems.length.toString(),
                       ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface,
