@@ -7,6 +7,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/palette_provider.dart';
+import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
@@ -1077,13 +1078,30 @@ class _SystemGamesListState extends State<SystemGamesList> {
     GamepadNavigationManager.popLayer('games_grid');
     GamepadNavigationManager.popLayer('system_games_list');
 
-    // Restore secondary display to original system branding.
+    // Restore secondary display to original system branding. Resolve the logo
+    // and background the same way the systems grid does (custom → active-theme
+    // → bundled asset, themed background when present) so themed systems don't
+    // flash the default logo here before the grid re-asserts its state on pop.
     final configProvider = context.read<SqliteConfigProvider>();
+    final neoAssets = context.read<NeoAssetsProvider>();
     final folder = widget.system.primaryFolderName;
-    final systemLogo = 'assets/images/systems/logos/$folder.webp';
+
+    final String? customLogo = widget.system.customLogoPath?.isNotEmpty == true
+        ? widget.system.customLogoPath
+        : null;
+    final String? themeLogo = customLogo == null
+        ? neoAssets.getLogoForSystemSync(folder)
+        : null;
+    final systemLogo =
+        customLogo ?? themeLogo ?? 'assets/images/systems/logos/$folder.webp';
+    final bool isLogoAsset = customLogo == null && themeLogo == null;
+
     final String? customBg = widget.system.customBackgroundPath;
     final bool hasCustomBg = customBg != null && customBg.isNotEmpty;
-    final String? systemBackground = hasCustomBg ? customBg : null;
+    final String? themeBg = hasCustomBg
+        ? null
+        : neoAssets.getBackgroundForSystemSync(folder);
+    final String? systemBackground = hasCustomBg ? customBg : themeBg;
 
     final paletteProvider = Provider.of<PaletteProvider>(
       context,
@@ -1098,11 +1116,11 @@ class _SystemGamesListState extends State<SystemGamesList> {
       isVideoMuted: !configProvider.config.videoSound,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor.toARGB32(),
       systemLogo: systemLogo,
-      isLogoAsset: true,
+      isLogoAsset: isLogoAsset,
       systemBackground: systemBackground,
       clearSystemBackground: systemBackground == null,
       isBackgroundAsset: false,
-      useShader: !hasCustomBg,
+      useShader: systemBackground == null,
       shaderColor1: widget.system.color1AsColor?.toARGB32(),
       shaderColor2: widget.system.color2AsColor?.toARGB32(),
       useFluidShader: false,
