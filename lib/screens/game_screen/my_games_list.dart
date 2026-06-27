@@ -390,6 +390,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
                   _selectedGame = updatedGame;
                 }
               });
+              // Refresh the cached localized description so the scrape button
+              // label flips from 'Scrape' to 'Rescrape' immediately (it keys
+              // off whether a description is present).
+              if (_selectedGame?.romname == romname) {
+                _loadLocalizedDescription();
+              }
             }
           }
 
@@ -2693,6 +2699,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
         retroAchievementsProvider: _retroAchievementsProvider,
         syncProvider: syncManager.active!,
         localizedDescription: _localizedDescription,
+        isExternallyScraping: _scrapingGameRomnames.contains(
+          _selectedGame!.romname,
+        ),
         isNavigatingFast: _isNavigatingFast,
         isSecondaryScreenActive:
             _secondaryDisplayState?.value?.isSecondaryActive ?? false,

@@ -48,6 +48,12 @@ class GameDetailsCardList extends StatefulWidget {
   final RetroAchievementsProvider retroAchievementsProvider;
   final ISyncProvider syncProvider;
   final String? localizedDescription;
+
+  /// True when an external (list-level) scrape is running for this game, e.g.
+  /// triggered by the Select button. Drives the scrape button spinner so the
+  /// feedback matches a scrape started from the button itself.
+  final bool isExternallyScraping;
+
   final VoidCallback? onDeactivateNavigation;
   final VoidCallback? onReactivateNavigation;
   final void Function(VoidCallback)? onShowAchievements;
@@ -111,6 +117,7 @@ class GameDetailsCardList extends StatefulWidget {
     required this.retroAchievementsProvider,
     required this.syncProvider,
     this.localizedDescription,
+    this.isExternallyScraping = false,
     this.onDeactivateNavigation,
     this.onReactivateNavigation,
     this.onShowAchievements,
@@ -806,7 +813,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
               game: _game,
               isMusicSystem: _effectiveSystem.folderName == 'music',
               hasScreenScraper: _hasScreenScraper,
-              isScrapingGame: _isScrapingGame,
+              isScrapingGame: _isScrapingGame || widget.isExternallyScraping,
               localizedDescription: widget.localizedDescription,
               isSecondaryScreenActive: widget.isSecondaryScreenActive,
               isFavorite: _game.isFavorite ?? false,
@@ -841,7 +848,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
                         ? AppLocale.noDescription.getString(context)
                         : _game.getDescriptionForLanguage('en')),
                 screenshotPath: screenshotPath,
-                isScrapingGame: _isScrapingGame,
+                isScrapingGame: _isScrapingGame || widget.isExternallyScraping,
                 scrapeProgress: _scrapeProgress,
                 scrapeStatus: _scrapeStatus,
                 isSecondaryScreenActive: widget.isSecondaryScreenActive,
