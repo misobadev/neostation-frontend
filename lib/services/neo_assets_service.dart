@@ -196,13 +196,21 @@ class NeoAssetsService {
   }
 
   /// Returns the remote URL for a specific system background within a theme.
-  static String getBackgroundUrl(String themeFolder, String systemFolderName) {
-    return '$_baseRaw/themes/$themeFolder/backgrounds/$systemFolderName.webp';
+  static String getBackgroundUrl(
+    String themeFolder,
+    String systemFolderName, {
+    String ext = 'webp',
+  }) {
+    return '$_baseRaw/themes/$themeFolder/backgrounds/$systemFolderName.$ext';
   }
 
   /// Returns the remote URL for a specific system logo within a theme.
-  static String getLogoUrl(String themeFolder, String systemFolderName) {
-    return '$_baseRaw/themes/$themeFolder/logos/$systemFolderName.webp';
+  static String getLogoUrl(
+    String themeFolder,
+    String systemFolderName, {
+    String ext = 'webp',
+  }) {
+    return '$_baseRaw/themes/$themeFolder/logos/$systemFolderName.$ext';
   }
 
   /// Returns the remote URL for a theme's metadata JSON file.
@@ -247,39 +255,72 @@ class NeoAssetsService {
   /// Synchronous variant of background path resolution, requires previous initialization.
   static String? backgroundCachePathSync(
     String themeFolder,
-    String systemFolderName,
-  ) {
+    String systemFolderName, {
+    String ext = 'webp',
+  }) {
     final dir = _cachedThemeDir;
     if (dir == null) return null;
-    return path.join(dir, themeFolder, 'backgrounds', '$systemFolderName.webp');
+    return path.join(dir, themeFolder, 'backgrounds', '$systemFolderName.$ext');
   }
 
   /// Synchronous variant of logo path resolution, requires previous initialization.
   static String? logoCachePathSync(
     String themeFolder,
+    String systemFolderName, {
+    String ext = 'webp',
+  }) {
+    final dir = _cachedThemeDir;
+    if (dir == null) return null;
+    return path.join(dir, themeFolder, 'logos', '$systemFolderName.$ext');
+  }
+
+  /// Resolves the cached background path checking both .webp and .gif formats.
+  /// Returns the path to the existing file, preferring .webp over .gif.
+  /// If neither exists, returns the .webp path as default.
+  static String? resolveBackgroundPathSync(
+    String themeFolder,
     String systemFolderName,
   ) {
     final dir = _cachedThemeDir;
     if (dir == null) return null;
-    return path.join(dir, themeFolder, 'logos', '$systemFolderName.webp');
+
+    final webpPath = path.join(
+      dir,
+      themeFolder,
+      'backgrounds',
+      '$systemFolderName.webp',
+    );
+    if (File(webpPath).existsSync()) return webpPath;
+
+    final gifPath = path.join(
+      dir,
+      themeFolder,
+      'backgrounds',
+      '$systemFolderName.gif',
+    );
+    if (File(gifPath).existsSync()) return gifPath;
+
+    return webpPath;
   }
 
   /// Returns the local cache path for a specific background.
   static Future<String> backgroundCachePath(
     String themeFolder,
-    String systemFolderName,
-  ) async {
+    String systemFolderName, {
+    String ext = 'webp',
+  }) async {
     final dir = await _cacheDir();
-    return path.join(dir, themeFolder, 'backgrounds', '$systemFolderName.webp');
+    return path.join(dir, themeFolder, 'backgrounds', '$systemFolderName.$ext');
   }
 
   /// Returns the local cache path for a specific logo.
   static Future<String> logoCachePath(
     String themeFolder,
-    String systemFolderName,
-  ) async {
+    String systemFolderName, {
+    String ext = 'webp',
+  }) async {
     final dir = await _cacheDir();
-    return path.join(dir, themeFolder, 'logos', '$systemFolderName.webp');
+    return path.join(dir, themeFolder, 'logos', '$systemFolderName.$ext');
   }
 
   /// Returns the local cache path for a theme's metadata file.
@@ -349,8 +390,15 @@ class NeoAssetsService {
   ) async {
     int missing = 0;
     for (final system in systemFolderNames) {
-      final bgPath = await backgroundCachePath(themeFolder, system);
-      if (!await File(bgPath).exists()) missing++;
+      final bgWebp = await backgroundCachePath(themeFolder, system);
+      final bgGif = await backgroundCachePath(
+        themeFolder,
+        system,
+        ext: 'gif',
+      );
+      if (!await File(bgWebp).exists() && !await File(bgGif).exists()) {
+        missing++;
+      }
 
       final logoPath = await logoCachePath(themeFolder, system);
       if (!await File(logoPath).exists()) missing++;
@@ -388,13 +436,26 @@ class NeoAssetsService {
   }
 
   /// Retrieves a cached background image, downloading it if necessary.
+  /// Tries .webp first, then falls back to .gif.
   static Future<String?> getCachedBackground(
     String themeFolder,
     String systemFolderName,
   ) async {
-    final localPath = await backgroundCachePath(themeFolder, systemFolderName);
-    final url = getBackgroundUrl(themeFolder, systemFolderName);
-    return downloadAndCacheAsset(url, localPath);
+    final webpPath = await backgroundCachePath(themeFolder, systemFolderName);
+    final webpUrl = getBackgroundUrl(themeFolder, systemFolderName);
+    var result = await downloadAndCacheAsset(webpUrl, webpPath);
+    if (result != null) return result;
+
+    final gifPath = await backgroundCachePath(
+      themeFolder,
+      systemFolderName,
+      ext: 'gif',
+    );
+    final gifUrl = getBackgroundUrl(themeFolder, systemFolderName, ext: 'gif');
+    result = await downloadAndCacheAsset(gifUrl, gifPath);
+    if (result != null) return result;
+
+    return null;
   }
 
   /// Retrieves a cached system logo image, downloading it if necessary.
@@ -442,10 +503,19 @@ class NeoAssetsService {
 
     int done = 0;
     for (final system in systemFolderNames) {
-      final bgPath = await backgroundCachePath(themeFolder, system);
-      if (!await File(bgPath).exists()) {
+      final bgWebp = await backgroundCachePath(themeFolder, system);
+      final bgGif = await backgroundCachePath(
+        themeFolder,
+        system,
+        ext: 'gif',
+      );
+      if (!await File(bgWebp).exists() && !await File(bgGif).exists()) {
         final bgUrl = getBackgroundUrl(themeFolder, system);
-        await downloadAndCacheAsset(bgUrl, bgPath);
+        var result = await downloadAndCacheAsset(bgUrl, bgWebp);
+        if (result == null) {
+          final gifUrl = getBackgroundUrl(themeFolder, system, ext: 'gif');
+          await downloadAndCacheAsset(gifUrl, bgGif);
+        }
         done++;
         onProgress?.call(done, missingTotal);
       }

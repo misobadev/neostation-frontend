@@ -283,7 +283,7 @@ class _SystemCardState extends State<SystemCard> {
     final customBgPath = widget.info.customBackgroundPath;
     final hasCustomBg = customBgPath != null && customBgPath.isNotEmpty;
 
-    // SCENARIO A: Animated GIF background.
+    // SCENARIO A: Animated GIF (custom or theme-provided).
     if (hasCustomBg && ImageUtils.isGif(customBgPath)) {
       return Positioned.fill(
         child: ClipRRect(
@@ -299,7 +299,25 @@ class _SystemCardState extends State<SystemCard> {
       );
     }
 
-    // SCENARIO B: Static image (Custom or Theme-provided).
+    // SCENARIO B: Animated GIF from theme.
+    if (!hasCustomBg && ImageUtils.isGif(_themeBackgroundPath)) {
+      return Positioned.fill(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12.r),
+          child: Container(
+            color: Theme.of(context).colorScheme.surface,
+            child: ShaderGifWidget(
+              imagePath: _themeBackgroundPath!,
+              key: ValueKey(
+                '${_themeBackgroundPath}_${widget.info.imageVersion}',
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // SCENARIO C: Static image (Custom or Theme-provided).
     final activeBgPath = hasCustomBg ? customBgPath : _themeBackgroundPath;
     final hasActiveBg = activeBgPath != null && activeBgPath.isNotEmpty;
 
