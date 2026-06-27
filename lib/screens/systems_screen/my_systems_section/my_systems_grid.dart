@@ -631,15 +631,35 @@ class MySystems extends StatelessWidget {
     if (secondaryState == null) return;
     final folder = system.primaryFolderName ?? system.folderName ?? 'all';
 
-    // UI Asset Mapping logic.
+    // UI Asset Mapping logic — resolve the same way as the hover path
+    // (_updateSecondaryScreenName): prefer a custom logo, then the active
+    // theme's logo, then the bundled asset. Resolving the theme asset here
+    // (instead of always falling back to the bundled asset) is what keeps the
+    // correct system art on the secondary display when returning from a
+    // system, rather than reverting to the default logo until the user hovers
+    // another system. See NeoAssetsProvider (returns null when no theme).
+    final neoAssets = Provider.of<NeoAssetsProvider>(context, listen: false);
+
+    final String? customLogo = system.customLogoPath?.isNotEmpty == true
+        ? system.customLogoPath
+        : null;
+    final String? themeLogo = customLogo == null
+        ? neoAssets.getLogoForSystemSync(folder)
+        : null;
     final String? systemLogo = system.isGame
         ? system.customWheelImage
-        : 'assets/images/systems/logos/$folder.webp';
-    final bool isLogoAsset = !system.isGame;
+        : (customLogo ??
+              themeLogo ??
+              'assets/images/systems/logos/$folder.webp');
+    final bool isLogoAsset =
+        !system.isGame && customLogo == null && themeLogo == null;
 
     final String? customBg = system.customBackgroundPath;
     final bool hasCustomBg = customBg != null && customBg.isNotEmpty;
-    final String? systemBackground = hasCustomBg ? customBg : null;
+    final String? themeBg = hasCustomBg
+        ? null
+        : neoAssets.getBackgroundForSystemSync(folder);
+    final String? systemBackground = hasCustomBg ? customBg : themeBg;
     final bool isBackgroundAsset = false;
 
     final paletteProvider = Provider.of<PaletteProvider>(
@@ -656,7 +676,7 @@ class MySystems extends StatelessWidget {
       systemBackground: systemBackground,
       clearSystemBackground: systemBackground == null,
       isBackgroundAsset: isBackgroundAsset,
-      useShader: !hasCustomBg,
+      useShader: systemBackground == null,
       shaderColor1: system.color1AsColor?.toARGB32(),
       shaderColor2: system.color2AsColor?.toARGB32(),
       isGameSelected: false,
