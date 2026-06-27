@@ -654,8 +654,8 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
     final customBgPath = system.customBackgroundPath;
     final hasCustomBg = customBgPath != null && customBgPath.isNotEmpty;
 
-    // SCENARIO A: Animated GIF background.
-    if (hasCustomBg && ImageUtils.isGif(customBgPath)) {
+    // SCENARIO A: Animated GIF (custom or theme-provided).
+    if (ImageUtils.isGif(customBgPath)) {
       return Positioned.fill(
         child: Container(
           color: Theme.of(context).colorScheme.surface,
@@ -667,9 +667,22 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
       );
     }
 
-    // SCENARIO B: Static Asset resolution (Priority: custom > theme > color).
+    // SCENARIO B: Animated GIF from theme.
     final folderKey = system.primaryFolderName ?? system.folderName ?? '';
     final themeBgPath = hasCustomBg ? null : _themeBackgrounds[folderKey];
+    if (!hasCustomBg && ImageUtils.isGif(themeBgPath)) {
+      return Positioned.fill(
+        child: Container(
+          color: Theme.of(context).colorScheme.surface,
+          child: ShaderGifWidget(
+            imagePath: themeBgPath!,
+            key: ValueKey('${themeBgPath}_${system.imageVersion}'),
+          ),
+        ),
+      );
+    }
+
+    // SCENARIO C: Static Asset resolution (Priority: custom > theme > color).
     final activeBgPath = hasCustomBg ? customBgPath : themeBgPath;
     final hasActiveBg = activeBgPath != null && activeBgPath.isNotEmpty;
 
