@@ -83,6 +83,9 @@ class EmulatorRepository {
   static Future<List<String>> getAndroidRetroArchPackages() =>
       SqliteService.getAndroidRetroArchPackages();
 
+  static Future<void> fixRetroArchDefaultForAndroid(String preferredPackage) =>
+      SqliteService.fixRetroArchDefaultForAndroid(preferredPackage);
+
   /// Resolves the detected RetroArch executable path for the current OS.
   static Future<String?> getRetroArchExecutablePath() async {
     final db = await SqliteService.getDatabase();

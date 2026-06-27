@@ -16,7 +16,10 @@ import 'neo_sync_screen/login_screen/neo_sync_content.dart';
 import 'neo_sync_screen/neo_sync_tab.dart';
 import '../widgets/scraper_content.dart';
 import 'package:neostation/services/game_service.dart';
+import 'package:neostation/services/android_service.dart';
 import 'package:neostation/providers/palette_provider.dart';
+import 'package:neostation/repositories/emulator_repository.dart';
+import 'dart:async';
 import 'dart:io';
 
 /// The root screen of the application, managing high-level navigation tabs.
@@ -168,6 +171,45 @@ class AppScreenState extends State<AppScreen> {
         configProvider.hasRomFolder &&
         mounted) {
       configProvider.scanSystems();
+    }
+
+    unawaited(_fixRetroarchAndroidDefault());
+  }
+
+  /// Detects which RetroArch variant the user has installed on Android and sets
+  /// it as the default package for all systems. Priority order:
+  ///   com.retroarch.aarch64 > com.retroarch > com.retroarch.ra32
+  Future<void> _fixRetroarchAndroidDefault() async {
+    if (!Platform.isAndroid) return;
+
+    try {
+      final packages = await EmulatorRepository.getAndroidRetroArchPackages();
+      if (packages.isEmpty) return;
+
+      const priorityOrder = [
+        'com.retroarch.aarch64',
+        'com.retroarch',
+        'com.retroarch.ra32',
+      ];
+
+      String? chosenPackage;
+      for (final pkg in priorityOrder) {
+        if (packages.contains(pkg) &&
+            await AndroidService.isPackageInstalled(pkg)) {
+          chosenPackage = pkg;
+          break;
+        }
+      }
+
+      chosenPackage ??= priorityOrder.firstWhere(
+        (p) => packages.contains(p),
+        orElse: () => 'com.retroarch.aarch64',
+      );
+
+      await EmulatorRepository.fixRetroArchDefaultForAndroid(chosenPackage);
+      _log.i('Android: Set RetroArch default package to $chosenPackage');
+    } catch (e) {
+      _log.e('Failed to fix RetroArch default package', error: e);
     }
   }
 

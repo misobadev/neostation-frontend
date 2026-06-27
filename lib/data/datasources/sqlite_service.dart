@@ -4141,6 +4141,45 @@ class SqliteService {
         .toList();
   }
 
+  /// Updates [is_default] across all systems so that [preferredPackage] is the
+  /// active RetroArch variant on Android. Resets all other RetroArch packages
+  /// to non-default, then sets [preferredPackage] as the default.
+  static Future<void> fixRetroArchDefaultForAndroid(
+    String preferredPackage,
+  ) async {
+    final db = await instance.database;
+
+    final osResult = await db.query(
+      'app_os',
+      where: 'name = ?',
+      whereArgs: ['android'],
+    );
+    if (osResult.isEmpty) return;
+    final osId = int.tryParse(osResult.first['id']?.toString() ?? '0') ?? 0;
+
+    await db.transaction((txn) async {
+      await txn.rawUpdate(
+        'UPDATE app_emulators SET is_default = 0 '
+        'WHERE os_id = ? AND android_package_name LIKE ?',
+        [osId, 'com.retroarch%'],
+      );
+      await txn.rawUpdate(
+        'UPDATE app_emulators SET is_default = 1 '
+        'WHERE os_id = ? AND android_package_name = ?',
+        [osId, preferredPackage],
+      );
+    });
+
+    try {
+      await db.execute('PRAGMA wal_checkpoint(FULL)');
+    } catch (e) {
+      _log.e(
+        'Failed to finalize RetroArch default fix via WAL checkpoint',
+        error: e,
+      );
+    }
+  }
+
   /// Retrieves a list of emulators for a system (legacy alias for [getCoresBySystemId]).
   static Future<List<Map<String, dynamic>>> getEmulatorsForSystem(
     String systemId,
