@@ -311,7 +311,7 @@ class InitialSetupWidget extends StatelessWidget {
                 .getString(context)
                 .replaceFirst(
                   '{count}',
-                  configProvider.detectedSystems.length.toString(),
+                  configProvider.detectedRealSystems.length.toString(),
                 ),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(

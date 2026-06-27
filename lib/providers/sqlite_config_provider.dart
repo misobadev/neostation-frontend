@@ -72,6 +72,17 @@ class SqliteConfigProvider extends ChangeNotifier {
   // Getters
   ConfigModel get config => _config;
   List<SystemModel> get detectedSystems => _detectedSystems;
+
+  /// Detected systems excluding virtual aggregate groups (e.g. 'all',
+  /// 'favorites'), which are not real systems and would inflate any
+  /// "X systems found" count shown to the user.
+  List<SystemModel> get detectedRealSystems => _detectedSystems
+      .where(
+        (s) =>
+            s.folderName != SystemFolderNames.all &&
+            s.folderName != SystemFolderNames.favorites,
+      )
+      .toList();
   List<SystemModel> get availableSystems => _availableSystems;
   Map<String, EmulatorModel> get availableEmulators => _availableEmulators;
   bool get isLoading => _isLoading;
