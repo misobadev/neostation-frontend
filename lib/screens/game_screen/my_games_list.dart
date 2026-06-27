@@ -143,7 +143,6 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
   // Integration callbacks for GameDetailsCardList.
   VoidCallback? _refreshAchievementsCallback;
-  VoidCallback? _toggleInfoCallback;
 
   // Overlay interaction delegates.
   bool Function()? _isAchievementsOpen;
@@ -323,15 +322,6 @@ class _SystemGamesListState extends State<SystemGamesList> {
     _updateSecondaryDisplay(_selectedGame!);
   }
 
-  /// Opens the detailed game information overlay.
-  void _openGameInfo() {
-    if (_selectedGame == null) return;
-
-    if (_toggleInfoCallback != null) {
-      _toggleInfoCallback!();
-    }
-  }
-
   void _onScrapeCurrentGame() async {
     final game = _selectedGame;
     if (game == null) return;
@@ -339,6 +329,13 @@ class _SystemGamesListState extends State<SystemGamesList> {
     final romPath = game.romPath;
     if (romPath == null) return;
     if (_scrapingGameRomnames.contains(romname)) return;
+
+    // Claim the lock synchronously, before any await, so rapid repeated
+    // presses (the scrape button or the Select shortcut) can't slip past the
+    // guard above and queue duplicate scrapes for the same game.
+    _scrapingGameRomnames.add(romname);
+    _scrapeProgress[romname] = 0.0;
+    setState(() {});
 
     // Resolve the actual system (not favorites virtual system).
     SystemModel targetSystem = widget.system;
@@ -354,11 +351,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
     }
 
     final systemId = targetSystem.id;
-    if (systemId == null) return;
-
-    _scrapingGameRomnames.add(romname);
-    _scrapeProgress[romname] = 0.0;
-    setState(() {});
+    if (systemId == null) {
+      _scrapingGameRomnames.remove(romname);
+      _scrapeProgress.remove(romname);
+      if (mounted) setState(() {});
+      return;
+    }
 
     ScreenScraperService.scrapeSingleGame(
           appSystemId: systemId,
@@ -400,6 +398,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
                   _selectedGame = updatedGame;
                 }
               });
+              // Refresh the cached localized description so the scrape button
+              // label flips from 'Scrape' to 'Rescrape' immediately (it keys
+              // off whether a description is present).
+              if (_selectedGame?.romname == romname) {
+                _loadLocalizedDescription();
+              }
             }
           }
 
@@ -528,12 +532,11 @@ class _SystemGamesListState extends State<SystemGamesList> {
           }
           return;
         }
-        if (_secondaryOverlayAction != null) {
-          _secondaryOverlayAction!();
-        } else {
-          _openGameInfo();
-        }
-      }, // Select - Scrape/Info.
+        // Scrape the selected game directly, matching the grid/carousel views.
+        // Routing through the details card's secondary action early-returns when
+        // the secondary display is active (e.g. AYN Thor), so scraping never ran.
+        _onScrapeCurrentGame();
+      }, // Select - Scrape.
       onLeftBumper: _handleLeftBumper,
       onRightBumper: _handleRightBumper,
       onPreviousTab: _handleLeftBumper, // Key Q.
@@ -2704,12 +2707,14 @@ class _SystemGamesListState extends State<SystemGamesList> {
         retroAchievementsProvider: _retroAchievementsProvider,
         syncProvider: syncManager.active!,
         localizedDescription: _localizedDescription,
+        isExternallyScraping: _scrapingGameRomnames.contains(
+          _selectedGame!.romname,
+        ),
         isNavigatingFast: _isNavigatingFast,
         isSecondaryScreenActive:
             _secondaryDisplayState?.value?.isSecondaryActive ?? false,
         onDeactivateNavigation: () => _gamepadNav.deactivate(),
         onReactivateNavigation: () => _gamepadNav.activate(),
-        onToggleInfo: (callback) => _toggleInfoCallback = callback,
         onRegisterOverlayState: (isOverlayOpen, isAchievementsOpen) {
           _isAchievementsOpen = isAchievementsOpen;
         },
