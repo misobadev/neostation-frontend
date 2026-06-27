@@ -482,7 +482,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
         GameViewModeDropdown.globalKey.currentState?.showDropdown();
       }, // Button X - View mode.
       onSettings: _handleStartButton, // Button Start.
-      onLeftTrigger: () {
+      onLeftStickClick: () {
         if (widget.system.folderName == 'music') {
           final service = MusicPlayerService();
           service.toggleShuffle();
@@ -497,7 +497,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
           _showRandomGameDialog();
         }
       }, // L3 - Random.
-      onRightTrigger: null,
+      onRightStickClick: null,
       onSelectButton: () {
         if (widget.system.folderName == 'music') {
           final service = MusicPlayerService();

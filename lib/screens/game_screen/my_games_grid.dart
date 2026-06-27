@@ -500,7 +500,7 @@ class _GamesGridState extends State<GamesGrid> {
           GameViewModeDropdown.globalKey.currentState?.showDropdown();
         } catch (_) {}
       },
-      onLeftTrigger: widget.onRandom,
+      onLeftStickClick: widget.onRandom,
       onSelectButton: widget.onScrape,
       onSettings: widget.onSettings,
     );

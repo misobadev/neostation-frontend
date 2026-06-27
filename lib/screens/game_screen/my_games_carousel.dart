@@ -251,7 +251,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
           GameViewModeDropdown.globalKey.currentState?.showDropdown();
         } catch (_) {}
       },
-      onLeftTrigger: widget.onRandom,
+      onLeftStickClick: widget.onRandom,
       onSelectButton: widget.onScrape,
       onSettings: widget.onSettings,
       onPreviousTab: AppNavigation.previousTab,
