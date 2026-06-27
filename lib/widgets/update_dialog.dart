@@ -296,12 +296,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
       _downloadProgress = 0.0;
     });
 
-    final success = await UpdateService.downloadAndInstall(
-      widget.updateInfo,
-      (progress) {
-        if (mounted) setState(() => _downloadProgress = progress);
-      },
-    );
+    final success = await UpdateService.downloadAndInstall(widget.updateInfo, (
+      progress,
+    ) {
+      if (mounted) setState(() => _downloadProgress = progress);
+    });
 
     if (!mounted) return;
 
