@@ -101,8 +101,15 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Deshabilitar el highlight de focus para toda la actividad
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        // Disable focus highlight for the entire activity
+        window.setDecorFitsSystemWindows(false)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            window.insetsController?.let { controller ->
+                controller.hide(android.view.WindowInsets.Type.systemBars())
+                controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            @Suppress("DEPRECATION")
             window.decorView.systemUiVisibility = (
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
@@ -354,7 +361,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                     try {                        val presentation = createSubScreenPresentation(secondaryDisplay) ?: FlutterPresentation(
                             this,
                             secondaryDisplay,
-                            getSubScreenEntryPoint() ?: "subDisplay"
+                            getSubScreenEntryPoint()
                         )
                         subScreenPresentation = presentation
                         presentation.show()
@@ -737,7 +744,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                         null, null, null
                     )
                     
-                    val canList = cursor != null && (cursor?.count ?: 0) >= 0
+                    val canList = cursor != null && cursor.count >= 0
                     cursor?.close()
                     
                     if (!canList) {

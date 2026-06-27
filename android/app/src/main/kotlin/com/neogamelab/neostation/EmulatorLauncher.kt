@@ -534,7 +534,7 @@ object EmulatorLauncher {
             if (subfolderDocId == null) return
 
             // Build tree URI for the subfolder and grant read permission
-            val subfolderTreeUri = android.provider.DocumentsContract.buildTreeDocumentUri(authority, subfolderDocId!!)
+            val subfolderTreeUri = android.provider.DocumentsContract.buildTreeDocumentUri(authority, subfolderDocId)
             try {
                 context.grantUriPermission(
                     packageName,
@@ -545,7 +545,7 @@ object EmulatorLauncher {
             } catch (_: Exception) {}
 
             // List every file inside the subfolder and grant explicit read permission
-            val subfolderChildrenUri = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(subfolderTreeUri, subfolderDocId!!)
+            val subfolderChildrenUri = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(subfolderTreeUri, subfolderDocId)
             context.contentResolver.query(
                 subfolderChildrenUri,
                 arrayOf(
