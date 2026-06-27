@@ -214,7 +214,8 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                             fit: BoxFit
                                                 .contain, // "se debe ver completo"
                                           )
-                                        else if (value.gameFanart != null)
+                                        else if (value.gameFanart != null ||
+                                            value.gameWheel != null)
                                           _buildFanartWithLogo(value),
                                       ] else ...[
                                         if (value.gameImageBytes != null)
@@ -229,7 +230,8 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                             fit: BoxFit
                                                 .contain, // "se debe ver completo"
                                           )
-                                        else if (value.gameFanart != null)
+                                        else if (value.gameFanart != null ||
+                                            value.gameWheel != null)
                                           _buildFanartWithLogo(value),
                                       ],
                                     ],
@@ -343,12 +345,15 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
 
   /// Mirrors the main screen's game art as a fallback when no screenshot or
   /// video is available: fanart filling the screen (cover) with the game's
-  /// wheel/logo centered on top.
+  /// wheel/logo centered on top. Either asset is optional — a logo-only game
+  /// shows just the centered logo over the app background, and a fanart-only
+  /// game shows just the fanart.
   Widget _buildFanartWithLogo(SecondaryDisplayStateData value) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        _buildBackground(value.gameFanart!, fit: BoxFit.cover),
+        if (value.gameFanart != null)
+          _buildBackground(value.gameFanart!, fit: BoxFit.cover),
         if (value.gameWheel != null)
           Center(
             child: Padding(
