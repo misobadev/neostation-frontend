@@ -15,6 +15,7 @@ import android.net.Uri
 import android.widget.Toast
 import android.content.pm.PackageManager
 import android.provider.Settings
+import androidx.core.view.WindowCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.flame_engine.gamepads_android.GamepadsCompatibleActivity
@@ -102,7 +103,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         super.onCreate(savedInstanceState)
 
         // Disable focus highlight for the entire activity
-        window.setDecorFitsSystemWindows(false)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             window.insetsController?.let { controller ->
                 controller.hide(android.view.WindowInsets.Type.systemBars())
