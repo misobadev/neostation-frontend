@@ -353,12 +353,33 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
           Center(
             child: Padding(
               padding: EdgeInsets.all(48.r),
-              child: Image.file(
-                File(value.gameWheel!),
-                fit: BoxFit.contain,
-                width: 600.r,
-                errorBuilder: (context, error, stackTrace) =>
-                    const SizedBox.shrink(),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Drop shadow: black-tinted copy offset behind the logo,
+                  // mirroring the main screen's wheel shadow treatment.
+                  Transform.translate(
+                    offset: Offset(4.r, 4.r),
+                    child: Image.file(
+                      File(value.gameWheel!),
+                      fit: BoxFit.contain,
+                      width: 600.r,
+                      filterQuality: FilterQuality.low,
+                      cacheWidth: 32,
+                      color: Colors.black.withValues(alpha: 0.7),
+                      errorBuilder: (context, error, stackTrace) =>
+                          const SizedBox.shrink(),
+                    ),
+                  ),
+                  Image.file(
+                    File(value.gameWheel!),
+                    fit: BoxFit.contain,
+                    width: 600.r,
+                    cacheWidth: 640,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox.shrink(),
+                  ),
+                ],
               ),
             ),
           ),
