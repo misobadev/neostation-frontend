@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/services/screenshot_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import '../models/system_model.dart';
 import '../models/config_model.dart';
@@ -47,6 +48,7 @@ class SqliteConfigProvider extends ChangeNotifier {
   bool _initialized = false;
   SecondaryDisplayState? _secondaryDisplayState;
   int _lastMuteToggleTrigger = 0;
+  int _lastScreenshotTrigger = 0;
   bool _hasAllFilesAccess = false;
   Set<String> _hiddenSystems = {};
 
@@ -193,6 +195,20 @@ class SqliteConfigProvider extends ChangeNotifier {
 
         // Initial permission check
         await refreshAllFilesAccess();
+        // Seed the secondary display with the current screenshot-access state so
+        // its in-game screenshot button shows from a cold start (not just after
+        // visiting settings or reconnecting the display).
+        await refreshSecondaryScreenshotAccess();
+        // The main engine can restart while the secondary engine persists (its
+        // cached engine group survives), leaving a stale Now Playing panel from
+        // a game that was running at quit. Clear it once the state is synced so
+        // we overwrite (not race) the retained shared state. No game is active
+        // at startup. A null value means the sync is still pending (initialSync
+        // is only assigned in that case, so it's safe to await).
+        if (_secondaryDisplayState!.value == null) {
+          await _secondaryDisplayState!.initialSync;
+        }
+        resetSecondaryInGameState();
       }
 
       // Automatically scan if there are ROM folders configured AND we have permissions
@@ -1339,6 +1355,10 @@ class SqliteConfigProvider extends ChangeNotifier {
           // stuck inactive, since hiding has already forced it false.
           isSecondaryActive: !value,
         );
+        if (!value) {
+          // ignore: unawaited_futures
+          refreshSecondaryScreenshotAccess();
+        }
       }
     }
 
@@ -1381,6 +1401,8 @@ class SqliteConfigProvider extends ChangeNotifier {
         nowPlayingDimDelay: _config.nowPlayingDimDelay,
         nowPlayingDimLevel: _config.nowPlayingDimLevel,
       );
+      // ignore: unawaited_futures
+      refreshSecondaryScreenshotAccess();
     } else {
       _secondaryDisplayState!.updateState(isSecondaryActive: false);
     }
@@ -1413,7 +1435,45 @@ class SqliteConfigProvider extends ChangeNotifier {
         // ignore: unawaited_futures
         toggleVideoSound();
       }
+      if (state.screenshotTrigger > _lastScreenshotTrigger) {
+        _lastScreenshotTrigger = state.screenshotTrigger;
+        // ignore: unawaited_futures
+        _handleSecondaryScreenshotRequest();
+      }
     }
+  }
+
+  /// Responds to a screenshot request from the secondary display: fires a system
+  /// screenshot of the main screen, or opens accessibility settings if the user
+  /// hasn't granted screenshot access yet.
+  Future<void> _handleSecondaryScreenshotRequest() async {
+    final taken = await ScreenshotService.takeScreenshot();
+    if (!taken) {
+      await ScreenshotService.openAccessSettings();
+    }
+  }
+
+  /// Clears any stale in-game state on the secondary display. Used when the app
+  /// regains focus without an active game (e.g. after quitting mid-game and
+  /// relaunching), so the Now Playing panel doesn't linger.
+  void resetSecondaryInGameState() {
+    _secondaryDisplayState?.updateState(
+      nowPlayingActive: false,
+      showAchievementPanel: false,
+    );
+  }
+
+  /// Pushes a known screenshot-access state to the secondary display so it can
+  /// show or hide the in-game screenshot button.
+  void pushScreenshotAccess(bool enabled) {
+    _secondaryDisplayState?.updateState(screenshotAccessEnabled: enabled);
+  }
+
+  /// Checks current screenshot access and pushes it to the secondary display.
+  Future<void> refreshSecondaryScreenshotAccess() async {
+    if (_secondaryDisplayState == null) return;
+    final enabled = await ScreenshotService.isAccessEnabled();
+    _secondaryDisplayState!.updateState(screenshotAccessEnabled: enabled);
   }
 
   /// Re-applies the persisted secondary display visibility setting to the native

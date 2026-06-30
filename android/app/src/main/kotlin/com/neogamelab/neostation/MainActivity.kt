@@ -30,6 +30,7 @@ import java.io.ByteArrayOutputStream
 import android.view.Display
 import com.hcoderlee.subscreen.sub_screen.MultiDisplayFlutterActivity
 import com.hcoderlee.subscreen.sub_screen.FlutterPresentation
+import com.hcoderlee.subscreen.sub_screen.SharedStateManager
 import androidx.core.content.FileProvider
 
 class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
@@ -100,6 +101,11 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The secondary engine can survive a main-engine restart (cached engine
+        // group), so its retained shared state may still say a game is "now
+        // playing" from before the quit. Clear it before super.onCreate launches
+        // the sub screen, so the stale Now Playing panel never renders.
+        clearStaleSecondaryNowPlaying()
         super.onCreate(savedInstanceState)
 
         // Disable focus highlight for the entire activity
@@ -279,6 +285,20 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                 "startSecondaryDisplay" -> {
                     result.success(true)
                 }
+                "isScreenshotAccessEnabled" -> {
+                    result.success(isScreenshotAccessEnabled())
+                }
+                "openScreenshotAccessSettings" -> {
+                    openScreenshotAccessSettings()
+                    result.success(true)
+                }
+                "takeSystemScreenshot" -> {
+                    if (!isScreenshotAccessEnabled()) {
+                        result.success(false)
+                    } else {
+                        result.success(ScreenshotAccessibilityService.takeScreenshot())
+                    }
+                }
                 "installApk" -> {
                     val filePath = call.argument<String>("filePath")
                     if (filePath != null) {
@@ -376,6 +396,47 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             }
         } else {
             onCloseSubScreen()
+        }
+    }
+
+    /**
+     * Clears the in-game flags in the retained secondary-display shared state so
+     * a Now Playing panel left over from a quit-mid-game session doesn't render
+     * when the main engine restarts. No-op on a cold start (no retained state).
+     */
+    private fun clearStaleSecondaryNowPlaying() {
+        try {
+            val type = "SecondaryDisplayState"
+            val current = SharedStateManager.getState(type)?.toMutableMap() ?: return
+            current["nowPlayingActive"] = false
+            current["showAchievementPanel"] = false
+            SharedStateManager.updateState(type, current)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "clearStaleSecondaryNowPlaying: ${e.message}")
+        }
+    }
+
+    /** True when the user has enabled our screenshot accessibility service. */
+    private fun isScreenshotAccessEnabled(): Boolean {
+        // A connected service is the most reliable signal; fall back to the
+        // settings list in case the static reference isn't bound yet.
+        if (ScreenshotAccessibilityService.isConnected) return true
+        val enabled = android.provider.Settings.Secure.getString(
+            contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        val component = "$packageName/$packageName.ScreenshotAccessibilityService"
+        return enabled.split(':').any { it.equals(component, ignoreCase = true) }
+    }
+
+    /** Opens the system accessibility settings so the user can grant access. */
+    private fun openScreenshotAccessSettings() {
+        try {
+            val intent = android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Cannot open accessibility settings: ${e.message}")
         }
     }
 

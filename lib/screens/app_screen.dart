@@ -59,7 +59,7 @@ class AppNavigation {
   }
 }
 
-class AppScreenState extends State<AppScreen> {
+class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
   static final _log = LoggerService.instance;
 
   /// Currently active top-level navigation tab index.
@@ -89,6 +89,7 @@ class AppScreenState extends State<AppScreen> {
   void initState() {
     super.initState();
     _currentInstance = this;
+    WidgetsBinding.instance.addObserver(this);
 
     _tabContents = [
       SystemContent(), // Tab 0: Game Systems
@@ -267,10 +268,27 @@ class AppScreenState extends State<AppScreen> {
   @override
   void dispose() {
     _currentInstance = null;
+    WidgetsBinding.instance.removeObserver(this);
     _themeProvider?.removeListener(_onThemeChanged);
     GamepadNavigationManager.popLayer('app_screen');
     _gamepadNav.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // When NeoStation's own UI regains focus and no game is actually running,
+    // clear any stale Now Playing state left over from quitting mid-game. The
+    // isGameLaunched guard avoids interfering with the emulator launch handoff.
+    if (state == AppLifecycleState.resumed &&
+        Platform.isAndroid &&
+        !GameService.isGameLaunched) {
+      Provider.of<SqliteConfigProvider>(
+        context,
+        listen: false,
+      ).resetSecondaryInGameState();
+    }
   }
 
   /// Synchronizes visual state with secondary display hardware (Android OEM targets).

@@ -125,6 +125,8 @@ mixin AppLocale {
   static const String nowPlayingDimDarknessSubtitle =
       'now_playing_dim_darkness_subtitle';
   static const String nowPlayingDimNever = 'now_playing_dim_never';
+  static const String screenshotAccess = 'screenshot_access';
+  static const String screenshotAccessSubtitle = 'screenshot_access_subtitle';
   static const String ignoreHiddenFiles = 'ignore_hidden_files';
   static const String ignoreHiddenFilesSubtitle =
       'ignore_hidden_files_subtitle';

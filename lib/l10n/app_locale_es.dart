@@ -109,6 +109,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.nowPlayingDimDarkness: 'Nivel de oscurecimiento',
   AppLocale.nowPlayingDimDarknessSubtitle: 'Cuánto se oscurece el panel al atenuarse',
   AppLocale.nowPlayingDimNever: 'Nunca',
+  AppLocale.screenshotAccess: 'Acceso a capturas',
+  AppLocale.screenshotAccessSubtitle: 'Permite que el botón de captura grabe la pantalla principal (abre los ajustes de accesibilidad de Android)',
   AppLocale.scanOnStartupSubtitle:
       'Escanear carpetas de ROMs automáticamente al iniciar la app',
   AppLocale.ignoreHiddenFiles: 'Ignorar elementos ocultos',

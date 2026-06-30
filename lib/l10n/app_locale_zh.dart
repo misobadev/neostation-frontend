@@ -94,6 +94,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.nowPlayingDimDarkness: 'Dim darkness',
   AppLocale.nowPlayingDimDarknessSubtitle: 'How dark the in-game panel goes when it dims',
   AppLocale.nowPlayingDimNever: 'Never',
+  AppLocale.screenshotAccess: 'Screenshot access',
+  AppLocale.screenshotAccessSubtitle: 'Allow the screenshot button to capture the main screen (opens Android accessibility settings)',
   AppLocale.scanOnStartupSubtitle: '应用程序启动时自动扫描 ROM 文件夹',
   AppLocale.ignoreHiddenFiles: '忽略隐藏项目',
   AppLocale.ignoreHiddenFilesSubtitle: 'ROM 扫描期间隐藏隐藏文件和文件夹',

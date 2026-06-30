@@ -59,14 +59,29 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     super.initState();
     if (Platform.isAndroid) {
       _secondaryDisplayState = SecondaryDisplayState();
-
-      // Signal that secondary screen is now active
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _secondaryDisplayState?.updateState(isSecondaryActive: true);
-      });
-
       _secondaryDisplayState!.addListener(_onStateChanged);
+      // Signal that the secondary screen is active — but only after the initial
+      // state sync. Pushing it while the synced value is still null makes
+      // updateState fall back to the WELCOME default and clobber the real
+      // retained display state, which then shows until the next push.
+      _signalSecondaryActiveWhenSynced();
     }
+  }
+
+  /// Marks the secondary display active once [SecondaryDisplayState] has pulled
+  /// its initial value, so the flag layers onto the real state rather than the
+  /// WELCOME placeholder.
+  Future<void> _signalSecondaryActiveWhenSynced() async {
+    final state = _secondaryDisplayState;
+    if (state == null) return;
+    // A null value means no cached state was restored synchronously; in that
+    // case initialSync is assigned and safe to await. A non-null value means the
+    // state is already in hand.
+    if (state.value == null) {
+      await state.initialSync;
+    }
+    if (!mounted) return;
+    state.updateState(isSecondaryActive: true);
   }
 
   void _onStateChanged() {
@@ -283,6 +298,18 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       _secondaryDisplayState?.updateState(
         isVideoMuted: !state.isVideoMuted,
         muteToggleTrigger: state.muteToggleTrigger + 1,
+      );
+    }
+  }
+
+  /// Asks the main engine to take a system screenshot of the main screen by
+  /// bumping the shared trigger; the main engine watches for the increment.
+  void _requestScreenshot() {
+    final state = _secondaryDisplayState?.value;
+    if (state != null) {
+      _wakeInGamePanel();
+      _secondaryDisplayState?.updateState(
+        screenshotTrigger: state.screenshotTrigger + 1,
       );
     }
   }
@@ -778,7 +805,12 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         children: [
           _buildInGamePanelBody(value, raAvailable, page),
           Positioned.fill(
+            // While dimmed, the opaque scrim swallows touches so buttons
+            // underneath don't fire — the outer Listener still wakes the panel,
+            // so the first touch only wakes (no accidental presses). When awake,
+            // ignore the scrim entirely so touches reach the buttons.
             child: IgnorePointer(
+              ignoring: !_inGameDimmed,
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 500),
                 opacity: _inGameDimmed
@@ -944,10 +976,50 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                   label: 'LAST PLAYED',
                   text: _formatLastPlayed(value.lastPlayedMillis),
                 ),
+                if (value.screenshotAccessEnabled) ...[
+                  SizedBox(height: 28.r),
+                  _buildScreenshotButton(),
+                ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Tappable pill that asks the main engine to capture a system screenshot of
+  /// the main screen.
+  Widget _buildScreenshotButton() {
+    return GestureDetector(
+      onTap: _requestScreenshot,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 20.r, vertical: 12.r),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Symbols.photo_camera_rounded,
+              color: Colors.white,
+              size: 22.r,
+            ),
+            SizedBox(width: 12.r),
+            Text(
+              'SCREENSHOT',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14.r,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 2.r,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

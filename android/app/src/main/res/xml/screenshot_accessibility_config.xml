@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Minimal accessibility service used solely to trigger a system screenshot via
+  performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT). It observes no events and
+  reads no window content.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/screenshot_accessibility_desc"
+    android:accessibilityEventTypes="typeNotificationStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="100"
+    android:canRetrieveWindowContent="false" />

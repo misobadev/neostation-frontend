@@ -3,13 +3,17 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
+import 'package:neostation/services/screenshot_service.dart';
 import 'package:provider/provider.dart';
+
+import '../../../widgets/custom_toggle_switch.dart';
 
 /// Settings detail panel for secondary-display options. Only reachable while a
 /// secondary display is active (the menu entry is hidden otherwise), so it
 /// always renders its full set of controls.
 ///
-/// Items (gamepad index order): 0 = dim delay, 1 = dim darkness.
+/// Items (gamepad index order): 0 = dim delay, 1 = dim darkness,
+/// 2 = screenshot access.
 class SecondarySettingsContent extends StatefulWidget {
   final bool isContentFocused;
   final int selectedContentIndex;
@@ -25,7 +29,8 @@ class SecondarySettingsContent extends StatefulWidget {
       SecondarySettingsContentState();
 }
 
-class SecondarySettingsContentState extends State<SecondarySettingsContent> {
+class SecondarySettingsContentState extends State<SecondarySettingsContent>
+    with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   final List<GlobalKey> _itemKeys = [];
 
@@ -36,22 +41,49 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent> {
   /// deliberately — "no dim" is expressed by setting the delay to Never.
   static const _dimLevelCycle = [25, 50, 75, 100];
 
+  /// Whether the screenshot accessibility service is currently granted.
+  bool _screenshotAccessEnabled = false;
+
   @override
   void initState() {
     super.initState();
-    for (var i = 0; i < 2; i++) {
+    for (var i = 0; i < 3; i++) {
       _itemKeys.add(GlobalKey());
     }
+    WidgetsBinding.instance.addObserver(this);
+    _refreshScreenshotAccess();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Re-check after returning from the accessibility settings screen.
+    if (state == AppLifecycleState.resumed) {
+      _refreshScreenshotAccess();
+    }
+  }
+
+  /// Reloads the screenshot-access status into the UI.
+  Future<void> _refreshScreenshotAccess() async {
+    final enabled = await ScreenshotService.isAccessEnabled();
+    if (!mounted) return;
+    // Mirror the state to the secondary display so its screenshot button
+    // shows/hides to match.
+    context.read<SqliteConfigProvider>().pushScreenshotAccess(enabled);
+    if (enabled != _screenshotAccessEnabled) {
+      setState(() => _screenshotAccessEnabled = enabled);
+    }
+  }
+
   /// Number of navigable items in this panel.
-  int getItemCount() => 2;
+  int getItemCount() => 3;
 
   /// Dispatches a gamepad-select to the focused item.
   void selectItem(int index) {
@@ -63,6 +95,8 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent> {
       if (provider.config.nowPlayingDimDelay > 0) {
         _cycleDimLevel(provider);
       }
+    } else if (index == 2) {
+      ScreenshotService.openAccessSettings();
     }
   }
 
@@ -188,6 +222,63 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent> {
     );
   }
 
+  /// Toggle row for screenshot access, styled like the All Files Access row.
+  /// The switch reflects the granted state; toggling it (the OS service can't be
+  /// flipped programmatically) opens Android's accessibility settings.
+  Widget _buildScreenshotAccessRow() {
+    const index = 2;
+    final theme = Theme.of(context);
+    final focused =
+        widget.isContentFocused && widget.selectedContentIndex == index;
+    return Container(
+      key: _itemKeys[index],
+      padding: EdgeInsets.only(left: 12.r, right: 12.r, top: 6.r, bottom: 6.r),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(
+          color: focused ? theme.colorScheme.primary : Colors.transparent,
+          width: 2,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLocale.screenshotAccess.getString(context),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontSize: 12.r,
+                    fontWeight: FontWeight.w500,
+                    color: focused
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface,
+                  ),
+                ),
+                SizedBox(height: 4.r),
+                Text(
+                  AppLocale.screenshotAccessSubtitle.getString(context),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 9.r,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          CustomToggleSwitch(
+            value: _screenshotAccessEnabled,
+            onChanged: (_) => ScreenshotService.openAccessSettings(),
+            activeColor: theme.colorScheme.primary,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<SqliteConfigProvider>();
@@ -215,6 +306,8 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent> {
             enabled: config.nowPlayingDimDelay > 0,
             onTap: () => _cycleDimLevel(provider),
           ),
+          SizedBox(height: 12.r),
+          _buildScreenshotAccessRow(),
         ],
       ),
     );
