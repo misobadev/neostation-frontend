@@ -331,6 +331,11 @@ class _SystemGamesListState extends State<SystemGamesList> {
     if (romPath == null) return;
     if (_scrapingGameRomnames.contains(romname)) return;
 
+    // Audible feedback when a scrape is initiated. The on-screen scrape
+    // button plays this via its own onTap, but the Select shortcut routes
+    // here directly, so play it here to keep both paths consistent.
+    SfxService().playNavSound();
+
     // Claim the lock synchronously, before any await, so rapid repeated
     // presses (the scrape button or the Select shortcut) can't slip past the
     // guard above and queue duplicate scrapes for the same game.
