@@ -150,30 +150,38 @@ class AppScreenState extends State<AppScreen> {
   Future<void> _performUpdateSequence(
     SqliteConfigProvider configProvider,
   ) async {
-    bool systemsUpdated = false;
+    // Fire the deferred startup scan IMMEDIATELY — it must never be gated behind
+    // the network update checks below. On a freshly rebooted device the network
+    // is often not up yet, so awaiting those checks (each guarded by ~10s
+    // timeouts) left the Systems tab completely blank until they timed out. The
+    // scan flips isScanning/isLoading, so the user sees a spinner then content.
+    final startupScanPending = configProvider.consumeStartupScan();
+    Future<void>? initialScan;
+    if (startupScanPending && configProvider.hasRomFolder && mounted) {
+      initialScan = configProvider.scanSystems();
+    }
 
+    unawaited(_fixRetroarchAndroidDefault());
+
+    // App update check (network) — runs alongside the scan, no longer blocking it.
     if (configProvider.config.autoUpdateApp) {
       final appUpdateResult = await _checkAndShowAppUpdate();
       if (appUpdateResult == true) {
-        // User chose Update Now — consume scan flag but don't scan now.
-        // User will restart after updating.
-        configProvider.consumeStartupScan();
+        // User chose Update Now and will restart; nothing more to do here.
         return;
       }
     }
 
+    // Systems/emulator config update check (network).
     if (configProvider.config.autoUpdateSystems) {
-      systemsUpdated = await _checkAndShowSystemsUpdate(configProvider);
+      final systemsUpdated = await _checkAndShowSystemsUpdate(configProvider);
+      if (systemsUpdated && mounted) {
+        // New definitions were applied — re-scan to reflect them. Wait for the
+        // initial scan to settle first, since scanSystems ignores concurrent calls.
+        await initialScan;
+        if (mounted) configProvider.scanSystems();
+      }
     }
-
-    final startupScanPending = configProvider.consumeStartupScan();
-    if ((systemsUpdated || startupScanPending) &&
-        configProvider.hasRomFolder &&
-        mounted) {
-      configProvider.scanSystems();
-    }
-
-    unawaited(_fixRetroarchAndroidDefault());
   }
 
   /// Detects which RetroArch variant the user has installed on Android and sets
