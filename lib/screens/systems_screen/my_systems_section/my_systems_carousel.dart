@@ -131,10 +131,15 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   void _onSecondaryStateChanged() {
     if (!mounted) return;
     final isActive = _secondaryDisplayState?.value?.isSecondaryActive ?? false;
-    if (isActive && !_prevIsSecondaryActive) {
+    final wasActive = _prevIsSecondaryActive;
+    // Update the guard BEFORE calling _updateSecondaryScreenName(): that call
+    // writes secondary state synchronously, which re-enters this listener. If
+    // the flag were still false on re-entry the guard would pass again, looping
+    // until the stack overflows. Setting it first makes the re-entry a no-op.
+    _prevIsSecondaryActive = isActive;
+    if (isActive && !wasActive) {
       _updateSecondaryScreenName();
     }
-    _prevIsSecondaryActive = isActive;
   }
 
   @override
