@@ -85,7 +85,10 @@ class SqliteConfigProvider extends ChangeNotifier {
       .toList();
   List<SystemModel> get availableSystems => _availableSystems;
   Map<String, EmulatorModel> get availableEmulators => _availableEmulators;
-  bool get isLoading => _isLoading;
+  // Treat a deferred startup scan as a loading state so the home screen shows a
+  // spinner — not a blank screen — between initialization completing and the
+  // scan actually starting (see fix/cold-boot-empty-home).
+  bool get isLoading => _isLoading || _pendingStartupScan;
   bool get isScanning => _isScanning;
   String? get error => _error;
   bool get isScanningRoms => _isScanningRoms;
