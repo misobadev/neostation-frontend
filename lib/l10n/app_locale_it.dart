@@ -33,6 +33,7 @@ const Map<String, dynamic> appLocaleIt = {
 
   AppLocale.settings: 'Impostazioni',
   AppLocale.general: 'Generale',
+  AppLocale.secondaryDisplay: 'Secondary Screen',
   AppLocale.directories: 'Directory',
   AppLocale.palettes: 'Palette',
   AppLocale.neoThemes: 'Temi',
@@ -103,6 +104,11 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.errorConfiguringRetroArchPath:
       'Errore durante la configurazione del percorso RetroArch: {error}',
   AppLocale.scanOnStartup: 'Scansiona cartelle all’avvio',
+  AppLocale.nowPlayingDimAfter: 'Dim Now Playing after',
+  AppLocale.nowPlayingDimAfterSubtitle: 'Inactivity before the in-game panel dims on the secondary screen',
+  AppLocale.nowPlayingDimDarkness: 'Dim darkness',
+  AppLocale.nowPlayingDimDarknessSubtitle: 'How dark the in-game panel goes when it dims',
+  AppLocale.nowPlayingDimNever: 'Never',
   AppLocale.scanOnStartupSubtitle:
       'Scansiona automaticamente le cartelle ROM all’apertura dell’app',
   AppLocale.ignoreHiddenFiles: 'Ignora elementi nascosti',

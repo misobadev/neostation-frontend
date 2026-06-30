@@ -33,6 +33,7 @@ const Map<String, dynamic> appLocaleJa = {
 
   AppLocale.settings: '設定',
   AppLocale.general: '全般',
+  AppLocale.secondaryDisplay: 'Secondary Screen',
   AppLocale.directories: 'ディレクトリ',
   AppLocale.palettes: 'パレット',
   AppLocale.neoThemes: 'テーマ',
@@ -89,6 +90,11 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.errorConfiguringRetroArchPath:
       'RetroArchのパス設定中にエラーが発生しました: {error}',
   AppLocale.scanOnStartup: '起動時にフォルダをスキャン',
+  AppLocale.nowPlayingDimAfter: 'Dim Now Playing after',
+  AppLocale.nowPlayingDimAfterSubtitle: 'Inactivity before the in-game panel dims on the secondary screen',
+  AppLocale.nowPlayingDimDarkness: 'Dim darkness',
+  AppLocale.nowPlayingDimDarknessSubtitle: 'How dark the in-game panel goes when it dims',
+  AppLocale.nowPlayingDimNever: 'Never',
   AppLocale.scanOnStartupSubtitle: 'アプリ起動時にROMフォルダを自動的にスキャン',
   AppLocale.ignoreHiddenFiles: '隠しアイテムを無視',
   AppLocale.ignoreHiddenFilesSubtitle: 'ROMスキャン中に隠しファイルとフォルダを非表示にする',

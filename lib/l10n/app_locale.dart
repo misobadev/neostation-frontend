@@ -56,6 +56,7 @@ mixin AppLocale {
   // ---------------------------------------------------------------------------
   static const String settings = 'settings';
   static const String general = 'general';
+  static const String secondaryDisplay = 'secondary_display';
   static const String directories = 'directories';
   static const String palettes = 'palettes';
   static const String neoThemes = 'neo_themes';
@@ -117,6 +118,13 @@ mixin AppLocale {
       'error_configuring_retroarch_path';
   static const String scanOnStartup = 'scan_on_startup';
   static const String scanOnStartupSubtitle = 'scan_on_startup_subtitle';
+  static const String nowPlayingDimAfter = 'now_playing_dim_after';
+  static const String nowPlayingDimAfterSubtitle =
+      'now_playing_dim_after_subtitle';
+  static const String nowPlayingDimDarkness = 'now_playing_dim_darkness';
+  static const String nowPlayingDimDarknessSubtitle =
+      'now_playing_dim_darkness_subtitle';
+  static const String nowPlayingDimNever = 'now_playing_dim_never';
   static const String ignoreHiddenFiles = 'ignore_hidden_files';
   static const String ignoreHiddenFilesSubtitle =
       'ignore_hidden_files_subtitle';

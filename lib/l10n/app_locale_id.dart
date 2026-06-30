@@ -33,6 +33,7 @@ const Map<String, dynamic> appLocaleId = {
 
   AppLocale.settings: 'Pengaturan',
   AppLocale.general: 'Umum',
+  AppLocale.secondaryDisplay: 'Secondary Screen',
   AppLocale.directories: 'Direktori',
   AppLocale.palettes: 'Palet',
   AppLocale.neoThemes: 'Tema',
@@ -100,6 +101,11 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.errorConfiguringRetroArchPath:
       'Kesalahan saat mengonfigurasi jalur RetroArch: {error}',
   AppLocale.scanOnStartup: 'Pindai folder saat mulai',
+  AppLocale.nowPlayingDimAfter: 'Dim Now Playing after',
+  AppLocale.nowPlayingDimAfterSubtitle: 'Inactivity before the in-game panel dims on the secondary screen',
+  AppLocale.nowPlayingDimDarkness: 'Dim darkness',
+  AppLocale.nowPlayingDimDarknessSubtitle: 'How dark the in-game panel goes when it dims',
+  AppLocale.nowPlayingDimNever: 'Never',
   AppLocale.scanOnStartupSubtitle:
       'Pindai folder ROM secara otomatis saat membuka aplikasi',
   AppLocale.ignoreHiddenFiles: 'Abaikan item tersembunyi',

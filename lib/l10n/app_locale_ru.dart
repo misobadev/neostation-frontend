@@ -33,6 +33,7 @@ const Map<String, dynamic> appLocaleRu = {
 
   AppLocale.settings: 'Настройки',
   AppLocale.general: 'Общие',
+  AppLocale.secondaryDisplay: 'Secondary Screen',
   AppLocale.directories: 'Директории',
   AppLocale.palettes: 'Палитры',
   AppLocale.neoThemes: 'Темы',
@@ -100,6 +101,11 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.errorConfiguringRetroArchPath:
       'Ошибка при настройке пути для RetroArch: {error}',
   AppLocale.scanOnStartup: 'Сканировать папки при запуске',
+  AppLocale.nowPlayingDimAfter: 'Dim Now Playing after',
+  AppLocale.nowPlayingDimAfterSubtitle: 'Inactivity before the in-game panel dims on the secondary screen',
+  AppLocale.nowPlayingDimDarkness: 'Dim darkness',
+  AppLocale.nowPlayingDimDarknessSubtitle: 'How dark the in-game panel goes when it dims',
+  AppLocale.nowPlayingDimNever: 'Never',
   AppLocale.scanOnStartupSubtitle:
       'Автоматически сканировать папки ROM при запуске приложения',
   AppLocale.ignoreHiddenFiles: 'Игнорировать скрытые элементы',

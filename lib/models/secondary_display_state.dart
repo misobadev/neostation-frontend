@@ -152,6 +152,15 @@ class SecondaryDisplayStateData {
   /// ([DateTime] does not survive the JSON bridge), or null if never played.
   final int? lastPlayedMillis;
 
+  /// Seconds of inactivity before the in-game Now Playing panel dims, or `0`
+  /// for "never dim". User setting, only meaningful while a secondary display
+  /// is active.
+  final int nowPlayingDimDelay;
+
+  /// How dark the Now Playing panel goes when dimmed, as a percentage 0–100
+  /// (0 = no dim, 100 = pure black). User setting.
+  final int nowPlayingDimLevel;
+
   SecondaryDisplayStateData({
     required this.systemName,
     this.gameFanart,
@@ -197,6 +206,8 @@ class SecondaryDisplayStateData {
     this.gameBoxart,
     this.playTimeSeconds,
     this.lastPlayedMillis,
+    this.nowPlayingDimDelay = 5,
+    this.nowPlayingDimLevel = 100,
   });
 
   /// Returns a new instance with the specified properties updated.
@@ -263,6 +274,8 @@ class SecondaryDisplayStateData {
     bool clearPlayTimeSeconds = false,
     int? lastPlayedMillis,
     bool clearLastPlayed = false,
+    int? nowPlayingDimDelay,
+    int? nowPlayingDimLevel,
   }) {
     return SecondaryDisplayStateData(
       systemName: systemName ?? this.systemName,
@@ -329,6 +342,8 @@ class SecondaryDisplayStateData {
       lastPlayedMillis: clearLastPlayed
           ? null
           : (lastPlayedMillis ?? this.lastPlayedMillis),
+      nowPlayingDimDelay: nowPlayingDimDelay ?? this.nowPlayingDimDelay,
+      nowPlayingDimLevel: nowPlayingDimLevel ?? this.nowPlayingDimLevel,
     );
   }
 
@@ -393,6 +408,8 @@ class SecondaryDisplayStateData {
       gameBoxart: json['gameBoxart'] as String?,
       playTimeSeconds: (json['playTimeSeconds'] as num?)?.toInt(),
       lastPlayedMillis: (json['lastPlayedMillis'] as num?)?.toInt(),
+      nowPlayingDimDelay: (json['nowPlayingDimDelay'] as num?)?.toInt() ?? 5,
+      nowPlayingDimLevel: (json['nowPlayingDimLevel'] as num?)?.toInt() ?? 100,
     );
   }
 
@@ -445,6 +462,8 @@ class SecondaryDisplayStateData {
       'gameBoxart': gameBoxart,
       'playTimeSeconds': playTimeSeconds,
       'lastPlayedMillis': lastPlayedMillis,
+      'nowPlayingDimDelay': nowPlayingDimDelay,
+      'nowPlayingDimLevel': nowPlayingDimLevel,
     };
   }
 }
@@ -530,6 +549,8 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     bool clearPlayTimeSeconds = false,
     int? lastPlayedMillis,
     bool clearLastPlayed = false,
+    int? nowPlayingDimDelay,
+    int? nowPlayingDimLevel,
   }) async {
     if (!Platform.isAndroid) return;
 
@@ -601,6 +622,8 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
           clearPlayTimeSeconds: clearPlayTimeSeconds,
           lastPlayedMillis: lastPlayedMillis,
           clearLastPlayed: clearLastPlayed,
+          nowPlayingDimDelay: nowPlayingDimDelay,
+          nowPlayingDimLevel: nowPlayingDimLevel,
         ),
       );
     } catch (e) {

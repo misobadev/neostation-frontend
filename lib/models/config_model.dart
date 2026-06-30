@@ -65,6 +65,14 @@ class ConfigModel {
   /// Whether to hide the "Recently Played" card from the main dashboard.
   final bool hideRecentCard;
 
+  /// Seconds of inactivity before the secondary "Now Playing" panel dims, or `0`
+  /// to never dim. Only meaningful when a secondary display is active.
+  final int nowPlayingDimDelay;
+
+  /// How dark the secondary "Now Playing" panel goes when it dims, as a
+  /// percentage 0–100 (0 = no dim, 100 = pure black).
+  final int nowPlayingDimLevel;
+
   /// ID of the active sync provider (matches [ISyncProvider.providerId]).
   final String activeSyncProvider;
 
@@ -111,6 +119,8 @@ class ConfigModel {
     this.systemGridColumns = 'M',
     this.gameGridColumns = 'M',
     this.gameCarouselCardStyle = 'fanart',
+    this.nowPlayingDimDelay = 5,
+    this.nowPlayingDimLevel = 100,
   });
 
   /// Convenience getter that returns the primary ROM folder, if any are configured.
@@ -225,6 +235,22 @@ class ConfigModel {
                   json['game_carousel_card_style'] ??
                   'fanart')
               .toString(),
+      nowPlayingDimDelay:
+          int.tryParse(
+                (json['nowPlayingDimDelay'] ??
+                        json['now_playing_dim_delay'] ??
+                        5)
+                    .toString(),
+              ) ??
+          5,
+      nowPlayingDimLevel:
+          int.tryParse(
+                (json['nowPlayingDimLevel'] ??
+                        json['now_playing_dim_level'] ??
+                        100)
+                    .toString(),
+              ) ??
+          100,
     );
   }
 
@@ -263,6 +289,8 @@ class ConfigModel {
       'systemGridColumns': systemGridColumns,
       'gameGridColumns': gameGridColumns,
       'gameCarouselCardStyle': gameCarouselCardStyle,
+      'nowPlayingDimDelay': nowPlayingDimDelay,
+      'nowPlayingDimLevel': nowPlayingDimLevel,
     };
   }
 
@@ -295,6 +323,8 @@ class ConfigModel {
     String? systemGridColumns,
     String? gameGridColumns,
     String? gameCarouselCardStyle,
+    int? nowPlayingDimDelay,
+    int? nowPlayingDimLevel,
   }) {
     return ConfigModel(
       romFolders: romFolders ?? this.romFolders,
@@ -325,6 +355,8 @@ class ConfigModel {
       gameGridColumns: gameGridColumns ?? this.gameGridColumns,
       gameCarouselCardStyle:
           gameCarouselCardStyle ?? this.gameCarouselCardStyle,
+      nowPlayingDimDelay: nowPlayingDimDelay ?? this.nowPlayingDimDelay,
+      nowPlayingDimLevel: nowPlayingDimLevel ?? this.nowPlayingDimLevel,
     );
   }
 

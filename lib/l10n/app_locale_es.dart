@@ -33,6 +33,7 @@ const Map<String, dynamic> appLocaleEs = {
 
   AppLocale.settings: 'Ajustes',
   AppLocale.general: 'General',
+  AppLocale.secondaryDisplay: 'Pantalla secundaria',
   AppLocale.directories: 'Directorios',
   AppLocale.palettes: 'Paletas',
   AppLocale.neoThemes: 'Themes',
@@ -103,6 +104,11 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.errorConfiguringRetroArchPath:
       'Error al configurar la ruta de RetroArch: {error}',
   AppLocale.scanOnStartup: 'Escanear al Iniciar',
+  AppLocale.nowPlayingDimAfter: 'Atenuar «Reproduciendo» tras',
+  AppLocale.nowPlayingDimAfterSubtitle: 'Inactividad antes de atenuar el panel en la pantalla secundaria',
+  AppLocale.nowPlayingDimDarkness: 'Nivel de oscurecimiento',
+  AppLocale.nowPlayingDimDarknessSubtitle: 'Cuánto se oscurece el panel al atenuarse',
+  AppLocale.nowPlayingDimNever: 'Nunca',
   AppLocale.scanOnStartupSubtitle:
       'Escanear carpetas de ROMs automáticamente al iniciar la app',
   AppLocale.ignoreHiddenFiles: 'Ignorar elementos ocultos',

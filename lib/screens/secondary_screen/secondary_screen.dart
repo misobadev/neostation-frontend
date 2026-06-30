@@ -53,7 +53,6 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   /// touch — wakes it to full brightness and restarts the countdown.
   Timer? _dimTimer;
   bool _inGameDimmed = false;
-  static const _dimAfter = Duration(seconds: 5);
 
   @override
   void initState() {
@@ -195,7 +194,10 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     if (_inGameDimmed && mounted) {
       setState(() => _inGameDimmed = false);
     }
-    _dimTimer = Timer(_dimAfter, () {
+    // User setting: 0 seconds means "never dim", so leave the panel lit.
+    final delaySeconds = _secondaryDisplayState?.value?.nowPlayingDimDelay ?? 5;
+    if (delaySeconds <= 0) return;
+    _dimTimer = Timer(Duration(seconds: delaySeconds), () {
       if (mounted) setState(() => _inGameDimmed = true);
     });
   }
@@ -779,7 +781,9 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
             child: IgnorePointer(
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 500),
-                opacity: _inGameDimmed ? 1.0 : 0.0,
+                opacity: _inGameDimmed
+                    ? value.nowPlayingDimLevel.clamp(0, 100) / 100.0
+                    : 0.0,
                 child: const ColoredBox(color: Colors.black),
               ),
             ),

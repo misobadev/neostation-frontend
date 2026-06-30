@@ -97,6 +97,11 @@ class SqliteConfigProvider extends ChangeNotifier {
   /// The shared secondary display state instance (null on non-Android platforms).
   SecondaryDisplayState? get secondaryDisplayState => _secondaryDisplayState;
 
+  /// True when a secondary display is currently active (connected and not
+  /// hidden). Drives visibility of secondary-only settings.
+  bool get isSecondaryActive =>
+      _secondaryDisplayState?.value?.isSecondaryActive ?? false;
+
   /// True when a startup scan was requested but deferred for update checks.
   bool get pendingStartupScan => _pendingStartupScan;
 
@@ -1281,6 +1286,26 @@ class SqliteConfigProvider extends ChangeNotifier {
     await updateVideoSound(!_config.videoSound);
   }
 
+  /// Sets the inactivity delay (seconds) before the secondary Now Playing panel
+  /// dims; `0` disables dimming. Persists and pushes the value to the secondary
+  /// display.
+  Future<void> updateNowPlayingDimDelay(int seconds) async {
+    _config = _config.copyWith(nowPlayingDimDelay: seconds);
+    await SqliteConfigService.saveConfig(_config);
+    _secondaryDisplayState?.updateState(nowPlayingDimDelay: seconds);
+    notifyListeners();
+  }
+
+  /// Sets how dark the secondary Now Playing panel goes when dimmed (0–100%).
+  /// Persists and pushes the value to the secondary display.
+  Future<void> updateNowPlayingDimLevel(int percent) async {
+    final clamped = percent.clamp(0, 100);
+    _config = _config.copyWith(nowPlayingDimLevel: clamped);
+    await SqliteConfigService.saveConfig(_config);
+    _secondaryDisplayState?.updateState(nowPlayingDimLevel: clamped);
+    notifyListeners();
+  }
+
   /// Marks the initial application onboarding as completed.
   Future<void> completeSetup() async {
     _config = _config.copyWith(setupCompleted: true);
@@ -1309,7 +1334,10 @@ class SqliteConfigProvider extends ChangeNotifier {
           hideBottomScreen: value,
           backgroundColor: backgroundColor ?? current.backgroundColor,
           muteToggleTrigger: current.muteToggleTrigger,
-          isSecondaryActive: value ? false : current.isSecondaryActive,
+          // Hiding deactivates the secondary; un-hiding reactivates it. Mirror
+          // the toggle directly — preserving the prior value would leave it
+          // stuck inactive, since hiding has already forced it false.
+          isSecondaryActive: !value,
         );
       }
     }
@@ -1348,7 +1376,11 @@ class SqliteConfigProvider extends ChangeNotifier {
     if (_secondaryDisplayState == null) return;
 
     if (connected && !_config.hideBottomScreen) {
-      _secondaryDisplayState!.updateState(isSecondaryActive: true);
+      _secondaryDisplayState!.updateState(
+        isSecondaryActive: true,
+        nowPlayingDimDelay: _config.nowPlayingDimDelay,
+        nowPlayingDimLevel: _config.nowPlayingDimLevel,
+      );
     } else {
       _secondaryDisplayState!.updateState(isSecondaryActive: false);
     }
