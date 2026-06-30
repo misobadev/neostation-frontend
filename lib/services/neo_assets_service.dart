@@ -391,11 +391,7 @@ class NeoAssetsService {
     int missing = 0;
     for (final system in systemFolderNames) {
       final bgWebp = await backgroundCachePath(themeFolder, system);
-      final bgGif = await backgroundCachePath(
-        themeFolder,
-        system,
-        ext: 'gif',
-      );
+      final bgGif = await backgroundCachePath(themeFolder, system, ext: 'gif');
       if (!await File(bgWebp).exists() && !await File(bgGif).exists()) {
         missing++;
       }
@@ -504,11 +500,7 @@ class NeoAssetsService {
     int done = 0;
     for (final system in systemFolderNames) {
       final bgWebp = await backgroundCachePath(themeFolder, system);
-      final bgGif = await backgroundCachePath(
-        themeFolder,
-        system,
-        ext: 'gif',
-      );
+      final bgGif = await backgroundCachePath(themeFolder, system, ext: 'gif');
       if (!await File(bgWebp).exists() && !await File(bgGif).exists()) {
         final bgUrl = getBackgroundUrl(themeFolder, system);
         var result = await downloadAndCacheAsset(bgUrl, bgWebp);
