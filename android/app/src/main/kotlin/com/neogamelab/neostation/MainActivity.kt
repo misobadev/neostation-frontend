@@ -45,6 +45,9 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     private var secondaryDisplayChannel: MethodChannel? = null // Canal para pantalla secundaria
     private var gameLaunchTimestamp: Long = 0 // Timestamp del lanzamiento del juego
     private var displayListener: android.hardware.display.DisplayManager.DisplayListener? = null
+    // True while the Now Playing presentation is hidden to reveal a dock-launched
+    // app on the secondary display; restored when NeoStation resumes.
+    private var presentationHiddenForApp = false
 
     // Usar directorio por defecto para cores; no verificar existencia por permisos
     private fun getDefaultLibretroDirectory(retroArchPackage: String): String {
@@ -56,7 +59,10 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     }
 
     override fun createSubScreenPresentation(display: Display): FlutterPresentation? {
-        return null
+        // Custom presentation that registers a secondary-engine-only MethodChannel
+        // so the bottom-screen app dock can list/launch Android apps directly
+        // (the secondary engine can't reach the main "/game" channel).
+        return SecondaryAppsPresentation(this, display, getSubScreenEntryPoint())
     }
 
     override fun onLaunchSubScreen(display: Display) {
@@ -546,7 +552,10 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
 
     override fun onResume() {
         super.onResume()
-        
+
+        // Bring back the Now Playing panel if it was hidden for a dock-launched app.
+        restoreSecondaryAfterApp()
+
         if (isGameActive) {
             // Calcular tiempo transcurrido desde el lanzamiento (si tenemos timestamp)
             var elapsedSeconds = 0
@@ -643,7 +652,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
 
     // --- NEW ANDROID APPS/GAMES LOGIC (SCAN EVERYTHING) ---
 
-    private fun getInstalledApps(includeSystemApps: Boolean, result: MethodChannel.Result) {
+    internal fun getInstalledApps(includeSystemApps: Boolean, result: MethodChannel.Result) {
         Thread {
             try {
                 val pm = packageManager
@@ -734,7 +743,84 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         }
     }
 
-    private fun getAppIcon(packageName: String, result: MethodChannel.Result) {
+    /**
+     * Launches [packageName] preferring the secondary (bottom) display, falling
+     * back to the default display if the OS rejects the targeted launch. Used by
+     * the bottom-screen app dock.
+     */
+    internal fun launchPackageOnSecondaryDisplay(packageName: String, result: MethodChannel.Result) {
+        try {
+            val intent = packageManager.getLaunchIntentForPackage(packageName)
+            if (intent == null) {
+                result.error("LAUNCH_FAILED", "Could not find launch intent for package", null)
+                return
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // Block gamepad briefly to avoid accidental inputs on return.
+            setGamepadBlockInternal(true, 2000)
+
+            val dm = getSystemService(android.content.Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
+            val secondaryDisplay = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
+
+            if (secondaryDisplay != null) {
+                try {
+                    val options = android.app.ActivityOptions.makeBasic()
+                        .setLaunchDisplayId(secondaryDisplay.displayId)
+                    startActivity(intent, options.toBundle())
+                    // The Now Playing presentation is a TYPE_PRESENTATION window
+                    // that layers above normal activities, so it would hide the
+                    // app we just launched on the same display. Hide it (keeping
+                    // the engine + dock state alive) and restore it on resume.
+                    hideSecondaryForApp(packageName, secondaryDisplay.displayId)
+                    result.success(true)
+                    return
+                } catch (e: Exception) {
+                    android.util.Log.w("MainActivity", "Secondary-display launch failed, falling back: ${e.message}")
+                }
+            }
+
+            // Fallback: launch on the default (top) display.
+            startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("LAUNCH_FAILED", e.message, null)
+        }
+    }
+
+    /**
+     * Hides the Now Playing presentation so a dock-launched app is visible, and
+     * (if the accessibility service is granted) watches the secondary display so
+     * Now Playing is restored the moment the app is dismissed.
+     */
+    private fun hideSecondaryForApp(packageName: String, displayId: Int) {
+        try {
+            subScreenPresentation?.let {
+                if (it.isShowing) {
+                    it.hide()
+                    presentationHiddenForApp = true
+                }
+            }
+            ScreenshotAccessibilityService.startWatch(packageName, displayId) {
+                Handler(Looper.getMainLooper()).post { restoreSecondaryAfterApp() }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Hiding secondary for app failed: ${e.message}")
+        }
+    }
+
+    /** Restores the Now Playing presentation hidden by a dock launch. */
+    private fun restoreSecondaryAfterApp() {
+        ScreenshotAccessibilityService.stopWatch()
+        if (!presentationHiddenForApp) return
+        presentationHiddenForApp = false
+        try {
+            subScreenPresentation?.show()
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Restoring secondary after app failed: ${e.message}")
+        }
+    }
+
+    internal fun getAppIcon(packageName: String, result: MethodChannel.Result) {
         Thread {
             try {
                 val iconDrawable = packageManager.getApplicationIcon(packageName)

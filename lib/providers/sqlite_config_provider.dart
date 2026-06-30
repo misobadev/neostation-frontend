@@ -49,6 +49,7 @@ class SqliteConfigProvider extends ChangeNotifier {
   SecondaryDisplayState? _secondaryDisplayState;
   int _lastMuteToggleTrigger = 0;
   int _lastScreenshotTrigger = 0;
+  int _lastDockEditTrigger = 0;
   bool _hasAllFilesAccess = false;
   Set<String> _hiddenSystems = {};
 
@@ -209,6 +210,8 @@ class SqliteConfigProvider extends ChangeNotifier {
           await _secondaryDisplayState!.initialSync;
         }
         resetSecondaryInGameState();
+        // Seed the app-dock slots so the dock renders from a cold start.
+        _secondaryDisplayState!.updateState(dockApps: _config.dockApps);
       }
 
       // Automatically scan if there are ROM folders configured AND we have permissions
@@ -1322,6 +1325,16 @@ class SqliteConfigProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Persists the secondary app-dock slot assignments (one package name per
+  /// slot, empty string = free) and pushes them to the secondary display.
+  Future<void> updateDockApps(List<String> apps) async {
+    final normalized = ConfigModel.normalizeDock(apps);
+    _config = _config.copyWith(dockApps: normalized);
+    await SqliteConfigService.saveConfig(_config);
+    _secondaryDisplayState?.updateState(dockApps: normalized);
+    notifyListeners();
+  }
+
   /// Marks the initial application onboarding as completed.
   Future<void> completeSetup() async {
     _config = _config.copyWith(setupCompleted: true);
@@ -1400,6 +1413,7 @@ class SqliteConfigProvider extends ChangeNotifier {
         isSecondaryActive: true,
         nowPlayingDimDelay: _config.nowPlayingDimDelay,
         nowPlayingDimLevel: _config.nowPlayingDimLevel,
+        dockApps: _config.dockApps,
       );
       // ignore: unawaited_futures
       refreshSecondaryScreenshotAccess();
@@ -1439,6 +1453,13 @@ class SqliteConfigProvider extends ChangeNotifier {
         _lastScreenshotTrigger = state.screenshotTrigger;
         // ignore: unawaited_futures
         _handleSecondaryScreenshotRequest();
+      }
+      if (state.dockEditTrigger > _lastDockEditTrigger) {
+        _lastDockEditTrigger = state.dockEditTrigger;
+        // The secondary already shows the new layout; persist it on the main
+        // engine (the source of truth for SQLite).
+        // ignore: unawaited_futures
+        updateDockApps(state.dockApps);
       }
     }
   }

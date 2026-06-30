@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
@@ -166,6 +167,7 @@ class SqliteConfigService {
         systemGridColumns:
             userConfig?['system_grid_columns']?.toString() ?? 'M',
         gameGridColumns: userConfig?['game_grid_columns']?.toString() ?? 'M',
+        dockApps: ConfigModel.normalizeDock(userConfig?['dock_apps']),
       );
     } catch (e) {
       _log.e('Error applying configuration in loadConfig: $e');
@@ -203,6 +205,7 @@ class SqliteConfigService {
         autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
         systemGridColumns: config.systemGridColumns,
         gameGridColumns: config.gameGridColumns,
+        dockApps: jsonEncode(config.dockApps),
       );
 
       await SqliteService.saveUserRomFolders(config.romFolders);

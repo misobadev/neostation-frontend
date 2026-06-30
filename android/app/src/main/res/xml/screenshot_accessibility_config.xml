@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Minimal accessibility service used solely to trigger a system screenshot via
-  performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT). It observes no events and
-  reads no window content.
+  Accessibility service with two jobs:
+   1. Trigger a system screenshot via performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT).
+   2. Watch window changes so the secondary "Now Playing" panel can be restored
+      when a dock-launched app is closed (back press) on the bottom display.
+  Window content retrieval + interactive windows are needed to read which app is
+  topmost on each display.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/screenshot_accessibility_desc"
-    android:accessibilityEventTypes="typeNotificationStateChanged"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:notificationTimeout="100"
-    android:canRetrieveWindowContent="false" />
+    android:notificationTimeout="0"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true" />

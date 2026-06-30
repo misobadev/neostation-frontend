@@ -1,7 +1,34 @@
+import 'dart:convert';
+
 import 'emulator_model.dart';
 
 /// Represents the global application configuration and user preferences.
 class ConfigModel {
+  /// Number of slots in the secondary "Now Playing" app dock.
+  static const int dockSlotCount = 5;
+
+  /// Coerces an arbitrary value into a fixed-length [dockSlotCount] list of
+  /// package-name strings, accepting either a `List` or a JSON-encoded string.
+  static List<String> normalizeDock(dynamic raw) {
+    List<dynamic> list;
+    if (raw is List) {
+      list = raw;
+    } else if (raw is String && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        list = decoded is List ? decoded : const [];
+      } catch (_) {
+        list = const [];
+      }
+    } else {
+      list = const [];
+    }
+    final out = List<String>.filled(dockSlotCount, '');
+    for (var i = 0; i < dockSlotCount && i < list.length; i++) {
+      out[i] = list[i]?.toString() ?? '';
+    }
+    return out;
+  }
   /// List of absolute paths to directories containing game ROMs.
   final List<String> romFolders;
 
@@ -73,6 +100,10 @@ class ConfigModel {
   /// percentage 0–100 (0 = no dim, 100 = pure black).
   final int nowPlayingDimLevel;
 
+  /// Package names occupying the secondary "Now Playing" app dock, one entry
+  /// per slot. Always [dockSlotCount] long; an empty string marks a free slot.
+  final List<String> dockApps;
+
   /// ID of the active sync provider (matches [ISyncProvider.providerId]).
   final String activeSyncProvider;
 
@@ -121,6 +152,7 @@ class ConfigModel {
     this.gameCarouselCardStyle = 'fanart',
     this.nowPlayingDimDelay = 5,
     this.nowPlayingDimLevel = 100,
+    this.dockApps = const ['', '', '', '', ''],
   });
 
   /// Convenience getter that returns the primary ROM folder, if any are configured.
@@ -251,6 +283,7 @@ class ConfigModel {
                     .toString(),
               ) ??
           100,
+      dockApps: normalizeDock(json['dockApps'] ?? json['dock_apps']),
     );
   }
 
@@ -291,6 +324,7 @@ class ConfigModel {
       'gameCarouselCardStyle': gameCarouselCardStyle,
       'nowPlayingDimDelay': nowPlayingDimDelay,
       'nowPlayingDimLevel': nowPlayingDimLevel,
+      'dockApps': dockApps,
     };
   }
 
@@ -325,6 +359,7 @@ class ConfigModel {
     String? gameCarouselCardStyle,
     int? nowPlayingDimDelay,
     int? nowPlayingDimLevel,
+    List<String>? dockApps,
   }) {
     return ConfigModel(
       romFolders: romFolders ?? this.romFolders,
@@ -357,6 +392,7 @@ class ConfigModel {
           gameCarouselCardStyle ?? this.gameCarouselCardStyle,
       nowPlayingDimDelay: nowPlayingDimDelay ?? this.nowPlayingDimDelay,
       nowPlayingDimLevel: nowPlayingDimLevel ?? this.nowPlayingDimLevel,
+      dockApps: dockApps ?? this.dockApps,
     );
   }
 

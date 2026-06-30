@@ -1213,6 +1213,15 @@ class SqliteService {
       }
     }
 
+    // FIX: Ensure user_config includes the secondary app-dock column.
+    if (tableNames.contains('user_config')) {
+      try {
+        await _ensureUserConfigColumns(db);
+      } catch (e) {
+        _log.e('Minor fix for user_config columns failed: $e');
+      }
+    }
+
     // FIX: Ensure unique_identifier column in app_emulators.
     if (tableNames.contains('app_emulators')) {
       try {
@@ -1320,6 +1329,22 @@ class SqliteService {
       }
     } catch (e) {
       _log.e('Minor fix ensuring system settings columns failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Ensures required columns exist in user_config (added after the table's
+  /// original schema).
+  Future<void> _ensureUserConfigColumns(DatabaseAdapter db) async {
+    try {
+      final tableInfo = await db.rawQuery('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+
+      if (!columns.contains('dock_apps')) {
+        await db.execute('ALTER TABLE user_config ADD COLUMN dock_apps TEXT');
+      }
+    } catch (e) {
+      _log.e('Minor fix ensuring user_config columns failed: $e');
       rethrow;
     }
   }
@@ -1566,7 +1591,8 @@ class SqliteService {
         auto_update_systems INTEGER DEFAULT 1,
         system_grid_columns TEXT DEFAULT 'M',
         game_grid_columns TEXT DEFAULT 'M',
-        use_12_hour_clock INTEGER DEFAULT 0
+        use_12_hour_clock INTEGER DEFAULT 0,
+        dock_apps TEXT
       );
       ''',
       '''
@@ -2272,6 +2298,7 @@ class SqliteService {
     int? autoUpdateSystems,
     String? systemGridColumns,
     String? gameGridColumns,
+    String? dockApps,
   }) async {
     final db = await instance.database;
 
@@ -2352,6 +2379,9 @@ class SqliteService {
     }
     if (gameGridColumns != null) {
       newConfig['game_grid_columns'] = gameGridColumns;
+    }
+    if (dockApps != null) {
+      newConfig['dock_apps'] = dockApps;
     }
 
     await db.insert(

@@ -169,6 +169,14 @@ class SecondaryDisplayStateData {
   /// (0 = no dim, 100 = pure black). User setting.
   final int nowPlayingDimLevel;
 
+  /// Package names occupying the Now Playing app dock, one per slot. Pushed by
+  /// the main engine; an empty string marks a free slot.
+  final List<String> dockApps;
+
+  /// Monotonic counter the secondary bumps when the user assigns or clears a
+  /// dock slot, signalling the main engine to persist [dockApps].
+  final int dockEditTrigger;
+
   SecondaryDisplayStateData({
     required this.systemName,
     this.gameFanart,
@@ -218,6 +226,8 @@ class SecondaryDisplayStateData {
     this.lastPlayedMillis,
     this.nowPlayingDimDelay = 5,
     this.nowPlayingDimLevel = 100,
+    this.dockApps = const ['', '', '', '', ''],
+    this.dockEditTrigger = 0,
   });
 
   /// Returns a new instance with the specified properties updated.
@@ -288,6 +298,8 @@ class SecondaryDisplayStateData {
     bool clearLastPlayed = false,
     int? nowPlayingDimDelay,
     int? nowPlayingDimLevel,
+    List<String>? dockApps,
+    int? dockEditTrigger,
   }) {
     return SecondaryDisplayStateData(
       systemName: systemName ?? this.systemName,
@@ -359,6 +371,8 @@ class SecondaryDisplayStateData {
           : (lastPlayedMillis ?? this.lastPlayedMillis),
       nowPlayingDimDelay: nowPlayingDimDelay ?? this.nowPlayingDimDelay,
       nowPlayingDimLevel: nowPlayingDimLevel ?? this.nowPlayingDimLevel,
+      dockApps: dockApps ?? this.dockApps,
+      dockEditTrigger: dockEditTrigger ?? this.dockEditTrigger,
     );
   }
 
@@ -428,6 +442,12 @@ class SecondaryDisplayStateData {
       lastPlayedMillis: (json['lastPlayedMillis'] as num?)?.toInt(),
       nowPlayingDimDelay: (json['nowPlayingDimDelay'] as num?)?.toInt() ?? 5,
       nowPlayingDimLevel: (json['nowPlayingDimLevel'] as num?)?.toInt() ?? 100,
+      dockApps: json['dockApps'] is List
+          ? (json['dockApps'] as List<dynamic>)
+                .map((e) => e?.toString() ?? '')
+                .toList()
+          : const ['', '', '', '', ''],
+      dockEditTrigger: (json['dockEditTrigger'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -484,6 +504,8 @@ class SecondaryDisplayStateData {
       'lastPlayedMillis': lastPlayedMillis,
       'nowPlayingDimDelay': nowPlayingDimDelay,
       'nowPlayingDimLevel': nowPlayingDimLevel,
+      'dockApps': dockApps,
+      'dockEditTrigger': dockEditTrigger,
     };
   }
 }
@@ -573,6 +595,8 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     bool clearLastPlayed = false,
     int? nowPlayingDimDelay,
     int? nowPlayingDimLevel,
+    List<String>? dockApps,
+    int? dockEditTrigger,
   }) async {
     if (!Platform.isAndroid) return;
 
@@ -648,6 +672,8 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
           clearLastPlayed: clearLastPlayed,
           nowPlayingDimDelay: nowPlayingDimDelay,
           nowPlayingDimLevel: nowPlayingDimLevel,
+          dockApps: dockApps,
+          dockEditTrigger: dockEditTrigger,
         ),
       );
     } catch (e) {

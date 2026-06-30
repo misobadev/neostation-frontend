@@ -5,7 +5,9 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:neostation/services/secondary_apps_service.dart';
 import 'package:video_player/video_player.dart';
+import '../../models/config_model.dart';
 import '../../models/secondary_achievement_item.dart';
 import '../../models/secondary_display_state.dart';
 import '../../widgets/shaders/shader_gif_widget.dart';
@@ -53,6 +55,14 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   /// touch — wakes it to full brightness and restarts the countdown.
   Timer? _dimTimer;
   bool _inGameDimmed = false;
+
+  /// Dock slot index currently being assigned via the app picker, or null when
+  /// the picker is closed.
+  int? _pickerSlot;
+
+  /// Installed-app list backing the picker; null until first loaded.
+  List<Map<String, dynamic>>? _pickerApps;
+  bool _loadingPickerApps = false;
 
   @override
   void initState() {
@@ -312,6 +322,73 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         screenshotTrigger: state.screenshotTrigger + 1,
       );
     }
+  }
+
+  /// Current dock slot assignments, always [ConfigModel.dockSlotCount] long.
+  List<String> get _dockApps {
+    final apps = _secondaryDisplayState?.value?.dockApps;
+    return ConfigModel.normalizeDock(apps);
+  }
+
+  /// Writes a new dock layout to shared state and bumps the edit trigger so the
+  /// main engine persists it.
+  void _commitDock(List<String> next) {
+    final state = _secondaryDisplayState?.value;
+    if (state == null) return;
+    _secondaryDisplayState?.updateState(
+      dockApps: next,
+      dockEditTrigger: state.dockEditTrigger + 1,
+    );
+  }
+
+  /// Opens the app picker for [slot], lazily loading the installed-app list.
+  Future<void> _openAppPicker(int slot) async {
+    _wakeInGamePanel();
+    SfxService().playNavSound();
+    setState(() => _pickerSlot = slot);
+    if (_pickerApps == null && !_loadingPickerApps) {
+      setState(() => _loadingPickerApps = true);
+      final apps = await SecondaryAppsService.getInstalledApps();
+      if (!mounted) return;
+      setState(() {
+        _pickerApps = apps;
+        _loadingPickerApps = false;
+      });
+    }
+  }
+
+  void _closeAppPicker() {
+    setState(() => _pickerSlot = null);
+  }
+
+  /// Assigns [package] to the pending picker slot and closes the picker.
+  void _assignSlot(String package) {
+    final slot = _pickerSlot;
+    if (slot == null) return;
+    final next = List<String>.from(_dockApps);
+    if (slot >= 0 && slot < next.length) {
+      next[slot] = package;
+      _commitDock(next);
+    }
+    _closeAppPicker();
+  }
+
+  /// Empties dock [slot] (long-press on a filled slot).
+  void _clearSlot(int slot) {
+    _wakeInGamePanel();
+    SfxService().playNavSound();
+    final next = List<String>.from(_dockApps);
+    if (slot >= 0 && slot < next.length) {
+      next[slot] = '';
+      _commitDock(next);
+    }
+  }
+
+  /// Launches a docked app, preferring the bottom display.
+  void _launchDockApp(String package) {
+    _wakeInGamePanel();
+    SfxService().playNavSound();
+    SecondaryAppsService.launchAppOnSecondary(package);
   }
 
   @override
@@ -820,6 +897,9 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
               ),
             ),
           ),
+          // App picker overlay sits above the dim scrim so opening it (which
+          // also wakes the panel) is always visible.
+          if (_pickerSlot != null) _buildAppPickerOverlay(),
         ],
       ),
     );
@@ -914,10 +994,13 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       color: value.backgroundColor != null
           ? Color(value.backgroundColor!)
           : Colors.black,
-      padding: EdgeInsets.symmetric(horizontal: 44.r, vertical: 32.r),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Stack(
         children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(44.r, 32.r, 44.r, 96.r),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
           _buildNowPlayingBoxart(value.gameBoxart),
           SizedBox(width: 32.r),
           Expanded(
@@ -983,6 +1066,15 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
               ],
             ),
           ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildAppDock(value),
+          ),
         ],
       ),
     );
@@ -1020,6 +1112,196 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The app dock pinned to the bottom of the Now Playing page: a centered row
+  /// of [ConfigModel.dockSlotCount] slots. Tap a filled slot to launch it, tap
+  /// an empty slot to pick an app, long-press a filled slot to clear it.
+  Widget _buildAppDock(SecondaryDisplayStateData value) {
+    final apps = ConfigModel.normalizeDock(value.dockApps);
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 12.r),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            Colors.black.withValues(alpha: 0.55),
+            Colors.black.withValues(alpha: 0.0),
+          ],
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (var i = 0; i < apps.length; i++) ...[
+            if (i > 0) SizedBox(width: 14.r),
+            _buildDockSlot(i, apps[i]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// A single dock slot. [package] empty = free slot.
+  Widget _buildDockSlot(int index, String package) {
+    final filled = package.isNotEmpty;
+    return GestureDetector(
+      onTap: () => filled ? _launchDockApp(package) : _openAppPicker(index),
+      onLongPress: filled ? () => _clearSlot(index) : null,
+      child: Container(
+        width: 56.r,
+        height: 56.r,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: filled ? 0.10 : 0.05),
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: filled ? 0.22 : 0.14),
+          ),
+        ),
+        child: filled
+            ? Padding(
+                padding: EdgeInsets.all(8.r),
+                child: _buildDockIcon(package),
+              )
+            : Icon(
+                Symbols.add_rounded,
+                color: Colors.white.withValues(alpha: 0.45),
+                size: 26.r,
+              ),
+      ),
+    );
+  }
+
+  /// Lazily loads and renders a docked app's launcher icon (cached in
+  /// [SecondaryAppsService]).
+  Widget _buildDockIcon(String package) {
+    return FutureBuilder<Uint8List?>(
+      future: SecondaryAppsService.getAppIcon(package),
+      builder: (context, snapshot) {
+        final bytes = snapshot.data;
+        if (bytes != null) {
+          return Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true);
+        }
+        return Icon(
+          Symbols.android_rounded,
+          color: Colors.white.withValues(alpha: 0.6),
+          size: 24.r,
+        );
+      },
+    );
+  }
+
+  /// Full-panel overlay for choosing an app for the pending dock slot. Tapping
+  /// the backdrop cancels; tapping an app assigns it.
+  Widget _buildAppPickerOverlay() {
+    return Positioned.fill(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _closeAppPicker,
+        child: ColoredBox(
+          color: Colors.black.withValues(alpha: 0.82),
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.all(20.r),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'CHOOSE AN APP',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16.r,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 2.r,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: _closeAppPicker,
+                        child: Icon(
+                          Symbols.close_rounded,
+                          color: Colors.white,
+                          size: 26.r,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16.r),
+                  Expanded(child: _buildAppPickerGrid()),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppPickerGrid() {
+    if (_loadingPickerApps || _pickerApps == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
+    }
+    final apps = _pickerApps!;
+    if (apps.isEmpty) {
+      return Center(
+        child: Text(
+          'No apps found',
+          style: TextStyle(color: Colors.white70, fontSize: 14.r),
+        ),
+      );
+    }
+    // Swallow taps inside the grid so they don't hit the dismiss backdrop.
+    return GestureDetector(
+      onTap: () {},
+      child: GridView.builder(
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 128.r,
+          mainAxisSpacing: 20.r,
+          crossAxisSpacing: 20.r,
+          childAspectRatio: 0.82,
+        ),
+        itemCount: apps.length,
+        itemBuilder: (context, i) {
+          final app = apps[i];
+          final package = (app['package'] ?? '').toString();
+          final name = (app['name'] ?? package).toString();
+          return _buildPickerTile(package, name);
+        },
+      ),
+    );
+  }
+
+  Widget _buildPickerTile(String package, String name) {
+    return GestureDetector(
+      onTap: package.isEmpty ? null : () => _assignSlot(package),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 84.r,
+            height: 84.r,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(18.r),
+            ),
+            padding: EdgeInsets.all(12.r),
+            child: _buildDockIcon(package),
+          ),
+          SizedBox(height: 8.r),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white70, fontSize: 10.r),
+          ),
+        ],
       ),
     );
   }
