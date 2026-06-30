@@ -404,6 +404,14 @@ class _SystemGamesListState extends State<SystemGamesList> {
               // off whether a description is present).
               if (_selectedGame?.romname == romname) {
                 _loadLocalizedDescription();
+                // Push the freshly-scraped media to the secondary screen and
+                // the main background right away. The main list rebuilds from
+                // _selectedGame via setState, but the secondary window is a
+                // separate engine fed only through _updateSecondaryDisplay —
+                // without this it stays stale until the selection changes.
+                _updateBackground(updatedGame);
+                _updateSecondaryDisplay(updatedGame, forceMediaRefresh: true);
+                _updateSecondaryDisplayVideo(updatedGame);
               }
             }
           }
@@ -761,7 +769,16 @@ class _SystemGamesListState extends State<SystemGamesList> {
   }
 
   /// Synchronizes selection metadata and assets with secondary hardware displays.
-  void _updateSecondaryDisplay(GameModel game) async {
+  ///
+  /// [forceMediaRefresh] forces a push even when every media path is unchanged
+  /// and bumps [SecondaryDisplayStateData.mediaRevision]. Use it after a
+  /// re-scrape (forceOverwrite) rewrites the art in place: the paths stay the
+  /// same, so the dedup below would otherwise skip the update and the secondary
+  /// engine would keep showing the stale cached bitmap.
+  void _updateSecondaryDisplay(
+    GameModel game, {
+    bool forceMediaRefresh = false,
+  }) async {
     if (_secondaryDisplayState == null || _isNavigatingBack) return;
 
     final systemFolderName =
@@ -783,6 +800,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
       _fileProvider,
     );
 
+    final wheelPath = game.getImagePath(
+      systemFolderName,
+      'wheels',
+      _fileProvider,
+    );
+
     final videoPath = _getVideoPath(game);
     final videoExists = await _fileProvider.fileExists(videoPath);
 
@@ -794,9 +817,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
     final isMusicSystem = widget.system.folderName == 'music';
 
-    // State optimization: Skip updates if metadata remains identical.
+    // State optimization: Skip updates if metadata remains identical. A forced
+    // media refresh (post re-scrape) always pushes — the paths are unchanged
+    // but their bytes are not, so the secondary engine must be told to re-decode.
     final currentState = _secondaryDisplayState?.value;
     final bool shouldUpdate =
+        forceMediaRefresh ||
         currentState == null ||
         currentState.systemName != widget.system.realName ||
         currentState.gameId !=
@@ -815,6 +841,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
                       : null)) ||
         currentState.gameVideo !=
             (isMusicSystem ? null : (videoExists ? videoPath : null)) ||
+        currentState.gameWheel !=
+            (isMusicSystem
+                ? null
+                : (File(wheelPath).existsSync() ? wheelPath : null)) ||
         currentState.isVideoMuted != isVideoMuted ||
         currentState.isGameLaunching != _isGameLaunching;
 
@@ -822,6 +852,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
       final bool hasFanart = !isMusicSystem && File(fanartPath).existsSync();
       final bool hasScreenshot =
           !isMusicSystem && File(screenshotPath).existsSync();
+      final bool hasWheel = !isMusicSystem && File(wheelPath).existsSync();
 
       // ignore: unawaited_futures
       _secondaryDisplayState?.updateState(
@@ -830,8 +861,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
         gameScreenshot: hasScreenshot ? screenshotPath : null,
         clearFanart: !hasFanart,
         clearScreenshot: !hasScreenshot,
-        gameWheel: null,
-        clearWheel: true,
+        gameWheel: hasWheel ? wheelPath : null,
+        clearWheel: !hasWheel,
         gameVideo: null, // Reset video state during active scrolling.
         clearVideo: true,
         gameImageBytes: null,
@@ -848,6 +879,11 @@ class _SystemGamesListState extends State<SystemGamesList> {
             ? MusicPlayerService().activeTrack?.romPath
             : game.romPath,
         isScraperLoggedIn: isScraperLoggedIn,
+        // Bump the revision on a forced refresh so the secondary engine evicts
+        // its now-stale cached bitmaps and re-decodes the same paths from disk.
+        mediaRevision: forceMediaRefresh
+            ? (currentState?.mediaRevision ?? 0) + 1
+            : null,
       );
     }
 

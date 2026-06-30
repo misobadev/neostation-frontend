@@ -97,6 +97,13 @@ class SecondaryDisplayStateData {
   /// Whether to optimize the secondary display for OLED panels (e.g., using pure blacks).
   final bool isOled;
 
+  /// Monotonic counter bumped whenever the current game's media is rewritten in
+  /// place (e.g. a re-scrape with forceOverwrite). The image paths stay the same
+  /// but their bytes change, so the secondary engine — which has its own image
+  /// cache and keys its widgets on the path — needs this to know it must evict
+  /// and re-decode rather than show the stale cached bitmap.
+  final int mediaRevision;
+
   SecondaryDisplayStateData({
     required this.systemName,
     this.gameFanart,
@@ -127,6 +134,7 @@ class SecondaryDisplayStateData {
     this.shaderColor2,
     this.useFluidShader = false,
     this.isOled = false,
+    this.mediaRevision = 0,
   });
 
   /// Returns a new instance with the specified properties updated.
@@ -170,6 +178,7 @@ class SecondaryDisplayStateData {
     int? shaderColor2,
     bool? useFluidShader,
     bool? isOled,
+    int? mediaRevision,
   }) {
     return SecondaryDisplayStateData(
       systemName: systemName ?? this.systemName,
@@ -211,6 +220,7 @@ class SecondaryDisplayStateData {
       shaderColor2: shaderColor2 ?? this.shaderColor2,
       useFluidShader: useFluidShader ?? this.useFluidShader,
       isOled: isOled ?? this.isOled,
+      mediaRevision: mediaRevision ?? this.mediaRevision,
     );
   }
 
@@ -248,6 +258,7 @@ class SecondaryDisplayStateData {
       shaderColor2: json['shaderColor2'] as int?,
       useFluidShader: json['useFluidShader'] as bool? ?? false,
       isOled: json['isOled'] as bool? ?? false,
+      mediaRevision: json['mediaRevision'] as int? ?? 0,
     );
   }
 
@@ -285,6 +296,7 @@ class SecondaryDisplayStateData {
       'shaderColor2': shaderColor2,
       'useFluidShader': useFluidShader,
       'isOled': isOled,
+      'mediaRevision': mediaRevision,
     };
   }
 }
@@ -347,6 +359,7 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     int? shaderColor2,
     bool? useFluidShader,
     bool? isOled,
+    int? mediaRevision,
   }) async {
     if (!Platform.isAndroid) return;
 
@@ -395,6 +408,7 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
           shaderColor2: shaderColor2,
           useFluidShader: useFluidShader,
           isOled: isOled,
+          mediaRevision: mediaRevision,
         ),
       );
     } catch (e) {

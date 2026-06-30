@@ -23,6 +23,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   Timer? _videoTimer;
   bool _showVideo = false;
   String? _currentVideoPath;
+  int _lastMediaRevision = 0;
 
   @override
   void initState() {
@@ -42,6 +43,20 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   void _onStateChanged() {
     final state = _secondaryDisplayState?.value;
     if (state == null) return;
+
+    // A re-scrape rewrites the art at the same path, so this engine's image
+    // cache still holds the old bitmap. When the producer bumps mediaRevision,
+    // clear the cache so the rebuild (its ValueKey also carries the revision)
+    // re-decodes the fresh bytes from disk. The secondary engine only ever
+    // shows one game's art, so a full clear is cheap — and it correctly drops
+    // the wheel's ResizeImage-wrapped entries, which a bare FileImage.evict
+    // would miss.
+    if (state.mediaRevision != _lastMediaRevision) {
+      _lastMediaRevision = state.mediaRevision;
+      final imageCache = PaintingBinding.instance.imageCache;
+      imageCache.clear();
+      imageCache.clearLiveImages();
+    }
 
     if (state.isGameLaunching) {
       _stopVideo();
@@ -195,7 +210,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                     ),
                                 child: Stack(
                                   key: ValueKey(
-                                    'game_content_${value.systemName}_${value.gameId}_${value.gameScreenshot ?? 'none'}_${value.gameImageBytes != null ? value.gameImageBytes.hashCode : 'none'}',
+                                    'game_content_${value.systemName}_${value.gameId}_${value.gameScreenshot ?? 'none'}_${value.gameFanart ?? 'none'}_${value.gameWheel ?? 'none'}_${value.gameImageBytes != null ? value.gameImageBytes.hashCode : 'none'}_${value.mediaRevision}',
                                   ),
                                   fit: StackFit.expand,
                                   children: [
@@ -213,7 +228,10 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                             value.gameScreenshot!,
                                             fit: BoxFit
                                                 .contain, // "se debe ver completo"
-                                          ),
+                                          )
+                                        else if (value.gameFanart != null ||
+                                            value.gameWheel != null)
+                                          _buildFanartWithLogo(value),
                                       ] else ...[
                                         if (value.gameImageBytes != null)
                                           _buildBackgroundBytes(
@@ -226,7 +244,10 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                             value.gameScreenshot!,
                                             fit: BoxFit
                                                 .contain, // "se debe ver completo"
-                                          ),
+                                          )
+                                        else if (value.gameFanart != null ||
+                                            value.gameWheel != null)
+                                          _buildFanartWithLogo(value),
                                       ],
                                     ],
                                   ],
@@ -335,6 +356,55 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
 
   Widget _buildDefaultBackground() {
     return const SizedBox.shrink();
+  }
+
+  /// Mirrors the main screen's game art as a fallback when no screenshot or
+  /// video is available: fanart filling the screen (cover) with the game's
+  /// wheel/logo centered on top. Either asset is optional — a logo-only game
+  /// shows just the centered logo over the app background, and a fanart-only
+  /// game shows just the fanart.
+  Widget _buildFanartWithLogo(SecondaryDisplayStateData value) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (value.gameFanart != null)
+          _buildBackground(value.gameFanart!, fit: BoxFit.cover),
+        if (value.gameWheel != null)
+          Center(
+            child: Padding(
+              padding: EdgeInsets.all(48.r),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Drop shadow: black-tinted copy offset behind the logo,
+                  // mirroring the main screen's wheel shadow treatment.
+                  Transform.translate(
+                    offset: Offset(4.r, 4.r),
+                    child: Image.file(
+                      File(value.gameWheel!),
+                      fit: BoxFit.contain,
+                      width: 600.r,
+                      filterQuality: FilterQuality.low,
+                      cacheWidth: 32,
+                      color: Colors.black.withValues(alpha: 0.7),
+                      errorBuilder: (context, error, stackTrace) =>
+                          const SizedBox.shrink(),
+                    ),
+                  ),
+                  Image.file(
+                    File(value.gameWheel!),
+                    fit: BoxFit.contain,
+                    width: 600.r,
+                    cacheWidth: 640,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildUnifiedAppBackground(SecondaryDisplayStateData value) {
