@@ -48,6 +48,13 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   Timer? _playTimeTicker;
   final Stopwatch _sessionWatch = Stopwatch();
 
+  /// Dims the in-game container after a spell of no activity, to cut glare and
+  /// burn-in while playing. Any activity — launch, page flip, a new unlock, or a
+  /// touch — wakes it to full brightness and restarts the countdown.
+  Timer? _dimTimer;
+  bool _inGameDimmed = false;
+  static const _dimAfter = Duration(seconds: 5);
+
   @override
   void initState() {
     super.initState();
@@ -131,6 +138,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         if (raAvailable) _inGamePanelPage = 1;
       });
     }
+    _wakeInGamePanel();
     _celebrationTimer = Timer(const Duration(seconds: 8), () {
       if (mounted) setState(() => _celebrate = false);
     });
@@ -149,8 +157,10 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
 
     if (freshLaunch) {
       _startPlayTimeTicker();
+      _wakeInGamePanel();
     } else if (exited) {
       _stopPlayTimeTicker();
+      _cancelDim();
     }
 
     if (freshLaunch && _inGamePanelPage != 0 && mounted) {
@@ -176,6 +186,24 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     _sessionWatch
       ..stop()
       ..reset();
+  }
+
+  /// Wakes the in-game container to full brightness and (re)arms the idle dim
+  /// countdown. Called on every activity event.
+  void _wakeInGamePanel() {
+    _dimTimer?.cancel();
+    if (_inGameDimmed && mounted) {
+      setState(() => _inGameDimmed = false);
+    }
+    _dimTimer = Timer(_dimAfter, () {
+      if (mounted) setState(() => _inGameDimmed = true);
+    });
+  }
+
+  void _cancelDim() {
+    _dimTimer?.cancel();
+    _dimTimer = null;
+    _inGameDimmed = false;
   }
 
   void _startVideoTimer(String path) {
@@ -242,6 +270,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     _secondaryDisplayState?.dispose();
     _celebrationTimer?.cancel();
     _playTimeTicker?.cancel();
+    _dimTimer?.cancel();
     _stopVideo();
     super.dispose();
   }
@@ -735,6 +764,36 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         value.showAchievementPanel && value.achievements != null;
     final page = (_inGamePanelPage == 1 && raAvailable) ? 1 : 0;
 
+    // Idle-dim wrapper: any touch wakes the panel (translucent so it never
+    // swallows chevron taps). Once the idle countdown elapses a full-bleed black
+    // scrim fades in over everything — panel and background art alike — so the
+    // display goes to near-black regardless of the current palette.
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _wakeInGamePanel(),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _buildInGamePanelBody(value, raAvailable, page),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 500),
+                opacity: _inGameDimmed ? 1.0 : 0.0,
+                child: const ColoredBox(color: Colors.black),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInGamePanelBody(
+    SecondaryDisplayStateData value,
+    bool raAvailable,
+    int page,
+  ) {
     return Stack(
       children: [
         // Opaque backdrop: while the two pages cross-fade they are both
@@ -780,6 +839,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         child: GestureDetector(
           onTap: () {
             SfxService().playNavSound();
+            _wakeInGamePanel();
             setState(() => _inGamePanelPage = left ? 0 : 1);
           },
           child: Container(
