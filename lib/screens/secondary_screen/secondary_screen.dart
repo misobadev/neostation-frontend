@@ -42,6 +42,12 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   bool _wasNowPlayingActive = false;
   String? _panelGameId;
 
+  /// Ticks once a second while a game is active so the Now Playing "PLAY TIME"
+  /// stat counts up live. [_sessionWatch] measures the current session, which is
+  /// added to the DB-supplied total at render time.
+  Timer? _playTimeTicker;
+  final Stopwatch _sessionWatch = Stopwatch();
+
   @override
   void initState() {
     super.initState();
@@ -137,11 +143,39 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     final freshLaunch =
         state.nowPlayingActive &&
         (!_wasNowPlayingActive || state.gameId != _panelGameId);
+    final exited = _wasNowPlayingActive && !state.nowPlayingActive;
     _wasNowPlayingActive = state.nowPlayingActive;
     _panelGameId = state.gameId;
+
+    if (freshLaunch) {
+      _startPlayTimeTicker();
+    } else if (exited) {
+      _stopPlayTimeTicker();
+    }
+
     if (freshLaunch && _inGamePanelPage != 0 && mounted) {
       setState(() => _inGamePanelPage = 0);
     }
+  }
+
+  /// Restarts the session stopwatch and the per-second repaint so the live
+  /// PLAY TIME counts up from zero for this launch.
+  void _startPlayTimeTicker() {
+    _sessionWatch
+      ..reset()
+      ..start();
+    _playTimeTicker?.cancel();
+    _playTimeTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _stopPlayTimeTicker() {
+    _playTimeTicker?.cancel();
+    _playTimeTicker = null;
+    _sessionWatch
+      ..stop()
+      ..reset();
   }
 
   void _startVideoTimer(String path) {
@@ -207,6 +241,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     _secondaryDisplayState?.removeListener(_onStateChanged);
     _secondaryDisplayState?.dispose();
     _celebrationTimer?.cancel();
+    _playTimeTicker?.cancel();
     _stopVideo();
     super.dispose();
   }
@@ -831,6 +866,14 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                   label: 'PLAY TIME',
                   text: _formatPlayTime(value.playTimeSeconds),
                 ),
+                if (_sessionWatch.isRunning) ...[
+                  SizedBox(height: 12.r),
+                  _buildNowPlayingStat(
+                    icon: Symbols.timer_rounded,
+                    label: 'SESSION',
+                    text: _formatSessionTime(),
+                  ),
+                ],
                 SizedBox(height: 12.r),
                 _buildNowPlayingStat(
                   icon: Symbols.history_rounded,
@@ -914,6 +957,21 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     if (h > 0) return '${h}h ${m}m';
     if (m > 0) return '${m}m';
     return '<1m';
+  }
+
+  /// The running session length, formatted down to the second so the per-second
+  /// tick is visible. Shown alongside the (static) total PLAY TIME while a game
+  /// is active.
+  String _formatSessionTime() {
+    final total = _sessionWatch.elapsed.inSeconds;
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final s = total % 60;
+    if (h > 0) {
+      return '${h}h ${m.toString().padLeft(2, '0')}m '
+          '${s.toString().padLeft(2, '0')}s';
+    }
+    return '${m}m ${s.toString().padLeft(2, '0')}s';
   }
 
   String _formatLastPlayed(int? millis) {
