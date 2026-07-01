@@ -421,7 +421,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 90;
+  static const int _databaseVersion = 91;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1213,15 +1213,6 @@ class SqliteService {
       }
     }
 
-    // FIX: Ensure user_config includes the secondary app-dock column.
-    if (tableNames.contains('user_config')) {
-      try {
-        await _ensureUserConfigColumns(db);
-      } catch (e) {
-        _log.e('Minor fix for user_config columns failed: $e');
-      }
-    }
-
     // FIX: Ensure unique_identifier column in app_emulators.
     if (tableNames.contains('app_emulators')) {
       try {
@@ -1329,32 +1320,6 @@ class SqliteService {
       }
     } catch (e) {
       _log.e('Minor fix ensuring system settings columns failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Ensures required columns exist in user_config (added after the table's
-  /// original schema).
-  Future<void> _ensureUserConfigColumns(DatabaseAdapter db) async {
-    try {
-      final tableInfo = await db.rawQuery('PRAGMA table_info(user_config)');
-      final columns = tableInfo.map((c) => c['name'].toString()).toList();
-
-      if (!columns.contains('dock_apps')) {
-        await db.execute('ALTER TABLE user_config ADD COLUMN dock_apps TEXT');
-      }
-      if (!columns.contains('dock_enabled')) {
-        await db.execute(
-          'ALTER TABLE user_config ADD COLUMN dock_enabled INTEGER DEFAULT 1',
-        );
-      }
-      if (!columns.contains('dock_slot_count')) {
-        await db.execute(
-          'ALTER TABLE user_config ADD COLUMN dock_slot_count INTEGER DEFAULT 3',
-        );
-      }
-    } catch (e) {
-      _log.e('Minor fix ensuring user_config columns failed: $e');
       rethrow;
     }
   }
