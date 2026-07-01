@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/providers/palette_provider.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/services/secondary_apps_service.dart';
 import 'package:video_player/video_player.dart';
@@ -430,12 +432,16 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       builder: (_, child) => ValueListenableBuilder<SecondaryDisplayStateData?>(
         valueListenable: _secondaryDisplayState ?? ValueNotifier(null),
         builder: (context, value, child) {
+          final palette = _resolvePalette(value?.themeName);
           return MaterialApp(
             debugShowCheckedModeBanner: false,
-            theme: ThemeData(
+            theme: palette.copyWith(
               scaffoldBackgroundColor: value?.backgroundColor != null
                   ? Color(value!.backgroundColor!)
-                  : Colors.black,
+                  : palette.scaffoldBackgroundColor,
+              // Match the primary app: default all text to the neostation
+              // (Anta) font so the secondary display stays on-brand.
+              textTheme: GoogleFonts.antaTextTheme(palette.textTheme),
             ),
             home: Scaffold(
               backgroundColor: value?.backgroundColor != null
@@ -1024,17 +1030,57 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
 
   /// Renders the "Now Playing" page: boxart, title, system, total play time
   /// and last-played. Shown for every launched game (page 0). View-only.
+  /// Resolves the full user-selected palette for the secondary display from the
+  /// theme name pushed by the main engine. The secondary display runs in the
+  /// same isolate as the main app, so [PaletteProvider.availablePalettes] is the
+  /// source of truth. Falls back to the brightness-appropriate neostation
+  /// palette for 'system' mode or an unknown/absent name.
+  ThemeData _resolvePalette(String? themeName) {
+    final palettes = PaletteProvider.availablePalettes;
+    final direct = themeName != null ? palettes[themeName] : null;
+    if (direct != null) return direct;
+    final brightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    return brightness == Brightness.dark
+        ? palettes['nsdark']!
+        : palettes['nslight']!;
+  }
+
+  /// WCAG contrast ratio between two opaque colors (1.0 = identical, 21.0 =
+  /// black-on-white).
+  double _contrastRatio(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    final hi = la > lb ? la : lb;
+    final lo = la > lb ? lb : la;
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  /// Builds the effective color scheme for the Now Playing panel. Text colors
+  /// are derived from the *actual* painted background luminance (not the
+  /// palette's own on-colors, which can mismatch the pushed background and
+  /// collapse contrast on light themes), while the palette's primary accent is
+  /// preserved as long as it stays legible on that background.
+  ColorScheme _panelScheme(SecondaryDisplayStateData value) {
+    final base = _resolvePalette(value.themeName).colorScheme;
+    final bg = value.backgroundColor != null
+        ? Color(value.backgroundColor!)
+        : base.surface;
+    final fg = bg.computeLuminance() > 0.5 ? const Color(0xFF14161A) : Colors.white;
+    final accent = _contrastRatio(base.primary, bg) >= 3.0 ? base.primary : fg;
+    return base.copyWith(surface: bg, onSurface: fg, primary: accent);
+  }
+
   Widget _buildNowPlayingPanel(SecondaryDisplayStateData value) {
     final title = (value.gameTitle != null && value.gameTitle!.isNotEmpty)
         ? value.gameTitle!
         : value.systemName;
+    final scheme = _panelScheme(value);
 
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: value.backgroundColor != null
-          ? Color(value.backgroundColor!)
-          : Colors.black,
+      color: scheme.surface,
       child: Stack(
         children: [
           Padding(
@@ -1052,7 +1098,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                 Text(
                   'NOW PLAYING',
                   style: TextStyle(
-                    color: const Color(0xFFFFC107),
+                    color: scheme.primary,
                     fontSize: 14.r,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 3.r,
@@ -1064,7 +1110,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: scheme.onSurface,
                     fontSize: 30.r,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1075,13 +1121,14 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white70,
+                    color: scheme.onSurface.withValues(alpha: 0.7),
                     fontSize: 16.r,
                     letterSpacing: 1.5.r,
                   ),
                 ),
                 SizedBox(height: 26.r),
                 _buildNowPlayingStat(
+                  scheme: scheme,
                   icon: Symbols.schedule_rounded,
                   label: 'PLAY TIME',
                   text: _formatPlayTime(value.playTimeSeconds),
@@ -1089,6 +1136,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                 if (_sessionWatch.isRunning) ...[
                   SizedBox(height: 12.r),
                   _buildNowPlayingStat(
+                    scheme: scheme,
                     icon: Symbols.timer_rounded,
                     label: 'SESSION',
                     text: _formatSessionTime(),
@@ -1096,13 +1144,14 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                 ],
                 SizedBox(height: 12.r),
                 _buildNowPlayingStat(
+                  scheme: scheme,
                   icon: Symbols.history_rounded,
                   label: 'LAST PLAYED',
                   text: _formatLastPlayed(value.lastPlayedMillis),
                 ),
                 if (value.screenshotAccessEnabled) ...[
                   SizedBox(height: 28.r),
-                  _buildScreenshotButton(),
+                  _buildScreenshotButton(scheme),
                 ],
               ],
             ),
@@ -1123,29 +1172,29 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
 
   /// Tappable pill that asks the main engine to capture a system screenshot of
   /// the main screen.
-  Widget _buildScreenshotButton() {
+  Widget _buildScreenshotButton(ColorScheme scheme) {
     return GestureDetector(
       onTap: _requestScreenshot,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 20.r, vertical: 12.r),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: scheme.onSurface.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          border: Border.all(color: scheme.onSurface.withValues(alpha: 0.18)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Symbols.photo_camera_rounded,
-              color: Colors.white,
+              color: scheme.onSurface,
               size: 22.r,
             ),
             SizedBox(width: 12.r),
             Text(
               'SCREENSHOT',
               style: TextStyle(
-                color: Colors.white,
+                color: scheme.onSurface,
                 fontSize: 14.r,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 2.r,
@@ -1164,6 +1213,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   Widget _buildAppDock(SecondaryDisplayStateData value) {
     if (!value.dockEnabled) return const SizedBox.shrink();
     final apps = ConfigModel.normalizeDock(value.dockApps);
+    final scheme = _panelScheme(value);
     final visibleSlots = value.dockSlotCount.clamp(
       ConfigModel.dockMinSlotCount,
       ConfigModel.dockMaxSlotCount,
@@ -1175,8 +1225,8 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
           colors: [
-            Colors.black.withValues(alpha: 0.55),
-            Colors.black.withValues(alpha: 0.0),
+            scheme.shadow.withValues(alpha: 0.55),
+            scheme.shadow.withValues(alpha: 0.0),
           ],
         ),
       ),
@@ -1185,7 +1235,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         children: [
           for (var i = 0; i < visibleSlots; i++) ...[
             if (i > 0) SizedBox(width: 14.r),
-            _buildDockSlot(i, apps[i]),
+            _buildDockSlot(i, apps[i], scheme),
           ],
         ],
       ),
@@ -1193,7 +1243,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   }
 
   /// A single dock slot. [package] empty = free slot.
-  Widget _buildDockSlot(int index, String package) {
+  Widget _buildDockSlot(int index, String package, ColorScheme scheme) {
     final filled = package.isNotEmpty;
     return GestureDetector(
       onTap: () => filled ? _launchDockApp(package) : _openAppPicker(index),
@@ -1202,10 +1252,10 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         width: 56.r,
         height: 56.r,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: filled ? 0.10 : 0.05),
+          color: scheme.onSurface.withValues(alpha: filled ? 0.10 : 0.05),
           borderRadius: BorderRadius.circular(14.r),
           border: Border.all(
-            color: Colors.white.withValues(alpha: filled ? 0.22 : 0.14),
+            color: scheme.onSurface.withValues(alpha: filled ? 0.22 : 0.14),
           ),
         ),
         child: filled
@@ -1215,7 +1265,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
               )
             : Icon(
                 Symbols.add_rounded,
-                color: Colors.white.withValues(alpha: 0.45),
+                color: scheme.onSurface.withValues(alpha: 0.45),
                 size: 26.r,
               ),
       ),
@@ -1234,7 +1284,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         }
         return Icon(
           Symbols.android_rounded,
-          color: Colors.white.withValues(alpha: 0.6),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           size: 24.r,
         );
       },
@@ -1389,18 +1439,20 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   }
 
   Widget _buildNowPlayingStat({
+    required ColorScheme scheme,
     required IconData icon,
     required String label,
     required String text,
   }) {
+    final muted = scheme.onSurface.withValues(alpha: 0.55);
     return Row(
       children: [
-        Icon(icon, color: Colors.white54, size: 20.r),
+        Icon(icon, color: muted, size: 20.r),
         SizedBox(width: 10.r),
         Text(
           '$label  ',
           style: TextStyle(
-            color: Colors.white54,
+            color: muted,
             fontSize: 14.r,
             letterSpacing: 1.r,
           ),
@@ -1408,7 +1460,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         Text(
           text,
           style: TextStyle(
-            color: Colors.white,
+            color: scheme.onSurface,
             fontSize: 16.r,
             fontWeight: FontWeight.w600,
           ),
