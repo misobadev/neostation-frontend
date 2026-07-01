@@ -210,12 +210,18 @@ class SqliteConfigProvider extends ChangeNotifier {
           await _secondaryDisplayState!.initialSync;
         }
         resetSecondaryInGameState();
-        // Seed the app-dock slots and its settings so the dock renders from a
-        // cold start.
+        // Seed the app-dock slots and the dim settings so the dock and the
+        // fanart/Now Playing dimming render from a cold start. The secondary's
+        // display-connect event doesn't fire when the panel is already attached
+        // at boot, so without this seed the state keeps its defaults and the
+        // persisted dim levels never reach the second screen.
         _secondaryDisplayState!.updateState(
           dockApps: _config.dockApps,
           dockEnabled: _config.dockEnabled,
           dockSlotCount: _config.dockSlotCount,
+          nowPlayingDimDelay: _config.nowPlayingDimDelay,
+          nowPlayingDimLevel: _config.nowPlayingDimLevel,
+          fanartDimLevel: _config.fanartDimLevel,
         );
       }
 
