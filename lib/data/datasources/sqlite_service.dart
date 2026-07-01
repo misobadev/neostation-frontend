@@ -421,7 +421,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 91;
+  static const int _databaseVersion = 92;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1569,7 +1569,10 @@ class SqliteService {
         use_12_hour_clock INTEGER DEFAULT 0,
         dock_apps TEXT,
         dock_enabled INTEGER DEFAULT 1,
-        dock_slot_count INTEGER DEFAULT 3
+        dock_slot_count INTEGER DEFAULT 3,
+        now_playing_dim_delay INTEGER DEFAULT 3,
+        now_playing_dim_level INTEGER DEFAULT 100,
+        fanart_dim_level INTEGER DEFAULT 25
       );
       ''',
       '''
@@ -2278,6 +2281,9 @@ class SqliteService {
     String? dockApps,
     int? dockEnabled,
     int? dockSlotCount,
+    int? nowPlayingDimDelay,
+    int? nowPlayingDimLevel,
+    int? fanartDimLevel,
   }) async {
     final db = await instance.database;
 
@@ -2367,6 +2373,15 @@ class SqliteService {
     }
     if (dockSlotCount != null) {
       newConfig['dock_slot_count'] = dockSlotCount;
+    }
+    if (nowPlayingDimDelay != null) {
+      newConfig['now_playing_dim_delay'] = nowPlayingDimDelay;
+    }
+    if (nowPlayingDimLevel != null) {
+      newConfig['now_playing_dim_level'] = nowPlayingDimLevel;
+    }
+    if (fanartDimLevel != null) {
+      newConfig['fanart_dim_level'] = fanartDimLevel;
     }
 
     await db.insert(

@@ -179,6 +179,23 @@ class SqliteConfigService {
                   ConfigModel.dockMinSlotCount,
                   ConfigModel.dockMaxSlotCount,
                 ),
+        nowPlayingDimDelay:
+            int.tryParse(
+              userConfig?['now_playing_dim_delay']?.toString() ?? '3',
+            ) ??
+            3,
+        nowPlayingDimLevel:
+            (int.tryParse(
+                  userConfig?['now_playing_dim_level']?.toString() ?? '100',
+                ) ??
+                100)
+                .clamp(0, 100),
+        fanartDimLevel:
+            (int.tryParse(
+                  userConfig?['fanart_dim_level']?.toString() ?? '25',
+                ) ??
+                25)
+                .clamp(0, 100),
       );
     } catch (e) {
       _log.e('Error applying configuration in loadConfig: $e');
@@ -219,6 +236,9 @@ class SqliteConfigService {
         dockApps: jsonEncode(config.dockApps),
         dockEnabled: config.dockEnabled ? 1 : 0,
         dockSlotCount: config.dockSlotCount,
+        nowPlayingDimDelay: config.nowPlayingDimDelay,
+        nowPlayingDimLevel: config.nowPlayingDimLevel,
+        fanartDimLevel: config.fanartDimLevel,
       );
 
       await SqliteService.saveUserRomFolders(config.romFolders);

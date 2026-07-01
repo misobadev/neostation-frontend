@@ -168,9 +168,9 @@ class ConfigModel {
     this.systemGridColumns = 'M',
     this.gameGridColumns = 'M',
     this.gameCarouselCardStyle = 'fanart',
-    this.nowPlayingDimDelay = 5,
+    this.nowPlayingDimDelay = 3,
     this.nowPlayingDimLevel = 100,
-    this.fanartDimLevel = 0,
+    this.fanartDimLevel = 25,
     this.dockApps = const ['', '', '', '', ''],
     this.dockEnabled = true,
     this.dockSlotCount = 3,
@@ -292,10 +292,10 @@ class ConfigModel {
           int.tryParse(
                 (json['nowPlayingDimDelay'] ??
                         json['now_playing_dim_delay'] ??
-                        5)
+                        3)
                     .toString(),
               ) ??
-          5,
+          3,
       nowPlayingDimLevel:
           int.tryParse(
                 (json['nowPlayingDimLevel'] ??
@@ -306,10 +306,10 @@ class ConfigModel {
           100,
       fanartDimLevel:
           int.tryParse(
-                (json['fanartDimLevel'] ?? json['fanart_dim_level'] ?? 0)
+                (json['fanartDimLevel'] ?? json['fanart_dim_level'] ?? 25)
                     .toString(),
               ) ??
-          0,
+          25,
       dockApps: normalizeDock(json['dockApps'] ?? json['dock_apps']),
       dockEnabled:
           (json['dockEnabled'] ?? true).toString().toLowerCase() == 'true' ||
