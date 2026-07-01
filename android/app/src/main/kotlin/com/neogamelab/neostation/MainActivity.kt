@@ -45,6 +45,10 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     private var secondaryDisplayChannel: MethodChannel? = null // Canal para pantalla secundaria
     private var gameLaunchTimestamp: Long = 0 // Timestamp del lanzamiento del juego
     private var displayListener: android.hardware.display.DisplayManager.DisplayListener? = null
+    // Bridges the device's real screen on/off state to the secondary engine, which
+    // never receives Android lifecycle callbacks, so its live SESSION timer can
+    // freeze while the device sleeps instead of counting phantom play time.
+    private var screenStateReceiver: android.content.BroadcastReceiver? = null
     // True while the Now Playing presentation is hidden to reveal a dock-launched
     // app on the secondary display; restored when NeoStation resumes.
     private var presentationHiddenForApp = false
@@ -132,6 +136,46 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                 View.SYSTEM_UI_FLAG_FULLSCREEN
             )
         }
+
+        registerScreenStateReceiver()
+    }
+
+    /// Listens for the device screen turning on/off and mirrors it into the
+    /// secondary display's shared state as [deviceScreenOn]. A play session runs
+    /// the game in a separate app, so this Activity is paused the whole time and
+    /// its lifecycle can't tell "playing" from "sleeping" — only the screen state
+    /// can, and it's the signal the secondary engine's SESSION timer needs.
+    private fun registerScreenStateReceiver() {
+        if (screenStateReceiver != null) return
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                when (intent?.action) {
+                    android.content.Intent.ACTION_SCREEN_OFF -> pushDeviceScreenOn(false)
+                    android.content.Intent.ACTION_SCREEN_ON -> pushDeviceScreenOn(true)
+                }
+            }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_SCREEN_ON)
+            addAction(android.content.Intent.ACTION_SCREEN_OFF)
+        }
+        registerReceiver(receiver, filter)
+        screenStateReceiver = receiver
+    }
+
+    /// Merges the screen-on flag into the retained secondary display state,
+    /// preserving every other field (same read-modify-write pattern as
+    /// [clearStaleSecondaryNowPlaying]).
+    private fun pushDeviceScreenOn(on: Boolean) {
+        try {
+            val type = "SecondaryDisplayState"
+            val current = SharedStateManager.getState(type)?.toMutableMap() ?: return
+            if (current["deviceScreenOn"] == on) return
+            current["deviceScreenOn"] = on
+            SharedStateManager.updateState(type, current)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "pushDeviceScreenOn: ${e.message}")
+        }
     }
 
     override fun onDestroy() {
@@ -140,6 +184,14 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             val dm = getSystemService(android.content.Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
             dm.unregisterDisplayListener(it)
         }
+        screenStateReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: IllegalArgumentException) {
+                // Already unregistered; ignore.
+            }
+        }
+        screenStateReceiver = null
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

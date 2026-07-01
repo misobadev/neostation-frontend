@@ -146,6 +146,13 @@ class SecondaryDisplayStateData {
   /// without a RetroAchievements set.
   final bool nowPlayingActive;
 
+  /// Whether the device's main screen is on. Bridged from a native
+  /// ACTION_SCREEN_ON/OFF receiver because the secondary FlutterEngine never
+  /// receives Android lifecycle callbacks. The Now Playing panel uses it to
+  /// freeze the live SESSION timer while the device sleeps. Defaults to true so
+  /// the timer runs until the first screen-off signal arrives.
+  final bool deviceScreenOn;
+
   /// Display title of the launched game (real [GameModel.name]; the RA title
   /// may differ or be null for non-RA games).
   final String? gameTitle;
@@ -220,6 +227,7 @@ class SecondaryDisplayStateData {
     this.raGameTitle,
     this.newlyEarnedIds,
     this.nowPlayingActive = false,
+    this.deviceScreenOn = true,
     this.gameTitle,
     this.gameBoxart,
     this.playTimeSeconds,
@@ -288,6 +296,7 @@ class SecondaryDisplayStateData {
     List<int>? newlyEarnedIds,
     bool clearNewlyEarnedIds = false,
     bool? nowPlayingActive,
+    bool? deviceScreenOn,
     String? gameTitle,
     bool clearGameTitle = false,
     String? gameBoxart,
@@ -361,6 +370,7 @@ class SecondaryDisplayStateData {
           ? null
           : (newlyEarnedIds ?? this.newlyEarnedIds),
       nowPlayingActive: nowPlayingActive ?? this.nowPlayingActive,
+      deviceScreenOn: deviceScreenOn ?? this.deviceScreenOn,
       gameTitle: clearGameTitle ? null : (gameTitle ?? this.gameTitle),
       gameBoxart: clearGameBoxart ? null : (gameBoxart ?? this.gameBoxart),
       playTimeSeconds: clearPlayTimeSeconds
@@ -436,6 +446,7 @@ class SecondaryDisplayStateData {
                 .toList()
           : null,
       nowPlayingActive: json['nowPlayingActive'] as bool? ?? false,
+      deviceScreenOn: json['deviceScreenOn'] as bool? ?? true,
       gameTitle: json['gameTitle'] as String?,
       gameBoxart: json['gameBoxart'] as String?,
       playTimeSeconds: (json['playTimeSeconds'] as num?)?.toInt(),
@@ -498,6 +509,7 @@ class SecondaryDisplayStateData {
       'raGameTitle': raGameTitle,
       'newlyEarnedIds': newlyEarnedIds,
       'nowPlayingActive': nowPlayingActive,
+      'deviceScreenOn': deviceScreenOn,
       'gameTitle': gameTitle,
       'gameBoxart': gameBoxart,
       'playTimeSeconds': playTimeSeconds,
@@ -585,6 +597,7 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     List<int>? newlyEarnedIds,
     bool clearNewlyEarnedIds = false,
     bool? nowPlayingActive,
+    bool? deviceScreenOn,
     String? gameTitle,
     bool clearGameTitle = false,
     String? gameBoxart,
@@ -662,6 +675,7 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
           newlyEarnedIds: newlyEarnedIds,
           clearNewlyEarnedIds: clearNewlyEarnedIds,
           nowPlayingActive: nowPlayingActive,
+          deviceScreenOn: deviceScreenOn,
           gameTitle: gameTitle,
           clearGameTitle: clearGameTitle,
           gameBoxart: gameBoxart,

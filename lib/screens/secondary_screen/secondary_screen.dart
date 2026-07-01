@@ -112,6 +112,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       imageCache.clearLiveImages();
     }
     _maybeResetInGamePage(state);
+    _applySessionPower(state);
     _maybeStartCelebration(state);
 
     if (state.isGameLaunching) {
@@ -198,6 +199,12 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     _sessionWatch
       ..reset()
       ..start();
+    _armPlayTimeTicker();
+  }
+
+  /// (Re)creates the per-second repaint timer without touching the stopwatch, so
+  /// it can be reused both for a fresh launch and for resuming after sleep.
+  void _armPlayTimeTicker() {
     _playTimeTicker?.cancel();
     _playTimeTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -210,6 +217,29 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     _sessionWatch
       ..stop()
       ..reset();
+  }
+
+  /// Freezes the live session clock while the device screen is off, resuming it
+  /// on wake. This engine never receives Android lifecycle callbacks (it runs in
+  /// a separate FlutterEngine behind the sub_screen Presentation), and a play
+  /// session runs the game in a separate app — so the only reliable "device is
+  /// asleep" signal is [SecondaryDisplayStateData.deviceScreenOn], bridged from a
+  /// native ACTION_SCREEN_ON/OFF receiver. Without this the [Stopwatch] keeps
+  /// accruing wall-clock time while the device sleeps.
+  void _applySessionPower(SecondaryDisplayStateData state) {
+    if (!state.deviceScreenOn) {
+      // Screen off: freeze the counter where it is.
+      if (_sessionWatch.isRunning) {
+        _playTimeTicker?.cancel();
+        _playTimeTicker = null;
+        _sessionWatch.stop();
+      }
+    } else if (_wasNowPlayingActive && !_sessionWatch.isRunning) {
+      // Screen back on mid-session: resume from the frozen elapsed time.
+      _sessionWatch.start();
+      _armPlayTimeTicker();
+      if (mounted) setState(() {});
+    }
   }
 
   /// Wakes the in-game container to full brightness and (re)arms the idle dim
