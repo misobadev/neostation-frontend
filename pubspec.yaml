@@ -51,7 +51,7 @@ dependencies:
   device_info_plus: ^13.1.0
   package_info_plus: ^10.1.0
   pointycastle: ^4.0.0
-  sqlite3: ^3.3.2
+  sqlite3: ^3.3.4
   fullscreen_window: ^1.2.1
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
