@@ -1249,7 +1249,9 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         behavior: HitTestBehavior.opaque,
         onTap: _closeAppPicker,
         child: ColoredBox(
-          color: Colors.black.withValues(alpha: 0.82),
+          // Fully opaque so the Now Playing screen behind is not visible while
+          // choosing an app for a dock slot.
+          color: Colors.black,
           child: SafeArea(
             child: Padding(
               padding: EdgeInsets.all(20.r),
