@@ -1014,6 +1014,43 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
     );
     final isOled = paletteProvider.isOled;
 
+    // Recent game cards drive the secondary with the game's own art (fanart +
+    // wheel) through the game-selected path, matching the game-view browse
+    // experience so the fanart-dim setting applies here too. Pushing the fanart
+    // as a plain systemBackground (the else branch below) renders it via
+    // _buildSystemBackground, which has no dim scrim.
+    if (info.isGame && info.gameModel != null) {
+      final game = info.gameModel!;
+      final gameFolder = game.systemFolderName ?? folder;
+      final fileProvider = Provider.of<FileProvider>(context, listen: false);
+      final fanartPath = game.getImagePath(gameFolder, 'fanarts', fileProvider);
+      final wheelPath = game.getImagePath(gameFolder, 'wheels', fileProvider);
+      final hasFanart = fanartPath.isNotEmpty && File(fanartPath).existsSync();
+      final hasWheel = wheelPath.isNotEmpty && File(wheelPath).existsSync();
+
+      _secondaryDisplayState?.updateState(
+        systemName: (info.shortName ?? info.title ?? 'NEOSTATION')
+            .toUpperCase(),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor.toARGB32(),
+        isGameSelected: true,
+        gameFanart: hasFanart ? fanartPath : null,
+        clearFanart: !hasFanart,
+        gameWheel: hasWheel ? wheelPath : null,
+        clearWheel: !hasWheel,
+        gameScreenshot: null,
+        clearScreenshot: true,
+        gameVideo: null,
+        clearVideo: true,
+        gameImageBytes: null,
+        clearImageBytes: true,
+        gameId: game.romPath,
+        useShader: false,
+        useFluidShader: false,
+        isOled: isOled,
+      );
+      return;
+    }
+
     _secondaryDisplayState?.updateState(
       systemName: (info.shortName ?? info.title ?? "NEOSTATION").toUpperCase(),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor.toARGB32(),
