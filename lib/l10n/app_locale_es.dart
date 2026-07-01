@@ -116,6 +116,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.nowPlayingFanartDim: 'Atenuar fanart',
   AppLocale.nowPlayingFanartDimSubtitle: 'Oscurece el arte de fondo tras el logo para que un fanart recargado no choque con él',
   AppLocale.nowPlayingDimOff: 'Desactivado',
+  AppLocale.secondarySectionNowPlaying: 'Panel Reproduciendo',
+  AppLocale.secondarySectionDock: 'Dock de apps',
   AppLocale.screenshotAccess: 'Acceso a capturas',
   AppLocale.screenshotAccessSubtitle: 'Permite que el botón de captura grabe la pantalla principal (abre los ajustes de accesibilidad de Android)',
   AppLocale.scanOnStartupSubtitle:

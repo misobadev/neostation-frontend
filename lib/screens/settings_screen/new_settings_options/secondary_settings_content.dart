@@ -13,8 +13,8 @@ import '../../../widgets/custom_toggle_switch.dart';
 /// secondary display is active (the menu entry is hidden otherwise), so it
 /// always renders its full set of controls.
 ///
-/// Items (gamepad index order): 0 = dim delay, 1 = dim darkness,
-/// 2 = fanart dim, 3 = dock enabled, 4 = dock slots, 5 = screenshot access.
+/// Items (gamepad index order): 0 = fanart dim, 1 = screenshot access,
+/// 2 = dim delay, 3 = dim darkness, 4 = dock enabled, 5 = dock slots.
 class SecondarySettingsContent extends StatefulWidget {
   final bool isContentFocused;
   final int selectedContentIndex;
@@ -90,23 +90,23 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
   void selectItem(int index) {
     final provider = context.read<SqliteConfigProvider>();
     if (index == 0) {
-      _cycleDimDelay(provider);
+      _cycleFanartDim(provider);
     } else if (index == 1) {
+      ScreenshotService.openAccessSettings();
+    } else if (index == 2) {
+      _cycleDimDelay(provider);
+    } else if (index == 3) {
       // Darkness is meaningless when the panel never dims.
       if (provider.config.nowPlayingDimDelay > 0) {
         _cycleDimLevel(provider);
       }
-    } else if (index == 2) {
-      _cycleFanartDim(provider);
-    } else if (index == 3) {
-      provider.updateDockEnabled(!provider.config.dockEnabled);
     } else if (index == 4) {
+      provider.updateDockEnabled(!provider.config.dockEnabled);
+    } else if (index == 5) {
       // Slot count is meaningless when the dock is hidden.
       if (provider.config.dockEnabled) {
         _cycleDockSlotCount(provider);
       }
-    } else if (index == 5) {
-      ScreenshotService.openAccessSettings();
     }
   }
 
@@ -318,7 +318,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
   /// The switch reflects the granted state; toggling it (the OS service can't be
   /// flipped programmatically) opens Android's accessibility settings.
   Widget _buildScreenshotAccessRow() {
-    const index = 5;
+    const index = 1;
     final theme = Theme.of(context);
     final focused =
         widget.isContentFocused && widget.selectedContentIndex == index;
@@ -371,6 +371,37 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
     );
   }
 
+  /// Non-navigable group heading (a small primary bar + bold label), matching
+  /// the section headers used elsewhere in Settings.
+  Widget _buildSectionHeader(String label) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.r, top: 4.r, left: 2.r),
+      child: Row(
+        children: [
+          Container(
+            width: 3.r,
+            height: 14.r,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary,
+              borderRadius: BorderRadius.circular(2.r),
+            ),
+          ),
+          SizedBox(width: 8.r),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.r,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<SqliteConfigProvider>();
@@ -382,8 +413,22 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildSectionHeader(AppLocale.general.getString(context)),
           _buildValueRow(
             index: 0,
+            title: AppLocale.nowPlayingFanartDim.getString(context),
+            subtitle: AppLocale.nowPlayingFanartDimSubtitle.getString(context),
+            valueText: _fanartDimLabel(config.fanartDimLevel),
+            onTap: () => _cycleFanartDim(provider),
+          ),
+          SizedBox(height: 12.r),
+          _buildScreenshotAccessRow(),
+          SizedBox(height: 24.r),
+          _buildSectionHeader(
+            AppLocale.secondarySectionNowPlaying.getString(context),
+          ),
+          _buildValueRow(
+            index: 2,
             title: AppLocale.nowPlayingDimAfter.getString(context),
             subtitle: AppLocale.nowPlayingDimAfterSubtitle.getString(context),
             valueText: _dimDelayLabel(config.nowPlayingDimDelay),
@@ -391,24 +436,19 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
           ),
           SizedBox(height: 12.r),
           _buildValueRow(
-            index: 1,
+            index: 3,
             title: AppLocale.nowPlayingDimDarkness.getString(context),
             subtitle: AppLocale.nowPlayingDimDarknessSubtitle.getString(context),
             valueText: '${config.nowPlayingDimLevel}%',
             enabled: config.nowPlayingDimDelay > 0,
             onTap: () => _cycleDimLevel(provider),
           ),
-          SizedBox(height: 12.r),
-          _buildValueRow(
-            index: 2,
-            title: AppLocale.nowPlayingFanartDim.getString(context),
-            subtitle: AppLocale.nowPlayingFanartDimSubtitle.getString(context),
-            valueText: _fanartDimLabel(config.fanartDimLevel),
-            onTap: () => _cycleFanartDim(provider),
+          SizedBox(height: 24.r),
+          _buildSectionHeader(
+            AppLocale.secondarySectionDock.getString(context),
           ),
-          SizedBox(height: 12.r),
           _buildToggleRow(
-            index: 3,
+            index: 4,
             title: AppLocale.nowPlayingDockEnabled.getString(context),
             subtitle: AppLocale.nowPlayingDockEnabledSubtitle.getString(context),
             value: config.dockEnabled,
@@ -416,15 +456,13 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
           ),
           SizedBox(height: 12.r),
           _buildValueRow(
-            index: 4,
+            index: 5,
             title: AppLocale.nowPlayingDockSlots.getString(context),
             subtitle: AppLocale.nowPlayingDockSlotsSubtitle.getString(context),
             valueText: '${config.dockSlotCount}',
             enabled: config.dockEnabled,
             onTap: () => _cycleDockSlotCount(provider),
           ),
-          SizedBox(height: 12.r),
-          _buildScreenshotAccessRow(),
         ],
       ),
     );

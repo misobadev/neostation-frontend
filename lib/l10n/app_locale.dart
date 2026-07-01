@@ -135,6 +135,9 @@ mixin AppLocale {
   static const String nowPlayingFanartDimSubtitle =
       'now_playing_fanart_dim_subtitle';
   static const String nowPlayingDimOff = 'now_playing_dim_off';
+  static const String secondarySectionNowPlaying =
+      'secondary_section_now_playing';
+  static const String secondarySectionDock = 'secondary_section_dock';
   static const String screenshotAccess = 'screenshot_access';
   static const String screenshotAccessSubtitle = 'screenshot_access_subtitle';
   static const String ignoreHiddenFiles = 'ignore_hidden_files';
