@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/models/config_model.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/services/screenshot_service.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +14,7 @@ import '../../../widgets/custom_toggle_switch.dart';
 /// always renders its full set of controls.
 ///
 /// Items (gamepad index order): 0 = dim delay, 1 = dim darkness,
-/// 2 = screenshot access.
+/// 2 = fanart dim, 3 = dock enabled, 4 = dock slots, 5 = screenshot access.
 class SecondarySettingsContent extends StatefulWidget {
   final bool isContentFocused;
   final int selectedContentIndex;
@@ -47,7 +48,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
   @override
   void initState() {
     super.initState();
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 6; i++) {
       _itemKeys.add(GlobalKey());
     }
     WidgetsBinding.instance.addObserver(this);
@@ -83,7 +84,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
   }
 
   /// Number of navigable items in this panel.
-  int getItemCount() => 3;
+  int getItemCount() => 6;
 
   /// Dispatches a gamepad-select to the focused item.
   void selectItem(int index) {
@@ -96,8 +97,35 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
         _cycleDimLevel(provider);
       }
     } else if (index == 2) {
+      _cycleFanartDim(provider);
+    } else if (index == 3) {
+      provider.updateDockEnabled(!provider.config.dockEnabled);
+    } else if (index == 4) {
+      // Slot count is meaningless when the dock is hidden.
+      if (provider.config.dockEnabled) {
+        _cycleDockSlotCount(provider);
+      }
+    } else if (index == 5) {
       ScreenshotService.openAccessSettings();
     }
+  }
+
+  /// Cycles the fanart dim 0→25→50→75→0 (%) and persists it.
+  void _cycleFanartDim(SqliteConfigProvider provider) {
+    const steps = [0, 25, 50, 75];
+    final cur = provider.config.fanartDimLevel;
+    final i = steps.indexOf(cur);
+    final next = steps[(i < 0 ? 0 : (i + 1) % steps.length)];
+    provider.updateFanartDimLevel(next);
+  }
+
+  /// Advances the visible dock slot count 1→2→…→max→1 and persists it.
+  void _cycleDockSlotCount(SqliteConfigProvider provider) {
+    final cur = provider.config.dockSlotCount;
+    final next = cur >= ConfigModel.dockMaxSlotCount
+        ? ConfigModel.dockMinSlotCount
+        : cur + 1;
+    provider.updateDockSlotCount(next);
   }
 
   /// Scrolls the item at [index] into view for gamepad navigation.
@@ -119,6 +147,10 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
   String _dimDelayLabel(int seconds) => seconds <= 0
       ? AppLocale.nowPlayingDimNever.getString(context)
       : '${seconds}s';
+
+  String _fanartDimLabel(int percent) => percent <= 0
+      ? AppLocale.nowPlayingDimOff.getString(context)
+      : '$percent%';
 
   /// Advances the dim delay to the next stop and persists it.
   void _cycleDimDelay(SqliteConfigProvider provider) {
@@ -223,10 +255,70 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
   }
 
   /// Toggle row for screenshot access, styled like the All Files Access row.
+  /// A labelled row with a trailing on/off switch, for boolean settings.
+  Widget _buildToggleRow({
+    required int index,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    final theme = Theme.of(context);
+    final focused =
+        widget.isContentFocused && widget.selectedContentIndex == index;
+    return Container(
+      key: _itemKeys[index],
+      padding: EdgeInsets.only(left: 12.r, right: 12.r, top: 6.r, bottom: 6.r),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(
+          color: focused ? theme.colorScheme.primary : Colors.transparent,
+          width: 2,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontSize: 12.r,
+                    fontWeight: FontWeight.w500,
+                    color: focused
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface,
+                  ),
+                ),
+                SizedBox(height: 4.r),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 9.r,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          CustomToggleSwitch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: theme.colorScheme.primary,
+          ),
+        ],
+      ),
+    );
+  }
+
   /// The switch reflects the granted state; toggling it (the OS service can't be
   /// flipped programmatically) opens Android's accessibility settings.
   Widget _buildScreenshotAccessRow() {
-    const index = 2;
+    const index = 5;
     final theme = Theme.of(context);
     final focused =
         widget.isContentFocused && widget.selectedContentIndex == index;
@@ -305,6 +397,31 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
             valueText: '${config.nowPlayingDimLevel}%',
             enabled: config.nowPlayingDimDelay > 0,
             onTap: () => _cycleDimLevel(provider),
+          ),
+          SizedBox(height: 12.r),
+          _buildValueRow(
+            index: 2,
+            title: AppLocale.nowPlayingFanartDim.getString(context),
+            subtitle: AppLocale.nowPlayingFanartDimSubtitle.getString(context),
+            valueText: _fanartDimLabel(config.fanartDimLevel),
+            onTap: () => _cycleFanartDim(provider),
+          ),
+          SizedBox(height: 12.r),
+          _buildToggleRow(
+            index: 3,
+            title: AppLocale.nowPlayingDockEnabled.getString(context),
+            subtitle: AppLocale.nowPlayingDockEnabledSubtitle.getString(context),
+            value: config.dockEnabled,
+            onChanged: (v) => provider.updateDockEnabled(v),
+          ),
+          SizedBox(height: 12.r),
+          _buildValueRow(
+            index: 4,
+            title: AppLocale.nowPlayingDockSlots.getString(context),
+            subtitle: AppLocale.nowPlayingDockSlotsSubtitle.getString(context),
+            valueText: '${config.dockSlotCount}',
+            enabled: config.dockEnabled,
+            onTap: () => _cycleDockSlotCount(provider),
           ),
           SizedBox(height: 12.r),
           _buildScreenshotAccessRow(),

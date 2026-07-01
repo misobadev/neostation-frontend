@@ -354,7 +354,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     }
   }
 
-  /// Current dock slot assignments, always [ConfigModel.dockSlotCount] long.
+  /// Current dock slot assignments, always [ConfigModel.dockMaxSlots] long.
   List<String> get _dockApps {
     final apps = _secondaryDisplayState?.value?.dockApps;
     return ConfigModel.normalizeDock(apps);
@@ -660,6 +660,17 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       children: [
         if (value.gameFanart != null)
           _buildBackground(value.gameFanart!, fit: BoxFit.cover),
+        // Optional scrim over the fanart only (below the logo) so a busy
+        // background doesn't clash with the logo. The logo, drawn next, stays
+        // at full brightness.
+        if (value.gameFanart != null && value.fanartDimLevel > 0)
+          Positioned.fill(
+            child: ColoredBox(
+              color: Colors.black.withValues(
+                alpha: value.fanartDimLevel.clamp(0, 100) / 100.0,
+              ),
+            ),
+          ),
         if (value.gameWheel != null)
           Center(
             child: Padding(
@@ -1147,10 +1158,16 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   }
 
   /// The app dock pinned to the bottom of the Now Playing page: a centered row
-  /// of [ConfigModel.dockSlotCount] slots. Tap a filled slot to launch it, tap
-  /// an empty slot to pick an app, long-press a filled slot to clear it.
+  /// of [SecondaryDisplayStateData.dockSlotCount] slots (user setting). Tap a
+  /// filled slot to launch it, tap an empty slot to pick an app, long-press a
+  /// filled slot to clear it. Hidden entirely when the dock is disabled.
   Widget _buildAppDock(SecondaryDisplayStateData value) {
+    if (!value.dockEnabled) return const SizedBox.shrink();
     final apps = ConfigModel.normalizeDock(value.dockApps);
+    final visibleSlots = value.dockSlotCount.clamp(
+      ConfigModel.dockMinSlotCount,
+      ConfigModel.dockMaxSlotCount,
+    );
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 12.r),
       decoration: BoxDecoration(
@@ -1166,7 +1183,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          for (var i = 0; i < apps.length; i++) ...[
+          for (var i = 0; i < visibleSlots; i++) ...[
             if (i > 0) SizedBox(width: 14.r),
             _buildDockSlot(i, apps[i]),
           ],

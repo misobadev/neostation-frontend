@@ -210,8 +210,13 @@ class SqliteConfigProvider extends ChangeNotifier {
           await _secondaryDisplayState!.initialSync;
         }
         resetSecondaryInGameState();
-        // Seed the app-dock slots so the dock renders from a cold start.
-        _secondaryDisplayState!.updateState(dockApps: _config.dockApps);
+        // Seed the app-dock slots and its settings so the dock renders from a
+        // cold start.
+        _secondaryDisplayState!.updateState(
+          dockApps: _config.dockApps,
+          dockEnabled: _config.dockEnabled,
+          dockSlotCount: _config.dockSlotCount,
+        );
       }
 
       // Automatically scan if there are ROM folders configured AND we have permissions
@@ -1325,6 +1330,16 @@ class SqliteConfigProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sets how much the game fanart/background art is dimmed behind the logo on
+  /// the secondary screen (percentage 0–100, 0 = off). Persists and pushes it.
+  Future<void> updateFanartDimLevel(int percent) async {
+    final clamped = percent.clamp(0, 100);
+    _config = _config.copyWith(fanartDimLevel: clamped);
+    await SqliteConfigService.saveConfig(_config);
+    _secondaryDisplayState?.updateState(fanartDimLevel: clamped);
+    notifyListeners();
+  }
+
   /// Persists the secondary app-dock slot assignments (one package name per
   /// slot, empty string = free) and pushes them to the secondary display.
   Future<void> updateDockApps(List<String> apps) async {
@@ -1332,6 +1347,29 @@ class SqliteConfigProvider extends ChangeNotifier {
     _config = _config.copyWith(dockApps: normalized);
     await SqliteConfigService.saveConfig(_config);
     _secondaryDisplayState?.updateState(dockApps: normalized);
+    notifyListeners();
+  }
+
+  /// Enables or disables the secondary Now Playing app dock. Persists and
+  /// pushes the value to the secondary display.
+  Future<void> updateDockEnabled(bool enabled) async {
+    _config = _config.copyWith(dockEnabled: enabled);
+    await SqliteConfigService.saveConfig(_config);
+    _secondaryDisplayState?.updateState(dockEnabled: enabled);
+    notifyListeners();
+  }
+
+  /// Sets how many secondary dock slots are visible, clamped to
+  /// [ConfigModel.dockMinSlotCount]–[ConfigModel.dockMaxSlotCount]. Persists and
+  /// pushes the value to the secondary display.
+  Future<void> updateDockSlotCount(int count) async {
+    final clamped = count.clamp(
+      ConfigModel.dockMinSlotCount,
+      ConfigModel.dockMaxSlotCount,
+    );
+    _config = _config.copyWith(dockSlotCount: clamped);
+    await SqliteConfigService.saveConfig(_config);
+    _secondaryDisplayState?.updateState(dockSlotCount: clamped);
     notifyListeners();
   }
 
@@ -1413,7 +1451,10 @@ class SqliteConfigProvider extends ChangeNotifier {
         isSecondaryActive: true,
         nowPlayingDimDelay: _config.nowPlayingDimDelay,
         nowPlayingDimLevel: _config.nowPlayingDimLevel,
+        fanartDimLevel: _config.fanartDimLevel,
         dockApps: _config.dockApps,
+        dockEnabled: _config.dockEnabled,
+        dockSlotCount: _config.dockSlotCount,
       );
       // ignore: unawaited_futures
       refreshSecondaryScreenshotAccess();

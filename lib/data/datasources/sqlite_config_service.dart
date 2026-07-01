@@ -168,6 +168,17 @@ class SqliteConfigService {
             userConfig?['system_grid_columns']?.toString() ?? 'M',
         gameGridColumns: userConfig?['game_grid_columns']?.toString() ?? 'M',
         dockApps: ConfigModel.normalizeDock(userConfig?['dock_apps']),
+        dockEnabled:
+            (int.tryParse(userConfig?['dock_enabled']?.toString() ?? '1') ??
+                1) ==
+            1,
+        dockSlotCount:
+            (int.tryParse(userConfig?['dock_slot_count']?.toString() ?? '3') ??
+                    3)
+                .clamp(
+                  ConfigModel.dockMinSlotCount,
+                  ConfigModel.dockMaxSlotCount,
+                ),
       );
     } catch (e) {
       _log.e('Error applying configuration in loadConfig: $e');
@@ -206,6 +217,8 @@ class SqliteConfigService {
         systemGridColumns: config.systemGridColumns,
         gameGridColumns: config.gameGridColumns,
         dockApps: jsonEncode(config.dockApps),
+        dockEnabled: config.dockEnabled ? 1 : 0,
+        dockSlotCount: config.dockSlotCount,
       );
 
       await SqliteService.saveUserRomFolders(config.romFolders);

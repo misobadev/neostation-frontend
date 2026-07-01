@@ -1343,6 +1343,16 @@ class SqliteService {
       if (!columns.contains('dock_apps')) {
         await db.execute('ALTER TABLE user_config ADD COLUMN dock_apps TEXT');
       }
+      if (!columns.contains('dock_enabled')) {
+        await db.execute(
+          'ALTER TABLE user_config ADD COLUMN dock_enabled INTEGER DEFAULT 1',
+        );
+      }
+      if (!columns.contains('dock_slot_count')) {
+        await db.execute(
+          'ALTER TABLE user_config ADD COLUMN dock_slot_count INTEGER DEFAULT 3',
+        );
+      }
     } catch (e) {
       _log.e('Minor fix ensuring user_config columns failed: $e');
       rethrow;
@@ -1592,7 +1602,9 @@ class SqliteService {
         system_grid_columns TEXT DEFAULT 'M',
         game_grid_columns TEXT DEFAULT 'M',
         use_12_hour_clock INTEGER DEFAULT 0,
-        dock_apps TEXT
+        dock_apps TEXT,
+        dock_enabled INTEGER DEFAULT 1,
+        dock_slot_count INTEGER DEFAULT 3
       );
       ''',
       '''
@@ -2299,6 +2311,8 @@ class SqliteService {
     String? systemGridColumns,
     String? gameGridColumns,
     String? dockApps,
+    int? dockEnabled,
+    int? dockSlotCount,
   }) async {
     final db = await instance.database;
 
@@ -2382,6 +2396,12 @@ class SqliteService {
     }
     if (dockApps != null) {
       newConfig['dock_apps'] = dockApps;
+    }
+    if (dockEnabled != null) {
+      newConfig['dock_enabled'] = dockEnabled;
+    }
+    if (dockSlotCount != null) {
+      newConfig['dock_slot_count'] = dockSlotCount;
     }
 
     await db.insert(

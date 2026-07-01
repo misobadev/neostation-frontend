@@ -4,10 +4,16 @@ import 'emulator_model.dart';
 
 /// Represents the global application configuration and user preferences.
 class ConfigModel {
-  /// Number of slots in the secondary "Now Playing" app dock.
-  static const int dockSlotCount = 5;
+  /// Maximum number of storable slots in the secondary "Now Playing" app dock.
+  /// The dock always persists this many slots so assignments in higher slots
+  /// survive when the user shrinks the visible count ([dockSlotCount]).
+  static const int dockMaxSlots = 5;
 
-  /// Coerces an arbitrary value into a fixed-length [dockSlotCount] list of
+  /// Smallest and largest number of dock slots the user may choose to show.
+  static const int dockMinSlotCount = 1;
+  static const int dockMaxSlotCount = dockMaxSlots;
+
+  /// Coerces an arbitrary value into a fixed-length [dockMaxSlots] list of
   /// package-name strings, accepting either a `List` or a JSON-encoded string.
   static List<String> normalizeDock(dynamic raw) {
     List<dynamic> list;
@@ -23,8 +29,8 @@ class ConfigModel {
     } else {
       list = const [];
     }
-    final out = List<String>.filled(dockSlotCount, '');
-    for (var i = 0; i < dockSlotCount && i < list.length; i++) {
+    final out = List<String>.filled(dockMaxSlots, '');
+    for (var i = 0; i < dockMaxSlots && i < list.length; i++) {
       out[i] = list[i]?.toString() ?? '';
     }
     return out;
@@ -100,9 +106,21 @@ class ConfigModel {
   /// percentage 0–100 (0 = no dim, 100 = pure black).
   final int nowPlayingDimLevel;
 
+  /// How much the game fanart/background art is dimmed behind the logo on the
+  /// secondary screen, as a percentage 0–100 (0 = off/full brightness). Keeps
+  /// the logo at full brightness so it stands out against busy fanart.
+  final int fanartDimLevel;
+
   /// Package names occupying the secondary "Now Playing" app dock, one entry
-  /// per slot. Always [dockSlotCount] long; an empty string marks a free slot.
+  /// per slot. Always [dockMaxSlots] long; an empty string marks a free slot.
   final List<String> dockApps;
+
+  /// Whether the secondary "Now Playing" app dock is shown at all.
+  final bool dockEnabled;
+
+  /// How many dock slots are visible, from [dockMinSlotCount] to
+  /// [dockMaxSlotCount]. Slots beyond this stay persisted but hidden.
+  final int dockSlotCount;
 
   /// ID of the active sync provider (matches [ISyncProvider.providerId]).
   final String activeSyncProvider;
@@ -152,7 +170,10 @@ class ConfigModel {
     this.gameCarouselCardStyle = 'fanart',
     this.nowPlayingDimDelay = 5,
     this.nowPlayingDimLevel = 100,
+    this.fanartDimLevel = 0,
     this.dockApps = const ['', '', '', '', ''],
+    this.dockEnabled = true,
+    this.dockSlotCount = 3,
   });
 
   /// Convenience getter that returns the primary ROM folder, if any are configured.
@@ -283,7 +304,23 @@ class ConfigModel {
                     .toString(),
               ) ??
           100,
+      fanartDimLevel:
+          int.tryParse(
+                (json['fanartDimLevel'] ?? json['fanart_dim_level'] ?? 0)
+                    .toString(),
+              ) ??
+          0,
       dockApps: normalizeDock(json['dockApps'] ?? json['dock_apps']),
+      dockEnabled:
+          (json['dockEnabled'] ?? true).toString().toLowerCase() == 'true' ||
+          (json['dock_enabled'] ?? 1).toString() == '1',
+      dockSlotCount:
+          (int.tryParse(
+                    (json['dockSlotCount'] ?? json['dock_slot_count'] ?? 3)
+                        .toString(),
+                  ) ??
+                  3)
+              .clamp(dockMinSlotCount, dockMaxSlotCount),
     );
   }
 
@@ -324,7 +361,10 @@ class ConfigModel {
       'gameCarouselCardStyle': gameCarouselCardStyle,
       'nowPlayingDimDelay': nowPlayingDimDelay,
       'nowPlayingDimLevel': nowPlayingDimLevel,
+      'fanartDimLevel': fanartDimLevel,
       'dockApps': dockApps,
+      'dockEnabled': dockEnabled,
+      'dockSlotCount': dockSlotCount,
     };
   }
 
@@ -359,7 +399,10 @@ class ConfigModel {
     String? gameCarouselCardStyle,
     int? nowPlayingDimDelay,
     int? nowPlayingDimLevel,
+    int? fanartDimLevel,
     List<String>? dockApps,
+    bool? dockEnabled,
+    int? dockSlotCount,
   }) {
     return ConfigModel(
       romFolders: romFolders ?? this.romFolders,
@@ -392,7 +435,10 @@ class ConfigModel {
           gameCarouselCardStyle ?? this.gameCarouselCardStyle,
       nowPlayingDimDelay: nowPlayingDimDelay ?? this.nowPlayingDimDelay,
       nowPlayingDimLevel: nowPlayingDimLevel ?? this.nowPlayingDimLevel,
+      fanartDimLevel: fanartDimLevel ?? this.fanartDimLevel,
       dockApps: dockApps ?? this.dockApps,
+      dockEnabled: dockEnabled ?? this.dockEnabled,
+      dockSlotCount: dockSlotCount ?? this.dockSlotCount,
     );
   }
 

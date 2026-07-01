@@ -176,6 +176,10 @@ class SecondaryDisplayStateData {
   /// (0 = no dim, 100 = pure black). User setting.
   final int nowPlayingDimLevel;
 
+  /// How much the game fanart/background art is dimmed behind the logo, as a
+  /// percentage 0–100 (0 = off). User setting, keeps the logo full brightness.
+  final int fanartDimLevel;
+
   /// Package names occupying the Now Playing app dock, one per slot. Pushed by
   /// the main engine; an empty string marks a free slot.
   final List<String> dockApps;
@@ -183,6 +187,14 @@ class SecondaryDisplayStateData {
   /// Monotonic counter the secondary bumps when the user assigns or clears a
   /// dock slot, signalling the main engine to persist [dockApps].
   final int dockEditTrigger;
+
+  /// Whether the Now Playing app dock is shown. User setting, pushed by the
+  /// main engine.
+  final bool dockEnabled;
+
+  /// How many dock slots are visible (1–5). User setting, pushed by the main
+  /// engine; slots beyond it stay in [dockApps] but are hidden.
+  final int dockSlotCount;
 
   SecondaryDisplayStateData({
     required this.systemName,
@@ -234,8 +246,11 @@ class SecondaryDisplayStateData {
     this.lastPlayedMillis,
     this.nowPlayingDimDelay = 5,
     this.nowPlayingDimLevel = 100,
+    this.fanartDimLevel = 0,
     this.dockApps = const ['', '', '', '', ''],
     this.dockEditTrigger = 0,
+    this.dockEnabled = true,
+    this.dockSlotCount = 3,
   });
 
   /// Returns a new instance with the specified properties updated.
@@ -307,8 +322,11 @@ class SecondaryDisplayStateData {
     bool clearLastPlayed = false,
     int? nowPlayingDimDelay,
     int? nowPlayingDimLevel,
+    int? fanartDimLevel,
     List<String>? dockApps,
     int? dockEditTrigger,
+    bool? dockEnabled,
+    int? dockSlotCount,
   }) {
     return SecondaryDisplayStateData(
       systemName: systemName ?? this.systemName,
@@ -381,8 +399,11 @@ class SecondaryDisplayStateData {
           : (lastPlayedMillis ?? this.lastPlayedMillis),
       nowPlayingDimDelay: nowPlayingDimDelay ?? this.nowPlayingDimDelay,
       nowPlayingDimLevel: nowPlayingDimLevel ?? this.nowPlayingDimLevel,
+      fanartDimLevel: fanartDimLevel ?? this.fanartDimLevel,
       dockApps: dockApps ?? this.dockApps,
       dockEditTrigger: dockEditTrigger ?? this.dockEditTrigger,
+      dockEnabled: dockEnabled ?? this.dockEnabled,
+      dockSlotCount: dockSlotCount ?? this.dockSlotCount,
     );
   }
 
@@ -453,12 +474,15 @@ class SecondaryDisplayStateData {
       lastPlayedMillis: (json['lastPlayedMillis'] as num?)?.toInt(),
       nowPlayingDimDelay: (json['nowPlayingDimDelay'] as num?)?.toInt() ?? 5,
       nowPlayingDimLevel: (json['nowPlayingDimLevel'] as num?)?.toInt() ?? 100,
+      fanartDimLevel: (json['fanartDimLevel'] as num?)?.toInt() ?? 0,
       dockApps: json['dockApps'] is List
           ? (json['dockApps'] as List<dynamic>)
                 .map((e) => e?.toString() ?? '')
                 .toList()
           : const ['', '', '', '', ''],
       dockEditTrigger: (json['dockEditTrigger'] as num?)?.toInt() ?? 0,
+      dockEnabled: json['dockEnabled'] as bool? ?? true,
+      dockSlotCount: (json['dockSlotCount'] as num?)?.toInt() ?? 3,
     );
   }
 
@@ -516,8 +540,11 @@ class SecondaryDisplayStateData {
       'lastPlayedMillis': lastPlayedMillis,
       'nowPlayingDimDelay': nowPlayingDimDelay,
       'nowPlayingDimLevel': nowPlayingDimLevel,
+      'fanartDimLevel': fanartDimLevel,
       'dockApps': dockApps,
       'dockEditTrigger': dockEditTrigger,
+      'dockEnabled': dockEnabled,
+      'dockSlotCount': dockSlotCount,
     };
   }
 }
@@ -608,8 +635,11 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     bool clearLastPlayed = false,
     int? nowPlayingDimDelay,
     int? nowPlayingDimLevel,
+    int? fanartDimLevel,
     List<String>? dockApps,
     int? dockEditTrigger,
+    bool? dockEnabled,
+    int? dockSlotCount,
   }) async {
     if (!Platform.isAndroid) return;
 
@@ -686,8 +716,11 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
           clearLastPlayed: clearLastPlayed,
           nowPlayingDimDelay: nowPlayingDimDelay,
           nowPlayingDimLevel: nowPlayingDimLevel,
+          fanartDimLevel: fanartDimLevel,
           dockApps: dockApps,
           dockEditTrigger: dockEditTrigger,
+          dockEnabled: dockEnabled,
+          dockSlotCount: dockSlotCount,
         ),
       );
     } catch (e) {

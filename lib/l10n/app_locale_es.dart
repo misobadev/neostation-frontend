@@ -109,6 +109,13 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.nowPlayingDimDarkness: 'Nivel de oscurecimiento',
   AppLocale.nowPlayingDimDarknessSubtitle: 'Cuánto se oscurece el panel al atenuarse',
   AppLocale.nowPlayingDimNever: 'Nunca',
+  AppLocale.nowPlayingDockEnabled: 'Dock de apps',
+  AppLocale.nowPlayingDockEnabledSubtitle: 'Muestra el dock de apps en el panel «Reproduciendo» de la pantalla secundaria',
+  AppLocale.nowPlayingDockSlots: 'Ranuras del dock',
+  AppLocale.nowPlayingDockSlotsSubtitle: 'Cuántas ranuras de apps muestra el dock (1-5)',
+  AppLocale.nowPlayingFanartDim: 'Atenuar fanart',
+  AppLocale.nowPlayingFanartDimSubtitle: 'Oscurece el arte de fondo tras el logo para que un fanart recargado no choque con él',
+  AppLocale.nowPlayingDimOff: 'Desactivado',
   AppLocale.screenshotAccess: 'Acceso a capturas',
   AppLocale.screenshotAccessSubtitle: 'Permite que el botón de captura grabe la pantalla principal (abre los ajustes de accesibilidad de Android)',
   AppLocale.scanOnStartupSubtitle:
