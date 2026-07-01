@@ -803,7 +803,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   Widget _buildSystemLogo(SecondaryDisplayStateData value) {
     if (value.systemLogo == null) return _buildDefaultLogo();
 
-    final double logoSize = 300.r;
+    final double logoSize = 460.r;
 
     if (value.isLogoAsset) {
       return Image.asset(
