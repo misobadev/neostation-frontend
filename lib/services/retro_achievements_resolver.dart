@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../models/game_model.dart';
 import '../models/retro_achievements_summary.dart';
 import '../models/secondary_achievement_item.dart';
@@ -114,17 +116,9 @@ class RetroAchievementsResolver {
 
     // Strategy 2: sanitized filename match.
     try {
-      var filename = game.romname.contains('.')
-          ? game.romname.substring(0, game.romname.lastIndexOf('.'))
-          : game.romname;
-      filename = filename
-          .replaceAll(RegExp(r'\([^)]*\)'), '')
-          .replaceAll(RegExp(r'\[[^\]]*\]'), '')
-          .trim();
-
       final gameId = await RetroAchievementsRepository.findGameIdByFilename(
         systemFolderName,
-        filename,
+        sanitizeRomName(game.romname),
       );
       if (gameId != null && gameId != 0) return gameId;
     } catch (e) {
@@ -133,9 +127,9 @@ class RetroAchievementsResolver {
 
     // Strategy 3: heuristic match against recently-played history.
     try {
-      final normalizedLocal = _normalize(game.name);
+      final normalizedLocal = normalizeTitle(game.name);
       for (final recent in summary?.recentlyPlayed ?? const []) {
-        if (_normalize(recent.title) == normalizedLocal) {
+        if (normalizeTitle(recent.title) == normalizedLocal) {
           return recent.gameId;
         }
       }
@@ -222,7 +216,23 @@ class RetroAchievementsResolver {
     }
   }
 
-  static String _normalize(String value) {
+  /// Strips the file extension and any `(...)` / `[...]` tags (region, revision,
+  /// dump flags) from a ROM filename, leaving a bare title for RA lookup.
+  @visibleForTesting
+  static String sanitizeRomName(String romname) {
+    final withoutExtension = romname.contains('.')
+        ? romname.substring(0, romname.lastIndexOf('.'))
+        : romname;
+    return withoutExtension
+        .replaceAll(RegExp(r'\([^)]*\)'), '')
+        .replaceAll(RegExp(r'\[[^\]]*\]'), '')
+        .trim();
+  }
+
+  /// Normalizes a title for loose equality: lowercased, punctuation removed,
+  /// whitespace collapsed. Used to match local names against RA history.
+  @visibleForTesting
+  static String normalizeTitle(String value) {
     return value
         .toLowerCase()
         .replaceAll(RegExp(r'[^\w\s]'), '')
