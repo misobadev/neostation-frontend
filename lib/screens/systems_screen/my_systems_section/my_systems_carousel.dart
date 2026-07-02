@@ -22,6 +22,8 @@ import '../../game_screen/android_apps/android_apps_grid.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/palette_provider.dart';
+import 'package:neostation/providers/retro_achievements_provider.dart';
+import 'package:neostation/services/secondary_achievements_controller.dart';
 import '../../game_screen/my_games_list.dart';
 import '../../../widgets/shaders/shader_gif_widget.dart';
 import '../../../widgets/shaders/music_card_shader_background.dart';
@@ -75,6 +77,11 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   bool _pullReady = false;
 
   SecondaryDisplayState? _secondaryDisplayState;
+
+  /// Drives the live RetroAchievements panel on the secondary display for games
+  /// launched directly from the "Recent Games" cards.
+  final SecondaryAchievementsController _achievementsController =
+      SecondaryAchievementsController();
 
   /// In-memory cache for resolved ID3v2 album art.
   Uint8List? _resolvedMusicCoverBytes;
@@ -163,6 +170,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
     _secondaryDisplayState?.removeListener(_onSecondaryStateChanged);
     _cleanupGamepad();
     _scrollController.dispose();
+    _achievementsController.dispose();
     _secondaryDisplayState?.dispose();
     super.dispose();
   }
@@ -364,6 +372,24 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
         final syncProvider = context.read<SyncManager>().active!;
 
+        // Push the in-game RetroAchievements panel to the secondary display.
+        // Fired without awaiting so it never blocks the emulator handoff; it
+        // lands during launchGameWithDialog's foreground window, overlaying the
+        // recent game's art until the game exits.
+        final boxartPath = SecondaryAchievementsController.resolveBoxart(
+          systemInfo.gameModel!,
+          gameSystemModel.primaryFolderName,
+          fileProvider,
+        );
+        // ignore: unawaited_futures
+        _achievementsController.pushForLaunch(
+          state: _secondaryDisplayState,
+          provider: context.read<RetroAchievementsProvider>(),
+          game: systemInfo.gameModel!,
+          systemFolderName: gameSystemModel.primaryFolderName,
+          boxartPath: boxartPath,
+        );
+
         await launchGameWithDialog(
           context: context,
           game: systemInfo.gameModel!,
@@ -371,6 +397,8 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           fileProvider: fileProvider,
           syncProvider: syncProvider,
           onGameClosed: () {
+            // Stop the poll and hide the panel so it fades back to the art.
+            _achievementsController.stop(hidePanel: true);
             if (mounted) setState(() => _isGameLaunching = false);
             _gamepadNav.activate();
             Provider.of<SqliteDatabaseProvider>(
@@ -379,6 +407,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
             ).refresh();
           },
           onLaunchFailed: (ctx, r) async {
+            _achievementsController.stop(hidePanel: true);
             if (mounted) setState(() => _isGameLaunching = false);
             _gamepadNav.activate();
           },

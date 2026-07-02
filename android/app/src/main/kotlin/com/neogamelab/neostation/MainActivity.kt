@@ -30,6 +30,7 @@ import java.io.ByteArrayOutputStream
 import android.view.Display
 import com.hcoderlee.subscreen.sub_screen.MultiDisplayFlutterActivity
 import com.hcoderlee.subscreen.sub_screen.FlutterPresentation
+import com.hcoderlee.subscreen.sub_screen.SharedStateManager
 import androidx.core.content.FileProvider
 
 class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
@@ -44,6 +45,13 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     private var secondaryDisplayChannel: MethodChannel? = null // Canal para pantalla secundaria
     private var gameLaunchTimestamp: Long = 0 // Timestamp del lanzamiento del juego
     private var displayListener: android.hardware.display.DisplayManager.DisplayListener? = null
+    // Bridges the device's real screen on/off state to the secondary engine, which
+    // never receives Android lifecycle callbacks, so its live SESSION timer can
+    // freeze while the device sleeps instead of counting phantom play time.
+    private var screenStateReceiver: android.content.BroadcastReceiver? = null
+    // True while the Now Playing presentation is hidden to reveal a dock-launched
+    // app on the secondary display; restored when NeoStation resumes.
+    private var presentationHiddenForApp = false
 
     // Usar directorio por defecto para cores; no verificar existencia por permisos
     private fun getDefaultLibretroDirectory(retroArchPackage: String): String {
@@ -55,7 +63,10 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     }
 
     override fun createSubScreenPresentation(display: Display): FlutterPresentation? {
-        return null
+        // Custom presentation that registers a secondary-engine-only MethodChannel
+        // so the bottom-screen app dock can list/launch Android apps directly
+        // (the secondary engine can't reach the main "/game" channel).
+        return SecondaryAppsPresentation(this, display, getSubScreenEntryPoint())
     }
 
     override fun onLaunchSubScreen(display: Display) {
@@ -100,6 +111,11 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The secondary engine can survive a main-engine restart (cached engine
+        // group), so its retained shared state may still say a game is "now
+        // playing" from before the quit. Clear it before super.onCreate launches
+        // the sub screen, so the stale Now Playing panel never renders.
+        clearStaleSecondaryNowPlaying()
         super.onCreate(savedInstanceState)
 
         // Disable focus highlight for the entire activity
@@ -120,6 +136,46 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                 View.SYSTEM_UI_FLAG_FULLSCREEN
             )
         }
+
+        registerScreenStateReceiver()
+    }
+
+    /// Listens for the device screen turning on/off and mirrors it into the
+    /// secondary display's shared state as [deviceScreenOn]. A play session runs
+    /// the game in a separate app, so this Activity is paused the whole time and
+    /// its lifecycle can't tell "playing" from "sleeping" — only the screen state
+    /// can, and it's the signal the secondary engine's SESSION timer needs.
+    private fun registerScreenStateReceiver() {
+        if (screenStateReceiver != null) return
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                when (intent?.action) {
+                    android.content.Intent.ACTION_SCREEN_OFF -> pushDeviceScreenOn(false)
+                    android.content.Intent.ACTION_SCREEN_ON -> pushDeviceScreenOn(true)
+                }
+            }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_SCREEN_ON)
+            addAction(android.content.Intent.ACTION_SCREEN_OFF)
+        }
+        registerReceiver(receiver, filter)
+        screenStateReceiver = receiver
+    }
+
+    /// Merges the screen-on flag into the retained secondary display state,
+    /// preserving every other field (same read-modify-write pattern as
+    /// [clearStaleSecondaryNowPlaying]).
+    private fun pushDeviceScreenOn(on: Boolean) {
+        try {
+            val type = "SecondaryDisplayState"
+            val current = SharedStateManager.getState(type)?.toMutableMap() ?: return
+            if (current["deviceScreenOn"] == on) return
+            current["deviceScreenOn"] = on
+            SharedStateManager.updateState(type, current)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "pushDeviceScreenOn: ${e.message}")
+        }
     }
 
     override fun onDestroy() {
@@ -128,6 +184,14 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             val dm = getSystemService(android.content.Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
             dm.unregisterDisplayListener(it)
         }
+        screenStateReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: IllegalArgumentException) {
+                // Already unregistered; ignore.
+            }
+        }
+        screenStateReceiver = null
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -279,6 +343,20 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                 "startSecondaryDisplay" -> {
                     result.success(true)
                 }
+                "isScreenshotAccessEnabled" -> {
+                    result.success(isScreenshotAccessEnabled())
+                }
+                "openScreenshotAccessSettings" -> {
+                    openScreenshotAccessSettings()
+                    result.success(true)
+                }
+                "takeSystemScreenshot" -> {
+                    if (!isScreenshotAccessEnabled()) {
+                        result.success(false)
+                    } else {
+                        result.success(ScreenshotAccessibilityService.takeScreenshot())
+                    }
+                }
                 "installApk" -> {
                     val filePath = call.argument<String>("filePath")
                     if (filePath != null) {
@@ -376,6 +454,47 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             }
         } else {
             onCloseSubScreen()
+        }
+    }
+
+    /**
+     * Clears the in-game flags in the retained secondary-display shared state so
+     * a Now Playing panel left over from a quit-mid-game session doesn't render
+     * when the main engine restarts. No-op on a cold start (no retained state).
+     */
+    private fun clearStaleSecondaryNowPlaying() {
+        try {
+            val type = "SecondaryDisplayState"
+            val current = SharedStateManager.getState(type)?.toMutableMap() ?: return
+            current["nowPlayingActive"] = false
+            current["showAchievementPanel"] = false
+            SharedStateManager.updateState(type, current)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "clearStaleSecondaryNowPlaying: ${e.message}")
+        }
+    }
+
+    /** True when the user has enabled our screenshot accessibility service. */
+    private fun isScreenshotAccessEnabled(): Boolean {
+        // A connected service is the most reliable signal; fall back to the
+        // settings list in case the static reference isn't bound yet.
+        if (ScreenshotAccessibilityService.isConnected) return true
+        val enabled = android.provider.Settings.Secure.getString(
+            contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        val component = "$packageName/$packageName.ScreenshotAccessibilityService"
+        return enabled.split(':').any { it.equals(component, ignoreCase = true) }
+    }
+
+    /** Opens the system accessibility settings so the user can grant access. */
+    private fun openScreenshotAccessSettings() {
+        try {
+            val intent = android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Cannot open accessibility settings: ${e.message}")
         }
     }
 
@@ -485,7 +604,10 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
 
     override fun onResume() {
         super.onResume()
-        
+
+        // Bring back the Now Playing panel if it was hidden for a dock-launched app.
+        restoreSecondaryAfterApp()
+
         if (isGameActive) {
             // Calcular tiempo transcurrido desde el lanzamiento (si tenemos timestamp)
             var elapsedSeconds = 0
@@ -582,7 +704,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
 
     // --- NEW ANDROID APPS/GAMES LOGIC (SCAN EVERYTHING) ---
 
-    private fun getInstalledApps(includeSystemApps: Boolean, result: MethodChannel.Result) {
+    internal fun getInstalledApps(includeSystemApps: Boolean, result: MethodChannel.Result) {
         Thread {
             try {
                 val pm = packageManager
@@ -673,7 +795,84 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         }
     }
 
-    private fun getAppIcon(packageName: String, result: MethodChannel.Result) {
+    /**
+     * Launches [packageName] preferring the secondary (bottom) display, falling
+     * back to the default display if the OS rejects the targeted launch. Used by
+     * the bottom-screen app dock.
+     */
+    internal fun launchPackageOnSecondaryDisplay(packageName: String, result: MethodChannel.Result) {
+        try {
+            val intent = packageManager.getLaunchIntentForPackage(packageName)
+            if (intent == null) {
+                result.error("LAUNCH_FAILED", "Could not find launch intent for package", null)
+                return
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // Block gamepad briefly to avoid accidental inputs on return.
+            setGamepadBlockInternal(true, 2000)
+
+            val dm = getSystemService(android.content.Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
+            val secondaryDisplay = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
+
+            if (secondaryDisplay != null) {
+                try {
+                    val options = android.app.ActivityOptions.makeBasic()
+                        .setLaunchDisplayId(secondaryDisplay.displayId)
+                    startActivity(intent, options.toBundle())
+                    // The Now Playing presentation is a TYPE_PRESENTATION window
+                    // that layers above normal activities, so it would hide the
+                    // app we just launched on the same display. Hide it (keeping
+                    // the engine + dock state alive) and restore it on resume.
+                    hideSecondaryForApp(packageName, secondaryDisplay.displayId)
+                    result.success(true)
+                    return
+                } catch (e: Exception) {
+                    android.util.Log.w("MainActivity", "Secondary-display launch failed, falling back: ${e.message}")
+                }
+            }
+
+            // Fallback: launch on the default (top) display.
+            startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("LAUNCH_FAILED", e.message, null)
+        }
+    }
+
+    /**
+     * Hides the Now Playing presentation so a dock-launched app is visible, and
+     * (if the accessibility service is granted) watches the secondary display so
+     * Now Playing is restored the moment the app is dismissed.
+     */
+    private fun hideSecondaryForApp(packageName: String, displayId: Int) {
+        try {
+            subScreenPresentation?.let {
+                if (it.isShowing) {
+                    it.hide()
+                    presentationHiddenForApp = true
+                }
+            }
+            ScreenshotAccessibilityService.startWatch(packageName, displayId) {
+                Handler(Looper.getMainLooper()).post { restoreSecondaryAfterApp() }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Hiding secondary for app failed: ${e.message}")
+        }
+    }
+
+    /** Restores the Now Playing presentation hidden by a dock launch. */
+    private fun restoreSecondaryAfterApp() {
+        ScreenshotAccessibilityService.stopWatch()
+        if (!presentationHiddenForApp) return
+        presentationHiddenForApp = false
+        try {
+            subScreenPresentation?.show()
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Restoring secondary after app failed: ${e.message}")
+        }
+    }
+
+    internal fun getAppIcon(packageName: String, result: MethodChannel.Result) {
         Thread {
             try {
                 val iconDrawable = packageManager.getApplicationIcon(packageName)

@@ -56,6 +56,7 @@ mixin AppLocale {
   // ---------------------------------------------------------------------------
   static const String settings = 'settings';
   static const String general = 'general';
+  static const String secondaryDisplay = 'secondary_display';
   static const String directories = 'directories';
   static const String palettes = 'palettes';
   static const String neoThemes = 'neo_themes';
@@ -117,6 +118,28 @@ mixin AppLocale {
       'error_configuring_retroarch_path';
   static const String scanOnStartup = 'scan_on_startup';
   static const String scanOnStartupSubtitle = 'scan_on_startup_subtitle';
+  static const String nowPlayingDimAfter = 'now_playing_dim_after';
+  static const String nowPlayingDimAfterSubtitle =
+      'now_playing_dim_after_subtitle';
+  static const String nowPlayingDimDarkness = 'now_playing_dim_darkness';
+  static const String nowPlayingDimDarknessSubtitle =
+      'now_playing_dim_darkness_subtitle';
+  static const String nowPlayingDimNever = 'now_playing_dim_never';
+  static const String nowPlayingDockEnabled = 'now_playing_dock_enabled';
+  static const String nowPlayingDockEnabledSubtitle =
+      'now_playing_dock_enabled_subtitle';
+  static const String nowPlayingDockSlots = 'now_playing_dock_slots';
+  static const String nowPlayingDockSlotsSubtitle =
+      'now_playing_dock_slots_subtitle';
+  static const String nowPlayingFanartDim = 'now_playing_fanart_dim';
+  static const String nowPlayingFanartDimSubtitle =
+      'now_playing_fanart_dim_subtitle';
+  static const String nowPlayingDimOff = 'now_playing_dim_off';
+  static const String secondarySectionNowPlaying =
+      'secondary_section_now_playing';
+  static const String secondarySectionDock = 'secondary_section_dock';
+  static const String screenshotAccess = 'screenshot_access';
+  static const String screenshotAccessSubtitle = 'screenshot_access_subtitle';
   static const String ignoreHiddenFiles = 'ignore_hidden_files';
   static const String ignoreHiddenFilesSubtitle =
       'ignore_hidden_files_subtitle';

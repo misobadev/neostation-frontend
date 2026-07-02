@@ -21,6 +21,7 @@ import '../../services/music_player_service.dart';
 import '../../repositories/system_repository.dart';
 import '../../repositories/game_repository.dart';
 import '../../services/screenscraper_service.dart';
+import '../../services/secondary_achievements_controller.dart';
 import '../../utils/gamepad_nav.dart';
 import '../../utils/centered_scroll_controller.dart';
 import '../../providers/file_provider.dart';
@@ -161,6 +162,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
   // Secondary display hardware management (OEM support).
   SecondaryDisplayState? _secondaryDisplayState;
 
+  /// Drives the live RetroAchievements panel on the secondary display for the
+  /// duration of a launched game (push at launch, poll during play, stop on
+  /// return). Shared with the systems carousel/grid "Recent Games" launches.
+  final SecondaryAchievementsController _achievementsController =
+      SecondaryAchievementsController();
+
   bool _canPop = false;
 
   // View keys for scroll synchronization.
@@ -266,6 +273,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     MusicPlayerService().removeListener(_onMusicPlayerStateChanged);
 
     _secondaryDisplayState?.dispose();
+    _achievementsController.dispose();
 
     _cleanupResources();
     _backButtonFocusNode.dispose();
@@ -780,7 +788,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// re-scrape (forceOverwrite) rewrites the art in place: the paths stay the
   /// same, so the dedup below would otherwise skip the update and the secondary
   /// engine would keep showing the stale cached bitmap.
-  void _updateSecondaryDisplay(
+  Future<void> _updateSecondaryDisplay(
     GameModel game, {
     bool forceMediaRefresh = false,
   }) async {
@@ -889,6 +897,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
         mediaRevision: forceMediaRefresh
             ? (currentState?.mediaRevision ?? 0) + 1
             : null,
+        // Panel is shown only by the launch push / live poll; browsing and
+        // returning from a game hide it (it fades out on the secondary screen).
+        showAchievementPanel: false,
       );
     }
 
@@ -1200,13 +1211,48 @@ class _SystemGamesListState extends State<SystemGamesList> {
   }
 
   /// Restores UI state and input focus after an external emulator process terminates.
+  /// Resolves the effective system folder name for a game, accounting for the
+  /// aggregate "all"/favorites views where each game carries its own system.
+  String _resolveSystemFolderName(GameModel game) {
+    return (widget.system.folderName == 'all' ||
+                widget.system.folderName == SystemFolderNames.favorites) &&
+            game.systemFolderName != null
+        ? game.systemFolderName!
+        : widget.system.primaryFolderName;
+  }
+
+  /// Resolves and pushes the launched game's achievement panel to the secondary
+  /// display, then keeps it live for the session. Delegates to the shared
+  /// [SecondaryAchievementsController]; no-op when there is no active secondary
+  /// display, RA is disconnected, or the game has no achievement set.
+  Future<void> _pushAchievementsForLaunch(GameModel game) {
+    final systemFolderName = _resolveSystemFolderName(game);
+    return _achievementsController.pushForLaunch(
+      state: _secondaryDisplayState,
+      provider: _retroAchievementsProvider,
+      game: game,
+      systemFolderName: systemFolderName,
+      boxartPath: SecondaryAchievementsController.resolveBoxart(
+        game,
+        systemFolderName,
+        _fileProvider,
+      ),
+    );
+  }
+
   void _reactivateGamepadNavigation() async {
     if (!mounted) return;
+
+    // Host re-pushes full game art below (hidePanel: false), which carries the
+    // panel-off flag, so the panel fades back to the art on return.
+    _achievementsController.stop();
 
     if (mounted) {
       setState(() {
         _isGameLaunching = false;
       });
+      // Returning from the game: hide the panel so it fades back to game art.
+      // Any unlocks were already surfaced live during play.
       if (_selectedGame != null) _updateSecondaryDisplay(_selectedGame!);
     }
 
@@ -1237,9 +1283,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
       _log.e('Error refreshing game data after gameplay: $e');
     }
 
-    if (_refreshAchievementsCallback != null) {
-      _refreshAchievementsCallback!();
-    }
+    // Defer to after the games-list reload settles and the details card has
+    // re-registered its callback, otherwise this fires against the old/unmounted
+    // card and no-ops — which is why a manual refresh was previously needed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshAchievementsCallback?.call();
+    });
 
     // Trigger sync after returning from game so local save gets uploaded.
     if (_selectedGame != null && mounted) {
@@ -1450,7 +1499,17 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
     // Resource termination and UI synchronization prior to process handoff.
     _stopVideoAndCleanup();
-    _updateSecondaryDisplay(_selectedGame!);
+    // Await the art push first so it can't land after the achievement push and
+    // re-hide the panel; the panel push is then the definitive last write.
+    await _updateSecondaryDisplay(_selectedGame!);
+    if (!mounted) return;
+
+    // Push the in-game RetroAchievements panel. Fired without awaiting so it
+    // never blocks the emulator handoff; it lands during launchGameWithDialog's
+    // ~2s foreground window, giving the secondary engine time to paint the
+    // panel and load badge art before the activity is backgrounded.
+    // ignore: unawaited_futures
+    _pushAchievementsForLaunch(_selectedGame!);
 
     // CRITICAL: Deactivate local input to avoid conflicts with external processes.
     _gamepadNav.deactivate();

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="screenshot_accessibility_label">NeoStation Screenshot</string>
+    <string name="screenshot_accessibility_desc">Lets NeoStation capture a system screenshot of the main screen when you tap the screenshot button on the secondary display. No screen content is read or collected.</string>
+</resources>

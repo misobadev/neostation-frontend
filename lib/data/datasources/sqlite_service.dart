@@ -421,7 +421,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 90;
+  static const int _databaseVersion = 92;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1566,7 +1566,13 @@ class SqliteService {
         auto_update_systems INTEGER DEFAULT 1,
         system_grid_columns TEXT DEFAULT 'M',
         game_grid_columns TEXT DEFAULT 'M',
-        use_12_hour_clock INTEGER DEFAULT 0
+        use_12_hour_clock INTEGER DEFAULT 0,
+        dock_apps TEXT,
+        dock_enabled INTEGER DEFAULT 1,
+        dock_slot_count INTEGER DEFAULT 3,
+        now_playing_dim_delay INTEGER DEFAULT 3,
+        now_playing_dim_level INTEGER DEFAULT 100,
+        fanart_dim_level INTEGER DEFAULT 25
       );
       ''',
       '''
@@ -2272,6 +2278,12 @@ class SqliteService {
     int? autoUpdateSystems,
     String? systemGridColumns,
     String? gameGridColumns,
+    String? dockApps,
+    int? dockEnabled,
+    int? dockSlotCount,
+    int? nowPlayingDimDelay,
+    int? nowPlayingDimLevel,
+    int? fanartDimLevel,
   }) async {
     final db = await instance.database;
 
@@ -2352,6 +2364,24 @@ class SqliteService {
     }
     if (gameGridColumns != null) {
       newConfig['game_grid_columns'] = gameGridColumns;
+    }
+    if (dockApps != null) {
+      newConfig['dock_apps'] = dockApps;
+    }
+    if (dockEnabled != null) {
+      newConfig['dock_enabled'] = dockEnabled;
+    }
+    if (dockSlotCount != null) {
+      newConfig['dock_slot_count'] = dockSlotCount;
+    }
+    if (nowPlayingDimDelay != null) {
+      newConfig['now_playing_dim_delay'] = nowPlayingDimDelay;
+    }
+    if (nowPlayingDimLevel != null) {
+      newConfig['now_playing_dim_level'] = nowPlayingDimLevel;
+    }
+    if (fanartDimLevel != null) {
+      newConfig['fanart_dim_level'] = fanartDimLevel;
     }
 
     await db.insert(

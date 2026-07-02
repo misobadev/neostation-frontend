@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
@@ -166,6 +167,35 @@ class SqliteConfigService {
         systemGridColumns:
             userConfig?['system_grid_columns']?.toString() ?? 'M',
         gameGridColumns: userConfig?['game_grid_columns']?.toString() ?? 'M',
+        dockApps: ConfigModel.normalizeDock(userConfig?['dock_apps']),
+        dockEnabled:
+            (int.tryParse(userConfig?['dock_enabled']?.toString() ?? '1') ??
+                1) ==
+            1,
+        dockSlotCount:
+            (int.tryParse(userConfig?['dock_slot_count']?.toString() ?? '3') ??
+                    3)
+                .clamp(
+                  ConfigModel.dockMinSlotCount,
+                  ConfigModel.dockMaxSlotCount,
+                ),
+        nowPlayingDimDelay:
+            int.tryParse(
+              userConfig?['now_playing_dim_delay']?.toString() ?? '3',
+            ) ??
+            3,
+        nowPlayingDimLevel:
+            (int.tryParse(
+                  userConfig?['now_playing_dim_level']?.toString() ?? '100',
+                ) ??
+                100)
+                .clamp(0, 100),
+        fanartDimLevel:
+            (int.tryParse(
+                  userConfig?['fanart_dim_level']?.toString() ?? '25',
+                ) ??
+                25)
+                .clamp(0, 100),
       );
     } catch (e) {
       _log.e('Error applying configuration in loadConfig: $e');
@@ -203,6 +233,12 @@ class SqliteConfigService {
         autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
         systemGridColumns: config.systemGridColumns,
         gameGridColumns: config.gameGridColumns,
+        dockApps: jsonEncode(config.dockApps),
+        dockEnabled: config.dockEnabled ? 1 : 0,
+        dockSlotCount: config.dockSlotCount,
+        nowPlayingDimDelay: config.nowPlayingDimDelay,
+        nowPlayingDimLevel: config.nowPlayingDimLevel,
+        fanartDimLevel: config.fanartDimLevel,
       );
 
       await SqliteService.saveUserRomFolders(config.romFolders);

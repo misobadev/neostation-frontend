@@ -276,6 +276,12 @@ class SqliteMigrations {
       case 90:
         await _migrateToVersion90(db);
         break;
+      case 91:
+        await _migrateToVersion91(db);
+        break;
+      case 92:
+        await _migrateToVersion92(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -4541,6 +4547,70 @@ class SqliteMigrations {
       }
     } catch (e, stackTrace) {
       _log.e('Error in migration v90: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v91: Adds the secondary-display app-dock columns to user_config
+  /// (dock apps payload, enable flag, and slot count).
+  static Future<void> _migrateToVersion91(Database db) async {
+    _log.i('Migration v91: Adding dock columns to user_config');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+
+      if (!columns.contains('dock_apps')) {
+        db.execute('ALTER TABLE user_config ADD COLUMN dock_apps TEXT');
+        _log.i('Column dock_apps added via v91');
+      }
+      if (!columns.contains('dock_enabled')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN dock_enabled INTEGER DEFAULT 1',
+        );
+        _log.i('Column dock_enabled added via v91');
+      }
+      if (!columns.contains('dock_slot_count')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN dock_slot_count INTEGER DEFAULT 3',
+        );
+        _log.i('Column dock_slot_count added via v91');
+      }
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v91: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v92: Adds the secondary Now Playing dim columns to user_config
+  /// (dim delay, dim darkness, and fanart dim level).
+  static Future<void> _migrateToVersion92(Database db) async {
+    _log.i('Migration v92: Adding dim columns to user_config');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+
+      if (!columns.contains('now_playing_dim_delay')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN now_playing_dim_delay INTEGER DEFAULT 3',
+        );
+        _log.i('Column now_playing_dim_delay added via v92');
+      }
+      if (!columns.contains('now_playing_dim_level')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN now_playing_dim_level INTEGER DEFAULT 100',
+        );
+        _log.i('Column now_playing_dim_level added via v92');
+      }
+      if (!columns.contains('fanart_dim_level')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN fanart_dim_level INTEGER DEFAULT 25',
+        );
+        _log.i('Column fanart_dim_level added via v92');
+      }
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v92: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

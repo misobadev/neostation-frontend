@@ -33,6 +33,8 @@ import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/models/secondary_display_state.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/system_background_provider.dart';
+import 'package:neostation/providers/retro_achievements_provider.dart';
+import 'package:neostation/services/secondary_achievements_controller.dart';
 import 'system_list_builder.dart';
 
 /// Primary widget for the 'My Systems' view, supporting both Grid and Carousel layouts.
@@ -512,6 +514,26 @@ class MySystems extends StatelessWidget {
           context.read<SystemBackgroundProvider>().clear();
         }
 
+        // Drive the in-game RetroAchievements panel on the secondary display.
+        // This launch path lives on the stateless [MySystems] widget, so the
+        // controller is scoped to this session: the periodic poll keeps itself
+        // alive via the event loop, and the onGameClosed/onLaunchFailed
+        // callbacks stop it. The app-lifetime shared state lives on the config
+        // provider (the grid/footer have no per-widget instance of their own).
+        final achievementsController = SecondaryAchievementsController();
+        // ignore: unawaited_futures
+        achievementsController.pushForLaunch(
+          state: configProvider.secondaryDisplayState,
+          provider: context.read<RetroAchievementsProvider>(),
+          game: systemInfo.gameModel!,
+          systemFolderName: gameSystemModel.primaryFolderName,
+          boxartPath: SecondaryAchievementsController.resolveBoxart(
+            systemInfo.gameModel!,
+            gameSystemModel.primaryFolderName,
+            fileProvider,
+          ),
+        );
+
         await launchGameWithDialog(
           context: context,
           game: systemInfo.gameModel!,
@@ -519,6 +541,8 @@ class MySystems extends StatelessWidget {
           fileProvider: fileProvider,
           syncProvider: syncProvider,
           onGameClosed: () {
+            // Stop the poll and hide the panel so it fades back to the art.
+            achievementsController.stop(hidePanel: true);
             MySystems.gridLaunchNotifier.value = false;
             GamepadNavigationManager.reactivate();
             Provider.of<SqliteDatabaseProvider>(
@@ -527,6 +551,7 @@ class MySystems extends StatelessWidget {
             ).refresh();
           },
           onLaunchFailed: (ctx, r) async {
+            achievementsController.stop(hidePanel: true);
             MySystems.gridLaunchNotifier.value = false;
             GamepadNavigationManager.reactivate();
           },
@@ -988,6 +1013,43 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
       listen: false,
     );
     final isOled = paletteProvider.isOled;
+
+    // Recent game cards drive the secondary with the game's own art (fanart +
+    // wheel) through the game-selected path, matching the game-view browse
+    // experience so the fanart-dim setting applies here too. Pushing the fanart
+    // as a plain systemBackground (the else branch below) renders it via
+    // _buildSystemBackground, which has no dim scrim.
+    if (info.isGame && info.gameModel != null) {
+      final game = info.gameModel!;
+      final gameFolder = game.systemFolderName ?? folder;
+      final fileProvider = Provider.of<FileProvider>(context, listen: false);
+      final fanartPath = game.getImagePath(gameFolder, 'fanarts', fileProvider);
+      final wheelPath = game.getImagePath(gameFolder, 'wheels', fileProvider);
+      final hasFanart = fanartPath.isNotEmpty && File(fanartPath).existsSync();
+      final hasWheel = wheelPath.isNotEmpty && File(wheelPath).existsSync();
+
+      _secondaryDisplayState?.updateState(
+        systemName: (info.shortName ?? info.title ?? 'NEOSTATION')
+            .toUpperCase(),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor.toARGB32(),
+        isGameSelected: true,
+        gameFanart: hasFanart ? fanartPath : null,
+        clearFanart: !hasFanart,
+        gameWheel: hasWheel ? wheelPath : null,
+        clearWheel: !hasWheel,
+        gameScreenshot: null,
+        clearScreenshot: true,
+        gameVideo: null,
+        clearVideo: true,
+        gameImageBytes: null,
+        clearImageBytes: true,
+        gameId: game.romPath,
+        useShader: false,
+        useFluidShader: false,
+        isOled: isOled,
+      );
+      return;
+    }
 
     _secondaryDisplayState?.updateState(
       systemName: (info.shortName ?? info.title ?? "NEOSTATION").toUpperCase(),
