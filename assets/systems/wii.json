@@ -129,6 +129,10 @@
           "executable": "primehack",
           "emudeck_launcher": "primehack.sh",
           "args": "-e \"{file.path}\""
+        },
+        "macos": {
+          "executable": "primehack",
+          "args": "-e \"{file.path}\""
         }
       }
     },
