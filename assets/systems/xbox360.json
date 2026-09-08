@@ -26,14 +26,15 @@
     ],
     "extensions": [
       "xex",
-      "iso"
+      "iso",
+      "zar"
     ]
   },
   "emulators": [
     {
       "name": "AX360e",
       "unique_id": "xbox360.aenu.ax360e",
-      "description": "Supported extensions: iso.",
+      "description": "Supported extensions: iso, zar.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -45,7 +46,7 @@
       "name": "AX360e (Free)",
       "default_standalone": true,
       "unique_id": "xbox360.aenu.ax360e.free",
-      "description": "Supported extensions: iso.",
+      "description": "Supported extensions: iso, zar.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -56,7 +57,7 @@
     {
       "name": "Xendroid",
       "unique_id": "xbox360.xendroid.composee",
-      "description": "Supported extensions: iso.",
+      "description": "Supported extensions: iso, zar.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -67,7 +68,7 @@
     {
       "name": "X360 Mobile",
       "unique_id": "xbox360.emu.x360.mobile",
-      "description": "Supported extensions: iso, xex.",
+      "description": "Supported extensions: iso, zar, xex.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -79,7 +80,7 @@
       "name": "Standalone Xenra",
       "unique_id": "xbox360.ali.xanite.green",
       "is_retroachievements_compatible": false,
-      "description": "Supported extensions: iso.",
+      "description": "Supported extensions: iso, zar.",
       "platforms": {
         "android": {
           "launch_arguments": "-n Ali.Xanite.green/Ali.Xanite.LauncherActivity -d \"{file.path}\""
@@ -89,7 +90,7 @@
     {
       "name": "Xenia",
       "unique_id": "xbox360.xenia",
-      "description": "Supported extensions: iso.",
+      "description": "Supported extensions: iso, zar, xex.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "windows": {
