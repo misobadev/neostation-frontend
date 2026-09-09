@@ -219,6 +219,10 @@
         "windows": {
           "executable": "Ryujinx.exe",
           "args": "\"{file.path}\""
+        },
+        "macos": {
+          "executable": "Ryujinx.app",
+          "args": "\"{file.path}\""
         }
       }
     }
