@@ -600,6 +600,7 @@ class SqliteDatabaseService {
           '.amazon',
           '.pcgame',
           '.customgame',
+          '.xcloud',
         };
         if (titleId == null &&
             windowsIdExts.any(entry.filename.toLowerCase().endsWith)) {

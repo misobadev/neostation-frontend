@@ -1,0 +1,63 @@
+{
+  "system": {
+    "id": "xcloud",
+    "multidisc": false,
+    "name": "XBox Game Pass",
+    "neosync": {
+      "sync": false,
+      "sync_folder": null
+    },
+    "short_name": "XCloud",
+    "details": {
+      "manufacturer": "Microsoft",
+      "release_date": "2017-06-01",
+      "description": "Microsoft's Cloud Gaming Platform",
+      "type": "virtual"
+    },
+    "ids": {
+      "screenscraper": null,
+      "retroachievements": null
+    },
+    "folders": [
+      "xcloud"
+    ],
+    "colors": [
+      "#91C300",
+      "#FFFFFF"
+    ],
+    "extensions": [
+      "xcloud"
+    ]
+  },
+"emulators": [
+    {
+      "name": "Standalone Better XCloud - Cloud Gaming",
+      "unique_id": "com.redphx.betterxc",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: xcloud.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.redphx.betterxc/com.redphx.betterxc.activity.MainActivity -a android.intent.action.VIEW -d bxc://play/{tags.localgameid} --activity-clear-task --activity-clear-top"
+        }
+      }
+    },
+    {
+      "name": "Standalone Better XCloud - Remote Play",
+      "unique_id": "com.redphx.betterxc.remoteplay",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: xcloud.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.redphx.betterxc/com.redphx.betterxc.activity.MainActivity -a android.intent.action.VIEW -d bxc://remote-play/{tags.localgameid} --activity-clear-task --activity-clear-top"
+        }
+      }
+    }
+  ],
+  "neosync": {
+    "sync": false,
+    "android_sync_folder": [],
+    "windows_sync_folder": [],
+    "linux_sync_folder": [],
+    "macos_sync_folder": []
+  }
+}
