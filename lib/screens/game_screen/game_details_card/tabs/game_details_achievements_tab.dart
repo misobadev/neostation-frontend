@@ -535,6 +535,19 @@ class GameDetailsAchievementsTabState
           decoration: BoxDecoration(
             color: ChromeSurface.fill(context),
             borderRadius: radii.radiusExternal,
+            // Invisible, and here for the same reason the loading shell above
+            // draws one: a border is part of a box's inset, so a panel built
+            // without one is 2.r wider and taller on the inside than the two
+            // panels that draw a gate edge. Every line of this state's content
+            // sat 2.r further out and further down than the same line on a
+            // matched game — measured as a 6px step on the hash line, which is
+            // the element close enough to the edge to make it obvious.
+            border: PanelGateHighlight.border(
+              context,
+              isDrivable: false,
+              isActive: false,
+              restingColor: Colors.transparent,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.25),
