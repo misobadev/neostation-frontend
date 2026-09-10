@@ -311,6 +311,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.raFixMatchUseAutomatic: 'Utiliser l’association automatique',
   AppLocale.raFixMatchUpdated: 'Association mise à jour.',
   AppLocale.raFixMatchAchievements: '{count} succès',
+  AppLocale.raHash: 'Empreinte RA',
   AppLocale.notifications: 'Notifications',
   AppLocale.clearAll: 'Tout effacer',
   AppLocale.noActiveNotifications: 'Aucune notification active',

@@ -302,6 +302,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.raFixMatchUseAutomatic: 'Usar associação automática',
   AppLocale.raFixMatchUpdated: 'Associação atualizada.',
   AppLocale.raFixMatchAchievements: '{count} conquistas',
+  AppLocale.raHash: 'Hash do RA',
   AppLocale.notifications: 'Notificações',
   AppLocale.clearAll: 'Limpar tudo',
   AppLocale.noActiveNotifications: 'Nenhuma notificação ativa',

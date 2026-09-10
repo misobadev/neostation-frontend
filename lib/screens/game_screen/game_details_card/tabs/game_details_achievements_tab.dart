@@ -47,6 +47,15 @@ class GameDetailsAchievementsTab extends StatefulWidget {
   /// most likely to want it.
   final VoidCallback? onFixMatch;
 
+  /// The ROM's RetroAchievements hash, or `null` when it has not been hashed.
+  ///
+  /// The one fact that explains every state this panel can be in: a set that
+  /// looks wrong was matched from this string, and a game with no set at all
+  /// either has no hash yet or has one RetroAchievements does not know. It is
+  /// also what a user is asked for when they report a missing set, so it is
+  /// worth being readable rather than only being in the database.
+  final String? raHash;
+
   const GameDetailsAchievementsTab({
     super.key,
     this.gameInfo,
@@ -59,6 +68,7 @@ class GameDetailsAchievementsTab extends StatefulWidget {
     this.rightOffset = 12.0,
     this.headerAction,
     this.onFixMatch,
+    this.raHash,
   });
 
   @override
@@ -298,6 +308,57 @@ class GameDetailsAchievementsTabState
   /// Action trigger delegate: Currently unused for achievements (selection is purely visual).
   void trigger() {}
 
+  /// The ROM's RetroAchievements hash, along the foot of the panel.
+  ///
+  /// Drawn in every one of the panel's three states and always at the same
+  /// height, because the state it is most useful in — no set found — is the one
+  /// a user reaches by *waiting* through the other two, and a line that arrives
+  /// only at the end would shift the badge grid up as the fetch lands. A game
+  /// that has not been hashed yet reads as a dash rather than dropping the line,
+  /// which is itself the answer to "why is there no set here".
+  Widget _buildHashLine(BuildContext context) {
+    final String hash = (widget.raHash ?? '').trim();
+    final Color color = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.5);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        _contentInsetH.r,
+        4.r,
+        _contentInsetH.r,
+        8.r,
+      ),
+      child: Row(
+        children: [
+          Icon(Symbols.tag_rounded, size: 10.r, color: color),
+          SizedBox(width: 4.r),
+          Text(
+            '${AppLocale.raHash.getString(context)}:',
+            style: TextStyle(fontSize: 9.r, color: color),
+          ),
+          SizedBox(width: 4.r),
+          Expanded(
+            child: Text(
+              hash.isEmpty ? '\u2013' : hash,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 9.r,
+                // Monospaced, like every other raw identifier the app shows:
+                // a hash is compared character by character against one on a
+                // website, and a proportional font makes that work harder than
+                // it needs to be.
+                fontFamily: 'monospace',
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final radii = Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m();
@@ -448,7 +509,7 @@ class GameDetailsAchievementsTabState
                     ),
                   ),
                 ),
-                SizedBox(height: 8.r),
+                _buildHashLine(context),
               ],
             ),
           ),
@@ -473,37 +534,52 @@ class GameDetailsAchievementsTabState
               ),
             ],
           ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Symbols.videogame_asset_off_rounded,
-                  size: 48.r,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                SizedBox(height: 16.r),
-                Text(
-                  AppLocale.noAchievementsFound.getString(context),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 14.r,
+          // Column rather than a bare Center: the hash line sits at the foot of
+          // this state too, and this is the state it earns its place in — the
+          // string a user needs to look the game up with, on the panel that
+          // just told them there is nothing to look up.
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Symbols.videogame_asset_off_rounded,
+                        size: 48.r,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      SizedBox(height: 16.r),
+                      Text(
+                        AppLocale.noAchievementsFound.getString(context),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 14.r,
+                        ),
+                      ),
+                      if (widget.onFixMatch != null) ...[
+                        SizedBox(height: 12.r),
+                        HeaderActionButton(
+                          isFocused: _isPanelActive && _headerFocusIndex == 0,
+                          label: AppLocale.raFixMatch
+                              .getString(context)
+                              .toUpperCase(),
+                          onTap: widget.onFixMatch!,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onPrimary,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (widget.onFixMatch != null) ...[
-                  SizedBox(height: 12.r),
-                  HeaderActionButton(
-                    isFocused: _isPanelActive && _headerFocusIndex == 0,
-                    label: AppLocale.raFixMatch
-                        .getString(context)
-                        .toUpperCase(),
-                    onTap: widget.onFixMatch!,
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  ),
-                ],
-              ],
-            ),
+              ),
+              _buildHashLine(context),
+            ],
           ),
         ),
       );
@@ -694,7 +770,7 @@ class GameDetailsAchievementsTabState
                   ),
                 ),
               ),
-              SizedBox(height: 8.r),
+              _buildHashLine(context),
             ],
           ),
         ),

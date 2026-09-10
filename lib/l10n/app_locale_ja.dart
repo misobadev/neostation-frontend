@@ -252,6 +252,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.raFixMatchUseAutomatic: '自動照合を使う',
   AppLocale.raFixMatchUpdated: 'ゲームの照合を更新しました。',
   AppLocale.raFixMatchAchievements: '実績 {count} 個',
+  AppLocale.raHash: 'RA ハッシュ',
   AppLocale.notifications: '通知',
   AppLocale.clearAll: 'すべてクリア',
   AppLocale.noActiveNotifications: 'アクティブな通知はありません',

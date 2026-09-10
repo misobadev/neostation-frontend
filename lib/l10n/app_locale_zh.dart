@@ -243,6 +243,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.raFixMatchUseAutomatic: '使用自动匹配',
   AppLocale.raFixMatchUpdated: '已更新游戏匹配。',
   AppLocale.raFixMatchAchievements: '{count} 个成就',
+  AppLocale.raHash: 'RA 哈希',
   AppLocale.notifications: '通知',
   AppLocale.clearAll: '清除全部',
   AppLocale.noActiveNotifications: '没有活动通知',

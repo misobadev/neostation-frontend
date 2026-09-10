@@ -296,6 +296,9 @@ mixin AppLocale {
   static const String raFixMatchUpdated = 'ra_fix_match_updated';
   static const String raFixMatchAchievements = 'ra_fix_match_achievements';
 
+  /// Label for the RetroAchievements ROM hash shown on the achievements panel.
+  static const String raHash = 'ra_hash';
+
   // ---------------------------------------------------------------------------
   // Notification center
   // ---------------------------------------------------------------------------

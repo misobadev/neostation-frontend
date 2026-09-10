@@ -294,6 +294,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.raFixMatchUseAutomatic: 'Use automatic matching',
   AppLocale.raFixMatchUpdated: 'Game match updated.',
   AppLocale.raFixMatchAchievements: '{count} achievements',
+  AppLocale.raHash: 'RA hash',
   AppLocale.notifications: 'Notifications',
   AppLocale.clearAll: 'Clear all',
   AppLocale.noActiveNotifications: 'No active notifications',

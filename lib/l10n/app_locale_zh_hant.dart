@@ -243,6 +243,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.raFixMatchUseAutomatic: '使用自動比對',
   AppLocale.raFixMatchUpdated: '已更新遊戲比對。',
   AppLocale.raFixMatchAchievements: '{count} 個成就',
+  AppLocale.raHash: 'RA 雜湊',
   AppLocale.notifications: '通知',
   AppLocale.clearAll: '清除全部',
   AppLocale.noActiveNotifications: '沒有活動通知',

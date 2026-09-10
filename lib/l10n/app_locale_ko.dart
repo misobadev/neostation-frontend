@@ -251,6 +251,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.raFixMatchUseAutomatic: '자동 매칭 사용',
   AppLocale.raFixMatchUpdated: '게임 매칭을 업데이트했습니다.',
   AppLocale.raFixMatchAchievements: '업적 {count}개',
+  AppLocale.raHash: 'RA 해시',
   AppLocale.notifications: '알림',
   AppLocale.clearAll: '모두 지우기',
   AppLocale.noActiveNotifications: '활성 알림 없음',

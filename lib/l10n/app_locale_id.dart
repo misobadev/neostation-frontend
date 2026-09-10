@@ -293,6 +293,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.raFixMatchUseAutomatic: 'Gunakan pencocokan otomatis',
   AppLocale.raFixMatchUpdated: 'Kecocokan game diperbarui.',
   AppLocale.raFixMatchAchievements: '{count} prestasi',
+  AppLocale.raHash: 'Hash RA',
   AppLocale.notifications: 'Notifikasi',
   AppLocale.clearAll: 'Hapus semua',
   AppLocale.noActiveNotifications: 'Tidak ada notifikasi aktif',

@@ -300,6 +300,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.raFixMatchUseAutomatic: 'Использовать автоматическое сопоставление',
   AppLocale.raFixMatchUpdated: 'Сопоставление обновлено.',
   AppLocale.raFixMatchAchievements: 'достижений: {count}',
+  AppLocale.raHash: 'Хеш RA',
   AppLocale.notifications: 'Уведомления',
   AppLocale.clearAll: 'Очистить все',
   AppLocale.noActiveNotifications: 'Нет активных уведомлений',
