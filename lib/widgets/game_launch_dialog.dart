@@ -41,6 +41,7 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
 
   bool _closeCalled = false;
   bool _onGameClosedFired = false;
+  bool _navLayerReleased = false;
   bool _postSyncStarted = false;
   String _gameStatus = '';
 
@@ -63,7 +64,7 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || _navLayerReleased) return;
       _dialogGamepadNav.initialize();
       // Modal: launching frees memory and clears caches, so background screens
       // remount while this dialog is up. Without the flag they push their own
@@ -81,7 +82,7 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
   @override
   void dispose() {
     GameLaunchManager().removeListener(_onManagerChanged);
-    GamepadNavigationManager.popLayer('game_launch_dialog');
+    _releaseNavLayer();
     _dialogGamepadNav.dispose();
     // Always finalize manager: idempotent, ensures music/SFX restore even if
     // the dialog was dismissed externally (barrier tap) or timer hadn't fired yet.
@@ -165,12 +166,41 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
   // Close
   // ---------------------------------------------------------------------------
 
+  /// Gives up the dialog's modal navigation layer.
+  ///
+  /// Called the moment the dialog is dismissed rather than waiting for
+  /// [dispose]: popping the route only *starts* the exit transition, so this
+  /// State — and its layer — outlive the dismissal by the length of that
+  /// animation. A *modal* layer left behind that way is not inert. It swallows
+  /// every non-modal push in that window: [GamepadNavigationManager.pushLayer]
+  /// slots those beneath the modal and deliberately does not activate them.
+  ///
+  /// The games grid lands in exactly that window. The list was emptied to free
+  /// RAM for the emulator, so the grid unmounted at launch and remounts as soon
+  /// as [GameLaunchDialog.onGameClosed] reloads the games — one short database
+  /// read plus a frame after the pop. When it lost that race it registered
+  /// without ever taking the controller, and the layer that did have it was the
+  /// host list. Its navigator drove the grid: D-pad up/down stepped one game
+  /// (reading as left/right across the grid) and left/right walked the details
+  /// tabs, with no way back but leaving the system and entering it again.
+  ///
+  /// Idempotent, and it also suppresses the push for a dialog dismissed before
+  /// its first post-frame callback ever ran.
+  void _releaseNavLayer() {
+    if (_navLayerReleased) return;
+    _navLayerReleased = true;
+    GamepadNavigationManager.popLayer('game_launch_dialog');
+  }
+
   void _closeDialog() {
     if (_closeCalled || !mounted) return;
     _closeCalled = true;
     Timer(const Duration(seconds: 1), () {
       if (mounted) {
         _onGameClosedFired = true;
+        // Before the pop: the layer must be gone by the time onGameClosed
+        // remounts the games view. See [_releaseNavLayer].
+        _releaseNavLayer();
         Navigator.of(context).pop();
         widget.onGameClosed();
       }
