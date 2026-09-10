@@ -305,6 +305,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.raFixMatchUseAutomatic: 'Automatische Zuordnung verwenden',
   AppLocale.raFixMatchUpdated: 'Zuordnung aktualisiert.',
   AppLocale.raFixMatchAchievements: '{count} Achievements',
+  AppLocale.raHash: 'RA-Hash',
   AppLocale.notifications: 'Benachrichtigungen',
   AppLocale.clearAll: 'Alle löschen',
   AppLocale.noActiveNotifications: 'Keine aktiven Benachrichtigungen',
@@ -1181,6 +1182,10 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.raCouldNotResolveLocalSystem:
       'Das lokale System für dieses Spiel konnte nicht ermittelt werden',
   AppLocale.raMissable: 'VERPASSBAR',
+  AppLocale.raFilterLocked: 'Gesperrt',
+  AppLocale.raFilterMissables: 'Verpassbare',
+  AppLocale.raNoAchievementsForFilter:
+      'Keine Erfolge entsprechen diesem Filter.',
   AppLocale.raComments: 'KOMMENTARE',
   AppLocale.raCommentsCouldNotLoad: 'Kommentare konnten nicht geladen werden.',
   AppLocale.raNoCommentsYet: 'Noch keine Kommentare.',

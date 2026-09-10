@@ -41,6 +41,27 @@
   },
   "emulators": [
     {
+      "name": "Standalone Gopher64",
+      "unique_id": "n64.gopher64",
+      "description": "Supported extensions: bin, n64, ndd, u1, v64, z64.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "windows": {
+          "executable": "gopher64-windows-x86_64.exe",
+          "args": "\"{file.path}\""
+        },
+        "linux": {
+          "executable": "gopher64-linux-x86_64",
+          "flatpak": "io.github.gopher64.gopher64",
+          "args": "\"{file.path}\""
+        },
+        "macos": {
+          "executable": "Gopher64.app",
+          "args": "\"{file.path}\""
+        }
+      }
+    },
+    {
       "name": "Standalone Mupen64Plus FZ",
       "unique_id": "n64.org.mupen64plusae.v3.fzurita",
       "description": "Supported extensions: bin, n64, ndd, u1, v64, z64.",

@@ -338,9 +338,81 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
                   ),
                 ),
               ),
+
+              _buildIdentityFooter(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Height of one identity line. Fixed, because the marquee inside it needs a
+  /// bounded box to measure its overflow against — the same reason the header's
+  /// fact strip has one.
+  double get _identityLineHeight => 15.r;
+
+  /// The game's own identity, at the foot of the panel.
+  ///
+  /// The display name and the ROM filename underneath it. The card carries no
+  /// title of its own anywhere else — the selected row in the list beside it is
+  /// the title — but this panel is where a game's facts are read, and the two
+  /// facts a scrape can disagree about are exactly these: what the game is
+  /// called now, and what the file it came from is called. The footer's
+  /// filename line only appears for scraped games, so an unscraped one had no
+  /// way to see its filename at all.
+  ///
+  /// Either line drops out when it is empty (an Android app has no ROM), and
+  /// the whole block drops out when both are, so nothing draws an empty band.
+  Widget _buildIdentityFooter() {
+    final String name = widget.game.name.trim();
+    final String romname = widget.game.romname.trim();
+    if (name.isEmpty && romname.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(8.r, 0, 8.r, 8.r),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Divider(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.1),
+            height: 10.r,
+          ),
+          if (name.isNotEmpty)
+            _buildIdentityLine(
+              icon: Symbols.label_rounded,
+              text: name,
+              alpha: 0.85,
+            ),
+          if (name.isNotEmpty && romname.isNotEmpty) SizedBox(height: 2.r),
+          if (romname.isNotEmpty)
+            _buildIdentityLine(
+              icon: Symbols.description_rounded,
+              text: romname,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// One line of the identity block: an icon and a value that marquees when it
+  /// outruns the panel's width. A ROM filename regularly does — region tags and
+  /// dump flags push well past the card — and truncating it hides the end,
+  /// which is the part that distinguishes two copies of the same game.
+  Widget _buildIdentityLine({
+    required IconData icon,
+    required String text,
+    double alpha = 0.6,
+  }) {
+    return SizedBox(
+      height: _identityLineHeight,
+      child: ScrollingStatusLine(
+        resetKey: widget.game.romname,
+        children: [
+          _InfoPill(icon: icon, text: text, fontSize: 10.r, alpha: alpha),
+        ],
       ),
     );
   }
@@ -497,31 +569,41 @@ class _InfoPill extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _InfoPill({required this.icon, required this.text});
+  /// Text size, in the same unscaled units as everything else on the card.
+  ///
+  /// The header's fact strip is a row of five that has to fit one line, so it
+  /// keeps the small default; the identity block at the foot is two lines of
+  /// one fact each and is meant to be read rather than skimmed, so it asks for
+  /// a size up.
+  final double? fontSize;
+
+  /// How strongly the line is drawn against the panel. The facts are muted
+  /// chrome; the game's own name is not.
+  final double alpha;
+
+  const _InfoPill({
+    required this.icon,
+    required this.text,
+    this.fontSize,
+    this.alpha = 0.6,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final Color color = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: alpha);
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 4.r),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 10.r,
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.6),
-          ),
+          Icon(icon, size: 10.r, color: color),
           SizedBox(width: 4.r),
           Text(
             text,
-            style: TextStyle(
-              fontSize: 9.r,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
+            style: TextStyle(fontSize: fontSize ?? 9.r, color: color),
           ),
         ],
       ),

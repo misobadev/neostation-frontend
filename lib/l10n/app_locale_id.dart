@@ -293,6 +293,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.raFixMatchUseAutomatic: 'Gunakan pencocokan otomatis',
   AppLocale.raFixMatchUpdated: 'Kecocokan game diperbarui.',
   AppLocale.raFixMatchAchievements: '{count} prestasi',
+  AppLocale.raHash: 'Hash RA',
   AppLocale.notifications: 'Notifikasi',
   AppLocale.clearAll: 'Hapus semua',
   AppLocale.noActiveNotifications: 'Tidak ada notifikasi aktif',
@@ -1148,6 +1149,10 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.raCouldNotResolveLocalSystem:
       'Tidak dapat menemukan sistem lokal untuk game ini',
   AppLocale.raMissable: 'BISA TERLEWAT',
+  AppLocale.raFilterLocked: 'Terkunci',
+  AppLocale.raFilterMissables: 'Bisa Terlewat',
+  AppLocale.raNoAchievementsForFilter:
+      'Tidak ada pencapaian yang sesuai dengan filter ini.',
   AppLocale.raComments: 'KOMENTAR',
   AppLocale.raCommentsCouldNotLoad: 'Komentar tidak dapat dimuat.',
   AppLocale.raNoCommentsYet: 'Belum ada komentar.',
