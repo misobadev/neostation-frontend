@@ -331,26 +331,35 @@ class GameDetailsAchievementsTabState
       ),
       child: Row(
         children: [
-          Icon(Symbols.tag_rounded, size: 10.r, color: color),
+          Icon(Symbols.tag_rounded, size: 12.r, color: color),
           SizedBox(width: 4.r),
           Text(
             '${AppLocale.raHash.getString(context)}:',
-            style: TextStyle(fontSize: 9.r, color: color),
+            style: TextStyle(fontSize: 11.r, color: color),
           ),
           SizedBox(width: 4.r),
           Expanded(
-            child: Text(
-              hash.isEmpty ? '\u2013' : hash,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 9.r,
-                // Monospaced, like every other raw identifier the app shows:
-                // a hash is compared character by character against one on a
-                // website, and a proportional font makes that work harder than
-                // it needs to be.
-                fontFamily: 'monospace',
-                color: color,
+            // Scaled down rather than clipped. A hash is read character by
+            // character against one on a website, so the one thing this line
+            // must never do is hide its tail: an ellipsis would leave a string
+            // that looks complete and is not. `scaleDown` renders it at the
+            // full size below whenever the panel is wide enough and only
+            // shrinks it \u2014 whole \u2014 when it is not.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                hash.isEmpty ? '\u2013' : hash,
+                maxLines: 1,
+                softWrap: false,
+                style: TextStyle(
+                  fontSize: 11.r,
+                  // Monospaced, like every other raw identifier the app shows:
+                  // a proportional font makes that character-by-character
+                  // comparison harder than it needs to be.
+                  fontFamily: 'monospace',
+                  color: color,
+                ),
               ),
             ),
           ),
