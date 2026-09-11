@@ -199,7 +199,14 @@
       "platforms": {
         "android": {
           "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbneo\""
-        }
+        },
+        "name": "Standalone Mugrat",
+        "unique_id": "Mugrat.app",
+        "description": "Supported extensions: 7z, ccd, cue, zip.",
+        "is_retroachievements_compatible": false,
+      "platforms": {
+        "mac": {
+        },
       }
     }
   ],
