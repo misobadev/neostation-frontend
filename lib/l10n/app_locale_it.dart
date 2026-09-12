@@ -81,7 +81,7 @@ const Map<String, dynamic> appLocaleIt = {
       'Attiva solo su una GPU potente — su hardware di fascia bassa la sfocatura ghiacciata può non restare fluida.',
   AppLocale.neoglassTransparency: 'Trasparenza del vetro',
   AppLocale.neoglassTransparencySubtitle:
-      '0 = nessuna trasparenza, 50 = massima',
+      '0 = nessuna trasparenza, 20 = massima',
   AppLocale.neoglassBorderWidth: 'Bordo del vetro',
   AppLocale.neoglassBorderWidthSubtitle: 'Spessore del bordo del vetro',
   AppLocale.systemTheme: 'Tema di Sistema',

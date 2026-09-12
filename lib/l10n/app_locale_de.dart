@@ -80,7 +80,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.neoglassBlurGpuWarning:
       'Nur auf einer leistungsstarken GPU aktivieren — auf schwacher Hardware kann der Frost-Blur nicht flüssig bleiben.',
   AppLocale.neoglassTransparency: 'Glas-Transparenz',
-  AppLocale.neoglassTransparencySubtitle: '0 = keine Transparenz, 50 = maximal',
+  AppLocale.neoglassTransparencySubtitle: '0 = keine Transparenz, 20 = maximal',
   AppLocale.neoglassBorderWidth: 'Glas-Rahmen',
   AppLocale.neoglassBorderWidthSubtitle: 'Breite des Glasrands',
   AppLocale.systemTheme: 'Systemdesign',

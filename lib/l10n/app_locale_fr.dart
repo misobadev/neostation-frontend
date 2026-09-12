@@ -81,7 +81,7 @@ const Map<String, dynamic> appLocaleFr = {
       'À activer uniquement sur un GPU puissant — sur du matériel modeste, le flou givré peut ne pas rester fluide.',
   AppLocale.neoglassTransparency: 'Transparence du verre',
   AppLocale.neoglassTransparencySubtitle:
-      '0 = aucune transparence, 50 = maximale',
+      '0 = aucune transparence, 20 = maximale',
   AppLocale.neoglassBorderWidth: 'Bordure du verre',
   AppLocale.neoglassBorderWidthSubtitle: 'Épaisseur du bord du verre',
   AppLocale.systemTheme: 'Thème du Système',

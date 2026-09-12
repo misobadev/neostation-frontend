@@ -74,7 +74,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.neoglassBlurGpuWarning:
       '강력한 GPU에서만 활성화하세요 — 저사양 하드웨어에서는 프로스트 블러가 부드럽게 유지되지 않을 수 있습니다.',
   AppLocale.neoglassTransparency: '유리 투명도',
-  AppLocale.neoglassTransparencySubtitle: '0 = 투명 없음, 50 = 최대',
+  AppLocale.neoglassTransparencySubtitle: '0 = 투명 없음, 20 = 최대',
   AppLocale.neoglassBorderWidth: '유리 테두리',
   AppLocale.neoglassBorderWidthSubtitle: '유리 가장자리 두께',
   AppLocale.systemTheme: '시스템',

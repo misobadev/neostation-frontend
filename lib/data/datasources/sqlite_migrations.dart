@@ -606,6 +606,9 @@ class SqliteMigrations {
       case 156:
         await _migrateToVersion156(db);
         break;
+      case 157:
+        await _migrateToVersion157(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -6953,6 +6956,54 @@ class SqliteMigrations {
       _log.i('Migration v156 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v156: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v157: Adds the NeoGlass frosted-glass appearance columns to
+  /// `user_config`: `neoglass_blur` (0–2), `neoglass_transparency` (0–20) and
+  /// `neoglass_border_width` (0.0–8.0).
+  ///
+  /// Defaults match the [ConfigModel] defaults (blur 0, transparency 5, border
+  /// 2) so a config written before these columns existed keeps the feature's
+  /// out-of-the-box look instead of being reset to a different value.
+  ///
+  /// Idempotent — each column is added only when absent.
+  static Future<void> _migrateToVersion157(Database db) async {
+    _log.i('Migration v157: Adding NeoGlass columns to user_config');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+      if (!columns.contains('neoglass_blur')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN neoglass_blur INTEGER DEFAULT 0',
+        );
+        _log.i('Column neoglass_blur added via v157');
+      } else {
+        _log.i('Column neoglass_blur already exists');
+      }
+      if (!columns.contains('neoglass_transparency')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN neoglass_transparency '
+          'INTEGER DEFAULT 5',
+        );
+        _log.i('Column neoglass_transparency added via v157');
+      } else {
+        _log.i('Column neoglass_transparency already exists');
+      }
+      if (!columns.contains('neoglass_border_width')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN neoglass_border_width '
+          'REAL DEFAULT 2',
+        );
+        _log.i('Column neoglass_border_width added via v157');
+      } else {
+        _log.i('Column neoglass_border_width already exists');
+      }
+      _log.i('Migration v157 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v157: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

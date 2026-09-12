@@ -72,7 +72,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.neoglassBlurOff: '關閉',
   AppLocale.neoglassBlurGpuWarning: '僅在效能強勁的 GPU 上啟用——在低階硬體上磨砂模糊可能無法保持流暢。',
   AppLocale.neoglassTransparency: '玻璃透明度',
-  AppLocale.neoglassTransparencySubtitle: '0 = 無透明度，50 = 最大',
+  AppLocale.neoglassTransparencySubtitle: '0 = 無透明度，20 = 最大',
   AppLocale.neoglassBorderWidth: '玻璃邊框',
   AppLocale.neoglassBorderWidthSubtitle: '玻璃邊緣的粗細',
   AppLocale.systemTheme: '系統預設',

@@ -80,7 +80,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.neoglassBlurGpuWarning:
       'Ative apenas em uma GPU potente — em hardware de baixo custo o desfoque fosco pode não se manter fluido.',
   AppLocale.neoglassTransparency: 'Transparência do vidro',
-  AppLocale.neoglassTransparencySubtitle: '0 = sem transparência, 50 = máxima',
+  AppLocale.neoglassTransparencySubtitle: '0 = sem transparência, 20 = máxima',
   AppLocale.neoglassBorderWidth: 'Borda do vidro',
   AppLocale.neoglassBorderWidthSubtitle: 'Espessura da borda do vidro',
   AppLocale.systemTheme: 'Tema do Sistema',

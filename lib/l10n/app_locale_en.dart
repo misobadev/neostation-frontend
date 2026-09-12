@@ -79,7 +79,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.neoglassBlurGpuWarning:
       'Only enable on a powerful GPU — on low-end hardware the frosted blur may not stay smooth.',
   AppLocale.neoglassTransparency: 'Glass Transparency',
-  AppLocale.neoglassTransparencySubtitle: '0 = no transparency, 50 = maximum',
+  AppLocale.neoglassTransparencySubtitle: '0 = no transparency, 20 = maximum',
   AppLocale.neoglassBorderWidth: 'Glass Border',
   AppLocale.neoglassBorderWidthSubtitle: 'Width of the glass edge',
   AppLocale.systemTheme: 'System',

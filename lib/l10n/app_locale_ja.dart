@@ -75,7 +75,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.neoglassBlurGpuWarning:
       '強力なGPUでのみ有効にしてください — 低スペック環境ではすりガラスのぼかしが滑らかに保たれない場合があります。',
   AppLocale.neoglassTransparency: 'ガラスの透明度',
-  AppLocale.neoglassTransparencySubtitle: '0 = 透明なし、50 = 最大',
+  AppLocale.neoglassTransparencySubtitle: '0 = 透明なし、20 = 最大',
   AppLocale.neoglassBorderWidth: 'ガラスの枠',
   AppLocale.neoglassBorderWidthSubtitle: 'ガラスの縁の太さ',
   AppLocale.systemTheme: 'システムテーマ',

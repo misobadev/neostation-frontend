@@ -80,7 +80,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.neoglassBlurGpuWarning:
       'Actívalo solo en una GPU potente: en hardware de gama baja el desenfoque esmerilado puede no mantenerse fluido.',
   AppLocale.neoglassTransparency: 'Transparencia del cristal',
-  AppLocale.neoglassTransparencySubtitle: '0 = sin transparencia, 50 = máxima',
+  AppLocale.neoglassTransparencySubtitle: '0 = sin transparencia, 20 = máxima',
   AppLocale.neoglassBorderWidth: 'Borde del cristal',
   AppLocale.neoglassBorderWidthSubtitle: 'Grosor del borde del cristal',
   AppLocale.systemTheme: 'Sistema',

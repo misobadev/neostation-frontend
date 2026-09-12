@@ -160,7 +160,10 @@ class DatabaseTestHelper {
         show_achievements_badge INTEGER DEFAULT 0,
         show_cloud_sync_icon INTEGER DEFAULT 1,
         ra_match_on_startup INTEGER DEFAULT 0,
-        subfolder_view_all INTEGER DEFAULT 0
+        subfolder_view_all INTEGER DEFAULT 0,
+        neoglass_blur INTEGER DEFAULT 0,
+        neoglass_transparency INTEGER DEFAULT 5,
+        neoglass_border_width REAL DEFAULT 2
       )
     ''');
 

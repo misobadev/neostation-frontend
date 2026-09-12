@@ -80,7 +80,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.neoglassBlurGpuWarning:
       'Включайте только на мощном GPU — на слабом железе матовое размытие может не оставаться плавным.',
   AppLocale.neoglassTransparency: 'Прозрачность стекла',
-  AppLocale.neoglassTransparencySubtitle: '0 = без прозрачности, 50 = максимум',
+  AppLocale.neoglassTransparencySubtitle: '0 = без прозрачности, 20 = максимум',
   AppLocale.neoglassBorderWidth: 'Рамка стекла',
   AppLocale.neoglassBorderWidthSubtitle: 'Толщина края стекла',
   AppLocale.systemTheme: 'Системная',

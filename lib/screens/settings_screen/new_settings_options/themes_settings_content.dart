@@ -59,8 +59,9 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
   /// Blur sigma choices (Off / 1 / 2). 0 disables the blur entirely.
   static const List<int> _blurSteps = [0, 1, 2];
 
-  /// Transparency choices on a 0–50 scale: 0 = no transparency, 50 = maximum.
-  static const List<int> _transparencySteps = [0, 10, 20, 30, 40, 50];
+  /// Transparency choices on a 0–20 scale, stepped by 5: 0 = no transparency,
+  /// 20 = maximum.
+  static const List<int> _transparencySteps = [0, 5, 10, 15, 20];
 
   /// Rim stroke width choices.
   static const List<double> _borderSteps = [0, 1, 2, 3, 4];

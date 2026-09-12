@@ -80,7 +80,7 @@ const Map<String, dynamic> appLocaleId = {
       'Aktifkan hanya pada GPU yang kuat — pada perangkat kelas bawah, blur buram mungkin tidak tetap halus.',
   AppLocale.neoglassTransparency: 'Transparansi Kaca',
   AppLocale.neoglassTransparencySubtitle:
-      '0 = tanpa transparansi, 50 = maksimal',
+      '0 = tanpa transparansi, 20 = maksimal',
   AppLocale.neoglassBorderWidth: 'Bingkai Kaca',
   AppLocale.neoglassBorderWidthSubtitle: 'Ketebalan tepi kaca',
   AppLocale.systemTheme: 'Tema Sistem',

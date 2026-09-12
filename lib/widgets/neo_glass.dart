@@ -66,9 +66,10 @@ class NeoGlass extends StatelessWidget {
   /// width is used.
   final double? borderWidth;
 
-  /// Transparency of the tint fill on a 0–50 scale. `0` means no transparency
-  /// (opaque tint), `50` means the maximum transparency (backdrop shows through
-  /// the most). When null, the user's configured transparency is used.
+  /// Transparency of the tint fill on a 0–20 scale (stepped by 5). `0` means no
+  /// transparency (opaque tint), `20` means the maximum transparency (backdrop
+  /// shows through the most). When null, the user's configured transparency is
+  /// used.
   final int? transparency;
 
   /// Reads the user's NeoGlass preferences from [SqliteConfigProvider], falling
@@ -85,7 +86,7 @@ class NeoGlass extends StatelessWidget {
         borderWidth: config.neoglassBorderWidth,
       );
     } catch (_) {
-      return (blur: 0, transparency: 10, borderWidth: 2);
+      return (blur: 0, transparency: 5, borderWidth: 2);
     }
   }
 
@@ -95,9 +96,9 @@ class NeoGlass extends StatelessWidget {
     final effectiveBlur = blur ?? prefs.blur;
     final effectiveTransparency = transparency ?? prefs.transparency;
     final effectiveBorderWidth = borderWidth ?? prefs.borderWidth;
-    // Transparency 0–50 maps to the tint alpha: 0 → opaque (1.0), 50 → the
+    // Transparency 0–20 maps to the tint alpha: 0 → opaque (1.0), 20 → the
     // maximum see-through.
-    final effectiveOpacity = (50 - effectiveTransparency) / 50.0;
+    final effectiveOpacity = (20 - effectiveTransparency) / 20.0;
 
     // Semi-transparent so the image behind shows through and the rim (drawn
     // beneath it) glows with the backdrop's colours.
