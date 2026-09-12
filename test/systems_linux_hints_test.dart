@@ -57,6 +57,7 @@ void main() {
     'org.azahar_emu.Azahar',
     'net.kuribo64.melonDS',
     'info.cemu.Cemu',
+    'io.github.gopher64.gopher64',
     'io.github.stella_emu.Stella',
   };
 

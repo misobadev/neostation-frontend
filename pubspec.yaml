@@ -31,7 +31,7 @@ dependencies:
   flutter_chd:
     path: packages/flutter_chd
 
-  file_picker: ^12.0.0-beta.7
+  file_picker: ^12.2.0
   device_info_plus: ^13.2.0
   package_info_plus: ^10.2.1
   google_fonts: ^8.2.1
@@ -60,11 +60,11 @@ dependencies:
   fullscreen_window: ^1.2.1
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
-  logger: ^2.7.0
+  logger: ^2.8.0
   sub_screen: ^0.1.9
   flutter_soloud: ^4.1.7
   audio_metadata_reader: ^1.7.1
-  wakelock_plus: ^1.7.0
+  wakelock_plus: ^1.8.0
   flutter_localization: ^0.4.1
   flutter_tilt: ^4.1.0
 

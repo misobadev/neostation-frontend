@@ -300,6 +300,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.raFixMatchUseAutomatic: 'Использовать автоматическое сопоставление',
   AppLocale.raFixMatchUpdated: 'Сопоставление обновлено.',
   AppLocale.raFixMatchAchievements: 'достижений: {count}',
+  AppLocale.raHash: 'Хеш RA',
   AppLocale.notifications: 'Уведомления',
   AppLocale.clearAll: 'Очистить все',
   AppLocale.noActiveNotifications: 'Нет активных уведомлений',
@@ -1146,6 +1147,10 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.raCouldNotResolveLocalSystem:
       'Не удалось определить локальную систему для этой игры',
   AppLocale.raMissable: 'МОЖНО ПРОПУСТИТЬ',
+  AppLocale.raFilterLocked: 'Заблокированные',
+  AppLocale.raFilterMissables: 'Пропускаемые',
+  AppLocale.raNoAchievementsForFilter:
+      'Нет достижений, соответствующих этому фильтру.',
   AppLocale.raComments: 'КОММЕНТАРИИ',
   AppLocale.raCommentsCouldNotLoad: 'Не удалось загрузить комментарии.',
   AppLocale.raNoCommentsYet: 'Пока нет комментариев.',
@@ -1174,6 +1179,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.raAotwOpenLocalGame: 'Открыть локальную игру',
   AppLocale.raAotwDownloadFromRomm: 'Скачать из RomM',
   AppLocale.raGamesPlayed: 'Сыграно игр: {count}',
+  AppLocale.raGamesBeaten: 'Пройдено игр: {count}',
   AppLocale.raAchievementProgress: 'Достижения: {earned}/{total}',
   AppLocale.raRecent30Days: '30 дней',
 

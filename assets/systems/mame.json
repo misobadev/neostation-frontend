@@ -125,6 +125,28 @@
       }
     },
     {
+      "name": "RetroArch64 MAME 2015",
+      "unique_id": "mame.ra64.mame2015",
+      "description": "Supported extensions: 7z, chd, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mame2015\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 MAME 2016",
+      "unique_id": "mame.ra64.mame2016",
+      "description": "Supported extensions: 7z, chd, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mame2016\""
+        }
+      }
+    },
+    {
       "name": "RetroArch32 MAME 2003",
       "unique_id": "mame.ra32.mame2003",
       "description": "Supported extensions: zip.",
@@ -188,6 +210,28 @@
       "platforms": {
         "android": {
           "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mame2010\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 MAME 2015",
+      "unique_id": "mame.ra32.mame2015",
+      "description": "Supported extensions: 7z, chd, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mame2015\""
+       }
+      }
+    },
+    {
+      "name": "RetroArch32 MAME 2016",
+      "unique_id": "mame.ra32.mame2016",
+      "description": "Supported extensions: 7z, chd, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mame2016\""
         }
       }
     },
@@ -339,6 +383,56 @@
         "macos": {
           "executable": "retroarch",
           "args": "-L mame2010_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch MAME 2015",
+      "unique_id": "mame.ra.mame2015",
+      "description": "Supported extensions: 7z, chd, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mame2015\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L mame2015_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L mame2015_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "RetroArch.App",
+          "args": "-L mame2015_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch MAME 2016",
+      "unique_id": "mame.ra.mame2016",
+      "description": "Supported extensions: 7z, chd, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mame2016\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L mame2016_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L mame2016_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "RetroArch.App",
+          "args": "-L mame2016_libretro.dylib \"{file.path}\""
         }
       }
     }

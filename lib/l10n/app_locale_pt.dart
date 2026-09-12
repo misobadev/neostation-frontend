@@ -302,6 +302,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.raFixMatchUseAutomatic: 'Usar associação automática',
   AppLocale.raFixMatchUpdated: 'Associação atualizada.',
   AppLocale.raFixMatchAchievements: '{count} conquistas',
+  AppLocale.raHash: 'Hash do RA',
   AppLocale.notifications: 'Notificações',
   AppLocale.clearAll: 'Limpar tudo',
   AppLocale.noActiveNotifications: 'Nenhuma notificação ativa',
@@ -1158,6 +1159,10 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.raCouldNotResolveLocalSystem:
       'Não foi possível resolver o sistema local para este jogo',
   AppLocale.raMissable: 'PERDÍVEL',
+  AppLocale.raFilterLocked: 'Bloqueadas',
+  AppLocale.raFilterMissables: 'Perdíveis',
+  AppLocale.raNoAchievementsForFilter:
+      'Nenhuma conquista corresponde a este filtro.',
   AppLocale.raComments: 'COMENTÁRIOS',
   AppLocale.raCommentsCouldNotLoad: 'Não foi possível carregar os comentários.',
   AppLocale.raNoCommentsYet: 'Nenhum comentário ainda.',
@@ -1188,6 +1193,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.raAotwOpenLocalGame: 'Abrir jogo local',
   AppLocale.raAotwDownloadFromRomm: 'Baixar do RomM',
   AppLocale.raGamesPlayed: '{count} jogos jogados',
+  AppLocale.raGamesBeaten: '{count} jogos concluídos',
   AppLocale.raAchievementProgress: '{earned}/{total} conquistas',
   AppLocale.raRecent30Days: '30 dias',
 

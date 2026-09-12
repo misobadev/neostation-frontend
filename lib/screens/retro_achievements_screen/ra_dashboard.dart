@@ -335,6 +335,9 @@ class RADashboardHubState extends State<RADashboardHub> {
     final highlightLabel = showCompletions
         ? AppLocale.raCompletionsLabel.getString(context)
         : AppLocale.raMasteriesLabel.getString(context);
+    final beatenGames = showCompletions
+        ? (raProvider.userAwards?.beatenCasualAwardsCount ?? 0)
+        : (raProvider.userAwards?.beatenHardcoreAwardsCount ?? 0);
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 14.r, vertical: 12.r),
@@ -409,6 +412,14 @@ class RADashboardHubState extends State<RADashboardHub> {
                           .getString(context)
                           .replaceFirst('{count}', '$trackedGames'),
                       color: theme.colorScheme.primary,
+                    ),
+                    _buildPill(
+                      context,
+                      icon: Symbols.flag_rounded,
+                      label: AppLocale.raGamesBeaten
+                          .getString(context)
+                          .replaceFirst('{count}', '$beatenGames'),
+                      color: theme.colorScheme.secondary,
                     ),
                     _buildPill(
                       context,

@@ -121,7 +121,7 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n org.dolphinemu.primehack/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n org.shiiion.primehack/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
         },
         "windows": {
           "executable": "primehack.exe",
@@ -130,6 +130,10 @@
         "linux": {
           "executable": "primehack",
           "emudeck_launcher": "primehack.sh",
+          "args": "-e \"{file.path}\""
+        },
+        "macos": {
+          "executable": "primehack",
           "args": "-e \"{file.path}\""
         }
       }

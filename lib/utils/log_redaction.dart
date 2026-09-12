@@ -28,12 +28,21 @@ const List<String> _sensitiveQueryParams = ['y', ..._sensitiveFieldNames];
 /// Deliberately excludes `y`: unlike a query string there is no `?`/`&` to
 /// anchor against, so a one-letter name matches inside ordinary prose. It is a
 /// URL parameter of the RetroAchievements web API and never a field name.
+///
+/// Also deliberately excludes `authorization`: the value-bearing header already
+/// matches [_authHeaderPattern] (which also redacts the scheme word, so the
+/// `Bearer`/`Basic` marker survives), and adding the bare name here would make
+/// [_jsonFieldPattern] swallow just the scheme and leave the token behind —
+/// `Authorization: Bearer abc` would become `Authorization: <redacted> abc`.
+/// The header name is not a credential shape on its own.
 const List<String> _sensitiveFieldNames = [
   'api_key',
   'apikey',
   'access_token',
   'refresh_token',
   'auth',
+  'client_secret_id',
+  'credential',
   'devid',
   'devpassword',
   'key',
@@ -42,6 +51,7 @@ const List<String> _sensitiveFieldNames = [
   'password',
   'secret',
   'session',
+  'sid',
   'sig',
   'signature',
   'ssid',

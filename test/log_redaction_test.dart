@@ -85,6 +85,63 @@ void main() {
       expect(redacted, isNot(contains('abc123')));
       expect(redacted, isNot(contains('xyz789')));
     });
+
+    test('redacts a credential-shaped field', () {
+      final redacted = redactSecrets(
+        'OAuth: credential=abc.def.ghi, client_secret_id=hunter2',
+      );
+      expect(redacted, isNot(contains('abc.def.ghi')));
+      expect(redacted, isNot(contains('hunter2')));
+      expect(redacted, contains('client_secret_id=<redacted>'));
+    });
+
+    test('redacts a Set-Cookie session id', () {
+      final redacted = redactSecrets('Set-Cookie: sid=abc123secret');
+      expect(redacted, isNot(contains('abc123secret')));
+      expect(redacted, contains('sid=<redacted>'));
+    });
+
+    test(
+      'an Authorization header still redacts the token, not just the scheme',
+      () {
+        // `authorization` is deliberately NOT in the field-name set: if it were,
+        // the JSON-field pattern would swallow only "Bearer" and leave the token.
+        // The auth-header pattern must therefore carry the whole value.
+        final redacted = redactSecrets(
+          'headers: {Authorization: Bearer abc123DEF456ghi}',
+        );
+        expect(redacted, isNot(contains('abc123DEF456ghi')));
+        expect(redacted, contains('Bearer <redacted>'));
+      },
+    );
+  });
+
+  group('redactSecrets — NeoSync auth failure reaching the sign-in screen', () {
+    // What the sign-in screen can render today: auth_service returns the server
+    // `error` body and the raw exception verbatim. Both must be clean before
+    // they ever reach auth_form's message box.
+    test('redacts credentials embedded in the network error URI', () {
+      const line =
+          'Network error: ClientException with SocketException: '
+          'Failed host lookup, uri=https://admin:hunter2@auth.neosync.cloud/login';
+      final redacted = redactSecrets(line);
+
+      expect(redacted, isNot(contains('hunter2')));
+      expect(redacted, isNot(contains('admin:hunter2')));
+      // The diagnostics needed to debug a failed login survive.
+      expect(redacted, contains('auth.neosync.cloud/login'));
+      expect(redacted, contains('Failed host lookup'));
+    });
+
+    test('redacts a credential-carrying server error body', () {
+      const line = 'Invalid credentials for user admin, api_key=abc123DEF456';
+      final redacted = redactSecrets(line);
+
+      expect(redacted, isNot(contains('abc123DEF456')));
+      expect(redacted, contains('api_key=<redacted>'));
+      // The server's plain-language reason is still readable.
+      expect(redacted, contains('Invalid credentials for user admin'));
+    });
   });
 
   group('redactSecrets — leaves ordinary logs alone', () {

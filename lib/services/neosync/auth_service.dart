@@ -5,6 +5,7 @@ import 'package:neostation/models/user.dart';
 import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/app_config.dart';
+import 'package:neostation/utils/log_redaction.dart';
 
 /// Service responsible for managing user authentication and profile synchronization.
 ///
@@ -103,11 +104,11 @@ class AuthService extends ChangeNotifier {
       } else {
         return {
           'success': false,
-          'message': data['error'] ?? 'Registration failed',
+          'message': redactSecrets(data['error'] ?? 'Registration failed'),
         };
       }
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e'};
+      return {'success': false, 'message': redactSecrets('Network error: $e')};
     }
   }
 
@@ -164,7 +165,7 @@ class AuthService extends ChangeNotifier {
           'tokenPersisted': tokenPersisted,
         };
       } else {
-        String errorMessage = data['error'] ?? 'Login failed';
+        String errorMessage = redactSecrets(data['error'] ?? 'Login failed');
         return {
           'success': false,
           'message': errorMessage,
@@ -174,7 +175,7 @@ class AuthService extends ChangeNotifier {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e'};
+      return {'success': false, 'message': redactSecrets('Network error: $e')};
     }
   }
 
@@ -194,15 +195,15 @@ class AuthService extends ChangeNotifier {
       } else {
         String errorMessage = 'Verification failed';
         if (data['error'] != null) {
-          errorMessage = data['error'];
+          errorMessage = redactSecrets(data['error']);
         } else if (data['message'] != null) {
-          errorMessage = data['message'];
+          errorMessage = redactSecrets(data['message']);
         }
 
         return {'success': false, 'message': errorMessage};
       }
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e'};
+      return {'success': false, 'message': redactSecrets('Network error: $e')};
     }
   }
 
@@ -228,11 +229,11 @@ class AuthService extends ChangeNotifier {
       } else {
         return {
           'success': false,
-          'message': data['error'] ?? 'Failed to check status',
+          'message': redactSecrets(data['error'] ?? 'Failed to check status'),
         };
       }
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e'};
+      return {'success': false, 'message': redactSecrets('Network error: $e')};
     }
   }
 
@@ -252,11 +253,13 @@ class AuthService extends ChangeNotifier {
       } else {
         return {
           'success': false,
-          'message': data['error'] ?? 'Failed to send verification email',
+          'message': redactSecrets(
+            data['error'] ?? 'Failed to send verification email',
+          ),
         };
       }
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e'};
+      return {'success': false, 'message': redactSecrets('Network error: $e')};
     }
   }
 
@@ -287,14 +290,14 @@ class AuthService extends ChangeNotifier {
       } else {
         return {
           'success': false,
-          'message': data['error'] ?? 'Failed to get profile',
+          'message': redactSecrets(data['error'] ?? 'Failed to get profile'),
           'statusCode': response.statusCode,
         };
       }
     } catch (e) {
       return {
         'success': false,
-        'message': 'Network error: $e',
+        'message': redactSecrets('Network error: $e'),
         'isNetworkError': true,
       };
     }
@@ -319,14 +322,15 @@ class AuthService extends ChangeNotifier {
       } else {
         return {
           'success': false,
-          'message':
-              data['error'] ??
-              data['message'] ??
-              'Failed to send password reset email',
+          'message': redactSecrets(
+            data['error'] ??
+                data['message'] ??
+                'Failed to send password reset email',
+          ),
         };
       }
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e'};
+      return {'success': false, 'message': redactSecrets('Network error: $e')};
     }
   }
 
@@ -352,12 +356,13 @@ class AuthService extends ChangeNotifier {
       } else {
         return {
           'success': false,
-          'message':
-              data['error'] ?? data['message'] ?? 'Failed to reset password',
+          'message': redactSecrets(
+            data['error'] ?? data['message'] ?? 'Failed to reset password',
+          ),
         };
       }
     } catch (e) {
-      return {'success': false, 'message': 'Network error: $e'};
+      return {'success': false, 'message': redactSecrets('Network error: $e')};
     }
   }
 

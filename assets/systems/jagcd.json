@@ -51,6 +51,56 @@
           "args": "\"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch64 Virtual Jaguar",
+      "default_core": true,
+      "unique_id": "jagcd.ra64.virtualjaguar",
+      "description": "Supported extensions: cue, cdi.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"virtualjaguar\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 Virtual Jaguar",
+      "default_core": true,
+      "unique_id": "jagcd.ra32.virtualjaguar",
+      "description": "Supported extensions: cue, cdi.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"virtualjaguar\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch Virtual Jaguar",
+      "default_core": true,
+      "unique_id": "jagcd.ra.virtualjaguar",
+      "description": "Supported extensions: cue, cdi.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"virtualjaguar\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L virtualjaguar_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L virtualjaguar_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "RetroArch.App",
+          "args": "-L virtualjaguar_libretro.dylib \"{file.path}\""
+        }
+      }
     }
   ],
   "neosync": {

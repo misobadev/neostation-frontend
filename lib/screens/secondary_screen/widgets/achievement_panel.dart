@@ -6,6 +6,25 @@ import '../../../l10n/app_locale.dart';
 import '../../../models/secondary_achievement_item.dart';
 import '../../../models/secondary_display_state.dart';
 
+/// The subset of a game's achievements visible on the secondary display.
+enum AchievementFilter { all, locked, missables }
+
+/// Returns the achievements represented by [filter].
+///
+/// Missables deliberately excludes earned achievements: once it has been
+/// earned, it is no longer something the player can miss.
+List<SecondaryAchievementItem> filterAchievements(
+  List<SecondaryAchievementItem> achievements,
+  AchievementFilter filter,
+) {
+  return switch (filter) {
+    AchievementFilter.all => achievements,
+    AchievementFilter.locked => achievements.where((a) => !a.earned).toList(),
+    AchievementFilter.missables =>
+      achievements.where((a) => !a.earned && a.isMissable).toList(),
+  };
+}
+
 /// The RetroAchievements panel shown on the secondary display: game title,
 /// earned/total + points header, progress bar, and a touch-scrollable badge
 /// grid or detail list (toggle in the header). Tapping a badge opens its
@@ -19,9 +38,11 @@ class AchievementPanel extends StatelessWidget {
     super.key,
     required this.value,
     required this.listView,
+    required this.filter,
     required this.celebrate,
     required this.l10nContext,
     required this.onToggleListView,
+    required this.onCycleFilter,
     required this.onSelectAchievement,
   });
 
@@ -29,6 +50,9 @@ class AchievementPanel extends StatelessWidget {
 
   /// Whether the list view (vs. the badge grid) is currently shown.
   final bool listView;
+
+  /// The subset currently displayed in either the badge grid or detail list.
+  final AchievementFilter filter;
 
   /// Whether the "freshly earned" celebration banner should be shown.
   final bool celebrate;
@@ -40,16 +64,20 @@ class AchievementPanel extends StatelessWidget {
   /// Toggles between the badge grid and the detail list.
   final VoidCallback onToggleListView;
 
+  /// Advances through All, Locked, and Missables.
+  final VoidCallback onCycleFilter;
+
   /// Opens the comments page for the tapped achievement.
   final void Function(SecondaryAchievementItem a) onSelectAchievement;
 
   @override
   Widget build(BuildContext context) {
-    final achievements =
+    final sortedAchievements =
         List<SecondaryAchievementItem>.from(value.achievements!)..sort((a, b) {
           if (a.earned != b.earned) return a.earned ? -1 : 1;
           return a.displayOrder.compareTo(b.displayOrder);
         });
+    final achievements = filterAchievements(sortedAchievements, filter);
 
     final newlyEarned = value.newlyEarnedIds?.toSet() ?? const <int>{};
     final progress = value.raTotal > 0 ? value.raEarned / value.raTotal : 0.0;
@@ -115,7 +143,9 @@ class AchievementPanel extends StatelessWidget {
                       fontFamily: 'Anta',
                     ),
                   ),
-                  SizedBox(width: 14.r),
+                  SizedBox(width: 8.r),
+                  _buildFilterButton(context),
+                  SizedBox(width: 8.r),
                   // Touch toggle: grid <-> list. Shows the icon of the view
                   // you'll switch to. The bottom screen is touch-only since
                   // the gamepad is driving the game on the main screen.
@@ -155,9 +185,11 @@ class AchievementPanel extends StatelessWidget {
               ),
               SizedBox(height: 16.r),
               // Content: badge grid or list, both touch-scrollable. Unlocked
-              // achievements are sorted first.
+              // achievements are sorted first within the selected filter.
               Expanded(
-                child: listView
+                child: achievements.isEmpty
+                    ? _buildEmptyFilterState(context)
+                    : listView
                     ? _buildAchievementListView(achievements, newlyEarned)
                     : SingleChildScrollView(
                         child: Wrap(
@@ -217,6 +249,61 @@ class AchievementPanel extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFilterButton(BuildContext context) {
+    final label = switch (filter) {
+      AchievementFilter.all => AppLocale.filterAll,
+      AchievementFilter.locked => AppLocale.raFilterLocked,
+      AchievementFilter.missables => AppLocale.raFilterMissables,
+    }.getString(l10nContext ?? context);
+
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        onTap: onCycleFilter,
+        child: Container(
+          constraints: BoxConstraints(minHeight: 38.r),
+          padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 6.r),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10.r),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Symbols.filter_list_rounded,
+                color: Colors.white,
+                size: 19.r,
+              ),
+              SizedBox(width: 4.r),
+              Text(
+                label.toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11.r,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Anta',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyFilterState(BuildContext context) {
+    return Center(
+      child: Text(
+        AppLocale.raNoAchievementsForFilter.getString(l10nContext ?? context),
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Colors.white60, fontSize: 14.r),
       ),
     );
   }
