@@ -4,6 +4,7 @@ import 'package:neostation/models/billing_models.dart';
 import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/app_config.dart';
+import 'package:neostation/utils/log_redaction.dart';
 import 'package:flutter/material.dart';
 
 /// Service responsible for managing subscriptions, billing sessions, and available plans.
@@ -97,11 +98,13 @@ class BillingService extends ChangeNotifier {
           return {'success': true, 'session': session};
         }
       } else {
-        final error = data['error'] ?? 'Failed to create checkout session';
+        final error = redactSecrets(
+          data['error'] ?? 'Failed to create checkout session',
+        );
         return {'success': false, 'message': error};
       }
     } catch (e) {
-      final error = 'Network error: $e';
+      final error = redactSecrets('Network error: $e');
       _log.e('Checkout creation error: $error');
       _lastError = error;
       return {'success': false, 'message': error};
@@ -134,12 +137,14 @@ class BillingService extends ChangeNotifier {
         return {'success': true};
       } else {
         final data = jsonDecode(response.body);
-        final error = data['error'] ?? 'Failed to cancel subscription';
+        final error = redactSecrets(
+          data['error'] ?? 'Failed to cancel subscription',
+        );
         _log.e('Cancellation failed: $error');
         return {'success': false, 'message': error};
       }
     } catch (e) {
-      final error = 'Network error: $e';
+      final error = redactSecrets('Network error: $e');
       _log.e('Cancellation error: $error');
       _lastError = error;
       return {'success': false, 'message': error};
@@ -173,12 +178,12 @@ class BillingService extends ChangeNotifier {
         return {'success': true, 'plans': plans};
       } else {
         final data = jsonDecode(response.body);
-        final error = data['error'] ?? 'Failed to fetch plans';
+        final error = redactSecrets(data['error'] ?? 'Failed to fetch plans');
         _log.e('Plans fetch failed: $error');
         return {'success': false, 'message': error};
       }
     } catch (e) {
-      final error = 'Network error: $e';
+      final error = redactSecrets('Network error: $e');
       _log.e('Plans fetch error: $error');
       _lastError = error;
       return {'success': false, 'message': error};

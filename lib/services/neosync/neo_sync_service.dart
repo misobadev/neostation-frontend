@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:crypto/crypto.dart';
 import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/utils/log_redaction.dart';
 import '../../repositories/sync_repository.dart';
 
 /// Service responsible for communicating with the NeoSync cloud synchronization API.
@@ -243,12 +244,12 @@ class NeoSyncService extends ChangeNotifier {
         );
         return {'success': true, 'data': data};
       } else {
-        final error = data['error'] ?? 'Upload failed';
+        final error = redactSecrets(data['error'] ?? 'Upload failed');
         _log.e('Upload failed: $error');
         return {'success': false, 'message': error};
       }
     } catch (e) {
-      final error = 'Network error: $e';
+      final error = redactSecrets('Network error: $e');
       _log.e('Sync error: $error');
       _lastError = error;
       return {'success': false, 'message': error};
@@ -318,12 +319,12 @@ class NeoSyncService extends ChangeNotifier {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true, 'data': data};
       } else {
-        final error = data['error'] ?? 'Upload failed';
+        final error = redactSecrets(data['error'] ?? 'Upload failed');
         _log.e('Upload failed: $error');
         return {'success': false, 'message': error};
       }
     } catch (e) {
-      final error = 'Network error: $e';
+      final error = redactSecrets('Network error: $e');
       _log.e('Upload error: $error');
       _lastError = error;
       return {'success': false, 'message': error};
@@ -377,12 +378,12 @@ class NeoSyncService extends ChangeNotifier {
         };
       } else {
         final data = jsonDecode(response.body);
-        final error = data['error'] ?? 'Failed to fetch files';
+        final error = redactSecrets(data['error'] ?? 'Failed to fetch files');
         _log.e('Fetch failed: $error (status: ${response.statusCode})');
         return {'success': false, 'message': error};
       }
     } catch (e) {
-      final error = 'Network error: $e';
+      final error = redactSecrets('Network error: $e');
       _log.e('Fetch error: $error');
       _lastError = error;
       return {'success': false, 'message': error};
@@ -432,7 +433,7 @@ class NeoSyncService extends ChangeNotifier {
         'emulators': lastPage['emulators'] ?? const <String>[],
       };
     } catch (e) {
-      final error = 'Network error: $e';
+      final error = redactSecrets('Network error: $e');
       _log.e('Get all files error: $error');
       _lastError = error;
       return {'success': false, 'message': error};
@@ -456,12 +457,12 @@ class NeoSyncService extends ChangeNotifier {
         return {'success': true};
       } else {
         final data = jsonDecode(response.body);
-        final error = data['error'] ?? 'Failed to delete file';
+        final error = redactSecrets(data['error'] ?? 'Failed to delete file');
         _log.e('Delete failed: $error');
         return {'success': false, 'message': error};
       }
     } catch (e) {
-      final error = 'Network error: $e';
+      final error = redactSecrets('Network error: $e');
       _log.e('Delete error: $error');
       _lastError = error;
       return {'success': false, 'message': error};
@@ -491,12 +492,12 @@ class NeoSyncService extends ChangeNotifier {
         return {'success': true, 'quota': quota};
       } else {
         final data = jsonDecode(response.body);
-        final error = data['error'] ?? 'Failed to fetch quota';
+        final error = redactSecrets(data['error'] ?? 'Failed to fetch quota');
         _log.e('Quota fetch failed: $error');
         return {'success': false, 'message': error};
       }
     } catch (e) {
-      final error = 'Network error: $e';
+      final error = redactSecrets('Network error: $e');
       _log.e('Quota fetch error: $error');
       _lastError = error;
       return {'success': false, 'message': error};
@@ -574,12 +575,12 @@ class NeoSyncService extends ChangeNotifier {
 
         return {
           'success': false,
-          'message': error,
+          'message': redactSecrets(error),
           'status_code': response.statusCode,
         };
       }
     } catch (e) {
-      final error = 'Network error: $e';
+      final error = redactSecrets('Network error: $e');
       _log.e('Download error: $error');
       _lastError = error;
       return {'success': false, 'message': error};
