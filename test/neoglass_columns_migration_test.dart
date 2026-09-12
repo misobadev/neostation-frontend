@@ -49,19 +49,22 @@ void main() {
       expect(configColumns(), contains('neoglass_border_width'));
     });
 
-    test('defaults match the ConfigModel defaults on an existing row', () async {
-      db.execute('INSERT INTO user_config (id) VALUES (1)');
+    test(
+      'defaults match the ConfigModel defaults on an existing row',
+      () async {
+        db.execute('INSERT INTO user_config (id) VALUES (1)');
 
-      await runV157();
+        await runV157();
 
-      final rows = db.select(
-        'SELECT neoglass_blur, neoglass_transparency, neoglass_border_width '
-        'FROM user_config WHERE id = 1',
-      );
-      expect(rows.first['neoglass_blur'], 0);
-      expect(rows.first['neoglass_transparency'], 5);
-      expect(rows.first['neoglass_border_width'], 2);
-    });
+        final rows = db.select(
+          'SELECT neoglass_blur, neoglass_transparency, neoglass_border_width '
+          'FROM user_config WHERE id = 1',
+        );
+        expect(rows.first['neoglass_blur'], 0);
+        expect(rows.first['neoglass_transparency'], 5);
+        expect(rows.first['neoglass_border_width'], 2);
+      },
+    );
 
     test('a row inserted after the migration also gets the defaults', () async {
       await runV157();
@@ -103,8 +106,11 @@ void main() {
       expect(rows.first['neoglass_blur'], 1);
       expect(rows.first['neoglass_transparency'], 15);
       expect(rows.first['neoglass_border_width'], 4);
-      expect(configColumns().where((c) => c == 'neoglass_blur').length, 1,
-          reason: 'the columns must not be added twice');
+      expect(
+        configColumns().where((c) => c == 'neoglass_blur').length,
+        1,
+        reason: 'the columns must not be added twice',
+      );
     });
 
     test('re-running the migration stays a no-op', () async {
