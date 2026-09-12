@@ -1,3 +1,4 @@
+import 'dart:ffi' show Abi;
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -127,7 +128,12 @@ class UpdateService {
     String platformPattern;
 
     if (Platform.isAndroid) {
-      platformPattern = '-android-arm64-v8a-';
+      // Match the ABI this build was compiled for, not the ones the device
+      // supports: the installer rejects an update whose native libs differ
+      // from the installed package.
+      platformPattern = Abi.current() == Abi.androidArm
+          ? '-android-armeabi-v7a-'
+          : '-android-arm64-v8a-';
     } else if (Platform.isWindows) {
       platformPattern = '-windows-x64-';
     } else if (Platform.isLinux) {
