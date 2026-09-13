@@ -1101,6 +1101,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.rommSearching: 'RomM wird durchsucht...',
   AppLocale.rommDownloading: 'Wird heruntergeladen...',
   AppLocale.rommDownloaded: 'Heruntergeladen',
+  AppLocale.rommLinked: 'Mit RomM verknüpft',
   AppLocale.rommDownloadComplete: 'Download abgeschlossen',
   AppLocale.rommDownloadFailed: 'Download fehlgeschlagen',
   AppLocale.rommDownloadCancelled: 'Download abgebrochen',
@@ -1119,6 +1120,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.rommSyncConfirmPlan:
       'Lädt {count} Spiele herunter ({size}). Das kann lange dauern.',
   AppLocale.rommSyncConfirmSkipped: '{count} bereits auf diesem Gerät.',
+  AppLocale.rommSyncConfirmLinked: '{count} werden mit RomM verknüpft.',
   AppLocale.rommSyncConfirmFree: '{free} frei.',
   AppLocale.rommSyncConfirmNoSpace:
       'Nicht genug Speicher: benötigt {size}, nur {free} frei.',
@@ -1133,6 +1135,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.rommSyncComplete: '{count} Spiele synchronisiert',
   AppLocale.rommSyncCancelled: 'Synchronisierung abgebrochen',
   AppLocale.rommSyncNothingToDo: 'Alles ist bereits heruntergeladen',
+  AppLocale.rommSyncLinkedCount: '{count} Spiele mit RomM verknüpft',
   AppLocale.rommSyncFailedCount: '{count} fehlgeschlagen',
   AppLocale.searchTitle: 'Suche',
   AppLocale.searchNameHint: 'Suchen...',
@@ -1319,4 +1322,33 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.noHiddenGames: 'Keine ausgeblendeten Spiele',
   AppLocale.noHiddenGamesSubtitle:
       'Blende ein Spiel in seinen Einstellungen aus, dann erscheint es hier.',
+  AppLocale.rommLinkRow: 'Mit RomM verknüpfen',
+  AppLocale.rommLinkRowSubtitle:
+      'Die RomM-Bibliothek durchsuchen und die ROM auswählen, die dieses Spiel ist',
+  AppLocale.rommLinkAction: 'Verknüpfen',
+  AppLocale.rommUnlinkRow: 'Verknüpfung mit RomM aufheben',
+  AppLocale.rommUnlinkRowSubtitle:
+      'Verknüpfung entfernen; eine spätere Verbindung kann sie anhand des Dateinamens erneut herstellen',
+  AppLocale.rommUnlinkAction: 'Aufheben',
+  AppLocale.rommUnlinkConfirmTitle: 'Verknüpfung mit RomM aufheben?',
+  AppLocale.rommUnlinkConfirmBody:
+      'Spielstände dieses Spiels werden nicht mehr mit {name} synchronisiert.',
+  AppLocale.rommLinkStateNotLinked: 'Nicht mit RomM verknüpft',
+  AppLocale.rommLinkStateAuto: 'Automatisch verknüpft mit {name}',
+  AppLocale.rommLinkStateManual: 'Manuell verknüpft mit {name}',
+  AppLocale.rommLinkPickerTitle: 'Mit einer RomM-ROM verknüpfen',
+  AppLocale.rommLinkPickerSearchHint: 'RomM-Bibliothek durchsuchen',
+  AppLocale.rommLinkPickerLoading: 'Suche läuft…',
+  AppLocale.rommLinkPickerNoResults: 'Keine passenden ROMs gefunden.',
+  AppLocale.rommLinkPickerError:
+      'Suche fehlgeschlagen. Auswählen, um es erneut zu versuchen.',
+  AppLocale.rommLinkPickerUnscoped:
+      'Keine RomM-Plattform passt zu diesem System, daher gibt es hier nichts zum Verknüpfen.',
+  AppLocale.rommLinkSaved: 'Verknüpft mit {name}',
+  AppLocale.rommLinkFailed: 'Verknüpfung mit RomM fehlgeschlagen',
+  AppLocale.rommUnlinked: 'Verknüpfung mit RomM aufgehoben',
+  AppLocale.rommUnlinkFailed:
+      'Verknüpfung mit RomM konnte nicht entfernt werden',
+  // Link action on search results
+  AppLocale.searchLinkToRomm: 'Mit RomM verknüpfen',
 };

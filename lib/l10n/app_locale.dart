@@ -1163,6 +1163,7 @@ mixin AppLocale {
   static const String rommSearching = 'romm_searching';
   static const String rommDownloading = 'romm_downloading';
   static const String rommDownloaded = 'romm_downloaded';
+  static const String rommLinked = 'romm_linked';
   static const String rommDownloadComplete = 'romm_download_complete';
   static const String rommDownloadFailed = 'romm_download_failed';
   static const String rommDownloadCancelled = 'romm_download_cancelled';
@@ -1178,6 +1179,7 @@ mixin AppLocale {
   static const String rommSyncConfirmTitle = 'romm_sync_confirm_title';
   static const String rommSyncConfirmPlan = 'romm_sync_confirm_plan';
   static const String rommSyncConfirmSkipped = 'romm_sync_confirm_skipped';
+  static const String rommSyncConfirmLinked = 'romm_sync_confirm_linked';
   static const String rommSyncConfirmFree = 'romm_sync_confirm_free';
   static const String rommSyncConfirmNoSpace = 'romm_sync_confirm_no_space';
   // Per-volume variants of the two above, used when a sync's ROMs land on more
@@ -1193,6 +1195,7 @@ mixin AppLocale {
   static const String rommSyncComplete = 'romm_sync_complete';
   static const String rommSyncCancelled = 'romm_sync_cancelled';
   static const String rommSyncNothingToDo = 'romm_sync_nothing_to_do';
+  static const String rommSyncLinkedCount = 'romm_sync_linked_count';
   static const String rommSyncFailedCount = 'romm_sync_failed_count';
 
   // Library search & filtering.
@@ -1301,6 +1304,31 @@ mixin AppLocale {
   static const String customFolderUploadFailed = 'custom_folder_upload_failed';
   static const String customSaveFoldersMigrate = 'custom_save_folders_migrate';
 
+  // RomM manual link picker / Manage tab link rows.
+  static const String rommLinkRow = 'romm_link_row';
+  static const String rommLinkRowSubtitle = 'romm_link_row_subtitle';
+  static const String rommLinkAction = 'romm_link_action';
+  static const String rommUnlinkRow = 'romm_unlink_row';
+  static const String rommUnlinkRowSubtitle = 'romm_unlink_row_subtitle';
+  static const String rommUnlinkAction = 'romm_unlink_action';
+  static const String rommUnlinkConfirmTitle = 'romm_unlink_confirm_title';
+  static const String rommUnlinkConfirmBody = 'romm_unlink_confirm_body';
+  static const String rommLinkStateNotLinked = 'romm_link_state_not_linked';
+  static const String rommLinkStateAuto = 'romm_link_state_auto';
+  static const String rommLinkStateManual = 'romm_link_state_manual';
+  static const String rommLinkPickerTitle = 'romm_link_picker_title';
+  static const String rommLinkPickerSearchHint = 'romm_link_picker_search_hint';
+  static const String rommLinkPickerLoading = 'romm_link_picker_loading';
+  static const String rommLinkPickerNoResults = 'romm_link_picker_no_results';
+  static const String rommLinkPickerError = 'romm_link_picker_error';
+  static const String rommLinkPickerUnscoped = 'romm_link_picker_unscoped';
+  static const String rommLinkSaved = 'romm_link_saved';
+  static const String rommLinkFailed = 'romm_link_failed';
+  static const String rommUnlinked = 'romm_unlinked';
+  static const String rommUnlinkFailed = 'romm_unlink_failed';
+
+  // Link action on search results
+  static const String searchLinkToRomm = 'search_link_to_romm';
   // ==========================================================================
   // Localization Maps
   // ==========================================================================

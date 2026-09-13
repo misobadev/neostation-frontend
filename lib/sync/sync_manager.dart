@@ -61,6 +61,14 @@ class SyncManager extends ChangeNotifier {
   /// Currently selected provider, or null if it is not yet registered.
   ISyncProvider? get active => _registry[_activeProviderId];
 
+  /// The registered provider with [providerId], active or not, or null when
+  /// none is registered under that id.
+  ///
+  /// For callers that have to reach a specific provider's own state — the
+  /// RomM link paths invalidate the RomM provider's cached game status, which
+  /// exists whether or not RomM is the one doing the saves.
+  ISyncProvider? provider(String providerId) => _registry[providerId];
+
   String get activeProviderId => _activeProviderId;
 
   /// Switch to [providerId] and persist the choice via [persist].

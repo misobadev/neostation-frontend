@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/romm_rom.dart';
 import '../models/romm_rom_page.dart';
 import '../services/logger_service.dart';
+import '../services/romm/romm_paging.dart';
 import 'romm_provider.dart';
 
 /// Fetches one page of the source being synced. Offset/limit paging only — the
@@ -12,6 +13,48 @@ typedef RommPageFetcher =
 
 /// True when [rom] is already on disk and should be skipped.
 typedef RommDownloadedCheck = Future<bool> Function(RommRom rom);
+
+/// An on-disk ROM the enumeration matched to its RomM entry, held until the
+/// plan is approved and written afterwards.
+@immutable
+class RommPendingLink {
+  /// The server entry the local file matches.
+  final RommRom rom;
+
+  /// Extension-stripped local name — the key the sync provider caches state
+  /// under, for the caller that refreshes it once a row is written.
+  final String romname;
+
+  /// True when the local file already had a mapping row when it was matched.
+  /// Those are carried anyway so the plan can count them; the write skips them.
+  final bool alreadyLinked;
+
+  const RommPendingLink({
+    required this.rom,
+    required this.romname,
+    required this.alreadyLinked,
+  });
+}
+
+/// Matches a ROM the downloaded check found on disk to its RomM entry and
+/// reports whether it is already linked. **Writes nothing**: the enumeration
+/// runs before the user has approved anything, and a link written then
+/// survives declining the dialog.
+///
+/// Returns null when there is no local copy after all (it vanished between the
+/// downloaded check and the match, or its platform resolves to no local
+/// system).
+typedef RommLocalLinkResolver = Future<RommPendingLink?> Function(RommRom rom);
+
+/// What writing the approved links came to: rows actually written, and rows
+/// whose write failed (never folded into "already linked" — they have no row).
+typedef RommLinkWriteResult = ({int written, int failed});
+
+/// Writes the mapping rows for the matches the plan was approved with, in as
+/// few transactions as the writer can manage. Rows only — never metadata or
+/// media: a sync can touch thousands of ROMs.
+typedef RommLocalLinkWriter =
+    Future<RommLinkWriteResult> Function(List<RommPendingLink> pending);
 
 /// Downloads one ROM, resolving to its final [RommDownload] record.
 typedef RommRomDownloader = Future<RommDownload> Function(RommRom rom);
@@ -122,8 +165,17 @@ class RommBulkSyncPlan {
   /// ROMs actually queued (the source minus what is already on disk).
   final int romCount;
 
-  /// ROMs the pass found already on disk and won't fetch again.
+  /// ROMs the pass found already on disk and won't fetch again
+  /// ([linked] + [alreadyLinked], plus any that matched no local file).
   final int skipped;
+
+  /// Of [skipped], ROMs that *will* gain a RomM link if this plan is
+  /// approved. Nothing has been written when the plan is offered: the rows go
+  /// in after the confirmation, so declining leaves the table untouched.
+  final int linked;
+
+  /// Of [skipped], ROMs that were already linked to RomM.
+  final int alreadyLinked;
 
   /// Sum of the queue's `fs_size_bytes` — what will be transferred.
   final int downloadBytes;
@@ -152,6 +204,8 @@ class RommBulkSyncPlan {
     required this.downloadBytes,
     required this.requiredBytes,
     required this.volumes,
+    this.linked = 0,
+    this.alreadyLinked = 0,
     this.unresolvedRoms = 0,
   });
 
@@ -211,16 +265,14 @@ class RommBulkSync extends ChangeNotifier {
   /// Three is a starting point to be tuned against a real server on device.
   static const int defaultConcurrency = 3;
 
-  /// Rows per enumeration request. Larger than the browse page size (50): this
-  /// pass is a means to an end, not something the user scrolls, so the round
-  /// trips matter more than the latency of any one of them.
-  static const int defaultPageSize = 500;
+  /// Rows per enumeration request — [RommPaging.pageSize], the one definition
+  /// this walk and the connect-time link pass share. Kept under this name for
+  /// the callers and tests that already read it here.
+  static const int defaultPageSize = RommPaging.pageSize;
 
-  /// Hard stop on the enumeration loop, in pages. A server that keeps returning
-  /// full pages (a `total` that never agrees with the rows, a filter the server
-  /// ignores) would otherwise page forever. 500 × 500 = 250k ROMs, far past any
-  /// real library.
-  static const int _maxPages = 500;
+  /// Hard stop on the enumeration loop, in pages — [RommPaging.maxPages],
+  /// shared with the link pass for the same reason as [defaultPageSize].
+  static const int maxPages = RommPaging.maxPages;
 
   RommBulkSyncPhase _phase = RommBulkSyncPhase.idle;
   String _sourceLabel = '';
@@ -231,9 +283,16 @@ class RommBulkSync extends ChangeNotifier {
   int _enumerateTotal = 0;
 
   final List<RommRom> _queue = [];
+
+  /// Matches the enumeration found, waiting on the confirmation. Written in
+  /// one go after the plan is approved, never before it.
+  final List<RommPendingLink> _pendingLinks = [];
   int _completed = 0;
   int _failed = 0;
   int _skipped = 0;
+  int _linked = 0;
+  int _alreadyLinked = 0;
+  int _linkFailures = 0;
   int _cancelled = 0;
   int _doneBytes = 0;
   int _queuedBytes = 0;
@@ -291,6 +350,23 @@ class RommBulkSync extends ChangeNotifier {
   /// ROMs the enumeration pass found already on disk and never queued.
   int get skipped => _skipped;
 
+  /// Of [skipped], ROMs that gained a RomM link during this run (a mapping
+  /// row was written for the local file). 0 when [run] had no linker, and 0
+  /// until the plan is approved — the rows are written after the confirmation.
+  int get linked => _linked;
+
+  /// Matches waiting on the confirmation: what [linked] will be if the plan
+  /// is approved and every write lands.
+  int get pendingLinks => _pendingLinks.length;
+
+  /// Of [skipped], ROMs that were already linked when the pass reached them.
+  int get alreadyLinked => _alreadyLinked;
+
+  /// Of [skipped], ROMs whose link could not be written (a failed database
+  /// write, or a linker that threw). Counted apart from [alreadyLinked]
+  /// because they have no row at all; the connect-time pass retries them.
+  int get linkFailed => _linkFailures;
+
   /// Queue items abandoned because the sync was cancelled mid-flight.
   int get cancelled => _cancelled;
 
@@ -317,6 +393,12 @@ class RommBulkSync extends ChangeNotifier {
   /// reports as already local, and runs the rest through [download] with at
   /// most [concurrency] transfers in flight.
   ///
+  /// Each ROM found on disk is handed to [resolveLink], which matches it to
+  /// its RomM entry without writing anything; the matches are written by
+  /// [writeLinks] *after* the plan is approved, so declining the confirmation
+  /// leaves the mapping table exactly as it was. Without them on-disk ROMs are
+  /// only counted as [skipped].
+  ///
   /// [cancelDownload] is invoked for each in-flight ROM when [cancel] is
   /// called, so cancelling stops the transfers as well as the queue.
   ///
@@ -337,6 +419,8 @@ class RommBulkSync extends ChangeNotifier {
     required RommPageFetcher fetchPage,
     required RommDownloadedCheck isDownloaded,
     required RommRomDownloader download,
+    RommLocalLinkResolver? resolveLink,
+    RommLocalLinkWriter? writeLinks,
     void Function(int romId)? cancelDownload,
     RommBulkSyncConfirm? confirm,
     RommDestinationProbe? destination,
@@ -351,8 +435,17 @@ class RommBulkSync extends ChangeNotifier {
     _notify();
 
     try {
-      await _enumerate(fetchPage, isDownloaded, pageSize);
-      if (_cancelRequested || _queue.isEmpty) return;
+      await _enumerate(fetchPage, isDownloaded, resolveLink, pageSize);
+      // A cancel during the enumeration stops everything, links included:
+      // nothing has been written yet, which is the point.
+      if (_cancelRequested) return;
+      if (_queue.isEmpty) {
+        // Nothing to download means no confirmation is asked for — there is no
+        // size to approve — so the links the user's sync found are written
+        // straight away. They are the only work this run has.
+        await _writeLinks(writeLinks);
+        return;
+      }
 
       if (confirm != null) {
         _phase = RommBulkSyncPhase.confirming;
@@ -371,6 +464,10 @@ class RommBulkSync extends ChangeNotifier {
           return;
         }
       }
+
+      // Approved (or never asked): now the rows go in.
+      await _writeLinks(writeLinks);
+      if (_cancelRequested) return;
 
       _phase = RommBulkSyncPhase.downloading;
       _notify();
@@ -467,6 +564,8 @@ class RommBulkSync extends ChangeNotifier {
       sourceLabel: _sourceLabel,
       romCount: _queue.length,
       skipped: _skipped,
+      linked: _pendingLinks.length,
+      alreadyLinked: _alreadyLinked,
       downloadBytes: _queuedBytes,
       requiredBytes: _queuedBytes + transientHeadroomBytes(concurrency),
       volumes: volumes,
@@ -514,9 +613,13 @@ class RommBulkSync extends ChangeNotifier {
     _enumerated = 0;
     _enumerateTotal = 0;
     _queue.clear();
+    _pendingLinks.clear();
     _completed = 0;
     _failed = 0;
     _skipped = 0;
+    _linked = 0;
+    _alreadyLinked = 0;
+    _linkFailures = 0;
     _cancelled = 0;
     _doneBytes = 0;
     _queuedBytes = 0;
@@ -524,18 +627,69 @@ class RommBulkSync extends ChangeNotifier {
     _lastError = null;
   }
 
+  /// Matches one on-disk ROM to its RomM entry, without writing.
+  ///
+  /// A resolver failure is logged and counted as [linkFailed], never as
+  /// [alreadyLinked]: the sync is about downloads first, and a mapping that
+  /// couldn't be made now is picked up by the next connect-time link pass.
+  Future<void> _resolveLink(RommLocalLinkResolver resolve, RommRom rom) async {
+    try {
+      final pending = await resolve(rom);
+      if (pending == null) return;
+      if (pending.alreadyLinked) {
+        _alreadyLinked++;
+        return;
+      }
+      _pendingLinks.add(pending);
+    } catch (e) {
+      _linkFailures++;
+      _log.e(
+        'RomM bulk sync: matching ${rom.fsName} (rom ${rom.id}) failed: $e',
+      );
+    }
+  }
+
+  /// Writes the matches the plan was approved with, in one call to the writer
+  /// rather than one transaction per ROM.
+  ///
+  /// A row that appeared between the match and the write (a download that
+  /// finished, another device's sync) is counted as already linked, which is
+  /// what it is; a write that failed is counted as [linkFailed], never as
+  /// already linked.
+  Future<void> _writeLinks(RommLocalLinkWriter? writeLinks) async {
+    if (writeLinks == null || _pendingLinks.isEmpty) return;
+    final pending = List<RommPendingLink>.unmodifiable(_pendingLinks);
+    try {
+      final result = await writeLinks(pending);
+      _linked += result.written;
+      _linkFailures += result.failed;
+      _alreadyLinked += pending.length - result.written - result.failed;
+    } catch (e) {
+      _linkFailures += pending.length;
+      _log.e('RomM bulk sync: writing ${pending.length} link(s) failed: $e');
+    }
+    _notify();
+  }
+
   /// Pages the whole source into [_queue], skipping ROMs already on disk.
   ///
   /// Filtering per page (rather than collecting everything and filtering after)
   /// keeps the queue and its byte total growing while the pass runs, so the
   /// progress UI has something truthful to show on a large platform.
+  ///
+  /// A ROM that is already on disk is the one case where the sync has work
+  /// that isn't a download: the file predates RomM (or was copied over by
+  /// hand) and has no mapping row, so save sync and the cloud badge can't see
+  /// it. [resolveLink] matches it here and the row is written after the
+  /// confirmation; the ROM is never queued either way.
   Future<void> _enumerate(
     RommPageFetcher fetchPage,
     RommDownloadedCheck isDownloaded,
+    RommLocalLinkResolver? resolveLink,
     int pageSize,
   ) async {
     var offset = 0;
-    for (var page = 0; page < _maxPages; page++) {
+    for (var page = 0; page < maxPages; page++) {
       if (_cancelRequested) return;
 
       final RommRomPage result;
@@ -556,6 +710,7 @@ class RommBulkSync extends ChangeNotifier {
         _enumerated++;
         if (await isDownloaded(rom)) {
           _skipped++;
+          if (resolveLink != null) await _resolveLink(resolveLink, rom);
         } else {
           _queue.add(rom);
           _queuedBytes += rom.fsSizeBytes;
@@ -570,7 +725,7 @@ class RommBulkSync extends ChangeNotifier {
       if (_enumerateTotal > 0 && offset >= _enumerateTotal) return;
     }
     _log.w(
-      'RomM bulk sync: enumeration hit the $_maxPages-page cap for '
+      'RomM bulk sync: enumeration hit the $maxPages-page cap for '
       '"$_sourceLabel" — syncing the ${_queue.length} ROMs found so far',
     );
   }

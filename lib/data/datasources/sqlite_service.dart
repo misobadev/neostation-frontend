@@ -13,6 +13,7 @@ import '../../models/emulator_model.dart';
 import '../../models/core_emulator_model.dart';
 // import '../models/neo_sync_models.dart'; // Removido si no se usa directamente aquí
 import '../../models/database_game_model.dart';
+import '../../models/romm_link_row.dart';
 import '../../constants/system_folder_names.dart';
 import '../../utils/cloud_path_builder.dart';
 import '../../utils/semaphore.dart';
@@ -459,7 +460,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 157;
+  static const int _databaseVersion = 158;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -4532,6 +4533,30 @@ class SqliteService {
       ORDER BY ur.is_favorite DESC, LOWER(game_display_name) ASC
     ''');
     return results.map((row) => DatabaseGameModel.fromJson(row)).toList();
+  }
+
+  /// Every scanned game as `(filename, romname, system folder)` — the columns
+  /// the RomM link pass matches on, and nothing else.
+  ///
+  /// Deliberately not [getAllGames]: that query joins the metadata table,
+  /// runs a correlated subquery per row and sorts by `LOWER(...)` over the
+  /// whole library, all of which the pass throws away. On a large Android
+  /// library it is the difference between a scan of two indexed columns and
+  /// several hundred milliseconds of work on the platform thread.
+  static Future<List<RommLinkRow>> getRommLinkRows() async {
+    final db = await instance.database;
+    final results = await db.rawQuery('''
+      SELECT ur.filename, s.folder_name AS system_folder
+      FROM user_roms ur
+      JOIN app_systems s ON ur.app_system_id = s.id
+    ''');
+    return [
+      for (final row in results)
+        rommLinkRow(
+          filename: row['filename']?.toString() ?? '',
+          systemFolder: row['system_folder']?.toString() ?? '',
+        ),
+    ];
   }
 
   /// Retrieves only games marked as favorites across all registered systems.

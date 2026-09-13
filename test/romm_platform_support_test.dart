@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/data/datasources/sqlite_service.dart';
 import 'package:neostation/models/romm_platform.dart';
+import 'package:neostation/models/romm_rom.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/services/romm_service.dart';
 
@@ -112,6 +113,70 @@ void main() {
       await provider.loadPlatforms();
 
       expect(provider.isPlatformSupported(1), isTrue);
+    });
+  });
+
+  group('systemForPlatform', () {
+    // Every case seeds some other system first: an empty app_systems table
+    // makes SqliteService re-sync from the JSON assets, which is not what a
+    // transient miss looks like and is not available to a unit test anyway.
+    test('a null resolution is not cached; the next call resolves', () async {
+      await localSystem('genesis');
+      final platform = _platform(1, 'snes');
+
+      expect(await provider.systemForPlatform(platform), isNull);
+      await localSystem('snes');
+
+      expect((await provider.systemForPlatform(platform))?.folderName, 'snes');
+    });
+
+    test('a hit is cached and shared with the ROM-level resolver', () async {
+      await localSystem('snes');
+      final platform = _platform(1, 'snes');
+
+      expect(await provider.systemForPlatform(platform), isNotNull);
+      await db.execute('DELETE FROM app_systems');
+
+      expect(
+        await provider.systemForPlatform(platform),
+        isNotNull,
+        reason: 'served from the per-platform cache',
+      );
+      final rom = RommRom(
+        id: 1,
+        name: 'Game',
+        platformId: 1,
+        platformSlug: 'snes',
+        fsName: 'Game.sfc',
+        fsNameNoExt: 'Game',
+        fsExtension: 'sfc',
+      );
+      expect(await provider.resolveSystem(rom), isNotNull);
+    });
+
+    test('a null the ROM-level resolver cached does not pin it', () async {
+      await localSystem('genesis');
+      final platform = _platform(1, 'snes');
+      final rom = RommRom(
+        id: 1,
+        name: 'Game',
+        platformId: 1,
+        platformSlug: 'snes',
+        fsName: 'Game.sfc',
+        fsNameNoExt: 'Game',
+        fsExtension: 'sfc',
+      );
+
+      expect(await provider.resolveSystem(rom), isNull);
+      await localSystem('snes');
+
+      expect(await provider.resolveSystem(rom), isNull, reason: 'memoised');
+      expect(await provider.systemForPlatform(platform), isNotNull);
+      expect(
+        await provider.resolveSystem(rom),
+        isNotNull,
+        reason: 'the platform hit replaces the pinned null',
+      );
     });
   });
 

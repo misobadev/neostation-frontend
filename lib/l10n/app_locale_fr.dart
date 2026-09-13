@@ -1105,6 +1105,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.rommSearching: 'Recherche dans RomM...',
   AppLocale.rommDownloading: 'Téléchargement...',
   AppLocale.rommDownloaded: 'Téléchargé',
+  AppLocale.rommLinked: 'Lié à RomM',
   AppLocale.rommDownloadComplete: 'Téléchargement terminé',
   AppLocale.rommDownloadFailed: 'Échec du téléchargement',
   AppLocale.rommDownloadCancelled: 'Téléchargement annulé',
@@ -1123,6 +1124,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.rommSyncConfirmPlan:
       'Télécharge {count} jeux ({size}). Cela peut être long.',
   AppLocale.rommSyncConfirmSkipped: '{count} déjà sur cet appareil.',
+  AppLocale.rommSyncConfirmLinked: '{count} seront liés à RomM.',
   AppLocale.rommSyncConfirmFree: '{free} disponibles.',
   AppLocale.rommSyncConfirmNoSpace:
       'Espace insuffisant : {size} nécessaires, seulement {free} disponibles.',
@@ -1137,6 +1139,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.rommSyncComplete: '{count} jeux synchronisés',
   AppLocale.rommSyncCancelled: 'Synchronisation annulée',
   AppLocale.rommSyncNothingToDo: 'Tout est déjà téléchargé',
+  AppLocale.rommSyncLinkedCount: '{count} jeux liés à RomM',
   AppLocale.rommSyncFailedCount: '{count} en échec',
   AppLocale.searchTitle: 'Rechercher',
   AppLocale.searchNameHint: 'Rechercher...',
@@ -1321,4 +1324,32 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.noHiddenGames: 'Aucun jeu masqué',
   AppLocale.noHiddenGamesSubtitle:
       'Masquez un jeu depuis ses paramètres pour le retrouver ici.',
+  AppLocale.rommLinkRow: 'Lier à RomM',
+  AppLocale.rommLinkRowSubtitle:
+      'Rechercher dans la bibliothèque RomM et choisir la ROM correspondant à ce jeu',
+  AppLocale.rommLinkAction: 'Lier',
+  AppLocale.rommUnlinkRow: 'Dissocier de RomM',
+  AppLocale.rommUnlinkRowSubtitle:
+      'Supprime le lien ; une connexion ultérieure pourra le rétablir d\'après le nom de fichier',
+  AppLocale.rommUnlinkAction: 'Dissocier',
+  AppLocale.rommUnlinkConfirmTitle: 'Dissocier de RomM ?',
+  AppLocale.rommUnlinkConfirmBody:
+      'Les sauvegardes de ce jeu ne seront plus synchronisées avec {name}.',
+  AppLocale.rommLinkStateNotLinked: 'Non lié à RomM',
+  AppLocale.rommLinkStateAuto: 'Lié automatiquement à {name}',
+  AppLocale.rommLinkStateManual: 'Lié manuellement à {name}',
+  AppLocale.rommLinkPickerTitle: 'Lier à une ROM RomM',
+  AppLocale.rommLinkPickerSearchHint: 'Rechercher dans la bibliothèque RomM',
+  AppLocale.rommLinkPickerLoading: 'Recherche…',
+  AppLocale.rommLinkPickerNoResults: 'Aucune ROM correspondante.',
+  AppLocale.rommLinkPickerError:
+      'La recherche a échoué. Sélectionnez pour réessayer.',
+  AppLocale.rommLinkPickerUnscoped:
+      'Aucune plateforme RomM ne correspond à ce système : rien à lier ici.',
+  AppLocale.rommLinkSaved: 'Lié à {name}',
+  AppLocale.rommLinkFailed: 'Échec de la liaison avec RomM',
+  AppLocale.rommUnlinked: 'Dissocié de RomM',
+  AppLocale.rommUnlinkFailed: 'Impossible de dissocier de RomM',
+  // Link action on search results
+  AppLocale.searchLinkToRomm: 'Lier à RomM',
 };

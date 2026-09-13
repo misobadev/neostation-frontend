@@ -24,6 +24,7 @@ import 'package:path/path.dart' as path;
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/romm_asset.dart';
+import 'package:neostation/models/romm_platform.dart';
 import 'package:neostation/models/romm_rom.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/repositories/emulator_repository.dart';
@@ -34,6 +35,7 @@ import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/services/romm/romm_library_linker.dart';
 import 'package:neostation/services/romm_playtime_service.dart';
 import 'package:neostation/services/romm_service.dart';
 
@@ -124,6 +126,11 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
   final Map<String, GameSyncState> _gameSyncStates = {};
 
+  /// The connect-time link pass. Built from [_browse] and the repositories
+  /// unless a test hands one in (a subclass recording [RommLibraryLinker.run]
+  /// is enough to test the schedule without a server or a database).
+  late final RommLibraryLinker _linker;
+
   RomMSyncProvider(
     this._browse,
     this._neoSync, {
@@ -131,10 +138,14 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     @visibleForTesting ResolveSaveTargets? resolveTargets,
     @visibleForTesting ListLocalGames? listGames,
     @visibleForTesting bool autoSweep = true,
+    @visibleForTesting RommLibraryLinker? linker,
+    @visibleForTesting Duration sweepStartupDelay = _sweepStartupDelay,
   }) : _locateOverride = locateSaves,
        _resolveTargetsOverride = resolveTargets,
        _listGamesOverride = listGames,
-       _autoSweep = autoSweep {
+       _autoSweep = autoSweep,
+       _startupDelay = sweepStartupDelay {
+    _linker = linker ?? _buildLinker();
     if (!_autoSweep) return;
     _wasConnected = _browse.isConnected;
     _browse.addListener(_onBrowseChanged);
@@ -147,6 +158,9 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// Whether the connect-triggered sweep is wired up. Off in tests, which drive
   /// [retryPendingUploads] directly rather than waiting out a timer.
   final bool _autoSweep;
+
+  /// [_sweepStartupDelay], or whatever a test shortened it to.
+  final Duration _startupDelay;
 
   bool _disposed = false;
 
@@ -1258,6 +1272,42 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   @override
   GameSyncState? getGameSyncState(String gameId) => _gameSyncStates[gameId];
 
+  /// Forgets the cached sync state for one game so the next status computation
+  /// starts from scratch.
+  ///
+  /// Called after a link path writes an `app_romm_rom_map` row for a game that
+  /// was already on the device. Until then [_syncGame] found no rom id and
+  /// cached [GameSyncStatus.disabled] — the grey cloud — and nothing would
+  /// recompute it before a restart. Dropping the entry (and notifying, so the
+  /// badge re-asks) lets the link show without one.
+  ///
+  /// The "downloaded" memo on the browse side is invalidated too, through its
+  /// owner: the new row is also what [RommProvider]'s existing-file probe uses
+  /// to recognise a multi-disc game by its recorded playlist name, so a stale
+  /// memo could keep reporting a freshly linked game as not downloaded. That
+  /// call is a wholesale, no-op-when-empty clear, so repeated invalidations are
+  /// cheap.
+  void invalidateGameSyncState(String romname) {
+    final removed = _gameSyncStates.remove(romname) != null;
+    _browse.invalidateDownloadedCache();
+    if (removed && !_disposed) notifyListeners();
+  }
+
+  /// [invalidateGameSyncState] for every game the link pass just linked, with
+  /// the browse-side cache cleared and listeners notified *once*.
+  ///
+  /// The single-game form clears the whole downloaded-cache each call, which
+  /// is fine for one link from the browser and a needless storm for the
+  /// hundreds a connect pass can write. One clear covers them all.
+  void invalidateGameSyncStates(Iterable<String> romnames) {
+    var removed = false;
+    for (final romname in romnames) {
+      removed = _gameSyncStates.remove(romname) != null || removed;
+    }
+    _browse.invalidateDownloadedCache();
+    if (removed && !_disposed) notifyListeners();
+  }
+
   @override
   Future<SyncResult> syncGameSavesBeforeLaunch(
     GameModel game, {
@@ -1399,6 +1449,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
   /// Guard against overlapping sweeps (connect + a manual [fullSync]).
   bool _sweeping = false;
+
+  /// Guard against overlapping link passes, the same way [_sweeping] guards
+  /// the sweep. A skipped pass is not rescheduled; the next connect runs it.
+  bool _linking = false;
 
   /// Whether [_browse] was connected at the last notification, so the sweep
   /// fires on the *transition* rather than on every notify a connected provider
@@ -1552,14 +1606,17 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
   void _scheduleSweep() {
     unawaited(
-      Future<void>.delayed(_sweepStartupDelay).then((_) async {
+      Future<void>.delayed(_startupDelay).then((_) async {
         if (_disposed) return;
         if (!_browse.isConnected) {
           _log.i('RomM upload sweep: skipped, disconnected before it ran');
           return;
         }
         if (_browse.bulkSync.isRunning) {
-          _log.i('RomM upload sweep: skipped, a bulk ROM sync is running');
+          _log.i(
+            'RomM connect-time link pass and upload sweep skipped: '
+            'a bulk ROM sync is running',
+          );
           return;
         }
 
@@ -1570,6 +1627,19 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           await pullRecentPlaytime();
         } catch (e) {
           _log.w('RomM playtime pull failed: $e');
+        }
+        if (_disposed || !_browse.isConnected) return;
+
+        // Link pre-existing ROMs before the sweep, so games linked here are
+        // swept in this same connect. Like playtime, not behind the
+        // active-provider gate: a link is what makes the badge, playtime and
+        // the browse grid's "downloaded" state right, whoever owns saves.
+        try {
+          await linkLibrary();
+        } catch (e) {
+          // linkLibrary is documented not to throw; belt-and-braces so an
+          // unawaited future can't go unhandled.
+          _log.w('RomM link pass failed: $e');
         }
         if (_disposed || !_browse.isConnected) return;
 
@@ -1586,6 +1656,95 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         }
       }),
     );
+  }
+
+  /// Runs the connect-time link pass once, under the sweep's guards.
+  ///
+  /// Skipped — with a log line saying why — when disconnected, when a bulk
+  /// ROM sync is running (its enumeration is walking the same server and its
+  /// downloads are writing the same table), or when a pass is already in
+  /// flight. Skipping never reschedules. On completion the games the pass
+  /// linked have their cached sync state dropped in one go, so the badge and
+  /// the browse grid see the links without a restart.
+  ///
+  /// Never throws: the linker's own failures (library, platform list, or
+  /// platform-to-system resolution unreadable) are logged here and read as
+  /// "nothing linked". Returns the pass summary, or null when the pass was
+  /// skipped.
+  Future<RommLinkPassSummary?> linkLibrary() async {
+    if (!_browse.isConnected) {
+      _log.i('RomM link pass skipped: disconnected');
+      return null;
+    }
+    if (_browse.bulkSync.isRunning) {
+      _log.i('RomM link pass skipped: a bulk ROM sync is running');
+      return null;
+    }
+    if (_linking) {
+      _log.i('RomM link pass skipped: a pass is already running');
+      return null;
+    }
+    _linking = true;
+    try {
+      final summary = await _linker.run();
+      if (summary.linkedRomnames.isNotEmpty) {
+        invalidateGameSyncStates(summary.linkedRomnames);
+      }
+      return summary;
+    } on RommLinkPassException catch (e) {
+      _log.w(e.toString());
+      return null;
+    } finally {
+      _linking = false;
+    }
+  }
+
+  /// The production linker: server access through [_browse], the library and
+  /// the map through their repositories, and a stop check tied to this
+  /// provider's lifetime.
+  RommLibraryLinker _buildLinker() => RommLibraryLinker(
+    listPlatforms: listPlatformsForLinkPass,
+    resolveSystem: _browse.systemForPlatform,
+    fetchPage: ({required platformId, required limit, required offset}) => _svc
+        .getRomsPage(platformIds: [platformId], limit: limit, offset: offset),
+    listGames: GameRepository.getRommLinkRows,
+    loadRomIdIndex: RommSaveMapRepository.getRomIdIndex,
+    putMappingsIfAbsent: RommSaveMapRepository.putMappingsIfAbsent,
+    shouldStop: () => _disposed || !_browse.isConnected,
+  );
+
+  /// The browse provider's platform list, loaded if it hasn't been yet.
+  ///
+  /// Going through [RommProvider.loadPlatforms] rather than the service means
+  /// the list is shared with the browse screen (a no-op when it already
+  /// loaded it) and, more to the point, that its support classification has
+  /// run — which warms the per-platform system cache
+  /// [RommProvider.systemForPlatform] reads and lets it try each platform's
+  /// `fs_slug`. The provider swallows a failed load into
+  /// [RommProvider.lastError], which is surfaced here as an error so the pass
+  /// reports it rather than reading "no platforms".
+  ///
+  /// A load already in flight (the browse screen opened just before the pass
+  /// fired) is awaited, not raced: `loadPlatforms` returns at once while one
+  /// is running, and the pass would otherwise read an empty list and report
+  /// "0 platforms processed, complete" with nothing to say why. Should the
+  /// list still be empty and loading after that (a forced reload started
+  /// underneath us), the pass fails with that as its named reason.
+  @visibleForTesting
+  Future<List<RommPlatform>> listPlatformsForLinkPass() async {
+    if (_browse.isLoadingPlatforms) {
+      _log.i('RomM link pass waiting: the platform list is still loading');
+      await _browse.platformsLoaded;
+    }
+    await _browse.loadPlatforms();
+    final platforms = _browse.platforms;
+    if (platforms.isEmpty && _browse.lastError != null) {
+      throw StateError(_browse.lastError!);
+    }
+    if (platforms.isEmpty && _browse.isLoadingPlatforms) {
+      throw StateError('the platform list is still loading');
+    }
+    return platforms;
   }
 
   /// Folds playtime recorded on other devices into the local totals.

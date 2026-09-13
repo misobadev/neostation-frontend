@@ -20,6 +20,7 @@ import '../services/romm_playtime_service.dart';
 import '../services/romm_service.dart';
 import '../services/storage_space_service.dart';
 import '../services/user_data_location_service.dart';
+import '../utils/romm_local_matcher.dart';
 import 'file_provider.dart';
 import 'romm_bulk_sync.dart';
 
@@ -198,6 +199,13 @@ class RommProvider extends ChangeNotifier {
   /// deletions made outside this app) and by [disconnect].
   final Map<int, bool> _downloadedByRomId = {};
 
+  /// The [RommLocalCopy] behind a `true` in [_downloadedByRomId], so the link
+  /// paths can act on a ROM the badge probe already found without probing the
+  /// disk a second time (two SAF stats per pre-existing ROM on a cold cache,
+  /// which is what bulk sync used to pay). Only hits are kept — a miss has
+  /// nothing to link — and it lives and dies with [_downloadedByRomId].
+  final Map<int, RommLocalCopy> _localCopyByRomId = {};
+
   // ── Getters ────────────────────────────────────────────────────────────────
   RommConnectionStatus get status => _status;
   bool get isConnected => _status == RommConnectionStatus.connected;
@@ -207,6 +215,21 @@ class RommProvider extends ChangeNotifier {
 
   List<RommPlatform> get platforms => List.unmodifiable(_platforms);
   bool get loadingPlatforms => _loadingPlatforms;
+
+  /// [loadingPlatforms] under the name the sync layer's guards read it by.
+  /// The link pass checks it the way it checks [isConnected], so it reads as
+  /// a state, not a progress flag.
+  bool get isLoadingPlatforms => _loadingPlatforms;
+
+  /// Completes when the platform load in flight finishes — immediately when
+  /// none is. [loadPlatforms] is a no-op while one is running, so a caller
+  /// that needs the *result* (the link pass) awaits this first rather than
+  /// reading an empty list and reporting nothing to do.
+  Future<void> get platformsLoaded =>
+      _platformsLoad?.future ?? Future<void>.value();
+
+  /// The load [loadPlatforms] is running, for [platformsLoaded].
+  Completer<void>? _platformsLoad;
 
   List<RommCollection> get collections => List.unmodifiable(_collections);
   bool get loadingCollections => _loadingCollections;
@@ -545,6 +568,7 @@ class RommProvider extends ChangeNotifier {
     _systemByPlatformId.clear();
     _unsupportedPlatformIds.clear();
     _downloadedByRomId.clear();
+    _localCopyByRomId.clear();
     _lastPersistedAccessToken = null;
     notifyListeners();
   }
@@ -556,6 +580,7 @@ class RommProvider extends ChangeNotifier {
     if (_loadingPlatforms) return;
     if (_platforms.isNotEmpty && !force) return;
     _loadingPlatforms = true;
+    final load = _platformsLoad = Completer<void>();
     _lastError = null;
     notifyListeners();
     try {
@@ -574,6 +599,8 @@ class RommProvider extends ChangeNotifier {
       _lastError = 'Failed to load platforms: $e';
     } finally {
       _loadingPlatforms = false;
+      _platformsLoad = null;
+      load.complete();
       notifyListeners();
     }
   }
@@ -817,6 +844,23 @@ class RommProvider extends ChangeNotifier {
       (index[system.realName] ??= <int>[]).add(platform.id);
     }
     return index;
+  }
+
+  /// Local system for a RomM platform, for callers that have a platform and
+  /// not a ROM (the connect-time link pass).
+  ///
+  /// Reads the per-platform cache but, unlike [resolveSystem], never writes a
+  /// null into it: [SystemRepository.getSystemByFolderName] answers null for
+  /// an unreadable or still-loading system table as readily as for a platform
+  /// with no match, and a null pinned during that window would leave the
+  /// platform unlinkable until the next connect. A hit is cached, so a
+  /// platform that failed to resolve once is simply asked again next time.
+  Future<SystemModel?> systemForPlatform(RommPlatform platform) async {
+    final cached = _systemByPlatformId[platform.id];
+    if (cached != null) return cached;
+    final system = await _systemForPlatform(platform);
+    if (system != null) _systemByPlatformId[platform.id] = system;
+    return system;
   }
 
   /// Local system for a RomM platform, using the same slug/alias candidates
@@ -1142,8 +1186,19 @@ class RommProvider extends ChangeNotifier {
     SystemModel system,
     RommRom rom,
     List<String> romFolders,
+  ) async => (await _existingRomFile(system, rom, romFolders))?.directory;
+
+  /// The on-disk copy of [rom] under any of [system]'s folder aliases, or null
+  /// if none exists. [_existingRomDir] is this minus the filename; the link
+  /// paths need the name too, because it is what the mapping row is keyed by.
+  Future<RommLocalCopy?> _existingRomFile(
+    SystemModel system,
+    RommRom rom,
+    List<String> romFolders,
   ) async {
-    final candidates = _existingRomNames(rom);
+    // The name rule is shared with the link paths (see RommLocalMatcher) so
+    // the "downloaded" badge and a written link can never disagree.
+    final candidates = RommLocalMatcher.candidateNames(rom);
     // A bundled multi-disc playlist keeps its own arbitrary basename, which the
     // name heuristics above can't reconstruct. If this ROM was downloaded here
     // before, the map recorded the exact on-disk indexed name (the .m3u) — use
@@ -1161,23 +1216,42 @@ class RommProvider extends ChangeNotifier {
       for (final name in _systemFolderNames(system)) {
         final dir = p.join(base, name);
         for (final candidate in candidates) {
-          if (await File(p.join(dir, candidate)).exists()) return dir;
+          final file = File(p.join(dir, candidate));
+          if (await file.exists()) {
+            return RommLocalCopy(
+              system: system,
+              directory: dir,
+              filename: await _onDiskName(file, candidate),
+            );
+          }
         }
         // ScummVM game data lives in an ID-named subfolder. The descriptor is
         // what the scanner indexes, but it is no longer a direct child of the
         // system folder, so look for it recursively when checking whether this
-        // RomM entry already exists locally.
-        if (system.folderName == 'scummvm' &&
-            await _containsNamedFileRecursively(dir, candidates)) {
-          return dir;
+        // RomM entry already exists locally. The copy still reports the system
+        // folder as its directory (that is where a download would land), while
+        // the filename is the descriptor's own, which is what the scan indexed
+        // and therefore what a mapping row has to be keyed by.
+        if (system.folderName == 'scummvm') {
+          final nested = await _findNamedFileRecursively(dir, candidates);
+          if (nested != null) {
+            return RommLocalCopy(
+              system: system,
+              directory: dir,
+              filename: p.basename(nested.path),
+            );
+          }
         }
       }
     }
     return null;
   }
 
-  /// Whether [dir] contains a file with one of [names] anywhere below it.
-  Future<bool> _containsNamedFileRecursively(
+  /// The first file under [dir] whose basename is one of [names], or null.
+  ///
+  /// Returns the file rather than a bare bool because the link paths need the
+  /// name the filesystem actually holds, not the candidate that matched it.
+  Future<File?> _findNamedFileRecursively(
     String dir,
     List<String> names,
   ) async {
@@ -1188,33 +1262,128 @@ class RommProvider extends ChangeNotifier {
       ).list(recursive: true, followLinks: false)) {
         if (entity is File &&
             wanted.contains(p.basename(entity.path).toLowerCase())) {
-          return true;
+          return entity;
         }
       }
     } catch (_) {
       // Missing or unreadable directories are simply not downloaded copies.
     }
-    return false;
+    return null;
   }
 
-  /// On-disk names that mark [rom] as already downloaded in a folder.
+  /// The spelling the filesystem actually holds for [file], which
+  /// `exists()` matched under [candidate].
   ///
-  /// A single-file ROM lands as its [RommRom.fsName]. A multi-disc ROM is
-  /// served as a zip that [extractMultiDiscZip] unpacks into disc files plus a
-  /// `.m3u` playlist and then deletes — so the fsName itself never exists on
-  /// disk; only the playlist does. We match the playlist names that extraction
-  /// would produce: the synthesised fallback (`<fsName>.m3u`) and, defensively,
-  /// the extension-replaced variant. (A bundled playlist keeps its own basename
-  /// which we can't predict here, so those re-download; the common synthesised
-  /// case is covered.)
-  List<String> _existingRomNames(RommRom rom) {
-    final names = <String>[rom.fsName];
-    if (rom.isMultiFile) {
-      names.add('${rom.fsName}.m3u');
-      final stem = p.basenameWithoutExtension(rom.fsName);
-      if (stem.isNotEmpty && stem != rom.fsName) names.add('$stem.m3u');
+  /// On a case-folding filesystem (macOS, Windows) `Game.sfc` hits a file
+  /// stored as `game.sfc`, and the library scan indexed the stored spelling.
+  /// The mapping row has to carry that spelling or `getRommRomId`'s exact
+  /// lookup misses it and the link is dead on arrival. Resolving the path
+  /// canonicalises case on those platforms; on a case-sensitive one the two
+  /// are already equal. The resolved name is only trusted when it *is* the
+  /// candidate modulo case — a symlink resolves to its target's name, and the
+  /// scan indexes the link, not the target.
+  static Future<String> _onDiskName(File file, String candidate) async {
+    try {
+      final real = p.basename(await file.resolveSymbolicLinks());
+      if (RommLocalMatcher.normalizeName(real) ==
+          RommLocalMatcher.normalizeName(candidate)) {
+        return real;
+      }
+    } on FileSystemException catch (e) {
+      // The file exists but can't be canonicalised (permissions, a racing
+      // delete): the candidate spelling is still the best answer available,
+      // so fall through to it rather than lose the match.
+      _log.w('RomM: could not resolve on-disk name for ${file.path}: $e');
     }
-    return names;
+    return candidate;
+  }
+
+  /// The already-downloaded copy of [rom] in a configured ROM folder, or null
+  /// when there is none (or its platform resolves to no local system).
+  ///
+  /// The same probe as [isDownloaded] — this is what the link paths for
+  /// pre-existing ROMs act on, and the whole point of sharing it is that a
+  /// ROM the browse grid badges as downloaded is exactly a ROM that links.
+  Future<RommLocalCopy?> findLocalCopy(
+    RommRom rom,
+    List<String> romFolders,
+  ) async {
+    // A copy the badge probe already found is handed back as-is: bulk sync
+    // asks [isDownloadedCached] and then this for every on-disk ROM, and the
+    // second look must not be a second disk probe.
+    final cached = _localCopyByRomId[rom.id];
+    if (cached != null) return cached;
+    final system = await resolveSystem(rom);
+    if (system == null) return null;
+    final copy = await _existingRomFile(system, rom, romFolders);
+    if (copy != null) _localCopyByRomId[rom.id] = copy;
+    return copy;
+  }
+
+  /// Writes the `app_romm_rom_map` row linking [copy] to [rom], unless one
+  /// already exists for that file — which is left alone, whatever it points
+  /// at. Reports the three outcomes apart: a row written, an existing row
+  /// kept, and a write that failed (which is *not* a link and must not be
+  /// counted as one).
+  ///
+  /// The row is keyed the way the download path keys its own: the on-disk
+  /// filename the scan indexes as `user_roms.filename`, within the system's
+  /// canonical folder. That is the shape `RommSaveMapRepository.getRommRomId`
+  /// resolves from a `GameModel` (exact, then extension-stripped), so save
+  /// sync, playtime and the cloud badge all find the link.
+  Future<RommMappingWriteResult> linkLocalCopy(
+    RommRom rom,
+    RommLocalCopy copy,
+  ) async {
+    final result = await RommSaveMapRepository.putMappingIfAbsent(
+      romname: copy.filename,
+      systemFolder: copy.system.folderName,
+      rommRomId: rom.id,
+      fsName: rom.fsName,
+    );
+    switch (result) {
+      case RommMappingWriteResult.written:
+        _log.i(
+          'RomM: linked ${copy.system.folderName}/${copy.filename} '
+          'to rom ${rom.id}',
+        );
+      case RommMappingWriteResult.kept:
+        break;
+      case RommMappingWriteResult.failed:
+        _log.e(
+          'RomM: linking ${copy.system.folderName}/${copy.filename} '
+          'to rom ${rom.id} failed; it stays unlinked',
+        );
+    }
+    return result;
+  }
+
+  /// Imports RomM's metadata and artwork for a linked [copy] of [rom], but
+  /// only when the local game has no metadata row at all.
+  ///
+  /// The browser path's counterpart to the import a download performs. Gated
+  /// on "no row" rather than "not fully scraped" so a game the user scraped,
+  /// edited, or imported from ES-DE is never replaced — the same fill-gaps
+  /// posture as the ES-DE importer, and [ScraperRepository.saveGameMetadata]
+  /// is a whole-row replace. Returns true when an import ran. Arms the
+  /// debounced settle on success so the library picks up the new art without
+  /// a manual rescan, exactly as a download does.
+  Future<bool> importMetadataIfMissing(
+    RommRom rom,
+    RommLocalCopy copy,
+    FileProvider fileProvider,
+  ) async {
+    final sysId = copy.system.id ?? '';
+    if (sysId.isEmpty) return false;
+    final existing = await ScraperRepository.getGameMetadata(
+      sysId,
+      copy.filename,
+    );
+    if (existing != null) return false;
+    await _importMetadata(rom, copy.system, fileProvider, copy.filename);
+    _downloadedSystems[copy.system.folderName] = copy.system;
+    _scheduleSettle();
+    return true;
   }
 
   /// True when a file named after [rom] already exists in a configured folder.
@@ -1230,10 +1399,13 @@ class RommProvider extends ChangeNotifier {
   /// it. Use this from tile widgets so recycling a tile back into view doesn't
   /// re-run the sqlite3 read + filesystem stats — the storm behind the "list
   /// can't keep up" jank on large platforms.
+  ///
+  /// Probes through [findLocalCopy], so a hit also memoises the copy itself
+  /// and the link that follows it costs no second look at the disk.
   Future<bool> isDownloadedCached(RommRom rom, List<String> romFolders) async {
     final cached = _downloadedByRomId[rom.id];
     if (cached != null) return cached;
-    final result = await isDownloaded(rom, romFolders);
+    final result = await findLocalCopy(rom, romFolders) != null;
     _downloadedByRomId[rom.id] = result;
     return result;
   }
@@ -1262,8 +1434,13 @@ class RommProvider extends ChangeNotifier {
   /// whose tiles read exactly these finished entries.
   void invalidateDownloadedCache() {
     if (bulkSync.isRunning) return;
-    if (_downloadedByRomId.isEmpty && _downloads.isEmpty) return;
+    if (_downloadedByRomId.isEmpty &&
+        _localCopyByRomId.isEmpty &&
+        _downloads.isEmpty) {
+      return;
+    }
     _downloadedByRomId.clear();
+    _localCopyByRomId.clear();
     _downloads.removeWhere(
       (_, d) => d.status != RommDownloadStatus.downloading,
     );
@@ -1289,6 +1466,7 @@ class RommProvider extends ChangeNotifier {
     );
     if (romId == null) return;
     _downloadedByRomId.remove(romId);
+    _localCopyByRomId.remove(romId);
     // A transfer still running owns its own entry: dropping it here would
     // strand the progress UI and the completion handler that follows it.
     final download = _downloads[romId];
@@ -1431,12 +1609,18 @@ class RommProvider extends ChangeNotifier {
     // Record the rom_id ↔ local game mapping so save sync can target this ROM.
     // [indexedName] is the on-disk filename the library scan indexes as
     // GameModel.romname (the .m3u for unpacked multi-disc ROMs), so the key
-    // matches at sync time.
-    await RommSaveMapRepository.putMapping(
+    // matches at sync time. Tagged as a download so a later manual pick can
+    // replace it; a row the user already picked by hand is kept as-is and the
+    // download still completes (the repository refuses the replace).
+    // `romm_fs_name` is the *server's* name for the entry, as every other
+    // writer records it — the Manage tab renders it as the RomM entry a game
+    // is linked to, so writing the local filename there named the wrong side.
+    final linked = await RommSaveMapRepository.putMapping(
       romname: indexedName,
       systemFolder: system.folderName,
       rommRomId: rom.id,
-      fsName: indexedName,
+      source: RommLinkSource.download,
+      fsName: rom.fsName,
     );
     _completedPendingIndex[rom.id] = _CompletedRommDownload(
       rom: rom,
@@ -1444,6 +1628,23 @@ class RommProvider extends ChangeNotifier {
       indexedName: indexedName,
       tracker: tracker,
     );
+    switch (linked) {
+      case RommMappingWriteResult.written:
+        break;
+      case RommMappingWriteResult.kept:
+        _log.i(
+          'RomM: ${system.folderName}/$indexedName keeps its manual link; '
+          'downloaded rom ${rom.id} was not re-linked',
+        );
+      case RommMappingWriteResult.failed:
+        // Not a refusal: the row is missing, so save sync, playtime and the
+        // cloud badge have nothing to key on for a ROM that did land on disk.
+        // The connect-time link pass is what picks it up again.
+        _log.e(
+          'RomM: ${system.folderName}/$indexedName was downloaded but its '
+          'link to rom ${rom.id} could not be written',
+        );
+    }
     _notifyDownloadState();
     // Arm the debounced rescan so this ROM (and any others finishing around the
     // same time) get indexed + their lists refreshed shortly, without waiting
@@ -1472,6 +1673,13 @@ class RommProvider extends ChangeNotifier {
   /// only so tests and non-interactive callers can skip it; the UI always
   /// passes one.
   ///
+  /// ROMs the enumeration finds already on disk are matched to their RomM
+  /// entry rather than queued, and the rows are written once [confirm] has
+  /// approved the plan — never during the enumeration, which runs before the
+  /// user has agreed to anything. [onLinked] is told the extension-stripped
+  /// name of each game that gained a link, so the caller can refresh its sync
+  /// state.
+  ///
   /// Progress and cancellation live on [bulkSync]. Returns when the queue is
   /// drained; no-op while another sync is running.
   Future<void> syncSource({
@@ -1480,6 +1688,7 @@ class RommProvider extends ChangeNotifier {
     required List<String> romFolders,
     FileProvider? fileProvider,
     RommBulkSyncConfirm? confirm,
+    void Function(String romname)? onLinked,
   }) async {
     // An explicit argument wins outright: a sync started from the list must not
     // inherit the other kind of source from whatever the browser has open.
@@ -1497,6 +1706,10 @@ class RommProvider extends ChangeNotifier {
     }
     if (target == null && source == null) return;
 
+    // Read once, on the first ROM that needs it, and reused for the whole
+    // enumeration: the alternative is a query per already-downloaded ROM.
+    RommRomIdIndex? mapIndex;
+
     await bulkSync.run(
       sourceLabel: target?.name ?? source?.name ?? '',
       fetchPage: ({required int limit, required int offset}) =>
@@ -1513,6 +1726,22 @@ class RommProvider extends ChangeNotifier {
             offset: offset,
           ),
       isDownloaded: (rom) => isDownloadedCached(rom, romFolders),
+      // A ROM already on disk is matched instead of fetched — matched only:
+      // the row is written after the confirmation, by the writer below.
+      // Whether it is already linked is answered from one read of the mapping
+      // table rather than a query per ROM, since a sync can touch thousands.
+      resolveLink: (rom) async {
+        final copy = await findLocalCopy(rom, romFolders);
+        if (copy == null) return null;
+        final index = mapIndex ??= await RommSaveMapRepository.getRomIdIndex();
+        return RommPendingLink(
+          rom: rom,
+          romname: copy.romname,
+          alreadyLinked:
+              index.lookup(copy.filename, copy.system.folderName) != null,
+        );
+      },
+      writeLinks: (pending) => _writeBulkLinks(pending, romFolders, onLinked),
       download: (rom) =>
           downloadRom(rom, romFolders: romFolders, fileProvider: fileProvider),
       cancelDownload: cancelDownload,
@@ -1523,6 +1752,74 @@ class RommProvider extends ChangeNotifier {
     // whatever the last one ended up with.
     await _persistRefreshedTokens();
   }
+
+  /// Writes the mapping rows for the matches a bulk sync's plan was approved
+  /// with, batched rather than one transaction per ROM.
+  ///
+  /// Rows only — never metadata or media: a sync can touch thousands of ROMs,
+  /// and the metadata import is reserved for the single, user-initiated
+  /// browser action. Insert-if-absent, like every link path for a pre-existing
+  /// ROM, so a row somebody else wrote (the picker, a download that finished
+  /// first) is never replaced.
+  ///
+  /// Split into chunks so one failure costs a chunk rather than every link in
+  /// the run: each batch is a single transaction, all-or-nothing by design.
+  Future<RommLinkWriteResult> _writeBulkLinks(
+    List<RommPendingLink> pending,
+    List<String> romFolders,
+    void Function(String romname)? onLinked,
+  ) async {
+    final entries = <RommSaveMapEntry>[];
+    final romnames = <String>[];
+    for (final match in pending) {
+      // Memoized by [findLocalCopy] during the enumeration, so this is a map
+      // lookup rather than a second disk probe.
+      final copy = await findLocalCopy(match.rom, romFolders);
+      if (copy == null) continue;
+      entries.add((
+        romname: copy.filename,
+        systemFolder: copy.system.folderName,
+        rommRomId: match.rom.id,
+        fsName: match.rom.fsName,
+      ));
+      romnames.add(copy.romname);
+    }
+    if (entries.isEmpty) return (written: 0, failed: 0);
+
+    var written = 0;
+    var failed = 0;
+    for (var start = 0; start < entries.length; start += _linkWriteChunk) {
+      final end = (start + _linkWriteChunk).clamp(0, entries.length);
+      final chunk = entries.sublist(start, end);
+      final result = await RommSaveMapRepository.putMappingsIfAbsent(chunk);
+      if (result.failed) {
+        failed += chunk.length;
+        continue;
+      }
+      written += result.inserted;
+      if (result.inserted > 0) {
+        // Which rows within a chunk were skipped isn't reported, so every game
+        // in a chunk that wrote something is invalidated. Harmless: a game
+        // that was linked by a download meanwhile needs its badge refreshed
+        // just the same.
+        for (final romname in romnames.sublist(start, end)) {
+          onLinked?.call(romname);
+        }
+      }
+    }
+    if (written > 0) {
+      _log.i('RomM: bulk sync linked $written local ROM(s) to RomM');
+    }
+    if (failed > 0) {
+      _log.e(
+        'RomM: bulk sync could not write $failed link(s); they stay unlinked',
+      );
+    }
+    return (written: written, failed: failed);
+  }
+
+  /// Mapping rows per transaction in [_writeBulkLinks].
+  static const int _linkWriteChunk = 200;
 
   /// Unpacks a downloaded multi-disc zip ([zipPath]) into NeoStation's native
   /// multi-disc layout under [destDir]: the `.m3u` playlist and the disc images
@@ -2066,5 +2363,34 @@ class RommProvider extends ChangeNotifier {
     } catch (e) {
       _log.w('RomM RA progression fetch failed (non-fatal): $e');
     }
+  }
+}
+
+/// An already-downloaded copy of a RomM ROM, as [RommProvider.findLocalCopy]
+/// found it: which local system it belongs to, the directory it sits in, and
+/// the name it sits under.
+@immutable
+class RommLocalCopy {
+  /// The local system the ROM's platform resolved to.
+  final SystemModel system;
+
+  /// Real filesystem directory holding the file (SAF folders already mapped).
+  final String directory;
+
+  /// On-disk basename, in the spelling the library scan indexes as
+  /// `user_roms.filename` — `Game.sfc`, or the `.m3u` of a multi-disc game.
+  final String filename;
+
+  const RommLocalCopy({
+    required this.system,
+    required this.directory,
+    required this.filename,
+  });
+
+  /// [filename] with its extension stripped: the `GameModel.romname` the sync
+  /// layer keys a game's cached state by (same rule as `DatabaseGameModel`).
+  String get romname {
+    final lastDot = filename.lastIndexOf('.');
+    return lastDot != -1 ? filename.substring(0, lastDot) : filename;
   }
 }
