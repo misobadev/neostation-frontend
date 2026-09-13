@@ -85,21 +85,66 @@ class PermissionService {
   }
 
   /// Requests 'MANAGE_EXTERNAL_STORAGE' permission or legacy storage access.
+  ///
+  /// Prefers permission_handler because it launches the grant with
+  /// `startActivityForResult` and so reports the outcome the moment the user
+  /// comes back. That call is unguarded inside the plugin, though, so on a ROM
+  /// that ships no per-app All-Files settings activity it throws instead of
+  /// resolving — hence the fallback to [openAllFilesAccessSettings], which
+  /// walks a chain of broader intents. The fallback has no activity result, so
+  /// it returns `false` and leaves the caller to re-poll [hasAllFilesAccess]
+  /// on resume.
+  ///
+  /// The plugin can also come back denied without ever showing anything:
+  /// reported on Lenovo tablets, where tapping Grant Access did nothing and
+  /// logged nothing. No one can find and flip the toggle in under
+  /// [_minHumanGrantTime], so a denial that fast means the per-app page never
+  /// really opened, and the general All-Files list is opened instead.
   static Future<bool> requestAllFilesAccess() async {
     if (!Platform.isAndroid) return true;
     final version = await _getAndroidVersion();
     if (version < 30) {
       return await Permission.storage.request().isGranted;
     }
-    final status = await Permission.manageExternalStorage.request();
-    return status.isGranted;
+    try {
+      final stopwatch = Stopwatch()..start();
+      final status = await Permission.manageExternalStorage.request();
+      final elapsed = stopwatch.elapsed;
+      _log.i(
+        'All-Files request returned $status after ${elapsed.inMilliseconds}ms',
+      );
+      if (status.isGranted) return true;
+      if (elapsed < _minHumanGrantTime) {
+        _log.w(
+          'All-Files page closed too fast to have been shown; '
+          'opening the All-Files list instead',
+        );
+        await openAllFilesAccessSettings(skipAppPage: true);
+      }
+      return false;
+    } catch (e) {
+      _log.e('All-Files request failed, falling back to settings: $e');
+      await openAllFilesAccessSettings();
+      return false;
+    }
   }
 
+  /// Below this, a denied All-Files request cannot have been a person's
+  /// decision. See [requestAllFilesAccess].
+  static const _minHumanGrantTime = Duration(seconds: 1);
+
   /// Navigates the user to the system settings page for 'All Files Access'.
-  static Future<void> openAllFilesAccessSettings() async {
+  ///
+  /// [skipAppPage] starts at the general All-Files list, for when the per-app
+  /// page is known not to show.
+  static Future<void> openAllFilesAccessSettings({
+    bool skipAppPage = false,
+  }) async {
     if (!Platform.isAndroid) return;
     try {
-      await _channel.invokeMethod('openAllFilesAccessSettings');
+      await _channel.invokeMethod('openAllFilesAccessSettings', {
+        'skipAppPage': skipAppPage,
+      });
     } catch (e) {
       _log.e('Error opening all files access settings: $e');
       await openAppSettings();

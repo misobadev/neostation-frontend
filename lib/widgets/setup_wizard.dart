@@ -53,6 +53,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   /// Whether All-Files (storage) access is currently granted.
   bool _storageGranted = false;
 
+  /// Set whenever the app leaves the foreground, so the permissions step can
+  /// tell "a system Settings screen actually opened" from "the grant never
+  /// launched at all". Only the latter may re-arm gamepad input on a timer —
+  /// see [_handlePermissionAction].
+  bool _leftForegroundDuringGrant = false;
+
   /// Whether the screenshot/return accessibility service is currently granted.
   /// Both are re-checked whenever the app resumes (the user grants them in
   /// system Settings, so we can't observe the change synchronously).
@@ -137,7 +143,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && Platform.isAndroid) {
+    if (state != AppLifecycleState.resumed) {
+      // Something came to the front (the Settings screen we just asked for,
+      // most likely), so the safety re-arm in _handlePermissionAction must
+      // stand down: re-enabling gamepad input while backgrounded is the exact
+      // key leakage that deactivate() is there to prevent.
+      _leftForegroundDuringGrant = true;
+      return;
+    }
+    if (Platform.isAndroid) {
       _refreshPermissionStates();
       // The gamepad was deactivated before we sent the user to Settings; bring
       // it back now that we have focus again on the Permissions step.
@@ -217,12 +231,13 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   }
 
   void _handleSkip() {
-    // Permissions step: the accessibility grant is optional, so once storage
-    // is granted the user can skip past it to folder selection.
-    if (_currentStep == _stepPermissions &&
-        _storageGranted &&
-        _needsAccessibility &&
-        !_accessibilityGranted) {
+    // Permissions step: neither grant is a hard requirement. ROM access goes
+    // through SAF, and UserDataLocationService already falls back to the
+    // app-specific external dir without All-Files access. The skip is
+    // deliberately unconditional — gating it on `_storageGranted` walled users
+    // in at this step on ROMs where the All-Files grant can't be launched at
+    // all (reported on Lenovo tablets), with no Next, no Skip and no way out.
+    if (_currentStep == _stepPermissions) {
       setState(() => _currentStep = _stepFolder);
       return;
     }
@@ -1689,18 +1704,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     }
 
     // For other steps, use normal logic.
-    // Skip is offered on the optional steps: the folder step and the
-    // permissions step once storage is granted (Android only), plus the two
-    // trailing optional steps (ES-DE import, art pack) on every platform.
+    // Skip is offered on the optional steps: the folder and permissions steps
+    // (Android only), plus the two trailing optional steps (ES-DE import, art
+    // pack) on every platform. The permissions step always offers it — see
+    // _handleSkip for why it must never be gated on a grant succeeding.
     final showSkip =
         _currentStep == _stepEsde ||
         _currentStep == _stepArtPack ||
         (Platform.isAndroid &&
-            (_currentStep == _stepFolder ||
-                (_currentStep == _stepPermissions &&
-                    _storageGranted &&
-                    _needsAccessibility &&
-                    !_accessibilityGranted)));
+            (_currentStep == _stepFolder || _currentStep == _stepPermissions));
     // Wrapped in a NeoAssets consumer so the art-pack step's button label
     // (Download vs Finish) stays in sync with the live theme/download state —
     // otherwise a non-reactive read can show "Finish" while the action still
@@ -1913,6 +1925,20 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     // Deactivate gamepad before opening system settings to prevent key event
     // leakage when the app regains focus after the user grants the permission.
     _gamepadNav?.deactivate();
+    // Safety re-arm. The request below can fail to open anything at all on
+    // some ROMs, and with no Settings screen there is no resume to re-activate
+    // on either — which left the wizard permanently deaf to the controller,
+    // B (skip) included. Only fires while we still hold the foreground, so a
+    // Settings screen that did open keeps input suspended as intended.
+    _leftForegroundDuringGrant = false;
+    // Deliberately not gated on still being the permissions step: a touch
+    // user can tap Skip inside this window, and bailing out there would strand
+    // the folder step with dead input. Holding the foreground is the only
+    // condition that matters, and every route that opens another activity
+    // (including the SAF picker) trips the flag first.
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && !_leftForegroundDuringGrant) _gamepadNav?.activate();
+    });
     try {
       if (!_storageGranted) {
         final success = await PermissionService.requestAllFilesAccess();

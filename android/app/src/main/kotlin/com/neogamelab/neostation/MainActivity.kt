@@ -362,19 +362,44 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                 }
                 "openAllFilesAccessSettings" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        try {
-                            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                            intent.data = Uri.parse("package:${packageName}")
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            startActivity(intent)
-                            result.success(true)
-                        } catch (e: Exception) {
-                            // Fallback to general manage all files access
-                            val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            startActivity(intent)
-                            result.success(true)
+                        // Narrowest to broadest. The general All-Files list used
+                        // to be the last resort but was itself launched outside
+                        // any try/catch, so a ROM shipping neither All-Files
+                        // activity threw out of the method channel and left the
+                        // caller with no route to the grant. App details is a
+                        // poorer landing spot but always resolves.
+                        // skipAppPage drops the per-app page when Dart has
+                        // already seen it come back without showing.
+                        val skipAppPage = call.argument<Boolean>("skipAppPage") == true
+                        val intents = listOfNotNull(
+                            if (skipAppPage) null else
+                                Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                                    .setData(Uri.parse("package:${packageName}")),
+                            Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                .setData(Uri.parse("package:${packageName}"))
+                        )
+                        var opened = false
+                        for (intent in intents) {
+                            try {
+                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                startActivity(intent)
+                                opened = true
+                                break
+                            } catch (e: Exception) {
+                                android.util.Log.w(
+                                    "MainActivity",
+                                    "Cannot open ${intent.action}: ${e.message}"
+                                )
+                            }
                         }
+                        if (!opened) {
+                            android.util.Log.e(
+                                "MainActivity",
+                                "No activity could handle any All-Files settings intent"
+                            )
+                        }
+                        result.success(opened)
                     } else {
                         result.success(false)
                     }
