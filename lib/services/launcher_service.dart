@@ -274,6 +274,9 @@ class LauncherService {
       if (platformConfig.containsKey('emudeck_launcher')) {
         result['emudeck_launcher'] = platformConfig['emudeck_launcher'];
       }
+      if (platformConfig.containsKey('launch_via_open')) {
+        result['launch_via_open'] = platformConfig['launch_via_open'] == true;
+      }
 
       if (player.containsKey('unique_id')) {
         result['unique_id'] = player['unique_id'];
@@ -500,7 +503,10 @@ class LauncherService {
   String resolvePlaceholdersDesktop(String template, GameModel game) {
     if (template.isEmpty) return template;
 
-    String result = template;
+    // Expand profile paths before inserting ROM names, which can themselves
+    // contain literal placeholder text. HOME uses the real macOS user home,
+    // not the frontend's sandbox container.
+    String result = ConfigService.resolvePath(template);
     if (game.romPath != null) {
       if (game.romPath!.contains(' ') && !template.contains('"{file.path}"')) {
         result = result.replaceAll('{file.path}', '"${game.romPath!}"');
