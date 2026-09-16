@@ -907,6 +907,10 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.folderNotEmptyBody:
       'このフォルダには既に {count} 個の項目があります。NeoStation は既存の内容とともに、ここに独自のデータを保存します。',
   AppLocale.folderNotEmptyUseAnyway: 'このまま使用',
+  AppLocale.userDataFolderNotWritable:
+      "このフォルダに書き込めません。別のフォルダを選ぶか、既定の場所のままにしてください。",
+  AppLocale.userDataFolderGrantAllFiles:
+      "このフォルダを使うには、Android の設定 → アプリ → 特別なアプリアクセス → 全ファイルアクセス で NeoStation を許可してから、もう一度選択してください。",
   AppLocale.moveUserDataTitle: 'ユーザーデータを移動しますか？',
   AppLocale.moveUserDataBody:
       'NeoStation は自身のデータ（データベース、取得したメディア、設定）を現在のフォルダから新しいフォルダへ移動します。NeoStation が作成していないファイルはそのまま残ります。',

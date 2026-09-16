@@ -1079,6 +1079,10 @@ mixin AppLocale {
   static const String folderNotEmptyTitle = 'folder_not_empty_title';
   static const String folderNotEmptyBody = 'folder_not_empty_body';
   static const String folderNotEmptyUseAnyway = 'folder_not_empty_use_anyway';
+  static const String userDataFolderNotWritable =
+      'user_data_folder_not_writable';
+  static const String userDataFolderGrantAllFiles =
+      'user_data_folder_grant_all_files';
   static const String moveUserDataTitle = 'move_user_data_title';
   static const String moveUserDataBody = 'move_user_data_body';
   static const String moveUserDataDestNotEmpty =

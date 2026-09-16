@@ -888,6 +888,9 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.folderNotEmptyBody:
       '此文件夹已包含 {count} 个项目。NeoStation 会将自己的数据存储在此处，与现有内容放在一起。',
   AppLocale.folderNotEmptyUseAnyway: '仍然使用',
+  AppLocale.userDataFolderNotWritable: "无法写入此文件夹。请选择其他文件夹，或保留默认位置。",
+  AppLocale.userDataFolderGrantAllFiles:
+      "要使用此文件夹，请在 Android 设置 → 应用 → 特殊应用权限 → 所有文件访问权限 中允许 NeoStation，然后重新选择。",
   AppLocale.moveUserDataTitle: '移动用户数据？',
   AppLocale.moveUserDataBody:
       'NeoStation 会将自己的数据（数据库、抓取的媒体和设置）从当前文件夹移动到新文件夹。非 NeoStation 创建的文件不会被改动。',

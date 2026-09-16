@@ -70,6 +70,27 @@ class UserDataLocationService {
     }
   }
 
+  /// Whether NeoStation can create and delete a file inside [dirPath],
+  /// creating the directory first if it is missing.
+  ///
+  /// Fail-closed, unlike [countDirectoryEntries]: this gates whether a folder
+  /// may hold the database. On Android without All-Files access a folder
+  /// outside the app's own storage can be listed but not written, so SQLite
+  /// fails with SQLITE_CANTOPEN (code 14) only after the path is saved.
+  static Future<bool> canWriteDirectory(String dirPath) async {
+    try {
+      final dir = Directory(dirPath);
+      if (!await dir.exists()) await dir.create(recursive: true);
+      final probe = File(path.join(dirPath, '.neostation_write_probe'));
+      await probe.writeAsString('ok', flush: true);
+      await probe.delete();
+      return true;
+    } catch (e) {
+      _log.w('canWriteDirectory: $dirPath is not writable: $e');
+      return false;
+    }
+  }
+
   /// Converts an Android SAF tree URI (content://com.android.externalstorage...)
   /// to a real filesystem path.
   ///

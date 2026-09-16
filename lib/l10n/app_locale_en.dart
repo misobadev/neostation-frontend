@@ -996,6 +996,10 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.folderNotEmptyBody:
       'This folder already contains {count} item(s). NeoStation will store its own data here, alongside the existing contents.',
   AppLocale.folderNotEmptyUseAnyway: 'Use Anyway',
+  AppLocale.userDataFolderNotWritable:
+      "Can't write to this folder. Pick another one, or keep the default location.",
+  AppLocale.userDataFolderGrantAllFiles:
+      "To use this folder, allow All files access for NeoStation in Android Settings → Apps → Special app access → All files access, then pick it again.",
   AppLocale.moveUserDataTitle: 'Move User Data?',
   AppLocale.moveUserDataBody:
       'NeoStation will move its own data — database, scraped media, and settings — from the current folder to the new one. Files not created by NeoStation are left untouched.',

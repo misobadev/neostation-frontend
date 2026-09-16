@@ -272,9 +272,38 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
   void _initializeSteps() {
     // Load the current user-data path for display in step 0.
-    ConfigService.getUserDataPath().then((p) {
-      if (mounted) setState(() => _selectedUserDataPath = p);
-    });
+    _loadUserDataPath();
+  }
+
+  Future<void> _loadUserDataPath() async {
+    try {
+      await _resetUnwritableUserDataPath();
+    } catch (e) {
+      _log.e('Wizard: user-data path check failed: $e');
+    }
+    final p = await ConfigService.getUserDataPath();
+    if (mounted) setState(() => _selectedUserDataPath = p);
+  }
+
+  Future<void> _resetUnwritableUserDataPath() async {
+    final p = await ConfigService.getUserDataPath();
+    // Earlier builds saved a folder the database couldn't be created in, and
+    // the wizard reopens on every launch because setup never completed. Drop
+    // that path so Next doesn't carry it forward. Safe here: the wizard only
+    // runs before setup completes, so there is no library at that path yet.
+    final custom = await UserDataLocationService.getCustomPath();
+    if (!mounted) return;
+    if (custom != null &&
+        custom == p &&
+        context.read<SqliteConfigProvider>().error != null &&
+        !await UserDataLocationService.canWriteDirectory(custom)) {
+      _log.w('Wizard: saved user-data path $custom is not writable, resetting');
+      await UserDataLocationService.clearCustomPath();
+      if (!mounted) return;
+      await context.read<SqliteConfigProvider>().reinitialize();
+      if (!mounted) return;
+      await context.read<NeoAssetsProvider>().reinitialize();
+    }
   }
 
   // Step layout:
@@ -751,6 +780,19 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     );
   }
 
+  void _showUserDataNotWritable() {
+    var message = AppLocale.userDataFolderNotWritable.getString(context);
+    if (Platform.isAndroid) {
+      message +=
+          '\n${AppLocale.userDataFolderGrantAllFiles.getString(context)}';
+    }
+    GlobalNotificationService().show(
+      id: 'wizard_user_data_not_writable',
+      message: message,
+      type: GlobalNotificationType.error,
+    );
+  }
+
   /// Opens a folder picker, saves the new user-data path, and reinitializes the DB.
   Future<void> _selectUserDataLocationWizard() async {
     setState(() => _isSelectingUserDataFolder = true);
@@ -796,6 +838,16 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
       if (selected == _selectedUserDataPath) return;
 
+      // Refuse a folder the database can't be created in. On Android this
+      // step runs before the permissions step, so without All-Files access a
+      // folder like /storage/emulated/0/Emulation lists fine but can't be
+      // written. Saving it anyway left SQLite failing with code 14 on every
+      // launch, stuck on an empty library.
+      if (!await UserDataLocationService.canWriteDirectory(selected)) {
+        if (mounted) _showUserDataNotWritable();
+        return;
+      }
+
       // Warn if the chosen folder already contains files, so the user doesn't
       // unknowingly store NeoStation's data inside an existing library.
       final entryCount = await UserDataLocationService.countDirectoryEntries(
@@ -811,6 +863,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
         if (!proceed || !mounted) return;
       }
 
+      final previousCustomPath = await UserDataLocationService.getCustomPath();
       await UserDataLocationService.setCustomPath(selected);
 
       // Reinitialize the DB at the new path (no data yet on first launch).
@@ -820,6 +873,24 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
         listen: false,
       );
       await configProvider.reinitialize();
+
+      // The provider swallows its own init errors, so check what it recorded.
+      // A folder that passed the probe can still refuse the database; put the
+      // previous location back rather than persist one that never opens.
+      if (configProvider.error != null) {
+        _log.e(
+          'Wizard: database failed to open at $selected, restoring '
+          '${previousCustomPath ?? 'default location'}',
+        );
+        if (previousCustomPath != null) {
+          await UserDataLocationService.setCustomPath(previousCustomPath);
+        } else {
+          await UserDataLocationService.clearCustomPath();
+        }
+        await configProvider.reinitialize();
+        if (mounted) _showUserDataNotWritable();
+        selected = await ConfigService.getUserDataPath();
+      }
 
       // The database is now open at the new path, but this provider resolved
       // its cache directory and active theme against the old one at launch.

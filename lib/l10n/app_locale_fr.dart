@@ -1034,6 +1034,10 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.folderNotEmptyBody:
       'Ce dossier contient déjà {count} élément(s). NeoStation y stockera ses propres données, aux côtés du contenu existant.',
   AppLocale.folderNotEmptyUseAnyway: 'Utiliser quand même',
+  AppLocale.userDataFolderNotWritable:
+      "Impossible d'écrire dans ce dossier. Choisissez-en un autre ou gardez l'emplacement par défaut.",
+  AppLocale.userDataFolderGrantAllFiles:
+      "Pour utiliser ce dossier, autorisez l'accès à tous les fichiers pour NeoStation dans Paramètres Android → Applications → Accès spéciaux des applications → Accès à tous les fichiers, puis choisissez-le à nouveau.",
   AppLocale.moveUserDataTitle: 'Déplacer les données ?',
   AppLocale.moveUserDataBody:
       'NeoStation déplacera ses propres données (base de données, médias récupérés et paramètres) du dossier actuel vers le nouveau. Les fichiers non créés par NeoStation restent intacts.',

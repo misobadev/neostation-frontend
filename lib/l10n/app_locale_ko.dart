@@ -916,6 +916,10 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.folderNotEmptyBody:
       '이 폴더에는 이미 {count}개의 항목이 포함되어 있습니다. NeoStation은 기존 콘텐츠와 함께 여기에 자체 데이터를 저장합니다.',
   AppLocale.folderNotEmptyUseAnyway: '그래도 사용',
+  AppLocale.userDataFolderNotWritable:
+      "이 폴더에 쓸 수 없습니다. 다른 폴더를 선택하거나 기본 위치를 유지하세요.",
+  AppLocale.userDataFolderGrantAllFiles:
+      "이 폴더를 사용하려면 Android 설정 → 애플리케이션 → 특별한 앱 액세스 → 모든 파일 액세스에서 NeoStation을 허용한 후 다시 선택하세요.",
   AppLocale.moveUserDataTitle: '사용자 데이터를 이동하시겠습니까?',
   AppLocale.moveUserDataBody:
       'NeoStation은 자체 데이터(데이터베이스, 스크랩한 미디어, 설정)를 현재 폴더에서 새 폴더로 이동합니다. NeoStation에서 생성되지 않은 파일은 그대로 유지됩니다.',
