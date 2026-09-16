@@ -63,7 +63,7 @@ dependencies:
   logger: ^2.8.0
   sub_screen: ^0.1.9
   flutter_soloud: ^4.1.7
-  audio_metadata_reader: ^1.7.1
+  audio_metadata_reader: ^1.8.0
   wakelock_plus: ^1.8.0
   flutter_localization: ^0.4.1
   flutter_tilt: ^4.1.0
