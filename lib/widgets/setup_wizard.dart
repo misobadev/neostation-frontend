@@ -295,7 +295,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     if (!mounted) return;
     if (custom != null &&
         custom == p &&
-        context.read<SqliteConfigProvider>().error != null &&
+        !context.read<SqliteConfigProvider>().databaseOpened &&
         !await UserDataLocationService.canWriteDirectory(custom)) {
       _log.w('Wizard: saved user-data path $custom is not writable, resetting');
       await UserDataLocationService.clearCustomPath();
@@ -874,10 +874,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       );
       await configProvider.reinitialize();
 
-      // The provider swallows its own init errors, so check what it recorded.
-      // A folder that passed the probe can still refuse the database; put the
-      // previous location back rather than persist one that never opens.
-      if (configProvider.error != null) {
+      // The provider swallows its own init errors, so ask whether the database
+      // itself opened. Not `error`: that also catches unrelated startup steps,
+      // and reverting on those would undo a folder that works. A folder that
+      // passed the probe can still refuse the database; put the previous
+      // location back rather than persist one that never opens.
+      if (!configProvider.databaseOpened) {
         _log.e(
           'Wizard: database failed to open at $selected, restoring '
           '${previousCustomPath ?? 'default location'}',

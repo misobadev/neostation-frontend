@@ -53,6 +53,7 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
   SystemModel? _silentScannedSystem;
   ScanSummary? _lastScanSummary;
   String? _error;
+  bool _databaseOpened = false;
   bool _scanCompleted = false;
   bool _isFastScan = false;
   bool _initialized = false;
@@ -105,6 +106,11 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool get isLoading => _isLoading || _pendingStartupScan;
   bool get isScanning => _isScanning;
   String? get error => _error;
+
+  /// Whether the last [initialize] got the database open. [error] can't answer
+  /// that: it also records failures from every later startup step, so a
+  /// caller deciding whether a user-data folder is usable must check this.
+  bool get databaseOpened => _databaseOpened;
   bool get isScanningRoms => _isScanningRoms;
   bool get isSilentScanning => _isSilentScanning;
 
@@ -172,6 +178,7 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
 
     _setLoading(true);
     _error = null;
+    _databaseOpened = false;
 
     try {
       if (Platform.isAndroid) {
@@ -198,6 +205,7 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
 
       // Initialize SQLite
       await SqliteService.getDatabase(); // This initializes the DB
+      _databaseOpened = true;
 
       // Initialize the configuration system
       await SqliteConfigService.initialize();
