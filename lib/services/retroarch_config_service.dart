@@ -163,10 +163,15 @@ class RetroArchConfigService {
   /// matched exactly, the miss being a core upstream has since renamed
   /// (`Beetle WonderSwan` is now `Beetle Cygne`) — which is why callers treat
   /// this as a hint and prefer an observed local layout when one exists.
+  ///
+  /// On Android the stored name also carries the RetroArch build as a
+  /// ` (64-bit)`/` (32-bit)` suffix (see `SqliteService`), which is ours, not
+  /// the core's: keeping it sent RomM downloads to `saves/FCEUmm (64-bit)/`,
+  /// a folder RetroArch never reads (issue #511).
   static String? coreFolderName(String? emulatorName) {
     if (emulatorName == null) return null;
     final match = RegExp(
-      r'^RetroArch(?:64)?\s+(.+)$',
+      r'^RetroArch(?:32|64)?\s+(.+?)(?:\s+\((?:32|64)-bit\))?$',
     ).firstMatch(emulatorName.trim());
     final core = match?.group(1)?.trim();
     return (core == null || core.isEmpty) ? null : core;

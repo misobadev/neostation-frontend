@@ -988,18 +988,10 @@ extension NeoSyncCore on NeoSyncProvider {
   Future<List<String>> resolveLocalTargetPaths(
     GameModel game,
     String relativeName,
-  ) {
-    final synthetic = NeoSyncFile(
-      id: '',
-      fileName: relativeName,
-      filePath: relativeName,
-      fileSize: 0,
-      gameName: game.name,
-      uploadedAt: DateTime.now(),
-      userId: '',
-    );
-    return resolveCloudFileToLocalPath(game, synthetic);
-  }
+  ) => resolveCloudFileToLocalPath(
+    game,
+    localTargetCloudFile(game, relativeName),
+  );
 
   /// Obtiene TODOS los archivos de guardado de la nube para un juego específico
   Future<List<NeoSyncFile>> _getCloudSaveFilesForGame(GameModel game) async {
@@ -1433,4 +1425,31 @@ extension NeoSyncCore on NeoSyncProvider {
       rethrow;
     }
   }
+}
+
+/// Builds the [NeoSyncFile] that [NeoSyncCore.resolveLocalTargetPaths]
+/// hands to the resolver for a provider-relative name like `saves/<core>/<file>`
+/// or `states/<file>`.
+///
+/// The resolver places by [NeoSyncFile.type] and joins [NeoSyncFile.filePath]
+/// onto the save or state directory, because NeoSync's backend stores the path
+/// relative to that directory. A caller-supplied name still carries its
+/// `saves/`/`states/` root, so that root becomes the type and is stripped here;
+/// passing it through wrote RomM saves to `<saves>/saves/<core>/` and states
+/// under the saves directory (issue #511).
+@visibleForTesting
+NeoSyncFile localTargetCloudFile(GameModel game, String relativeName) {
+  final match = RegExp(r'^(saves|states)[/\\](.+)$').firstMatch(relativeName);
+  final isState = match?.group(1) == 'states';
+  final rest = match?.group(2) ?? relativeName;
+  return NeoSyncFile(
+    id: '',
+    fileName: rest,
+    filePath: rest,
+    fileSize: 0,
+    gameName: game.name,
+    uploadedAt: DateTime.now(),
+    userId: '',
+    type: isState ? 'state' : 'save',
+  );
 }

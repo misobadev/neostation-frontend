@@ -96,6 +96,32 @@ void main() {
       );
     });
 
+    test('drops the Android build suffix the emulator row carries', () {
+      // The Android DB names RetroArch emulators after the package they
+      // launch; RetroArch's folder is the bare core name (issue #511).
+      expect(
+        RetroArchConfigService.coreFolderName('RetroArch64 FCEUmm (64-bit)'),
+        'FCEUmm',
+      );
+      expect(
+        RetroArchConfigService.coreFolderName('RetroArch32 Mesen-S (32-bit)'),
+        'Mesen-S',
+      );
+    });
+
+    test('keeps parentheses that belong to the core name', () {
+      expect(
+        RetroArchConfigService.coreFolderName('RetroArch MAME 2003 (0.78)'),
+        'MAME 2003 (0.78)',
+      );
+      expect(
+        RetroArchConfigService.coreFolderName(
+          'RetroArch64 MAME 2003 (0.78) (64-bit)',
+        ),
+        'MAME 2003 (0.78)',
+      );
+    });
+
     test('returns null for anything that is not a RetroArch core', () {
       // A standalone emulator has no per-core save folder to speak of.
       expect(
