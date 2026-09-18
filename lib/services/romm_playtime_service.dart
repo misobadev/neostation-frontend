@@ -47,8 +47,11 @@ class RommPlaytimeService {
     required String romPath,
     required DateTime startTime,
     required DateTime endTime,
+    Duration? played,
   }) async {
-    final durationMs = endTime.difference(startTime).inMilliseconds;
+    // [played] excludes time the device spent asleep inside the window, so it
+    // can be shorter than endTime - startTime.
+    final durationMs = (played ?? endTime.difference(startTime)).inMilliseconds;
     if (durationMs < minSessionSeconds * 1000) return false;
     if (romname.isEmpty || systemFolder.isEmpty || romPath.isEmpty) {
       return false;

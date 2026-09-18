@@ -294,6 +294,29 @@ void main() {
       expect(pending.single['duration_ms'], 1800000);
     });
 
+    test('reports the time played, not the time the session spanned', () async {
+      await RommSaveMapRepository.putMapping(
+        romname: 'game.sfc',
+        systemFolder: 'snes',
+        rommRomId: 7,
+      );
+
+      // Half an hour of play, then the device slept overnight before exit.
+      final start = DateTime.now().subtract(const Duration(hours: 20));
+      final queued = await RommPlaytimeService.recordCompletedSession(
+        romname: 'game.sfc',
+        systemFolder: 'snes',
+        romPath: '/roms/snes/game.sfc',
+        startTime: start,
+        endTime: start.add(const Duration(hours: 20)),
+        played: const Duration(minutes: 30),
+      );
+
+      expect(queued, isTrue);
+      final pending = await RommPlaytimeRepository.pendingSessions();
+      expect(pending.single['duration_ms'], 1800000);
+    });
+
     test('skips a game that did not come from RomM', () async {
       final start = DateTime.now().subtract(const Duration(minutes: 30));
       final queued = await RommPlaytimeService.recordCompletedSession(
