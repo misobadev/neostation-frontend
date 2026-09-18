@@ -515,25 +515,34 @@ class _GamesCarouselState extends State<GamesCarousel> {
     _scheduleAchievementsLoad();
     _scheduleChromeSettle();
     _scrollToCurrentLetter();
-    _updateBackground();
   }
 
-  /// Advances the footer/legend's settled selection. A single (slow) page
-  /// change updates it immediately; during a fast-swipe burst it is deferred
-  /// until navigation settles, so the chrome isn't rebuilt every frame.
+  /// Advances the footer/legend's settled selection, and with it the
+  /// full-screen background. A single (slow) page change updates them
+  /// immediately; during a fast-swipe burst they are deferred until navigation
+  /// settles, so the chrome isn't rebuilt every frame.
   void _scheduleChromeSettle() {
     _settleTimer?.cancel();
     if (!_isNavigatingFast) {
-      if (_settledIndex != _currentIndex) {
-        setState(() => _settledIndex = _currentIndex);
-      }
+      _commitSettledSelection();
       return;
     }
     _settleTimer = Timer(_chromeSettleDelay, () {
-      if (mounted && _settledIndex != _currentIndex) {
-        setState(() => _settledIndex = _currentIndex);
-      }
+      if (mounted) _commitSettledSelection();
     });
+  }
+
+  /// The background rides with the chrome rather than with the selection.
+  ///
+  /// A page change is published the moment a D-pad step starts, so the card
+  /// the buttons act on is never behind what is on screen. That cadence is
+  /// wrong for a full-screen image: a held D-pad through a 9,000-game library
+  /// would queue a decode for every card it passes, to display none of them.
+  void _commitSettledSelection() {
+    if (_settledIndex != _currentIndex) {
+      setState(() => _settledIndex = _currentIndex);
+    }
+    _updateBackground();
   }
 
   /// (Re)builds the footer pill + action-button legend only when the settled

@@ -164,6 +164,23 @@ class NativeCarouselState extends State<NativeCarousel> {
   /// Whether a finger is currently on the carousel. A gesture in progress
   /// always outranks the input gate.
   bool _pointerDown = false;
+
+  /// The page a controller-driven move is heading for, or null when the scroll
+  /// position is the source of truth (at rest, or while a finger owns it).
+  ///
+  /// A D-pad step publishes its destination as the move *starts* rather than
+  /// when the 260ms slide lands, so an A press 30ms later acts on the card the
+  /// user is looking at instead of the one the carousel has not finished
+  /// leaving. The frames the slide travels through are travel, not selection,
+  /// so [_onPageScroll] stops deriving an index while this is set — otherwise
+  /// `page.round()` would drag the selection back to the card behind.
+  int? _targetIndex;
+
+  /// Identifies the in-flight controller move. Each new step supersedes the
+  /// last, and an interrupted [PageController.animateToPage] still completes
+  /// its future — without this, the move that was cut short would clear its
+  /// successor's target and lift the successor's input gate.
+  int _moveToken = 0;
   CarouselPageChangeReason _pageChangeReason =
       CarouselPageChangeReason.controller;
 
@@ -184,7 +201,9 @@ class NativeCarouselState extends State<NativeCarousel> {
       // Reconciling with the parent, not acting on a discrete user input. A
       // fling outruns the parent's index, so this fires mid-swipe — gating
       // input here would kill the gesture the user is still performing.
-      _animateToPage(widget.initialIndex, gateInput: false);
+      // Also not a moment to call back into the parent: didUpdateWidget runs
+      // inside its build, and the index being adopted is the parent's own.
+      _animateToPage(widget.initialIndex, gateInput: false, notify: false);
     }
   }
 
@@ -202,9 +221,15 @@ class NativeCarouselState extends State<NativeCarousel> {
     if (page == null) return;
 
     _pageNotifier.value = page;
-    _currentIndex = page.round();
+    // Still reported mid-move: this drives the indicator cursor, which tracks
+    // the cards continuously rather than per selection.
     widget.onPageScrolled?.call(page);
 
+    // A controller move has already published where it is going; the pages it
+    // slides through are not selections the user made.
+    if (_targetIndex != null) return;
+
+    _currentIndex = page.round();
     if (_currentIndex != _lastReportedIndex) {
       final dist = (page - _currentIndex).abs();
       if (dist < 0.05) {
@@ -256,13 +281,24 @@ class NativeCarouselState extends State<NativeCarousel> {
   /// and the target, so wrapping the far end of a 9,000-game library would
   /// scroll the entire library past the viewport at animation speed. The letter
   /// jump has the same problem and solves it the same way.
-  void _wrapToPage(int index) {
+  void _wrapToPage(int index) => _jumpToPage(index);
+
+  /// Adopts [index] as the selection the instant a controller move starts, so
+  /// a button press landing mid-slide reads the card the user is looking at.
+  void _openMove(int index, {bool notify = true}) {
     _pageChangeReason = CarouselPageChangeReason.controller;
-    _pageController?.jumpToPage(index);
+    _targetIndex = index;
+    _currentIndex = index;
+    if (_lastReportedIndex == index) return;
+    _lastReportedIndex = index;
+    if (notify) {
+      widget.onPageChanged?.call(index, CarouselPageChangeReason.controller);
+    }
   }
 
-  void _animateToPage(int index, {bool gateInput = true}) {
-    _pageChangeReason = CarouselPageChangeReason.controller;
+  void _animateToPage(int index, {bool gateInput = true, bool notify = true}) {
+    _openMove(index, notify: notify);
+    final token = ++_moveToken;
     // Never gate while a finger is on the glass: the user is mid-gesture and
     // owns the carousel until they lift it.
     if (gateInput && !_pointerDown) _animating.value = true;
@@ -273,16 +309,28 @@ class NativeCarouselState extends State<NativeCarousel> {
           curve: Curves.easeOutQuart,
         )
         // Completing or being interrupted both end the move, so this is where
-        // the input gate lifts.
+        // the input gate lifts — unless a newer step has already taken over,
+        // which owns the gate and the target from here.
         .whenComplete(() {
-          if (!mounted) return;
+          if (!mounted || token != _moveToken) return;
           _animating.value = false;
+          _targetIndex = null;
         });
   }
 
-  void jumpToPage(int index) {
-    _pageChangeReason = CarouselPageChangeReason.controller;
+  void jumpToPage(int index) => _jumpToPage(index);
+
+  /// A jump arrives immediately, so it opens and closes its move in one go.
+  ///
+  /// It also supersedes any slide still in flight — a letter jump fired during
+  /// a held D-pad step is exactly that — which means taking over the move token
+  /// and lowering the input gate the abandoned slide will no longer lower.
+  void _jumpToPage(int index) {
+    _openMove(index);
+    _moveToken++;
+    _animating.value = false;
     _pageController?.jumpToPage(index);
+    _targetIndex = null;
   }
 
   void animateToPage(int index) {
@@ -335,6 +383,10 @@ class NativeCarouselState extends State<NativeCarousel> {
               onPointerDown: (_) {
                 _pointerDown = true;
                 _pageChangeReason = CarouselPageChangeReason.manual;
+                // A finger outranks an ungated move in flight (the parent
+                // reconciling its index is the one that is not gated): the
+                // scroll position is the source of truth again from here.
+                _targetIndex = null;
               },
               onPointerUp: (_) => _pointerDown = false,
               onPointerCancel: (_) => _pointerDown = false,
