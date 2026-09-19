@@ -209,6 +209,9 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     count++; // Cloud-save mark in the game views
     count++; // Achievement badges on game tiles
     count++; // Match RetroAchievements on startup
+    if (Platform.isAndroid) {
+      count++; // Android Apps layout
+    }
     count += hidableNavTabs().length; // Navigation tab visibility
     count++; // Language
     if (!kIsWeb &&
@@ -398,6 +401,17 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
       return;
     }
     currentItemIndex++;
+
+    // Protocol: Android apps appear as either a System card or a root tab.
+    if (Platform.isAndroid) {
+      if (index == currentItemIndex) {
+        configProvider.updateAndroidAppsAsTab(
+          !configProvider.config.androidAppsAsTab,
+        );
+        return;
+      }
+      currentItemIndex++;
+    }
 
     // Protocol: Navigation Tab Visibility (one entry per hidable tab, in the
     // same order the rows are built below).
@@ -822,6 +836,34 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                     ),
                   );
                 }(),
+
+                // Setting: Android Apps location. This moves the existing
+                // virtual system into a top-level tab without changing the
+                // default Systems experience.
+                if (Platform.isAndroid) ...[
+                  SizedBox(height: 12.r),
+                  () {
+                    final index = currentItemIdx++;
+                    return SettingRow(
+                      key: _itemKeys[index],
+                      onTap: () => selectItem(index),
+                      focused:
+                          widget.isContentFocused &&
+                          widget.selectedContentIndex == index,
+                      title: AppLocale.androidAppLayout.getString(context),
+                      subtitle: AppLocale.androidAppLayoutSubtitle.getString(
+                        context,
+                      ),
+                      trailing: SettingValueChip(
+                        text:
+                            (config.androidAppsAsTab
+                                    ? AppLocale.androidAppLayoutTab
+                                    : AppLocale.androidAppLayoutSystem)
+                                .getString(context),
+                      ),
+                    );
+                  }(),
+                ],
 
                 // Setting: Navigation Tab Visibility — one row per hidable tab,
                 // so a future tab gets its toggle from its NavTabSpec alone.

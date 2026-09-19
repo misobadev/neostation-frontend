@@ -129,6 +129,13 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Chooses whether Android apps are opened from Systems or their own tab.
+  Future<void> updateAndroidAppsAsTab(bool value) async {
+    _config = _config.copyWith(androidAppsAsTab: value);
+    await SqliteConfigService.saveConfig(_config);
+    _notify();
+  }
+
   Future<void> updateActiveSyncProvider(String providerId) async {
     _config = _config.copyWith(activeSyncProvider: providerId);
     await SqliteConfigService.saveConfig(_config);

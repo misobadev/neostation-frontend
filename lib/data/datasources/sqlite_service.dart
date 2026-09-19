@@ -459,7 +459,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 157;
+  static const int _databaseVersion = 159;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1934,6 +1934,7 @@ class SqliteService {
         hide_tab_scraper INTEGER DEFAULT 0,
         hide_tab_romm INTEGER DEFAULT 0,
         hide_tab_search INTEGER DEFAULT 0,
+        android_apps_as_tab INTEGER DEFAULT 0,
         active_sync_provider TEXT DEFAULT 'neosync',
         systems_version TEXT DEFAULT '',
         -- Generation stamp of the bundled RA seed asset that is currently
@@ -2765,6 +2766,7 @@ class SqliteService {
     int? hideTabScraper,
     int? hideTabRomm,
     int? hideTabSearch,
+    int? androidAppsAsTab,
     String? activeSyncProvider,
     String? systemsVersion,
     String? raSeedStamp,
@@ -2876,6 +2878,9 @@ class SqliteService {
     }
     if (hideTabSearch != null) {
       updates['hide_tab_search'] = hideTabSearch;
+    }
+    if (androidAppsAsTab != null) {
+      updates['android_apps_as_tab'] = androidAppsAsTab;
     }
     if (activeSyncProvider != null) {
       updates['active_sync_provider'] = activeSyncProvider;

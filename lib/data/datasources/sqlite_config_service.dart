@@ -209,6 +209,12 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['hide_tab_search']?.toString() ?? '0') ??
                 0) ==
             1,
+        androidAppsAsTab:
+            (int.tryParse(
+                  userConfig?['android_apps_as_tab']?.toString() ?? '0',
+                ) ??
+                0) ==
+            1,
         activeSyncProvider:
             userConfig?['active_sync_provider']?.toString() ?? 'neosync',
         autoUpdateApp:
@@ -348,6 +354,7 @@ class SqliteConfigService {
         hideTabScraper: config.hideTabScraper ? 1 : 0,
         hideTabRomm: config.hideTabRomm ? 1 : 0,
         hideTabSearch: config.hideTabSearch ? 1 : 0,
+        androidAppsAsTab: config.androidAppsAsTab ? 1 : 0,
         activeSyncProvider: config.activeSyncProvider,
         autoUpdateApp: config.autoUpdateApp ? 1 : 0,
         autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,

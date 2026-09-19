@@ -145,6 +145,12 @@ const Map<String, dynamic> appLocaleDe = {
       'Fehler beim Konfigurieren des RetroArch-Pfads: {error}',
   AppLocale.androidSystemSettings: 'Systemeinstellungen',
   AppLocale.androidSystemSettingsSubtitle: 'Android-Systemeinstellungen öffnen',
+  AppLocale.androidApps: 'Android-Apps',
+  AppLocale.androidAppLayout: 'Android-App-Layout',
+  AppLocale.androidAppLayoutSubtitle:
+      'Lege fest, wo installierte Android-Apps angezeigt werden',
+  AppLocale.androidAppLayoutSystem: 'System',
+  AppLocale.androidAppLayoutTab: 'Tab',
   AppLocale.scanOnStartup: 'Ordner beim Start scannen',
   AppLocale.nowPlayingDimAfter: 'Now Playing abdunkeln nach',
   AppLocale.nowPlayingDimAfterSubtitle:
