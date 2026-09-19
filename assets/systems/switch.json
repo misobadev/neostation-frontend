@@ -222,7 +222,8 @@
         },
         "macos": {
           "executable": "Ryujinx.app",
-          "args": "\"{file.path}\""
+          "args": "-r \"{HOME}/Library/Application Support/Ryujinx\" \"{file.path}\"",
+          "launch_via_open": true
         }
       }
     }

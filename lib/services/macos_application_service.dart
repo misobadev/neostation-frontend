@@ -48,6 +48,20 @@ class MacOsApplicationService {
     );
   }
 
+  /// Finds the application bundle containing an executable resolved from a
+  /// `.app` path. Launch Services needs the bundle rather than its inner
+  /// `Contents/MacOS` binary.
+  static String? bundlePathForExecutable(String executablePath) {
+    var current = Directory(executablePath).parent;
+    while (current.path != current.parent.path) {
+      if (path.extension(current.path).toLowerCase() == '.app') {
+        return current.path;
+      }
+      current = current.parent;
+    }
+    return null;
+  }
+
   static Future<String?> findInstalledApplication({
     required List<String> applicationNames,
     String? bundleIdentifierHint,

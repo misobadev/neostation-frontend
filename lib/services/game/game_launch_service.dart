@@ -737,6 +737,7 @@ class GameLaunchService {
 
       final argsStr = launchCmd['args']?.toString() ?? '';
       var args = LauncherService.splitArgs(argsStr);
+      var processExecutable = executable;
 
       // The systems JSON names cores by filename alone (`-L snes9x_libretro.so`),
       // which RetroArch resolves against the working directory — ours, not its
@@ -762,17 +763,36 @@ class GameLaunchService {
       final env = Map<String, String>.from(Platform.environment);
       if (Platform.isMacOS) {
         env['HOME'] = ConfigService.getRealHomePath();
+
+        // A sandboxed Flutter process passes its sandbox to binaries it starts
+        // directly. Ryubing can then read its explicitly selected data folder
+        // but cannot open the ROM as a normal macOS application would. Launch
+        // it through Launch Services so Ryubing runs with its own app context.
+        if (launchCmd['launch_via_open'] == true) {
+          final bundlePath = MacOsApplicationService.bundlePathForExecutable(
+            executable,
+          );
+          if (bundlePath != null) {
+            processExecutable = '/usr/bin/open';
+            args = ['-n', '-a', bundlePath, '--args', ...args];
+          } else {
+            _log.w(
+              'Could not find the macOS application bundle for $executable; '
+              'launching its executable directly',
+            );
+          }
+        }
       }
 
       final process = await LinuxHostProcess.start(
-        executable,
+        processExecutable,
         args,
         environment: env,
       );
 
       final diagnostics = EmulatorLaunchDiagnostics.attach(
         process,
-        executable,
+        processExecutable,
         args,
       );
 
