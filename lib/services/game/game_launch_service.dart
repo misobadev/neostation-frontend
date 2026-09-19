@@ -15,6 +15,7 @@ import '../config_service.dart';
 import '../android_service.dart';
 import '../launcher_service.dart';
 import '../linux_emulator_discovery.dart';
+import '../windows_emulator_discovery.dart';
 import '../linux_host_process.dart';
 import '../macos_application_service.dart';
 import 'emulator_launch_diagnostics.dart';
@@ -492,6 +493,27 @@ class GameLaunchService {
           await EmulatorRepository.getUserDetectedEmulators();
       var retroArch = detectedEmulators['RetroArch'];
 
+      // The Windows installer and common package managers place RetroArch in
+      // predictable locations. Probe them when the saved picker value is
+      // missing or stale, just as Linux probes its Flatpak/EmuDeck locations.
+      if (Platform.isWindows &&
+          (retroArch == null || !await File(retroArch.path).exists())) {
+        final discovered = await WindowsEmulatorDiscovery.resolveExecutable(
+          'retroarch.exe',
+        );
+        if (discovered != null) {
+          _log.i('Discovered RetroArch on Windows at $discovered');
+          retroArch =
+              (retroArch ??
+                      const EmulatorModel(
+                        name: 'RetroArch',
+                        path: '',
+                        detected: false,
+                      ))
+                  .copyWith(path: discovered, detected: true);
+        }
+      }
+
       // On Linux a database entry is not required to find RetroArch: it ships
       // as a Flatpak or behind an EmuDeck launcher script, both of which live
       // at well-known paths. Discovery runs when there is no configured path or
@@ -656,6 +678,14 @@ class GameLaunchService {
               );
             }
             executable = ra.path;
+          } else if (Platform.isWindows) {
+            final discovered = await WindowsEmulatorDiscovery.resolveExecutable(
+              'retroarch.exe',
+            );
+            if (discovered != null) {
+              _log.i('Discovered RetroArch on Windows at $discovered');
+              executable = discovered;
+            }
           }
         } else if (!await File(executable).exists()) {
           String? resolvedPath;
@@ -683,6 +713,14 @@ class GameLaunchService {
 
           if (resolvedPath != null) {
             executable = resolvedPath;
+          } else if (Platform.isWindows) {
+            final discovered = await WindowsEmulatorDiscovery.resolveExecutable(
+              executable,
+            );
+            if (discovered != null) {
+              _log.i('Discovered $executable on Windows at $discovered');
+              executable = discovered;
+            }
           }
         }
 
