@@ -235,11 +235,13 @@ void main() {
     await memcard.writeAsString('INITIAL');
 
     await RommSaveMapRepository.putMapping(
+      source: RommLinkSource.download,
       romname: 'GameA',
       systemFolder: 'ps2',
       rommRomId: 1,
     );
     await RommSaveMapRepository.putMapping(
+      source: RommLinkSource.download,
       romname: 'GameB',
       systemFolder: 'ps2',
       rommRomId: 2,

@@ -236,6 +236,7 @@ void main() {
     await Directory(p.join(tempDir.path, 'saves')).create(recursive: true);
 
     await RommSaveMapRepository.putMapping(
+      source: RommLinkSource.download,
       romname: 'Game.nes',
       systemFolder: 'nes',
       rommRomId: 1,

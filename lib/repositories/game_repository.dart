@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:neostation/services/logger_service.dart';
 import '../models/database_game_model.dart';
+import '../models/romm_link_row.dart';
 import '../data/datasources/sqlite_database_service.dart';
 import '../data/datasources/sqlite_service.dart';
 import '../providers/file_provider.dart';
@@ -208,6 +209,11 @@ class GameRepository {
 
   static Future<List<DatabaseGameModel>> getFavoriteGames() =>
       SqliteService.getFavoriteGames();
+
+  /// The library as the RomM link pass needs it: filename, extension-stripped
+  /// name and system folder, with none of [getAllGames]' joins or ordering.
+  static Future<List<RommLinkRow>> getRommLinkRows() =>
+      SqliteService.getRommLinkRows();
 
   static Future<List<DatabaseGameModel>> getGamesBySystem(String systemId) =>
       SqliteService.getGamesBySystem(systemId);

@@ -45,6 +45,29 @@ RommDownload _failed(
   error: error,
 );
 
+/// A local file matched to [rom], as the enumeration hands it on — matched
+/// only, never written.
+RommPendingLink _pending(RommRom rom, {bool alreadyLinked = false}) =>
+    RommPendingLink(
+      rom: rom,
+      romname: rom.fsNameNoExt,
+      alreadyLinked: alreadyLinked,
+    );
+
+/// Stands in for the mapping write: records every call and writes every match
+/// it is given, so a test can assert both *when* it ran and how often.
+class _FakeLinkWriter {
+  final List<List<RommPendingLink>> calls = [];
+
+  Future<RommLinkWriteResult> write(List<RommPendingLink> pending) async {
+    calls.add(pending);
+    return (written: pending.length, failed: 0);
+  }
+
+  /// Every match written across every call.
+  int get written => calls.fold(0, (sum, c) => sum + c.length);
+}
+
 /// A page fetcher over a fixed ROM list, honouring limit/offset the way RomM
 /// does (and reporting the full match count as `total`).
 RommPageFetcher _pagesOver(List<RommRom> all, {List<int>? requestedOffsets}) {
@@ -119,15 +142,23 @@ void main() {
       expect(sync.completed, 20);
     });
 
-    test('ROMs already on disk are skipped, not queued', () async {
+    test('ROMs already on disk are linked and skipped, not queued', () async {
       final all = [for (var i = 0; i < 6; i++) _rom(i)];
       final downloaded = <int>[];
+      final matched = <int>[];
+      final writer = _FakeLinkWriter();
       final sync = RommBulkSync();
 
       await sync.run(
         sourceLabel: 'SNES',
         fetchPage: _pagesOver(all),
         isDownloaded: (rom) async => rom.id.isEven,
+        // Rom 0 already had a row; the other two on-disk ROMs gain one.
+        resolveLink: (rom) async {
+          matched.add(rom.id);
+          return _pending(rom, alreadyLinked: rom.id == 0);
+        },
+        writeLinks: writer.write,
         download: (rom) async {
           downloaded.add(rom.id);
           return _completed(rom);
@@ -136,9 +167,315 @@ void main() {
       );
 
       expect(downloaded, [1, 3, 5]);
+      expect(matched, [
+        0,
+        2,
+        4,
+      ], reason: 'every on-disk ROM is offered a link, nothing else is');
       expect(sync.skipped, 3);
+      expect(sync.linked, 2);
+      expect(sync.alreadyLinked, 1);
       expect(sync.total, 3);
       expect(sync.enumerated, 6);
+    });
+
+    test('a linked ROM is never downloaded and fetches no media', () async {
+      // The engine only ever reaches the outside world through the callbacks
+      // it is given: `download` is the sole path to a transfer and to the
+      // metadata/media import that rides on it. A ROM that links must not
+      // reach it, and the linker itself is handed nothing to fetch with.
+      final all = [_rom(1, sizeBytes: 500)];
+      var downloads = 0;
+      var links = 0;
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (_) async => true,
+        resolveLink: (rom) async {
+          links++;
+          return _pending(rom);
+        },
+        writeLinks: _FakeLinkWriter().write,
+        download: (rom) async {
+          downloads++;
+          return _completed(rom);
+        },
+        concurrency: 1,
+      );
+
+      expect(links, 1);
+      expect(downloads, 0);
+      expect(sync.total, 0, reason: 'not queued');
+      expect(sync.totalBytes, 0, reason: 'nothing priced for transfer');
+      expect(sync.linked, 1);
+      expect(sync.skipped, 1);
+    });
+
+    test(
+      'without a linker, on-disk ROMs are only counted as skipped',
+      () async {
+        final all = [_rom(1), _rom(2)];
+        final sync = RommBulkSync();
+
+        await sync.run(
+          sourceLabel: 'SNES',
+          fetchPage: _pagesOver(all),
+          isDownloaded: (_) async => true,
+          download: (rom) async => _completed(rom),
+          concurrency: 1,
+        );
+
+        expect(sync.skipped, 2);
+        expect(sync.linked, 0);
+        expect(sync.alreadyLinked, 0);
+      },
+    );
+
+    test(
+      'a matcher that throws is logged and does not stop the sync',
+      () async {
+        final all = [_rom(1), _rom(2), _rom(3)];
+        final downloaded = <int>[];
+        final sync = RommBulkSync();
+
+        await sync.run(
+          sourceLabel: 'SNES',
+          fetchPage: _pagesOver(all),
+          isDownloaded: (rom) async => rom.id == 2,
+          resolveLink: (_) async => throw StateError('db closed'),
+          writeLinks: _FakeLinkWriter().write,
+          download: (rom) async {
+            downloaded.add(rom.id);
+            return _completed(rom);
+          },
+          concurrency: 1,
+        );
+
+        expect(downloaded, [1, 3]);
+        expect(sync.skipped, 1);
+        expect(sync.linked, 0);
+        expect(
+          sync.alreadyLinked,
+          0,
+          reason: 'a failure is never booked as already linked',
+        );
+        expect(sync.linkFailed, 1);
+      },
+    );
+
+    test('a write that fails is counted apart from already linked', () async {
+      final all = [_rom(1), _rom(2)];
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (_) async => true,
+        resolveLink: (rom) async => _pending(rom),
+        writeLinks: (pending) async => (written: 0, failed: pending.length),
+        download: (rom) async => _completed(rom),
+        concurrency: 1,
+      );
+
+      expect(sync.linked, 0);
+      expect(sync.alreadyLinked, 0);
+      expect(sync.linkFailed, 2);
+    });
+
+    test('a row that appeared meanwhile counts as already linked', () async {
+      final all = [_rom(1), _rom(2)];
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (_) async => true,
+        resolveLink: (rom) async => _pending(rom),
+        // The insert-if-absent write skipped one row: something else had
+        // written it between the match and the write.
+        writeLinks: (_) async => (written: 1, failed: 0),
+        download: (rom) async => _completed(rom),
+        concurrency: 1,
+      );
+
+      expect(sync.linked, 1);
+      expect(sync.alreadyLinked, 1);
+      expect(sync.linkFailed, 0);
+    });
+
+    // The confirmation offers the links as part of what the user is agreeing
+    // to ("{count} linked to RomM"), so they must not already be written when
+    // the question is asked — and declining must leave the table untouched.
+    test('nothing is written before the plan is approved', () async {
+      final all = [_rom(1), _rom(2), _rom(3)];
+      final writer = _FakeLinkWriter();
+      var writtenAtConfirm = -1;
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (rom) async => rom.id != 3,
+        resolveLink: (rom) async => _pending(rom),
+        writeLinks: writer.write,
+        download: (rom) async => _completed(rom),
+        confirm: (plan) async {
+          writtenAtConfirm = writer.written;
+          expect(plan.linked, 2, reason: 'the plan proposes two links');
+          return true;
+        },
+        concurrency: 1,
+      );
+
+      expect(
+        writtenAtConfirm,
+        0,
+        reason: 'the dialog proposed, it did not report',
+      );
+      expect(writer.written, 2, reason: 'written once approved');
+      expect(sync.linked, 2);
+    });
+
+    test('declining the plan writes no link at all', () async {
+      final all = [_rom(1), _rom(2), _rom(3)];
+      final writer = _FakeLinkWriter();
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (rom) async => rom.id != 3,
+        resolveLink: (rom) async => _pending(rom),
+        writeLinks: writer.write,
+        download: (rom) async => _completed(rom),
+        confirm: (_) async => false,
+        concurrency: 1,
+      );
+
+      expect(sync.declined, isTrue);
+      expect(writer.calls, isEmpty, reason: 'the user said no');
+      expect(sync.linked, 0);
+    });
+
+    test('a cancel during enumeration writes no link', () async {
+      final all = [_rom(1), _rom(2)];
+      final writer = _FakeLinkWriter();
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (_) async => true,
+        resolveLink: (rom) async {
+          sync.cancel();
+          return _pending(rom);
+        },
+        writeLinks: writer.write,
+        download: (rom) async => _completed(rom),
+        confirm: (_) async => true,
+        concurrency: 1,
+      );
+
+      expect(sync.cancelRequested, isTrue);
+      expect(writer.calls, isEmpty);
+      expect(sync.linked, 0);
+    });
+
+    // A source with nothing to fetch asks no question — there is no size to
+    // approve — so the links the user's sync found are the whole job.
+    test('with nothing to download the links are still written', () async {
+      final all = [_rom(1), _rom(2)];
+      final writer = _FakeLinkWriter();
+      var confirmed = false;
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (_) async => true,
+        resolveLink: (rom) async => _pending(rom),
+        writeLinks: writer.write,
+        download: (rom) async => _completed(rom),
+        confirm: (_) async {
+          confirmed = true;
+          return true;
+        },
+        concurrency: 1,
+      );
+
+      expect(confirmed, isFalse, reason: 'nothing to price');
+      expect(sync.linked, 2);
+    });
+
+    // One transaction per ROM in the phase the confirmation is waiting on is
+    // what the connect-time pass already avoids by batching.
+    test('every approved link is written in one call', () async {
+      final all = [for (var i = 0; i < 25; i++) _rom(i)];
+      final writer = _FakeLinkWriter();
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (rom) async => rom.id != 24,
+        resolveLink: (rom) async => _pending(rom),
+        writeLinks: writer.write,
+        download: (rom) async => _completed(rom),
+        confirm: (_) async => true,
+        concurrency: 1,
+      );
+
+      expect(writer.calls, hasLength(1), reason: '24 matches, one write');
+      expect(writer.calls.single, hasLength(24));
+      expect(sync.linked, 24);
+    });
+
+    test('already-linked matches are never handed to the writer', () async {
+      final all = [_rom(1), _rom(2), _rom(3)];
+      final writer = _FakeLinkWriter();
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (_) async => true,
+        resolveLink: (rom) async => _pending(rom, alreadyLinked: rom.id != 2),
+        writeLinks: writer.write,
+        download: (rom) async => _completed(rom),
+        concurrency: 1,
+      );
+
+      expect(writer.calls.single.map((m) => m.rom.id), [2]);
+      expect(sync.linked, 1);
+      expect(sync.alreadyLinked, 2);
+    });
+
+    test('the plan carries the linked counts', () async {
+      final all = [_rom(1), _rom(2), _rom(3)];
+      RommBulkSyncPlan? seen;
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (rom) async => rom.id != 3,
+        resolveLink: (rom) async => _pending(rom, alreadyLinked: rom.id != 1),
+        writeLinks: _FakeLinkWriter().write,
+        download: (rom) async => _completed(rom),
+        confirm: (plan) async {
+          seen = plan;
+          return true;
+        },
+        concurrency: 1,
+      );
+
+      expect(seen, isNotNull);
+      expect(seen!.skipped, 2);
+      expect(seen!.linked, 1);
+      expect(seen!.alreadyLinked, 1);
+      expect(seen!.romCount, 1);
     });
 
     test('queued bytes count only what is actually downloaded', () async {

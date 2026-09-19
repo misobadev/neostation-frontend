@@ -579,3 +579,44 @@ T? cycleFilterValue<T>(List<T> options, T? current, int delta) {
   if (next < 0) next += len;
   return next == 0 ? null : options[next - 1];
 }
+
+/// Ordered choices offered when a search result is selected.
+///
+/// [download] only ever appears for a RomM result that isn't on this device
+/// yet; once it is downloaded a remote result offers the same [goTo] / [play]
+/// as a local one, plus [link], which opens the manual RomM link picker
+/// pre-selected on that result.
+enum SearchResultAction { goTo, play, download, link }
+
+/// The action list for a selected result, in D-pad order.
+///
+/// A local row offers Go-to-game and Play, plus Link while RomM is connected
+/// ([canLink]). That is the only way in for the case manual linking exists
+/// for: a ROM whose local filename does not match the server's is never
+/// recognised as downloaded, so the remote row for it cannot resolve back to
+/// it and offers Download alone. Starting from the local game instead, the
+/// picker opens on the game's own system and the user chooses the RomM entry.
+///
+/// A remote row that maps back to a local game ([hasLocal]) offers the same
+/// two first — so the existing focus order is unchanged — and then Link; one
+/// that doesn't offers Download only.
+List<SearchResultAction> searchResultActionsFor({
+  required bool isRemote,
+  required bool hasLocal,
+  bool canLink = false,
+}) {
+  if (!isRemote) {
+    return [
+      SearchResultAction.goTo,
+      SearchResultAction.play,
+      if (canLink && hasLocal) SearchResultAction.link,
+    ];
+  }
+  return hasLocal
+      ? const [
+          SearchResultAction.goTo,
+          SearchResultAction.play,
+          SearchResultAction.link,
+        ]
+      : const [SearchResultAction.download];
+}
