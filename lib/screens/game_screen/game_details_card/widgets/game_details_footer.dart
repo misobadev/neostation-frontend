@@ -12,6 +12,7 @@ import '../../../../models/game_model.dart';
 import '../../../../models/retro_achievements_game_info.dart';
 import '../../../../themes/corner_radii.dart';
 import '../../../../utils/game_utils.dart';
+import '../../../../utils/game_list_responsive.dart';
 import '../../../../widgets/neo_glass.dart';
 import '../../../../widgets/monospaced_clock.dart';
 import '../../music/music_player.dart';
@@ -90,6 +91,11 @@ class GameDetailsFooter extends StatelessWidget {
     final bool hasPlayTime =
         GameUtils.formatPlayTime(game.playTime ?? 0) != '0s';
     final bool showsAchievements = _showsAchievements(context);
+    final viewport = MediaQuery.sizeOf(context);
+    final bool showSecondaryActions = !GameListResponsive.isCompactViewport(
+      viewport.width,
+      viewport.height,
+    );
 
     // One row, always the same height, in reading order: what the game *is*
     // on the left, what you can *do* with it on the right.
@@ -198,29 +204,31 @@ class GameDetailsFooter extends StatelessWidget {
                         ),
                         SizedBox(width: _rowGap),
                         // Controls, in the order the removed rail had them.
-                        if (onShowRandomGame != null) ...[
+                        if (showSecondaryActions) ...[
+                          if (onShowRandomGame != null) ...[
+                            _FooterActionButton(
+                              // The same dice the Y context menu gives Random, so the
+                              // action carries one glyph wherever it is offered.
+                              icon: Symbols.casino_rounded,
+                              onTap: onShowRandomGame!,
+                            ),
+                            SizedBox(width: _rowGap),
+                          ],
                           _FooterActionButton(
-                            // The same dice the Y context menu gives Random, so the
-                            // action carries one glyph wherever it is offered.
-                            icon: Symbols.casino_rounded,
-                            onTap: onShowRandomGame!,
+                            icon: Symbols.favorite_rounded,
+                            // Filled and tinted when the game is already a
+                            // favourite: the button is a toggle, so its state has to
+                            // be readable without pressing it.
+                            isOn: game.isFavorite == true,
+                            onTap: onToggleFavorite,
+                          ),
+                          SizedBox(width: _rowGap),
+                          _FooterActionButton(
+                            icon: Symbols.settings_rounded,
+                            onTap: onOpenGameSettings,
                           ),
                           SizedBox(width: _rowGap),
                         ],
-                        _FooterActionButton(
-                          icon: Symbols.favorite_rounded,
-                          // Filled and tinted when the game is already a
-                          // favourite: the button is a toggle, so its state has to
-                          // be readable without pressing it.
-                          isOn: game.isFavorite == true,
-                          onTap: onToggleFavorite,
-                        ),
-                        SizedBox(width: _rowGap),
-                        _FooterActionButton(
-                          icon: Symbols.settings_rounded,
-                          onTap: onOpenGameSettings,
-                        ),
-                        SizedBox(width: _rowGap),
                         _buildPlayButton(context),
                       ],
                     ),

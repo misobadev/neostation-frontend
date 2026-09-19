@@ -53,6 +53,7 @@ import '../../widgets/letter_indicator.dart';
 import '../../constants/system_folder_names.dart';
 import '../../utils/artwork_cache.dart';
 import '../../utils/game_list_update.dart';
+import '../../utils/game_list_responsive.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 import '../../themes/corner_radii.dart';
@@ -1432,29 +1433,44 @@ class _SystemGamesListState extends State<SystemGamesList> {
         // 12.r of margin above and below, so a screen-derived height made the
         // block 24.r taller than its box and it overflowed on any device whose
         // system insets were smaller than that.
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Sidebar: Interactive list of games or music tracks.
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-              width: 200.r,
-              margin: EdgeInsets.only(left: 12.r, top: 12.r, bottom: 12.r),
-              // Frosted glass pane over the fanart: a single engine blur +
-              // tint + rim (native NeoGlass, no refraction shader).
-              child: NeoGlass(
-                cornerRadius:
-                    Theme.of(
-                      context,
-                    ).extension<CornerRadii>()?.radiusExternalRadius ??
-                    14.r,
-                child: _buildGamesListPanel(),
-              ),
-            ),
-            // Main Viewport: Rich metadata, video previews, and launch controls.
-            Expanded(child: _buildGameDetailsPanel()),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final listFraction = GameListResponsive.listFraction(
+              constraints.maxWidth,
+              constraints.maxHeight,
+            );
+            // The margin belongs to the sidebar, so subtract it from the
+            // target fraction to make the complete pane (margin included)
+            // occupy the requested 55%/40% of the row.
+            final listWidth = (constraints.maxWidth * listFraction - 12.r)
+                .clamp(180.r, constraints.maxWidth * 0.75)
+                .toDouble();
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Sidebar: Interactive list of games or music tracks.
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  width: listWidth,
+                  margin: EdgeInsets.only(left: 12.r, top: 12.r, bottom: 12.r),
+                  // Frosted glass pane over the fanart: a single engine blur +
+                  // tint + rim (native NeoGlass, no refraction shader).
+                  child: NeoGlass(
+                    cornerRadius:
+                        Theme.of(
+                          context,
+                        ).extension<CornerRadii>()?.radiusExternalRadius ??
+                        14.r,
+                    child: _buildGamesListPanel(),
+                  ),
+                ),
+                // Main Viewport: Rich metadata, video previews, and launch controls.
+                Expanded(child: _buildGameDetailsPanel()),
+              ],
+            );
+          },
         ),
       ],
     );

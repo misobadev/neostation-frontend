@@ -1052,22 +1052,12 @@ class _MyAppState extends State<MyApp> {
                       checkerboardOffscreenLayers: false,
                       showSemanticsDebugger: false,
                       builder: (context, child) {
-                        return MediaQuery(
-                          data: MediaQuery.of(context).copyWith(
-                            textScaler: MediaQuery.of(context).textScaler.clamp(
-                              minScaleFactor: 0.6,
-                              maxScaleFactor: 1.4,
-                            ),
-                          ),
-                          // The back swipe lives above every route and dialog
-                          // so touch users have a way back on any screen whose
-                          // navigation layer binds B. Nothing else on screen
-                          // offers one: B is a gamepad button and the system
-                          // back gesture belongs to the platform.
-                          child: Stack(
-                            children: [child!, const BackSwipeZone()],
-                          ),
-                        );
+                        // The back swipe lives above every route and dialog so
+                        // touch users have a way back on any screen whose
+                        // navigation layer binds B. Nothing else on screen
+                        // offers one: B is a gamepad button and the system
+                        // back gesture belongs to the platform.
+                        return Stack(children: [child!, const BackSwipeZone()]);
                       },
                       theme: themeProvider.currentTheme.copyWith(
                         textTheme: GoogleFonts.antaTextTheme(
