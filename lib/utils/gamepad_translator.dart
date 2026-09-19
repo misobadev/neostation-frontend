@@ -823,7 +823,7 @@ class GamepadEventTranslator {
 
     if (Platform.isAndroid) {
       // Android uses absolute values for directionality.
-      return value.abs() == 1.0;
+      return value.abs() >= 0.5;
     }
 
     if (Platform.isLinux) {
