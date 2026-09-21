@@ -648,7 +648,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.cancelScan: '스캔 취소',
   AppLocale.progress: '진행상황',
   AppLocale.raLogin: 'RetroAchievements 로그인',
-  AppLocale.raOfflineBanner: '오프라인 — 마지막으로 동기화된 업적을 표시합니다',
+  AppLocale.raOfflineBanner: '오프라인 — 마지막으로 동기화된 업적을 표시합니다. 다시 시도하는 중…',
   AppLocale.raWhatIs: 'RetroAchievements란?',
   AppLocale.raDescription:
       'RetroAchievements는 에뮬레이터로 즐기는 고전 게임에 업적 기능을 제공하는 커뮤니티 서비스입니다.',

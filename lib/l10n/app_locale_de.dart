@@ -734,7 +734,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.progress: 'Fortschritt',
   AppLocale.raLogin: 'RetroAchievements Login',
   AppLocale.raOfflineBanner:
-      'Offline – zeigt deine zuletzt synchronisierten Erfolge',
+      'Offline – zeigt deine zuletzt synchronisierten Erfolge. Erneuter Versuch läuft…',
   AppLocale.raWhatIs: 'Was ist RetroAchievements?',
   AppLocale.raDescription:
       'RetroAchievements ist eine Community, die Erfolge für klassische Spiele über Emulation anbietet.',

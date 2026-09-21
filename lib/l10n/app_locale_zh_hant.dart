@@ -630,7 +630,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.cancelScan: '取消掃描',
   AppLocale.progress: '進度',
   AppLocale.raLogin: 'RetroAchievements 登入',
-  AppLocale.raOfflineBanner: '離線 — 顯示上次同步的成就',
+  AppLocale.raOfflineBanner: '離線 — 顯示上次同步的成就。正在重試…',
   AppLocale.raWhatIs: '什麼是 RetroAchievements？',
   AppLocale.raDescription: 'RetroAchievements 是一個透過模擬器為經典遊戲提供成就的社群。',
   AppLocale.raEarnPoints: '賺取硬核積分並展示成就',

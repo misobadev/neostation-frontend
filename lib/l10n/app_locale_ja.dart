@@ -642,7 +642,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.cancelScan: 'スキャンキャンセル',
   AppLocale.progress: '進捗',
   AppLocale.raLogin: 'RetroAchievementsログイン',
-  AppLocale.raOfflineBanner: 'オフライン — 最後に同期した実績を表示しています',
+  AppLocale.raOfflineBanner: 'オフライン — 最後に同期した実績を表示しています。再接続を試行中…',
   AppLocale.raWhatIs: 'RetroAchievementsとは？',
   AppLocale.raDescription:
       'RetroAchievementsは、エミュレーションを通じてクラシックゲームに実績を提供するコミュニティです。',
