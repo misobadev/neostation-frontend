@@ -339,6 +339,10 @@ mixin AppLocale {
   static const String thankYou = 'thank_you';
   static const String visitWebsite = 'visit_website';
   static const String joinCommunity = 'join_community';
+  static const String exportLogs = 'export_logs';
+  static const String exportLogsDesc = 'export_logs_desc';
+  static const String exportLogsSaved = 'export_logs_saved';
+  static const String exportLogsFailed = 'export_logs_failed';
   static const String specialThanks = 'special_thanks';
   static const String forInvaluableContributions =
       'for_invaluable_contributions';

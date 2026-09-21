@@ -319,6 +319,11 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.visitWebsite: 'Kunjungi situs web resmi kami',
   AppLocale.joinCommunity:
       'Bergabunglah dengan komunitas kami untuk mendapatkan dukungan',
+  AppLocale.exportLogs: 'Ekspor log',
+  AppLocale.exportLogsDesc:
+      'Untuk laporan bug. Berisi jalur file dan nama game.',
+  AppLocale.exportLogsSaved: 'Log disimpan di {path}',
+  AppLocale.exportLogsFailed: 'Gagal mengekspor log',
   AppLocale.specialThanks: 'Terima Kasih Khusus',
   AppLocale.forInvaluableContributions: 'atas kontribusi yang sangat berharga',
   AppLocale.supportOnKofi: 'Dukung kami di Ko-fi',

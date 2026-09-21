@@ -338,6 +338,11 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.thankYou: 'Merci d’utiliser NeoStation !',
   AppLocale.visitWebsite: 'Visitez notre site officiel',
   AppLocale.joinCommunity: 'Rejoignez notre communauté pour de l’aide',
+  AppLocale.exportLogs: 'Exporter les journaux',
+  AppLocale.exportLogsDesc:
+      'Pour les rapports de bug. Contient des chemins de fichiers et des noms de jeux.',
+  AppLocale.exportLogsSaved: 'Journaux enregistrés dans {path}',
+  AppLocale.exportLogsFailed: 'Impossible d’exporter les journaux',
   AppLocale.specialThanks: 'Remerciements Spéciaux',
   AppLocale.forInvaluableContributions: 'pour ses contributions inestimables',
   AppLocale.supportOnKofi: 'Soutenez-nous sur Ko-fi',

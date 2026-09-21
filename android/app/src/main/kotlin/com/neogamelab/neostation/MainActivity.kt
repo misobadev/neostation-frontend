@@ -544,6 +544,16 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                         result.error("INVALID_ARGUMENTS", "File path is required", null)
                     }
                 }
+                "shareFile" -> {
+                    val filePath = call.argument<String>("filePath")
+                    val mimeType = call.argument<String>("mimeType") ?: "application/octet-stream"
+                    val title = call.argument<String>("title")
+                    if (filePath != null) {
+                        shareFile(filePath, mimeType, title, result)
+                    } else {
+                        result.error("INVALID_ARGUMENTS", "File path is required", null)
+                    }
+                }
                 "deleteSafFile" -> {
                     val uriString = call.argument<String>("uri")
                     if (uriString != null) {
@@ -2209,6 +2219,30 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             result.success(true)
         } catch (e: Exception) {
             result.error("INSTALL_ERROR", "Failed to launch installer: ${e.message}", null)
+        }
+    }
+
+    /// Opens the system share sheet with [filePath] attached, e.g. so a user
+    /// can send their log zip straight to Discord. The file must sit under a
+    /// path covered by file_provider_paths.xml (the cache dir is).
+    private fun shareFile(filePath: String, mimeType: String, title: String?, result: MethodChannel.Result) {
+        try {
+            val file = File(filePath)
+            if (!file.exists()) {
+                result.error("FILE_NOT_FOUND", "File not found: $filePath", null)
+                return
+            }
+            val contentUri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, contentUri)
+                clipData = android.content.ClipData.newRawUri(file.name, contentUri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(send, title))
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("SHARE_ERROR", "Failed to share file: ${e.message}", null)
         }
     }
 }

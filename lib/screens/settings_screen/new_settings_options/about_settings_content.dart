@@ -1,12 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/services/log_export_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/data/datasources/sqlite_service.dart';
+import 'package:neostation/widgets/custom_notification.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'settings_title.dart';
 
@@ -31,11 +35,14 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
   final AdaptiveScroller _scroller = AdaptiveScroller();
 
   /// Keys used for calculating viewport alignment during navigation, one per
-  /// link card.
-  final List<GlobalKey> _itemKeys = List.generate(5, (_) => GlobalKey());
+  /// card.
+  final List<GlobalKey> _itemKeys = List.generate(6, (_) => GlobalKey());
 
   String _appVersion = '';
   String _systemsVersion = '';
+
+  /// Blocks a second export while the zip is still being built.
+  bool _exporting = false;
 
   @override
   void initState() {
@@ -94,8 +101,48 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
     }
   }
 
+  /// Zips the logs and hands them to the share sheet (Android) or a save
+  /// dialog (desktop), so a user can attach them to a Discord bug report.
+  Future<void> _exportLogs() async {
+    if (_exporting) return;
+    _exporting = true;
+    final title = AppLocale.exportLogs.getString(context);
+    final savedMessage = AppLocale.exportLogsSaved.getString(context);
+    final failedMessage = AppLocale.exportLogsFailed.getString(context);
+    try {
+      final (result, savedPath) = await LogExportService.export(
+        dialogTitle: title,
+        systemsVersion: _systemsVersion,
+      );
+      if (!mounted) return;
+      switch (result) {
+        case LogExportResult.saved:
+          AppNotification.showNotification(
+            context,
+            savedMessage.replaceFirst('{path}', savedPath ?? ''),
+            type: NotificationType.success,
+          );
+          if (savedPath != null) {
+            // Show the file so it can be dragged straight into Discord.
+            await launchUrl(Uri.directory(File(savedPath).parent.path));
+          }
+        case LogExportResult.failed:
+          AppNotification.showNotification(
+            context,
+            failedMessage,
+            type: NotificationType.error,
+          );
+        case LogExportResult.shared:
+        case LogExportResult.cancelled:
+          break;
+      }
+    } finally {
+      _exporting = false;
+    }
+  }
+
   int getItemCount() {
-    return 5;
+    return 6;
   }
 
   void selectItem(int index) {
@@ -114,6 +161,9 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
         break;
       case 4:
         _launchUrl('https://neostation.dev/');
+        break;
+      case 5:
+        _exportLogs();
         break;
     }
   }
@@ -246,6 +296,21 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                             widget.isContentFocused &&
                             widget.selectedContentIndex == 4,
                       ),
+                      SizedBox(height: 8.h),
+                      _buildInfoCard(
+                        cardKey: _itemKeys[5],
+                        icon: Symbols.bug_report_rounded,
+                        title: AppLocale.exportLogs.getString(context),
+                        value: AppLocale.exportLogsDesc.getString(context),
+                        onTap: _exportLogs,
+                        trailingIcon: Platform.isAndroid
+                            ? Symbols.share_rounded
+                            : Symbols.download_rounded,
+                        theme: theme,
+                        isFocused:
+                            widget.isContentFocused &&
+                            widget.selectedContentIndex == 5,
+                      ),
                     ],
                   ),
                 ),
@@ -262,7 +327,9 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
     required IconData icon,
     required String title,
     required String value,
-    required String url,
+    String? url,
+    VoidCallback? onTap,
+    IconData trailingIcon = Symbols.open_in_new_rounded,
     required ThemeData theme,
     bool isFocused = false,
   }) {
@@ -270,7 +337,11 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
       key: cardKey,
       onTap: () {
         SfxService().playNavSound();
-        _launchUrl(url);
+        if (onTap != null) {
+          onTap();
+        } else if (url != null) {
+          _launchUrl(url);
+        }
       },
       borderRadius: BorderRadius.circular(12.r),
       canRequestFocus: false,
@@ -315,7 +386,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
               ),
             ),
             Icon(
-              Symbols.open_in_new_rounded,
+              trailingIcon,
               size: 14.r,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
             ),
