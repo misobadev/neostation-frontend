@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -12,11 +13,48 @@ import 'package:neostation/utils/log_redaction.dart';
 /// Handles registration, login, email verification, password recovery, and
 /// session persistence. Where the token is kept is [CredentialStore]'s problem,
 /// including the platforms whose secure storage cannot hold it.
+/// What a [AuthService.restoreSession] attempt found.
+enum SessionRestore {
+  /// The server accepted the stored token: the user is signed in.
+  live,
+
+  /// Nothing could be asked. No network yet, an unreadable credential store,
+  /// or a server error — the token is untouched and the attempt is worth
+  /// repeating.
+  unreachable,
+
+  /// There is nothing to restore: no token is stored, or the server rejected
+  /// the one that was.
+  none,
+}
+
 class AuthService extends ChangeNotifier {
   /// Storage key for the authentication JWT token.
   static const String _tokenKey = 'auth_token';
 
   static final _log = LoggerService.instance;
+
+  /// How long the profile request may take before it counts as unreachable.
+  /// `main` awaits [initialize], so an unbounded request on a handheld that
+  /// powered on before its Wi-Fi associated would hold the whole app on the
+  /// splash screen for as long as the socket took to give up.
+  static const Duration _profileTimeout = Duration(seconds: 10);
+
+  /// Background retry schedule for a session that could not be restored
+  /// because nothing was reachable. Covers the cold-boot window in which a
+  /// device running NeoStation as its launcher starts before the network.
+  static const int _restoreRetryAttempts = 5;
+  static const Duration _restoreRetryDelay = Duration(seconds: 4);
+
+  /// HTTP client for the session reads. Null in the app, where the service
+  /// uses its own; tests swap it between phases to take the network away and
+  /// give it back.
+  @visibleForTesting
+  http.Client? httpClient;
+
+  /// Guards against two overlapping retry loops (one from [initialize], one
+  /// from a caller that retried by hand).
+  bool _restoreRetryRunning = false;
 
   /// Whether a valid user session is currently active.
   bool _isLoggedIn = false;
@@ -27,48 +65,92 @@ class AuthService extends ChangeNotifier {
   bool get isLoggedIn => _isLoggedIn;
   User? get currentUser => _currentUser;
 
-  /// Initializes the service by attempting to restore a previous session from storage.
+  /// Initializes the service by attempting to restore a previous session from
+  /// storage, and keeps trying in the background while nothing is reachable.
   ///
-  /// If a token is found, it performs a profile fetch to validate its authenticity.
-  /// Implements defensive logic to preserve tokens during network failures
-  /// while purging them on explicit authentication errors (401/403).
+  /// `main` awaits this, so only the first attempt is on the startup path; the
+  /// retries are not. They exist because a device that powers on with
+  /// NeoStation as its launcher reaches this line before Wi-Fi has associated.
+  /// The token survived that (it always did), but nothing ever re-checked it,
+  /// so the user stayed signed out — websocket included — until they typed
+  /// their password again, however long the network had been back (issue
+  /// #482).
   Future<void> initialize() async {
+    final result = await restoreSession();
+    if (result == SessionRestore.unreachable) {
+      unawaited(_retryRestoreSession());
+    }
+  }
+
+  /// Validates the stored token against the server and updates the session.
+  ///
+  /// Preserves the token on anything that is not an outright rejection: a
+  /// network failure, an unreadable credential store (a cold boot can reach
+  /// this before the database's volume is mounted) and a server error all
+  /// leave the account alone, because treating any of them as "signed out"
+  /// deletes a perfectly good session.
+  Future<SessionRestore> restoreSession() async {
     try {
       final token = await CredentialStore.read(_tokenKey);
-      if (token != null) {
-        final profileResult = await getProfile();
-        if (profileResult['success'] == true) {
-          _isLoggedIn = true;
-        } else if (profileResult['isNetworkError'] == true) {
-          _isLoggedIn = false;
-          _log.i(
-            'AuthService: Network error during initialization. Token preserved.',
-          );
-        } else {
-          final statusCode = profileResult['statusCode'];
-          if (statusCode == 401 || statusCode == 403) {
-            _log.w(
-              'AuthService: Token invalid or expired ($statusCode). Clearing storage.',
-            );
-            await CredentialStore.delete(_tokenKey);
-          } else {
-            _log.i(
-              'AuthService: Unexpected server error ($statusCode). Token preserved.',
-            );
-          }
-          _isLoggedIn = false;
-          _currentUser = null;
-        }
-      } else {
+      if (token == null) {
         _isLoggedIn = false;
         _currentUser = null;
+        notifyListeners();
+        return SessionRestore.none;
       }
+
+      final profileResult = await getProfile();
+      if (profileResult['success'] == true) {
+        // getProfile has already set _isLoggedIn and notified: a server that
+        // answers the profile call has accepted the token.
+        return SessionRestore.live;
+      }
+
+      if (profileResult['isNetworkError'] == true) {
+        _log.i('AuthService: network unreachable. Token preserved.');
+        return SessionRestore.unreachable;
+      }
+
+      final statusCode = profileResult['statusCode'];
+      if (statusCode == 401 || statusCode == 403) {
+        _log.w(
+          'AuthService: Token invalid or expired ($statusCode). Clearing storage.',
+        );
+        await CredentialStore.delete(_tokenKey);
+        _isLoggedIn = false;
+        _currentUser = null;
+        notifyListeners();
+        return SessionRestore.none;
+      }
+
+      _log.i(
+        'AuthService: Unexpected server error ($statusCode). Token preserved.',
+      );
+      return SessionRestore.unreachable;
     } catch (e) {
-      _isLoggedIn = false;
-      _currentUser = null;
-      _log.e('Error initializing auth service: $e');
+      // Includes an unreadable credential store, which is not a signed-out
+      // user: change nothing and let the caller try again.
+      _log.e('Error restoring the NeoSync session: $e');
+      return SessionRestore.unreachable;
     }
-    notifyListeners();
+  }
+
+  Future<void> _retryRestoreSession() async {
+    if (_restoreRetryRunning) return;
+    _restoreRetryRunning = true;
+    try {
+      for (var attempt = 1; attempt <= _restoreRetryAttempts; attempt++) {
+        await Future<void>.delayed(_restoreRetryDelay);
+        final result = await restoreSession();
+        if (result != SessionRestore.unreachable) return;
+        _log.i(
+          'AuthService: session restore attempt $attempt found nothing '
+          'reachable; retrying',
+        );
+      }
+    } finally {
+      _restoreRetryRunning = false;
+    }
   }
 
   /// Registers a new user account with the remote authentication server.
@@ -265,7 +347,12 @@ class AuthService extends ChangeNotifier {
 
   /// Fetches the detailed user profile for the current authenticated session.
   ///
-  /// Automatically updates the internal [_currentUser] state on success.
+  /// Automatically updates the internal [_currentUser] state on success — and
+  /// marks the session live, because a server that answers this call has
+  /// accepted the stored token. That is what makes opening the NeoSync tab
+  /// enough to recover a session that started offline: the screen already
+  /// calls this on entry, and used to throw the answer away and go on showing
+  /// the login form.
   Future<Map<String, dynamic>> getProfile() async {
     try {
       final token = await CredentialStore.read(_tokenKey);
@@ -273,18 +360,23 @@ class AuthService extends ChangeNotifier {
         return {'success': false, 'message': 'Not authenticated'};
       }
 
-      final response = await http.get(
-        Uri.parse('${AppConfig.authBaseUrl}/auth/me'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
+      final url = Uri.parse('${AppConfig.authBaseUrl}/auth/me');
+      final headers = {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      };
+      final client = httpClient;
+      final response =
+          await (client == null
+                  ? http.get(url, headers: headers)
+                  : client.get(url, headers: headers))
+              .timeout(_profileTimeout);
 
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
         _currentUser = User.fromJson(data);
+        _isLoggedIn = true;
         notifyListeners();
         return {'success': true, 'user': _currentUser};
       } else {
