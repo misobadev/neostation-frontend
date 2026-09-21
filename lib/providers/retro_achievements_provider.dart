@@ -40,6 +40,19 @@ class RetroAchievementsProvider extends ChangeNotifier {
   static const String _dashboardApiKeyError =
       'A RetroAchievements web API key is required for this dashboard data.';
 
+  /// How long to keep reaching for the API after signing in from the offline
+  /// cache. A handheld's Wi-Fi associates anywhere between a few seconds and
+  /// a few minutes after power-on, so the schedule widens rather than
+  /// repeating one short delay; past the end of it, entering the tab and the
+  /// dashboard's own re-check take over.
+  static const List<Duration> _liveRetryBackoff = [
+    Duration(seconds: 4),
+    Duration(seconds: 8),
+    Duration(seconds: 15),
+    Duration(seconds: 30),
+    Duration(seconds: 60),
+  ];
+
   static const String _rateLimitError =
       'RetroAchievements is rate-limiting requests. Please wait a moment and try again.';
 
@@ -380,7 +393,14 @@ class RetroAchievementsProvider extends ChangeNotifier {
     // The summary is only worth a request once the API has actually answered:
     // while still offline it would replay the same stale copy from disk and
     // re-mark its own key.
-    if (live) await loadUserSummary();
+    if (live) {
+      // A live read logs nothing of its own, so without this line a bug report
+      // shows the session going stale and never shows it recovering.
+      _log.i(
+        'RA: session live again after being served from the offline cache',
+      );
+      await loadUserSummary();
+    }
     notifyListeners();
     return live;
   }
@@ -625,15 +645,16 @@ class RetroAchievementsProvider extends ChangeNotifier {
         if (loggedIn) {
           // Signing in is not proof the network was up: the profile may have
           // been replayed from the offline cache, which leaves the session
-          // stale and the offline banner showing. Spend the attempts this
-          // login did not need on reaching the API, so the cold-boot Wi-Fi
-          // window is covered here instead of the banner outliving it.
-          for (var retry = attempt; retry < maxAttempts && isOffline; retry++) {
+          // stale and the offline banner showing. Keep reaching for the API on
+          // a widening schedule, so the cold-boot Wi-Fi window is covered here
+          // instead of the banner outliving it.
+          for (final delay in _liveRetryBackoff) {
+            if (!isOffline) break;
             _log.i(
               'RetroAchievements signed in from the offline cache; '
-              'retrying the live session read',
+              'retrying the live session read in ${delay.inSeconds}s',
             );
-            await Future<void>.delayed(retryDelay);
+            await Future<void>.delayed(delay);
             if (await revalidateSession()) break;
           }
           await fetchGOTW();

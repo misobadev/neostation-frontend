@@ -44,6 +44,21 @@ class RADashboardHubState extends State<RADashboardHub> {
   /// is just quickly passing through this tab.
   Timer? _dashboardLoadTimer;
 
+  /// Re-check while the offline banner is up, as well as on tab entry.
+  ///
+  /// Entering the tab is the app's refresh gesture, which covers the player
+  /// who opens RetroAchievements after the network is back. It does nothing
+  /// for the player already sitting on the tab when it comes back — and on a
+  /// handheld that is the normal case, because the tab is where they were when
+  /// they powered the device on. Observed on an AYN Thor: Wi-Fi associated
+  /// four and a half minutes after boot, long after every startup retry had
+  /// given up, and the banner stayed until the tab was left and re-entered.
+  ///
+  /// Armed only while [RetroAchievementsProvider.isOffline] — a state the
+  /// player wants resolved — so a healthy session never polls.
+  static const Duration _offlineRecheckInterval = Duration(seconds: 30);
+  Timer? _offlineRecheckTimer;
+
   /// The provider this hub is subscribed to, and the invalidation generation
   /// it has already acted on. Watching the generation is what makes a refresh
   /// work while the hub is mounted: [didChangeDependencies] runs once, so a
@@ -195,6 +210,7 @@ class RADashboardHubState extends State<RADashboardHub> {
       provider.addListener(_onProviderChanged);
     }
     _resolveRommWeekGame(provider);
+    _syncOfflineRecheck(provider);
     // Entering the tab re-reads anything past its staleness window, which is
     // what stands in for a refresh control: leaving and coming back is the
     // gesture. Without it the dashboard was a once-per-app-session snapshot —
@@ -220,6 +236,7 @@ class RADashboardHubState extends State<RADashboardHub> {
     final provider = _provider;
     if (provider == null || !mounted) return;
     _resolveRommWeekGame(provider);
+    _syncOfflineRecheck(provider);
     if (provider.cacheGeneration == _seenCacheGeneration) return;
     _seenCacheGeneration = provider.cacheGeneration;
     if (!provider.isConnected) return;
@@ -229,9 +246,35 @@ class RADashboardHubState extends State<RADashboardHub> {
     _loadDashboard(provider);
   }
 
+  /// Arms the re-check while the session is stale and disarms it once it is
+  /// live, so the timer exists only for as long as it has something to fix.
+  void _syncOfflineRecheck(RetroAchievementsProvider provider) {
+    if (provider.isOffline) {
+      _offlineRecheckTimer ??= Timer.periodic(
+        _offlineRecheckInterval,
+        (_) => _recheckOffline(),
+      );
+    } else {
+      _offlineRecheckTimer?.cancel();
+      _offlineRecheckTimer = null;
+    }
+  }
+
+  Future<void> _recheckOffline() async {
+    final provider = _provider;
+    if (provider == null || !mounted) return;
+    if (!provider.isOffline || provider.isDashboardLoading) return;
+    if (!await provider.revalidateSession()) return;
+    if (!mounted) return;
+    // The session is live again, but every section on screen is still the copy
+    // that was replayed from disk, so re-read them too.
+    await _loadDashboard(provider);
+  }
+
   @override
   void dispose() {
     _dashboardLoadTimer?.cancel();
+    _offlineRecheckTimer?.cancel();
     _provider?.removeListener(_onProviderChanged);
     super.dispose();
   }
