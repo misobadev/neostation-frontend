@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -93,6 +94,28 @@ void main() {
         reason: '401 is the server saying the account is gone',
       );
     });
+
+    test(
+      'signing out while a profile read is in flight stays signed out',
+      () async {
+        // The window this guards: the tab fires getProfile on entry, the player
+        // confirms the logout dialog, and the server's 200 lands afterwards.
+        // Marking the session live on it would sign them back in with a token
+        // that has already been deleted.
+        final completer = Completer<http.Response>();
+        final auth = AuthService()
+          ..httpClient = MockClient((request) => completer.future);
+        addTearDown(auth.dispose);
+
+        final inFlight = auth.getProfile();
+        await auth.logout();
+        completer.complete(http.Response(profileBody, 200));
+
+        expect((await inFlight)['success'], isFalse);
+        expect(auth.isLoggedIn, isFalse);
+        expect(auth.currentUser, isNull);
+      },
+    );
 
     test('no stored token is simply signed out', () async {
       await CredentialStore.delete('auth_token');

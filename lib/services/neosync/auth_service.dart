@@ -65,6 +65,13 @@ class AuthService extends ChangeNotifier {
   /// from a caller that retried by hand).
   bool _restoreRetryRunning = false;
 
+  /// Bumped by [logout]. A profile request already in flight when the user
+  /// signs out comes back with a 200 the server was right to send, and
+  /// marking the session live on it would sign them back in with a token that
+  /// no longer exists. Comparing the epoch the request started with costs
+  /// nothing and closes that window.
+  int _sessionEpoch = 0;
+
   /// Whether a valid user session is currently active.
   bool _isLoggedIn = false;
 
@@ -366,6 +373,10 @@ class AuthService extends ChangeNotifier {
   /// calls this on entry, and used to throw the answer away and go on showing
   /// the login form.
   Future<Map<String, dynamic>> getProfile() async {
+    // Captured before the first await, not next to the request: the token read
+    // below is itself a suspension point, and a logout landing during it would
+    // otherwise be invisible to the check.
+    final epoch = _sessionEpoch;
     try {
       final token = await CredentialStore.read(_tokenKey);
       if (token == null) {
@@ -387,6 +398,10 @@ class AuthService extends ChangeNotifier {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
+        if (epoch != _sessionEpoch) {
+          // Signed out while this was in flight; the answer is stale.
+          return {'success': false, 'message': 'Not authenticated'};
+        }
         _currentUser = User.fromJson(data);
         _isLoggedIn = true;
         notifyListeners();
@@ -472,6 +487,7 @@ class AuthService extends ChangeNotifier {
 
   /// Terminates the current user session and purges the stored authentication token.
   Future<void> logout() async {
+    _sessionEpoch++;
     await CredentialStore.delete(_tokenKey);
     _isLoggedIn = false;
     _currentUser = null;
