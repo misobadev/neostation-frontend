@@ -417,13 +417,22 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
     );
   }
 
+  /// The "Incomplete Metadata" notice, scaled down to fit when it has to.
+  ///
+  /// Since the identity footer joined the panel, the room between the header
+  /// and the footer on a short landscape phone is less than the notice's
+  /// natural height. As a bare centred column it overflowed both ways and drew
+  /// its explanation straight across the game's name and filename; scaling it
+  /// down keeps every line of it readable and inside its own band.
   Widget _buildNonScrapedView() {
-    return Center(
+    return FittedBox(
+      fit: BoxFit.scaleDown,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             AppLocale.incompleteMetadata.getString(context),
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurface,
               fontSize: 20.r,
