@@ -42,9 +42,18 @@ class AuthService extends ChangeNotifier {
 
   /// Background retry schedule for a session that could not be restored
   /// because nothing was reachable. Covers the cold-boot window in which a
-  /// device running NeoStation as its launcher starts before the network.
-  static const int _restoreRetryAttempts = 5;
-  static const Duration _restoreRetryDelay = Duration(seconds: 4);
+  /// device running NeoStation as its launcher starts before the network:
+  /// measured on an AYN Thor, Wi-Fi associated four and a half minutes after
+  /// boot, so the schedule widens rather than repeating one short delay.
+  /// Past the end of it, opening the tab and waking the device take over.
+  static const List<Duration> _restoreRetryBackoff = [
+    Duration(seconds: 4),
+    Duration(seconds: 8),
+    Duration(seconds: 15),
+    Duration(seconds: 30),
+    Duration(seconds: 60),
+    Duration(seconds: 120),
+  ];
 
   /// HTTP client for the session reads. Null in the app, where the service
   /// uses its own; tests swap it between phases to take the network away and
@@ -139,13 +148,16 @@ class AuthService extends ChangeNotifier {
     if (_restoreRetryRunning) return;
     _restoreRetryRunning = true;
     try {
-      for (var attempt = 1; attempt <= _restoreRetryAttempts; attempt++) {
-        await Future<void>.delayed(_restoreRetryDelay);
+      for (final delay in _restoreRetryBackoff) {
+        await Future<void>.delayed(delay);
         final result = await restoreSession();
-        if (result != SessionRestore.unreachable) return;
+        if (result == SessionRestore.live) {
+          _log.i('AuthService: session restored once the network came back');
+          return;
+        }
+        if (result == SessionRestore.none) return;
         _log.i(
-          'AuthService: session restore attempt $attempt found nothing '
-          'reachable; retrying',
+          'AuthService: nothing reachable yet; retrying the session restore',
         );
       }
     } finally {

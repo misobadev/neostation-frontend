@@ -89,9 +89,8 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
         listen: false,
       );
       if (screenOn) {
-        notificationService.connect().catchError((error) {
-          _log.e('Failed to reconnect notifications on screen-on: $error');
-        });
+        // ignore: unawaited_futures
+        _restoreSessionAndReconnect('screen-on');
       } else {
         notificationService.suspend();
       }
@@ -119,6 +118,31 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
     super.dispose();
   }
 
+  /// Waking up is where a session that started without a network finally has
+  /// one: a handheld powers on before Wi-Fi associates, and the screen coming
+  /// back on (or the app resuming) is the next moment worth retrying. The
+  /// websocket needs a live session to authenticate, so the token check goes
+  /// first and the reconnect follows it.
+  Future<void> _restoreSessionAndReconnect(String reason) async {
+    if (!mounted) return;
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final notificationService = Provider.of<NotificationService>(
+      context,
+      listen: false,
+    );
+
+    if (!authService.isLoggedIn) {
+      await authService.restoreSession();
+      if (!mounted) return;
+    }
+
+    try {
+      await notificationService.connect();
+    } catch (e) {
+      _log.e('Failed to reconnect notifications on $reason: $e');
+    }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     super.didChangeAppLifecycleState(state);
@@ -143,13 +167,8 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
         configProvider.refreshSecondaryScreenshotAccess();
       }
 
-      final notificationService = Provider.of<NotificationService>(
-        context,
-        listen: false,
-      );
-      notificationService.connect().catchError((error) {
-        _log.e('Failed to reconnect notifications on app resume: $error');
-      });
+      // ignore: unawaited_futures
+      _restoreSessionAndReconnect('app resume');
 
       MusicPlayerService().appResumed();
 
