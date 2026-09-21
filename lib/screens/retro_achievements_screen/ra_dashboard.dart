@@ -168,6 +168,12 @@ class RADashboardHubState extends State<RADashboardHub> {
     // and the stamp is what stops a second entry starting a duplicate run
     // while this one is still going.
     provider.markDashboardAttempted();
+    // Only while the session itself is stale, so this costs two extra requests
+    // on a cold-boot launch and none afterwards. Without it the profile and
+    // summary read at sign-in stay marked as served-from-cache for the life of
+    // the process — nothing else re-reads them — and the offline banner
+    // survived long after the network came back (issue #482).
+    if (provider.isOffline) await provider.revalidateSession();
     // Load sequentially rather than with Future.wait: firing every RA endpoint
     // at once trips the rate limiter (HTTP 429). AOTW goes first because it is
     // the dashboard's primary task; each section still resolves independently.
