@@ -79,6 +79,10 @@ class GameRepository {
   static Future<int> deleteRomsByFolderPath(String folderPath) =>
       SqliteService.deleteRomsByFolderPath(folderPath);
 
+  /// Whether any stored ROM was found under the ROM root [folderPath].
+  static Future<bool> hasRomsUnderFolder(String folderPath) =>
+      SqliteService.hasRomsUnderFolder(folderPath);
+
   /// Permanently deletes a game, its database metadata, and all associated
   /// scraped media files (screenshots, fanart, wheel, boxart, video) from disk.
   static Future<void> deleteGame({

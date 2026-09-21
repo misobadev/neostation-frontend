@@ -289,10 +289,23 @@ class SqliteDatabaseService {
       ..clear()
       ..addAll(deduplicatedEntries);
 
-    // Clean orphaned entries (files deleted from disk)
+    // Clean orphaned entries (files deleted from disk). Rows under a root that
+    // is not mounted right now are left alone: a missing SD card lists as an
+    // empty root, and without this every game on it would read as deleted.
+    final offlineRoots = offlineRomRoots(
+      rootFoldersMap ?? await getExistingSubdirectories(romFolders),
+    );
+    if (offlineRoots.isNotEmpty) {
+      _log.w(
+        'Scan[${system.realName}]: ${offlineRoots.length} ROM folder(s) '
+        'list no subdirectories, keeping their games: '
+        '${offlineRoots.join(', ')}',
+      );
+    }
     final cleanup = await _cleanupOrphanedRomsOptimized(
       system.id!,
       romEntries.map((e) => e.path).toSet(),
+      offlineRoots: offlineRoots,
     );
     final removedCount = cleanup.removed;
 
@@ -760,8 +773,9 @@ class SqliteDatabaseService {
   static Future<({int removed, Set<String> knownPaths})>
   _cleanupOrphanedRomsOptimized(
     String systemId,
-    Set<String> existingRomPaths,
-  ) async {
+    Set<String> existingRomPaths, {
+    Set<String> offlineRoots = const {},
+  }) async {
     try {
       final db = await SqliteService.getDatabase();
       final existingRoms = await db.rawQuery(
@@ -778,7 +792,7 @@ class SqliteDatabaseService {
         final path = rom['rom_path'].toString();
         if (existingRomPaths.contains(path)) {
           knownPaths.add(path);
-        } else {
+        } else if (!offlineRoots.any((root) => isRomPathUnder(path, root))) {
           romsToDelete.add(path);
         }
       }
@@ -1062,6 +1076,32 @@ class SqliteDatabaseService {
       }
     }
     await batch.commit(noResult: true);
+  }
+
+  /// The ROM roots in [rootFoldersMap] that list no subdirectories.
+  ///
+  /// A root folder holds one subfolder per system, so a root with none is far
+  /// more likely unmounted (an SD card that has not come up yet after a
+  /// reboot, an unplugged drive whose mount point is left behind) than
+  /// genuinely emptied. The scan must not read such a root as "every game on
+  /// it was deleted". Removing the folder in Settings > Directories still
+  /// clears its games.
+  static Set<String> offlineRomRoots(
+    Map<String, Map<String, String>> rootFoldersMap,
+  ) => {
+    for (final entry in rootFoldersMap.entries)
+      if (entry.value.isEmpty) entry.key,
+  };
+
+  /// Whether [romPath] was found under the ROM root [root]. Matches the rule
+  /// [SqliteService.deleteRomsByFolderPath] uses: SAF document URIs extend
+  /// their tree URI with `/document/…`, plain paths with a separator.
+  static bool isRomPathUnder(String romPath, String root) {
+    final base = root.replaceFirst(RegExp(r'[/\\]+$'), '');
+    if (base.isEmpty) return false;
+    return romPath == base ||
+        romPath.startsWith('$base/') ||
+        romPath.startsWith('$base\\');
   }
 
   /// Quickly identifies existing subdirectories within multiple ROM root folders.

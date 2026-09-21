@@ -2719,6 +2719,22 @@ class SqliteService {
     );
   }
 
+  /// Whether any `user_roms` row lives under the ROM root [folderPath].
+  ///
+  /// Compares prefixes with `substr` rather than `LIKE`: SAF tree URIs are
+  /// full of `%` escapes, which `LIKE` would read as wildcards.
+  static Future<bool> hasRomsUnderFolder(String folderPath) async {
+    final base = folderPath.replaceFirst(RegExp(r'[/\\]+$'), '');
+    if (base.isEmpty) return false;
+    final db = await instance.database;
+    final rows = await db.rawQuery(
+      'SELECT EXISTS(SELECT 1 FROM user_roms WHERE rom_path = ? '
+      'OR substr(rom_path, 1, ?) IN (?, ?)) AS present',
+      [base, base.length + 1, '$base/', '$base\\'],
+    );
+    return rows.isNotEmpty && rows.first['present'] == 1;
+  }
+
   /// Permanently deletes a single game and its metadata from the database.
   static Future<void> deleteGame(String appSystemId, String filename) async {
     final db = await instance.database;
