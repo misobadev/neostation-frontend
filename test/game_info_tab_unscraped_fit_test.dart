@@ -126,6 +126,12 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(shown.bottom, lessThanOrEqualTo(name.top));
       expect(shown.overlaps(file), isFalse);
+
+      // Scaling down must not cost the notice its centring: the panel's
+      // column hands this band a loose width, so a bare FittedBox shrank to
+      // the notice and sat against the left edge.
+      final panel = tester.getRect(find.byType(GameDetailsGameInfoTab));
+      expect(shown.center.dx, moreOrLessEquals(panel.center.dx, epsilon: 1));
     });
   }
 }

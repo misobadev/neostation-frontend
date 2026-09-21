@@ -424,62 +424,67 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
   /// natural height. As a bare centred column it overflowed both ways and drew
   /// its explanation straight across the game's name and filename; scaling it
   /// down keeps every line of it readable and inside its own band.
+  ///
+  /// The [Center] stays: the panel's column hands this band a loose width, and
+  /// a bare [FittedBox] shrinks to the notice and sits against the left edge.
   Widget _buildNonScrapedView() {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            AppLocale.incompleteMetadata.getString(context),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 20.r,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 12.r),
-          SizedBox(
-            width: 300.r,
-            child: Text(
-              AppLocale.scrapeToDownload.getString(context),
+    return Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              AppLocale.incompleteMetadata.getString(context),
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
-                fontSize: 12.r,
-                height: 1.5,
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 20.r,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-          SizedBox(height: 32.r),
-          FutureBuilder<bool>(
-            future: ScreenScraperService.hasSavedCredentials(),
-            builder: (context, snapshot) {
-              if (widget.system.folderName == 'android-apps') {
-                return Text(
-                  AppLocale.scrapingUnavailableAndroid.getString(context),
-                  style: TextStyle(fontSize: 10.r, color: Colors.grey),
-                );
-              }
-              final hasCredentials = snapshot.data ?? false;
-              if (!hasCredentials) {
-                return Text(
-                  AppLocale.loginToScrape.getString(context),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                    fontSize: 10.r,
-                    fontStyle: FontStyle.italic,
-                  ),
-                );
-              }
+            SizedBox(height: 12.r),
+            SizedBox(
+              width: 300.r,
+              child: Text(
+                AppLocale.scrapeToDownload.getString(context),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                  fontSize: 12.r,
+                  height: 1.5,
+                ),
+              ),
+            ),
+            SizedBox(height: 32.r),
+            FutureBuilder<bool>(
+              future: ScreenScraperService.hasSavedCredentials(),
+              builder: (context, snapshot) {
+                if (widget.system.folderName == 'android-apps') {
+                  return Text(
+                    AppLocale.scrapingUnavailableAndroid.getString(context),
+                    style: TextStyle(fontSize: 10.r, color: Colors.grey),
+                  );
+                }
+                final hasCredentials = snapshot.data ?? false;
+                if (!hasCredentials) {
+                  return Text(
+                    AppLocale.loginToScrape.getString(context),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 10.r,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  );
+                }
 
-              return const SizedBox.shrink();
-            },
-          ),
-        ],
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
