@@ -223,9 +223,6 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.showAchievementsTab: 'Show Achievements tab',
   AppLocale.showAchievementsTabSubtitle:
       'Display the RetroAchievements tab in the navigation bar',
-  AppLocale.showScraperTab: 'Show Scraper tab',
-  AppLocale.showScraperTabSubtitle:
-      'Display the Scraping tab in the navigation bar',
   AppLocale.showRommTab: 'Show RomM tab',
   AppLocale.showRommTabSubtitle: 'Display the RomM tab in the navigation bar',
   AppLocale.showSearchTab: 'Show Search tab',
@@ -511,13 +508,10 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.account: 'Account',
   AppLocale.scraping: 'Scraping',
   AppLocale.scrapeMode: 'Scrape Mode',
-  AppLocale.scrapeModeSub: 'Choose what content to scrape',
   AppLocale.media: 'Media',
-  AppLocale.mediaSub: 'Choose what content types to download',
   AppLocale.language: 'Language',
   AppLocale.languageSub: 'Select preferred language for game metadata',
   AppLocale.preferredLanguage: 'Preferred Language',
-  AppLocale.region: 'Region',
   AppLocale.regionSub: 'Set region priority for scraping',
   AppLocale.regionPriority: 'Region Priority',
   AppLocale.regionPrioritySub:
@@ -535,9 +529,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.logoutError: 'Error during logout',
   AppLocale.newContentOnly: 'New content only',
   AppLocale.allContent: 'All content',
-  AppLocale.scrapeModeUpdated: 'Scrape mode updated to:',
   AppLocale.scrapeModeError: 'Error updating scrape mode',
-  AppLocale.languageUpdated: 'Language updated successfully',
   AppLocale.languageError: 'Error updating language',
   AppLocale.mediaSettingsError: 'Error saving media settings',
   AppLocale.newContentOnlyDesc:
@@ -760,6 +752,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.requiresFreeAccount: 'Requires a free account',
   AppLocale.createAccountAt: 'Create an account at ',
   AppLocale.toGetCredentials: ' to get your Account credentials.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
   AppLocale.screenScraperLogin: 'ScreenScraper Login',
   AppLocale.scanningSystemsRoms: 'Scanning systems and ROMs...',
   AppLocale.ofSystems: '{scanned} of {total} systems',

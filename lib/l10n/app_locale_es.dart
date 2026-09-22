@@ -231,9 +231,6 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.showAchievementsTab: 'Mostrar pestaña Logros',
   AppLocale.showAchievementsTabSubtitle:
       'Muestra la pestaña de RetroAchievements en la barra de navegación',
-  AppLocale.showScraperTab: 'Mostrar pestaña Scraper',
-  AppLocale.showScraperTabSubtitle:
-      'Muestra la pestaña de scraping en la barra de navegación',
   AppLocale.showRommTab: 'Mostrar pestaña RomM',
   AppLocale.showRommTabSubtitle:
       'Muestra la pestaña de RomM en la barra de navegación',
@@ -528,13 +525,10 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.account: 'Cuenta',
   AppLocale.scraping: 'Scraping',
   AppLocale.scrapeMode: 'Modo de Scraping',
-  AppLocale.scrapeModeSub: 'Elige qué contenido descargar',
   AppLocale.media: 'Multimedia',
-  AppLocale.mediaSub: 'Elige qué tipos de contenido descargar',
   AppLocale.language: 'Idioma',
   AppLocale.languageSub: 'Selecciona el idioma preferido para los metadatos',
   AppLocale.preferredLanguage: 'Idioma Preferido',
-  AppLocale.region: 'Región',
   AppLocale.regionSub: 'Configura la prioridad de región para el scraping',
   AppLocale.regionPriority: 'Prioridad de Región',
   AppLocale.regionPrioritySub:
@@ -552,9 +546,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.logoutError: 'Error al cerrar sesión',
   AppLocale.newContentOnly: 'Solo contenido nuevo',
   AppLocale.allContent: 'Todo el contenido',
-  AppLocale.scrapeModeUpdated: 'Modo de scraping actualizado a:',
   AppLocale.scrapeModeError: 'Error al actualizar el modo de scraping',
-  AppLocale.languageUpdated: 'Idioma actualizado con éxito',
   AppLocale.languageError: 'Error al actualizar el idioma',
   AppLocale.mediaSettingsError: 'Error al guardar los ajustes multimedia',
   AppLocale.newContentOnlyDesc:
@@ -783,6 +775,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.requiresFreeAccount: 'Requiere una cuenta gratuita',
   AppLocale.createAccountAt: 'Crea una cuenta en ',
   AppLocale.toGetCredentials: ' para obtener tus credenciales de cuenta.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
   AppLocale.screenScraperLogin: 'Login de ScreenScraper',
   AppLocale.scanningSystemsRoms: 'Escaneando sistemas y ROMs...',
   AppLocale.ofSystems: '{scanned} de {total} sistemas',

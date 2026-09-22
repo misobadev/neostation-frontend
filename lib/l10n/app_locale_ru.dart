@@ -228,9 +228,6 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.showAchievementsTab: 'Показывать вкладку достижений',
   AppLocale.showAchievementsTabSubtitle:
       'Отображает вкладку RetroAchievements на панели навигации',
-  AppLocale.showScraperTab: 'Показывать вкладку скрапера',
-  AppLocale.showScraperTabSubtitle:
-      'Отображает вкладку скрапинга на панели навигации',
   AppLocale.showRommTab: 'Показывать вкладку RomM',
   AppLocale.showRommTabSubtitle: 'Отображает вкладку RomM на панели навигации',
   AppLocale.showSearchTab: 'Показывать вкладку поиска',
@@ -521,13 +518,10 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.account: 'Аккаунт',
   AppLocale.scraping: 'Скрапинг',
   AppLocale.scrapeMode: 'Режим скрапинга',
-  AppLocale.scrapeModeSub: 'Выберите контент для получения',
   AppLocale.media: 'Медиа',
-  AppLocale.mediaSub: 'Выберите типы медиа для загрузки',
   AppLocale.language: 'Язык',
   AppLocale.languageSub: 'Выберите предпочтительный язык для метаданных',
   AppLocale.preferredLanguage: 'Предпочтительный язык',
-  AppLocale.region: 'Регион',
   AppLocale.regionSub: 'Установить приоритет регионов для скрапинга',
   AppLocale.regionPriority: 'Приоритет регионов',
   AppLocale.regionPrioritySub:
@@ -545,9 +539,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.logoutError: 'Ошибка при выходе',
   AppLocale.newContentOnly: 'Только новый контент',
   AppLocale.allContent: 'Весь контент',
-  AppLocale.scrapeModeUpdated: 'Режим скрапинга обновлен на:',
   AppLocale.scrapeModeError: 'Ошибка при обновлении режима скрапинга',
-  AppLocale.languageUpdated: 'Язык успешно обновлен',
   AppLocale.languageError: 'Ошибка при обновлении языка',
   AppLocale.mediaSettingsError: 'Ошибка при сохранении настроек медиа',
   AppLocale.newContentOnlyDesc:
@@ -772,6 +764,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.requiresFreeAccount: 'Требуется бесплатный аккаунт',
   AppLocale.createAccountAt: 'Создайте аккаунт на ',
   AppLocale.toGetCredentials: ' , чтобы получить данные аккаунта.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
   AppLocale.screenScraperLogin: 'Вход в ScreenScraper',
   AppLocale.scanningSystemsRoms: 'Сканирование систем и ROM...',
   AppLocale.ofSystems: '{scanned} из {total} систем',

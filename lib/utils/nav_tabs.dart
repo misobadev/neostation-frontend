@@ -9,7 +9,7 @@ import 'package:neostation/models/config_model.dart';
 /// (`_selectedTabIndex`, `_buildCurrentTabContent`, the secondary-display tab
 /// names). Append new tabs at the end — inserting one renumbers every existing
 /// tab and silently repoints all of that dispatch.
-enum NavTab { systems, search, sync, achievements, scraper, romm, settings }
+enum NavTab { systems, search, sync, achievements, romm, settings }
 
 /// Static description of one navigation tab: how it is drawn, whether the user
 /// may hide it, and how that preference is read and written.
@@ -91,14 +91,6 @@ const Map<NavTab, NavTabSpec> navTabSpecs = {
     settingsTitleKey: AppLocale.showAchievementsTab,
     settingsSubtitleKey: AppLocale.showAchievementsTabSubtitle,
   ),
-  NavTab.scraper: NavTabSpec(
-    icon: 'assets/images/icons/box-search.webp',
-    labelKey: AppLocale.scraping,
-    hidden: _hideTabScraper,
-    withHidden: _withHideTabScraper,
-    settingsTitleKey: AppLocale.showScraperTab,
-    settingsSubtitleKey: AppLocale.showScraperTabSubtitle,
-  ),
   NavTab.romm: NavTabSpec(
     icon: 'assets/images/icons/romm-light.svg',
     labelKey: AppLocale.rommLibrary,
@@ -116,7 +108,6 @@ const Map<NavTab, NavTabSpec> navTabSpecs = {
 // Torn out as top-level functions so [navTabSpecs] can stay `const`.
 bool _hideTabSync(ConfigModel c) => c.hideTabSync;
 bool _hideTabAchievements(ConfigModel c) => c.hideTabAchievements;
-bool _hideTabScraper(ConfigModel c) => c.hideTabScraper;
 bool _hideTabRomm(ConfigModel c) => c.hideTabRomm;
 bool _hideTabSearch(ConfigModel c) => c.hideTabSearch;
 
@@ -124,8 +115,6 @@ ConfigModel _withHideTabSync(ConfigModel c, bool hidden) =>
     c.copyWith(hideTabSync: hidden);
 ConfigModel _withHideTabAchievements(ConfigModel c, bool hidden) =>
     c.copyWith(hideTabAchievements: hidden);
-ConfigModel _withHideTabScraper(ConfigModel c, bool hidden) =>
-    c.copyWith(hideTabScraper: hidden);
 ConfigModel _withHideTabRomm(ConfigModel c, bool hidden) =>
     c.copyWith(hideTabRomm: hidden);
 ConfigModel _withHideTabSearch(ConfigModel c, bool hidden) =>
