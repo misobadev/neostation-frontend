@@ -90,7 +90,7 @@ extension _GamepadNav on _SystemGamesListState {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _gamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
-        'system_games_list',
+        _listLayerId,
         onActivate: () => _gamepadNav.activate(),
         onDeactivate: () => _gamepadNav.deactivate(),
       );

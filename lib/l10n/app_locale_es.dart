@@ -237,9 +237,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.showRommTab: 'Mostrar pestaña RomM',
   AppLocale.showRommTabSubtitle:
       'Muestra la pestaña de RomM en la barra de navegación',
-  AppLocale.showSearchTab: 'Mostrar pestaña Buscar',
-  AppLocale.showSearchTabSubtitle:
-      'Muestra la pestaña de búsqueda en la barra de navegación',
+  AppLocale.searchCard: 'Tarjeta de Búsqueda',
+  AppLocale.searchCardSubtitle: 'Muestra la tarjeta de búsqueda en la grilla',
 
   AppLocale.configureDirectories: 'Directorios',
   AppLocale.configureRomsFolder: 'Configurar carpeta de ROMs',

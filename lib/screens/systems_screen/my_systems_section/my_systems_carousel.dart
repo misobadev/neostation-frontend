@@ -20,6 +20,7 @@ import '../../../providers/system_background_provider.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
 import '../../collections_screen/collections_browser_screen.dart';
+import '../../search_screen/search_screen.dart';
 import '../../game_screen/android_apps/android_apps_grid.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
@@ -524,6 +525,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           context,
           MaterialPageRoute(builder: (context) => targetScreen),
         );
+      } else if (systemInfo.folderName == SystemFolderNames.search) {
+        // Mirrors the grid's branch, for the same reason as Collections below.
+        await openSearch(context);
       } else if (systemInfo.folderName == SystemFolderNames.collections) {
         // Same branch as the grid's: miss one copy and Collections works in
         // only one of the two systems layouts.

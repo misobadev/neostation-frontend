@@ -33,6 +33,7 @@ import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import '../../collections_screen/collections_browser_screen.dart';
+import '../../search_screen/search_screen.dart';
 import '../../game_screen/android_apps/android_apps_grid.dart';
 import 'package:neostation/widgets/header_sort_dropdown.dart';
 import 'package:neostation/widgets/context_menu/anchored_context_menu.dart';
@@ -57,6 +58,7 @@ part 'my_systems_grid/pull_to_refresh.dart';
 const String kSystemsGridNavLayerId = 'my_systems_list';
 
 const String _menuSettings = 'settings';
+const String _menuSearch = 'search';
 const String _menuViewMode = 'view_mode';
 const String _menuViewGrid = 'view_grid';
 const String _menuViewCarousel = 'view_carousel';
@@ -284,6 +286,11 @@ class MySystems extends StatelessWidget {
   /// [_navigateToSystem] does. That left `View mode` as the top row on exactly
   /// one kind of card, so the menu's first entry moved depending on which card
   /// the cursor happened to be on.
+  ///
+  /// `Search` follows it, so the library search is one Y press away wherever
+  /// the cursor is. The Search card itself gets neither: it has no system to
+  /// configure, and A on it already opens search, so its menu is View mode
+  /// alone.
   Future<void> _openSystemContextMenu(
     BuildContext context,
     SystemInfo system,
@@ -292,18 +299,26 @@ class MySystems extends StatelessWidget {
     SfxService().playNavSound();
 
     final isCarousel = configProvider.config.systemViewMode == 'carousel';
+    final isSearchCard = system.folderName == SystemFolderNames.search;
 
     final items = <ContextMenuItem>[
-      ContextMenuItem(
-        id: _menuSettings,
-        label: AppLocale.settings.getString(context),
-        icon: Symbols.settings_rounded,
-      ),
+      if (!isSearchCard) ...[
+        ContextMenuItem(
+          id: _menuSettings,
+          label: AppLocale.settings.getString(context),
+          icon: Symbols.settings_rounded,
+        ),
+        ContextMenuItem(
+          id: _menuSearch,
+          label: AppLocale.searchTitle.getString(context),
+          icon: Symbols.search_rounded,
+        ),
+      ],
       ContextMenuItem(
         id: _menuViewMode,
         label: AppLocale.viewMode.getString(context),
         icon: Symbols.grid_view_rounded,
-        separatorBefore: true,
+        separatorBefore: !isSearchCard,
         children: [
           ContextMenuItem(
             id: _menuViewGrid,
@@ -337,10 +352,31 @@ class MySystems extends StatelessWidget {
     switch (result) {
       case _menuSettings:
         _openSystemSettings(context, system, configProvider);
+      case _menuSearch:
+        // A recent-game card is not a system, so it searches everything.
+        await _openSearch(
+          context,
+          systemFolder: system.isGame ? null : system.folderName,
+        );
       case _menuViewGrid:
         await configProvider.updateSystemViewMode('grid');
       case _menuViewCarousel:
         await configProvider.updateSystemViewMode('carousel');
+    }
+  }
+
+  /// Opens search from the Y menu of any card, filtered to [systemFolder].
+  ///
+  /// The same hand-off [_navigateToSystem] makes for the Search card, minus
+  /// its secondary-display refresh: that would repaint the second screen for
+  /// the Search card while the cursor sits on a different one.
+  Future<void> _openSearch(BuildContext context, {String? systemFolder}) async {
+    if (MySystems.isNavigating) return;
+    MySystems.isNavigating = true;
+    try {
+      await openSearch(context, systemFolder: systemFolder);
+    } finally {
+      MySystems.isNavigating = false;
     }
   }
 
@@ -518,6 +554,8 @@ class MySystems extends StatelessWidget {
             MaterialPageRoute(builder: (context) => targetScreen),
           );
         }
+      } else if (systemInfo.folderName == SystemFolderNames.search) {
+        if (context.mounted) await openSearch(context);
       } else if (systemInfo.folderName == SystemFolderNames.collections) {
         // Collections are user data, not `app_systems` rows, so there is no
         // SystemModel to open: the browser screen lists them and synthesizes

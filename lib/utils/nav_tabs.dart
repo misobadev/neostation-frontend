@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/config_model.dart';
 
@@ -9,7 +8,7 @@ import 'package:neostation/models/config_model.dart';
 /// (`_selectedTabIndex`, `_buildCurrentTabContent`, the secondary-display tab
 /// names). Append new tabs at the end — inserting one renumbers every existing
 /// tab and silently repoints all of that dispatch.
-enum NavTab { systems, search, sync, achievements, scraper, romm, settings }
+enum NavTab { systems, sync, achievements, scraper, romm, settings }
 
 /// Static description of one navigation tab: how it is drawn, whether the user
 /// may hide it, and how that preference is read and written.
@@ -66,15 +65,6 @@ const Map<NavTab, NavTabSpec> navTabSpecs = {
     icon: 'assets/images/icons/grids.webp',
     labelKey: AppLocale.systems,
   ),
-  NavTab.search: NavTabSpec(
-    icon: '',
-    labelKey: AppLocale.searchTitle,
-    iconData: Symbols.search_rounded,
-    hidden: _hideTabSearch,
-    withHidden: _withHideTabSearch,
-    settingsTitleKey: AppLocale.showSearchTab,
-    settingsSubtitleKey: AppLocale.showSearchTabSubtitle,
-  ),
   NavTab.sync: NavTabSpec(
     icon: 'assets/images/icons/cloud-add.webp',
     labelKey: AppLocale.neoSync,
@@ -118,7 +108,6 @@ bool _hideTabSync(ConfigModel c) => c.hideTabSync;
 bool _hideTabAchievements(ConfigModel c) => c.hideTabAchievements;
 bool _hideTabScraper(ConfigModel c) => c.hideTabScraper;
 bool _hideTabRomm(ConfigModel c) => c.hideTabRomm;
-bool _hideTabSearch(ConfigModel c) => c.hideTabSearch;
 
 ConfigModel _withHideTabSync(ConfigModel c, bool hidden) =>
     c.copyWith(hideTabSync: hidden);
@@ -128,8 +117,6 @@ ConfigModel _withHideTabScraper(ConfigModel c, bool hidden) =>
     c.copyWith(hideTabScraper: hidden);
 ConfigModel _withHideTabRomm(ConfigModel c, bool hidden) =>
     c.copyWith(hideTabRomm: hidden);
-ConfigModel _withHideTabSearch(ConfigModel c, bool hidden) =>
-    c.copyWith(hideTabSearch: hidden);
 
 /// Description of [tab], never null — see [_fallbackSpec].
 NavTabSpec navTabSpec(NavTab tab) => navTabSpecs[tab] ?? _fallbackSpec;

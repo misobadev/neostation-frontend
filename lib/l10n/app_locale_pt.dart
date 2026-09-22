@@ -233,9 +233,9 @@ const Map<String, dynamic> appLocalePt = {
       'Exibe a aba de scraping na barra de navegação',
   AppLocale.showRommTab: 'Mostrar aba RomM',
   AppLocale.showRommTabSubtitle: 'Exibe a aba RomM na barra de navegação',
-  AppLocale.showSearchTab: 'Mostrar aba Pesquisar',
-  AppLocale.showSearchTabSubtitle:
-      'Exibe a aba de pesquisa na barra de navegação',
+  AppLocale.searchCard: 'Card de Pesquisa',
+  AppLocale.searchCardSubtitle:
+      'Mostrar o card de pesquisa na grade de sistemas',
 
   AppLocale.configureDirectories: 'Configurar Diretórios',
   AppLocale.configureRomsFolder: 'Configurar Pasta de ROMs',
