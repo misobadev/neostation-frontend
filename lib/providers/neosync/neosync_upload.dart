@@ -63,6 +63,7 @@ extension NeoSyncUpload on NeoSyncProvider {
                   .listSync(recursive: true)
                   .whereType<File>()
                   .where((f) => !f.path.endsWith('.') && !f.path.endsWith('..'))
+                  .where((f) => !f.path.toLowerCase().endsWith('.neosync.bak'))
                   .toList();
 
               for (final file in switchFiles) {
@@ -121,6 +122,7 @@ extension NeoSyncUpload on NeoSyncProvider {
                   .listSync(recursive: true)
                   .whereType<File>()
                   .where((f) => !f.path.endsWith('.') && !f.path.endsWith('..'))
+                  .where((f) => !f.path.toLowerCase().endsWith('.neosync.bak'))
                   .toList();
               saveFiles.addAll(switchFiles);
             }
@@ -315,21 +317,14 @@ extension NeoSyncUpload on NeoSyncProvider {
         syncType = 'custom';
       } else if (retroArchBasePath != null) {
         final fileName = path.basenameWithoutExtension(file.path);
-        final lowerPath = file.path.toLowerCase();
 
         // Only sync RetroArch saves that belong to a game still in the local
         // library (the save base name matches a ROM) or that are shared memory
         // cards. Orphan saves left behind by removed games (e.g. a Naomi EEPROM
         // whose ROM is no longer on disk) must not be uploaded, otherwise the
         // auto-sync picks them up while scanning the whole saves folder.
-        final isSharedCard =
-            lowerPath.endsWith('.ps2') ||
-            lowerPath.endsWith('.mcr') ||
-            lowerPath.endsWith('.mcd') ||
-            lowerPath.endsWith('.vmu') ||
-            lowerPath.endsWith('.vmp') ||
-            lowerPath.contains('vmu_save');
-        syncType = isState ? 'state' : (isSharedCard ? 'shared' : 'save');
+        final isSharedCard = _syncTypeForFile(file, isState: false) == 'shared';
+        syncType = _syncTypeForFile(file, isState: isState);
         final gameRow = await GameRepository.findRomForSaveName(fileName);
         if (gameRow == null && !isSharedCard) {
           _skippedFiles++;
@@ -593,6 +588,7 @@ extension NeoSyncUpload on NeoSyncProvider {
         isState: isState,
         systemId: systemId,
         emulatorId: emulatorId,
+        type: _syncTypeForFile(file, isState: isState),
       );
 
       if (result['success']) {

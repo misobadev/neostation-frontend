@@ -116,11 +116,12 @@ void main() {
 
     if (Platform.isWindows) return;
     for (final name in const ['credentials.enc', 'credentials.key']) {
-      final mode = await Process.run('stat', [
-        '-c',
-        '%a',
-        path.join(directory.path, name),
-      ]);
+      final target = path.join(directory.path, name);
+      // BSD `stat` (macOS) uses `-f %Lp`; GNU `stat` (Linux) uses `-c %a`.
+      final args = Platform.isMacOS
+          ? ['-f', '%Lp', target]
+          : ['-c', '%a', target];
+      final mode = await Process.run('stat', args);
       expect((mode.stdout as String).trim(), '600', reason: name);
     }
   });

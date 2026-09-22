@@ -24,7 +24,9 @@ extension NeoSyncDownload on NeoSyncProvider {
         throw Exception('Failed to fetch cloud files: ${result['message']}');
       }
 
-      final cloudFiles = result['files'] as List<NeoSyncFile>;
+      final cloudFiles = _dedupeCloudFiles(
+        result['files'] as List<NeoSyncFile>,
+      );
       if (cloudFiles.isEmpty) {
         _syncStatus = 'No cloud files found';
         _processedItems.add('No cloud files found for auto-sync');
@@ -74,7 +76,7 @@ extension NeoSyncDownload on NeoSyncProvider {
       throw Exception('Failed to fetch cloud files: ${result['message']}');
     }
 
-    final cloudFiles = result['files'] as List<NeoSyncFile>;
+    final cloudFiles = _dedupeCloudFiles(result['files'] as List<NeoSyncFile>);
     if (cloudFiles.isEmpty) {
       _processedItems.add('No cloud files found');
       return;
@@ -96,42 +98,12 @@ extension NeoSyncDownload on NeoSyncProvider {
     String savesPath,
   ) async {
     try {
-      // NeoSync v2 paths (`saves/<system>/<emulator>/<scope>/...`) carry the
-      // emulator slug. Shared memory-card files route directly to the
-      // configured custom folder; per-game files fall through to the normal
-      // game lookup below.
-      final v2Path = CloudPathBuilder.parse(cloudFile.fileName);
-      if (v2Path != null && v2Path.isShared) {
-        final customFolder = await NeoSyncSaveFolderRepository.getFolder(
-          v2Path.system,
-          v2Path.emulatorSlug,
-        );
-        if (customFolder != null && customFolder.isNotEmpty) {
-          final localFile = File(path.join(customFolder, v2Path.filePath));
-          await localFile.parent.create(recursive: true);
-          if (!localFile.existsSync() ||
-              cloudFile.uploadedAt.isAfter(await localFile.lastModified())) {
-            await _downloadCloudFileImpl(cloudFile, localFile);
-            _downloadedFiles++;
-            _processedItems.add('Standalone save: ${cloudFile.fileName}');
-          } else {
-            NeoSyncProvider._log.i(
-              'Download: shared already current ${cloudFile.fileName}',
-            );
-            _skippedFiles++;
-          }
-          return;
-        }
-        // A shared memory card has no game to associate; without a configured
-        // custom folder there is nowhere to place it. Record a clear reason.
-        NeoSyncProvider._log.w(
-          'Download: shared ${cloudFile.fileName} skipped: no custom save '
-          'folder for system=${v2Path.system} emulator=${v2Path.emulatorSlug}',
-        );
-        _skippedFiles++;
-        _processedItems.add(
-          'Skipped cloud file (no standalone folder): ${cloudFile.fileName}',
-        );
+      // Standalone and shared memory cards carry their system + emulator in the
+      // metadata (not in the on-disk path), so they route straight to the
+      // configured custom folder without needing a game match. This works the
+      // same on every OS because it never parses a platform-specific path.
+      if (cloudFile.type == 'shared' || cloudFile.type == 'custom') {
+        await _downloadSharedCloudFile(cloudFile);
         return;
       }
 
@@ -141,7 +113,7 @@ extension NeoSyncDownload on NeoSyncProvider {
       if (game == null) {
         NeoSyncProvider._log.w(
           'Download: no game matched ${cloudFile.fileName} '
-          '(system "${v2Path?.system ?? '?'}" / "${cloudFile.gameName}")',
+          '(system "${cloudFile.systemName ?? '?'}" / "${cloudFile.gameName}")',
         );
         _processedItems.add(
           'No game matched cloud file: ${cloudFile.fileName}',
@@ -166,14 +138,14 @@ extension NeoSyncDownload on NeoSyncProvider {
       for (final localPath in localPaths) {
         final localFile = File(localPath);
         if (localFile.existsSync()) {
-          final localStat = await localFile.stat();
-          if (cloudFile.uploadedAt.isAfter(localStat.modified)) {
+          if (await _shouldDownloadOverLocal(cloudFile, localFile)) {
             await _downloadCloudFileImpl(cloudFile, localFile);
             _downloadedFiles++;
             _processedItems.add('Auto-updated: ${cloudFile.fileName}');
           } else {
             NeoSyncProvider._log.i(
-              'Download: skipping ${cloudFile.fileName} (local is newer)',
+              'Download: keeping local ${cloudFile.fileName} '
+              '(local is newer or changed since last sync)',
             );
             _skippedFiles++;
           }
@@ -287,6 +259,7 @@ extension NeoSyncDownload on NeoSyncProvider {
       final bytes = result['data'] as List<int>;
       try {
         await localFile.parent.create(recursive: true);
+        await _backupLocalFile(localFile);
         await localFile.writeAsBytes(bytes, flush: true);
         NeoSyncProvider._log.i(
           'Download: OK ${bytes.length} bytes -> ${localFile.path}',
@@ -343,36 +316,8 @@ extension NeoSyncDownload on NeoSyncProvider {
     NeoSyncFile cloudFile,
     String savesPath,
   ) async {
-    final v2Path = CloudPathBuilder.parse(cloudFile.fileName);
-    if (v2Path != null && v2Path.isShared) {
-      final customFolder = await NeoSyncSaveFolderRepository.getFolder(
-        v2Path.system,
-        v2Path.emulatorSlug,
-      );
-      if (customFolder != null && customFolder.isNotEmpty) {
-        final localFile = File(path.join(customFolder, v2Path.filePath));
-        await localFile.parent.create(recursive: true);
-        if (!localFile.existsSync() ||
-            cloudFile.uploadedAt.isAfter(await localFile.lastModified())) {
-          await _downloadCloudFileImpl(cloudFile, localFile);
-          _downloadedFiles++;
-          _processedItems.add('Updated: ${cloudFile.fileName}');
-        } else {
-          NeoSyncProvider._log.i(
-            'Download: shared already current ${cloudFile.fileName}',
-          );
-          _skippedFiles++;
-        }
-        return;
-      }
-      NeoSyncProvider._log.w(
-        'Download: shared ${cloudFile.fileName} skipped: no custom save '
-        'folder for system=${v2Path.system} emulator=${v2Path.emulatorSlug}',
-      );
-      _skippedFiles++;
-      _processedItems.add(
-        'Skipped cloud file (no standalone folder): ${cloudFile.fileName}',
-      );
+    if (cloudFile.type == 'shared' || cloudFile.type == 'custom') {
+      await _downloadSharedCloudFile(cloudFile);
       return;
     }
 
@@ -397,14 +342,14 @@ extension NeoSyncDownload on NeoSyncProvider {
     for (final localPath in localPaths) {
       final localFile = File(localPath);
       if (localFile.existsSync()) {
-        final localStat = await localFile.stat();
-        if (cloudFile.uploadedAt.isAfter(localStat.modified)) {
+        if (await _shouldDownloadOverLocal(cloudFile, localFile)) {
           await _downloadCloudFileImpl(cloudFile, localFile);
           _downloadedFiles++;
           _processedItems.add('Updated: ${cloudFile.fileName}');
         } else {
           NeoSyncProvider._log.i(
-            'Download: skipping ${cloudFile.fileName} (local is newer)',
+            'Download: keeping local ${cloudFile.fileName} '
+            '(local is newer or changed since last sync)',
           );
           _skippedFiles++;
         }
@@ -416,4 +361,130 @@ extension NeoSyncDownload on NeoSyncProvider {
       }
     }
   }
+
+  /// Downloads a standalone/shared cloud file (PS2 memcard, Dreamcast VMU, ...)
+  /// into its configured custom save folder.
+  ///
+  /// The system + emulator come from the file metadata, so no game lookup is
+  /// needed and the same logic applies on Android, Windows, Linux and macOS.
+  /// Returns true when the file was placed; false when no custom folder is
+  /// configured for that system+emulator.
+  Future<bool> _downloadSharedCloudFile(NeoSyncFile cloudFile) async {
+    final systemFolder = cloudFile.systemName ?? '';
+    final emulatorSlug = cloudFile.emulator ?? '';
+    if (emulatorSlug.isEmpty) {
+      NeoSyncProvider._log.w(
+        'Download: shared ${cloudFile.fileName} skipped: no emulator metadata',
+      );
+      _skippedFiles++;
+      _processedItems.add(
+        'Skipped cloud file (no emulator): ${cloudFile.fileName}',
+      );
+      return false;
+    }
+
+    final customFolder = await NeoSyncSaveFolderRepository.getFolder(
+      systemFolder,
+      emulatorSlug,
+    );
+    if (customFolder == null || customFolder.isEmpty) {
+      NeoSyncProvider._log.w(
+        'Download: shared ${cloudFile.fileName} skipped: no custom save '
+        'folder for system=$systemFolder emulator=$emulatorSlug',
+      );
+      _skippedFiles++;
+      _processedItems.add(
+        'Skipped cloud file (no standalone folder): ${cloudFile.fileName}',
+      );
+      return false;
+    }
+
+    var rel = cloudFile.filePath.isNotEmpty
+        ? cloudFile.filePath
+        : cloudFile.fileName;
+    // Strip any residual cloud namespace so only the on-disk relative path
+    // remains (handles legacy rows that stored the full v2/custom path).
+    final m = RegExp(r'^v2/custom/[^/]+/(.+)$').firstMatch(rel);
+    if (m != null) rel = m.group(1)!;
+
+    final localFile = File(path.join(customFolder, rel));
+    await localFile.parent.create(recursive: true);
+    if (!localFile.existsSync() ||
+        await _shouldDownloadOverLocal(cloudFile, localFile)) {
+      await _downloadCloudFileImpl(cloudFile, localFile);
+      _downloadedFiles++;
+      _processedItems.add('Standalone save: ${cloudFile.fileName}');
+    } else {
+      NeoSyncProvider._log.i(
+        'Download: shared already current ${cloudFile.fileName}',
+      );
+      _skippedFiles++;
+    }
+    return true;
+  }
+
+  /// Whether the cloud copy should overwrite [localFile].
+  ///
+  /// Prefers the local copy on conflict so gameplay progress is never lost, and
+  /// uses the content modification time (`fileModifiedAtTimestamp`) instead of
+  /// the upload time (`createdAt`), so a save uploaded later from another device
+  /// with older content can never roll the local save back.
+  Future<bool> _shouldDownloadOverLocal(
+    NeoSyncFile cloudFile,
+    File localFile,
+  ) async {
+    final localStat = await localFile.stat();
+    final localTime = localStat.modified.millisecondsSinceEpoch;
+    final cloudTime =
+        cloudFile.fileModifiedAtTimestamp ??
+        cloudFile.uploadedAt.millisecondsSinceEpoch;
+
+    // Identical content: nothing to do.
+    try {
+      final localBytes = await localFile.readAsBytes();
+      final localHash = _neoSyncService.calculateFileHash(localBytes);
+      if (cloudFile.checksum != null &&
+          cloudFile.checksum!.isNotEmpty &&
+          cloudFile.checksum == localHash) {
+        return false;
+      }
+    } catch (e) {
+      NeoSyncProvider._log.w('Download: could not hash ${localFile.path}: $e');
+    }
+
+    final syncState = await SyncRepository.getSyncState(
+      NeoSyncProvider.kSyncProviderId,
+      localFile.path,
+    );
+
+    if (syncState != null) {
+      final savedLocalTime = syncState['local_modified_at'] as int? ?? 0;
+      final savedCloudTime = syncState['cloud_updated_at'] as int? ?? 0;
+      const toleranceMs = 2000;
+      final localChanged = (localTime - savedLocalTime).abs() > toleranceMs;
+      final cloudChanged = cloudTime > savedCloudTime;
+
+      if (localChanged) {
+        // The local file was edited since the last sync: prefer local.
+        NeoSyncProvider._log.i(
+          'Download: local changed since last sync for ${localFile.path}; '
+          'keeping local',
+        );
+        return false;
+      }
+      if (cloudChanged) return true;
+      return cloudTime > localTime;
+    }
+
+    // No recorded state: only take the cloud copy when its content is newer.
+    return cloudTime > localTime;
+  }
+
+  /// Collapses cloud rows that represent the same logical save (same on-disk
+  /// path + kind, case-insensitive) keeping the one with the newest content.
+  ///
+  /// Legacy duplicate rows (from the unstable cloud namespace) must never make
+  /// the client pick an older version just because it was uploaded later.
+  List<NeoSyncFile> _dedupeCloudFiles(List<NeoSyncFile> files) =>
+      CloudPathBuilder.dedupeCloudFiles(files);
 }

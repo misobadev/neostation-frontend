@@ -273,6 +273,15 @@ extension NeoSyncPathResolver on NeoSyncProvider {
     return _calculateRelativePath(file, basePath, isState: isState);
   }
 
+  /// Returns the canonical NeoSync file kind for [file].
+  ///
+  /// The kind is derived only from the file itself (never from the cloud
+  /// namespace), so the same save is classified identically on every device and
+  /// OS: `state` for save states, `shared` for memory cards / VMU that hold
+  /// many games, `save` otherwise.
+  String _syncTypeForFile(File file, {required bool isState}) =>
+      CloudPathBuilder.syncTypeForPath(file.path, isState: isState);
+
   /// Calcula la ruta relativa para sincronización
   String _calculateRelativePath(
     File file,
@@ -449,7 +458,12 @@ extension NeoSyncPathResolver on NeoSyncProvider {
     final segments = relativeToBase.split(RegExp(r'[/\\]'));
     if (segments.length > 1) {
       final coreName = segments.first;
-      if (coreName.isNotEmpty) return coreName;
+      // Guard against a wrong base path that exposes the saves/states root as
+      // the "core" folder, which produced a bogus `retroarch.saves` slug.
+      final lower = coreName.toLowerCase();
+      if (coreName.isNotEmpty && lower != 'saves' && lower != 'states') {
+        return coreName;
+      }
     }
     return null;
   }
@@ -865,7 +879,10 @@ extension NeoSyncPathResolver on NeoSyncProvider {
   // HELPER METHODS (Restored/Moved)
   // =========================================
 
-  /// Gets all save files recursively from a directory
+  /// Gets all save files recursively from a directory.
+  ///
+  /// NeoSync backup copies (`*.neosync.bak`) are excluded so the recovery
+  /// safety net is never itself uploaded or synced.
   Future<List<File>> _getSaveFiles(String directoryPath) async {
     final dir = Directory(directoryPath);
     if (!await dir.exists()) return [];
@@ -875,6 +892,7 @@ extension NeoSyncPathResolver on NeoSyncProvider {
           .list(recursive: true)
           .where((entity) => entity is File)
           .cast<File>()
+          .where((file) => !file.path.toLowerCase().endsWith('.neosync.bak'))
           .toList();
     } catch (e) {
       NeoSyncProvider._log.e('Error listing save files in $directoryPath: $e');

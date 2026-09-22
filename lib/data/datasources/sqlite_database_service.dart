@@ -184,7 +184,7 @@ class SqliteDatabaseService {
     // GameCube system, so walking each alias in turn finds every file twice and
     // stores it under two different rom_path spellings.
     final scanTargets =
-        <({String dirPath, String canonicalPath, bool useSaf})>[];
+        <({String dirPath, String canonicalPath, bool useSaf, bool isLink})>[];
 
     for (final romFolder in romFolders) {
       final bool useSaf =
@@ -217,6 +217,7 @@ class SqliteDatabaseService {
             dirPath: dirPath,
             canonicalPath: await _canonicalScanPath(dirPath, useSaf: useSaf),
             useSaf: useSaf,
+            isLink: !useSaf && await FileSystemEntity.isLink(dirPath),
           ));
         } catch (e) {
           _log.e('Error resolving folder $folderToScan in $romFolder: $e');
@@ -226,10 +227,13 @@ class SqliteDatabaseService {
 
     // Walk real directories before symlinked aliases so the stored rom_path
     // names the physical location: if the user later drops the alias link, the
-    // rows that survived still resolve.
+    // rows that survived still resolve. Symlink-ness is read from the entry
+    // itself rather than `dirPath != canonicalPath`: on macOS the temp root
+    // lives under a `/var` symlink, so every real directory would otherwise
+    // look like an alias and the ordering would silently invert.
     final orderedTargets = [
-      ...scanTargets.where((t) => t.dirPath == t.canonicalPath),
-      ...scanTargets.where((t) => t.dirPath != t.canonicalPath),
+      ...scanTargets.where((t) => !t.isLink),
+      ...scanTargets.where((t) => t.isLink),
     ];
 
     final walkedDirs = <String>{};

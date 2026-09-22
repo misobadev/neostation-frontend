@@ -283,6 +283,7 @@ class NeoSyncProvider extends ChangeNotifier {
       final bytes = result['data'] as List<int>;
       try {
         await localFile.parent.create(recursive: true);
+        await _backupLocalFile(localFile);
         await localFile.writeAsBytes(bytes, flush: true);
         _log.i('Download: OK ${bytes.length} bytes -> ${localFile.path}');
       } on FileSystemException catch (e) {
@@ -317,6 +318,22 @@ class NeoSyncProvider extends ChangeNotifier {
         '$reason (status ${statusCode ?? 'n/a'})',
       );
       throw Exception(reason);
+    }
+  }
+
+  /// Copies an existing local file to `<name>.neosync.bak` before a cloud
+  /// download overwrites it, so a sync mistake is always recoverable.
+  ///
+  /// The backup lives next to the save and is excluded from upload scanning.
+  /// Best effort: a failed backup never blocks the download.
+  Future<void> _backupLocalFile(File localFile) async {
+    try {
+      if (!await localFile.exists()) return;
+      final backup = File('${localFile.path}.neosync.bak');
+      await localFile.copy(backup.path);
+      _log.i('Download: backed up ${localFile.path} -> ${backup.path}');
+    } catch (e) {
+      _log.w('Download: could not back up ${localFile.path}: $e');
     }
   }
 
