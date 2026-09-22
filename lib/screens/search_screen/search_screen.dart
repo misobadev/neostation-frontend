@@ -31,7 +31,54 @@ import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/utils/game_launch_utils.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/screens/game_screen/my_games_list.dart';
-import 'package:neostation/screens/app_screen.dart';
+
+/// Opens [SearchScreen], then the game list for a result picked with "Go to
+/// game".
+///
+/// Go to game closes search and hands the game back here rather than pushing
+/// the list over itself, so Back from that list leaves the system instead of
+/// returning to search. The list is opened *before* this returns, which is the
+/// point of routing every opener through one function: a caller resumes its
+/// own post-navigation work (reactivating its navigator, repainting the second
+/// screen) only once the user is back on its screen. Resuming it while the
+/// list was already up would leave two navigators handling the same press.
+///
+/// [showInPlace] lets a games-list caller take a picked game it already shows:
+/// returning true skips opening a second copy of the same list on top of it.
+Future<void> openSearch(
+  BuildContext context, {
+  String? systemFolder,
+  bool Function(DatabaseGameModel picked)? showInPlace,
+}) async {
+  GamepadNavigationManager.deactivateAll();
+  try {
+    final picked = await Navigator.of(context).push<DatabaseGameModel>(
+      MaterialPageRoute(
+        builder: (_) => SearchScreen(initialSystemFolder: systemFolder),
+      ),
+    );
+    if (picked == null || !context.mounted) return;
+    if (showInPlace?.call(picked) ?? false) return;
+
+    final folder = picked.systemFolderName;
+    if (folder == null || folder.isEmpty) return;
+    final fileProvider = context.read<FileProvider>();
+    final system = await SqliteService.getSystemByFolderName(folder);
+    if (!context.mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SystemGamesList(
+          system: system,
+          fileProvider: fileProvider,
+          initialRomPath: GameModel.fromDatabaseModel(picked).romPath,
+        ),
+      ),
+    );
+  } finally {
+    GamepadNavigationManager.reactivate();
+  }
+}
 
 /// Library-wide ROM search & filter overlay.
 ///
@@ -40,10 +87,19 @@ import 'package:neostation/screens/app_screen.dart';
 /// faceted — each chip only offers values still present in the results the
 /// other criteria produce, so a filter never leads to an empty list.
 ///
-/// Reachable as its own top-level tab; selecting a result offers Go-to-game or
+/// Opened through [openSearch] as a full-screen route (the Search card, or
+/// Search in a system card's or a game's Y menu); selecting a result offers
+/// Go-to-game or
 /// launching it through the standard [launchGameWithDialog] flow.
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({super.key, this.initialSystemFolder});
+
+  /// Folder name of the system the search was opened from, which pre-selects
+  /// that system in the platform filter (and opens the filter row so the chip
+  /// is visible and one press from being cleared). Null opens an unfiltered
+  /// library-wide search, as the Search card does. A folder no game belongs to
+  /// (All Games, Favorites, Collections) is ignored.
+  final String? initialSystemFolder;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -88,6 +144,11 @@ class _SearchScreenState extends State<SearchScreen> {
   int? _rating;
   String? _source;
   String? _achievements;
+
+  /// Whether the route may pop. Kept false so system back routes through
+  /// [_handleBack] and unwinds a menu or the results before leaving.
+  bool _canPop = false;
+  bool _isNavigatingBack = false;
 
   _FocusRegion _region = _FocusRegion.search;
   int _barIndex = 0;
@@ -159,7 +220,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Timer? _remoteTimer;
 
-  /// Deferred first load, cancelled if the tab is left before it fires.
+  /// Deferred first load, cancelled if the screen is left before it fires.
   Timer? _initialLoadTimer;
 
   /// Incremented per issued search; a response whose sequence no longer matches
@@ -209,12 +270,8 @@ class _SearchScreenState extends State<SearchScreen> {
       onNavigateRight: _navigateRight,
       onSelectItem: _handleSelect,
       onBack: _handleBack,
-      // Search runs as a tab and owns the input layer while it is on screen,
-      // so it has to keep the bumper/tab cycling working itself.
-      onPreviousTab: AppNavigation.previousTab,
-      onNextTab: AppNavigation.nextTab,
-      onLeftBumper: AppNavigation.previousTab,
-      onRightBumper: AppNavigation.nextTab,
+      // No bumper handlers: this is a pushed route, not part of the tab strip,
+      // so its shoulder buttons must not cycle tabs out from under it.
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -225,12 +282,10 @@ class _SearchScreenState extends State<SearchScreen> {
         onDeactivate: () => _gamepadNav.deactivate(),
       );
 
-      // Wait for the tab indicator animation to finish before starting any
-      // database work. Held as a cancellable timer, not a bare Future.delayed:
-      // a bumper held through the tab strip mounts and disposes this screen in
-      // passing, and an uncancelled delay still ran the full-library query for
-      // every pass — several of them landing on whichever tab the user actually
-      // stopped on.
+      // Wait for the route transition to finish before starting any database
+      // work. Held as a cancellable timer, not a bare Future.delayed, so
+      // backing straight out again never leaves a full-library query running
+      // for a screen that is already gone.
       _initialLoadTimer = Timer(const Duration(milliseconds: 250), _loadGames);
     });
 
@@ -265,10 +320,11 @@ class _SearchScreenState extends State<SearchScreen> {
     if (!mounted) return;
 
     // Phase 1: make the data available and show the loaded UI instantly
-    // without any heavy computation, so the tab transition never freezes.
+    // without any heavy computation, so the route transition never freezes.
     setState(() {
       _all = games;
       _loading = false;
+      _seedPlatform(games);
     });
 
     // Phase 2: after the first loaded frame is on screen, run the expensive
@@ -277,6 +333,22 @@ class _SearchScreenState extends State<SearchScreen> {
       if (!mounted) return;
       setState(() => _recompute());
     });
+  }
+
+  /// Applies [SearchScreen.initialSystemFolder] as the platform filter.
+  ///
+  /// The filter matches on the system's display name, so the folder is
+  /// resolved through the loaded games rather than assumed to be one.
+  void _seedPlatform(List<DatabaseGameModel> games) {
+    final folder = widget.initialSystemFolder;
+    if (folder == null) return;
+    for (final g in games) {
+      if (g.systemFolderName == folder && g.systemRealName != null) {
+        _platform = g.systemRealName;
+        _filtersExpanded = true;
+        return;
+      }
+    }
   }
 
   /// Extracts a 4-digit year from a raw year / ISO release-date string.
@@ -999,6 +1071,19 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  /// Pops the route, once, handing [picked] to [openSearch] when the user
+  /// chose Go to game. The pop is deferred a frame so [PopScope] sees
+  /// [_canPop] flip before the navigator asks it.
+  void _goBack({DatabaseGameModel? picked}) {
+    if (_isNavigatingBack) return;
+    _isNavigatingBack = true;
+    setState(() => _canPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pop(picked);
+    });
+  }
+
   void _handleBack() {
     if (_nameFocus.hasFocus) {
       _nameFocus.unfocus();
@@ -1014,9 +1099,8 @@ class _SearchScreenState extends State<SearchScreen> {
       case _FocusRegion.filters:
         setState(() => _region = _FocusRegion.search);
       case _FocusRegion.search:
-        // Top of the search tab: stay put. Like every other tab, B does not
-        // leave the tab — only the bumpers/tab strip change tabs.
-        break;
+        // Top of the screen: B leaves search, back to the systems screen.
+        _goBack();
     }
   }
 
@@ -1294,29 +1378,13 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// Opens the result's system game list with that game pre-selected, so the
-  /// user lands on it in the normal browsing view.
-  ///
-  /// Search is a tab rather than an overlay, so this pushes on top of the tab
-  /// and backing out of the game list returns here with the query intact.
-  Future<void> _goToGame(DatabaseGameModel dbGame) async {
+  /// Leaves search for the result's system game list, with that game
+  /// pre-selected. Search closes first and [openSearch] opens the list, so Back
+  /// from the list leaves the system rather than coming back here.
+  void _goToGame(DatabaseGameModel dbGame) {
     final folder = dbGame.systemFolderName;
     if (folder == null || folder.isEmpty) return;
-
-    final fileProvider = context.read<FileProvider>();
-    final system = await SqliteService.getSystemByFolderName(folder);
-    if (!mounted) return;
-
-    final game = GameModel.fromDatabaseModel(dbGame);
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SystemGamesList(
-          system: system,
-          fileProvider: fileProvider,
-          initialRomPath: game.romPath,
-        ),
-      ),
-    );
+    _goBack(picked: dbGame);
   }
 
   // ── UI ────────────────────────────────────────────────────────────────────
@@ -1324,10 +1392,10 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Tab content sits under the global header, so it carries no Scaffold or
-    // AppBar of its own — the leading SizedBox clears the header the same way
-    // the other tabs do (32.r tab strip + margin).
-    return _loading
+    // A full-screen route with no header, like the Collections browser: the
+    // search field sits at the top of the screen. System back goes through
+    // [_handleBack], so it steps out of a menu or the results before it leaves.
+    final body = _loading
         ? const Center(child: CircularProgressIndicator())
         : Stack(
             children: [
@@ -1336,7 +1404,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(height: 64.r),
+                    SizedBox(height: 16.r),
                     _buildSearchRow(theme),
                     if (_filtersExpanded) ...[
                       SizedBox(height: 6.r),
@@ -1354,6 +1422,18 @@ class _SearchScreenState extends State<SearchScreen> {
                 _buildActionChooser(theme),
             ],
           );
+
+    return PopScope(
+      canPop: _canPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: body,
+      ),
+    );
   }
 
   /// Modal overlay offering the actions available for the selected result.
@@ -1812,11 +1892,10 @@ class _SearchScreenState extends State<SearchScreen> {
   ///
   /// Sized against the real viewport rather than a fixed `.r` height: 360.r is
   /// most of a 1080p handheld's screen, which pushed a long list (platforms,
-  /// years) to full height and slid its title under the global tab strip. The
-  /// overlay covers the whole tab area — which starts behind the header — so the
-  /// menu keeps clear of that header via [_FilterMenuLayout] rather than top
-  /// padding: padding centred the menu in the space left below the header,
-  /// which read as sitting too low on screen.
+  /// years) to full height and off the top of the screen. The overlay covers
+  /// the whole screen, and the menu keeps its margins via [_FilterMenuLayout]
+  /// rather than top padding: padding centred the menu in the space left below
+  /// it, which read as sitting too low on screen.
   Widget _buildFilterMenu(ThemeData theme, String key) {
     final scheme = theme.colorScheme;
     final labels = _menuLabels(key);
@@ -1828,13 +1907,7 @@ class _SearchScreenState extends State<SearchScreen> {
         child: ColoredBox(
           color: Colors.black.withValues(alpha: 0.6),
           child: CustomSingleChildLayout(
-            delegate: _FilterMenuLayout(
-              // The header's own 46.r (see header.dart) plus a 12.r gap — not
-              // the 64.r top spacer the tab *content* starts after, which
-              // reserved space the header never occupied.
-              topInset: 46.r + 12.r,
-              bottomInset: 12.r,
-            ),
+            delegate: _FilterMenuLayout(topInset: 12.r, bottomInset: 12.r),
             child: GestureDetector(
               onTap: () {},
               child: Container(

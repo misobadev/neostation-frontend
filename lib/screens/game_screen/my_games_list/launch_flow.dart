@@ -214,7 +214,7 @@ extension _LaunchFlow on _SystemGamesListState {
     // us during the launch, so "the top layer" is no longer a reliable answer
     // to who was in charge.
     _gamepadNav.deactivate();
-    GamepadNavigationManager.rememberFocusOwner('system_games_list');
+    GamepadNavigationManager.rememberFocusOwner(_listLayerId);
 
     // Free maximum RAM before handing off to the emulator.
     _freeMemoryForGameplay();

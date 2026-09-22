@@ -202,8 +202,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.showAchievementsTabSubtitle: '내비게이션 바에 RetroAchievements 탭을 표시합니다',
   AppLocale.showRommTab: 'RomM 탭 표시',
   AppLocale.showRommTabSubtitle: '내비게이션 바에 RomM 탭을 표시합니다',
-  AppLocale.showSearchTab: '검색 탭 표시',
-  AppLocale.showSearchTabSubtitle: '내비게이션 바에 검색 탭을 표시합니다',
+  AppLocale.searchCard: '검색 카드',
+  AppLocale.searchCardSubtitle: '시스템 그리드에 검색 카드를 표시합니다',
 
   AppLocale.configureDirectories: '폴더',
   AppLocale.configureRomsFolder: 'ROM 폴더 설정',

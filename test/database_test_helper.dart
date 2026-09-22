@@ -149,6 +149,7 @@ class DatabaseTestHelper {
         hide_tab_scraper INTEGER DEFAULT 0,
         hide_tab_romm INTEGER DEFAULT 0,
         hide_tab_search INTEGER DEFAULT 0,
+        hide_search_card INTEGER DEFAULT 1,
         game_grid_columns TEXT DEFAULT 'M',
         game_carousel_card_style TEXT DEFAULT 'fanart',
         dock_apps TEXT,

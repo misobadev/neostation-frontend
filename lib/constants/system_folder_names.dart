@@ -46,6 +46,13 @@ class SystemFolderNames {
   /// The parent virtual system that lists the user's collections.
   static const String collections = 'collections';
 
+  /// The Search card on the systems screen, which opens the library-wide
+  /// search. Unlike the other virtual systems it has no `assets/systems/` entry
+  /// and no `app_systems` row: `buildSystemsList` synthesizes the card, so it
+  /// never reaches anything that walks `detectedSystems` (scans, per-system
+  /// settings, artwork downloads).
+  static const String search = 'search';
+
   /// Prefix of a single collection's synthesized folder name
   /// (`collection:<uuid>`). Collections are user data, not `app_systems` rows,
   /// so they only ever exist as synthesized [SystemModel]s carrying this.

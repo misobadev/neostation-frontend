@@ -93,6 +93,12 @@ class GamesCarousel extends StatefulWidget {
   /// the pill that goes.
   final bool isSecondaryScreenActive;
 
+  /// Id this view registers its gamepad layer under. The host passes one per
+  /// instance: a games list can appear twice on the route stack (search's "Go
+  /// to game" opens one over another), and a shared id lets the top copy's pop
+  /// unregister the bottom copy's layer instead of its own.
+  final String navLayerId;
+
   const GamesCarousel({
     super.key,
     required this.system,
@@ -116,6 +122,7 @@ class GamesCarousel extends StatefulWidget {
     this.onYButton,
     this.selectedItemKey,
     this.isSecondaryScreenActive = false,
+    this.navLayerId = 'games_carousel',
   });
 
   @override
@@ -440,7 +447,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _gamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
-        'games_carousel',
+        widget.navLayerId,
         onActivate: () => _gamepadNav.activate(),
         onDeactivate: () => _gamepadNav.deactivate(),
       );
@@ -478,7 +485,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
   }
 
   void _cleanupGamepad() {
-    GamepadNavigationManager.popLayer('games_carousel');
+    GamepadNavigationManager.popLayer(widget.navLayerId);
     _gamepadNav.dispose();
   }
 

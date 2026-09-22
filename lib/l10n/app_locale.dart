@@ -114,6 +114,8 @@ mixin AppLocale {
   static const String hideRecentCardSubtitle = 'hide_recent_card_subtitle';
   static const String recentCardSize = 'recent_card_size';
   static const String recentCardSizeSubtitle = 'recent_card_size_subtitle';
+  static const String searchCard = 'search_card';
+  static const String searchCardSubtitle = 'search_card_subtitle';
   static const String recentCardSizeDefault = 'recent_card_size_default';
   static const String recentCardSize2x1 = 'recent_card_size_2x1';
 
@@ -239,8 +241,6 @@ mixin AppLocale {
       'show_achievements_tab_subtitle';
   static const String showRommTab = 'show_romm_tab';
   static const String showRommTabSubtitle = 'show_romm_tab_subtitle';
-  static const String showSearchTab = 'show_search_tab';
-  static const String showSearchTabSubtitle = 'show_search_tab_subtitle';
 
   // ---------------------------------------------------------------------------
   // Directories

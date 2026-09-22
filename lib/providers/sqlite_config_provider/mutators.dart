@@ -84,6 +84,13 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Shows or hides the Search card on the systems screen.
+  Future<void> updateHideSearchCard(bool value) async {
+    _config = _config.copyWith(hideSearchCard: value);
+    await SqliteConfigService.saveConfig(_config);
+    _notify();
+  }
+
   /// Persists the cell span of the "Recently Played" card in the systems grid
   /// ('default' for the 3x2 block, '2x1' for the compact wide card).
   Future<void> updateRecentCardSize(String value) async {

@@ -612,6 +612,9 @@ class SqliteMigrations {
       case 159:
         await _migrateToVersion159(db);
         break;
+      case 160:
+        await _migrateToVersion160(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7035,6 +7038,36 @@ class SqliteMigrations {
       _log.i('Migration v159 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v159: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v160: adds `user_config.hide_search_card`, defaulting to hidden.
+  ///
+  /// Search moved from a navigation tab to a card on the systems screen, and
+  /// the card starts hidden. The old `hide_tab_search` column cannot carry
+  /// that: it defaults to 0 and nearly every row holds that default, so an
+  /// unset preference and "shown" read the same. A new column whose default is
+  /// 1 hides the card on every existing row too, since SQLite fills the default
+  /// into rows that predate the column. `hide_tab_search` is left in place,
+  /// unread.
+  static Future<void> _migrateToVersion160(Database db) async {
+    _log.i('Migration v160: Adding hide_search_card to user_config');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+      if (!columns.contains('hide_search_card')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN hide_search_card INTEGER DEFAULT 1',
+        );
+        _log.i('Column hide_search_card added via v160');
+      } else {
+        _log.i('Column hide_search_card already exists');
+      }
+      _log.i('Migration v160 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v160: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

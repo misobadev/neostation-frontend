@@ -123,6 +123,7 @@ extension _ContextMenu on _SystemGamesListState {
       onViewMode: () =>
           GameViewModeDropdown.globalKey.currentState?.showDropdown(),
       onRandom: _showRandomGameDialog,
+      onSearch: _openSearchFromMenu,
     );
 
     _deferFavoriteReseat = false;
@@ -137,6 +138,33 @@ extension _ContextMenu on _SystemGamesListState {
       return;
     }
     _flushPendingFavoriteReseats();
+  }
+
+  /// Opens the library search filtered to this list's system.
+  ///
+  /// An aggregate list (All Games, Favourites, a collection) spans many
+  /// systems, so it opens an unfiltered search instead. A game picked with Go
+  /// to game that this list already shows is selected here rather than opened
+  /// in a second copy of the same list.
+  Future<void> _openSearchFromMenu() async {
+    final folder = widget.system.folderName;
+    await openSearch(
+      context,
+      systemFolder: SystemFolderNames.isAggregate(folder) ? null : folder,
+      showInPlace: _selectSearchPickInPlace,
+    );
+  }
+
+  /// Selects [picked] in the loaded folder level, if it is there.
+  bool _selectSearchPickInPlace(DatabaseGameModel picked) {
+    final romPath = GameModel.fromDatabaseModel(picked).romPath;
+    for (final game in _games) {
+      if (game.romPath == romPath) {
+        _selectGame(game);
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Applies a favourite change chosen in the checklist, reporting whether it
