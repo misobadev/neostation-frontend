@@ -48,7 +48,7 @@ dependencies:
   http: ^1.6.0
   flutter_svg: ^2.0.10
   crypto: ^3.0.7
-  archive: ^4.2.0
+  archive: ^4.3.0
   web_socket_channel: ^3.0.3
   url_launcher: ^6.3.2
   widget_mask: ^1.0.0
@@ -56,7 +56,7 @@ dependencies:
   window_manager: ^0.5.2
   permission_handler: ^12.0.3
   pointycastle: ^4.0.0
-  sqlite3: ^3.5.1
+  sqlite3: ^3.6.0
   fullscreen_window: ^1.2.1
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
