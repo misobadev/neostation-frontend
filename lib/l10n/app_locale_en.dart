@@ -281,6 +281,17 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.cleanOrphanedMetadataFailed:
       'Failed to clean orphaned metadata: {error}',
   AppLocale.rematchAchievements: 'Match RetroAchievements Games',
+  AppLocale.rommLinkLibrary: 'Link library to RomM',
+  AppLocale.rommLinkLibrarySubtitle:
+      'Match local ROMs against your RomM server and link them',
+  AppLocale.rommLinkLibraryWarning:
+      'This walks every platform on your RomM server and links local ROMs it recognises.\n\nLinked games become eligible for save sync, so their saves will begin uploading to RomM. On a large library this can take several minutes.',
+  AppLocale.rommLinkLibraryPreparing: 'Preparing…',
+  AppLocale.rommLinkLibraryProgress: '{done} of {total} — {system}',
+  AppLocale.rommLinkLibraryDone: 'Linked {count} games',
+  AppLocale.rommLinkLibraryNothingToDo: 'Nothing new to link',
+  AppLocale.rommLinkLibraryFailed: 'Linking failed',
+  AppLocale.rommLinkLibraryUnavailable: 'Not available right now',
   AppLocale.rematchAchievementsSubtitle:
       'Check your whole library for achievement sets, instead of one game at a time',
   AppLocale.rematchAchievementsWarning:
@@ -1079,6 +1090,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.rommSearchClear: 'Clear search',
   AppLocale.rommDownloading: 'Downloading...',
   AppLocale.rommDownloaded: 'Downloaded',
+  AppLocale.rommLinked: 'Linked to RomM',
   AppLocale.rommDownloadComplete: 'Download complete',
   AppLocale.rommDownloadFailed: 'Download failed',
   AppLocale.rommDownloadCancelled: 'Download cancelled',
@@ -1095,6 +1107,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.rommSyncConfirmPlan:
       'Downloads {count} games ({size}). This can take a long time.',
   AppLocale.rommSyncConfirmSkipped: '{count} already on this device.',
+  AppLocale.rommSyncConfirmLinked: '{count} will be linked to RomM.',
   AppLocale.rommSyncConfirmFree: '{free} free.',
   AppLocale.rommSyncConfirmNoSpace:
       'Not enough space: needs {size}, only {free} free.',
@@ -1108,6 +1121,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.rommSyncComplete: 'Synced {count} games',
   AppLocale.rommSyncCancelled: 'Sync cancelled',
   AppLocale.rommSyncNothingToDo: 'Everything is already downloaded',
+  AppLocale.rommSyncLinkedCount: 'Linked {count} games to RomM',
   AppLocale.rommSyncFailedCount: '{count} failed',
   AppLocale.searchTitle: 'Search',
   AppLocale.searchNameHint: 'Search...',
@@ -1281,4 +1295,31 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.noHiddenGames: 'No hidden games',
   AppLocale.noHiddenGamesSubtitle:
       'Hide a game from its own settings and it appears here.',
+  AppLocale.rommLinkRow: 'Link to RomM',
+  AppLocale.rommLinkRowSubtitle:
+      'Search the RomM library and pick the ROM this game is',
+  AppLocale.rommLinkAction: 'Link',
+  AppLocale.rommUnlinkRow: 'Unlink from RomM',
+  AppLocale.rommUnlinkRowSubtitle:
+      'Remove the link; a later connect may link it again by filename',
+  AppLocale.rommUnlinkAction: 'Unlink',
+  AppLocale.rommUnlinkConfirmTitle: 'Unlink from RomM?',
+  AppLocale.rommUnlinkConfirmBody:
+      'Saves for this game stop syncing with {name}.',
+  AppLocale.rommLinkStateNotLinked: 'Not linked to RomM',
+  AppLocale.rommLinkStateAuto: 'Linked automatically to {name}',
+  AppLocale.rommLinkStateManual: 'Linked manually to {name}',
+  AppLocale.rommLinkPickerTitle: 'Link to a RomM ROM',
+  AppLocale.rommLinkPickerSearchHint: 'Search the RomM library',
+  AppLocale.rommLinkPickerLoading: 'Searching…',
+  AppLocale.rommLinkPickerNoResults: 'No matching ROMs found.',
+  AppLocale.rommLinkPickerError: 'Search failed. Select to retry.',
+  AppLocale.rommLinkPickerUnscoped:
+      'No RomM platform matches this system, so there is nothing here to link to.',
+  AppLocale.rommLinkSaved: 'Linked to {name}',
+  AppLocale.rommLinkFailed: 'Linking to RomM failed',
+  AppLocale.rommUnlinked: 'Unlinked from RomM',
+  AppLocale.rommUnlinkFailed: 'Could not unlink from RomM',
+  // Link action on search results
+  AppLocale.searchLinkToRomm: 'Link to RomM',
 };

@@ -274,6 +274,7 @@ void main() {
 
     test('records a finished session for a RomM-linked game', () async {
       await RommSaveMapRepository.putMapping(
+        source: RommLinkSource.download,
         romname: 'game.sfc',
         systemFolder: 'snes',
         rommRomId: 7,
@@ -299,6 +300,7 @@ void main() {
         romname: 'game.sfc',
         systemFolder: 'snes',
         rommRomId: 7,
+        source: RommLinkSource.download,
       );
 
       // Half an hour of play, then the device slept overnight before exit.
@@ -333,6 +335,7 @@ void main() {
 
     test('skips a session too short to be real play', () async {
       await RommSaveMapRepository.putMapping(
+        source: RommLinkSource.download,
         romname: 'game.sfc',
         systemFolder: 'snes',
         rommRomId: 7,

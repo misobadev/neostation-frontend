@@ -289,6 +289,17 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.cleanOrphanedMetadataFailed:
       'Falha ao limpar metadados órfãos: {error}',
   AppLocale.rematchAchievements: 'Associar jogos do RetroAchievements',
+  AppLocale.rommLinkLibrary: 'Vincular biblioteca ao RomM',
+  AppLocale.rommLinkLibrarySubtitle:
+      'Comparar as ROMs locais com o seu servidor RomM e vinculá-las',
+  AppLocale.rommLinkLibraryWarning:
+      'Isto percorre todas as plataformas do seu servidor RomM e vincula as ROMs locais que reconhece.\n\nJogos vinculados passam a sincronizar saves, portanto os seus saves serão enviados para o RomM. Numa biblioteca grande isto pode demorar vários minutos.',
+  AppLocale.rommLinkLibraryPreparing: 'A preparar…',
+  AppLocale.rommLinkLibraryProgress: '{done} de {total} — {system}',
+  AppLocale.rommLinkLibraryDone: '{count} jogos vinculados',
+  AppLocale.rommLinkLibraryNothingToDo: 'Nada de novo para vincular',
+  AppLocale.rommLinkLibraryFailed: 'Falha ao vincular',
+  AppLocale.rommLinkLibraryUnavailable: 'Indisponível de momento',
   AppLocale.rematchAchievementsSubtitle:
       'Verifica toda a biblioteca à procura de conjuntos de conquistas, em vez de um jogo de cada vez',
   AppLocale.rematchAchievementsWarning:
@@ -1095,6 +1106,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.rommSearchClear: 'Limpar pesquisa',
   AppLocale.rommDownloading: 'Baixando...',
   AppLocale.rommDownloaded: 'Baixado',
+  AppLocale.rommLinked: 'Vinculado ao RomM',
   AppLocale.rommDownloadComplete: 'Download concluído',
   AppLocale.rommDownloadFailed: 'Falha no download',
   AppLocale.rommDownloadCancelled: 'Download cancelado',
@@ -1113,6 +1125,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.rommSyncConfirmPlan:
       'Baixa {count} jogos ({size}). Pode demorar bastante.',
   AppLocale.rommSyncConfirmSkipped: '{count} já estão neste dispositivo.',
+  AppLocale.rommSyncConfirmLinked: '{count} serão vinculados ao RomM.',
   AppLocale.rommSyncConfirmFree: '{free} livres.',
   AppLocale.rommSyncConfirmNoSpace:
       'Espaço insuficiente: precisa de {size} e há apenas {free} livres.',
@@ -1127,6 +1140,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.rommSyncComplete: '{count} jogos sincronizados',
   AppLocale.rommSyncCancelled: 'Sincronização cancelada',
   AppLocale.rommSyncNothingToDo: 'Tudo já foi baixado',
+  AppLocale.rommSyncLinkedCount: '{count} jogos vinculados ao RomM',
   AppLocale.rommSyncFailedCount: '{count} com erros',
   AppLocale.searchTitle: 'Pesquisar',
   AppLocale.searchNameHint: 'Pesquisar...',
@@ -1308,4 +1322,32 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.noHiddenGames: 'Nenhum jogo oculto',
   AppLocale.noHiddenGamesSubtitle:
       'Oculte um jogo nas configurações dele e ele aparecerá aqui.',
+  AppLocale.rommLinkRow: 'Vincular ao RomM',
+  AppLocale.rommLinkRowSubtitle:
+      'Pesquise na biblioteca do RomM e escolha a ROM correspondente a este jogo',
+  AppLocale.rommLinkAction: 'Vincular',
+  AppLocale.rommUnlinkRow: 'Desvincular do RomM',
+  AppLocale.rommUnlinkRowSubtitle:
+      'Remove o vínculo; uma conexão posterior pode vinculá-lo novamente pelo nome do arquivo',
+  AppLocale.rommUnlinkAction: 'Desvincular',
+  AppLocale.rommUnlinkConfirmTitle: 'Desvincular do RomM?',
+  AppLocale.rommUnlinkConfirmBody:
+      'Os saves deste jogo deixarão de sincronizar com {name}.',
+  AppLocale.rommLinkStateNotLinked: 'Não vinculado ao RomM',
+  AppLocale.rommLinkStateAuto: 'Vinculado automaticamente a {name}',
+  AppLocale.rommLinkStateManual: 'Vinculado manualmente a {name}',
+  AppLocale.rommLinkPickerTitle: 'Vincular a uma ROM do RomM',
+  AppLocale.rommLinkPickerSearchHint: 'Pesquisar na biblioteca do RomM',
+  AppLocale.rommLinkPickerLoading: 'Pesquisando…',
+  AppLocale.rommLinkPickerNoResults: 'Nenhuma ROM correspondente encontrada.',
+  AppLocale.rommLinkPickerError:
+      'A pesquisa falhou. Selecione para tentar novamente.',
+  AppLocale.rommLinkPickerUnscoped:
+      'Nenhuma plataforma do RomM corresponde a este sistema, portanto não há nada para vincular.',
+  AppLocale.rommLinkSaved: 'Vinculado a {name}',
+  AppLocale.rommLinkFailed: 'Falha ao vincular ao RomM',
+  AppLocale.rommUnlinked: 'Desvinculado do RomM',
+  AppLocale.rommUnlinkFailed: 'Não foi possível desvincular do RomM',
+  // Link action on search results
+  AppLocale.searchLinkToRomm: 'Vincular ao RomM',
 };

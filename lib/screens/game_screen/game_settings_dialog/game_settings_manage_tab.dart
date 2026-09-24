@@ -11,13 +11,18 @@ import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/providers/sqlite_database_provider.dart';
 import 'package:neostation/repositories/game_repository.dart';
+import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
+import 'package:neostation/screens/game_screen/game_settings_dialog/romm_match_picker_dialog.dart';
 import 'package:neostation/utils/enabled_index_nav.dart';
 import 'package:neostation/screens/settings_screen/new_settings_options/widgets/setting_row.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/sync/i_sync_provider.dart';
+import 'package:neostation/sync/providers/romm_provider.dart';
+import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/utils/game_utils.dart';
+import 'package:neostation/utils/romm_link_state.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/custom_toggle_switch.dart';
@@ -25,8 +30,9 @@ import 'package:neostation/widgets/delete_game_dialog.dart';
 import 'package:provider/provider.dart';
 
 /// Manage tab for [GameSettingsDialog]: cloud sync, grid size/style,
-/// play-time reset, hiding the game, and permanent game deletion. View mode is
-/// selected from the game view itself (X button), not here.
+/// play-time reset, hiding the game, permanent game deletion, and the game's
+/// RomM link (state line, link picker, unlink). View mode is selected from the
+/// game view itself (X button), not here.
 class GameSettingsManageTab extends StatefulWidget {
   final GameModel game;
   final SystemModel system;
@@ -62,6 +68,18 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
   bool _isResettingPlayTime = false;
   bool _isHiding = false;
   bool _isDeleting = false;
+  bool _isUnlinkingRomm = false;
+
+  /// Whether RomM is connected, read from the provider on every build; the
+  /// link row is only enabled (and reachable) while it is.
+  bool _rommConnected = false;
+
+  /// The game's `app_romm_rom_map` row, or null when it is not linked.
+  RommSaveMapping? _rommMapping;
+
+  /// Name shown for the linked ROM: `romm_fs_name` from the row, the server's
+  /// name when the row has none and RomM is reachable, else the bare id.
+  String? _rommLinkedName;
 
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _itemKeys = {};
@@ -75,7 +93,9 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
   int get _playTimeIdx => 1;
   int get _hideIdx => 2;
   int get _deleteIdx => 3;
-  int get _totalItems => 4;
+  int get _linkRommIdx => 4;
+  int get _unlinkRommIdx => 5;
+  int get _totalItems => 6;
 
   bool get _showCloudSync => widget.syncProvider?.isAuthenticated == true;
 
@@ -89,6 +109,7 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
     super.initState();
     _cloudSyncEnabled = widget.game.cloudSyncEnabled ?? true;
     _selectedIndex = _showCloudSync ? _cloudSyncIdx : _playTimeIdx;
+    _loadRommLink();
   }
 
   @override
@@ -100,6 +121,8 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
   /// Returns whether [idx] can receive focus in the current state.
   bool _isEnabledIndex(int idx) {
     if (idx == _cloudSyncIdx && !_showCloudSync) return false;
+    if (idx == _linkRommIdx && !_rommConnected) return false;
+    if (idx == _unlinkRommIdx && _rommMapping == null) return false;
     return idx >= 0 && idx < _totalItems;
   }
 
@@ -112,7 +135,13 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
 
   void _ensureSelectedIndexEnabled() {
     if (!_isEnabledIndex(_selectedIndex)) {
-      _selectedIndex = _nextEnabledIndex();
+      final next = _nextEnabledIndex();
+      // Nothing enabled below (the row just vanished or was disabled while
+      // selected, e.g. after an unlink): fall back upward so focus never
+      // strands on a row that is not rendered.
+      _selectedIndex = _isEnabledIndex(next) && next != _selectedIndex
+          ? next
+          : _previousEnabledIndex();
     }
   }
 
@@ -138,6 +167,10 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
       if (!_isHiding) _hideGame();
     } else if (idx == _deleteIdx) {
       _confirmDeleteGame();
+    } else if (idx == _linkRommIdx) {
+      _openRommPicker();
+    } else if (idx == _unlinkRommIdx) {
+      _confirmUnlinkRomm();
     }
   }
 
@@ -339,7 +372,195 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
     }
   }
 
+  // ── RomM link ───────────────────────────────────────────────────────────
+
+  /// Reads the game's mapping row for the state line and the unlink row.
+  ///
+  /// `getMapping` resolves the extension-stripped `GameModel.romname` to the
+  /// row the sync provider actually uses, whichever spelling it was written
+  /// with. The display name is the row's `romm_fs_name`; a row without one
+  /// asks the server for the ROM's name only while connected, and otherwise
+  /// falls back to the id so the state line never goes blank.
+  Future<void> _loadRommLink() async {
+    final mapping = await RommSaveMapRepository.getMapping(
+      widget.game.romname,
+      _targetSystemFolder,
+    );
+    if (!mounted) return;
+
+    String? name = mapping?.fsName;
+    if (mapping != null && name == null) {
+      final rommProvider = context.read<RommProvider>();
+      if (rommProvider.isConnected) {
+        try {
+          name = (await rommProvider.service.getRom(mapping.rommRomId)).name;
+        } catch (e) {
+          _log.w(
+            'RomM link: name lookup failed (romId=${mapping.rommRomId}): $e',
+          );
+        }
+        if (!mounted) return;
+      }
+    }
+
+    setState(() {
+      _rommMapping = mapping;
+      _rommLinkedName =
+          name ?? (mapping == null ? null : '#${mapping.rommRomId}');
+    });
+  }
+
+  /// The localized state line: not linked / linked automatically / manually.
+  String _rommLinkStateLabel(BuildContext context) {
+    final name = _rommLinkedName ?? '';
+    switch (rommLinkStateOf(_rommMapping)) {
+      case RommLinkState.notLinked:
+        return AppLocale.rommLinkStateNotLinked.getString(context);
+      case RommLinkState.auto:
+        return AppLocale.rommLinkStateAuto
+            .getString(context)
+            .replaceFirst('{name}', name);
+      case RommLinkState.manual:
+        return AppLocale.rommLinkStateManual
+            .getString(context)
+            .replaceFirst('{name}', name);
+    }
+  }
+
+  /// The system the game's mapping row is keyed under. In "all games" mode the
+  /// tab's [SystemModel] is the aggregate, so the game's own system is looked
+  /// up by folder for the picker's platform scope.
+  Future<SystemModel?> _targetSystem() async {
+    if (_targetSystemFolder == widget.system.folderName) return widget.system;
+    final system = await SystemRepository.getSystemByFolderName(
+      _targetSystemFolder,
+    );
+    if (system == null) {
+      _log.e('RomM link: no system for folder $_targetSystemFolder');
+    }
+    return system;
+  }
+
+  /// Opens the link picker; a `true` result means a manual row was written
+  /// and the sync state already invalidated, so only this tab re-reads.
+  Future<void> _openRommPicker() async {
+    if (!_rommConnected) return;
+    SfxService().playNavSound();
+    final system = await _targetSystem();
+    if (!mounted || system == null) return;
+
+    final changed = await RommMatchPickerDialog.show(
+      context,
+      widget.game,
+      system,
+    );
+    if (!mounted || changed != true) return;
+
+    await _loadRommLink();
+    if (!mounted) return;
+    AppNotification.showNotification(
+      context,
+      AppLocale.rommLinkSaved
+          .getString(context)
+          .replaceFirst('{name}', _rommLinkedName ?? ''),
+      type: NotificationType.success,
+    );
+  }
+
+  Future<void> _confirmUnlinkRomm() async {
+    if (_rommMapping == null || _isUnlinkingRomm) return;
+    SfxService().playNavSound();
+    final confirmed = await ConfirmActionDialog.show(
+      context,
+      title: AppLocale.rommUnlinkConfirmTitle.getString(context),
+      body: AppLocale.rommUnlinkConfirmBody
+          .getString(context)
+          .replaceFirst('{name}', _rommLinkedName ?? ''),
+      confirmLabel: AppLocale.rommUnlinkAction.getString(context),
+      icon: Symbols.link_off_rounded,
+    );
+    if (confirmed == true && mounted) {
+      _unlinkRomm();
+    }
+  }
+
+  /// Removes the mapping whatever its source and drops everything that cached
+  /// it. [RommProvider.forgetLocalDownload] is the same unlink the delete path
+  /// uses (row, downloaded memo, completed transfer); the sync provider's
+  /// per-game state is invalidated here so the badge goes back to disabled.
+  Future<void> _unlinkRomm() async {
+    if (_isUnlinkingRomm) return;
+    setState(() => _isUnlinkingRomm = true);
+
+    final romname = widget.game.romname;
+    final systemFolder = _targetSystemFolder;
+    // Read before the await: the dialog can be gone by the time this ends.
+    final rommProvider = context.read<RommProvider>();
+
+    try {
+      await rommProvider.forgetLocalDownload(
+        romname: romname,
+        systemFolder: systemFolder,
+      );
+      final sync = SyncManager.instance.provider(RomMSyncProvider.kProviderId);
+      if (sync is RomMSyncProvider) sync.invalidateGameSyncState(romname);
+      _log.i('RomM link: unlinked $systemFolder/$romname by hand');
+      await _loadRommLink();
+      if (mounted) {
+        // removeMapping swallows DB errors into null, so trust the reloaded
+        // state rather than the call: only report success when the row is
+        // really gone.
+        final unlinked = _rommMapping == null;
+        AppNotification.showNotification(
+          context,
+          unlinked
+              ? AppLocale.rommUnlinked.getString(context)
+              : AppLocale.rommUnlinkFailed.getString(context),
+          type: unlinked ? NotificationType.info : NotificationType.error,
+        );
+      }
+    } catch (e, st) {
+      _log.e(
+        'RomM unlink failed (romname=$romname, systemFolder=$systemFolder)',
+        error: e,
+        stackTrace: st,
+      );
+    } finally {
+      if (mounted) setState(() => _isUnlinkingRomm = false);
+    }
+  }
+
   // ── Build helpers ───────────────────────────────────────────────────────
+
+  /// The small trailing button the RomM rows use, greyed while [enabled] is
+  /// false so a disabled row reads as one.
+  Widget _actionChip(
+    ThemeData theme,
+    String label, {
+    required Color color,
+    bool enabled = true,
+  }) {
+    final tint = enabled ? color : theme.colorScheme.onSurface;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 3.r),
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: enabled ? 0.15 : 0.05),
+        borderRadius: BorderRadius.circular(4.r),
+        border: Border.all(
+          color: tint.withValues(alpha: enabled ? 0.4 : 0.1),
+          width: 1.r,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11.r,
+          fontWeight: FontWeight.w600,
+          color: enabled ? tint : tint.withValues(alpha: 0.3),
+        ),
+      ),
+    );
+  }
 
   // ── Build ───────────────────────────────────────────────────────────────
 
@@ -347,9 +568,12 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final canReset = (widget.game.playTime ?? 0) > 0 && !_isResettingPlayTime;
+    _rommConnected = context.watch<RommProvider>().isConnected;
+    final hasRommLink = _rommMapping != null;
 
-    // If the current selection became disabled (e.g. cloud sync hidden), move to
-    // the nearest enabled row without triggering a scroll animation.
+    // If the current selection became disabled (e.g. cloud sync hidden, RomM
+    // disconnected), move to the nearest enabled row without triggering a
+    // scroll animation.
     _ensureSelectedIndexEnabled();
 
     return SingleChildScrollView(
@@ -557,6 +781,96 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                     ),
             ),
           ),
+
+          SizedBox(height: 16.r),
+
+          // RomM link state line (not focusable; the rows below act on it).
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4.r),
+            child: Row(
+              children: [
+                Icon(
+                  hasRommLink ? Symbols.link_rounded : Symbols.link_off_rounded,
+                  size: 14.r,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                SizedBox(width: 6.r),
+                Expanded(
+                  child: Text(
+                    _rommLinkStateLabel(context),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.r,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          SizedBox(height: 8.r),
+
+          // Link to RomM: enabled only while connected, otherwise greyed and
+          // skipped by the D-pad.
+          GestureDetector(
+            onTap: () {
+              if (!_rommConnected) return;
+              setState(() => _selectedIndex = _linkRommIdx);
+              _openRommPicker();
+            },
+            child: Opacity(
+              opacity: _rommConnected ? 1.0 : 0.5,
+              child: SettingRow(
+                key: _itemKey(_linkRommIdx),
+                focused: _selectedIndex == _linkRommIdx,
+                title: AppLocale.rommLinkRow.getString(context),
+                subtitle: _rommConnected
+                    ? AppLocale.rommLinkRowSubtitle.getString(context)
+                    : AppLocale.rommNotConnected.getString(context),
+                trailing: _actionChip(
+                  theme,
+                  AppLocale.rommLinkAction.getString(context),
+                  color: theme.colorScheme.primary,
+                  enabled: _rommConnected,
+                ),
+              ),
+            ),
+          ),
+
+          SizedBox(height: hasRommLink ? 12.r : 0.r),
+
+          // Unlink from RomM: present only while a mapping row exists.
+          if (hasRommLink)
+            GestureDetector(
+              onTap: () {
+                setState(() => _selectedIndex = _unlinkRommIdx);
+                _confirmUnlinkRomm();
+              },
+              child: SettingRow(
+                key: _itemKey(_unlinkRommIdx),
+                focused: _selectedIndex == _unlinkRommIdx,
+                title: AppLocale.rommUnlinkRow.getString(context),
+                subtitle: AppLocale.rommUnlinkRowSubtitle.getString(context),
+                trailing: _isUnlinkingRomm
+                    ? SizedBox(
+                        width: 20.r,
+                        height: 20.r,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.error,
+                        ),
+                      )
+                    : _actionChip(
+                        theme,
+                        AppLocale.rommUnlinkAction.getString(context),
+                        color: theme.colorScheme.error,
+                      ),
+              ),
+            )
+          else
+            SizedBox.shrink(key: _itemKey(_unlinkRommIdx)),
         ],
       ),
     );

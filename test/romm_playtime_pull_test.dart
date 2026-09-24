@@ -116,6 +116,7 @@ void main() {
     );
     if (romId != null) {
       await RommSaveMapRepository.putMapping(
+        source: RommLinkSource.download,
         // The mapping is written with the on-disk filename; the library row
         // carries it stripped. Defaulting to "<romname>.zip" keeps every test
         // on the mismatching spelling, which is the case that used to miss.

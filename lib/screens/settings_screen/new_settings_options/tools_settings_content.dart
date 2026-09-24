@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/services/romm/romm_link_runner.dart';
 import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
@@ -48,7 +49,7 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
 
   /// Keys used for calculating viewport alignment during navigation, one per
   /// tool row.
-  final List<GlobalKey> _itemKeys = List.generate(3, (_) => GlobalKey());
+  final List<GlobalKey> _itemKeys = List.generate(4, (_) => GlobalKey());
 
   bool _isOrganizingMultiDisc = false;
   bool _isCleaningMetadata = false;
@@ -75,7 +76,7 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
     }
   }
 
-  int getItemCount() => 3;
+  int getItemCount() => 4;
 
   /// Synchronizes the scroll viewport with the currently focused tool row.
   void scrollToIndex(int index) {
@@ -94,7 +95,52 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
         _cleanOrphanedMetadata();
       case 2:
         _organizeMultiDiscGames();
+      case 3:
+        _linkRommLibrary();
     }
+  }
+
+  /// Walks the RomM server and links local ROMs it recognises.
+  ///
+  /// Lives here rather than on the connect path. The pass takes minutes on a
+  /// large library — 201 seconds over 34 platforms on a real device — and a
+  /// mapping row is the gate for save sync, so running it automatically both
+  /// charged every launch a full walk and enrolled games the user had never
+  /// offered to the server. A run the user asked for is allowed to be slow, and
+  /// the dialog is where the save-sync consequence is stated before any row is
+  /// written.
+  Future<void> _linkRommLibrary() async {
+    // The runner owns "is it running", not this widget: leaving Tools disposes
+    // the screen while the pass carries on, so a local flag would read idle on
+    // the way back and start a second walk of the same server.
+    if (RommLinkRunner.isRunning) return;
+
+    final strings = RommLinkStrings(
+      title: AppLocale.rommLinkLibrary.getString(context),
+      preparing: AppLocale.rommLinkLibraryPreparing.getString(context),
+      progressTemplate: AppLocale.rommLinkLibraryProgress.getString(context),
+      doneTemplate: AppLocale.rommLinkLibraryDone.getString(context),
+      nothingToDo: AppLocale.rommLinkLibraryNothingToDo.getString(context),
+      failed: AppLocale.rommLinkLibraryFailed.getString(context),
+      unavailable: AppLocale.rommLinkLibraryUnavailable.getString(context),
+    );
+
+    final confirmed = await ConfirmActionDialog.show(
+      context,
+      title: AppLocale.rommLinkLibrary.getString(context),
+      body: AppLocale.rommLinkLibraryWarning.getString(context),
+      confirmLabel: AppLocale.confirm.getString(context),
+      icon: Symbols.link_rounded,
+      accentColor: Theme.of(context).colorScheme.primary,
+    );
+    if (confirmed != true || !mounted) return;
+
+    await RommLinkRunner.run(
+      strings: strings,
+      onProgressStateChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   Future<void> _organizeMultiDiscGames() async {
@@ -503,6 +549,10 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
                 notifications,
                 'rematch_achievements',
               );
+              final rommLinkProgress = _progressFor(
+                notifications,
+                RommLinkRunner.notificationId,
+              );
 
               return ListView(
                 controller: _scrollController,
@@ -572,6 +622,29 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
                     belowContent: _buildInlineProgress(
                       context,
                       multiDiscProgress,
+                    ),
+                  ),
+                  SettingsCardRow(
+                    key: _itemKeys[3],
+                    icon: Symbols.link_rounded,
+                    title: AppLocale.rommLinkLibrary.getString(context),
+                    subtitle: AppLocale.rommLinkLibrarySubtitle.getString(
+                      context,
+                    ),
+                    subtitleMaxLines: 2,
+                    selected:
+                        widget.isContentFocused &&
+                        widget.selectedContentIndex == 3,
+                    onTap: () => _linkRommLibrary(),
+                    trailing: SettingsActionButton(
+                      icon: Symbols.link_rounded,
+                      selected:
+                          widget.isContentFocused &&
+                          widget.selectedContentIndex == 3,
+                    ),
+                    belowContent: _buildInlineProgress(
+                      context,
+                      rommLinkProgress,
                     ),
                   ),
                 ],

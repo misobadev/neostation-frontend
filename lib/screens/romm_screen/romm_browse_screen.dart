@@ -13,6 +13,7 @@ import '../../providers/file_provider.dart';
 import '../../providers/romm_bulk_sync.dart';
 import '../../providers/romm_provider.dart';
 import '../../providers/sqlite_config_provider.dart';
+import '../../repositories/romm_save_map_repository.dart';
 import '../../services/game_service.dart';
 import '../../services/logger_service.dart';
 import '../../services/romm_service.dart';
@@ -337,30 +338,90 @@ class _RommBrowseScreenState extends State<RommBrowseScreen> {
   }
 
   /// Handles a controller confirm on a ROM tile. Mirrors the on-tile control:
-  /// an in-flight download cancels; an already-downloaded ROM (completed this
-  /// session or present on disk from a prior one) is a no-op with an info
-  /// toast rather than a duplicate download; otherwise the download starts.
+  /// an in-flight download cancels; a ROM downloaded this session is a no-op
+  /// with an info toast rather than a duplicate download; a ROM already on
+  /// disk from before is linked to its RomM entry (see [_linkLocalCopy]);
+  /// otherwise the download starts.
   Future<void> _confirmRom(RommRom rom) async {
     final active = _rommProvider.downloadFor(rom.id);
     if (active != null && active.status == RommDownloadStatus.downloading) {
       _rommProvider.cancelDownload(rom.id);
       return;
     }
+    // A download that finished this session already wrote its mapping row.
+    if (active != null && active.status == RommDownloadStatus.completed) {
+      _showDownloadedToast();
+      return;
+    }
 
     final romFolders = context.read<SqliteConfigProvider>().config.romFolders;
-    final alreadyDownloaded =
-        (active != null && active.status == RommDownloadStatus.completed) ||
-        await _rommProvider.isDownloaded(rom, romFolders);
+    final copy = await _rommProvider.findLocalCopy(rom, romFolders);
     if (!mounted) return;
-    if (alreadyDownloaded) {
-      AppNotification.showNotification(
-        context,
-        AppLocale.rommDownloaded.getString(context),
-        type: NotificationType.info,
-      );
+    if (copy != null) {
+      await _linkLocalCopy(rom, copy);
       return;
     }
     _startDownload(rom);
+  }
+
+  /// Links a ROM that is already on disk to its RomM entry.
+  ///
+  /// The file predates RomM (or was copied over by hand), so it has no
+  /// `app_romm_rom_map` row and save sync, playtime and the cloud badge all
+  /// treat it as a non-RomM game. Writing the row is what the user's confirm
+  /// most plausibly means here — there is nothing to download. When a row is
+  /// written the user is told so, the game's cached sync status is dropped so
+  /// the badge recomputes without a restart, and RomM's metadata and art are
+  /// imported if the game has none. When the row already existed this is the
+  /// same "already downloaded" no-op it always was.
+  Future<void> _linkLocalCopy(RommRom rom, RommLocalCopy copy) async {
+    final fileProvider = context.read<FileProvider>();
+    final linked = await _rommProvider.linkLocalCopy(rom, copy);
+    if (!mounted) return;
+    switch (linked) {
+      case RommMappingWriteResult.written:
+        break;
+      case RommMappingWriteResult.kept:
+        _showDownloadedToast();
+        return;
+      case RommMappingWriteResult.failed:
+        // A failed write is not "already downloaded": the row the whole
+        // feature hangs off is missing, and saying so is the only way the
+        // user learns the link they asked for did not happen.
+        AppNotification.showNotification(
+          context,
+          AppLocale.rommLinkFailed.getString(context),
+          type: NotificationType.error,
+        );
+        return;
+    }
+    AppNotification.showNotification(
+      context,
+      AppLocale.rommLinked.getString(context),
+      type: NotificationType.success,
+    );
+    _invalidateSyncState(copy.romname);
+    // Best-effort and last: a metadata fetch is network work the link itself
+    // doesn't depend on, and the toast has already said what happened.
+    await _rommProvider.importMetadataIfMissing(rom, copy, fileProvider);
+  }
+
+  void _showDownloadedToast() {
+    AppNotification.showNotification(
+      context,
+      AppLocale.rommDownloaded.getString(context),
+      type: NotificationType.info,
+    );
+  }
+
+  /// Drops the RomM sync provider's cached status for the game called
+  /// [romname] (extension-stripped, as `GameModel.romname`), so the cloud
+  /// badge re-asks now that a mapping row exists. Reaches the provider by id
+  /// rather than through [SyncManager.active]: the cache lives on the RomM
+  /// provider whether or not it is the one doing the saves.
+  void _invalidateSyncState(String romname) {
+    final sync = SyncManager.instance.provider(RomMSyncProvider.kProviderId);
+    if (sync is RomMSyncProvider) sync.invalidateGameSyncState(romname);
   }
 
   Future<void> _startDownload(RommRom rom) async {
@@ -450,6 +511,7 @@ class _RommBrowseScreenState extends State<RommBrowseScreen> {
       collection: collection,
       romFolders: context.read<SqliteConfigProvider>().config.romFolders,
       fileProvider: context.read<FileProvider>(),
+      onLinked: _invalidateSyncState,
       confirm: (plan) => _confirmSyncPlan(label, plan),
     );
     if (!mounted) return;
@@ -478,6 +540,13 @@ class _RommBrowseScreenState extends State<RommBrowseScreen> {
         AppLocale.rommSyncConfirmSkipped
             .getString(context)
             .replaceFirst('{count}', '${plan.skipped}'),
+      );
+    }
+    if (plan.linked > 0) {
+      lines.add(
+        AppLocale.rommSyncConfirmLinked
+            .getString(context)
+            .replaceFirst('{count}', '${plan.linked}'),
       );
     }
     lines.addAll(_spaceLines(plan));
@@ -578,7 +647,18 @@ class _RommBrowseScreenState extends State<RommBrowseScreen> {
       return;
     }
     if (sync.completed == 0) {
-      // Nothing was queued: every ROM in the source was already on disk.
+      // Nothing was queued: every ROM in the source was already on disk. If
+      // the pass linked some of them to RomM, that is the news worth telling.
+      if (sync.linked > 0) {
+        AppNotification.showNotification(
+          context,
+          AppLocale.rommSyncLinkedCount
+              .getString(context)
+              .replaceFirst('{count}', '${sync.linked}'),
+          type: NotificationType.success,
+        );
+        return;
+      }
       AppNotification.showNotification(
         context,
         AppLocale.rommSyncNothingToDo.getString(context),
