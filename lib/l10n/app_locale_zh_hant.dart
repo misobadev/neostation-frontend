@@ -41,8 +41,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.secondaryDisplay: '副螢幕',
   AppLocale.directories: '目錄',
   AppLocale.themes: '主題',
-  AppLocale.systemArt: 'System Art',
-  AppLocale.systemArtSubtitle: '使用 System Art 包自訂系統卡片背景和標誌',
+  AppLocale.systemArt: '系統藝術',
+  AppLocale.systemArtSubtitle: '使用 System Art 包自訂系統卡片背景',
   AppLocale.systemArtNone: '無',
   AppLocale.systemArtNoneSubtitle: '預設外觀',
   AppLocale.systemArtLoading: '正在載入 System Art...',
@@ -52,6 +52,12 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.systemArtRedownloadTitle: '重新下載 System Art？',
   AppLocale.systemArtRedownloadBody: '將刪除已快取的包並重新下載。如果部分系統背景缺失，請使用此選項。',
   AppLocale.systemArtDownloading: '正在下載 System Art 包...',
+  AppLocale.systemArtByAuthor: '作者 {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} 次下載',
+  AppLocale.systemArtSystemsCovered: '{count} 個系統',
+  AppLocale.systemArtSupport: '支持',
+  AppLocale.systemArtApplied: '已套用',
   AppLocale.about: '關於',
   AppLocale.exit: '離開',
   AppLocale.launcher: '啟動器',
@@ -1127,13 +1133,14 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.wizardEsdeStepDesc:
       '已經在使用 ES-DE 了嗎？匯入你的遊戲中繼資料和圖片。選擇包含「gamelists」和'
       '「downloaded_media」資料夾的 ES-DE 主資料夾。選用；你可以稍後在「設定」中執行。',
-  AppLocale.wizardArtPackTitle: '取得 NeoStation 美術包',
+  AppLocale.wizardArtPackTitle: '取得 System Art Pack',
   AppLocale.wizardArtPackDesc:
-      '我們強烈建議下載 NeoStation 系統美術包，為你的整個遊戲庫帶來精美的'
+      '我們強烈建議下載 System Art Pack（SAP），為你的整個遊戲庫帶來精美的'
       '主機背景。之後可在「設定」中變更。',
-  AppLocale.wizardDownloadArtPack: '下載美術包',
-  AppLocale.wizardArtPackInstalled: '美術包已安裝！你之後可以在「設定」中探索更多主題。',
-  AppLocale.wizardArtPackUnavailable: '目前無法存取美術包。連上網路後，你可以稍後在「設定」中安裝它。',
+  AppLocale.wizardDownloadArtPack: '下載 System Art Pack',
+  AppLocale.wizardArtPackInstalled: 'System Art Pack 已安裝！你之後可以在「設定」中探索更多包。',
+  AppLocale.wizardArtPackUnavailable:
+      '目前無法存取 System Art Pack。連上網路後，你可以稍後在「設定」中安裝它。',
 
   // Hide / unhide games
   AppLocale.hideGame: '隱藏遊戲',

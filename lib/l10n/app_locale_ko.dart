@@ -42,7 +42,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.directories: '폴더',
   AppLocale.themes: '테마',
   AppLocale.systemArt: '시스템 아트',
-  AppLocale.systemArtSubtitle: '시스템 아트 팩으로 시스템 카드의 배경과 로고를 꾸밉니다',
+  AppLocale.systemArtSubtitle: '시스템 아트 팩으로 시스템 카드의 배경을 꾸밉니다',
   AppLocale.systemArtNone: '없음',
   AppLocale.systemArtNoneSubtitle: '기본 디자인',
   AppLocale.systemArtLoading: '시스템 아트 불러오는 중...',
@@ -53,6 +53,12 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.systemArtRedownloadBody:
       '캐시된 팩을 삭제하고 다시 다운로드합니다. 일부 시스템 배경이 표시되지 않을 때 사용하세요.',
   AppLocale.systemArtDownloading: '시스템 아트 팩 다운로드 중...',
+  AppLocale.systemArtByAuthor: '{author} 제작',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '다운로드 {count}회',
+  AppLocale.systemArtSystemsCovered: '{count}개 시스템',
+  AppLocale.systemArtSupport: '후원하기',
+  AppLocale.systemArtApplied: '적용됨',
   AppLocale.about: '소개',
   AppLocale.exit: '종료',
   AppLocale.launcher: '런처',
@@ -1139,15 +1145,15 @@ const Map<String, dynamic> appLocaleKo = {
       '이미 ES-DE를 사용 중이신가요? 게임 메타데이터와 아트워크를 가져오세요. '
       '"gamelists"와 "downloaded_media" 폴더가 포함된 ES-DE 메인 폴더를 '
       '선택하세요. 선택 사항이며, 나중에 설정에서 실행할 수 있습니다.',
-  AppLocale.wizardArtPackTitle: 'NeoStation 아트 팩 받기',
+  AppLocale.wizardArtPackTitle: 'System Art Pack 받기',
   AppLocale.wizardArtPackDesc:
-      '라이브러리 전체에 아름다운 콘솔 배경을 제공하는 NeoStation 시스템 '
-      '아트 팩 다운로드를 적극 권장합니다. 나중에 설정에서 변경할 수 있습니다.',
-  AppLocale.wizardDownloadArtPack: '아트 팩 다운로드',
+      '라이브러리 전체에 아름다운 콘솔 배경을 제공하는 System Art Pack(SAP) '
+      '다운로드를 적극 권장합니다. 나중에 설정에서 변경할 수 있습니다.',
+  AppLocale.wizardDownloadArtPack: 'System Art Pack 다운로드',
   AppLocale.wizardArtPackInstalled:
-      '아트 팩이 설치되었습니다! 나중에 설정에서 더 많은 테마를 살펴볼 수 있습니다.',
+      'System Art Pack이 설치되었습니다! 나중에 설정에서 더 많은 팩을 살펴볼 수 있습니다.',
   AppLocale.wizardArtPackUnavailable:
-      '현재 아트 팩에 접근할 수 없습니다. 온라인 상태가 되면 설정에서 설치할 수 있습니다.',
+      '현재 System Art Pack에 접근할 수 없습니다. 온라인 상태가 되면 설정에서 설치할 수 있습니다.',
 
   // Library search & filtering.
   AppLocale.searchTitle: '검색',

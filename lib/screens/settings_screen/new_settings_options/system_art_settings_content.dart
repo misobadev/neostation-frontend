@@ -4,19 +4,15 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
-import 'package:neostation/services/neo_assets_service.dart';
-import 'package:neostation/providers/sqlite_config_provider.dart';
-import 'package:neostation/responsive.dart';
 import 'package:neostation/services/game_service.dart'
     show GamepadNavigationManager;
-import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/widgets/system_art_pack_dialog.dart';
+import 'package:neostation/widgets/system_art_pack_tile.dart';
 import 'package:provider/provider.dart';
 import 'settings_title.dart';
-
-final _log = LoggerService.instance;
 
 class SystemArtSettingsContent extends StatefulWidget {
   final bool isContentFocused;
@@ -42,7 +38,9 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
   final AdaptiveScroller _scroller = AdaptiveScroller();
   final List<GlobalKey> _itemKeys = [];
 
-  int get _gridColumns => Responsive.getThemesCrossAxisCount(context);
+  /// The list is a single column, so vertical navigation moves one row at a
+  /// time. Left always returns to the category menu.
+  static const int _gridColumns = 1;
 
   int getItemCount() => _itemKeys.length;
 
@@ -82,27 +80,12 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
   }
 
   bool navigateLeft() {
-    final currentCol = widget.selectedContentIndex % _gridColumns;
-    if (currentCol == 0) return true; // return to menu
-
-    final newIndex = GridNavUtils.navigateLeft(
-      currentIndex: widget.selectedContentIndex,
-      crossAxisCount: _gridColumns,
-      maxItems: getItemCount(),
-    );
-    widget.onSelectionChanged?.call(newIndex);
-    _ensureSelectedItemVisible(newIndex);
-    return false;
+    // Single-column list: Left always hands focus back to the menu.
+    return true;
   }
 
   void navigateRight() {
-    final newIndex = GridNavUtils.navigateRight(
-      currentIndex: widget.selectedContentIndex,
-      crossAxisCount: _gridColumns,
-      maxItems: getItemCount(),
-    );
-    widget.onSelectionChanged?.call(newIndex);
-    _ensureSelectedItemVisible(newIndex);
+    // Single-column list: there is nothing to the right.
   }
 
   void scrollToIndex(int index) => _ensureSelectedItemVisible(index);
@@ -111,58 +94,30 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
     _onItemTapped(index);
   }
 
-  List<String> _getSystemFolderNames() {
-    final sqliteProvider = context.read<SqliteConfigProvider>();
-    return sqliteProvider.availableSystems
-        .where((s) => s.folderName != 'all-background')
-        .map((s) => s.folderName)
-        .toList();
-  }
-
+  /// Handles A/tap on a row: opens the pack detail dialog for a pack, or clears
+  /// the applied pack for "None".
   void _onItemTapped(int index) async {
     final neoAssets = context.read<NeoAssetsProvider>();
     final themes = neoAssets.themes;
 
-    String targetFolder;
-    String targetName;
-
     if (index == 0) {
-      targetFolder = '';
-      targetName = AppLocale.systemArtNone.getString(context);
-    } else {
-      final themeIndex = index - 1;
-      if (themeIndex < 0 || themeIndex >= themes.length) return;
-      targetFolder = themes[themeIndex].folder;
-      targetName = themes[themeIndex].name;
-    }
-
-    // Re-picking the pack that is already applied is the repair path: it wipes
-    // the cache and refetches, which is the only way to recover a background
-    // that failed to download when the pack was first applied. "None" has
-    // nothing to redownload, so it stays a no-op.
-    final isRedownload = neoAssets.activeThemeFolder == targetFolder;
-    if (isRedownload && targetFolder.isEmpty) return;
-
-    final confirmed = await _showConfirmDialog(
-      targetName,
-      targetFolder.isEmpty,
-      isRedownload: isRedownload,
-    );
-    if (!confirmed) return;
-    if (!mounted) return;
-
-    widget.onSelectionChanged?.call(index);
-
-    if (targetFolder.isEmpty) {
-      await neoAssets.clearTheme();
-    } else {
-      final systemFolders = _getSystemFolderNames();
-      await neoAssets.downloadAndApplyTheme(
-        targetFolder,
-        systemFolders,
-        forceRedownload: isRedownload,
+      // "None" has nothing to redownload, so re-picking it is a no-op.
+      if (neoAssets.activeThemeFolder.isEmpty) return;
+      final confirmed = await _showConfirmDialog(
+        AppLocale.systemArtNone.getString(context),
+        true,
       );
+      if (!confirmed) return;
+      if (!mounted) return;
+      widget.onSelectionChanged?.call(index);
+      await neoAssets.clearTheme();
+      return;
     }
+
+    final themeIndex = index - 1;
+    if (themeIndex < 0 || themeIndex >= themes.length) return;
+    widget.onSelectionChanged?.call(index);
+    await SystemArtPackDialog.show(context, themes[themeIndex]);
   }
 
   Future<bool> _showConfirmDialog(
@@ -193,25 +148,10 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
     final neoAssets = context.watch<NeoAssetsProvider>();
     final theme = Theme.of(context);
 
-    final List<_ThemeItem> items = [
-      _ThemeItem(
-        label: AppLocale.systemArtNone.getString(context),
-        folder: '',
-        previewUrl: '',
-        isAi: false,
-      ),
-      ...neoAssets.themes.map(
-        (t) => _ThemeItem(
-          label: t.name,
-          folder: t.folder,
-          previewUrl: t.previewUrl,
-          isAi: t.isAi,
-        ),
-      ),
-    ];
-
-    if (_itemKeys.length != items.length) {
-      _initKeys(items.length);
+    final themes = neoAssets.themes;
+    final itemCount = themes.length + 1; // +1 for "None".
+    if (_itemKeys.length != itemCount) {
+      _initKeys(itemCount);
     }
 
     return SingleChildScrollView(
@@ -231,39 +171,110 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
             _buildDownloadProgress(neoAssets, theme)
           else if (neoAssets.loading)
             _buildLoadingIndicator(theme)
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: items.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: _gridColumns,
-                crossAxisSpacing: 8.r,
-                mainAxisSpacing: 8.r,
-                childAspectRatio: 1.05,
+          else ...[
+            _buildNoneTile(theme),
+            for (int i = 0; i < themes.length; i++)
+              Container(
+                key: _itemKeys[i + 1],
+                child: SystemArtPackTile(
+                  pack: themes[i],
+                  isActive: neoAssets.isThemeActive(themes[i].folder),
+                  isFocused:
+                      widget.isContentFocused &&
+                      widget.selectedContentIndex == i + 1,
+                  onTap: () {
+                    SfxService().playNavSound();
+                    _onItemTapped(i + 1);
+                  },
+                ),
               ),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final isSelected = neoAssets.activeThemeFolder == item.folder;
-                final isFocused =
-                    widget.isContentFocused &&
-                    widget.selectedContentIndex == index;
-
-                return Container(
-                  key: _itemKeys[index],
-                  child: _NeoThemeCard(
-                    item: item,
-                    isSelected: isSelected,
-                    isFocused: isFocused,
-                    onTap: () {
-                      SfxService().playNavSound();
-                      _onItemTapped(index);
-                    },
-                  ),
-                );
-              },
-            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildNoneTile(ThemeData theme) {
+    final primary = theme.colorScheme.primary;
+    final isFocused =
+        widget.isContentFocused && widget.selectedContentIndex == 0;
+    final isActive = context
+        .watch<NeoAssetsProvider>()
+        .activeThemeFolder
+        .isEmpty;
+
+    return Container(
+      key: _itemKeys.isNotEmpty ? _itemKeys[0] : null,
+      margin: EdgeInsets.symmetric(vertical: 4.r),
+      padding: EdgeInsets.all(8.r),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: isFocused
+              ? primary
+              : (isActive
+                    ? Colors.greenAccent.withValues(alpha: 0.7)
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.12)),
+          width: isFocused ? 2.r : 1.r,
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          SfxService().playNavSound();
+          _onItemTapped(0);
+        },
+        child: Row(
+          children: [
+            Container(
+              width: 64.r,
+              height: 64.r,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Center(
+                child: Icon(
+                  Symbols.block_rounded,
+                  size: 28.r,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                ),
+              ),
+            ),
+            SizedBox(width: 12.r),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    AppLocale.systemArtNone.getString(context),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontSize: 14.r,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 4.r),
+                  Text(
+                    AppLocale.systemArtNoneSubtitle.getString(context),
+                    style: TextStyle(
+                      fontSize: 10.r,
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.65,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isActive)
+              Icon(
+                Symbols.check_circle_rounded,
+                size: 18.r,
+                color: Colors.greenAccent,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -299,6 +310,9 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
   Widget _buildDownloadProgress(NeoAssetsProvider neoAssets, ThemeData theme) {
     final primary = theme.colorScheme.primary;
     final pct = (neoAssets.downloadProgress * 100).toInt();
+    final counts = neoAssets.downloadTotal > 0
+        ? '${neoAssets.downloadDone}/${neoAssets.downloadTotal}'
+        : '';
 
     return Padding(
       padding: EdgeInsets.all(32.r),
@@ -325,7 +339,7 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
             ),
             SizedBox(height: 4.r),
             Text(
-              '$pct%',
+              counts.isEmpty ? '$pct%' : '$pct%  ($counts)',
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontSize: 14.r,
                 fontWeight: FontWeight.w600,
@@ -333,210 +347,6 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ThemeItem {
-  final String label;
-  final String folder;
-  final String previewUrl;
-  final bool isAi;
-
-  const _ThemeItem({
-    required this.label,
-    required this.folder,
-    required this.previewUrl,
-    required this.isAi,
-  });
-}
-
-class _NeoThemeCard extends StatelessWidget {
-  static final Set<String> _loggedPreviewNormalizations = <String>{};
-
-  final _ThemeItem item;
-  final bool isSelected;
-  final bool isFocused;
-  final VoidCallback onTap;
-
-  const _NeoThemeCard({
-    required this.item,
-    required this.isSelected,
-    required this.isFocused,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AspectRatio(
-            aspectRatio: 4 / 3,
-            child: Container(
-              margin: EdgeInsets.symmetric(vertical: 4.h),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(
-                  color: isFocused ? primary : Colors.transparent,
-                  width: 2.r,
-                ),
-                boxShadow: isFocused
-                    ? [
-                        BoxShadow(
-                          color: primary.withValues(alpha: 0.3),
-                          blurRadius: 8.r,
-                          spreadRadius: 1.r,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6.r),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Preview image or placeholder
-                    _buildPreview(context, theme),
-
-                    // Selection indicator: centered checkmark, only when selected
-                    if (isSelected)
-                      Center(
-                        child: Container(
-                          width: 36.r,
-                          height: 36.r,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.greenAccent,
-                          ),
-                          child: Icon(
-                            Symbols.check_rounded,
-                            color: Colors.black,
-                            size: 24.r,
-                          ),
-                        ),
-                      ),
-
-                    if (item.isAi)
-                      Positioned(
-                        top: 8.r,
-                        left: 8.r,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 6.r,
-                            vertical: 2.r,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.62),
-                            borderRadius: BorderRadius.circular(999.r),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.35),
-                              width: 1.r,
-                            ),
-                          ),
-                          child: Text(
-                            'AI',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 8.r,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    // Tap layer
-                    Positioned.fill(
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          canRequestFocus: false,
-                          focusColor: Colors.transparent,
-                          hoverColor: Colors.transparent,
-                          highlightColor: Colors.transparent,
-                          splashColor: Colors.transparent,
-                          onTap: onTap,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          SizedBox(height: 4.r),
-          Text(
-            item.label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: isFocused || isSelected
-                  ? theme.colorScheme.onSurface
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.7),
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              fontSize: 11.r,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPreview(BuildContext context, ThemeData theme) {
-    final normalizedPreviewUrl = NeoAssetsTheme.normalizePreviewUrl(
-      item.previewUrl,
-    );
-
-    if (normalizedPreviewUrl.isNotEmpty) {
-      final normalizationKey =
-          '${item.folder}|${item.previewUrl}|$normalizedPreviewUrl';
-      if (item.previewUrl != normalizedPreviewUrl &&
-          _loggedPreviewNormalizations.add(normalizationKey)) {
-        _log.i(
-          'Theme preview URL normalized for "${item.folder}": '
-          'original="${item.previewUrl}" resolved="$normalizedPreviewUrl"',
-        );
-      }
-
-      return Image.network(
-        normalizedPreviewUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (_, error, stackTrace) {
-          _log.w(
-            'Theme preview failed for "${item.folder}" '
-            '(label="${item.label}") url="$normalizedPreviewUrl" error="$error"',
-          );
-          if (stackTrace != null) {
-            _log.d('Theme preview stackTrace: $stackTrace');
-          }
-          return _buildPlaceholder(theme);
-        },
-        loadingBuilder: (_, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return _buildPlaceholder(theme);
-        },
-      );
-    }
-    return _buildPlaceholder(theme);
-  }
-
-  Widget _buildPlaceholder(ThemeData theme) {
-    return Container(
-      color: theme.colorScheme.surface,
-      child: Center(
-        child: Icon(
-          item.folder.isEmpty ? Symbols.block_rounded : Symbols.image_rounded,
-          size: 28.r,
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
         ),
       ),
     );

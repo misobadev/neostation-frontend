@@ -42,9 +42,9 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.secondaryDisplay: 'Schermo Secondario',
   AppLocale.directories: 'Directory',
   AppLocale.themes: 'Temi',
-  AppLocale.systemArt: 'System Art',
+  AppLocale.systemArt: 'Arte dei sistemi',
   AppLocale.systemArtSubtitle:
-      'Personalizza sfondi e loghi delle schede di sistema con i pacchetti System Art',
+      'Personalizza gli sfondi delle schede di sistema con i pacchetti System Art',
   AppLocale.systemArtNone: 'Nessuno',
   AppLocale.systemArtNoneSubtitle: 'Aspetto predefinito',
   AppLocale.systemArtLoading: 'Caricamento System Art...',
@@ -56,6 +56,12 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.systemArtRedownloadBody:
       'Il pacchetto nella cache verrà eliminato e scaricato di nuovo. Usa questa opzione se mancano alcuni sfondi dei sistemi.',
   AppLocale.systemArtDownloading: 'Download del pacchetto System Art...',
+  AppLocale.systemArtByAuthor: 'di {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} download',
+  AppLocale.systemArtSystemsCovered: '{count} sistemi',
+  AppLocale.systemArtSupport: 'Sostieni',
+  AppLocale.systemArtApplied: 'Applicato',
   AppLocale.about: 'Informazioni',
   AppLocale.exit: 'Esci',
   AppLocale.launcher: 'Launcher',
@@ -1297,17 +1303,17 @@ const Map<String, dynamic> appLocaleIt = {
       'Seleziona la cartella principale di ES-DE che contiene le cartelle '
       '"gamelists" e "downloaded_media". Facoltativo; puoi eseguirlo più tardi '
       'dalle Impostazioni.',
-  AppLocale.wizardArtPackTitle: 'Ottieni il pacchetto grafico NeoStation',
+  AppLocale.wizardArtPackTitle: 'Ottieni un System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'Consigliamo vivamente di scaricare il pacchetto grafico dei sistemi '
-      'NeoStation per splendidi sfondi delle console in tutta la tua libreria. '
-      'Può essere modificato in seguito nelle Impostazioni.',
-  AppLocale.wizardDownloadArtPack: 'Scarica pacchetto grafico',
+      'Consigliamo vivamente di scaricare un System Art Pack (SAP) per '
+      'splendidi sfondi delle console in tutta la tua libreria. Puoi cambiarlo '
+      'in seguito nelle Impostazioni.',
+  AppLocale.wizardDownloadArtPack: 'Scarica System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      'Pacchetto grafico installato! Puoi esplorare altri temi in seguito nelle '
+      'System Art Pack installato! Puoi esplorare altri pack in seguito nelle '
       'Impostazioni.',
   AppLocale.wizardArtPackUnavailable:
-      'Al momento non è stato possibile raggiungere il pacchetto grafico. Puoi '
+      'Al momento non è stato possibile raggiungere il System Art Pack. Puoi '
       'installarlo in seguito dalle Impostazioni una volta online.',
 
   // Hide / unhide games

@@ -42,9 +42,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.secondaryDisplay: 'Layar Sekunder',
   AppLocale.directories: 'Direktori',
   AppLocale.themes: 'Tema',
-  AppLocale.systemArt: 'System Art',
+  AppLocale.systemArt: 'Seni Sistem',
   AppLocale.systemArtSubtitle:
-      'Sesuaikan latar belakang dan logo kartu sistem dengan paket System Art',
+      'Sesuaikan latar belakang kartu sistem dengan paket System Art',
   AppLocale.systemArtNone: 'Tidak Ada',
   AppLocale.systemArtNoneSubtitle: 'Tampilan default',
   AppLocale.systemArtLoading: 'Memuat System Art...',
@@ -56,6 +56,12 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.systemArtRedownloadBody:
       'Paket yang tersimpan akan dihapus dan diunduh ulang. Gunakan ini jika beberapa latar belakang sistem tidak muncul.',
   AppLocale.systemArtDownloading: 'Mengunduh paket System Art...',
+  AppLocale.systemArtByAuthor: 'oleh {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} unduhan',
+  AppLocale.systemArtSystemsCovered: '{count} sistem',
+  AppLocale.systemArtSupport: 'Dukung',
+  AppLocale.systemArtApplied: 'Diterapkan',
   AppLocale.about: 'Tentang',
   AppLocale.exit: 'Keluar',
   AppLocale.launcher: 'Launcher',
@@ -1269,17 +1275,17 @@ const Map<String, dynamic> appLocaleId = {
       'Sudah menggunakan ES-DE? Impor metadata dan gambar game Anda. Pilih '
       'folder utama ES-DE yang berisi folder "gamelists" dan "downloaded_media" '
       'Anda. Opsional; Anda dapat menjalankannya nanti dari Pengaturan.',
-  AppLocale.wizardArtPackTitle: 'Dapatkan Paket Gambar NeoStation',
+  AppLocale.wizardArtPackTitle: 'Dapatkan System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'Kami sangat menyarankan untuk mengunduh paket gambar sistem NeoStation '
-      'agar latar belakang konsol tampil indah di seluruh koleksi Anda. Ini '
-      'dapat diubah nanti di Pengaturan.',
-  AppLocale.wizardDownloadArtPack: 'Unduh Paket Gambar',
+      'Kami sangat menyarankan untuk mengunduh System Art Pack (SAP) agar latar '
+      'belakang konsol tampil indah di seluruh koleksi Anda. Ini dapat diubah '
+      'nanti di Pengaturan.',
+  AppLocale.wizardDownloadArtPack: 'Unduh System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      'Paket gambar terpasang! Anda dapat menjelajahi lebih banyak tema nanti '
+      'System Art Pack terpasang! Anda dapat menjelajahi lebih banyak pack nanti '
       'di Pengaturan.',
   AppLocale.wizardArtPackUnavailable:
-      'Paket gambar tidak dapat dijangkau saat ini. Anda dapat memasangnya '
+      'System Art Pack tidak dapat dijangkau saat ini. Anda dapat memasangnya '
       'nanti dari Pengaturan setelah online.',
 
   // Hide / unhide games

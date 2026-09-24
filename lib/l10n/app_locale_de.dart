@@ -42,9 +42,9 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.secondaryDisplay: 'Zweitbildschirm',
   AppLocale.directories: 'Verzeichnisse',
   AppLocale.themes: 'Themes',
-  AppLocale.systemArt: 'System Art',
+  AppLocale.systemArt: 'System-Art',
   AppLocale.systemArtSubtitle:
-      'Passe Hintergründe und Logos der Systemkarten mit System-Art-Paketen an',
+      'Passe Hintergründe der Systemkarten mit System-Art-Paketen an',
   AppLocale.systemArtNone: 'Keins',
   AppLocale.systemArtNoneSubtitle: 'Standarddarstellung',
   AppLocale.systemArtLoading: 'System Art wird geladen...',
@@ -56,6 +56,12 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.systemArtRedownloadBody:
       'Das zwischengespeicherte Paket wird gelöscht und erneut heruntergeladen. Verwende dies, wenn einige System-Hintergründe fehlen.',
   AppLocale.systemArtDownloading: 'System-Art-Paket wird heruntergeladen...',
+  AppLocale.systemArtByAuthor: 'von {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} Downloads',
+  AppLocale.systemArtSystemsCovered: '{count} Systeme',
+  AppLocale.systemArtSupport: 'Unterstützen',
+  AppLocale.systemArtApplied: 'Angewendet',
   AppLocale.about: 'Über',
   AppLocale.exit: 'Beenden',
   AppLocale.launcher: 'Launcher',
@@ -1306,18 +1312,17 @@ const Map<String, dynamic> appLocaleDe = {
       'Wähle den ES-DE-Hauptordner, der deine Ordner "gamelists" und '
       '"downloaded_media" enthält. Optional; du kannst es später in den '
       'Einstellungen ausführen.',
-  AppLocale.wizardArtPackTitle: 'Hol dir das NeoStation-Artwork-Paket',
+  AppLocale.wizardArtPackTitle: 'Hol dir ein System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'Wir empfehlen dringend, das NeoStation-System-Artwork-Paket '
-      'herunterzuladen, um in deiner gesamten Bibliothek schöne '
-      'Konsolen-Hintergründe zu erhalten. Es kann später in den Einstellungen '
-      'geändert werden.',
-  AppLocale.wizardDownloadArtPack: 'Artwork-Paket herunterladen',
+      'Wir empfehlen dringend, ein System Art Pack (SAP) herunterzuladen, um in '
+      'deiner gesamten Bibliothek schöne Konsolen-Hintergründe zu erhalten. Du '
+      'kannst es später in den Einstellungen ändern.',
+  AppLocale.wizardDownloadArtPack: 'System Art Pack herunterladen',
   AppLocale.wizardArtPackInstalled:
-      'Artwork-Paket installiert! Weitere Designs findest du später in den '
+      'System Art Pack installiert! Weitere Packs findest du später in den '
       'Einstellungen.',
   AppLocale.wizardArtPackUnavailable:
-      'Das Artwork-Paket ist derzeit nicht erreichbar. Du kannst es später in '
+      'Das System Art Pack ist derzeit nicht erreichbar. Du kannst es später in '
       'den Einstellungen installieren, sobald du online bist.',
 
   // Hide / unhide games

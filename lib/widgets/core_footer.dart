@@ -127,6 +127,10 @@ class GamepadControl extends StatelessWidget {
   final Color? textColor;
   final Gradient? gradient;
 
+  /// Shows a spinner in place of the glyph and disables the tap while work is
+  /// in flight (e.g. a download or a folder picker).
+  final bool busy;
+
   const GamepadControl({
     super.key,
     this.iconPath,
@@ -136,6 +140,7 @@ class GamepadControl extends StatelessWidget {
     this.backgroundColor,
     this.textColor,
     this.gradient,
+    this.busy = false,
   });
 
   @override
@@ -150,7 +155,7 @@ class GamepadControl extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: busy ? null : onTap,
         canRequestFocus: false,
         splashColor: contentColor.withValues(alpha: 0.2),
         highlightColor: Colors.transparent,
@@ -178,8 +183,17 @@ class GamepadControl extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (busy)
+                SizedBox(
+                  width: 14.r,
+                  height: 14.r,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.r,
+                    valueColor: AlwaysStoppedAnimation<Color>(contentColor),
+                  ),
+                )
               // Material Design icon
-              if (icon != null)
+              else if (icon != null)
                 Icon(icon, size: 12.r, color: contentColor)
               // Asset image
               else if (iconPath is String)

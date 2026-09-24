@@ -7,12 +7,11 @@ import 'package:http/testing.dart';
 import 'package:neostation/services/neo_assets_service.dart';
 import 'package:path/path.dart' as path;
 
-/// Coverage comes from the theme's declared `systems` list, so a system the
-/// pack does not cover is never requested at all. What still has to hold is
-/// the split between "the server says this is absent" (404) and "the server
-/// could not be reached" (timeout, 429, 5xx): only the former is a fact about
-/// the pack, and treating the latter as absence is how systems used to lose
-/// their backgrounds for the life of an install.
+/// The NeoAssets catalog is public (`GET /api/v1/packs`), and each pack's files
+/// come from `GET /api/v1/packs/{folder}/download`. These tests pin the parsing,
+/// the CDN URL resolution, the offline catalog fallback and the download-to-cache
+/// behaviour, including the split between a definitive 404 and a transient
+/// failure that must stay retryable.
 void main() {
   late Directory tempDir;
 
@@ -33,187 +32,269 @@ void main() {
     );
   }
 
-  File backgroundFile(String theme, String system, {String ext = 'webp'}) =>
-      File(path.join(tempDir.path, theme, 'backgrounds', '$system.$ext'));
+  String catalogBody() => jsonEncode({
+    'themes': [
+      {
+        'folder': 'wiird',
+        'name': 'WIIRD',
+        'author': 'Mistery',
+        'description': 'A pack.',
+        'donation_url': 'https://ko-fi.com/spritedmistery',
+        'ai': false,
+        'version': '1.0',
+        'preview': 'packs/wiird/backgrounds/vb.webp',
+        'backgrounds': ['packs/wiird/backgrounds/vb.webp'],
+        'downloads': 6,
+        'systems_covered': 59,
+      },
+      {
+        'folder': 'neostation',
+        'name': 'NeoStation',
+        'author': 'NeoStation Team',
+        'description': 'First and Official System Art Pack.',
+        'donation_url': 'https://ko-fi.com/neostation',
+        'ai': false,
+        'version': '1.0',
+        'preview': 'packs/neostation/backgrounds/gog.webp',
+        'backgrounds': [
+          'packs/neostation/backgrounds/gog.webp',
+          'packs/neostation/backgrounds/bbcmicro.webp',
+          'packs/neostation/backgrounds/amazon.webp',
+          'packs/neostation/backgrounds/zxspectrum.webp',
+        ],
+        'downloads': 15,
+        'systems_covered': 96,
+      },
+    ],
+    'total': 2,
+  });
 
-  group('getCachedBackground', () {
-    test('caches the webp when the asset exists', () async {
+  String packBody() => jsonEncode({
+    'folder': 'neostation',
+    'name': 'NeoStation',
+    'author': 'NeoStation Team',
+    'donation_url': 'https://ko-fi.com/neostation',
+    'version': '1.0',
+    'systems_covered': 96,
+    'files': [
+      {
+        'kind': 'background',
+        'system_id': 'gb',
+        'file_name': 'gb.webp',
+        'url': 'https://cdn.neoassets.dev/packs/neostation/backgrounds/gb.webp',
+        'size': 3,
+        'mime': 'image/webp',
+      },
+      {
+        'kind': 'background',
+        'system_id': 'snes',
+        'file_name': 'snes.webp',
+        'url':
+            'https://cdn.neoassets.dev/packs/neostation/backgrounds/snes.webp',
+        'size': 3,
+        'mime': 'image/webp',
+      },
+    ],
+  });
+
+  File backgroundFile(String system) => File(
+    path.join(tempDir.path, 'neostation', 'backgrounds', '$system.webp'),
+  );
+
+  group('fetchThemes', () {
+    test('parses the catalog and resolves CDN urls', () async {
       useClient((request) async {
-        if (request.url.path.endsWith('/backgrounds/wii.webp')) {
-          return http.Response.bytes([1, 2, 3], 200);
-        }
-        return http.Response('not found', 404);
+        expect(request.url.path, '/api/v1/packs');
+        return http.Response(catalogBody(), 200);
       });
 
-      final result = await NeoAssetsService.getCachedBackground(
-        'NeoStation',
-        'wii',
-      );
+      final themes = await NeoAssetsService.fetchThemes();
 
-      expect(result, isNotNull);
-      expect(File(result!).readAsBytesSync(), [1, 2, 3]);
+      // Most-downloaded first.
+      expect(themes.map((t) => t.folder), ['neostation', 'wiird']);
+      final pack = themes.first;
+      expect(pack.name, 'NeoStation');
+      expect(pack.author, 'NeoStation Team');
+      expect(pack.donationUrl, 'https://ko-fi.com/neostation');
+      expect(pack.version, '1.0');
+      expect(pack.systemsCovered, 96);
+      expect(pack.downloads, 15);
+      expect(pack.isAi, isFalse);
+      expect(
+        pack.previewUrl,
+        'https://cdn.neoassets.dev/packs/neostation/backgrounds/gog.webp',
+      );
+      expect(pack.backgrounds, hasLength(4));
+      expect(pack.mosaicImages, hasLength(4));
     });
 
-    test('leaves no .part file behind on success', () async {
-      useClient((request) async => http.Response.bytes([1], 200));
+    test('falls back to the cached catalog when offline', () async {
+      useClient((_) async => http.Response(catalogBody(), 200));
+      await NeoAssetsService.fetchThemes();
 
-      await NeoAssetsService.getCachedBackground('NeoStation', 'wii');
+      // New session, network down: the cached catalog must still answer.
+      NeoAssetsService.debugConfigure(
+        client: MockClient((_) async => throw const SocketException('offline')),
+        cacheDir: tempDir.path,
+      );
+      final themes = await NeoAssetsService.fetchThemes();
+
+      expect(themes, isNotEmpty);
+      expect(themes.first.folder, 'neostation');
+    });
+
+    test('forceRefresh re-reads the catalog so a new count shows', () async {
+      var downloads = 15;
+      useClient((_) async {
+        return http.Response(
+          jsonEncode({
+            'themes': [
+              {
+                'folder': 'neostation',
+                'name': 'NeoStation',
+                'downloads': downloads,
+              },
+            ],
+            'total': 1,
+          }),
+          200,
+        );
+      });
+
+      var themes = await NeoAssetsService.fetchThemes();
+      expect(themes.first.downloads, 15);
+
+      downloads = 16;
+      themes = await NeoAssetsService.fetchThemes();
+      expect(themes.first.downloads, 15, reason: 'served from the cache');
+
+      themes = await NeoAssetsService.fetchThemes(forceRefresh: true);
+      expect(themes.first.downloads, 16);
+    });
+
+    test('ignores a legacy GitHub catalog with no source marker', () async {
+      // The removed GitHub theme system cached a manifest shaped like this.
+      File(path.join(tempDir.path, 'manifest.json')).writeAsStringSync(
+        jsonEncode({
+          'latest_version': '0.6.0',
+          'themes': [
+            {
+              'name': 'NeoStation',
+              'author': 'Misoba',
+              'folder': 'NeoStation',
+              'preview': 'preview/neostation.webp',
+            },
+          ],
+        }),
+      );
+      useClient((_) async => throw const SocketException('offline'));
+
+      final themes = await NeoAssetsService.fetchThemes();
+
+      expect(themes, isEmpty);
+    });
+
+    test('ignores a legacy theme.json folder', () async {
+      final legacy = File(path.join(tempDir.path, 'LegacyPack', 'theme.json'));
+      legacy.parent.createSync(recursive: true);
+      legacy.writeAsStringSync(
+        jsonEncode({'id': 'neostation', 'name': 'LegacyPack'}),
+      );
+      useClient((_) async => throw const SocketException('offline'));
+
+      final themes = await NeoAssetsService.fetchThemes();
+
+      expect(themes, isEmpty);
+    });
+
+    test('merges a locally-downloaded pack case-insensitively', () async {
+      final local = File(path.join(tempDir.path, 'NeoStation', 'pack.json'));
+      local.parent.createSync(recursive: true);
+      local.writeAsStringSync(
+        jsonEncode({'name': 'NeoStation', 'folder': 'NeoStation'}),
+      );
+
+      useClient((_) async => http.Response(catalogBody(), 200));
+
+      final themes = await NeoAssetsService.fetchThemes();
+
+      // The catalog's `neostation` wins; the local `NeoStation` is not a second
+      // row despite the folder casing.
+      expect(
+        themes.where((t) => t.folder.toLowerCase() == 'neostation'),
+        hasLength(1),
+      );
+      expect(themes.map((t) => t.folder), isNot(contains('NeoStation')));
+    });
+  });
+
+  group('fetchPack', () {
+    test('parses files and resolves their urls', () async {
+      useClient((request) async {
+        expect(request.url.path, '/api/v1/packs/neostation/download');
+        return http.Response(packBody(), 200);
+      });
+
+      final pack = await NeoAssetsService.fetchPack('neostation');
+
+      expect(pack, isNotNull);
+      expect(pack!.files, hasLength(2));
+      expect(pack.files.first.isBackground, isTrue);
+      expect(pack.files.first.url, startsWith('https://cdn.neoassets.dev/'));
+    });
+
+    test('returns null when the pack is unreachable', () async {
+      useClient((_) async => http.Response('down', 503));
+
+      expect(await NeoAssetsService.fetchPack('neostation'), isNull);
+    });
+  });
+
+  group('downloadPack', () {
+    NeoAssetsPackFile file(String system) => NeoAssetsPackFile(
+      kind: 'background',
+      systemId: system,
+      fileName: '$system.webp',
+      url:
+          'https://cdn.neoassets.dev/packs/neostation/backgrounds/$system.webp',
+      size: 3,
+      mime: 'image/webp',
+    );
+
+    test('caches every file under backgrounds/ and leaves no .part', () async {
+      useClient((_) async => http.Response.bytes([1, 2, 3], 200));
+
+      final cached = await NeoAssetsService.downloadPack('neostation', [
+        file('gb'),
+        file('snes'),
+      ]);
+
+      expect(cached, 2);
+      expect(backgroundFile('gb').existsSync(), isTrue);
+      expect(backgroundFile('snes').existsSync(), isTrue);
 
       final parts = Directory(
-        path.join(tempDir.path, 'NeoStation'),
+        path.join(tempDir.path, 'neostation'),
       ).listSync(recursive: true).where((e) => e.path.endsWith('.part'));
       expect(parts, isEmpty);
     });
 
-    test('falls back to the legacy gif when the webp is a 404', () async {
+    test('counts only the files that were actually cached', () async {
       useClient((request) async {
-        if (request.url.path.endsWith('.gif')) {
-          return http.Response.bytes([7], 200);
+        if (request.url.path.endsWith('/gb.webp')) {
+          return http.Response.bytes([1], 200);
         }
-        return http.Response('not found', 404);
-      });
-
-      final result = await NeoAssetsService.getCachedBackground(
-        'NeoStation',
-        'wii',
-      );
-
-      expect(result, isNotNull);
-      expect(
-        backgroundFile('NeoStation', 'wii', ext: 'gif').existsSync(),
-        true,
-      );
-    });
-
-    test('a rate-limited webp does not go on to probe the gif', () async {
-      // A server refusing requests has nothing to say about the legacy gif
-      // either, and probing it would double the wait across ~100 systems.
-      final requested = <String>[];
-      useClient((request) async {
-        requested.add(request.url.path);
         return http.Response('rate limited', 429);
       });
 
-      final result = await NeoAssetsService.getCachedBackground(
-        'NeoStation',
-        'pce',
-      );
-
-      expect(result, isNull);
-      expect(requested.length, 3);
-      expect(requested.every((p) => p.endsWith('.webp')), isTrue);
-    });
-
-    test('a network error leaves nothing cached', () async {
-      useClient((request) async => throw const SocketException('reset'));
-
-      final result = await NeoAssetsService.getCachedBackground(
-        'NeoStation',
-        'pccd',
-      );
-
-      expect(result, isNull);
-      expect(backgroundFile('NeoStation', 'pccd').existsSync(), isFalse);
-    });
-
-    test('a transient failure resolves on a later attempt', () async {
-      var attempts = 0;
-      useClient((request) async {
-        attempts++;
-        if (attempts == 1) return http.Response('rate limited', 429);
-        return http.Response.bytes([9], 200);
-      });
-
-      final result = await NeoAssetsService.getCachedBackground(
-        'NeoStation',
-        'wii',
-      );
-
-      expect(result, isNotNull);
-    });
-  });
-
-  group('buildThemeDownloadPlan coverage', () {
-    /// Serves a theme.json declaring [systems], and 404s every asset.
-    void serveMetadata(List<String>? systems) {
-      useClient((request) async {
-        if (request.url.path.endsWith('theme.json')) {
-          return http.Response(
-            jsonEncode({'version': '1.0.0', 'systems': ?systems}),
-            200,
-          );
-        }
-        return http.Response('not found', 404);
-      });
-    }
-
-    test('plans only the systems the theme declares', () async {
-      serveMetadata(['wii', 'snes']);
-
-      final plan = await NeoAssetsService.buildThemeDownloadPlan('NeoStation', [
-        'wii',
-        'snes',
-        'uncovered',
+      final cached = await NeoAssetsService.downloadPack('neostation', [
+        file('gb'),
+        file('snes'),
       ]);
 
-      expect(plan.systemsToDownload, ['wii', 'snes']);
-    });
-
-    test('covers nothing when no systems list is declared', () async {
-      // Blind-probing every system is what the old negative cache existed to
-      // prevent, so an undeclared list must not fall back to "all systems".
-      serveMetadata(null);
-
-      final plan = await NeoAssetsService.buildThemeDownloadPlan('NeoStation', [
-        'wii',
-        'snes',
-      ]);
-
-      expect(plan.systemsToDownload, isEmpty);
-      expect(plan.totalAssetsToDownload, 0);
-    });
-
-    test('falls back to the cached theme.json when offline', () async {
-      final metadata = File(
-        path.join(tempDir.path, 'NeoStation', 'theme.json'),
-      );
-      metadata.parent.createSync(recursive: true);
-      metadata.writeAsStringSync(
-        jsonEncode({
-          'version': '1.0.0',
-          'systems': ['wii'],
-        }),
-      );
-
-      useClient((request) async => throw const SocketException('offline'));
-
-      final plan = await NeoAssetsService.buildThemeDownloadPlan('NeoStation', [
-        'wii',
-        'snes',
-      ]);
-
-      expect(plan.systemsToDownload, ['wii']);
-    });
-  });
-
-  group('deleteLegacyMissingMarkers', () {
-    test('clears markers once, then does not walk the cache again', () async {
-      NeoAssetsService.debugConfigure(cacheDir: tempDir.path);
-
-      final marker = File(
-        path.join(tempDir.path, 'NeoStation', 'backgrounds', 'wii.missing'),
-      );
-      marker.parent.createSync(recursive: true);
-      marker.writeAsStringSync('');
-
-      await NeoAssetsService.deleteLegacyMissingMarkers();
-      expect(marker.existsSync(), isFalse);
-
-      // The sentinel makes this a one-shot sweep, so a file recreated
-      // afterwards is left alone rather than costing a walk on every plan.
-      marker.writeAsStringSync('');
-      await NeoAssetsService.deleteLegacyMissingMarkers();
-      expect(marker.existsSync(), isTrue);
+      expect(cached, 1);
+      expect(backgroundFile('gb').existsSync(), isTrue);
+      expect(backgroundFile('snes').existsSync(), isFalse);
     });
   });
 }

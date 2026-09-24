@@ -41,8 +41,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.secondaryDisplay: 'セカンダリ画面',
   AppLocale.directories: 'ディレクトリ',
   AppLocale.themes: 'テーマ',
-  AppLocale.systemArt: 'System Art',
-  AppLocale.systemArtSubtitle: 'System Art パックでシステムカードの背景とロゴをカスタマイズ',
+  AppLocale.systemArt: 'システムアート',
+  AppLocale.systemArtSubtitle: 'System Art パックでシステムカードの背景をカスタマイズ',
   AppLocale.systemArtNone: 'なし',
   AppLocale.systemArtNoneSubtitle: 'デフォルトの外観',
   AppLocale.systemArtLoading: 'System Art を読み込み中...',
@@ -54,6 +54,12 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.systemArtRedownloadBody:
       'キャッシュされたパックを削除して再度ダウンロードします。一部のシステム背景が表示されない場合に使用してください。',
   AppLocale.systemArtDownloading: 'System Art パックをダウンロード中...',
+  AppLocale.systemArtByAuthor: '{author} 作',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: 'ダウンロード {count} 回',
+  AppLocale.systemArtSystemsCovered: '{count} システム',
+  AppLocale.systemArtSupport: '支援する',
+  AppLocale.systemArtApplied: '適用済み',
   AppLocale.about: 'NeoStationについて',
   AppLocale.exit: '終了',
   AppLocale.launcher: 'ランチャー',
@@ -1155,16 +1161,16 @@ const Map<String, dynamic> appLocaleJa = {
       'インポートできます。「gamelists」と「downloaded_media」フォルダーが含まれる '
       'ES-DE のメインフォルダーを選択してください。任意です。後で設定から'
       '実行できます。',
-  AppLocale.wizardArtPackTitle: 'NeoStation アートパックを入手',
+  AppLocale.wizardArtPackTitle: 'System Art Pack を入手',
   AppLocale.wizardArtPackDesc:
-      'ライブラリ全体で美しいコンソール背景を表示するために、NeoStation '
-      'システムアートパックのダウンロードを強くおすすめします。後で設定から'
-      '変更できます。',
-  AppLocale.wizardDownloadArtPack: 'アートパックをダウンロード',
-  AppLocale.wizardArtPackInstalled: 'アートパックをインストールしました！他のテーマは後で設定から確認できます。',
+      'ライブラリ全体で美しいコンソール背景を表示するために、System Art Pack'
+      '（SAP）のダウンロードを強くおすすめします。後で設定から変更できます。',
+  AppLocale.wizardDownloadArtPack: 'System Art Pack をダウンロード',
+  AppLocale.wizardArtPackInstalled:
+      'System Art Pack をインストールしました！他のパックは後で設定から確認できます。',
   AppLocale.wizardArtPackUnavailable:
-      '現在アートパックにアクセスできませんでした。オンラインになったら、後で'
-      '設定からインストールできます。',
+      '現在 System Art Pack にアクセスできませんでした。オンラインになったら、'
+      '後で設定からインストールできます。',
 
   // Hide / unhide games
   AppLocale.hideGame: 'ゲームを非表示',

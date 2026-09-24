@@ -3253,7 +3253,7 @@ class SqliteService {
     return config?['theme_name']?.toString() ?? 'system';
   }
 
-  /// Retrieves the active asset theme (neostation-assets).
+  /// Retrieves the active System Art pack folder.
   static Future<String> getActiveTheme() async {
     final config = await getUserConfig();
     return config?['active_theme']?.toString() ?? '';
