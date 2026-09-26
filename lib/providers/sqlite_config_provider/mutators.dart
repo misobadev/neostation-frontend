@@ -63,6 +63,13 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Updates the preferred width and density for the games list view.
+  Future<void> updateGameListLayout(String layout) async {
+    _config = _config.copyWith(gameListLayout: layout);
+    await SqliteConfigService.saveConfig(_config);
+    _notify();
+  }
+
   /// Toggles the application's fullscreen state.
   Future<void> updateIsFullscreen(bool value) async {
     _config = _config.copyWith(isFullscreen: value);

@@ -183,6 +183,9 @@ class ConfigModel {
   /// Preferred card style for the game carousel ('fanart' or 'box').
   final String gameCarouselCardStyle;
 
+  /// Preferred width and density for the games list view.
+  final String gameListLayout;
+
   /// Absolute path to the user's ES-DE application folder (the one containing
   /// `gamelists/` and `downloaded_media/`), or empty if not configured. Used
   /// by the ES-DE import and read-time fallback artwork resolution.
@@ -274,6 +277,7 @@ class ConfigModel {
     this.systemGridColumns = 'M',
     this.gameGridColumns = 'M',
     this.gameCarouselCardStyle = 'fanart',
+    this.gameListLayout = 'standard',
     this.nowPlayingDimDelay = 3,
     this.nowPlayingDimLevel = 100,
     this.fanartDimLevel = 25,
@@ -450,6 +454,9 @@ class ConfigModel {
                   json['game_carousel_card_style'] ??
                   'fanart')
               .toString(),
+      gameListLayout:
+          (json['gameListLayout'] ?? json['game_list_layout'] ?? 'standard')
+              .toString(),
       nowPlayingDimDelay:
           int.tryParse(
             (json['nowPlayingDimDelay'] ?? json['now_playing_dim_delay'] ?? 3)
@@ -603,6 +610,7 @@ class ConfigModel {
       'systemGridColumns': systemGridColumns,
       'gameGridColumns': gameGridColumns,
       'gameCarouselCardStyle': gameCarouselCardStyle,
+      'gameListLayout': gameListLayout,
       'nowPlayingDimDelay': nowPlayingDimDelay,
       'nowPlayingDimLevel': nowPlayingDimLevel,
       'fanartDimLevel': fanartDimLevel,
@@ -658,6 +666,7 @@ class ConfigModel {
     String? systemGridColumns,
     String? gameGridColumns,
     String? gameCarouselCardStyle,
+    String? gameListLayout,
     int? nowPlayingDimDelay,
     int? nowPlayingDimLevel,
     int? fanartDimLevel,
@@ -711,6 +720,7 @@ class ConfigModel {
       gameGridColumns: gameGridColumns ?? this.gameGridColumns,
       gameCarouselCardStyle:
           gameCarouselCardStyle ?? this.gameCarouselCardStyle,
+      gameListLayout: gameListLayout ?? this.gameListLayout,
       nowPlayingDimDelay: nowPlayingDimDelay ?? this.nowPlayingDimDelay,
       nowPlayingDimLevel: nowPlayingDimLevel ?? this.nowPlayingDimLevel,
       fanartDimLevel: fanartDimLevel ?? this.fanartDimLevel,

@@ -54,6 +54,7 @@ import '../../constants/system_folder_names.dart';
 import '../../utils/artwork_cache.dart';
 import '../../utils/game_list_update.dart';
 import '../../utils/game_list_responsive.dart';
+import '../../utils/game_list_layout.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 import '../../themes/corner_radii.dart';
@@ -1435,18 +1436,27 @@ class _SystemGamesListState extends State<SystemGamesList> {
         // system insets were smaller than that.
         LayoutBuilder(
           builder: (context, constraints) {
-            final listFraction = GameListResponsive.listFraction(
-              constraints.maxWidth,
-              constraints.maxHeight,
+            final config = context.watch<SqliteConfigProvider>().config;
+            final useGameListPreset =
+                config.gameViewMode == 'list' &&
+                widget.system.folderName != 'music';
+            final gameListLayout = GameListLayout.fromValue(
+              config.gameListLayout,
             );
+            final listFraction = useGameListPreset
+                ? gameListLayout.listFraction
+                : GameListResponsive.listFraction(
+                    constraints.maxWidth,
+                    constraints.maxHeight,
+                  );
             // The margin belongs to the sidebar, so subtract it from the
-            // target fraction to make the complete pane (margin included)
-            // occupy the requested 55%/40% of the row.
+            // selected fraction to make the complete pane (margin included)
+            // occupy the requested share of the row.
             final listWidth = (constraints.maxWidth * listFraction - 12.r)
                 .clamp(180.r, constraints.maxWidth * 0.75)
                 .toDouble();
 
-            return Row(
+            final row = Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Sidebar: Interactive list of games or music tracks.
@@ -1469,6 +1479,18 @@ class _SystemGamesListState extends State<SystemGamesList> {
                 // Main Viewport: Rich metadata, video previews, and launch controls.
                 Expanded(child: _buildGameDetailsPanel()),
               ],
+            );
+            if (!useGameListPreset || gameListLayout.contentScale == 1) {
+              return row;
+            }
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: GameListTextScaler(
+                  MediaQuery.textScalerOf(context),
+                  gameListLayout.contentScale,
+                ),
+              ),
+              child: row,
             );
           },
         ),
@@ -1807,10 +1829,16 @@ class _SystemGamesListState extends State<SystemGamesList> {
       );
     }
 
+    final config = context.read<SqliteConfigProvider>().config;
+    final gameListLayoutScale = config.gameViewMode == 'list'
+        ? GameListLayout.fromValue(config.gameListLayout).contentScale
+        : 1.0;
+
     return Consumer<SyncManager>(
       builder: (context, syncManager, child) => GameDetailsCardList(
         game: _selectedGame!,
         system: widget.system,
+        gameListLayoutScale: gameListLayoutScale,
         fileProvider: _fileProvider,
         showVideo: _showVideo,
         videoController: _videoController,

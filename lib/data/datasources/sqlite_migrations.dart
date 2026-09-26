@@ -609,6 +609,9 @@ class SqliteMigrations {
       case 157:
         await _migrateToVersion157(db);
         break;
+      case 160:
+        await _migrateToVersion160(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7004,6 +7007,30 @@ class SqliteMigrations {
       _log.i('Migration v157 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v157: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v160: Adds the saved game-list layout preset.
+  ///
+  /// Existing installs default to Standard, matching the original layout.
+  /// Idempotent — the column is added only when absent.
+  static Future<void> _migrateToVersion160(Database db) async {
+    _log.i('Migration v160: Adding game_list_layout to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((column) => column['name'].toString())
+          .toSet();
+      if (!columns.contains('game_list_layout')) {
+        db.execute(
+          "ALTER TABLE user_config ADD COLUMN game_list_layout TEXT DEFAULT 'standard'",
+        );
+      }
+      _log.i('Migration v160 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v160: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

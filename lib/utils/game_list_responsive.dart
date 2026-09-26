@@ -1,4 +1,4 @@
-/// Geometry and typography rules for the game-list split view.
+/// Viewport-based geometry retained for music lists and detail-panel safeguards.
 ///
 /// These values intentionally describe the viewport rather than a stored user
 /// preference. The list gets more room as a screen approaches square, while
@@ -29,21 +29,5 @@ class GameListResponsive {
   static bool isCompactViewport(double width, double height) {
     final aspect = height > 0 ? width / height : wideAspect;
     return width < compactWidth || aspect < wideAspect;
-  }
-
-  static double titleFontSize({
-    required bool compact,
-    required double scaledBaseSize,
-  }) {
-    return compact && scaledBaseSize < 14.0 ? 14.0 : scaledBaseSize;
-  }
-
-  static double rowHeight({
-    required bool compact,
-    required double titleFontSize,
-    required double scaledBaseHeight,
-  }) {
-    if (!compact) return scaledBaseHeight;
-    return titleFontSize + 12.0 > 36.0 ? titleFontSize + 12.0 : 36.0;
   }
 }

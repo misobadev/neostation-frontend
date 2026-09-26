@@ -135,6 +135,7 @@ class GameDetailsCardList extends StatefulWidget {
 
   final bool isSecondaryScreenActive;
   final bool isNavigatingFast;
+  final double gameListLayoutScale;
   final VoidCallback? onBack;
 
   const GameDetailsCardList({
@@ -178,6 +179,7 @@ class GameDetailsCardList extends StatefulWidget {
     this.onRegisterScrapeAction,
     this.isSecondaryScreenActive = false,
     this.isNavigatingFast = false,
+    this.gameListLayoutScale = 1.0,
     this.onBack,
   });
 
@@ -864,6 +866,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
               isScreenshotVideoHidden: _isGameInfoHidden,
               hasRetroAchievements: _hasRetroAchievements,
               currentTab: _currentTab,
+              scale: widget.gameListLayoutScale,
               onTabChanged: _setTab,
             ),
           ),

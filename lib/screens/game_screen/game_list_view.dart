@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -20,7 +19,7 @@ import '../../providers/collections_provider.dart';
 import '../../sync/i_sync_provider.dart';
 import '../../sync/sync_manager.dart';
 import '../../utils/effective_system.dart';
-import '../../utils/game_list_responsive.dart';
+import '../../utils/game_list_layout.dart';
 import '../../widgets/achievements_badge.dart';
 import '../../widgets/collection_badge.dart';
 import '../../widgets/marquee_text.dart';
@@ -308,22 +307,15 @@ class GameListViewState extends State<GameListView>
     _syncProvider = context.watch<SyncManager?>()?.active;
 
     final theme = Theme.of(context);
-    final viewport = MediaQuery.sizeOf(context);
-    final compactViewport = GameListResponsive.isCompactViewport(
-      viewport.width,
-      viewport.height,
+    final layout = GameListLayout.fromValue(
+      context.select<SqliteConfigProvider, String>(
+        (provider) => provider.config.gameListLayout,
+      ),
     );
-    final titleFontSize = GameListResponsive.titleFontSize(
-      compact: compactViewport,
-      scaledBaseSize: 11.r,
-    );
-    final itemHeight = GameListResponsive.rowHeight(
-      compact: compactViewport,
-      titleFontSize: titleFontSize,
-      scaledBaseHeight: _itemHeightBase.r,
-    );
+    final titleFontSize = 11.r;
+    final itemHeight = _itemHeightBase.r * layout.contentScale;
     final totalItemHeight = itemHeight;
-    final folderCountFontSize = compactViewport ? math.max(10.0, 9.r) : 9.r;
+    final folderCountFontSize = 9.r;
     _centeredScrollController.setItemExtent(totalItemHeight, paddingTop: 2.r);
 
     return Column(
@@ -448,7 +440,7 @@ class GameListViewState extends State<GameListView>
                                     margin: EdgeInsets.only(right: 4.r),
                                     child: Icon(
                                       Symbols.favorite_rounded,
-                                      size: 11.r,
+                                      size: 11.r * layout.contentScale,
                                       color: isSelected
                                           ? theme.colorScheme.onPrimary
                                           : Colors.redAccent,

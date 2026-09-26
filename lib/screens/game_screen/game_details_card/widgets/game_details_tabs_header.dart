@@ -23,6 +23,7 @@ class GameDetailsTabsHeader extends StatelessWidget {
   final bool isScreenshotVideoHidden;
   final bool hasRetroAchievements;
   final DetailTab currentTab;
+  final double scale;
   final ValueChanged<DetailTab> onTabChanged;
 
   const GameDetailsTabsHeader({
@@ -30,6 +31,7 @@ class GameDetailsTabsHeader extends StatelessWidget {
     required this.isScreenshotVideoHidden,
     required this.hasRetroAchievements,
     required this.currentTab,
+    this.scale = 1.0,
     required this.onTabChanged,
   });
 
@@ -43,6 +45,7 @@ class GameDetailsTabsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layoutScale = scale;
     // Dynamically calculate the active tab count for layout arbitration.
     final List<DetailTab> visibleTabs = [
       ..._baseTabs.where(
@@ -52,7 +55,7 @@ class GameDetailsTabsHeader extends StatelessWidget {
     ];
 
     final int numTabs = visibleTabs.length;
-    final double tabWidth = 36.r;
+    final double tabWidth = 36.r * layoutScale;
     final double totalTabsWidth = numTabs * tabWidth;
 
     // Resolve the visual index for the cursor animation, accounting for hidden tabs.
@@ -64,16 +67,19 @@ class GameDetailsTabsHeader extends StatelessWidget {
 
     return ClipRRect(
       child: Container(
-        height: 46.r,
-        padding: EdgeInsets.only(top: 4.r, right: 8.r),
+        height: 46.r * layoutScale,
+        padding: EdgeInsets.only(
+          top: 4.r * layoutScale,
+          right: 8.r * layoutScale,
+        ),
         child: Row(
           children: [
             const Spacer(),
 
             // D-pad glyphs sit outside the pill so the pill reads as a single
             // switch and the hardware hints stay visually distinct from it.
-            const DpadGlyph(isLeft: true),
-            SizedBox(width: 6.r),
+            DpadGlyph(isLeft: true, size: 22.r * layoutScale),
+            SizedBox(width: 6.r * layoutScale),
 
             // Tab Navigation Group: Hardware-mapped navigation controls.
             NeoGlass(
@@ -83,12 +89,12 @@ class GameDetailsTabsHeader extends StatelessWidget {
                   ).extension<CornerRadii>()?.radiusExternalRadius ??
                   12.r,
               child: SizedBox(
-                height: 36.r,
+                height: 36.r * layoutScale,
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8.r),
+                  padding: EdgeInsets.symmetric(horizontal: 8.r * layoutScale),
                   child: SizedBox(
                     width: totalTabsWidth,
-                    height: 36.r,
+                    height: 36.r * layoutScale,
                     child: Stack(
                       children: [
                         // Transition Cursor: Fluidly follows the active selection.
@@ -96,8 +102,8 @@ class GameDetailsTabsHeader extends StatelessWidget {
                           duration: const Duration(milliseconds: 160),
                           curve: Curves.easeInOut,
                           left: visualIndex * tabWidth,
-                          top: 4.r,
-                          bottom: 4.r,
+                          top: 4.r * layoutScale,
+                          bottom: 4.r * layoutScale,
                           width: tabWidth,
                           child: Container(
                             decoration: BoxDecoration(
@@ -117,6 +123,7 @@ class GameDetailsTabsHeader extends StatelessWidget {
                                 icon: _iconForTab(tab),
                                 tab: tab,
                                 width: tabWidth,
+                                scale: layoutScale,
                                 isSelected: currentTab == tab,
                                 onTap: onTabChanged,
                               ),
@@ -129,8 +136,8 @@ class GameDetailsTabsHeader extends StatelessWidget {
               ),
             ),
 
-            SizedBox(width: 6.r),
-            const DpadGlyph(isLeft: false),
+            SizedBox(width: 6.r * layoutScale),
+            DpadGlyph(isLeft: false, size: 22.r * layoutScale),
           ],
         ),
       ),
@@ -172,6 +179,7 @@ class _TabItem extends StatelessWidget {
   final IconData icon;
   final DetailTab tab;
   final double width;
+  final double scale;
   final bool isSelected;
   final ValueChanged<DetailTab> onTap;
 
@@ -179,6 +187,7 @@ class _TabItem extends StatelessWidget {
     required this.icon,
     required this.tab,
     required this.width,
+    required this.scale,
     required this.isSelected,
     required this.onTap,
   });
@@ -200,11 +209,11 @@ class _TabItem extends StatelessWidget {
         splashColor: theme.colorScheme.onSurface.withValues(alpha: 0.1),
         child: Container(
           width: width,
-          height: 36.r,
+          height: 36.r * scale,
           alignment: Alignment.center,
           child: Icon(
             icon,
-            size: 18.r,
+            size: 18.r * scale,
             color: isSelected
                 ? theme.colorScheme.onPrimary
                 : theme.colorScheme.onSurface,

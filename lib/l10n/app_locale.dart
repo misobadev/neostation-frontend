@@ -636,6 +636,10 @@ mixin AppLocale {
   static const String orderGroup = 'order_group';
   static const String cardSizeGroup = 'card_size_group';
   static const String cardStyleGroup = 'card_style_group';
+  static const String listLayoutGroup = 'list_layout_group';
+  static const String standard = 'standard';
+  static const String wide = 'wide';
+  static const String extraWide = 'extra_wide';
   static const String fanartCard = 'fanart_card';
   static const String boxCard = 'box_card';
   static const String synced = 'synced';
