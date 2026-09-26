@@ -185,6 +185,72 @@ class _SystemArtPackDialogState extends State<SystemArtPackDialog> {
               height: 1.r,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.1),
             ),
+            // Foreground download indicator. The pack content can scroll, so
+            // the progress lives outside the scroll and stays visible the whole
+            // time the pack downloads.
+            if (downloading)
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 10.r),
+                color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 16.r,
+                          height: 16.r,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.r,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 8.r),
+                        Expanded(
+                          child: Text(
+                            AppLocale.systemArtDownloading.getString(context),
+                            style: TextStyle(
+                              fontSize: 11.r,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          neoAssets.downloadTotal > 0
+                              ? '${(neoAssets.downloadProgress * 100).toInt()}%  '
+                                    '(${neoAssets.downloadDone}/${neoAssets.downloadTotal})'
+                              : '${(neoAssets.downloadProgress * 100).toInt()}%',
+                          style: TextStyle(
+                            fontSize: 11.r,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 6.r),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8.r),
+                      child: LinearProgressIndicator(
+                        value: neoAssets.downloadProgress > 0
+                            ? neoAssets.downloadProgress
+                            : null,
+                        minHeight: 6.r,
+                        backgroundColor: theme.colorScheme.primary.withValues(
+                          alpha: 0.15,
+                        ),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Flexible(
               child: SingleChildScrollView(
                 padding: EdgeInsets.all(16.r),
@@ -260,24 +326,6 @@ class _SystemArtPackDialogState extends State<SystemArtPackDialog> {
                         ),
                       ),
                     ],
-                    if (downloading) ...[
-                      SizedBox(height: 16.r),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8.r),
-                        child: LinearProgressIndicator(
-                          value: neoAssets.downloadProgress > 0
-                              ? neoAssets.downloadProgress
-                              : null,
-                          minHeight: 6.r,
-                          backgroundColor: theme.colorScheme.primary.withValues(
-                            alpha: 0.15,
-                          ),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            theme.colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                    ],
                     if (_failed) ...[
                       SizedBox(height: 12.r),
                       Text(
@@ -309,6 +357,7 @@ class _SystemArtPackDialogState extends State<SystemArtPackDialog> {
                                 : AppLocale.apply)
                             .getString(context),
                     onTap: _applying ? null : _apply,
+                    busy: downloading,
                     backgroundColor: theme.colorScheme.primary,
                     textColor: theme.colorScheme.onPrimary,
                   ),
