@@ -453,7 +453,8 @@ void main() {
       reason: 'omitted outright rather than drawn as a dark sliver',
     );
     // The rest of the row is unaffected: the controls are what the row is for.
-    expect(find.text('PLAY'), findsOneWidget);
+    // On a card this narrow, Play gives up its label and keeps the A action.
+    expect(find.byType(Image), findsOneWidget);
     expect(find.byIcon(Symbols.settings_rounded), findsOneWidget);
   });
 
@@ -523,6 +524,13 @@ void main() {
     // under the cap and takes up every unit the row does not spend.
     await pumpFooter(tester, showsPill: true, width: handheldCardWidth);
 
+    final playButton = find.byWidgetPredicate(
+      (widget) =>
+          widget is Container &&
+          widget.decoration is BoxDecoration &&
+          (widget.decoration! as BoxDecoration).color ==
+              const Color(0xFF2ECC71),
+    );
     final rects = [
       for (final finder in [
         find.byIcon(Symbols.star_rounded),
@@ -530,9 +538,9 @@ void main() {
         find.byIcon(Symbols.casino_rounded),
         find.byIcon(Symbols.favorite_rounded),
         find.byIcon(Symbols.settings_rounded),
-        find.text('PLAY'),
       ])
         _chipRect(tester, finder),
+      tester.getRect(playButton),
     ];
 
     final gaps = [

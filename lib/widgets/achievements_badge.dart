@@ -23,7 +23,8 @@ class AchievementsBadge extends StatelessWidget {
   /// The pill drawn over artwork: dark plate, trophy, achievement count.
   const AchievementsBadge({super.key, required this.game})
     : compact = false,
-      color = null;
+      color = null,
+      inlineSize = 11;
 
   /// Trophy only, no plate or count — for a text row that has no artwork to sit
   /// on and no vertical room for a pill. [color] follows the row's foreground so
@@ -32,11 +33,13 @@ class AchievementsBadge extends StatelessWidget {
     super.key,
     required this.game,
     required this.color,
+    this.inlineSize = 11,
   }) : compact = true;
 
   final GameModel game;
   final bool compact;
   final Color? color;
+  final double inlineSize;
 
   /// Whether [game] would draw anything, so callers can skip the `Positioned`
   /// wrapper entirely rather than stacking an invisible child on every tile.
@@ -58,7 +61,11 @@ class AchievementsBadge extends StatelessWidget {
     if (compact) {
       return Semantics(
         label: 'RetroAchievements: $total achievements',
-        child: Icon(Symbols.emoji_events_rounded, size: 11.r, color: color),
+        child: Icon(
+          Symbols.emoji_events_rounded,
+          size: inlineSize.r,
+          color: color,
+        ),
       );
     }
 

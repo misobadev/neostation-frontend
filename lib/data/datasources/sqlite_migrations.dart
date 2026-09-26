@@ -612,6 +612,9 @@ class SqliteMigrations {
       case 159:
         await _migrateToVersion159(db);
         break;
+      case 160:
+        await _migrateToVersion160(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7037,6 +7040,19 @@ class SqliteMigrations {
       _log.e('Error in migration v159: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
+    }
+  }
+
+  /// Migration v160: adds the independent List view size preference.
+  static Future<void> _migrateToVersion160(Database db) async {
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name'] as String)
+        .toSet();
+    if (!columns.contains('game_list_size')) {
+      db.execute(
+        "ALTER TABLE user_config ADD COLUMN game_list_size TEXT DEFAULT 'S'",
+      );
     }
   }
 }

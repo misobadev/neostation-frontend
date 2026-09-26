@@ -603,6 +603,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.descending: '降順',
   AppLocale.viewModeGroup: '表示モード',
   AppLocale.cardSizeGroup: 'カードサイズ',
+  AppLocale.listSizeGroup: 'リストサイズ',
   AppLocale.cardStyleGroup: 'カードスタイル',
   AppLocale.fanartCard: 'ファンアート',
   AppLocale.boxCard: 'ボックス',

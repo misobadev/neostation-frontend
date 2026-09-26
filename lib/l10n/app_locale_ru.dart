@@ -681,6 +681,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.descending: 'По убыванию',
   AppLocale.viewModeGroup: 'РЕЖИМ ПРОСМОТРА',
   AppLocale.cardSizeGroup: 'РАЗМЕР КАРТОЧКИ',
+  AppLocale.listSizeGroup: 'РАЗМЕР СПИСКА',
   AppLocale.cardStyleGroup: 'СТИЛЬ КАРТОЧКИ',
   AppLocale.fanartCard: 'Фанарт',
   AppLocale.boxCard: 'Коробка',

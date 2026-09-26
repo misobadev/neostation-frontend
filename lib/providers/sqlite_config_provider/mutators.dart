@@ -56,6 +56,24 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Updates the preferred List view text and row size.
+  Future<void> updateGameListSize(String gameListSize) async {
+    final normalized = const {'S', 'M', 'L', 'XL'}.contains(gameListSize)
+        ? gameListSize
+        : 'S';
+    if (_config.gameListSize == normalized) return;
+
+    _config = _config.copyWith(gameListSize: normalized);
+    // Publish first so the open game screen updates on the same input event;
+    // serialize writes so rapid size changes cannot persist out of order.
+    _notify();
+    final save = _pendingGameListSizeSave.then(
+      (_) => SqliteConfigService.saveConfig(_config),
+    );
+    _pendingGameListSizeSave = save.catchError((_) {});
+    await save;
+  }
+
   /// Updates the preferred card style for the game carousel ('fanart' or 'box').
   Future<void> updateGameCarouselCardStyle(String cardStyle) async {
     _config = _config.copyWith(gameCarouselCardStyle: cardStyle);

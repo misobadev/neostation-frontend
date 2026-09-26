@@ -22,17 +22,22 @@ class CollectionBadge extends StatelessWidget {
   /// 32.r, so the badge takes the host's rather than picking one.
   const CollectionBadge({super.key, required this.size})
     : compact = false,
-      color = null;
+      color = null,
+      inlineSize = 11;
 
   /// Glyph only, for a text row with no artwork to sit on. [color] follows the
   /// row's foreground so the mark stays legible on a selected row.
-  const CollectionBadge.inline({super.key, required this.color})
-    : compact = true,
-      size = 0;
+  const CollectionBadge.inline({
+    super.key,
+    required this.color,
+    this.inlineSize = 11,
+  }) : compact = true,
+       size = 0;
 
   final bool compact;
   final Color? color;
   final double size;
+  final double inlineSize;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +45,7 @@ class CollectionBadge extends StatelessWidget {
     if (compact) {
       return Semantics(
         label: label,
-        child: Icon(Symbols.bookmark_rounded, size: 11.r, color: color),
+        child: Icon(Symbols.bookmark_rounded, size: inlineSize.r, color: color),
       );
     }
 

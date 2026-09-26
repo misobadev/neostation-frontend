@@ -690,6 +690,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.descending: 'Descendente',
   AppLocale.viewModeGroup: 'MODO DE VISTA',
   AppLocale.cardSizeGroup: 'TAMAÑO DE CARTA',
+  AppLocale.listSizeGroup: 'TAMAÑO DE LISTA',
   AppLocale.cardStyleGroup: 'ESTILO DE CARTA',
   AppLocale.fanartCard: 'Fanart',
   AppLocale.boxCard: 'Caja',
