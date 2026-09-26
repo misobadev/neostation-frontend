@@ -241,9 +241,8 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.showRommTab: 'Afficher l’onglet RomM',
   AppLocale.showRommTabSubtitle:
       'Affiche l’onglet RomM dans la barre de navigation',
-  AppLocale.showSearchTab: 'Afficher l’onglet Rechercher',
-  AppLocale.showSearchTabSubtitle:
-      'Affiche l’onglet de recherche dans la barre de navigation',
+  AppLocale.searchCard: 'Carte Rechercher',
+  AppLocale.searchCardSubtitle: 'Afficher la carte de recherche dans la grille',
 
   AppLocale.configureDirectories: 'Configurer les Répertoires',
   AppLocale.configureRomsFolder: 'Configurer le Dossier des ROMs',

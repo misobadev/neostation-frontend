@@ -304,4 +304,49 @@ void main() {
       r.pop('app_screen');
     });
   });
+
+  group('GamepadNavigationManager duplicate routes', () {
+    // Search's "Go to game" opens a games list over search, which may itself
+    // sit over the same system's games list. Each copy registers its layer
+    // under a per-instance id and pops it twice (on back, then in dispose).
+    test('backing out of the top copy hands input to the bottom copy', () {
+      final r = _Recorder();
+      r.push('my_systems_list');
+      r.push('system_games_list#1');
+      r.push('search_screen');
+      r.push('system_games_list#2');
+
+      // The top list backs out: once from its back handler, once on dispose.
+      r.pop('system_games_list#2');
+      r.pop('system_games_list#2');
+      r.events.clear();
+
+      r.pop('search_screen');
+
+      expect(r.events, ['-search_screen', '+system_games_list#1']);
+
+      r.pop('system_games_list#1');
+      r.pop('my_systems_list');
+    });
+
+    test('a shared id is what broke it', () {
+      // Documents the failure the per-instance ids prevent: popLayer resolves
+      // the first match, so the top copy unregistered the bottom one.
+      final r = _Recorder();
+      r.push('my_systems_list');
+      r.push('system_games_list');
+      r.push('search_screen');
+      r.push('system_games_list');
+
+      r.pop('system_games_list');
+      r.pop('system_games_list');
+      r.events.clear();
+
+      r.pop('search_screen');
+
+      expect(r.events, ['-search_screen', '+my_systems_list']);
+
+      r.pop('my_systems_list');
+    });
+  });
 }

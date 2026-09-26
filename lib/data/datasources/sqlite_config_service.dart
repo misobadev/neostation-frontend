@@ -205,9 +205,10 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['hide_tab_romm']?.toString() ?? '0') ??
                 0) ==
             1,
-        hideTabSearch:
-            (int.tryParse(userConfig?['hide_tab_search']?.toString() ?? '0') ??
-                0) ==
+        // Unset reads as hidden: the card is opt-in (see migration v158).
+        hideSearchCard:
+            (int.tryParse(userConfig?['hide_search_card']?.toString() ?? '1') ??
+                1) ==
             1,
         activeSyncProvider:
             userConfig?['active_sync_provider']?.toString() ?? 'neosync',
@@ -347,7 +348,7 @@ class SqliteConfigService {
         hideTabAchievements: config.hideTabAchievements ? 1 : 0,
         hideTabScraper: config.hideTabScraper ? 1 : 0,
         hideTabRomm: config.hideTabRomm ? 1 : 0,
-        hideTabSearch: config.hideTabSearch ? 1 : 0,
+        hideSearchCard: config.hideSearchCard ? 1 : 0,
         activeSyncProvider: config.activeSyncProvider,
         autoUpdateApp: config.autoUpdateApp ? 1 : 0,
         autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,

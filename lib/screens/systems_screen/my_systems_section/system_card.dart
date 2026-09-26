@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import 'package:material_symbols_icons/symbols.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/models/my_systems.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/services/music_player_service.dart';
@@ -469,6 +471,30 @@ class _SystemCardState extends State<SystemCard> {
         Container(color: widget.info.color1AsColor?.withValues(alpha: 0.4)),
       ],
     );
+
+    // The Search card carries the magnifier the Search tab used to show, drawn
+    // rather than bundled so it takes the theme's colours. It only stands in
+    // for missing art: a theme that ships a `search` background still wins.
+    if (widget.info.folderName == SystemFolderNames.search) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          tint,
+          LayoutBuilder(
+            builder: (context, box) => Center(
+              child: Icon(
+                Symbols.search_rounded,
+                size: box.biggest.shortestSide * 0.55,
+                weight: 600,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.9),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
     if (mosaicPaths.isEmpty) return tint;
 

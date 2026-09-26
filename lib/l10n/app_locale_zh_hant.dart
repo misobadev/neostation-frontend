@@ -192,8 +192,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.showScraperTabSubtitle: '在導覽列中顯示刮削分頁',
   AppLocale.showRommTab: '顯示 RomM 分頁',
   AppLocale.showRommTabSubtitle: '在導覽列中顯示 RomM 分頁',
-  AppLocale.showSearchTab: '顯示搜尋分頁',
-  AppLocale.showSearchTabSubtitle: '在導覽列中顯示搜尋分頁',
+  AppLocale.searchCard: '搜尋卡片',
+  AppLocale.searchCardSubtitle: '在系統網格中顯示搜尋卡片',
 
   AppLocale.configureDirectories: '目錄設定',
   AppLocale.configureRomsFolder: '設定 ROM 資料夾',

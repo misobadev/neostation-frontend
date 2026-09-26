@@ -616,7 +616,7 @@ class HeaderState extends State<Header> {
   // Steam-style tab button.
   //
   // Most tabs use a webp asset; [iconData] is the fallback for tabs with no
-  // matching asset (Search), rendered at the same box size and tint.
+  // matching asset, rendered at the same box size and tint.
   //
   // [coverage] is how much of the sliding indicator currently sits under this
   // tab (1 = fully covered, 0 = uncovered). The tint follows it so the icon is
