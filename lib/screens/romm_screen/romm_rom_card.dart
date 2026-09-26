@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../l10n/app_locale.dart';
 import '../../models/romm_rom.dart';
 import '../../providers/romm_provider.dart';
+import '../../services/romm/romm_cover_image_provider.dart';
 import '../../utils/cover_decode.dart';
 import '../../widgets/romm_sync_banner.dart' show rommFormatBytes;
 
@@ -98,9 +99,16 @@ class RommRomCardState extends State<RommRomCard> {
     // Server thumbnail first: tiles are small, and RomM's cached small file is
     // the cheapest thing to fetch and decode.
     final covers = widget.provider.service.tileCoverUrlCandidates(widget.rom);
-    final coverUrl = _coverAttempt < covers.length
-        ? covers[_coverAttempt]
-        : null;
+    // Skip sources already known to answer with nothing. `_coverAttempt` is
+    // State, so a tile disposed by the grid's cache extent and scrolled back
+    // to starts again at zero — without this it re-requests the same dead
+    // URL on every scrollback, for the life of the library.
+    var attempt = _coverAttempt;
+    while (attempt < covers.length &&
+        widget.provider.service.isDeadCover(covers[attempt])) {
+      attempt++;
+    }
+    final coverUrl = attempt < covers.length ? covers[attempt] : null;
     final download = widget.provider.downloadFor(widget.rom.id);
     final scheme = theme.colorScheme;
 
@@ -444,10 +452,16 @@ class RommRomCardState extends State<RommRomCard> {
     );
   }
 
-  /// Advances to the next cover source after a failed load, on the next frame
-  /// — `errorBuilder` runs *during* build, where `setState` is illegal. Guarded
+  /// Advances past the candidate that just failed, on the next frame —
+  /// `errorBuilder` runs *during* build, where `setState` is illegal. Guarded
   /// on the attempt that failed so repeated error frames for the same source
   /// only skip it once.
+  ///
+  /// This moves [_coverAttempt] on by one rather than to the index actually
+  /// drawn, which can be further along when the skip loop in [build] stepped
+  /// over dead sources. That still converges: an absent cover is recorded in
+  /// the service's dead-cover set before the error frame, so the next build's
+  /// skip loop walks past it and every other known-dead entry in one go.
   void _tryNextCover() {
     final failed = _coverAttempt;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -493,21 +507,41 @@ class RommRomCardState extends State<RommRomCard> {
       fit: StackFit.expand,
       children: [
         _coverPlaceholder(theme),
-        Image.network(
-          coverUrl,
+        Image(
+          image: _coverProvider(coverUrl, hint),
           fit: BoxFit.cover,
-          // An unknown size (unbounded parent) skips the hint rather than
-          // decoding to a 1-pixel bitmap.
-          cacheWidth: hint.cacheWidth,
-          cacheHeight: hint.cacheHeight,
           gaplessPlayback: true,
-          headers: widget.provider.service.imageHeadersFor(coverUrl),
           errorBuilder: (_, _, _) {
             _tryNextCover();
             return _coverPlaceholder(theme);
           },
         ),
       ],
+    );
+  }
+
+  /// The provider for [coverUrl], decoded no wider than the tile needs.
+  ///
+  /// [RommCoverImage] rather than `NetworkImage` so the fetch goes through
+  /// [RommService]'s client under a concurrency bound. `NetworkImage` runs on
+  /// Flutter's own process-wide `HttpClient` with no per-host connection
+  /// limit, so a screenful of tiles opened a socket each and starved the
+  /// request fetching the next page of games on the same host.
+  ///
+  /// [ResizeImage] is what `Image.network`'s `cacheWidth` does internally, so
+  /// the decode bound and the size-keyed `ImageCache` entry are unchanged — an
+  /// unknown width (unbounded parent) skips the hint rather than decoding to a
+  /// one-pixel bitmap, exactly as before.
+  ImageProvider _coverProvider(
+    String coverUrl,
+    ({int? cacheWidth, int? cacheHeight}) hint,
+  ) {
+    final provider = RommCoverImage(coverUrl, widget.provider.service);
+    if (hint.cacheWidth == null && hint.cacheHeight == null) return provider;
+    return ResizeImage(
+      provider,
+      width: hint.cacheWidth,
+      height: hint.cacheHeight,
     );
   }
 
