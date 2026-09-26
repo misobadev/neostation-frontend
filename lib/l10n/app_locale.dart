@@ -155,6 +155,11 @@ mixin AppLocale {
   static const String androidSystemSettings = 'android_system_settings';
   static const String androidSystemSettingsSubtitle =
       'android_system_settings_subtitle';
+  static const String androidApps = 'android_apps';
+  static const String androidAppLayout = 'android_app_layout';
+  static const String androidAppLayoutSubtitle = 'android_app_layout_subtitle';
+  static const String androidAppLayoutSystem = 'android_app_layout_system';
+  static const String androidAppLayoutTab = 'android_app_layout_tab';
   static const String scanOnStartup = 'scan_on_startup';
   static const String scanOnStartupSubtitle = 'scan_on_startup_subtitle';
   static const String nowPlayingDimAfter = 'now_playing_dim_after';

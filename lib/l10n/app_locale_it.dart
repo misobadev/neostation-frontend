@@ -147,6 +147,12 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.androidSystemSettings: 'Impostazioni del Sistema',
   AppLocale.androidSystemSettingsSubtitle:
       'Apri le impostazioni di sistema Android',
+  AppLocale.androidApps: 'App Android',
+  AppLocale.androidAppLayout: 'Layout delle app Android',
+  AppLocale.androidAppLayoutSubtitle:
+      'Scegli dove visualizzare le app Android installate',
+  AppLocale.androidAppLayoutSystem: 'Sistema',
+  AppLocale.androidAppLayoutTab: 'Scheda',
   AppLocale.scanOnStartup: 'Scansiona cartelle all’avvio',
   AppLocale.nowPlayingDimAfter: 'Oscura Now Playing dopo',
   AppLocale.nowPlayingDimAfterSubtitle:

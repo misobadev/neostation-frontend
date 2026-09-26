@@ -9,13 +9,15 @@ import 'core_footer.dart';
 class AndroidAppsFooter extends CoreFooter {
   final String appName;
   final VoidCallback onLaunch;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
+  final bool showBack;
 
   const AndroidAppsFooter({
     super.key,
     required this.appName,
     required this.onLaunch,
-    required this.onBack,
+    this.onBack,
+    this.showBack = true,
   });
 
   @override
@@ -43,14 +45,16 @@ class AndroidAppsFooter extends CoreFooter {
     final theme = Theme.of(context);
 
     return [
-      GamepadControl(
-        iconPath: 'assets/images/gamepad/Xbox_B_button.png',
-        label: AppLocale.hintBack.getString(context),
-        onTap: onBack,
-        backgroundColor: theme.colorScheme.tertiary,
-        textColor: theme.colorScheme.onTertiary,
-      ),
-      SizedBox(width: 8.r),
+      if (showBack) ...[
+        GamepadControl(
+          iconPath: 'assets/images/gamepad/Xbox_B_button.png',
+          label: AppLocale.hintBack.getString(context),
+          onTap: onBack,
+          backgroundColor: theme.colorScheme.tertiary,
+          textColor: theme.colorScheme.onTertiary,
+        ),
+        SizedBox(width: 8.r),
+      ],
       GamepadControl(
         iconPath: 'assets/images/gamepad/Xbox_A_button.png',
         label: AppLocale.launch.getString(context),

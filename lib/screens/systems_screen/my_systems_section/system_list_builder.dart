@@ -47,6 +47,11 @@ List<SystemInfo> buildSystemsList({
       .where((s) => !hiddenFolders.contains(s.folderName))
       .where(
         (s) =>
+            !(configProvider.config.androidAppsAsTab &&
+                s.folderName == SystemFolderNames.android),
+      )
+      .where(
+        (s) =>
             !(s.folderName == SystemFolderNames.favorites &&
                 totalFavorites == 0),
       )

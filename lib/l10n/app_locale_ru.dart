@@ -144,6 +144,12 @@ const Map<String, dynamic> appLocaleRu = {
       'Ошибка при настройке пути для RetroArch: {error}',
   AppLocale.androidSystemSettings: 'Настройки системы',
   AppLocale.androidSystemSettingsSubtitle: 'Открыть настройки системы Android',
+  AppLocale.androidApps: 'Приложения Android',
+  AppLocale.androidAppLayout: 'Расположение приложений Android',
+  AppLocale.androidAppLayoutSubtitle:
+      'Выберите, где показывать установленные приложения Android',
+  AppLocale.androidAppLayoutSystem: 'Система',
+  AppLocale.androidAppLayoutTab: 'Вкладка',
   AppLocale.scanOnStartup: 'Сканировать папки при запуске',
   AppLocale.nowPlayingDimAfter: 'Затемнять Now Playing через',
   AppLocale.nowPlayingDimAfterSubtitle:

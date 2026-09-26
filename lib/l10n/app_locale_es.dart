@@ -146,6 +146,12 @@ const Map<String, dynamic> appLocaleEs = {
       'Error al configurar la ruta de RetroArch: {error}',
   AppLocale.androidSystemSettings: 'Ajustes del Sistema',
   AppLocale.androidSystemSettingsSubtitle: 'Abrir ajustes del sistema Android',
+  AppLocale.androidApps: 'Apps de Android',
+  AppLocale.androidAppLayout: 'Diseño de apps de Android',
+  AppLocale.androidAppLayoutSubtitle:
+      'Elige dónde aparecen las apps de Android instaladas',
+  AppLocale.androidAppLayoutSystem: 'Sistema',
+  AppLocale.androidAppLayoutTab: 'Pestaña',
   AppLocale.scanOnStartup: 'Escanear al Iniciar',
   AppLocale.nowPlayingDimAfter: 'Atenuar «Reproduciendo» tras',
   AppLocale.nowPlayingDimAfterSubtitle:

@@ -609,6 +609,9 @@ class SqliteMigrations {
       case 157:
         await _migrateToVersion157(db);
         break;
+      case 159:
+        await _migrateToVersion159(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7004,6 +7007,35 @@ class SqliteMigrations {
       _log.i('Migration v157 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v157: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v159: stores whether Android apps appear as a top-level tab.
+  ///
+  /// The default keeps Android apps in the Systems view, matching every
+  /// release before this preference existed. The schema check makes the
+  /// migration safe for an already-upgraded or freshly created database.
+  static Future<void> _migrateToVersion159(Database db) async {
+    _log.i('Migration v159: Adding android_apps_as_tab to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (!columns.contains('android_apps_as_tab')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN android_apps_as_tab '
+          'INTEGER DEFAULT 0',
+        );
+        _log.i('Column android_apps_as_tab added via v159');
+      } else {
+        _log.i('Column android_apps_as_tab already exists');
+      }
+      _log.i('Migration v159 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v159: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

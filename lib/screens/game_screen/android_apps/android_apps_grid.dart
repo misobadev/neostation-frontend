@@ -22,7 +22,21 @@ import 'android_app_card.dart';
 class AndroidAppsGrid extends StatefulWidget {
   final SystemModel system;
 
-  const AndroidAppsGrid({super.key, required this.system});
+  /// Renders inside the root tab rather than as a pushed Systems route.
+  final bool embedded;
+
+  /// Tab-cycle handlers supplied only by the root tab host. Pushed instances
+  /// leave these unset because changing a tab behind a route is invisible.
+  final VoidCallback? onPreviousTab;
+  final VoidCallback? onNextTab;
+
+  const AndroidAppsGrid({
+    super.key,
+    required this.system,
+    this.embedded = false,
+    this.onPreviousTab,
+    this.onNextTab,
+  });
 
   @override
   State<AndroidAppsGrid> createState() => _AndroidAppsGridState();
@@ -83,7 +97,11 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
       onNavigateLeft: _navigateLeft,
       onNavigateRight: _navigateRight,
       onSelectItem: _launchSelectedApp,
-      onBack: _goBack,
+      onBack: widget.embedded ? null : _goBack,
+      onPreviousTab: widget.embedded ? widget.onPreviousTab : null,
+      onNextTab: widget.embedded ? widget.onNextTab : null,
+      onLeftBumper: widget.embedded ? widget.onPreviousTab : null,
+      onRightBumper: widget.embedded ? widget.onNextTab : null,
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -300,7 +318,9 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
 
             Column(
               children: [
-                _buildCompactHeader(),
+                // AppScreen's global header floats above embedded tab content.
+                if (widget.embedded) SizedBox(height: 42.r),
+                if (!widget.embedded) _buildCompactHeader(),
 
                 Expanded(
                   child: _isLoading
@@ -313,7 +333,8 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
                 AndroidAppsFooter(
                   appName: _apps.isNotEmpty ? _apps[_selectedIndex].name : '',
                   onLaunch: _launchSelectedApp,
-                  onBack: _goBack,
+                  onBack: widget.embedded ? null : _goBack,
+                  showBack: !widget.embedded,
                 ),
               ],
             ),
