@@ -59,6 +59,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.systemArtSystemsCovered: '{count}개 시스템',
   AppLocale.systemArtSupport: '후원하기',
   AppLocale.systemArtApplied: '적용됨',
+  AppLocale.systemArtHideLogos: '시스템 로고 숨기기',
+  AppLocale.systemArtHideLogosSubtitle: '배경에 이미 로고가 포함된 경우 시스템 카드의 로고를 숨깁니다',
   AppLocale.about: '소개',
   AppLocale.exit: '종료',
   AppLocale.launcher: '런처',

@@ -62,6 +62,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.systemArtSystemsCovered: '{count} sistem',
   AppLocale.systemArtSupport: 'Dukung',
   AppLocale.systemArtApplied: 'Diterapkan',
+  AppLocale.systemArtHideLogos: 'Sembunyikan logo sistem',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Sembunyikan logo pada kartu sistem jika latar belakangnya sudah memuatnya',
   AppLocale.about: 'Tentang',
   AppLocale.exit: 'Keluar',
   AppLocale.launcher: 'Launcher',

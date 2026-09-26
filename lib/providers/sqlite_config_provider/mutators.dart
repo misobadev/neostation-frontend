@@ -180,6 +180,17 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Updates whether system cards hide their logo footer and render square.
+  ///
+  /// Purely visual, so unlike [updateSubfolderViewAll] it needs no per-system
+  /// stamping: the grid and carousel read the config directly.
+  Future<void> updateHideSystemLogos(bool value) async {
+    if (_config.hideSystemLogos == value) return;
+    _config = _config.copyWith(hideSystemLogos: value);
+    await SqliteConfigService.saveConfig(_config);
+    _notify();
+  }
+
   /// Updates whether hidden files/folders are ignored during ROM scans.
   Future<void> updateIgnoreHiddenFiles(bool ignoreHiddenFiles) async {
     _config = _config.copyWith(ignoreHiddenFiles: ignoreHiddenFiles);

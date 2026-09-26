@@ -60,6 +60,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.systemArtSystemsCovered: '{count} システム',
   AppLocale.systemArtSupport: '支援する',
   AppLocale.systemArtApplied: '適用済み',
+  AppLocale.systemArtHideLogos: 'システムロゴを非表示',
+  AppLocale.systemArtHideLogosSubtitle: '背景にロゴが含まれている場合、システムカードのロゴを隠します',
   AppLocale.about: 'NeoStationについて',
   AppLocale.exit: '終了',
   AppLocale.launcher: 'ランチャー',

@@ -58,6 +58,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.systemArtSystemsCovered: '{count} 个系统',
   AppLocale.systemArtSupport: '支持',
   AppLocale.systemArtApplied: '已应用',
+  AppLocale.systemArtHideLogos: '隐藏系统标志',
+  AppLocale.systemArtHideLogosSubtitle: '当背景已包含标志时，隐藏系统卡片上的标志',
   AppLocale.about: '关于',
   AppLocale.exit: '退出',
   AppLocale.launcher: '启动器',

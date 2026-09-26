@@ -81,6 +81,9 @@ mixin AppLocale {
   static const String systemArtSystemsCovered = 'system_art_systems_covered';
   static const String systemArtSupport = 'system_art_support';
   static const String systemArtApplied = 'system_art_applied';
+  static const String systemArtHideLogos = 'system_art_hide_logos';
+  static const String systemArtHideLogosSubtitle =
+      'system_art_hide_logos_subtitle';
   static const String about = 'about';
   static const String exit = 'exit';
   static const String launcher = 'launcher';

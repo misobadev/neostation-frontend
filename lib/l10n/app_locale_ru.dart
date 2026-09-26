@@ -62,6 +62,9 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.systemArtSystemsCovered: '{count} систем',
   AppLocale.systemArtSupport: 'Поддержать',
   AppLocale.systemArtApplied: 'Применено',
+  AppLocale.systemArtHideLogos: 'Скрыть логотипы систем',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Скрывает логотип на карточках систем, если он уже есть на фоне',
   AppLocale.about: 'О программе',
   AppLocale.exit: 'Выход',
   AppLocale.launcher: 'Лаунчер',

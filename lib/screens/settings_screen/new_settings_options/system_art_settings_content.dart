@@ -4,15 +4,18 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
+import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/services/game_service.dart'
     show GamepadNavigationManager;
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/widgets/custom_toggle_switch.dart';
 import 'package:neostation/widgets/system_art_pack_dialog.dart';
 import 'package:neostation/widgets/system_art_pack_tile.dart';
 import 'package:provider/provider.dart';
 import 'settings_title.dart';
+import 'widgets/setting_row.dart';
 
 class SystemArtSettingsContent extends StatefulWidget {
   final bool isContentFocused;
@@ -94,13 +97,21 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
     _onItemTapped(index);
   }
 
-  /// Handles A/tap on a row: opens the pack detail dialog for a pack, or clears
-  /// the applied pack for "None".
+  /// Handles A/tap on a row: toggles the logos setting, clears the applied pack
+  /// for "None", or opens the pack detail dialog for a pack.
   void _onItemTapped(int index) async {
     final neoAssets = context.read<NeoAssetsProvider>();
+    final config = context.read<SqliteConfigProvider>();
     final themes = neoAssets.themes;
 
+    // Index 0: hide the system card logos.
     if (index == 0) {
+      await config.updateHideSystemLogos(!config.config.hideSystemLogos);
+      return;
+    }
+
+    // Index 1: "None".
+    if (index == 1) {
       // "None" has nothing to redownload, so re-picking it is a no-op.
       if (neoAssets.activeThemeFolder.isEmpty) return;
       final confirmed = await _showConfirmDialog(
@@ -114,7 +125,8 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
       return;
     }
 
-    final themeIndex = index - 1;
+    // Index 2+: packs.
+    final themeIndex = index - 2;
     if (themeIndex < 0 || themeIndex >= themes.length) return;
     widget.onSelectionChanged?.call(index);
     await SystemArtPackDialog.show(context, themes[themeIndex]);
@@ -149,7 +161,8 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
     final theme = Theme.of(context);
 
     final themes = neoAssets.themes;
-    final itemCount = themes.length + 1; // +1 for "None".
+    final config = context.watch<SqliteConfigProvider>();
+    final itemCount = themes.length + 2; // toggle + "None".
     if (_itemKeys.length != itemCount) {
       _initKeys(itemCount);
     }
@@ -172,19 +185,20 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
           else if (neoAssets.loading)
             _buildLoadingIndicator(theme)
           else ...[
+            _buildHideLogosRow(context, theme, config),
             _buildNoneTile(theme),
             for (int i = 0; i < themes.length; i++)
               Container(
-                key: _itemKeys[i + 1],
+                key: _itemKeys[i + 2],
                 child: SystemArtPackTile(
                   pack: themes[i],
                   isActive: neoAssets.isThemeActive(themes[i].folder),
                   isFocused:
                       widget.isContentFocused &&
-                      widget.selectedContentIndex == i + 1,
+                      widget.selectedContentIndex == i + 2,
                   onTap: () {
                     SfxService().playNavSound();
-                    _onItemTapped(i + 1);
+                    _onItemTapped(i + 2);
                   },
                 ),
               ),
@@ -194,17 +208,45 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
     );
   }
 
+  /// The global "hide system logos" toggle shown at the top of the section.
+  Widget _buildHideLogosRow(
+    BuildContext context,
+    ThemeData theme,
+    SqliteConfigProvider config,
+  ) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.r),
+      child: SettingRow(
+        key: _itemKeys.isNotEmpty ? _itemKeys[0] : null,
+        onTap: () {
+          SfxService().playNavSound();
+          _onItemTapped(0);
+        },
+        focused: widget.isContentFocused && widget.selectedContentIndex == 0,
+        title: AppLocale.systemArtHideLogos.getString(context),
+        subtitle: AppLocale.systemArtHideLogosSubtitle.getString(context),
+        trailing: CustomToggleSwitch(
+          value: config.config.hideSystemLogos,
+          onChanged: (value) {
+            context.read<SqliteConfigProvider>().updateHideSystemLogos(value);
+          },
+          activeColor: theme.colorScheme.primary,
+        ),
+      ),
+    );
+  }
+
   Widget _buildNoneTile(ThemeData theme) {
     final primary = theme.colorScheme.primary;
     final isFocused =
-        widget.isContentFocused && widget.selectedContentIndex == 0;
+        widget.isContentFocused && widget.selectedContentIndex == 1;
     final isActive = context
         .watch<NeoAssetsProvider>()
         .activeThemeFolder
         .isEmpty;
 
     return Container(
-      key: _itemKeys.isNotEmpty ? _itemKeys[0] : null,
+      key: _itemKeys.length > 1 ? _itemKeys[1] : null,
       margin: EdgeInsets.symmetric(vertical: 4.r),
       padding: EdgeInsets.all(8.r),
       decoration: BoxDecoration(
@@ -222,7 +264,7 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
       child: InkWell(
         onTap: () {
           SfxService().playNavSound();
-          _onItemTapped(0);
+          _onItemTapped(1);
         },
         child: Row(
           children: [

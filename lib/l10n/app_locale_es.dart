@@ -62,6 +62,9 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.systemArtSystemsCovered: '{count} sistemas',
   AppLocale.systemArtSupport: 'Apoyar',
   AppLocale.systemArtApplied: 'Aplicado',
+  AppLocale.systemArtHideLogos: 'Ocultar logos de sistemas',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Oculta el logo de las cards de sistemas cuando el fondo ya lo incluye',
   AppLocale.about: 'Acerca de',
   AppLocale.exit: 'Salir',
   AppLocale.launcher: 'Lanzador',
