@@ -93,4 +93,11 @@ void main() {
 
     expect(result, isNull);
   });
+
+  test('finds the bundle containing its resolved executable', () {
+    expect(
+      MacOsApplicationService.bundlePathForExecutable(duckStationExecutable),
+      duckStationBundle,
+    );
+  });
 }
