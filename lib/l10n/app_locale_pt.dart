@@ -1,6 +1,21 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocalePt = {
+  AppLocale.raEvents: 'Eventos',
+  AppLocale.raAotwYearTitle: 'Conquista da Semana ({year})',
+  AppLocale.raAotw: 'AOTW',
+  AppLocale.raAwards: 'Prêmios',
+  AppLocale.raSetOrder: 'Ordem do conjunto',
+  AppLocale.raPointsSort: 'Pontos decrescentes',
+  AppLocale.raRaritySort: 'Mais raros primeiro',
+  AppLocale.raProgression: 'Progressão',
+  AppLocale.raWinCondition: 'Condição de vitória',
+  AppLocale.raWeek: 'Semana {week}',
+  AppLocale.raMissed: 'Perdido',
+  AppLocale.raUpcoming: 'Próximo',
+  AppLocale.raCurrent: 'Atual',
+  AppLocale.raEventUnavailable: 'Crédito do evento indisponível',
+  AppLocale.raEarned: 'Obtido',
   AppLocale.navigate: 'Navegar',
   AppLocale.select: 'Selecionar',
   AppLocale.back: 'Voltar',
@@ -732,8 +747,9 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.raDescription:
       'RetroAchievements é uma comunidade que oferece conquistas para jogos clássicos via emulação.',
   AppLocale.raEarnPoints: 'Ganhe pontos Hardcore e exiba-os',
-  AppLocale.raGlobalLeaderboards: 'Rankings e placares globais',
-  AppLocale.raGameplayHistory: 'Histórico de jogo e progresso detalhados',
+  AppLocale.raGlobalLeaderboards:
+      'Leaderboards por jogo e classificação pessoal',
+  AppLocale.raGameplayHistory: 'Jogos recentes e progresso das conquistas',
   AppLocale.raCreateAccountAt: 'Crie uma conta em',
   AppLocale.raToStartEarning: ' para começar a ganhar.',
   AppLocale.userProfile: 'Perfil do Usuário',
@@ -1172,6 +1188,40 @@ const Map<String, dynamic> appLocalePt = {
       'Isso excluirá permanentemente o ROM do jogo, seus dados de scraping e arquivos de mídia. Esta ação não pode ser desfeita.',
   AppLocale.deleteGameSubtitle: 'Remove permanentemente o arquivo ROM do disco',
 
+  AppLocale.raSubtabDashboard: 'Perfil',
+  AppLocale.raSubtabUnlocks: 'Conquistas',
+  AppLocale.raSubtabGames: 'Jogos',
+  AppLocale.raSubtabLeaderboards: 'Classificações',
+  AppLocale.raStanding: 'Minha classificação',
+  AppLocale.raStandingPill: 'Posição #{rank} · Top {percent}',
+  AppLocale.raUnranked: 'Sem classificação',
+  AppLocale.raYourRank: 'Posição: {rank}',
+  AppLocale.raYourPoints: 'Pontos: {points}',
+  AppLocale.raUserType: '{type}',
+  AppLocale.raCasual: 'Casual',
+  AppLocale.raYourGamesLeaderboards: 'Leaderboards dos seus jogos',
+  AppLocale.raNoLeaderboardGames:
+      'Ainda não há jogos com atividade em leaderboards',
+  AppLocale.raLeaderboardSignIn: 'Entre para ver as classificações deste jogo.',
+  AppLocale.raLeaderboardNoLeaderboards: 'Nenhuma classificação para este jogo',
+  AppLocale.raLeaderboardNoEntries: 'Ainda não há registros',
+  AppLocale.raLeaderboardEntries: 'Registros',
+  AppLocale.raLeaderboardTopEntry: 'Melhor: {user} · {score}',
+  AppLocale.raLeaderboardYourEntry: 'Seu registro',
+  AppLocale.raLeaderboardFormat: 'Formato: {format}',
+  AppLocale.raLeaderboardRankAscending: 'Pontuações menores ficam acima',
+  AppLocale.raLeaderboardRankDescending: 'Pontuações maiores ficam acima',
+  AppLocale.raGamesHeaderHint: 'Jogados + jogos acompanhados',
+  AppLocale.raFilterMastered: 'Dominados',
+  AppLocale.raFilterBeaten: 'Vencidos',
+  AppLocale.raGamesEndOfList: 'Esses são todos os jogos do seu histórico',
+  AppLocale.raGamesEmpty: 'Ainda não há atividade de jogo',
+  AppLocale.raErrorLoadGames: 'Erro ao carregar jogos: {error}',
+  AppLocale.raHardcore: 'Hardcore',
+  AppLocale.raUnlocksEndOfList:
+      'Essas são todas as conquistas dos últimos 30 dias',
+  AppLocale.raUnlockGameNotOwned:
+      'Este jogo não está na sua biblioteca nem no RomM',
   AppLocale.raCompletionsLabel: 'Conclusões',
   AppLocale.raMasteriesLabel: 'Masterizações',
   AppLocale.raPointsAbbrev: 'pts',
@@ -1179,6 +1229,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.raRecentCompletions: 'Conclusões Recentes',
   AppLocale.raRecentMasteries: 'Masterizações Recentes',
   AppLocale.raNoCompletionsYet: 'Nenhuma conclusão ainda',
+  AppLocale.raNoBeatenYet: 'Nenhum jogo vencido ainda',
   AppLocale.raNoMasteriesYet: 'Nenhuma masterização ainda',
   AppLocale.raTrackedGames: 'jogos acompanhados',
   AppLocale.raCompletionLabel: 'Conclusão',
@@ -1188,6 +1239,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.raMissable: 'PERDÍVEL',
   AppLocale.raFilterLocked: 'Bloqueadas',
   AppLocale.raFilterMissables: 'Perdíveis',
+  AppLocale.raGuide: 'Guia',
   AppLocale.raNoAchievementsForFilter:
       'Nenhuma conquista corresponde a este filtro.',
   AppLocale.raComments: 'COMENTÁRIOS',
@@ -1223,7 +1275,35 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.raGamesBeaten: '{count} jogos concluídos',
   AppLocale.raAchievementProgress: '{earned}/{total} conquistas',
   AppLocale.raRecent30Days: '30 dias',
+  AppLocale.raErrorApiKeyRequired:
+      'É necessária uma chave API Web do RetroAchievements para estes dados do painel.',
+  AppLocale.raErrorEnterUsername: 'Digite um nome de usuário',
+  AppLocale.raErrorEnterApiKey: 'Digite sua chave API Web do RetroAchievements',
+  AppLocale.raErrorUserNotFound: 'Usuário não encontrado no RetroAchievements',
+  AppLocale.raErrorConnect: 'Erro ao conectar ao RetroAchievements: {error}',
+  AppLocale.raErrorUserNotConnected: 'Usuário não conectado',
+  AppLocale.raErrorSummaryUnavailable:
+      'Não foi possível carregar o resumo do usuário',
+  AppLocale.raErrorAwardsUnavailable:
+      'Não foi possível carregar os prêmios do usuário',
+  AppLocale.raErrorGameInfoUnavailable:
+      'Não foi possível carregar as informações do jogo',
+  AppLocale.raErrorLoadGameInfo:
+      'Erro ao carregar as informações do jogo: {error}',
+  AppLocale.raErrorLoadSummary: 'Erro ao carregar o resumo do usuário: {error}',
+  AppLocale.raErrorLoadAotw: 'Erro ao carregar a conquista da semana: {error}',
+  AppLocale.raErrorLoadAwards:
+      'Erro ao carregar os prêmios do usuário: {error}',
+  AppLocale.raErrorLoadCompletionProgress:
+      'Erro ao carregar o progresso de conclusão: {error}',
+  AppLocale.raErrorLoadRecentlyPlayed:
+      'Erro ao carregar os jogos jogados recentemente: {error}',
+  AppLocale.raErrorLoadRecentUnlocks:
+      'Erro ao carregar desbloqueios recentes: {error}',
 
+  AppLocale.raErrorLoadLeaderboards: 'Erro ao carregar classificações: {error}',
+  AppLocale.raErrorLoadLeaderboardEntries:
+      'Erro ao carregar registros: {error}',
   // Custom save folders (NeoSync v2)
   AppLocale.customSaveFoldersTitle: 'Pastas de save standalone',
   AppLocale.customSaveFolderPickSystem: 'Escolha um sistema',

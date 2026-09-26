@@ -11,6 +11,7 @@ import '../../../providers/file_provider.dart';
 import '../../../providers/retro_achievements_provider.dart';
 import '../../../sync/i_sync_provider.dart';
 import '../../../models/retro_achievements_game_info.dart';
+import '../../../models/retro_achievements_leaderboard.dart';
 import '../../../repositories/retro_achievements_repository.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'dialogs/ra_match_picker_dialog.dart';
@@ -37,6 +38,7 @@ import 'tabs/game_details_box2d_tab.dart';
 import 'tabs/game_details_screenshot_video_tab.dart';
 import 'tabs/game_details_game_info_tab.dart';
 import 'tabs/game_details_achievements_tab.dart';
+import 'tabs/game_details_leaderboards_tab.dart';
 
 /// A comprehensive details view for a selected game, providing access to metadata,
 /// achievements, system settings, and cloud synchronization status.
@@ -54,6 +56,9 @@ class GameDetailsCardList extends StatefulWidget {
   final RetroAchievementsProvider retroAchievementsProvider;
   final ISyncProvider syncProvider;
   final String? localizedDescription;
+
+  /// Optional tab to open when a feature deep-links into this game.
+  final DetailTab? initialDetailTab;
 
   /// Bumped by the games list whenever this game's artwork files change on
   /// disk — a scrape, or a media file replaced from the settings dialog. The
@@ -149,6 +154,7 @@ class GameDetailsCardList extends StatefulWidget {
     required this.retroAchievementsProvider,
     required this.syncProvider,
     this.localizedDescription,
+    this.initialDetailTab,
     this.artworkVersion = 0,
     this.isExternallyScraping = false,
     this.externalScrapeProgress,
@@ -290,6 +296,8 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       GlobalKey<GameDetailsGameInfoTabState>();
   final GlobalKey<GameDetailsAchievementsTabState> _achievementsTabKey =
       GlobalKey<GameDetailsAchievementsTabState>();
+  final GlobalKey<GameDetailsLeaderboardsTabState> _leaderboardsTabKey =
+      GlobalKey<GameDetailsLeaderboardsTabState>();
 
   /// Determines if the screenshot/video tab should be suppressed when secondary display is active.
   bool get _isGameInfoHidden {
@@ -352,7 +360,10 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     // Restore the last tab the user picked with L1/R1. Deferred to the first
     // frame so _setTab can run its side effects (game info overlay, video
     // delay) exactly as it would for a live tab change.
-    final restoredTab = _persistedTab();
+    final requestedTab = widget.initialDetailTab;
+    final restoredTab = requestedTab != null && _isTabAvailable(requestedTab)
+        ? requestedTab
+        : _persistedTab();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (restoredTab == DetailTab.wheel) {
@@ -451,18 +462,22 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       moveUp: () => _movePanel(
         achievements: (state) => state.moveUp(),
         gameInfo: (state) => state.moveUp(),
+        leaderboards: (state) => state.moveUp(),
       ),
       moveDown: () => _movePanel(
         achievements: (state) => state.moveDown(),
         gameInfo: (state) => state.moveDown(),
+        leaderboards: (state) => state.moveDown(),
       ),
       moveLeft: () => _movePanel(
         achievements: (state) => state.moveLeft(),
         gameInfo: (state) => state.moveLeft(),
+        leaderboards: (state) => state.moveLeft(),
       ),
       moveRight: () => _movePanel(
         achievements: (state) => state.moveRight(),
         gameInfo: (state) => state.moveRight(),
+        leaderboards: (state) => state.moveRight(),
       ),
     );
     widget.onRegisterTriggerAction?.call(_handleTriggerAction);
@@ -568,7 +583,9 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     }
 
     if ((_isGameInfoHidden && _currentTab == DetailTab.screenshotVideo) ||
-        (!_hasRetroAchievements && _currentTab == DetailTab.achievements)) {
+        (!_hasRetroAchievements &&
+            (_currentTab == DetailTab.achievements ||
+                _currentTab == DetailTab.leaderboards))) {
       _currentTab = DetailTab.wheel;
       // A tab yanked away isn't a navigation the user made, so nothing slides:
       // drop the half-finished run rather than animating out of a panel this
@@ -733,6 +750,53 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     _achievementsLoadingTimer?.cancel();
     _achievementsLoadingTimer = null;
     _showAchievementsLoading = false;
+  }
+
+  Future<RaGameLeaderboardsPage> _loadGameLeaderboards(int gameId) async {
+    final page = await widget.retroAchievementsProvider.getGameLeaderboards(
+      gameId,
+    );
+    if (page == null) {
+      throw StateError(
+        widget.retroAchievementsProvider.error ??
+            AppLocale.raErrorLoadLeaderboards.getStringForCurrentLocale(),
+      );
+    }
+    return page;
+  }
+
+  Future<RaLeaderboardEntriesPage> _loadLeaderboardEntries(
+    int leaderboardId, {
+    required int count,
+    required int offset,
+  }) async {
+    final page = await widget.retroAchievementsProvider.getLeaderboardEntries(
+      leaderboardId,
+      count: count,
+      offset: offset,
+    );
+    if (page == null) {
+      throw StateError(
+        widget.retroAchievementsProvider.error ??
+            AppLocale.raErrorLoadLeaderboardEntries.getStringForCurrentLocale(),
+      );
+    }
+    return page;
+  }
+
+  Future<RaUserGameLeaderboardsPage> _loadUserGameLeaderboards(
+    int gameId,
+  ) async {
+    final page = await widget.retroAchievementsProvider.getUserGameLeaderboards(
+      gameId,
+    );
+    if (page == null) {
+      throw StateError(
+        widget.retroAchievementsProvider.error ??
+            AppLocale.raErrorLoadLeaderboards.getStringForCurrentLocale(),
+      );
+    }
+    return page;
   }
 
   Future<void> _loadAchievementsForGame({bool forceRefresh = false}) async {
@@ -983,6 +1047,20 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
                         raHash: _game.raHash,
                       ),
                     ),
+                  if (_isPanelMounted(DetailTab.leaderboards))
+                    _slidingPanel(
+                      DetailTab.leaderboards,
+                      GameDetailsLeaderboardsTab(
+                        key: _leaderboardsTabKey,
+                        gameId: _game.idRa ?? _currentGameInfo?.id,
+                        isConnected:
+                            widget.retroAchievementsProvider.isConnected,
+                        loadGameLeaderboards: _loadGameLeaderboards,
+                        loadLeaderboardEntries: _loadLeaderboardEntries,
+                        loadUserGameLeaderboards: _loadUserGameLeaderboards,
+                        bottomOffset: panelBottomOffset,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1227,7 +1305,10 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
   /// Whether [tab] can be shown for the current game and display setup.
   bool _isTabAvailable(DetailTab tab) {
     if (tab == DetailTab.screenshotVideo && _isGameInfoHidden) return false;
-    if (tab == DetailTab.achievements && !_hasRetroAchievements) return false;
+    if ((tab == DetailTab.achievements || tab == DetailTab.leaderboards) &&
+        !_hasRetroAchievements) {
+      return false;
+    }
     return true;
   }
 
@@ -1275,6 +1356,8 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
         _achievementsTabKey.currentState?.isPanelActive ?? false,
       DetailTab.gameInfo =>
         _gameInfoTabKey.currentState?.isPanelActive ?? false,
+      DetailTab.leaderboards =>
+        _leaderboardsTabKey.currentState?.isPanelActive ?? false,
       _ => false,
     };
   }
@@ -1283,6 +1366,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
   void _movePanel({
     required void Function(GameDetailsAchievementsTabState) achievements,
     required void Function(GameDetailsGameInfoTabState) gameInfo,
+    required void Function(GameDetailsLeaderboardsTabState) leaderboards,
   }) {
     if (!mounted) return;
     switch (_currentTab) {
@@ -1292,6 +1376,9 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       case DetailTab.gameInfo:
         final state = _gameInfoTabKey.currentState;
         if (state != null) gameInfo(state);
+      case DetailTab.leaderboards:
+        final state = _leaderboardsTabKey.currentState;
+        if (state != null) leaderboards(state);
       default:
         break;
     }
@@ -1319,6 +1406,10 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
         // A stays consumed so it cannot launch the game from under a panel the
         // user is reading.
         return state.isPanelActive || state.enterPanel();
+      case DetailTab.leaderboards:
+        final state = _leaderboardsTabKey.currentState;
+        if (state == null) return false;
+        return state.isPanelActive || state.enterPanel();
       default:
         return false;
     }
@@ -1333,6 +1424,8 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       DetailTab.achievements =>
         _achievementsTabKey.currentState?.exitPanel() ?? false,
       DetailTab.gameInfo => _gameInfoTabKey.currentState?.exitPanel() ?? false,
+      DetailTab.leaderboards =>
+        _leaderboardsTabKey.currentState?.exitPanel() ?? false,
       _ => false,
     };
   }

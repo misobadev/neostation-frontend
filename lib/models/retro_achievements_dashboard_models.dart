@@ -321,6 +321,169 @@ class RetroAchievementCompletionProgressItem {
   }
 }
 
+/// One row of the Games sub-tab's merged list: a game the player has recent
+/// activity in, folded from the two endpoints the merge reads — recently
+/// played (the "still playing" side, carrying live achievement progress and
+/// box art) and completion progress (every tracked game, carrying its
+/// highest award). A game both endpoints report collapses into one row: the
+/// played side wins the identity fields, the completion side contributes the
+/// award.
+class RaGamesListItem {
+  final int gameId;
+  final String title;
+  final int consoleId;
+  final String consoleName;
+
+  /// RA media path (e.g. `/Images/…`) — resolved against
+  /// `media.retroachievements.org` at render time, like the other RA lists.
+  final String imageIcon;
+  final String imageBoxArt;
+
+  /// Total achievements the game has — the progress fraction's denominator.
+  final int maxPossible;
+
+  /// Achievements earned in any mode — hardcore included.
+  final int numAwarded;
+
+  /// The hardcore subset of [numAwarded].
+  final int numAwardedHardcore;
+
+  /// `mastered` / `completed` / `beaten-hardcore` / `beaten-softcore` from
+  /// the completion-progress side, or null when no completion row exists
+  /// (which also covers "tracked but no award").
+  final String? highestAwardKind;
+  final DateTime? lastPlayed;
+  final DateTime? mostRecentAwardedDate;
+
+  const RaGamesListItem({
+    required this.gameId,
+    required this.title,
+    required this.consoleId,
+    required this.consoleName,
+    required this.imageIcon,
+    required this.imageBoxArt,
+    required this.maxPossible,
+    required this.numAwarded,
+    required this.numAwardedHardcore,
+    required this.highestAwardKind,
+    required this.lastPlayed,
+    required this.mostRecentAwardedDate,
+  });
+
+  /// The row's place in a date-ordered list: whichever source last saw the
+  /// player in this game.
+  DateTime? get sortDate {
+    final played = lastPlayed;
+    final awarded = mostRecentAwardedDate;
+    if (played == null) return awarded;
+    if (awarded == null) return played;
+    return played.isAfter(awarded) ? played : awarded;
+  }
+
+  bool get isMastered => _kindIs('mastered');
+  bool get isCompleted => _kindIs('completed');
+  bool get isBeaten =>
+      isMastered ||
+      isCompleted ||
+      _kindIs('beaten-hardcore') ||
+      _kindIs('beaten-softcore');
+
+  String? get awardMode {
+    final kind = (highestAwardKind ?? '').trim().toLowerCase();
+    if (kind.endsWith('-hardcore')) return 'hardcore';
+    if (kind.endsWith('-softcore')) return 'softcore';
+    return null;
+  }
+
+  bool _kindIs(String kind) =>
+      (highestAwardKind ?? '').trim().toLowerCase() == kind;
+
+  /// RA timestamps are `yyyy-MM-dd HH:mm:ss` (UTC); the space is not a
+  /// separator `DateTime.parse` accepts, and an unparsable date must read as
+  /// "unknown" rather than throw — the merge sorts around nulls.
+  static DateTime? _parseRaDate(String raw) {
+    if (raw.isEmpty) return null;
+    return DateTime.tryParse(raw.replaceFirst(' ', 'T'));
+  }
+
+  /// Folds whole pages of both sources into the merged, date-ordered list:
+  /// one row per game id (played identity + completion award), freshest
+  /// activity first, undated rows last. Pure, so the provider's rebuild is
+  /// exactly this and nothing else.
+  static List<RaGamesListItem> mergeAll({
+    required List<RetroAchievementRecentlyPlayedGameItem> played,
+    required List<RetroAchievementCompletionProgressItem> progress,
+  }) {
+    final playedById = <int, RetroAchievementRecentlyPlayedGameItem>{
+      for (final item in played) item.gameId: item,
+    };
+    final completionById = <int, RetroAchievementCompletionProgressItem>{
+      for (final item in progress) item.gameId: item,
+    };
+    final merged = <RaGamesListItem>[];
+    for (final entry in playedById.entries) {
+      merged.add(
+        RaGamesListItem.merge(
+          played: entry.value,
+          progress: completionById[entry.key],
+        ),
+      );
+    }
+    for (final entry in completionById.entries) {
+      if (playedById.containsKey(entry.key)) continue;
+      merged.add(RaGamesListItem.merge(progress: entry.value));
+    }
+    merged.sort((a, b) {
+      final awarded = b.sortDate;
+      final playedDate = a.sortDate;
+      if (playedDate == null && awarded == null) {
+        return b.gameId.compareTo(a.gameId);
+      }
+      if (playedDate == null) return 1;
+      if (awarded == null) return -1;
+      final byDate = awarded.compareTo(playedDate);
+      return byDate != 0 ? byDate : b.gameId.compareTo(a.gameId);
+    });
+    return merged;
+  }
+
+  /// Folds one row from each source into the merged row. Either side may be
+  /// absent (a game only one endpoint reports); when both are present the
+  /// played row wins identity and progress — it has the box art and the
+  /// fresher date — and the completion row contributes its award.
+  factory RaGamesListItem.merge({
+    RetroAchievementRecentlyPlayedGameItem? played,
+    RetroAchievementCompletionProgressItem? progress,
+  }) {
+    assert(
+      played != null || progress != null,
+      'a merged row needs at least one source',
+    );
+    return RaGamesListItem(
+      gameId: played?.gameId ?? progress!.gameId,
+      title: played?.title ?? progress!.title,
+      consoleId: played?.consoleId ?? progress!.consoleId,
+      consoleName: played?.consoleName ?? progress!.consoleName,
+      imageIcon: (played?.imageIcon.isNotEmpty ?? false)
+          ? played!.imageIcon
+          : (progress?.imageIcon ?? ''),
+      imageBoxArt: played?.imageBoxArt ?? '',
+      maxPossible:
+          played?.numPossibleAchievements ?? progress?.maxPossible ?? 0,
+      numAwarded: played?.numAchieved ?? progress?.numAwarded ?? 0,
+      numAwardedHardcore:
+          played?.numAchievedHardcore ?? progress?.numAwardedHardcore ?? 0,
+      highestAwardKind: (progress?.highestAwardKind ?? '').trim().isEmpty
+          ? null
+          : progress?.highestAwardKind,
+      lastPlayed: _parseRaDate(played?.lastPlayed ?? ''),
+      mostRecentAwardedDate: _parseRaDate(
+        progress?.mostRecentAwardedDate ?? '',
+      ),
+    );
+  }
+}
+
 class OwnedWeekGameResolution {
   final int raGameId;
   final DatabaseGameModel game;

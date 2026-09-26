@@ -26,6 +26,18 @@ import 'romm_bulk_sync.dart';
 /// High-level connection state for the RomM integration.
 enum RommConnectionStatus { disconnected, connecting, connected, error }
 
+/// Outcome of the small RetroAchievements-id lookup used by the AOTW card.
+/// Keeping a failed request distinct from a successful miss lets the card offer
+/// retry instead of telling the user a game is absent when RomM was unreachable.
+enum RommRaLookupStatus { found, missing, notConnected, failed }
+
+class RommRaLookupResult {
+  const RommRaLookupResult(this.status, {this.rom});
+
+  final RommRaLookupStatus status;
+  final RommRom? rom;
+}
+
 /// Per-ROM download lifecycle state.
 enum RommDownloadStatus { downloading, completed, failed, cancelled }
 
@@ -671,10 +683,29 @@ class RommProvider extends ChangeNotifier {
   /// id makes the final decision. This is an AOTW-sized lookup, not a library
   /// sweep.
   Future<RommRom?> findRomByRaGameId(int gameId, String gameTitle) async {
-    if (!isConnected || gameId <= 0 || gameTitle.trim().isEmpty) return null;
+    final result = await findRomByRaGameIdResult(gameId, gameTitle);
+    return result.rom;
+  }
+
+  Future<RommRaLookupResult> findRomByRaGameIdResult(
+    int gameId,
+    String gameTitle, {
+    bool forceRefresh = false,
+  }) async {
+    if (!isConnected || gameId <= 0 || gameTitle.trim().isEmpty) {
+      return RommRaLookupResult(
+        isConnected
+            ? RommRaLookupStatus.missing
+            : RommRaLookupStatus.notConnected,
+      );
+    }
     final cacheKey = '$gameId|${gameTitle.trim().toLowerCase()}';
-    if (_raGameLookupCache.containsKey(cacheKey)) {
-      return _raGameLookupCache[cacheKey];
+    if (!forceRefresh && _raGameLookupCache.containsKey(cacheKey)) {
+      final cached = _raGameLookupCache[cacheKey];
+      return RommRaLookupResult(
+        cached == null ? RommRaLookupStatus.missing : RommRaLookupStatus.found,
+        rom: cached,
+      );
     }
     try {
       final matches = await _service.getRoms(search: gameTitle, limit: 100);
@@ -682,16 +713,17 @@ class RommProvider extends ChangeNotifier {
       for (final rom in matches) {
         if (rom.raId == gameId) {
           _raGameLookupCache[cacheKey] = rom;
-          return rom;
+          return RommRaLookupResult(RommRaLookupStatus.found, rom: rom);
         }
       }
       _raGameLookupCache[cacheKey] = null;
+      return const RommRaLookupResult(RommRaLookupStatus.missing);
     } on RommException catch (e) {
       _log.w('RomM RA lookup failed: ${e.message}');
     } catch (e) {
       _log.w('RomM RA lookup failed: $e');
     }
-    return null;
+    return const RommRaLookupResult(RommRaLookupStatus.failed);
   }
 
   /// Enters a library-wide search: queries ROMs by [term] alone across the

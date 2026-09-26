@@ -1,3 +1,4 @@
+import '../../../widgets/ra_earned_badge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -476,20 +477,9 @@ Widget buildAchievementBadge(
     badge = Opacity(opacity: 0.45, child: badge);
   }
 
-  Widget result = Container(
-    decoration: isNew
-        ? BoxDecoration(
-            borderRadius: BorderRadius.circular(10.r),
-            border: Border.all(color: const Color(0xFFFFC107), width: 2.r),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFFC107).withValues(alpha: 0.6),
-                blurRadius: 12.r,
-              ),
-            ],
-          )
-        : null,
-    padding: EdgeInsets.all(isNew ? 2.r : 0),
+  Widget result = RaEarnedBadge(
+    casual: a.earned,
+    hardcore: a.earnedHardcore,
     child: badge,
   );
   if (a.isMissable) {

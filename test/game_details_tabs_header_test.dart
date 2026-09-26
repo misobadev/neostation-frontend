@@ -102,6 +102,7 @@ void main() {
         Symbols.image_rounded,
         Symbols.info_rounded,
         Symbols.emoji_events_rounded,
+        Symbols.leaderboard_rounded,
       ]) {
         expect(find.byIcon(icon), findsOneWidget);
       }
@@ -127,6 +128,7 @@ void main() {
 
     expect(find.byIcon(Symbols.image_rounded), findsNothing);
     expect(find.byIcon(Symbols.emoji_events_rounded), findsNothing);
+    expect(find.byIcon(Symbols.leaderboard_rounded), findsNothing);
     // The three that are always there stay.
     expect(find.byIcon(Symbols.branding_watermark_rounded), findsOneWidget);
     expect(find.byIcon(Symbols.filter_frames_rounded), findsOneWidget);
@@ -163,6 +165,16 @@ void main() {
     await tester.pump();
 
     expect(reported, DetailTab.achievements);
+  });
+
+  testWidgets('the leaderboard tab reports itself when tapped', (tester) async {
+    DetailTab? reported;
+    await pumpHeader(tester, onTabChanged: (tab) => reported = tab);
+
+    await tester.tap(find.byIcon(Symbols.leaderboard_rounded));
+    await tester.pump();
+
+    expect(reported, DetailTab.leaderboards);
   });
 
   testWidgets('the cursor follows the visible order, not the enum', (

@@ -193,6 +193,44 @@ void main() {
     expect(find.text('Not in your library'), findsOneWidget);
   });
 
+  testWidgets('keeps AOTW focusable when it is not local or in RomM', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<RetroAchievementsProvider>.value(
+            value: _DashboardProvider(null),
+          ),
+          ChangeNotifierProvider(create: (_) => RommProvider()),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(1280, 720),
+          builder: (context, _) => MaterialApp(
+            localizationsDelegates:
+                FlutterLocalization.instance.localizationsDelegates,
+            supportedLocales: FlutterLocalization.instance.supportedLocales,
+            home: Scaffold(
+              body: RADashboardHub(
+                logoutSelected: false,
+                weekCardSelected: true,
+                onDisconnectRequested: () {},
+                onOwnedWeekGameSelected: (_) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final selected = find.byWidgetPredicate(
+      (widget) => widget is Semantics && widget.properties.selected == true,
+    );
+    expect(selected, findsOneWidget);
+    expect(tester.widget<Semantics>(selected).properties.button, isTrue);
+  });
+
   testWidgets('renders an empty event as a neutral state', (tester) async {
     await tester.pumpWidget(
       MultiProvider(

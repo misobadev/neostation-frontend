@@ -1,3 +1,4 @@
+import 'package:neostation/widgets/ra_earned_badge.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -979,9 +980,7 @@ class _AchievementsGrid extends StatelessWidget {
       itemCount: achievements.length,
       itemBuilder: (context, index) {
         final achievement = achievements[index];
-        final isUnlocked =
-            achievement.dateEarned != null &&
-            achievement.dateEarned!.isNotEmpty;
+        final isUnlocked = achievement.isUnlocked;
         final isSelected = index == selectedIndex;
 
         return GestureDetector(
@@ -994,22 +993,24 @@ class _AchievementsGrid extends StatelessWidget {
                     ? Theme.of(context).colorScheme.secondary.withValues(
                         alpha: isFocused ? 1.0 : 0.35,
                       )
-                    : (isUnlocked
-                          ? Colors.orange.withValues(alpha: 0.5)
-                          : Colors.transparent),
+                    : Colors.transparent,
                 width: isSelected ? 2.r : 1.r,
               ),
               borderRadius: radii.radiusInternal,
             ),
-            child: ClipRRect(
-              borderRadius: radii.radiusInternal,
-              child: Image.network(
-                // Use the standard RA Badge CDN protocol for locked vs unlocked icons.
-                isUnlocked
-                    ? 'https://media.retroachievements.org/Badge/${achievement.badgeName}.png'
-                    : 'https://media.retroachievements.org/Badge/${achievement.badgeName}_lock.png',
-                cacheWidth: 64,
-                fit: BoxFit.cover,
+            child: RaEarnedBadge(
+              casual: achievement.isUnlocked,
+              hardcore: (achievement.dateEarnedHardcore ?? '').isNotEmpty,
+              child: ClipRRect(
+                borderRadius: radii.radiusInternal,
+                child: Image.network(
+                  // Use the standard RA Badge CDN protocol for locked vs unlocked icons.
+                  isUnlocked
+                      ? 'https://media.retroachievements.org/Badge/${achievement.badgeName}.png'
+                      : 'https://media.retroachievements.org/Badge/${achievement.badgeName}_lock.png',
+                  cacheWidth: 64,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
           ),

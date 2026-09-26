@@ -73,6 +73,11 @@ class Achievement {
     this.dateEarnedHardcore,
   });
 
+  bool get isUnlocked =>
+      (dateEarned ?? '').isNotEmpty || (dateEarnedHardcore ?? '').isNotEmpty;
+
+  bool get isMissable => (type ?? '').trim().toLowerCase() == 'missable';
+
   /// Creates an [Achievement] from a JSON-compatible map provided by the RA API.
   factory Achievement.fromJson(Map<String, dynamic> json) {
     return Achievement(
@@ -81,7 +86,7 @@ class Achievement {
       description: (json['Description'] ?? '').toString(),
       points: RAParsingUtils.toInt(json['Points']),
       trueRatio: RAParsingUtils.toInt(json['TrueRatio']),
-      type: json['Type']?.toString(),
+      type: (json['Type'] ?? json['type'])?.toString(),
       badgeName: (json['BadgeName'] ?? '').toString(),
       numAwarded: RAParsingUtils.toInt(json['NumAwarded']),
       numAwardedHardcore: RAParsingUtils.toInt(json['NumAwardedHardcore']),
@@ -177,6 +182,9 @@ class GameInfoAndUserProgress {
   /// Rich presence script used to show live game status in RA.
   final String richPresencePatch;
 
+  /// Optional community guide supplied by the game metadata endpoint.
+  final String? guideUrl;
+
   /// Map of achievements, keyed by their unique identifier string.
   final Map<String, Achievement> achievements;
 
@@ -213,6 +221,7 @@ class GameInfoAndUserProgress {
     required this.releasedAtGranularity,
     required this.isFinal,
     required this.richPresencePatch,
+    this.guideUrl,
     required this.achievements,
     this.highestAwardKind,
     this.highestAwardDate,
@@ -221,27 +230,38 @@ class GameInfoAndUserProgress {
   /// Creates a [GameInfoAndUserProgress] instance from an RA API response.
   factory GameInfoAndUserProgress.fromJson(Map<String, dynamic> json) {
     final achievementsJson =
-        json['Achievements'] as Map<String, dynamic>? ?? {};
+        (json['Achievements'] ?? json['achievements'])
+            as Map<String, dynamic>? ??
+        {};
     final achievements = <String, Achievement>{};
     achievementsJson.forEach((achievementId, achievementData) {
       achievements[achievementId] = Achievement.fromJson(achievementData);
     });
 
     return GameInfoAndUserProgress(
-      id: RAParsingUtils.toInt(json['ID']),
-      title: (json['Title'] ?? '').toString(),
-      consoleId: RAParsingUtils.toInt(json['ConsoleID']),
-      consoleName: (json['ConsoleName'] ?? '').toString(),
-      parentGameId: RAParsingUtils.toInt(json['ParentGameID']),
-      numDistinctPlayers: RAParsingUtils.toInt(json['NumDistinctPlayers']),
+      id: RAParsingUtils.toInt(json['ID'] ?? json['id']),
+      title: (json['Title'] ?? json['title'] ?? '').toString(),
+      consoleId: RAParsingUtils.toInt(json['ConsoleID'] ?? json['consoleId']),
+      consoleName: (json['ConsoleName'] ?? json['consoleName'] ?? '')
+          .toString(),
+      parentGameId: RAParsingUtils.toInt(
+        json['ParentGameID'] ?? json['parentGameId'],
+      ),
+      numDistinctPlayers: RAParsingUtils.toInt(
+        json['NumDistinctPlayers'] ?? json['numDistinctPlayers'],
+      ),
       numDistinctPlayersCasual: RAParsingUtils.toInt(
         json['NumDistinctPlayersCasual'],
       ),
       numDistinctPlayersHardcore: RAParsingUtils.toInt(
         json['NumDistinctPlayersHardcore'],
       ),
-      numAchievements: RAParsingUtils.toInt(json['NumAchievements']),
-      numAwardedToUser: RAParsingUtils.toInt(json['NumAwardedToUser']),
+      numAchievements: RAParsingUtils.toInt(
+        json['NumAchievements'] ?? json['numAchievements'],
+      ),
+      numAwardedToUser: RAParsingUtils.toInt(
+        json['NumAwardedToUser'] ?? json['numAwardedToUser'],
+      ),
       numAwardedToUserHardcore: RAParsingUtils.toInt(
         json['NumAwardedToUserHardcore'],
       ),
@@ -250,10 +270,11 @@ class GameInfoAndUserProgress {
           .toString(),
       forumTopicId: RAParsingUtils.toInt(json['ForumTopicID']),
       flags: RAParsingUtils.toInt(json['Flags']),
-      imageIcon: (json['ImageIcon'] ?? '').toString(),
+      imageIcon: (json['ImageIcon'] ?? json['imageIcon'] ?? '').toString(),
       imageTitle: (json['ImageTitle'] ?? '').toString(),
       imageIngame: (json['ImageIngame'] ?? '').toString(),
-      imageBoxArt: (json['ImageBoxArt'] ?? '').toString(),
+      imageBoxArt: (json['ImageBoxArt'] ?? json['imageBoxArt'] ?? '')
+          .toString(),
       publisher: (json['Publisher'] ?? '').toString(),
       developer: (json['Developer'] ?? '').toString(),
       genre: (json['Genre'] ?? '').toString(),
@@ -261,6 +282,7 @@ class GameInfoAndUserProgress {
       releasedAtGranularity: (json['ReleasedAtGranularity'] ?? '').toString(),
       isFinal: RAParsingUtils.toBool(json['IsFinal']),
       richPresencePatch: (json['RichPresencePatch'] ?? '').toString(),
+      guideUrl: (json['GuideURL'] ?? json['guideUrl'])?.toString(),
       achievements: achievements,
       highestAwardKind: json['HighestAwardKind']?.toString(),
       highestAwardDate: json['HighestAwardDate']?.toString(),

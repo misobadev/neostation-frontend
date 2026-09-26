@@ -21,9 +21,17 @@ Check the emulator configured for that system. NeoStation can report missing Ret
 
 Confirm that you are signed in to ScreenScraper and that the game system is mapped. A successful metadata request can still have failed media downloads; retry after checking your connection.
 
+## RetroAchievements data is missing or stale
+
+Confirm that you are signed in with your personal RetroAchievements Web API key. NeoStation can replay cached responses while offline, but new pages and refreshes need a connection. Reconnect, open the **RetroAchievements** tab, and select **Refresh**. If there is no cached response for a view, wait for the connection to return and refresh again.
+
 ## RetroAchievements has no matches
 
-Run **Settings → Tools → Match RetroAchievements Games**. Matching a large library can take time and may be paused and resumed. Sign in to the RetroAchievements tab to view results.
+Run **Settings → Tools → Match RetroAchievements Games**. Matching a large library can take time and may be paused and resumed. Sign in to the RetroAchievements tab to view results. A game must be matched before NeoStation can show its achievement progress or per-game leaderboards.
+
+## A matched game has no leaderboard
+
+Open the game's details card and select **Leaderboards**. Some games have no RetroAchievements leaderboards or no submitted entries, even when the game is matched. If the game is not listed in your activity, play or sync it first, then refresh the RetroAchievements tab.
 
 ## A NeoSync save is not appearing on another device
 

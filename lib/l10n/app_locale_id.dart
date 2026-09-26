@@ -1,6 +1,21 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleId = {
+  AppLocale.raEvents: 'Acara',
+  AppLocale.raAotwYearTitle: 'Pencapaian Minggu Ini ({year})',
+  AppLocale.raAotw: 'AOTW',
+  AppLocale.raAwards: 'Penghargaan',
+  AppLocale.raSetOrder: 'Urutan set',
+  AppLocale.raPointsSort: 'Poin tertinggi',
+  AppLocale.raRaritySort: 'Paling langka dahulu',
+  AppLocale.raProgression: 'Progres',
+  AppLocale.raWinCondition: 'Syarat menang',
+  AppLocale.raWeek: 'Minggu {week}',
+  AppLocale.raMissed: 'Terlewat',
+  AppLocale.raUpcoming: 'Mendatang',
+  AppLocale.raCurrent: 'Saat ini',
+  AppLocale.raEventUnavailable: 'Kredit acara tidak tersedia',
+  AppLocale.raEarned: 'Diraih',
   AppLocale.navigate: 'Navigasi',
   AppLocale.select: 'Pilih',
   AppLocale.back: 'Kembali',
@@ -722,8 +737,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.raDescription:
       'RetroAchievements adalah komunitas yang menawarkan pencapaian untuk game klasik melalui emulasi.',
   AppLocale.raEarnPoints: 'Dapatkan poin Hardcore dan tampilkan',
-  AppLocale.raGlobalLeaderboards: 'Papan peringkat global',
-  AppLocale.raGameplayHistory: 'Riwayat permainan dan kemajuan mendetail',
+  AppLocale.raGlobalLeaderboards:
+      'Papan peringkat per game dan peringkat pribadi',
+  AppLocale.raGameplayHistory: 'Game terbaru dan kemajuan pencapaian',
   AppLocale.raCreateAccountAt: 'Buat akun di',
   AppLocale.raToStartEarning: ' untuk mulai mendapatkan poin.',
   AppLocale.userProfile: 'Profil Pengguna',
@@ -1162,6 +1178,43 @@ const Map<String, dynamic> appLocaleId = {
       'Ini akan menghapus permanen ROM game, data scraping, dan file media. Tindakan ini tidak dapat dibatalkan.',
   AppLocale.deleteGameSubtitle: 'Menghapus permanen file ROM dari disk',
 
+  AppLocale.raSubtabDashboard: 'Profil',
+  AppLocale.raSubtabUnlocks: 'Pencapaian',
+  AppLocale.raSubtabGames: 'Game',
+  AppLocale.raSubtabLeaderboards: 'Papan peringkat',
+  AppLocale.raStanding: 'Peringkat saya',
+  AppLocale.raStandingPill: 'Peringkat #{rank} · Top {percent}',
+  AppLocale.raUnranked: 'Belum berperingkat',
+  AppLocale.raYourRank: 'Peringkat: {rank}',
+  AppLocale.raYourPoints: 'Poin: {points}',
+  AppLocale.raUserType: '{type}',
+  AppLocale.raCasual: 'Kasual',
+  AppLocale.raYourGamesLeaderboards: 'Papan peringkat game Anda',
+  AppLocale.raNoLeaderboardGames:
+      'Belum ada game dengan aktivitas papan peringkat',
+  AppLocale.raLeaderboardSignIn:
+      'Masuk untuk melihat papan peringkat game ini.',
+  AppLocale.raLeaderboardNoLeaderboards:
+      'Tidak ada papan peringkat untuk game ini',
+  AppLocale.raLeaderboardNoEntries: 'Belum ada entri',
+  AppLocale.raLeaderboardEntries: 'Entri',
+  AppLocale.raLeaderboardTopEntry: 'Teratas: {user} · {score}',
+  AppLocale.raLeaderboardYourEntry: 'Entri Anda',
+  AppLocale.raLeaderboardFormat: 'Format: {format}',
+  AppLocale.raLeaderboardRankAscending:
+      'Skor lebih rendah mendapat peringkat lebih tinggi',
+  AppLocale.raLeaderboardRankDescending:
+      'Skor lebih tinggi mendapat peringkat lebih tinggi',
+  AppLocale.raGamesHeaderHint: 'Dimainkan + game terlacak',
+  AppLocale.raFilterMastered: 'Dikuasai',
+  AppLocale.raFilterBeaten: 'Ditamatkan',
+  AppLocale.raGamesEndOfList: 'Itu semua game dalam riwayatmu',
+  AppLocale.raGamesEmpty: 'Belum ada aktivitas game',
+  AppLocale.raErrorLoadGames: 'Gagal memuat game: {error}',
+  AppLocale.raHardcore: 'Hardcore',
+  AppLocale.raUnlocksEndOfList: 'Itu semua pencapaian dari 30 hari terakhir',
+  AppLocale.raUnlockGameNotOwned:
+      'Game ini tidak ada di pustaka atau RomM Anda',
   AppLocale.raCompletionsLabel: 'Penyelesaian',
   AppLocale.raMasteriesLabel: 'Penguasaan',
   AppLocale.raPointsAbbrev: 'poin',
@@ -1169,6 +1222,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.raRecentCompletions: 'Penyelesaian Terbaru',
   AppLocale.raRecentMasteries: 'Penguasaan Terbaru',
   AppLocale.raNoCompletionsYet: 'Belum ada penyelesaian',
+  AppLocale.raNoBeatenYet: 'Belum ada game yang ditamatkan',
   AppLocale.raNoMasteriesYet: 'Belum ada penguasaan',
   AppLocale.raTrackedGames: 'game terlacak',
   AppLocale.raCompletionLabel: 'Penyelesaian',
@@ -1178,6 +1232,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.raMissable: 'BISA TERLEWAT',
   AppLocale.raFilterLocked: 'Terkunci',
   AppLocale.raFilterMissables: 'Bisa Terlewat',
+  AppLocale.raGuide: 'Panduan',
   AppLocale.raNoAchievementsForFilter:
       'Tidak ada pencapaian yang sesuai dengan filter ini.',
   AppLocale.raComments: 'KOMENTAR',
@@ -1212,7 +1267,34 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.raGamesBeaten: '{count} game ditamatkan',
   AppLocale.raAchievementProgress: '{earned}/{total} pencapaian',
   AppLocale.raRecent30Days: '30 hari',
+  AppLocale.raErrorApiKeyRequired:
+      'Kunci API Web RetroAchievements diperlukan untuk data dasbor ini.',
+  AppLocale.raErrorEnterUsername: 'Masukkan nama pengguna',
+  AppLocale.raErrorEnterApiKey: 'Masukkan kunci API Web RetroAchievements Anda',
+  AppLocale.raErrorUserNotFound:
+      'Pengguna tidak ditemukan di RetroAchievements',
+  AppLocale.raErrorConnect: 'Gagal terhubung ke RetroAchievements: {error}',
+  AppLocale.raErrorUserNotConnected: 'Pengguna tidak terhubung',
+  AppLocale.raErrorSummaryUnavailable: 'Ringkasan pengguna tidak dapat dimuat',
+  AppLocale.raErrorAwardsUnavailable: 'Hadiah pengguna tidak dapat dimuat',
+  AppLocale.raErrorGameInfoUnavailable: 'Informasi game tidak dapat dimuat',
+  AppLocale.raErrorLoadGameInfo:
+      'Kesalahan saat memuat informasi game: {error}',
+  AppLocale.raErrorLoadSummary:
+      'Kesalahan saat memuat ringkasan pengguna: {error}',
+  AppLocale.raErrorLoadAotw:
+      'Kesalahan saat memuat Pencapaian Minggu Ini: {error}',
+  AppLocale.raErrorLoadAwards: 'Kesalahan saat memuat hadiah pengguna: {error}',
+  AppLocale.raErrorLoadCompletionProgress:
+      'Kesalahan saat memuat progres penyelesaian: {error}',
+  AppLocale.raErrorLoadRecentlyPlayed:
+      'Kesalahan saat memuat game yang baru dimainkan: {error}',
+  AppLocale.raErrorLoadRecentUnlocks:
+      'Kesalahan saat memuat pencapaian yang baru dibuka: {error}',
 
+  AppLocale.raErrorLoadLeaderboards: 'Gagal memuat papan peringkat: {error}',
+  AppLocale.raErrorLoadLeaderboardEntries:
+      'Gagal memuat entri papan peringkat: {error}',
   // Custom save folders (NeoSync v2)
   AppLocale.customSaveFoldersTitle: 'Folder penyimpanan standalone',
   AppLocale.customSaveFolderPickSystem: 'Pilih sistem',

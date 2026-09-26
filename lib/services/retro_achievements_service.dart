@@ -9,6 +9,7 @@ import '../models/retro_achievements_game_info.dart';
 import '../models/retro_achievements_gotw.dart';
 import '../models/retro_achievement_comment.dart';
 import '../models/retro_achievements_dashboard_models.dart';
+import '../models/retro_achievements_leaderboard.dart';
 
 /// Service for interacting with the RetroAchievements API.
 ///
@@ -28,6 +29,59 @@ class RetroAchievementsService {
   static String resolveApiKey(String? apiKey) => apiKey?.trim() ?? '';
 
   static final _log = LoggerService.instance;
+
+  /// Discover the legacy event set through the public Events-system catalogue.
+  /// No website scraping or assumptions about event IDs being game IDs.
+  static Future<GameInfoAndUserProgress?> getAnnualEventProgress(
+    int year,
+    String username, {
+    required String apiKey,
+    http.Client? client,
+  }) async {
+    if (resolveApiKey(apiKey).isEmpty) throw StateError('API key required');
+    Future<dynamic> read(
+      String endpoint,
+      Map<String, String> parameters,
+      String cacheKey,
+    ) {
+      final url = Uri.parse(
+        '$_baseUrl/$endpoint.php',
+      ).replace(queryParameters: {...parameters, 'y': apiKey});
+      final headers = {
+        'User-Agent': 'NeoStation/1.0',
+        'Accept': 'application/json',
+      };
+      return _fetchWithCache<dynamic>(
+        cacheKey: cacheKey,
+        send: () => client == null
+            ? http.get(url, headers: headers)
+            : client.get(url, headers: headers),
+        parse: (data) => data,
+        onMiss: (_) => throw const HttpException('Event data unavailable'),
+      );
+    }
+
+    final list = await read('API_GetGameList', {
+      'i': '101',
+    }, 'event_catalogue_$year');
+    if (list is! List) throw const FormatException('Invalid event catalogue');
+    final matches = list
+        .whereType<Map>()
+        .where((g) => g['Title'] == 'Achievement of the Week $year')
+        .toList();
+    if (matches.length != 1) return null;
+    final id = matches.single['ID'].toString();
+    final data = await read('API_GetGameInfoAndUserProgress', {
+      'g': id,
+      'u': username,
+    }, 'event_${year}_$username');
+    if (data is! Map ||
+        data['Achievements'] is! Map ||
+        data['Title'] != 'Achievement of the Week $year') {
+      return null;
+    }
+    return GameInfoAndUserProgress.fromJson(Map<String, dynamic>.from(data));
+  }
 
   /// Runs a cache-aware GET.
   ///
@@ -380,38 +434,35 @@ class RetroAchievementsService {
     );
   }
 
-  /// Resolves a game's information and user progress using a file hash.
-  @Deprecated(
-    'The Web API does not support hash lookup on the user-progress endpoint. '
-    'Resolve the hash to a game ID locally, then call getGameInfoAndUserProgress.',
-  )
-  static Future<GameInfoAndUserProgress?> searchGameByHash(
-    String md5Hash,
-    String username, {
-    String? apiKey,
-  }) async {
-    _log.w(
-      'Ignoring unsupported RA hash-only lookup for $md5Hash. '
-      'Resolve a game ID from the local hash database first.',
-    );
-    return null;
-  }
-
   static const String apiGetUserAwards = 'API_GetUserAwards.php';
 
+  /// The user's recent achievement unlocks (`API_GetUserRecentAchievements`).
+  ///
+  /// Without [count]/[offset] this is the dashboard's preview read — the
+  /// server's default page, cached whole under the legacy key. With them it is
+  /// one page of the see-all list: the parameters land in the query (`c`
+  /// count, `o` offset, the endpoint's documented maximum of 500 enforced
+  /// here) and in the cache key, because two offsets are different reads and
+  /// must never replay each other's payload — the mistake the recently-played
+  /// key carries latently (its caller has only ever used the defaults).
   static Future<List<RetroAchievementRecentUnlockItem>>
   getUserRecentAchievements(
     String username, {
     int minutes = 43200,
+    int? count,
+    int? offset,
     String? apiKey,
     http.Client? client,
   }) async {
+    final paginated = count != null || offset != null;
     final url = Uri.parse('$_baseUrl/API_GetUserRecentAchievements.php')
         .replace(
           queryParameters: {
             'u': username,
             'm': minutes.toString(),
             'y': resolveApiKey(apiKey),
+            if (count != null) 'c': count.clamp(1, 500).toString(),
+            if (offset != null) 'o': offset.clamp(0, 1 << 31).toString(),
           },
         );
 
@@ -421,7 +472,9 @@ class RetroAchievementsService {
     };
 
     return _fetchWithCache<List<RetroAchievementRecentUnlockItem>>(
-      cacheKey: 'recent_unlocks_$username',
+      cacheKey: paginated
+          ? 'recent_unlocks_${username}_${count ?? 0}_${offset ?? 0}'
+          : 'recent_unlocks_$username',
       send: () => client == null
           ? http.get(url, headers: headers)
           : client.get(url, headers: headers),
@@ -453,12 +506,18 @@ class RetroAchievementsService {
     String? apiKey,
     http.Client? client,
   }) async {
+    // Clamped once so the request and its cache key agree: the key names the
+    // page, because this endpoint is paginated now (the Games sub-tab walks
+    // it in pages) and a page-less key would make every later page replay
+    // page one's cached copy offline.
+    final effectiveCount = count.clamp(1, 50);
+    final effectiveOffset = offset.clamp(0, 1 << 31);
     final url = Uri.parse('$_baseUrl/API_GetUserRecentlyPlayedGames.php')
         .replace(
           queryParameters: {
             'u': username,
-            'c': count.clamp(1, 50).toString(),
-            'o': offset.clamp(0, 1 << 31).toString(),
+            'c': effectiveCount.toString(),
+            'o': effectiveOffset.toString(),
             'y': resolveApiKey(apiKey),
           },
         );
@@ -469,7 +528,8 @@ class RetroAchievementsService {
     };
 
     return _fetchWithCache<List<RetroAchievementRecentlyPlayedGameItem>>(
-      cacheKey: 'recently_played_$username',
+      cacheKey:
+          'recently_played_${username}_${effectiveCount}_$effectiveOffset',
       send: () => client == null
           ? http.get(url, headers: headers)
           : client.get(url, headers: headers),
@@ -501,12 +561,16 @@ class RetroAchievementsService {
     String? apiKey,
     http.Client? client,
   }) async {
+    // Same page-named key as the recently-played endpoint above, for the same
+    // reason: the Games sub-tab walks this endpoint in pages too.
+    final effectiveCount = count.clamp(1, 500);
+    final effectiveOffset = offset.clamp(0, 1 << 31);
     final url = Uri.parse('$_baseUrl/API_GetUserCompletionProgress.php')
         .replace(
           queryParameters: {
             'u': username,
-            'c': count.clamp(1, 500).toString(),
-            'o': offset.clamp(0, 1 << 31).toString(),
+            'c': effectiveCount.toString(),
+            'o': effectiveOffset.toString(),
             'y': resolveApiKey(apiKey),
           },
         );
@@ -517,7 +581,7 @@ class RetroAchievementsService {
     };
 
     return _fetchWithCache<RetroAchievementCompletionProgressSummary>(
-      cacheKey: 'completion_$username',
+      cacheKey: 'completion_${username}_${effectiveCount}_$effectiveOffset',
       send: () => client == null
           ? http.get(url, headers: headers)
           : client.get(url, headers: headers),
@@ -536,6 +600,155 @@ class RetroAchievementsService {
       ),
     );
   }
+
+  /// Retrieves the leaderboards defined for a game.
+  static Future<RaGameLeaderboardsPage> getGameLeaderboards(
+    int gameId, {
+    int count = 100,
+    int offset = 0,
+    String? apiKey,
+    http.Client? client,
+  }) async {
+    final effectiveApiKey = resolveApiKey(apiKey);
+    if (effectiveApiKey.isEmpty) {
+      throw StateError('A RetroAchievements API key is required');
+    }
+
+    final effectiveCount = count.clamp(1, 500);
+    final effectiveOffset = offset.clamp(0, 1 << 31);
+    final url = Uri.parse('$_baseUrl/API_GetGameLeaderboards.php').replace(
+      queryParameters: {
+        'i': gameId.toString(),
+        'c': effectiveCount.toString(),
+        'o': effectiveOffset.toString(),
+        'y': effectiveApiKey,
+      },
+    );
+
+    return _fetchWithCache<RaGameLeaderboardsPage>(
+      cacheKey:
+          'game_leaderboards_${gameId}_${effectiveCount}_$effectiveOffset',
+      send: () => client == null
+          ? http.get(url, headers: _raHeaders)
+          : client.get(url, headers: _raHeaders),
+      parse: (decoded) {
+        if (decoded is! Map) {
+          throw const FormatException(
+            'Invalid RetroAchievements game leaderboards response',
+          );
+        }
+        return RaGameLeaderboardsPage.fromJson(
+          Map<String, dynamic>.from(decoded),
+        );
+      },
+      onMiss: (statusCode) => throw HttpException(
+        'RetroAchievements game leaderboards request failed (${statusCode ?? 'offline'})',
+      ),
+    );
+  }
+
+  /// Retrieves one leaderboard's ranked entries.
+  static Future<RaLeaderboardEntriesPage> getLeaderboardEntries(
+    int leaderboardId, {
+    int count = 100,
+    int offset = 0,
+    String? apiKey,
+    http.Client? client,
+  }) async {
+    final effectiveApiKey = resolveApiKey(apiKey);
+    if (effectiveApiKey.isEmpty) {
+      throw StateError('A RetroAchievements API key is required');
+    }
+
+    final effectiveCount = count.clamp(1, 500);
+    final effectiveOffset = offset.clamp(0, 1 << 31);
+    final url = Uri.parse('$_baseUrl/API_GetLeaderboardEntries.php').replace(
+      queryParameters: {
+        'i': leaderboardId.toString(),
+        'c': effectiveCount.toString(),
+        'o': effectiveOffset.toString(),
+        'y': effectiveApiKey,
+      },
+    );
+
+    return _fetchWithCache<RaLeaderboardEntriesPage>(
+      cacheKey:
+          'leaderboard_entries_${leaderboardId}_${effectiveCount}_$effectiveOffset',
+      send: () => client == null
+          ? http.get(url, headers: _raHeaders)
+          : client.get(url, headers: _raHeaders),
+      parse: (decoded) {
+        if (decoded is! Map) {
+          throw const FormatException(
+            'Invalid RetroAchievements leaderboard entries response',
+          );
+        }
+        return RaLeaderboardEntriesPage.fromJson(
+          Map<String, dynamic>.from(decoded),
+        );
+      },
+      onMiss: (statusCode) => throw HttpException(
+        'RetroAchievements leaderboard entries request failed (${statusCode ?? 'offline'})',
+      ),
+    );
+  }
+
+  /// Retrieves the signed-in user's leaderboard entries for a game.
+  ///
+  /// [username] may be the stable ULID returned by the profile endpoint. The
+  /// API accepts either a username or ULID, and the provider prefers the ULID
+  /// so a username change cannot make the request target another account.
+  static Future<RaUserGameLeaderboardsPage> getUserGameLeaderboards(
+    int gameId,
+    String username, {
+    int count = 200,
+    int offset = 0,
+    String? apiKey,
+    http.Client? client,
+  }) async {
+    final effectiveApiKey = resolveApiKey(apiKey);
+    if (effectiveApiKey.isEmpty) {
+      throw StateError('A RetroAchievements API key is required');
+    }
+
+    final effectiveCount = count.clamp(1, 500);
+    final effectiveOffset = offset.clamp(0, 1 << 31);
+    final url = Uri.parse('$_baseUrl/API_GetUserGameLeaderboards.php').replace(
+      queryParameters: {
+        'i': gameId.toString(),
+        'u': username,
+        'c': effectiveCount.toString(),
+        'o': effectiveOffset.toString(),
+        'y': effectiveApiKey,
+      },
+    );
+
+    return _fetchWithCache<RaUserGameLeaderboardsPage>(
+      cacheKey:
+          'user_game_leaderboards_${username}_${gameId}_${effectiveCount}_$effectiveOffset',
+      send: () => client == null
+          ? http.get(url, headers: _raHeaders)
+          : client.get(url, headers: _raHeaders),
+      parse: (decoded) {
+        if (decoded is! Map) {
+          throw const FormatException(
+            'Invalid RetroAchievements user game leaderboards response',
+          );
+        }
+        return RaUserGameLeaderboardsPage.fromJson(
+          Map<String, dynamic>.from(decoded),
+        );
+      },
+      onMiss: (statusCode) => throw HttpException(
+        'RetroAchievements user game leaderboards request failed (${statusCode ?? 'offline'})',
+      ),
+    );
+  }
+
+  static const Map<String, String> _raHeaders = {
+    'User-Agent': 'NeoStation/1.0',
+    'Accept': 'application/json',
+  };
 
   /// Retrieves the list of site-wide awards earned by a user.
   static Future<Map<String, dynamic>?> getUserAwards(

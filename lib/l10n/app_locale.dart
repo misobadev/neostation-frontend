@@ -2,6 +2,8 @@
 /// Usage: AppLocale.play.getString(context)
 library;
 
+import 'package:flutter_localization/flutter_localization.dart';
+
 part 'app_locale_en.dart';
 part 'app_locale_es.dart';
 part 'app_locale_ru.dart';
@@ -1247,6 +1249,55 @@ mixin AppLocale {
   static const String neoSyncLogoutConfirmBody = 'neo_sync_logout_confirm_body';
 
   // RetroAchievements dashboard & achievement comments
+  static const String raSubtabDashboard = 'ra_subtab_dashboard';
+  static const String raSubtabUnlocks = 'ra_subtab_unlocks';
+  static const String raSubtabGames = 'ra_subtab_games';
+  static const String raSubtabLeaderboards = 'ra_subtab_leaderboards';
+  static const String raStanding = 'ra_standing';
+  static const String raStandingPill = 'ra_standing_pill';
+  static const String raUnranked = 'ra_unranked';
+  static const String raYourRank = 'ra_your_rank';
+  static const String raYourPoints = 'ra_your_points';
+  static const String raUserType = 'ra_user_type';
+  static const String raCasual = 'ra_casual';
+  static const String raEvents = 'raEvents';
+  static const String raAotwYearTitle = 'ra_aotw_year_title';
+  static const String raAotw = 'raAotw';
+  static const String raAwards = 'raAwards';
+  static const String raSetOrder = 'raSetOrder';
+  static const String raPointsSort = 'raPointsSort';
+  static const String raRaritySort = 'raRaritySort';
+  static const String raProgression = 'raProgression';
+  static const String raWinCondition = 'raWinCondition';
+  static const String raWeek = 'raWeek';
+  static const String raMissed = 'raMissed';
+  static const String raUpcoming = 'raUpcoming';
+  static const String raCurrent = 'raCurrent';
+  static const String raEventUnavailable = 'raEventUnavailable';
+  static const String raEarned = 'raEarned';
+  static const String raYourGamesLeaderboards = 'ra_your_games_leaderboards';
+  static const String raNoLeaderboardGames = 'ra_no_leaderboard_games';
+  static const String raLeaderboardSignIn = 'ra_leaderboard_sign_in';
+  static const String raLeaderboardNoLeaderboards =
+      'ra_leaderboard_no_leaderboards';
+  static const String raLeaderboardNoEntries = 'ra_leaderboard_no_entries';
+  static const String raLeaderboardEntries = 'ra_leaderboard_entries';
+  static const String raLeaderboardTopEntry = 'ra_leaderboard_top_entry';
+  static const String raLeaderboardYourEntry = 'ra_leaderboard_your_entry';
+  static const String raLeaderboardFormat = 'ra_leaderboard_format';
+  static const String raLeaderboardRankAscending =
+      'ra_leaderboard_rank_ascending';
+  static const String raLeaderboardRankDescending =
+      'ra_leaderboard_rank_descending';
+  static const String raGamesHeaderHint = 'ra_games_header_hint';
+  static const String raFilterMastered = 'ra_filter_mastered';
+  static const String raFilterBeaten = 'ra_filter_beaten';
+  static const String raGamesEndOfList = 'ra_games_end_of_list';
+  static const String raGamesEmpty = 'ra_games_empty';
+  static const String raErrorLoadGames = 'ra_error_load_games';
+  static const String raHardcore = 'ra_hardcore';
+  static const String raUnlocksEndOfList = 'ra_unlocks_end_of_list';
+  static const String raUnlockGameNotOwned = 'ra_unlock_game_not_owned';
   static const String raCompletionsLabel = 'ra_completions_label';
   static const String raMasteriesLabel = 'ra_masteries_label';
   static const String raPointsAbbrev = 'ra_points_abbrev';
@@ -1254,6 +1305,7 @@ mixin AppLocale {
   static const String raRecentCompletions = 'ra_recent_completions';
   static const String raRecentMasteries = 'ra_recent_masteries';
   static const String raNoCompletionsYet = 'ra_no_completions_yet';
+  static const String raNoBeatenYet = 'ra_no_beaten_yet';
   static const String raNoMasteriesYet = 'ra_no_masteries_yet';
   static const String raTrackedGames = 'ra_tracked_games';
   static const String raCompletionLabel = 'ra_completion_label';
@@ -1263,6 +1315,7 @@ mixin AppLocale {
   static const String raMissable = 'ra_missable';
   static const String raFilterLocked = 'ra_filter_locked';
   static const String raFilterMissables = 'ra_filter_missables';
+  static const String raGuide = 'ra_guide';
   static const String raNoAchievementsForFilter =
       'ra_no_achievements_for_filter';
   static const String raComments = 'ra_comments';
@@ -1294,6 +1347,33 @@ mixin AppLocale {
   static const String raGamesBeaten = 'ra_games_beaten';
   static const String raAchievementProgress = 'ra_achievement_progress';
   static const String raRecent30Days = 'ra_recent_30_days';
+
+  // RetroAchievements error messages (resolved context-free by the provider
+  // via AppLocaleContextFreeLookup; keys carry an {error} placeholder where
+  // the raw exception is appended for diagnostics).
+  static const String raErrorApiKeyRequired = 'ra_error_api_key_required';
+  static const String raErrorEnterUsername = 'ra_error_enter_username';
+  static const String raErrorEnterApiKey = 'ra_error_enter_api_key';
+  static const String raErrorUserNotFound = 'ra_error_user_not_found';
+  static const String raErrorConnect = 'ra_error_connect';
+  static const String raErrorUserNotConnected = 'ra_error_user_not_connected';
+  static const String raErrorSummaryUnavailable =
+      'ra_error_summary_unavailable';
+  static const String raErrorAwardsUnavailable = 'ra_error_awards_unavailable';
+  static const String raErrorGameInfoUnavailable =
+      'ra_error_game_info_unavailable';
+  static const String raErrorLoadGameInfo = 'ra_error_load_game_info';
+  static const String raErrorLoadSummary = 'ra_error_load_summary';
+  static const String raErrorLoadAotw = 'ra_error_load_aotw';
+  static const String raErrorLoadAwards = 'ra_error_load_awards';
+  static const String raErrorLoadCompletionProgress =
+      'ra_error_load_completion_progress';
+  static const String raErrorLoadRecentlyPlayed =
+      'ra_error_load_recently_played';
+  static const String raErrorLoadRecentUnlocks = 'ra_error_load_recent_unlocks';
+  static const String raErrorLoadLeaderboards = 'ra_error_load_leaderboards';
+  static const String raErrorLoadLeaderboardEntries =
+      'ra_error_load_leaderboard_entries';
 
   // Custom save folders (NeoSync v2)
   static const String customSaveFoldersTitle = 'custom_save_folders_title';
@@ -1333,6 +1413,29 @@ mixin AppLocale {
   static const Map<String, dynamic> ja = appLocaleJa;
   static const Map<String, dynamic> ko = appLocaleKo;
 
+  /// All locale maps keyed by the language codes the app registers with
+  /// `FlutterLocalization` in `main.dart` (and that settings passes to
+  /// `translate`). Note `zh_Hant` is a raw code in this app, not a Flutter
+  /// script subtag, so a plain string match is enough.
+  ///
+  /// `main.dart` currently duplicates this registry for its two `init`
+  /// calls; deriving those `MapLocale` lists from this map is a known
+  /// follow-up.
+  static const Map<String, Map<String, dynamic>> _mapsByLanguageCode = {
+    'de': de,
+    'en': en,
+    'es': es,
+    'fr': fr,
+    'id': id,
+    'it': it,
+    'ja': ja,
+    'ko': ko,
+    'pt': pt,
+    'ru': ru,
+    'zh': zh,
+    'zh_Hant': zhHant,
+  };
+
   /// Map of supported languages: code -> display name
   static const Map<String, String> supportedLanguages = {
     'en': 'English',
@@ -1348,4 +1451,22 @@ mixin AppLocale {
     'ja': '日本語',
     'ko': '한국어',
   };
+}
+
+/// Context-free [AppLocale] lookup for code that runs outside the widget
+/// tree (providers, services) and so has no [BuildContext] to call
+/// `getString` with. Resolves against whatever language `FlutterLocalization`
+/// currently holds — the platform language during startup, the app's saved
+/// language once `init` runs, and none at all in pure unit tests; widget code
+/// should keep using `AppLocale.<key>.getString(context)`.
+///
+/// Falls back to English when no language is active or the language has no
+/// registered map, and to the key itself when neither map defines it — a
+/// visible, greppy failure rather than a silent blank.
+extension AppLocaleContextFreeLookup on String {
+  String getStringForCurrentLocale() {
+    final language = FlutterLocalization.instance.currentLocale?.languageCode;
+    final map = AppLocale._mapsByLanguageCode[language] ?? AppLocale.en;
+    return (map[this] ?? AppLocale.en[this] ?? this).toString();
+  }
 }

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/logger_service.dart';
+
+import '../l10n/app_locale.dart';
 import '../models/retro_achievements_user.dart';
 import '../models/retro_achievements_summary.dart';
 import '../services/retro_achievements_service.dart';
@@ -12,14 +14,25 @@ import '../repositories/retro_achievements_repository.dart';
 import '../models/retro_achievements_dashboard_models.dart';
 import '../models/retro_achievements_game_info.dart';
 import '../models/retro_achievements_gotw.dart';
+import '../models/retro_achievements_leaderboard.dart';
 import '../models/retro_achievements_user_awards.dart';
+import '../models/retro_achievement_comment.dart';
+import '../repositories/ra_event_catalogue_repository.dart';
 import '../services/game/game_session_manager.dart';
 import 'retro_achievements_credentials.dart';
 
+/// The Games sub-tab's award filter — which slice of the merged list the
+/// chips at the top of the tab are showing. Filter state lives in the
+/// provider so the choice survives sub-tab switches; switching never
+/// refetches (the merged list is already loaded — see
+/// [RetroAchievementsProvider.visibleGamesListItems]).
+enum RaGamesFilter { all, mastered, beaten }
+
 /// Provider responsible for managing the integration with RetroAchievements.org.
 ///
-/// Handles user authentication, profile synchronization, achievement progress
-/// tracking, and ROM identification via console-specific hashing algorithms.
+/// Handles user authentication, dashboard data (weekly event, unlocks,
+/// awards, recently played, completion progress), and per-game achievement
+/// progress caching.
 class RetroAchievementsProvider extends ChangeNotifier {
   RetroAchievementsProvider({this.sessionHttpClient}) {
     GameSessionManager.addSessionEndListener(invalidateCachedReads);
@@ -37,9 +50,6 @@ class RetroAchievementsProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  static const String _dashboardApiKeyError =
-      'A RetroAchievements web API key is required for this dashboard data.';
-
   /// How long to keep reaching for the API after signing in from the offline
   /// cache. A handheld's Wi-Fi associates anywhere between a few seconds and
   /// a few minutes after power-on, so the schedule widens rather than
@@ -52,9 +62,6 @@ class RetroAchievementsProvider extends ChangeNotifier {
     Duration(seconds: 30),
     Duration(seconds: 60),
   ];
-
-  static const String _rateLimitError =
-      'RetroAchievements is rate-limiting requests. Please wait a moment and try again.';
 
   /// Basic profile information for the authenticated user.
   RetroAchievementsUser? _user;
@@ -71,6 +78,10 @@ class RetroAchievementsProvider extends ChangeNotifier {
   /// Current authenticated username.
   String _username = '';
 
+  /// Changes whenever the active account changes, so an older in-flight API
+  /// response cannot populate the newly signed-in user's view.
+  int _sessionGeneration = 0;
+
   /// Current RetroAchievements API key used for requests.
   String _apiKey = '';
 
@@ -79,27 +90,6 @@ class RetroAchievementsProvider extends ChangeNotifier {
   bool _credentialsPersisted = true;
 
   static final _log = LoggerService.instance;
-
-  /// Whether a ROM scanning process for RA compatibility is active.
-  bool _isScanning = false;
-
-  /// Normalized progress of the ROM scan (0.0 to 1.0).
-  final double _scanProgress = 0.0;
-
-  /// Human-readable status message for the scan operation.
-  String _scanStatus = '';
-
-  /// Total number of ROMs identified for the scan.
-  final int _totalRoms = 0;
-
-  /// Count of ROMs processed in the current scan.
-  final int _processedRoms = 0;
-
-  /// Count of ROMs that were successfully identified as RA-compatible.
-  final int _retroAchievementsCompatibleRoms = 0;
-
-  /// History of identifiers processed in the current scanning session.
-  final List<String> _processedItems = [];
 
   /// Total count of ROMs in the user's local database.
   int _totalLocalRoms = 0;
@@ -118,9 +108,6 @@ class RetroAchievementsProvider extends ChangeNotifier {
 
   /// Memory cache for detailed game metadata and user progress, keyed by Game ID.
   final Map<int, GameInfoAndUserProgress> _gameInfoCache = {};
-
-  /// Mapping of game titles to their corresponding RetroAchievements Game IDs.
-  final Map<String, int> _gameIdMapping = {};
 
   /// Current "Game of the Week" metadata.
   RetroAchievementsGOTW? _gotw;
@@ -145,6 +132,43 @@ class RetroAchievementsProvider extends ChangeNotifier {
   bool _recentUnlocksLoaded = false;
   bool _recentUnlocksLoading = false;
   String? _recentUnlocksError;
+
+  /// The see-all Unlocks sub-tab's page accumulator. Deliberately separate
+  /// from [_recentUnlocks]: the dashboard preview is one server-default read
+  /// capped at five rows, while this list paginates through everything the
+  /// 30-day window holds, so the two must never overwrite each other.
+  List<RetroAchievementRecentUnlockItem> _unlocksListItems = [];
+  bool _unlocksListLoaded = false;
+  bool _unlocksListLoading = false;
+  bool _unlocksListHasMore = true;
+  String? _unlocksListError;
+
+  /// Where the next see-all page starts. Advances by the page length, not by
+  /// [unlocksPageSize], so a short final page still leaves the offset pointing
+  /// past the data (which is what makes [loadUnlocksPage] a no-op from then
+  /// on, even before [_unlocksListHasMore] is consulted).
+  int _unlocksListOffset = 0;
+
+  /// The see-all Games sub-tab's merged list. The same accumulator shape as
+  /// the Unlocks list above, but folded from two paginated endpoints — so
+  /// there is an offset and a hasMore per source, and the merged rows are
+  /// re-derived from the source pages whenever a page lands (see
+  /// [_rebuildGamesList]) rather than appended in place. Deliberately
+  /// separate from [_recentlyPlayedGames] and [_completionProgress]: those
+  /// are the dashboard's single default-parameter reads.
+  List<RaGamesListItem> _gamesListItems = [];
+  bool _gamesListLoaded = false;
+  bool _gamesListLoading = false;
+  bool _gamesListHasMore = true;
+  String? _gamesListError;
+  RaGamesFilter _gamesFilter = RaGamesFilter.all;
+  List<RetroAchievementRecentlyPlayedGameItem> _gamesPlayedPages = [];
+  List<RetroAchievementCompletionProgressItem> _gamesCompletionPages = [];
+  int _gamesPlayedOffset = 0;
+  int _gamesCompletionOffset = 0;
+  bool _gamesPlayedHasMore = true;
+  bool _gamesCompletionHasMore = true;
+  bool _gamesFilterResultsLoading = false;
 
   List<RetroAchievementRecentlyPlayedGameItem> _recentlyPlayedGames = [];
   bool _recentlyPlayedLoaded = false;
@@ -177,14 +201,63 @@ class RetroAchievementsProvider extends ChangeNotifier {
   String? get error => _error;
   String get username => _username;
   String get apiKey => _apiKey;
+  Future<Map<String, dynamic>> getEventCatalogue(int year) =>
+      RaEventCatalogueRepository.load(year);
+  Future<GameInfoAndUserProgress?> getAnnualEventProgress(int year) async {
+    if (!isConnected || !hasResolvedApiKey) throw StateError('Not connected');
+    final generation = sessionGeneration;
+    final result = await RetroAchievementsService.getAnnualEventProgress(
+      year,
+      _username,
+      apiKey: _apiKey,
+    );
+    if (generation != sessionGeneration) throw StateError('Account changed');
+    return result;
+  }
 
-  bool get isScanning => _isScanning;
-  double get scanProgress => _scanProgress;
-  String get scanStatus => _scanStatus;
-  int get totalRoms => _totalRoms;
-  int get processedRoms => _processedRoms;
-  int get retroAchievementsCompatibleRoms => _retroAchievementsCompatibleRoms;
-  List<String> get processedItems => _processedItems;
+  final Map<String, RetroAchievementCommentsPage> _commentPages = {};
+  Future<RetroAchievementCommentsPage> getAchievementComments(
+    int achievementId, {
+    int offset = 0,
+  }) async {
+    if (!isConnected || !hasResolvedApiKey) throw StateError('Not connected');
+    final generation = sessionGeneration;
+    final key = '$generation:$achievementId:$offset';
+    if (_commentPages.containsKey(key)) return _commentPages[key]!;
+    final page = await RetroAchievementsService.getAchievementComments(
+      achievementId,
+      offset: offset,
+      count: 25,
+      apiKey: _apiKey,
+    );
+    if (generation != sessionGeneration) throw StateError('Account changed');
+    _commentPages[key] = page;
+    return page;
+  }
+
+  /// Completion pages include awards hidden from the public profile cabinet.
+  Future<List<RetroAchievementCompletionProgressItem>>
+  getAwardProgress() async {
+    if (!isConnected || !hasResolvedApiKey) throw StateError('Not connected');
+    final generation = sessionGeneration;
+    final rows = <RetroAchievementCompletionProgressItem>[];
+    var offset = 0;
+    while (true) {
+      final page = await RetroAchievementsService.getUserCompletionProgress(
+        _username,
+        apiKey: _apiKey,
+        count: 100,
+        offset: offset,
+      );
+      if (generation != sessionGeneration) throw StateError('Account changed');
+      rows.addAll(page.results);
+      offset += page.results.length;
+      if (page.results.isEmpty || offset >= page.total) break;
+    }
+    return rows;
+  }
+
+  int get sessionGeneration => _sessionGeneration;
 
   int get totalLocalRoms => _totalLocalRoms;
   int get retroAchievementsCompatibleLocalRoms =>
@@ -195,7 +268,6 @@ class RetroAchievementsProvider extends ChangeNotifier {
   bool get summaryLoaded => _summaryLoaded;
 
   Map<int, GameInfoAndUserProgress> get gameInfoCache => _gameInfoCache;
-  Map<String, int> get gameIdMapping => _gameIdMapping;
 
   RetroAchievementsGOTW? get gotw => _gotw;
   bool get gotwLoaded => _gotwLoaded;
@@ -214,6 +286,47 @@ class RetroAchievementsProvider extends ChangeNotifier {
   bool get recentUnlocksLoaded => _recentUnlocksLoaded;
   bool get recentUnlocksLoading => _recentUnlocksLoading;
   String? get recentUnlocksError => _recentUnlocksError;
+
+  /// The see-all Unlocks list: every row accumulated so far, across pages.
+  List<RetroAchievementRecentUnlockItem> get unlocksListItems =>
+      _unlocksListItems;
+  bool get unlocksListLoaded => _unlocksListLoaded;
+  bool get unlocksListLoading => _unlocksListLoading;
+  bool get unlocksListHasMore => _unlocksListHasMore;
+  String? get unlocksListError => _unlocksListError;
+
+  /// The see-all Games list: every merged row accumulated so far, across
+  /// pages of both sources, in freshest-activity order.
+  List<RaGamesListItem> get gamesListItems => _gamesListItems;
+  bool get gamesListLoaded => _gamesListLoaded;
+  bool get gamesListLoading => _gamesListLoading;
+  bool get gamesListHasMore => _gamesListHasMore;
+  String? get gamesListError => _gamesListError;
+  RaGamesFilter get gamesFilter => _gamesFilter;
+  bool get gamesFilterResultsLoading => _gamesFilterResultsLoading;
+
+  /// The merged list as the active award filter shows it. Client-side by
+  /// design: the merge is already loaded, so switching the filter re-derives
+  /// the view without a refetch.
+  List<RaGamesListItem> get visibleGamesListItems {
+    switch (_gamesFilter) {
+      case RaGamesFilter.all:
+        return _gamesListItems;
+      case RaGamesFilter.mastered:
+        return _gamesListItems.where((item) => item.isMastered).toList();
+      case RaGamesFilter.beaten:
+        return _gamesListItems.where((item) => item.isBeaten).toList();
+    }
+  }
+
+  /// The tab's chip row calls this; it never fetches — the filter only
+  /// changes how the already-loaded merge is presented.
+  void setGamesFilter(RaGamesFilter filter) {
+    if (_gamesFilter == filter) return;
+    _gamesFilter = filter;
+    notifyListeners();
+  }
+
   List<RetroAchievementRecentlyPlayedGameItem> get recentlyPlayedGames =>
       _recentlyPlayedGames;
   bool get recentlyPlayedLoaded => _recentlyPlayedLoaded;
@@ -256,19 +369,20 @@ class RetroAchievementsProvider extends ChangeNotifier {
   /// and triggers a background fetch of user statistics, summaries, and awards.
   Future<bool> connect(String username, {String? apiKey}) async {
     if (username.trim().isEmpty) {
-      _error = 'Please enter a username';
+      _error = AppLocale.raErrorEnterUsername.getStringForCurrentLocale();
       notifyListeners();
       return false;
     }
 
     final resolvedApiKey = RetroAchievementsService.resolveApiKey(apiKey);
     if (resolvedApiKey.trim().isEmpty) {
-      _error = 'Please enter your RetroAchievements web API key';
+      _error = AppLocale.raErrorEnterApiKey.getStringForCurrentLocale();
       _isConnected = false;
       notifyListeners();
       return false;
     }
 
+    final sessionGeneration = ++_sessionGeneration;
     _setLoading(true);
     _error = null;
     _username = username.trim();
@@ -281,6 +395,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
         client: sessionHttpClient,
       );
 
+      if (sessionGeneration != _sessionGeneration) return false;
       if (userProfile != null) {
         _user = userProfile;
         _isConnected = true;
@@ -293,13 +408,13 @@ class RetroAchievementsProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = 'User not found on RetroAchievements';
+        _error = AppLocale.raErrorUserNotFound.getStringForCurrentLocale();
         _isConnected = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _error = 'Error connecting to RetroAchievements: $e';
+      _error = _errorWith(AppLocale.raErrorConnect, e);
       _isConnected = false;
       _log.e('$_error');
       notifyListeners();
@@ -312,18 +427,19 @@ class RetroAchievementsProvider extends ChangeNotifier {
   /// Refreshes the full user summary, including recent achievements and active game list.
   Future<bool> loadUserSummary() async {
     if (!_isConnected || _username.isEmpty) {
-      _error = 'User not connected';
+      _error = AppLocale.raErrorUserNotConnected.getStringForCurrentLocale();
       notifyListeners();
       return false;
     }
 
     if (!hasResolvedApiKey) {
       _summaryLoaded = false;
-      _error = _dashboardApiKeyError;
+      _error = AppLocale.raErrorApiKeyRequired.getStringForCurrentLocale();
       notifyListeners();
       return false;
     }
 
+    final sessionGeneration = _sessionGeneration;
     _setLoading(true);
     _error = null;
 
@@ -334,19 +450,21 @@ class RetroAchievementsProvider extends ChangeNotifier {
         client: sessionHttpClient,
       );
 
+      if (sessionGeneration != _sessionGeneration) return false;
       if (summary != null) {
         _userSummary = summary;
         _summaryLoaded = true;
         notifyListeners();
         return true;
       } else {
-        _error = 'User summary could not be loaded';
+        _error = AppLocale.raErrorSummaryUnavailable
+            .getStringForCurrentLocale();
         _summaryLoaded = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _error = _describeApiError(e, 'Error loading user summary');
+      _error = _describeApiError(e, AppLocale.raErrorLoadSummary);
       _summaryLoaded = false;
       _log.e('$_error');
       notifyListeners();
@@ -415,7 +533,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
     if (!hasResolvedApiKey) {
       _gotw = null;
       _gotwLoaded = false;
-      _gotwError = _dashboardApiKeyError;
+      _gotwError = AppLocale.raErrorApiKeyRequired.getStringForCurrentLocale();
       _ownedWeekGame = null;
       _aotwPersonalProgress = const AotwPersonalProgress.unknown();
       notifyListeners();
@@ -449,10 +567,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
         return true;
       }
     } catch (e) {
-      _gotwError = _describeApiError(
-        e,
-        'Error loading Achievement of the Week',
-      );
+      _gotwError = _describeApiError(e, AppLocale.raErrorLoadAotw);
       _gotwLoaded = false;
       _gotw = null;
       _ownedWeekGame = null;
@@ -473,7 +588,8 @@ class RetroAchievementsProvider extends ChangeNotifier {
     if (!hasResolvedApiKey) {
       _userAwards = null;
       _userAwardsLoaded = false;
-      _userAwardsError = _dashboardApiKeyError;
+      _userAwardsError = AppLocale.raErrorApiKeyRequired
+          .getStringForCurrentLocale();
       notifyListeners();
       return false;
     }
@@ -499,10 +615,11 @@ class RetroAchievementsProvider extends ChangeNotifier {
         return true;
       }
       _userAwardsLoaded = false;
-      _userAwardsError = 'User awards could not be loaded';
+      _userAwardsError = AppLocale.raErrorAwardsUnavailable
+          .getStringForCurrentLocale();
       return false;
     } catch (e) {
-      _userAwardsError = _describeApiError(e, 'Error loading user awards');
+      _userAwardsError = _describeApiError(e, AppLocale.raErrorLoadAwards);
       _userAwardsLoaded = false;
       _userAwards = null;
       _log.e(_userAwardsError ?? 'Unknown user awards error');
@@ -523,7 +640,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
     String? md5Hash,
   }) async {
     if (!_isConnected || _username.isEmpty) {
-      _error = 'User not connected';
+      _error = AppLocale.raErrorUserNotConnected.getStringForCurrentLocale();
       return null;
     }
 
@@ -535,6 +652,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
       return _gameInfoCache[gameId];
     }
 
+    final sessionGeneration = _sessionGeneration;
     _error = null;
 
     try {
@@ -547,15 +665,111 @@ class RetroAchievementsProvider extends ChangeNotifier {
             apiKey: _apiKey,
           );
 
+      if (sessionGeneration != _sessionGeneration) return null;
       if (gameInfo != null) {
         _gameInfoCache[gameId] = gameInfo;
         return gameInfo;
       } else {
-        _error = 'Game information could not be loaded';
+        _error = AppLocale.raErrorGameInfoUnavailable
+            .getStringForCurrentLocale();
         return null;
       }
     } catch (e) {
-      _error = 'Error loading game information: $e';
+      _error = _errorWith(AppLocale.raErrorLoadGameInfo, e);
+      _log.e('$_error');
+      return null;
+    }
+  }
+
+  /// Loads the leaderboards available for a game through the authenticated
+  /// service layer. A null result means the request failed; [error] contains
+  /// the localized message suitable for the details card.
+  Future<RaGameLeaderboardsPage?> getGameLeaderboards(
+    int gameId, {
+    int count = 100,
+    int offset = 0,
+  }) async {
+    if (!_isConnected || _username.isEmpty) {
+      _error = AppLocale.raErrorUserNotConnected.getStringForCurrentLocale();
+      return null;
+    }
+    if (!hasResolvedApiKey) {
+      _error = AppLocale.raErrorApiKeyRequired.getStringForCurrentLocale();
+      return null;
+    }
+
+    try {
+      _error = null;
+      return await RetroAchievementsService.getGameLeaderboards(
+        gameId,
+        count: count,
+        offset: offset,
+        apiKey: _apiKey,
+      );
+    } catch (e) {
+      _error = _describeApiError(e, AppLocale.raErrorLoadLeaderboards);
+      _log.e('$_error');
+      return null;
+    }
+  }
+
+  /// Loads one leaderboard's public entries through the authenticated service.
+  Future<RaLeaderboardEntriesPage?> getLeaderboardEntries(
+    int leaderboardId, {
+    int count = 100,
+    int offset = 0,
+  }) async {
+    if (!_isConnected || _username.isEmpty) {
+      _error = AppLocale.raErrorUserNotConnected.getStringForCurrentLocale();
+      return null;
+    }
+    if (!hasResolvedApiKey) {
+      _error = AppLocale.raErrorApiKeyRequired.getStringForCurrentLocale();
+      return null;
+    }
+
+    try {
+      _error = null;
+      return await RetroAchievementsService.getLeaderboardEntries(
+        leaderboardId,
+        count: count,
+        offset: offset,
+        apiKey: _apiKey,
+      );
+    } catch (e) {
+      _error = _describeApiError(e, AppLocale.raErrorLoadLeaderboardEntries);
+      _log.e('$_error');
+      return null;
+    }
+  }
+
+  /// Loads the signed-in user's submitted entries for a game's leaderboards.
+  Future<RaUserGameLeaderboardsPage?> getUserGameLeaderboards(
+    int gameId, {
+    int count = 200,
+    int offset = 0,
+  }) async {
+    if (!_isConnected || _username.isEmpty) {
+      _error = AppLocale.raErrorUserNotConnected.getStringForCurrentLocale();
+      return null;
+    }
+    if (!hasResolvedApiKey) {
+      _error = AppLocale.raErrorApiKeyRequired.getStringForCurrentLocale();
+      return null;
+    }
+
+    try {
+      _error = null;
+      final userIdentifier = _user?.ulid.trim() ?? '';
+      return await RetroAchievementsService.getUserGameLeaderboards(
+        gameId,
+        userIdentifier.isNotEmpty ? userIdentifier : _username,
+        count: count,
+        offset: offset,
+        apiKey: _apiKey,
+      );
+    } catch (e) {
+      _error = _describeApiError(e, AppLocale.raErrorLoadLeaderboards);
       _log.e('$_error');
       return null;
     }
@@ -572,11 +786,12 @@ class RetroAchievementsProvider extends ChangeNotifier {
   /// How long a dashboard read stays good enough to show without re-fetching.
   ///
   /// Entering the RetroAchievements tab re-reads anything older than this, so
-  /// leaving the tab and coming back is the way to refresh — there is no
-  /// refresh control, and a gamepad launcher is a poor place to hunt for one.
-  /// Long enough that walking between tabs costs nothing, short enough that
-  /// achievements earned on another device, or a section that failed the first
-  /// time, are not stuck until the app restarts.
+  /// leaving the tab and coming back is one way to refresh — the other is the
+  /// REFRESH action the app header shows while this tab is on screen, which
+  /// beats the clock the same way a finished game session does. Long enough
+  /// that walking between tabs costs nothing, short enough that achievements
+  /// earned on another device, or a section that failed the first time, are
+  /// not stuck until the app restarts.
   static const Duration dashboardStaleAfter = Duration(minutes: 2);
 
   /// When the dashboard last finished a load *attempt*. Set whether or not the
@@ -591,6 +806,35 @@ class RetroAchievementsProvider extends ChangeNotifier {
 
   /// Records that a dashboard load attempt has just finished.
   void markDashboardAttempted() => _dashboardAttemptedAt = DateTime.now();
+
+  /// When the see-all Unlocks list last finished a load *attempt* — the same
+  /// attempt-based semantics as [_dashboardAttemptedAt], for the same reason:
+  /// a failing endpoint should be retried on the next entry, not on every
+  /// entry, and a success should not be re-fetched just because the player
+  /// walked between sub-tabs.
+  DateTime? _unlocksListAttemptedAt;
+
+  /// Whether entering the Unlocks sub-tab should re-read the list. Shares
+  /// [dashboardStaleAfter]: both are "recent activity" reads of the same
+  /// account, and one window for both keeps the mental model to a single
+  /// number.
+  bool get unlocksListIsStale =>
+      _unlocksListAttemptedAt == null ||
+      DateTime.now().difference(_unlocksListAttemptedAt!) > dashboardStaleAfter;
+
+  /// Records that an Unlocks list load attempt has just finished.
+  void markUnlocksListAttempted() => _unlocksListAttemptedAt = DateTime.now();
+
+  DateTime? _gamesListAttemptedAt;
+
+  /// Whether entering the Games sub-tab should re-read the list. Same window
+  /// and same reasoning as [unlocksListIsStale].
+  bool get gamesListIsStale =>
+      _gamesListAttemptedAt == null ||
+      DateTime.now().difference(_gamesListAttemptedAt!) > dashboardStaleAfter;
+
+  /// Records that a Games list load attempt has just finished.
+  void markGamesListAttempted() => _gamesListAttemptedAt = DateTime.now();
 
   /// Drops every cached RetroAchievements read so the next look re-fetches.
   ///
@@ -613,10 +857,11 @@ class RetroAchievementsProvider extends ChangeNotifier {
   void invalidateCachedReads() {
     _cacheGeneration++;
     _dashboardAttemptedAt = null;
-    // Infrequent (a finished session, or a sign-out) and the only trace this
-    // leaves, so it is worth a line: without it there is no way to tell a
-    // dashboard that reloaded because the player just finished a game from one
-    // that reloaded because it aged out.
+    // Infrequent (a finished session, a sign-out, or a press of the header's
+    // REFRESH action) and the only trace this leaves, so it is worth a line:
+    // without it there is no way to tell a dashboard that reloaded because
+    // the player just finished a game from one that reloaded because it aged
+    // out or was asked to.
     _log.i('RA: cached reads invalidated (generation $_cacheGeneration)');
     _gameInfoCache.clear();
     _summaryLoaded = false;
@@ -627,7 +872,49 @@ class RetroAchievementsProvider extends ChangeNotifier {
     _recentUnlocksLoaded = false;
     _recentlyPlayedLoaded = false;
     _completionProgressLoaded = false;
+    // The see-all list goes stale the same way: a mounted Unlocks sub-tab
+    // watches the generation and reloads from its first page, and one that is
+    // merely parked behind another sub-tab re-reads on its next activation.
+    // Items are left in place — the reset happens in loadUnlocksPage, so a
+    // parked tab keeps its rows on screen until the moment it refetches.
+    _unlocksListLoaded = false;
+    _unlocksListAttemptedAt = null;
+    // The Games merge goes stale through the same generation watch, with the
+    // same leave-the-rows-until-refetch behaviour.
+    _gamesListLoaded = false;
+    _gamesListAttemptedAt = null;
+    _gamesFilterResultsLoading = false;
     notifyListeners();
+  }
+
+  /// Keeps paging the two source lists until the active filter has a result
+  /// or the API has no more rows. This matters for Beaten/Mastered: the
+  /// completion endpoint is date ordered, so a valid match can be beyond the
+  /// first page even though the UI initially has no visible rows.
+  Future<void> ensureGamesFilterResults({
+    int maxPages = 20,
+    bool Function()? shouldContinue,
+  }) async {
+    if (_gamesFilterResultsLoading || _gamesListLoading) return;
+    _gamesFilterResultsLoading = true;
+    notifyListeners();
+    try {
+      var pages = 0;
+      while (pages < maxPages &&
+          (shouldContinue?.call() ?? true) &&
+          _isConnected &&
+          !_gamesListLoading &&
+          visibleGamesListItems.isEmpty &&
+          _gamesListHasMore &&
+          _gamesListError == null) {
+        pages++;
+        final loaded = await loadGamesPage();
+        if (!loaded) break;
+      }
+    } finally {
+      _gamesFilterResultsLoading = false;
+      notifyListeners();
+    }
   }
 
   /// Initializes the provider and attempts automatic login with stored credentials.
@@ -732,6 +1019,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
   ///
   /// If [clearSavedUser] is true, the credentials are removed from persistent storage.
   void disconnect({bool clearSavedUser = true}) {
+    _sessionGeneration++;
     _user = null;
     _isConnected = false;
     _username = '';
@@ -756,6 +1044,22 @@ class RetroAchievementsProvider extends ChangeNotifier {
     _recentUnlocksLoaded = false;
     _recentUnlocksLoading = false;
     _recentUnlocksError = null;
+    // The see-all list is per-account too: a different user signing in must
+    // never inherit the previous one's rows (the page cache keys carry the
+    // username, so the refetch re-keys itself).
+    _unlocksListItems = [];
+    _unlocksListLoaded = false;
+    _unlocksListLoading = false;
+    _unlocksListHasMore = true;
+    _unlocksListError = null;
+    _unlocksListOffset = 0;
+    _unlocksListAttemptedAt = null;
+    // The Games merge is per-account for the same reason, and its filter is
+    // a per-connection preference: a new sign-in starts at All.
+    _resetGamesListState();
+    _gamesListAttemptedAt = null;
+    _gamesFilterResultsLoading = false;
+    _gamesFilter = RaGamesFilter.all;
     _recentlyPlayedGames = [];
     _recentlyPlayedLoaded = false;
     _recentlyPlayedLoading = false;
@@ -777,13 +1081,6 @@ class RetroAchievementsProvider extends ChangeNotifier {
 
   void _setLoading(bool loading) {
     _isLoading = loading;
-    notifyListeners();
-  }
-
-  /// Interrupts an active ROM scanning operation.
-  void stopScanning() {
-    _isScanning = false;
-    _scanStatus = 'Scan stopped by user';
     notifyListeners();
   }
 
@@ -878,7 +1175,8 @@ class RetroAchievementsProvider extends ChangeNotifier {
     if (!hasResolvedApiKey) {
       _completionProgress = null;
       _completionProgressLoaded = false;
-      _completionProgressError = _dashboardApiKeyError;
+      _completionProgressError = AppLocale.raErrorApiKeyRequired
+          .getStringForCurrentLocale();
       notifyListeners();
       return false;
     }
@@ -899,7 +1197,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
     } catch (e) {
       _completionProgressError = _describeApiError(
         e,
-        'Error loading completion progress',
+        AppLocale.raErrorLoadCompletionProgress,
       );
       _completionProgressLoaded = false;
       _completionProgress = null;
@@ -917,7 +1215,8 @@ class RetroAchievementsProvider extends ChangeNotifier {
     if (!hasResolvedApiKey) {
       _recentlyPlayedGames = [];
       _recentlyPlayedLoaded = false;
-      _recentlyPlayedError = _dashboardApiKeyError;
+      _recentlyPlayedError = AppLocale.raErrorApiKeyRequired
+          .getStringForCurrentLocale();
       notifyListeners();
       return false;
     }
@@ -938,7 +1237,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
     } catch (e) {
       _recentlyPlayedError = _describeApiError(
         e,
-        'Error loading recently played games',
+        AppLocale.raErrorLoadRecentlyPlayed,
       );
       _recentlyPlayedLoaded = false;
       _recentlyPlayedGames = [];
@@ -956,7 +1255,8 @@ class RetroAchievementsProvider extends ChangeNotifier {
     if (!hasResolvedApiKey) {
       _recentUnlocks = [];
       _recentUnlocksLoaded = false;
-      _recentUnlocksError = _dashboardApiKeyError;
+      _recentUnlocksError = AppLocale.raErrorApiKeyRequired
+          .getStringForCurrentLocale();
       notifyListeners();
       return false;
     }
@@ -977,7 +1277,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
     } catch (e) {
       _recentUnlocksError = _describeApiError(
         e,
-        'Error loading recent unlocks',
+        AppLocale.raErrorLoadRecentUnlocks,
       );
       _recentUnlocksLoaded = false;
       _recentUnlocks = [];
@@ -987,6 +1287,212 @@ class RetroAchievementsProvider extends ChangeNotifier {
       _recentUnlocksLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Page size for the see-all Unlocks list ([loadUnlocksPage]). 50 sits in
+  /// the plan's 50–100 band: small enough that a page renders before the next
+  /// arrives, large enough that the whole 30-day window is usually one or two
+  /// presses of Down at the end of the list.
+  static const int unlocksPageSize = 50;
+
+  /// Loads one page of the see-all Unlocks list.
+  ///
+  /// [reset] starts over from offset 0 — first entry into the sub-tab, the
+  /// REFRESH action, or the staleness window elapsing. Without it, the next
+  /// page appends (the "load more as the cursor approaches the end" path).
+  /// A short page is the end of the data; a failed append keeps the rows
+  /// already on screen and leaves the error for the list footer, while a
+  /// failed reset empties the list so the full error state shows.
+  Future<bool> loadUnlocksPage({bool reset = false}) async {
+    if (!_isConnected || _username.isEmpty) return false;
+    if (_unlocksListLoading) return false;
+    if (!reset && !_unlocksListHasMore) return false;
+
+    if (!hasResolvedApiKey) {
+      _unlocksListItems = [];
+      _unlocksListLoaded = false;
+      _unlocksListHasMore = false;
+      _unlocksListOffset = 0;
+      _unlocksListError = AppLocale.raErrorApiKeyRequired
+          .getStringForCurrentLocale();
+      notifyListeners();
+      return false;
+    }
+
+    final offset = reset ? 0 : _unlocksListOffset;
+    // Stamped up front for the same reason [markDashboardAttempted] is: the
+    // stamp is what stops a re-entry from starting a duplicate page while
+    // this one is still in flight.
+    markUnlocksListAttempted();
+
+    _unlocksListLoading = true;
+    _unlocksListError = null;
+    if (reset) {
+      _unlocksListItems = [];
+      _unlocksListOffset = 0;
+      _unlocksListHasMore = true;
+      _unlocksListLoaded = false;
+    }
+    notifyListeners();
+
+    try {
+      final page = await RetroAchievementsService.getUserRecentAchievements(
+        _username,
+        apiKey: _apiKey,
+        count: unlocksPageSize,
+        offset: offset,
+      );
+      _unlocksListItems = [..._unlocksListItems, ...page];
+      _unlocksListOffset = offset + page.length;
+      _unlocksListHasMore = page.length == unlocksPageSize;
+      _unlocksListLoaded = true;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      // A failed reset already emptied the list when it started, so the full
+      // error state shows; a failed append keeps the rows on screen and
+      // leaves the error for the footer — the list stays usable.
+      _unlocksListError = _describeApiError(
+        e,
+        AppLocale.raErrorLoadRecentUnlocks,
+      );
+      _log.e(_unlocksListError ?? 'Unknown unlocks page error');
+      return false;
+    } finally {
+      _unlocksListLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Page sizes for the see-all Games list ([loadGamesPage]). Recently
+  /// played is capped at 50 by the API; completion progress allows more, and
+  /// 100 keeps the two sources roughly level in rows-per-page.
+  static const int gamesPlayedPageSize = 50;
+  static const int gamesCompletionPageSize = 100;
+
+  /// Clears the merged list and both source accumulators back to "never
+  /// loaded". Called by [loadGamesPage] on reset and by [disconnect] — never
+  /// by invalidation, which only marks the list stale so a parked tab keeps
+  /// its rows until it refetches.
+  void _resetGamesListState() {
+    _gamesListItems = [];
+    _gamesPlayedPages = [];
+    _gamesCompletionPages = [];
+    _gamesPlayedOffset = 0;
+    _gamesCompletionOffset = 0;
+    _gamesPlayedHasMore = true;
+    _gamesCompletionHasMore = true;
+    _gamesListHasMore = true;
+    _gamesListLoaded = false;
+    _gamesListError = null;
+  }
+
+  /// Loads one "page" of the see-all Games list: the next recently-played
+  /// page and the next completion-progress page, whichever of the two still
+  /// has rows. [reset] starts both sources over from offset 0 — first entry
+  /// into the sub-tab, the REFRESH action, or the staleness window elapsing.
+  /// Without it the next pages append to the merge.
+  ///
+  /// A failed append keeps the merged rows on screen and leaves the error
+  /// for the list footer, while a failed reset empties everything — the
+  /// partial pages a half-successful reset fetched are dropped too, because
+  /// the full error state must be able to trust "no rows" as "no data". The
+  /// retry re-reads those pages from cache, so nothing is fetched twice.
+  ///
+  /// The two fetches are sequential, like every other multi-fetch in this
+  /// provider: the RA API rate-limits per key, and a 429 from the second
+  /// source must not be re-triggered by a retry that re-sends the first.
+  Future<bool> loadGamesPage({bool reset = false}) async {
+    if (!_isConnected || _username.isEmpty) return false;
+    if (_gamesListLoading) return false;
+    if (!reset && !_gamesListHasMore) return false;
+
+    if (!hasResolvedApiKey) {
+      _resetGamesListState();
+      _gamesListError = AppLocale.raErrorApiKeyRequired
+          .getStringForCurrentLocale();
+      notifyListeners();
+      return false;
+    }
+
+    final playedOffset = reset ? 0 : _gamesPlayedOffset;
+    final completionOffset = reset ? 0 : _gamesCompletionOffset;
+    final needPlayed = reset || _gamesPlayedHasMore;
+    final needCompletion = reset || _gamesCompletionHasMore;
+    // Stamped up front, like [markUnlocksListAttempted]: the stamp is what
+    // stops a re-entry from starting a duplicate page while this one is in
+    // flight.
+    markGamesListAttempted();
+
+    _gamesListLoading = true;
+    _gamesListError = null;
+    if (reset) {
+      _resetGamesListState();
+    }
+    notifyListeners();
+
+    try {
+      if (needPlayed) {
+        final page = await RetroAchievementsService.getUserRecentlyPlayedGames(
+          _username,
+          apiKey: _apiKey,
+          count: gamesPlayedPageSize,
+          offset: playedOffset,
+        );
+        _gamesPlayedPages = [..._gamesPlayedPages, ...page];
+        _gamesPlayedOffset = playedOffset + page.length;
+        // A bare list with no total: a short page is the end of the data.
+        _gamesPlayedHasMore = page.length == gamesPlayedPageSize;
+      }
+      if (needCompletion) {
+        final summary =
+            await RetroAchievementsService.getUserCompletionProgress(
+              _username,
+              apiKey: _apiKey,
+              count: gamesCompletionPageSize,
+              offset: completionOffset,
+            );
+        _gamesCompletionPages = [..._gamesCompletionPages, ...summary.results];
+        _gamesCompletionOffset = completionOffset + summary.results.length;
+        // This endpoint reports a total, so "more" is offset < total — but
+        // trust a full page over a wrong total, and never trust a total past
+        // an empty page (that way a miscounted total cannot loop empty
+        // fetches).
+        final fetched = summary.results.length;
+        _gamesCompletionHasMore =
+            fetched > 0 &&
+            (fetched == gamesCompletionPageSize ||
+                _gamesCompletionOffset < summary.total);
+      }
+      _rebuildGamesList();
+      _gamesListHasMore = _gamesPlayedHasMore || _gamesCompletionHasMore;
+      _gamesListLoaded = true;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      if (reset) {
+        _resetGamesListState();
+      }
+      _gamesListError = _describeApiError(e, AppLocale.raErrorLoadGames);
+      _log.e(_gamesListError ?? 'Unknown games page error');
+      return false;
+    } finally {
+      _gamesListLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Re-derives the merged list from the accumulated source pages. Runs
+  /// after every page lands rather than patching rows in place: the merge is
+  /// a map-and-sort over a few hundred rows, and one code path beats an
+  /// incremental one that has to keep two sort orders consistent. The fold
+  /// itself lives on [RaGamesListItem.mergeAll], where it is testable
+  /// without the provider.
+  void _rebuildGamesList() {
+    _gamesListItems = RaGamesListItem.mergeAll(
+      played: _gamesPlayedPages,
+      progress: _gamesCompletionPages,
+    );
   }
 
   Future<void> _resolveOwnedWeekGame() async {
@@ -1015,6 +1521,23 @@ class RetroAchievementsProvider extends ChangeNotifier {
     if (_gotw == null) return;
     await _resolveOwnedWeekGame();
     notifyListeners();
+  }
+
+  /// Resolves the local library entry for an arbitrary RA game id — the same
+  /// query the AOTW link uses, exposed for drill-downs that start from rows
+  /// the dashboard doesn't pre-resolve (see-all unlock entries). Returns null
+  /// when the player owns no matching ROM; failures resolve to null rather
+  /// than throw so a drill-down falls through to its RomM/notice branches.
+  Future<OwnedWeekGameResolution?> resolveLocalGameForRaId(int raGameId) async {
+    if (raGameId <= 0) return null;
+    try {
+      return await RetroAchievementsRepository.findBestLocalGameByRaGameId(
+        raGameId,
+      );
+    } catch (e) {
+      _log.e('Error resolving local game for RA id $raGameId: $e');
+      return null;
+    }
   }
 
   Future<void> _resolveAotwPersonalProgress() async {
@@ -1078,13 +1601,23 @@ class RetroAchievementsProvider extends ChangeNotifier {
   /// the thrown message, so match on that.
   bool _isRateLimitedError(Object error) => error.toString().contains('(429)');
 
+  /// Resolves [key] in the app's current language and fills its `{error}`
+  /// placeholder with the raw error text, keeping the exception's diagnostic
+  /// value in the message the user sees.
+  String _errorWith(String key, Object error) =>
+      key.getStringForCurrentLocale().replaceFirst('{error}', error.toString());
+
   /// Maps a caught API error to a user-facing message: a missing/invalid key
   /// and rate-limiting each get a dedicated, actionable string; everything
-  /// else falls back to [fallback] with the raw error appended.
-  String _describeApiError(Object error, String fallback) {
-    if (_isUnauthorizedError(error)) return _dashboardApiKeyError;
-    if (_isRateLimitedError(error)) return _rateLimitError;
-    return '$fallback: $error';
+  /// else falls back to [fallbackKey] with the raw error appended.
+  String _describeApiError(Object error, String fallbackKey) {
+    if (_isUnauthorizedError(error)) {
+      return AppLocale.raErrorApiKeyRequired.getStringForCurrentLocale();
+    }
+    if (_isRateLimitedError(error)) {
+      return AppLocale.raRateLimited.getStringForCurrentLocale();
+    }
+    return _errorWith(fallbackKey, error);
   }
 
   /// Recomputes the filtered/sorted recent masteries/completions caches.
