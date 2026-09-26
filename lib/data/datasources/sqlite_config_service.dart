@@ -280,6 +280,13 @@ class SqliteConfigService {
                 ) ??
                 0) ==
             1,
+        // Missing column/row => 0 => logos shown (the default).
+        hideSystemLogos:
+            (int.tryParse(
+                  userConfig?['hide_system_logos']?.toString() ?? '0',
+                ) ??
+                0) ==
+            1,
         // Missing column/row => 0 => blur off (the default). The frosted blur
         // is only smooth on a powerful GPU, so it starts disabled.
         neoglassBlur:
@@ -365,6 +372,7 @@ class SqliteConfigService {
         showCloudSyncIcon: config.showCloudSyncIcon ? 1 : 0,
         raMatchOnStartup: config.raMatchOnStartup ? 1 : 0,
         subfolderViewAll: config.subfolderViewAll ? 1 : 0,
+        hideSystemLogos: config.hideSystemLogos ? 1 : 0,
         neoglassBlur: config.neoglassBlur,
         neoglassTransparency: config.neoglassTransparency,
         neoglassBorderWidth: config.neoglassBorderWidth,

@@ -609,6 +609,9 @@ class SqliteMigrations {
       case 157:
         await _migrateToVersion157(db);
         break;
+      case 159:
+        await _migrateToVersion159(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7004,6 +7007,34 @@ class SqliteMigrations {
       _log.i('Migration v157 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v157: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v159: adds `hide_system_logos` to `user_config`.
+  ///
+  /// When enabled, the systems grid/carousel hide each card's logo footer and
+  /// render square (1:1) cards, for packs whose backgrounds already carry the
+  /// console logo. 158 is reserved by another branch (`hide_search_card`), so
+  /// this takes the next free slot.
+  static Future<void> _migrateToVersion159(Database db) async {
+    _log.i('Migration v159: Adding hide_system_logos to user_config');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+      if (!columns.contains('hide_system_logos')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN hide_system_logos '
+          'INTEGER DEFAULT 0',
+        );
+        _log.i('Column hide_system_logos added via v159');
+      } else {
+        _log.i('Column hide_system_logos already exists');
+      }
+      _log.i('Migration v159 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v159: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

@@ -42,9 +42,9 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.secondaryDisplay: 'Второй экран',
   AppLocale.directories: 'Директории',
   AppLocale.themes: 'Темы',
-  AppLocale.systemArt: 'System Art',
+  AppLocale.systemArt: 'Арт систем',
   AppLocale.systemArtSubtitle:
-      'Настройте фоны и логотипы карточек систем с помощью пакетов System Art',
+      'Настройте фоны карточек систем с помощью пакетов System Art',
   AppLocale.systemArtNone: 'Нет',
   AppLocale.systemArtNoneSubtitle: 'Внешний вид по умолчанию',
   AppLocale.systemArtLoading: 'Загрузка System Art...',
@@ -56,6 +56,15 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.systemArtRedownloadBody:
       'Кэшированный пакет будет удалён и загружен заново. Используйте это, если отсутствуют некоторые фоны систем.',
   AppLocale.systemArtDownloading: 'Загрузка пакета System Art...',
+  AppLocale.systemArtByAuthor: 'от {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} загрузок',
+  AppLocale.systemArtSystemsCovered: '{count} систем',
+  AppLocale.systemArtSupport: 'Поддержать',
+  AppLocale.systemArtApplied: 'Применено',
+  AppLocale.systemArtHideLogos: 'Скрыть логотипы систем',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Скрывает логотип на карточках систем, если он уже есть на фоне',
   AppLocale.about: 'О программе',
   AppLocale.exit: 'Выход',
   AppLocale.launcher: 'Лаунчер',
@@ -1268,18 +1277,18 @@ const Map<String, dynamic> appLocaleRu = {
       'Выберите основную папку ES-DE, содержащую папки "gamelists" и '
       '"downloaded_media". Необязательно; вы можете сделать это позже в '
       'Настройках.',
-  AppLocale.wizardArtPackTitle: 'Получите набор обложек NeoStation',
+  AppLocale.wizardArtPackTitle: 'Получите System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'Мы настоятельно рекомендуем загрузить набор системных обложек NeoStation '
-      'для красивых фонов консолей по всей вашей библиотеке. Его можно изменить '
+      'Мы настоятельно рекомендуем загрузить System Art Pack (SAP) для '
+      'красивых фонов консолей по всей вашей библиотеке. Его можно изменить '
       'позже в Настройках.',
-  AppLocale.wizardDownloadArtPack: 'Загрузить набор обложек',
+  AppLocale.wizardDownloadArtPack: 'Загрузить System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      'Набор обложек установлен! Другие темы можно посмотреть позже в '
+      'System Art Pack установлен! Другие паки можно посмотреть позже в '
       'Настройках.',
   AppLocale.wizardArtPackUnavailable:
-      'Сейчас не удалось получить набор обложек. Вы можете установить его позже '
-      'в Настройках, когда будете онлайн.',
+      'Сейчас не удалось получить System Art Pack. Вы можете установить его '
+      'позже в Настройках, когда будете онлайн.',
 
   // Hide / unhide games
   AppLocale.hideGame: 'Скрыть игру',

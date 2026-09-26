@@ -41,8 +41,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.secondaryDisplay: '副屏',
   AppLocale.directories: '目录',
   AppLocale.themes: '主题',
-  AppLocale.systemArt: 'System Art',
-  AppLocale.systemArtSubtitle: '使用 System Art 包自定义系统卡片背景和标志',
+  AppLocale.systemArt: '系统艺术',
+  AppLocale.systemArtSubtitle: '使用 System Art 包自定义系统卡片背景',
   AppLocale.systemArtNone: '无',
   AppLocale.systemArtNoneSubtitle: '默认外观',
   AppLocale.systemArtLoading: '正在加载 System Art...',
@@ -52,6 +52,14 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.systemArtRedownloadTitle: '重新下载 System Art？',
   AppLocale.systemArtRedownloadBody: '将删除已缓存的包并重新下载。如果部分系统背景缺失，请使用此选项。',
   AppLocale.systemArtDownloading: '正在下载 System Art 包...',
+  AppLocale.systemArtByAuthor: '作者 {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} 次下载',
+  AppLocale.systemArtSystemsCovered: '{count} 个系统',
+  AppLocale.systemArtSupport: '支持',
+  AppLocale.systemArtApplied: '已应用',
+  AppLocale.systemArtHideLogos: '隐藏系统标志',
+  AppLocale.systemArtHideLogosSubtitle: '当背景已包含标志时，隐藏系统卡片上的标志',
   AppLocale.about: '关于',
   AppLocale.exit: '退出',
   AppLocale.launcher: '启动器',
@@ -1126,13 +1134,14 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.wizardEsdeStepDesc:
       '已经在使用 ES-DE 了吗？导入你的游戏元数据和图片。选择包含 “gamelists” 和 '
       '“downloaded_media” 文件夹的 ES-DE 主文件夹。可选；你可以稍后在“设置”中运行。',
-  AppLocale.wizardArtPackTitle: '获取 NeoStation 美术包',
+  AppLocale.wizardArtPackTitle: '获取 System Art Pack',
   AppLocale.wizardArtPackDesc:
-      '我们强烈建议下载 NeoStation 系统美术包，为你的整个游戏库带来精美的'
+      '我们强烈建议下载 System Art Pack（SAP），为你的整个游戏库带来精美的'
       '主机背景。之后可在“设置”中更改。',
-  AppLocale.wizardDownloadArtPack: '下载美术包',
-  AppLocale.wizardArtPackInstalled: '美术包已安装！你之后可以在“设置”中探索更多主题。',
-  AppLocale.wizardArtPackUnavailable: '目前无法访问美术包。联网后，你可以稍后在“设置”中安装它。',
+  AppLocale.wizardDownloadArtPack: '下载 System Art Pack',
+  AppLocale.wizardArtPackInstalled: 'System Art Pack 已安装！你之后可以在“设置”中探索更多包。',
+  AppLocale.wizardArtPackUnavailable:
+      '目前无法访问 System Art Pack。联网后，你可以稍后在“设置”中安装它。',
 
   // Hide / unhide games
   AppLocale.hideGame: '隐藏游戏',

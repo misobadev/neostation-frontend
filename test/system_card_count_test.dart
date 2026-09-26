@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/my_systems.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
+import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/screens/systems_screen/my_systems_section/system_card.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,8 +34,11 @@ void main() {
     SystemInfo info, {
     VoidCallback? onLongPress,
     bool showCount = true,
-  }) => ChangeNotifierProvider(
-    create: (_) => NeoAssetsProvider(),
+  }) => MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => NeoAssetsProvider()),
+      ChangeNotifierProvider(create: (_) => SqliteConfigProvider()),
+    ],
     child: ScreenUtilInit(
       designSize: const Size(1280, 720),
       builder: (context, _) => MaterialApp(

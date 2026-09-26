@@ -221,6 +221,13 @@ class ConfigModel {
   /// by a later systems update inherits.
   final bool subfolderViewAll;
 
+  /// Whether system cards hide their logo strip and render as a square.
+  ///
+  /// Some System Art backgrounds already include the console logo, so the
+  /// card's own logo would appear twice. When enabled, the card drops the logo
+  /// footer and becomes a 1:1 tile.
+  final bool hideSystemLogos;
+
   /// Gaussian blur sigma of the frosted-glass chrome (NeoGlass), clamped to
   /// 0–2. `0` (the default) disables the blur entirely (flat translucent
   /// panel, cheapest). Higher values are only smooth on a powerful GPU.
@@ -285,6 +292,7 @@ class ConfigModel {
     this.showCloudSyncIcon = true,
     this.raMatchOnStartup = false,
     this.subfolderViewAll = false,
+    this.hideSystemLogos = false,
     this.neoglassBlur = 0,
     this.neoglassTransparency = 10,
     this.neoglassBorderWidth = 2,
@@ -513,6 +521,12 @@ class ConfigModel {
               '1' ||
           (json['subfolderViewAll'] ?? false).toString().toLowerCase() ==
               'true',
+      // Absent => 0 => logos shown (the default).
+      hideSystemLogos:
+          (json['hideSystemLogos'] ?? json['hide_system_logos'] ?? 0)
+                  .toString() ==
+              '1' ||
+          (json['hideSystemLogos'] ?? false).toString().toLowerCase() == 'true',
       // Absent => 0 => blur off (the default). The frosted blur is only smooth
       // on a powerful GPU, so it starts disabled.
       neoglassBlur:
@@ -614,6 +628,7 @@ class ConfigModel {
       'showCloudSyncIcon': showCloudSyncIcon,
       'raMatchOnStartup': raMatchOnStartup,
       'subfolderViewAll': subfolderViewAll,
+      'hideSystemLogos': hideSystemLogos,
       'neoglassBlur': neoglassBlur,
       'neoglassTransparency': neoglassTransparency,
       'neoglassBorderWidth': neoglassBorderWidth,
@@ -669,6 +684,7 @@ class ConfigModel {
     bool? showCloudSyncIcon,
     bool? raMatchOnStartup,
     bool? subfolderViewAll,
+    bool? hideSystemLogos,
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
@@ -723,6 +739,7 @@ class ConfigModel {
       showCloudSyncIcon: showCloudSyncIcon ?? this.showCloudSyncIcon,
       raMatchOnStartup: raMatchOnStartup ?? this.raMatchOnStartup,
       subfolderViewAll: subfolderViewAll ?? this.subfolderViewAll,
+      hideSystemLogos: hideSystemLogos ?? this.hideSystemLogos,
       neoglassBlur: neoglassBlur ?? this.neoglassBlur,
       neoglassTransparency: neoglassTransparency ?? this.neoglassTransparency,
       neoglassBorderWidth: neoglassBorderWidth ?? this.neoglassBorderWidth,

@@ -42,9 +42,9 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.secondaryDisplay: 'Pantalla secundaria',
   AppLocale.directories: 'Directorios',
   AppLocale.themes: 'Themes',
-  AppLocale.systemArt: 'System Art',
+  AppLocale.systemArt: 'Arte de sistemas',
   AppLocale.systemArtSubtitle:
-      'Personaliza fondos y logos de las cards de sistemas con paquetes de System Art',
+      'Personaliza los fondos de las cards de sistemas con paquetes de System Art',
   AppLocale.systemArtNone: 'Ninguno',
   AppLocale.systemArtNoneSubtitle: 'Apariencia predeterminada',
   AppLocale.systemArtLoading: 'Cargando System Art...',
@@ -56,6 +56,15 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.systemArtRedownloadBody:
       'El paquete en caché se eliminará y se descargará de nuevo. Usa esta opción si faltan algunos fondos de sistemas.',
   AppLocale.systemArtDownloading: 'Descargando el paquete de System Art...',
+  AppLocale.systemArtByAuthor: 'por {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} descargas',
+  AppLocale.systemArtSystemsCovered: '{count} sistemas',
+  AppLocale.systemArtSupport: 'Apoyar',
+  AppLocale.systemArtApplied: 'Aplicado',
+  AppLocale.systemArtHideLogos: 'Ocultar logos de sistemas',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Oculta el logo de las cards de sistemas cuando el fondo ya lo incluye',
   AppLocale.about: 'Acerca de',
   AppLocale.exit: 'Salir',
   AppLocale.launcher: 'Lanzador',
@@ -1299,17 +1308,17 @@ const Map<String, dynamic> appLocaleEs = {
       'Selecciona la carpeta principal de ES-DE que contiene tus carpetas '
       '"gamelists" y "downloaded_media". Opcional; puedes ejecutarlo más tarde '
       'desde Ajustes.',
-  AppLocale.wizardArtPackTitle: 'Consigue el paquete de arte de NeoStation',
+  AppLocale.wizardArtPackTitle: 'Consigue un System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'Recomendamos encarecidamente descargar el paquete de arte de sistemas de '
-      'NeoStation para tener bonitos fondos de consola en toda tu biblioteca. '
-      'Se puede cambiar más tarde en Ajustes.',
-  AppLocale.wizardDownloadArtPack: 'Descargar paquete de arte',
+      'Recomendamos encarecidamente descargar un System Art Pack (SAP) para '
+      'tener bonitos fondos de consola en toda tu biblioteca. Puedes cambiarlo '
+      'más tarde en Ajustes.',
+  AppLocale.wizardDownloadArtPack: 'Descargar System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      '¡Paquete de arte instalado! Puedes explorar más temas más tarde en '
+      '¡System Art Pack instalado! Puedes explorar más packs más tarde en '
       'Ajustes.',
   AppLocale.wizardArtPackUnavailable:
-      'No se pudo acceder al paquete de arte en este momento. Puedes instalarlo '
+      'No se pudo acceder al System Art Pack en este momento. Puedes instalarlo '
       'más tarde desde Ajustes cuando estés en línea.',
 
   // Hide / unhide games
