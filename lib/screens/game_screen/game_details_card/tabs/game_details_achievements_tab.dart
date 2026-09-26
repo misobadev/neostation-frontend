@@ -9,6 +9,7 @@ import 'package:neostation/screens/game_screen/game_details_card/widgets/panel_g
 import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import '../../../../models/retro_achievements_game_info.dart';
+import '../../../../utils/game_list_responsive.dart';
 
 /// How far the panel's content sits from its own edge, horizontally.
 ///
@@ -177,6 +178,34 @@ class GameDetailsAchievementsTabState
       if (widget.onFixMatch != null)
         _HeaderAction(label: AppLocale.raFixMatch, onTap: widget.onFixMatch!),
     ];
+  }
+
+  /// Builds the actions as a wrapping group so a narrow header can place the
+  /// buttons on their own row without clipping either label.
+  Widget _buildHeaderActions(
+    BuildContext context,
+    List<_HeaderAction> headerActions,
+  ) {
+    return Wrap(
+      spacing: 6.r,
+      runSpacing: 4.r,
+      children: [
+        for (final (index, action) in headerActions.indexed)
+          HeaderActionButton(
+            label: action.label.getString(context).toUpperCase(),
+            onTap: () {
+              setState(() => _headerFocusIndex = index);
+              action.onTap();
+            },
+            isFocused: _isPanelActive && _headerFocusIndex == index,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
+          ),
+        if (widget.headerAction != null) widget.headerAction!,
+      ],
+    );
   }
 
   /// Moves header focus by [delta], clamped to the ends so the run of actions
@@ -617,6 +646,11 @@ class GameDetailsAchievementsTabState
     final percentage = total > 0
         ? (unlocked / total * 100).toStringAsFixed(0)
         : '0';
+    final viewport = MediaQuery.sizeOf(context);
+    final isCompact = GameListResponsive.isCompactViewport(
+      viewport.width,
+      viewport.height,
+    );
 
     return Positioned(
       left: widget.leftOffset.r,
@@ -671,76 +705,63 @@ class GameDetailsAchievementsTabState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // One line, three zones: identity, progress, actions. The
-                    // count is flexible so a long title can never crash into it
-                    // (the header used to be two fixed Rows in a spaceBetween,
-                    // which is why the title butted up against the count chip),
-                    // and it is plain muted text rather than a filled pill: the
-                    // card's own footer already carries the progress bar, so a
-                    // second high-contrast block of the same numbers was the
-                    // loudest thing in the panel.
-                    Row(
-                      children: [
-                        Icon(
-                          Symbols.emoji_events_rounded,
-                          color: Colors.orange,
-                          size: 13.r,
-                        ),
-                        SizedBox(width: 8.r),
-                        // No title: the selected tab in the card's header strip
-                        // is already the trophy, so naming the panel again only
-                        // costs the actions room they need.
-                        Text(
-                          '$unlocked / $total  ·  $percentage%',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.75),
-                            fontSize: 11.r,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const Spacer(),
-                        Row(
+                    // The compact header uses two rows so the action labels
+                    // never compete with the progress summary for width.
+                    Builder(
+                      builder: (context) {
+                        final progress = Row(
                           children: [
-                            // No gate chip: the panel's own edge says whether
-                            // there is a set in here to walk and whether it
-                            // currently holds the D-pad, which leaves this row to
-                            // the actions the D-pad actually walks.
-                            // Label-only chips: they are D-pad targets now, so a
-                            // button glyph on them would advertise a shortcut
-                            // that no longer exists.
-                            for (final (index, action) in headerActions.indexed)
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  left: index == 0 ? 0 : 6.r,
-                                ),
-                                child: HeaderActionButton(
-                                  label: action.label
-                                      .getString(context)
-                                      .toUpperCase(),
-                                  onTap: () {
-                                    setState(() => _headerFocusIndex = index);
-                                    action.onTap();
-                                  },
-                                  isFocused:
-                                      _isPanelActive &&
-                                      _headerFocusIndex == index,
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                                  foregroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
-                                ),
+                            Icon(
+                              Symbols.emoji_events_rounded,
+                              color: Colors.orange,
+                              size: 13.r,
+                            ),
+                            SizedBox(width: 8.r),
+                            // No title: the selected tab in the card's header
+                            // strip is already the trophy.
+                            Text(
+                              '$unlocked / $total  ·  $percentage%',
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.75),
+                                fontSize: 11.r,
+                                fontWeight: FontWeight.w600,
                               ),
-                            if (widget.headerAction != null) ...[
-                              SizedBox(width: 6.r),
-                              widget.headerAction!,
-                            ],
+                            ),
                           ],
-                        ),
-                      ],
+                        );
+                        final actions = _buildHeaderActions(
+                          context,
+                          headerActions,
+                        );
+
+                        if (isCompact) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              progress,
+                              if (headerActions.isNotEmpty ||
+                                  widget.headerAction != null) ...[
+                                SizedBox(height: 6.r),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: actions,
+                                ),
+                              ],
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            Expanded(child: progress),
+                            if (headerActions.isNotEmpty ||
+                                widget.headerAction != null)
+                              actions,
+                          ],
+                        );
+                      },
                     ),
                     Divider(
                       color: Theme.of(
@@ -752,43 +773,65 @@ class GameDetailsAchievementsTabState
                 ),
               ),
 
-              // Content: Dual-pane layout (Metadata on left, Grid on right).
+              // Content: the grid and selected achievement copy reflow by
+              // viewport shape; wide screens stay dual-pane while square
+              // handhelds stack the copy below the badge gallery.
               Expanded(
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: _contentInsetH.r),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 4,
-                        child: _SelectedAchievementInfo(
-                          achievements: achievements,
-                          selectedIndex: _selectedAchievementIndex,
-                        ),
-                      ),
-                      SizedBox(width: 12.r),
-                      Expanded(
-                        flex: 6,
-                        child: _AchievementsGrid(
-                          achievements: achievements,
-                          selectedIndex: _selectedAchievementIndex,
-                          // The badges are only live while the header cursor
-                          // is parked.
-                          isFocused: _isPanelActive && _headerFocusIndex < 0,
-                          scrollController: _scrollController,
-                          getKey: _getAchievementKey,
-                          onSelect: (index) {
-                            SfxService().playNavSound();
-                            setState(() {
-                              _selectedAchievementIndex = index;
-                              // A tap is the touch equivalent of the A gate.
-                              _isPanelActive = true;
-                              _headerFocusIndex = -1;
-                            });
-                          },
-                        ),
-                      ),
-                    ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final viewport = MediaQuery.sizeOf(context);
+                      final isCompact = GameListResponsive.isCompactViewport(
+                        viewport.width,
+                        viewport.height,
+                      );
+                      final info = _SelectedAchievementInfo(
+                        achievements: achievements,
+                        selectedIndex: _selectedAchievementIndex,
+                      );
+                      final grid = _AchievementsGrid(
+                        achievements: achievements,
+                        selectedIndex: _selectedAchievementIndex,
+                        // The badges are only live while the header cursor
+                        // is parked.
+                        isFocused: _isPanelActive && _headerFocusIndex < 0,
+                        scrollController: _scrollController,
+                        getKey: _getAchievementKey,
+                        onSelect: (index) {
+                          SfxService().playNavSound();
+                          setState(() {
+                            _selectedAchievementIndex = index;
+                            // A tap is the touch equivalent of the A gate.
+                            _isPanelActive = true;
+                            _headerFocusIndex = -1;
+                          });
+                        },
+                      );
+
+                      if (isCompact) {
+                        // Square handhelds have too little horizontal room for
+                        // readable achievement copy beside six badge columns.
+                        // Keep the gallery above the selected achievement and
+                        // give the copy its own scrollable lower region.
+                        return Column(
+                          children: [
+                            Expanded(flex: 6, child: grid),
+                            SizedBox(height: 8.r),
+                            Expanded(flex: 4, child: info),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 4, child: info),
+                          SizedBox(width: 12.r),
+                          Expanded(flex: 6, child: grid),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),

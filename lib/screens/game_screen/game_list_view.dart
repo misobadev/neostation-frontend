@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -19,6 +20,7 @@ import '../../providers/collections_provider.dart';
 import '../../sync/i_sync_provider.dart';
 import '../../sync/sync_manager.dart';
 import '../../utils/effective_system.dart';
+import '../../utils/game_list_responsive.dart';
 import '../../widgets/achievements_badge.dart';
 import '../../widgets/collection_badge.dart';
 import '../../widgets/marquee_text.dart';
@@ -306,8 +308,22 @@ class GameListViewState extends State<GameListView>
     _syncProvider = context.watch<SyncManager?>()?.active;
 
     final theme = Theme.of(context);
-    final itemHeight = _itemHeightBase.r;
+    final viewport = MediaQuery.sizeOf(context);
+    final compactViewport = GameListResponsive.isCompactViewport(
+      viewport.width,
+      viewport.height,
+    );
+    final titleFontSize = GameListResponsive.titleFontSize(
+      compact: compactViewport,
+      scaledBaseSize: 11.r,
+    );
+    final itemHeight = GameListResponsive.rowHeight(
+      compact: compactViewport,
+      titleFontSize: titleFontSize,
+      scaledBaseHeight: _itemHeightBase.r,
+    );
     final totalItemHeight = itemHeight;
+    final folderCountFontSize = compactViewport ? math.max(10.0, 9.r) : 9.r;
     _centeredScrollController.setItemExtent(totalItemHeight, paddingTop: 2.r);
 
     return Column(
@@ -393,6 +409,8 @@ class GameListViewState extends State<GameListView>
                           index,
                           isSelected,
                           totalItemHeight,
+                          titleFontSize,
+                          folderCountFontSize,
                         );
                       }
 
@@ -447,7 +465,7 @@ class GameListViewState extends State<GameListView>
                                         fontWeight: isSelected
                                             ? FontWeight.bold
                                             : FontWeight.normal,
-                                        fontSize: 11.r,
+                                        fontSize: titleFontSize,
                                         color: isSelected
                                             ? theme.colorScheme.onPrimary
                                             : theme.colorScheme.onSurface,
@@ -463,6 +481,9 @@ class GameListViewState extends State<GameListView>
                                               : game.romname,
                                         ),
                                         isActive: isSelected,
+                                        key: ValueKey(
+                                          '${game.romPath ?? game.romname}-$isSelected',
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -623,6 +644,8 @@ class GameListViewState extends State<GameListView>
     int index,
     bool isSelected,
     double totalItemHeight,
+    double titleFontSize,
+    double folderCountFontSize,
   ) {
     final fg = isSelected
         ? theme.colorScheme.onPrimary
@@ -665,7 +688,7 @@ class GameListViewState extends State<GameListView>
                       fontWeight: isSelected
                           ? FontWeight.bold
                           : FontWeight.w500,
-                      fontSize: 11.r,
+                      fontSize: titleFontSize,
                       color: fg,
                       fontFamily: theme.textTheme.bodyMedium?.fontFamily,
                     ),
@@ -676,7 +699,7 @@ class GameListViewState extends State<GameListView>
               Text(
                 '${folder.gameCount}',
                 style: TextStyle(
-                  fontSize: 9.r,
+                  fontSize: folderCountFontSize,
                   color: fg.withValues(alpha: 0.7),
                   fontFamily: theme.textTheme.bodyMedium?.fontFamily,
                 ),

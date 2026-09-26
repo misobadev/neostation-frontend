@@ -30,6 +30,7 @@ class MarqueeText extends StatelessWidget {
           text: TextSpan(text: text, style: effectiveStyle),
           maxLines: 1,
           textDirection: TextDirection.ltr,
+          textScaler: MediaQuery.textScalerOf(context),
         )..layout(maxWidth: double.infinity);
 
         final bool overflows = textPainter.size.width > constraints.maxWidth;
