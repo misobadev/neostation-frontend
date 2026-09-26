@@ -319,17 +319,17 @@
       "platforms": {
         "windows": {
           "executable": "pcsx2.exe",
-          "args": "{file.path}"
+          "args": "-batch \"{file.path}\""
         },
         "linux": {
           "executable": "pcsx2",
           "flatpak": "net.pcsx2.PCSX2",
           "emudeck_launcher": "pcsx2-qt.sh",
-          "args": "{file.path}"
+          "args": "-batch \"{file.path}\""
         },
         "macos": {
           "executable": "pcsx2",
-          "args": "{file.path}"
+          "args": "-batch \"{file.path}\""
         }
       }
     }
