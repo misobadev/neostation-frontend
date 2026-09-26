@@ -10,6 +10,7 @@ class GameSessionPersistence {
   static const String _keySystemFolderName = 'game_session_system_folder';
   static const String _keyFilename = 'game_session_filename';
   static const String _keyStartTimestamp = 'game_session_start_timestamp';
+  static const String _keyPlayedSeconds = 'game_session_played_seconds';
   static const String _keySkipStartupScan = 'game_session_skip_startup_scan';
 
   static final _log = LoggerService.instance;
@@ -26,9 +27,22 @@ class GameSessionPersistence {
       await prefs.setString(_keySystemFolderName, systemFolderName);
       await prefs.setString(_keyFilename, filename);
       await prefs.setInt(_keyStartTimestamp, startTimestamp);
+      await prefs.remove(_keyPlayedSeconds);
       await prefs.setBool(_keySkipStartupScan, true);
     } catch (e) {
       _log.e('Error saving game session: $e');
+    }
+  }
+
+  /// Records how long the active session has actually been played, so a
+  /// session the OS kills can still be reported with its real length rather
+  /// than the time between launch and the next start of the app.
+  static Future<void> savePlayedSeconds(int playedSeconds) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_keyPlayedSeconds, playedSeconds);
+    } catch (e) {
+      _log.e('Error saving game session playtime: $e');
     }
   }
 
@@ -56,6 +70,8 @@ class GameSessionPersistence {
         'systemFolderName': systemFolderName,
         'filename': filename,
         'startTimestamp': startTimestamp,
+        // Absent for a session saved by an older build: treated as unplayed.
+        'playedSeconds': prefs.getInt(_keyPlayedSeconds) ?? 0,
       };
     } catch (e) {
       _log.e('Error reading game session: $e');
@@ -74,6 +90,7 @@ class GameSessionPersistence {
       await prefs.remove(_keySystemFolderName);
       await prefs.remove(_keyFilename);
       await prefs.remove(_keyStartTimestamp);
+      await prefs.remove(_keyPlayedSeconds);
       await prefs.remove(_keySkipStartupScan);
     } catch (e) {
       _log.e('Error clearing game session: $e');

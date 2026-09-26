@@ -219,6 +219,12 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // In landscape the software keyboard can consume over half the display.
+    // Keeping the dialog chrome in that small remaining area leaves no useful
+    // room for the scrolling metadata editor, so hide it temporarily while
+    // the keyboard is open. The editor then owns the resized viewport and can
+    // keep its focused field comfortably above the IME.
+    final isKeyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     final displayName = widget.game.name.isNotEmpty
         ? widget.game.name
         : widget.game.romname;
@@ -247,8 +253,10 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildHeader(theme, displayName),
-            _buildTabsHeader(theme),
+            if (!isKeyboardVisible) ...[
+              _buildHeader(theme, displayName),
+              _buildTabsHeader(theme),
+            ],
             Expanded(
               child: IndexedStack(
                 index: _currentTab,
@@ -282,7 +290,7 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
                 ],
               ),
             ),
-            _buildFooter(theme),
+            if (!isKeyboardVisible) _buildFooter(theme),
           ],
         ),
       ),

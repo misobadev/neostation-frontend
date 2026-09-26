@@ -10,4 +10,13 @@ class AppConfig {
 
   /// WebSocket endpoint for the real-time notification service.
   static const String notifyBaseUrl = 'ws://notify.neosync.cloud/ws';
+
+  /// Base URL for the NeoAssets public catalog API (system art packs).
+  ///
+  /// The `/api/v1/packs` endpoints are public and need no token or account;
+  /// the developer-only `/api/v1/scrape/*` endpoints are not used.
+  static const String neoAssetsApiBaseUrl = 'https://api.neoassets.dev';
+
+  /// CDN that serves the NeoAssets pack images.
+  static const String neoAssetsCdnBaseUrl = 'https://cdn.neoassets.dev';
 }

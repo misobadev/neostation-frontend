@@ -123,6 +123,7 @@ class MySystems extends StatelessWidget {
                       selectedIndex: selectedIndex,
                       onCardTapped: onCardTapped,
                       selectedItemKey: _cardAnchorKey,
+                      hideSystemLogos: configProvider.config.hideSystemLogos,
                       onYPressed: () => _openSystemContextMenu(
                         context,
                         currentSystem,
@@ -229,7 +230,9 @@ class MySystems extends StatelessWidget {
               crossAxisCount: Responsive.getSystemsCrossAxisCountFromSize(
                 configProvider.config.systemGridColumns,
               ),
-              childAspectRatio: 0.80,
+              childAspectRatio: configProvider.config.hideSystemLogos
+                  ? 1.0
+                  : 0.80,
               recentCardSize: configProvider.config.recentCardSize,
               selectedIndex: selectedIndex,
               onCardTapped: onCardTapped,

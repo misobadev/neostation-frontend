@@ -8,6 +8,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/collection_model.dart';
 import 'package:neostation/models/my_systems.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
+import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/screens/collections_screen/collection_cards.dart';
 import 'package:neostation/screens/systems_screen/my_systems_section/system_card.dart';
 import 'package:neostation/widgets/cover_mosaic.dart';
@@ -153,8 +154,11 @@ void main() {
   });
 
   group('SystemCard', () {
-    Widget card(SystemInfo info) => ChangeNotifierProvider(
-      create: (_) => NeoAssetsProvider(),
+    Widget card(SystemInfo info) => MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => NeoAssetsProvider()),
+        ChangeNotifierProvider(create: (_) => SqliteConfigProvider()),
+      ],
       child: ScreenUtilInit(
         designSize: const Size(1280, 720),
         builder: (context, _) => MaterialApp(

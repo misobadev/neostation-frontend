@@ -37,7 +37,13 @@ void main() {
   );
 
   setUpAll(() async {
+    // Resolve against the Linux JSON blocks on any host, macOS included.
+    LauncherService.platformOverride = 'linux';
     expect(await service.loadSystemConfig('gc.json'), isTrue);
+  });
+
+  tearDownAll(() {
+    LauncherService.platformOverride = null;
   });
 
   test('carries flatpak and emudeck_launcher into the launch command', () {

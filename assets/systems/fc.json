@@ -345,6 +345,53 @@
           "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbneo\""
         }
       }
+    },
+    {
+      "name": "RetroArch fixNES",
+      "unique_id": "fc.ra.fixnes",
+      "description": "Supported extensions: nes, fds, qd, nsf.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fixnes\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L fixnes_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L fixnes_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L fixnes_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 fixNES",
+      "unique_id": "fc.ra64.fixnes",
+      "description": "Supported extensions: nes, fds, qd, nsf.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fixnes\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 fixNES",
+      "unique_id": "fc.ra32.fixnes",
+      "description": "Supported extensions: nes, fds, qd, nsf.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fixnes\""
+        }
+      }
     }
   ],
   "neosync": {

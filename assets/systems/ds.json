@@ -260,6 +260,53 @@
           "launch_arguments": "-n com.hydra.noods/.FileBrowser -e LaunchPath \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch DeSmuME 2015",
+      "unique_id": "ds.ra.desmume2015",
+      "description": "Supported extensions: nds, ids, bin.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"desmume2015\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L desmume2015_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L desmume2015_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L desmume2015_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 DeSmuME 2015",
+      "unique_id": "ds.ra64.desmume2015",
+      "description": "Supported extensions: nds, ids, bin.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"desmume2015\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 DeSmuME 2015",
+      "unique_id": "ds.ra32.desmume2015",
+      "description": "Supported extensions: nds, ids, bin.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"desmume2015\""
+        }
+      }
     }
   ],
   "neosync": {

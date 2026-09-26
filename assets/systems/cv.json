@@ -201,6 +201,53 @@
           "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbneo\""
         }
       }
+    },
+    {
+      "name": "RetroArch JollyCV",
+      "unique_id": "cv.ra.jollycv",
+      "description": "Supported extensions: col, rom, myv, bin.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"jollycv\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L jollycv_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L jollycv_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L jollycv_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 JollyCV",
+      "unique_id": "cv.ra64.jollycv",
+      "description": "Supported extensions: col, rom, myv, bin.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"jollycv\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 JollyCV",
+      "unique_id": "cv.ra32.jollycv",
+      "description": "Supported extensions: col, rom, myv, bin.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"jollycv\""
+        }
+      }
     }
   ],
   "neosync": {

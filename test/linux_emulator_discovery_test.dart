@@ -28,6 +28,9 @@ void main() {
   setUp(() {
     home = Directory.systemTemp.createTempSync('neostation_linux_discovery');
     LinuxEmulatorDiscovery.homeOverride = home.path;
+    // Discovery is Linux-only in production; force it on so the resolution
+    // order is exercised on any host, macOS included.
+    LinuxEmulatorDiscovery.linuxOverride = true;
     // Point the removable-media scan at an empty fixture path by default, so a
     // test never depends on whether the host running it has an SD card mounted.
     LinuxEmulatorDiscovery.removableMediaRoot = p.join(home.path, 'no-media');
@@ -36,6 +39,7 @@ void main() {
 
   tearDown(() {
     LinuxEmulatorDiscovery.homeOverride = null;
+    LinuxEmulatorDiscovery.linuxOverride = false;
     LinuxEmulatorDiscovery.removableMediaRoot = '/run/media';
     LinuxEmulatorDiscovery.invalidateCache();
     if (home.existsSync()) home.deleteSync(recursive: true);

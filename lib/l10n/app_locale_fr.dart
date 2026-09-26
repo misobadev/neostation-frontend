@@ -42,9 +42,9 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.secondaryDisplay: 'Écran secondaire',
   AppLocale.directories: 'Répertoires',
   AppLocale.themes: 'Thèmes',
-  AppLocale.systemArt: 'System Art',
+  AppLocale.systemArt: 'Art des systèmes',
   AppLocale.systemArtSubtitle:
-      'Personnalisez les arrière-plans et logos des cartes de systèmes avec des packs System Art',
+      'Personnalisez les arrière-plans des cartes de systèmes avec des packs System Art',
   AppLocale.systemArtNone: 'Aucun',
   AppLocale.systemArtNoneSubtitle: 'Apparence par défaut',
   AppLocale.systemArtLoading: 'Chargement de System Art...',
@@ -56,6 +56,15 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.systemArtRedownloadBody:
       'Le pack en cache sera supprimé puis téléchargé à nouveau. Utilisez cette option si certains arrière-plans de systèmes sont manquants.',
   AppLocale.systemArtDownloading: 'Téléchargement du pack System Art...',
+  AppLocale.systemArtByAuthor: 'par {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} téléchargements',
+  AppLocale.systemArtSystemsCovered: '{count} systèmes',
+  AppLocale.systemArtSupport: 'Soutenir',
+  AppLocale.systemArtApplied: 'Appliqué',
+  AppLocale.systemArtHideLogos: 'Masquer les logos des systèmes',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Masque le logo des cartes de systèmes quand le fond l\'inclut déjà',
   AppLocale.about: 'À propos',
   AppLocale.exit: 'Quitter',
   AppLocale.launcher: 'Lanceur',
@@ -338,6 +347,11 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.thankYou: 'Merci d’utiliser NeoStation !',
   AppLocale.visitWebsite: 'Visitez notre site officiel',
   AppLocale.joinCommunity: 'Rejoignez notre communauté pour de l’aide',
+  AppLocale.exportLogs: 'Exporter les journaux',
+  AppLocale.exportLogsDesc:
+      'Pour les rapports de bug. Contient des chemins de fichiers et des noms de jeux.',
+  AppLocale.exportLogsSaved: 'Journaux enregistrés dans {path}',
+  AppLocale.exportLogsFailed: 'Impossible d’exporter les journaux',
   AppLocale.specialThanks: 'Remerciements Spéciaux',
   AppLocale.forInvaluableContributions: 'pour ses contributions inestimables',
   AppLocale.supportOnKofi: 'Soutenez-nous sur Ko-fi',
@@ -744,7 +758,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.progress: 'Progression',
   AppLocale.raLogin: 'Connexion RetroAchievements',
   AppLocale.raOfflineBanner:
-      'Hors ligne — affichage de vos derniers succès synchronisés',
+      'Hors ligne — affichage de vos derniers succès synchronisés. Nouvelle tentative…',
   AppLocale.raWhatIs: 'Qu’est-ce que RetroAchievements ?',
   AppLocale.raDescription:
       'RetroAchievements est une communauté qui propose des succès pour les jeux classiques via l’émulation.',
@@ -1309,18 +1323,18 @@ const Map<String, dynamic> appLocaleFr = {
       'jeux. Sélectionnez le dossier principal ES-DE contenant vos dossiers '
       '"gamelists" et "downloaded_media". Facultatif ; vous pourrez le faire '
       'plus tard depuis les Paramètres.',
-  AppLocale.wizardArtPackTitle: 'Obtenez le pack visuel NeoStation',
+  AppLocale.wizardArtPackTitle: 'Obtenez un System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'Nous vous recommandons vivement de télécharger le pack visuel des systèmes '
-      'NeoStation pour de superbes arrière-plans de console dans toute votre '
-      'bibliothèque. Il peut être modifié plus tard dans les Paramètres.',
-  AppLocale.wizardDownloadArtPack: 'Télécharger le pack visuel',
+      'Nous vous recommandons vivement de télécharger un System Art Pack (SAP) '
+      'pour de superbes arrière-plans de console dans toute votre bibliothèque. '
+      'Vous pourrez le modifier plus tard dans les Paramètres.',
+  AppLocale.wizardDownloadArtPack: 'Télécharger le System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      'Pack visuel installé ! Vous pourrez explorer d\'autres thèmes plus tard '
-      'dans les Paramètres.',
+      'System Art Pack installé ! Vous pourrez explorer d\'autres packs plus '
+      'tard dans les Paramètres.',
   AppLocale.wizardArtPackUnavailable:
-      'Le pack visuel est actuellement inaccessible. Vous pourrez l\'installer '
-      'plus tard depuis les Paramètres une fois en ligne.',
+      'Le System Art Pack est actuellement inaccessible. Vous pourrez '
+      'l\'installer plus tard depuis les Paramètres une fois en ligne.',
 
   // Hide / unhide games
   AppLocale.hideGame: 'Masquer le jeu',

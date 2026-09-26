@@ -189,6 +189,53 @@
           "args": "-L holani_libretro.dylib \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch Gearlynx",
+      "unique_id": "lynx.ra.gearlynx",
+      "description": "Supported extensions: lnx, lyx, o, bin.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"gearlynx\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L gearlynx_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L gearlynx_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L gearlynx_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 Gearlynx",
+      "unique_id": "lynx.ra64.gearlynx",
+      "description": "Supported extensions: lnx, lyx, o, bin.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"gearlynx\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 Gearlynx",
+      "unique_id": "lynx.ra32.gearlynx",
+      "description": "Supported extensions: lnx, lyx, o, bin.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"gearlynx\""
+        }
+      }
     }
   ],
   "neosync": {

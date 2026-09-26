@@ -567,26 +567,48 @@ extension SqliteConfigScanning on SqliteConfigProvider {
     return rows.isNotEmpty && rows.first.values.first == 1;
   }
 
-  /// Waits briefly for configured Android ROM roots to expose at least one
-  /// directory. SAF can report a valid persisted permission while the physical
-  /// SD volume is still mounting, so [canAccessDirectory] alone is insufficient.
+  /// Waits briefly for configured Android ROM roots to expose their
+  /// directories. SAF can report a valid persisted permission while the
+  /// physical SD volume is still mounting, so [canAccessDirectory] alone is
+  /// insufficient.
+  ///
+  /// Every root that already holds games has to come up, not just one: with
+  /// ROMs split between internal storage and an SD card, internal storage is
+  /// ready at once while the card is still mounting. Returns false only when
+  /// no root came up at all; a root still missing after the wait keeps its
+  /// games through the scan's own offline-root guard.
   Future<bool> _waitForAndroidRomFolders() async {
     const retryDelay = Duration(seconds: 3);
     const maxAttempts = 10;
+
+    final rootsWithGames = <String>{
+      for (final root in _config.romFolders)
+        if (await GameRepository.hasRomsUnderFolder(root)) root,
+    };
 
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       final folders = await SqliteDatabaseService.getExistingSubdirectories(
         _config.romFolders,
       );
-      if (folders.values.any((subdirectories) => subdirectories.isNotEmpty)) {
+      final offline = SqliteDatabaseService.offlineRomRoots(folders);
+      final anyOnline = offline.length < folders.length;
+      if (anyOnline && !offline.any(rootsWithGames.contains)) {
         return true;
       }
-
-      if (attempt < maxAttempts) {
-        _scanStatus = 'Waiting for ROM storage ($attempt/$maxAttempts)...';
-        _notify();
-        await Future<void>.delayed(retryDelay);
+      if (attempt == maxAttempts) {
+        if (anyOnline) {
+          SqliteConfigProvider._log.w(
+            'ROM folder(s) still not ready after the startup wait, scanning '
+            'the rest and keeping their games: '
+            '${offline.where(rootsWithGames.contains).join(', ')}',
+          );
+        }
+        return anyOnline;
       }
+
+      _scanStatus = 'Waiting for ROM storage ($attempt/$maxAttempts)...';
+      _notify();
+      await Future<void>.delayed(retryDelay);
     }
     return false;
   }

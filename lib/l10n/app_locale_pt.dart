@@ -42,9 +42,9 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.secondaryDisplay: 'Tela Secundária',
   AppLocale.directories: 'Diretórios',
   AppLocale.themes: 'Themes',
-  AppLocale.systemArt: 'System Art',
+  AppLocale.systemArt: 'Arte de sistemas',
   AppLocale.systemArtSubtitle:
-      'Personalize fundos e logos dos cards de sistemas com pacotes de System Art',
+      'Personalize os fundos dos cards de sistemas com pacotes de System Art',
   AppLocale.systemArtNone: 'Nenhum',
   AppLocale.systemArtNoneSubtitle: 'Aparência padrão',
   AppLocale.systemArtLoading: 'Carregando System Art...',
@@ -56,6 +56,15 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.systemArtRedownloadBody:
       'O pacote em cache será excluído e baixado novamente. Use esta opção se faltarem alguns fundos de sistemas.',
   AppLocale.systemArtDownloading: 'Baixando o pacote de System Art...',
+  AppLocale.systemArtByAuthor: 'por {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} downloads',
+  AppLocale.systemArtSystemsCovered: '{count} sistemas',
+  AppLocale.systemArtSupport: 'Apoiar',
+  AppLocale.systemArtApplied: 'Aplicado',
+  AppLocale.systemArtHideLogos: 'Ocultar logos dos sistemas',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Oculta o logotipo das cards de sistemas quando o fundo já o inclui',
   AppLocale.about: 'Sobre',
   AppLocale.exit: 'Sair',
   AppLocale.launcher: 'Launcher',
@@ -328,6 +337,11 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.thankYou: 'Obrigado por usar o NeoStation!',
   AppLocale.visitWebsite: 'Visite nosso site oficial',
   AppLocale.joinCommunity: 'Junte-se à nossa comunidade para suporte',
+  AppLocale.exportLogs: 'Exportar registros',
+  AppLocale.exportLogsDesc:
+      'Para relatar bugs. Inclui caminhos de arquivos e nomes de jogos.',
+  AppLocale.exportLogsSaved: 'Registros salvos em {path}',
+  AppLocale.exportLogsFailed: 'Não foi possível exportar os registros',
   AppLocale.specialThanks: 'Agradecimentos Especiais',
   AppLocale.forInvaluableContributions: 'por contribuições inestimáveis',
   AppLocale.supportOnKofi: 'Apoie-nos no Ko-fi',
@@ -726,7 +740,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.progress: 'Progresso',
   AppLocale.raLogin: 'Login RetroAchievements',
   AppLocale.raOfflineBanner:
-      'Offline — a mostrar as suas últimas conquistas sincronizadas',
+      'Offline — a mostrar as suas últimas conquistas sincronizadas. A tentar novamente…',
   AppLocale.raWhatIs: 'O que é RetroAchievements?',
   AppLocale.raDescription:
       'RetroAchievements é uma comunidade que oferece conquistas para jogos clássicos via emulação.',
@@ -1280,17 +1294,17 @@ const Map<String, dynamic> appLocalePt = {
       'Selecione a pasta principal do ES-DE que contém suas pastas "gamelists" '
       'e "downloaded_media". Opcional; você pode fazer isso mais tarde nas '
       'Configurações.',
-  AppLocale.wizardArtPackTitle: 'Obtenha o pacote de arte da NeoStation',
+  AppLocale.wizardArtPackTitle: 'Obtenha um System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'Recomendamos fortemente baixar o pacote de arte de sistemas da NeoStation '
-      'para ter belos planos de fundo de console em toda a sua biblioteca. Pode '
-      'ser alterado mais tarde nas Configurações.',
-  AppLocale.wizardDownloadArtPack: 'Baixar pacote de arte',
+      'Recomendamos fortemente baixar um System Art Pack (SAP) para ter belos '
+      'planos de fundo de console em toda a sua biblioteca. Você pode alterá-lo '
+      'mais tarde nas Configurações.',
+  AppLocale.wizardDownloadArtPack: 'Baixar System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      'Pacote de arte instalado! Você pode explorar mais temas mais tarde nas '
+      'System Art Pack instalado! Você pode explorar mais packs mais tarde nas '
       'Configurações.',
   AppLocale.wizardArtPackUnavailable:
-      'Não foi possível acessar o pacote de arte agora. Você pode instalá-lo '
+      'Não foi possível acessar o System Art Pack agora. Você pode instalá-lo '
       'mais tarde nas Configurações quando estiver online.',
 
   // Hide / unhide games

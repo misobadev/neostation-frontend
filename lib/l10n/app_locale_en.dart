@@ -44,7 +44,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.themes: 'Themes',
   AppLocale.systemArt: 'System Art',
   AppLocale.systemArtSubtitle:
-      'Customize system card backgrounds and logos with System Art packs',
+      'Customize system card backgrounds with System Art packs',
   AppLocale.systemArtNone: 'None',
   AppLocale.systemArtNoneSubtitle: 'Default appearance',
   AppLocale.systemArtLoading: 'Loading System Art...',
@@ -56,6 +56,15 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.systemArtRedownloadBody:
       'The cached pack will be deleted and downloaded again. Use this if some system backgrounds are missing.',
   AppLocale.systemArtDownloading: 'Downloading System Art pack...',
+  AppLocale.systemArtByAuthor: 'by {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} downloads',
+  AppLocale.systemArtSystemsCovered: '{count} systems',
+  AppLocale.systemArtSupport: 'Support',
+  AppLocale.systemArtApplied: 'Applied',
+  AppLocale.systemArtHideLogos: 'Hide system logos',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Hide the logo on system cards when the background already includes one',
   AppLocale.about: 'About',
   AppLocale.exit: 'Exit',
   AppLocale.launcher: 'Launcher',
@@ -319,6 +328,11 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.thankYou: 'Thank you for using NeoStation!',
   AppLocale.visitWebsite: 'Visit our official website',
   AppLocale.joinCommunity: 'Join our community and get support',
+  AppLocale.exportLogs: 'Export logs',
+  AppLocale.exportLogsDesc:
+      'For bug reports. Includes file paths and game names.',
+  AppLocale.exportLogsSaved: 'Logs saved to {path}',
+  AppLocale.exportLogsFailed: 'Couldn\'t export the logs',
   AppLocale.specialThanks: 'Special Thanks',
   AppLocale.forInvaluableContributions: 'For invaluable contributions',
   AppLocale.supportOnKofi: 'Support us on Ko-fi',
@@ -712,7 +726,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.cancelScan: 'Cancel Scan',
   AppLocale.progress: 'Progress',
   AppLocale.raLogin: 'RetroAchievements Login',
-  AppLocale.raOfflineBanner: 'Offline — showing your last synced achievements',
+  AppLocale.raOfflineBanner:
+      'Offline — showing your last synced achievements. Retrying…',
   AppLocale.raWhatIs: 'What is RetroAchievements?',
   AppLocale.raDescription:
       'RetroAchievements is a community effort to provide achievements for classic games using emulators.',
@@ -1253,17 +1268,17 @@ const Map<String, dynamic> appLocaleEn = {
       'Already using ES-DE? Import your game metadata and artwork. Select the '
       'main ES-DE folder containing your "gamelists" and "downloaded_media" '
       'folders. Optional; you can run it later from Settings.',
-  AppLocale.wizardArtPackTitle: 'Get the NeoStation Art Pack',
+  AppLocale.wizardArtPackTitle: 'Get a System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'We strongly recommend downloading the NeoStation system art pack for '
-      'beautiful console backgrounds across your library. It can be changed '
-      'later in Settings.',
-  AppLocale.wizardDownloadArtPack: 'Download Art Pack',
+      'We strongly recommend downloading a System Art Pack (SAP) for beautiful '
+      'console backgrounds across your library. You can change it later in '
+      'Settings.',
+  AppLocale.wizardDownloadArtPack: 'Download System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      'Art pack installed! You can explore more themes later in Settings.',
+      'System Art Pack installed! You can explore more packs later in Settings.',
   AppLocale.wizardArtPackUnavailable:
-      'The art pack couldn\'t be reached right now. You can install it later '
-      'from Settings once you\'re online.',
+      'The System Art Pack couldn\'t be reached right now. You can install it '
+      'later from Settings once you\'re online.',
 
   // Hide / unhide games
   AppLocale.hideGame: 'Hide Game',

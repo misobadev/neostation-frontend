@@ -136,6 +136,53 @@
           "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbneo\""
         }
       }
+    },
+    {
+      "name": "RetroArch Ep128emu",
+      "unique_id": "zxspectrum.ra.ep128emu_core",
+      "description": "Supported extensions: img, dsk, tap, dtf, com, trn, 128, bas, cas, cdt, tzx, wav, tvcwav, ..",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"ep128emu_core\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L ep128emu_core_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L ep128emu_core_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L ep128emu_core_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 Ep128emu",
+      "unique_id": "zxspectrum.ra64.ep128emu_core",
+      "description": "Supported extensions: img, dsk, tap, dtf, com, trn, 128, bas, cas, cdt, tzx, wav, tvcwav, ..",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"ep128emu_core\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 Ep128emu",
+      "unique_id": "zxspectrum.ra32.ep128emu_core",
+      "description": "Supported extensions: img, dsk, tap, dtf, com, trn, 128, bas, cas, cdt, tzx, wav, tvcwav, ..",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"ep128emu_core\""
+        }
+      }
     }
   ],
   "neosync": {

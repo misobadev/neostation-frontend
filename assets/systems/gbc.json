@@ -543,6 +543,75 @@
           "args": "-L bsnes_libretro.dylib \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch fixGB",
+      "unique_id": "gbc.ra.fixgb",
+      "description": "Supported extensions: gb, gbc, gbs.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fixgb\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L fixgb_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L fixgb_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L fixgb_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 fixGB",
+      "unique_id": "gbc.ra64.fixgb",
+      "description": "Supported extensions: gb, gbc, gbs.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fixgb\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 fixGB",
+      "unique_id": "gbc.ra32.fixgb",
+      "description": "Supported extensions: gb, gbc, gbs.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fixgb\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch nSide Balanced",
+      "unique_id": "gbc.ra.nside_sfc_balanced",
+      "description": "Supported extensions: sfc, smc, gb, gbc, bml, rom.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L nside_sfc_balanced_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L nside_sfc_balanced_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L nside_sfc_balanced_libretro.dylib \"{file.path}\""
+        }
+      }
     }
   ],
   "neosync": {

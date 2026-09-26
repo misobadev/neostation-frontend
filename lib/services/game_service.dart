@@ -75,6 +75,7 @@ class GameService {
         // As a HOME launcher we are not paused on lock, so this is the only
         // reliable signal to release background resources while locked.
         deviceScreenOn.value = false;
+        GameSessionManager.onDeviceScreenChanged(false);
         MusicPlayerService().appPaused();
         onScreenStateChanged?.call(false);
       } else if (call.method == 'onDeviceScreenOn') {
@@ -82,6 +83,7 @@ class GameService {
         // running game (the preview video) check that themselves, and leaving
         // the notifier stuck on false would strand them after the game exits.
         deviceScreenOn.value = true;
+        GameSessionManager.onDeviceScreenChanged(true);
         // Skip restore while a game owns the foreground — the game-return
         // (lifecycle resumed) path re-opens everything. Restoring here would
         // reopen the audio engine (and restart music/websocket) behind the

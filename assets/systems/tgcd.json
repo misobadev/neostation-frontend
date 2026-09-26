@@ -194,6 +194,53 @@
           "args": "-L mednafen_pce_libretro.dylib \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch Geargrafx",
+      "unique_id": "tgcd.ra.geargrafx",
+      "description": "Supported extensions: pce, sgx, hes, cue, chd, mmi.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"geargrafx\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L geargrafx_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L geargrafx_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L geargrafx_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 Geargrafx",
+      "unique_id": "tgcd.ra64.geargrafx",
+      "description": "Supported extensions: pce, sgx, hes, cue, chd, mmi.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"geargrafx\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 Geargrafx",
+      "unique_id": "tgcd.ra32.geargrafx",
+      "description": "Supported extensions: pce, sgx, hes, cue, chd, mmi.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"geargrafx\""
+        }
+      }
     }
   ],
   "neosync": {
