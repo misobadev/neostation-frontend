@@ -228,8 +228,6 @@ mixin AppLocale {
   static const String showAchievementsTab = 'show_achievements_tab';
   static const String showAchievementsTabSubtitle =
       'show_achievements_tab_subtitle';
-  static const String showScraperTab = 'show_scraper_tab';
-  static const String showScraperTabSubtitle = 'show_scraper_tab_subtitle';
   static const String showRommTab = 'show_romm_tab';
   static const String showRommTabSubtitle = 'show_romm_tab_subtitle';
   static const String showSearchTab = 'show_search_tab';
@@ -542,13 +540,10 @@ mixin AppLocale {
   static const String scrapingData = 'scraping_data';
   static const String scrapingMedia = 'scraping_media';
   static const String scrapeMode = 'scrape_mode';
-  static const String scrapeModeSub = 'scrape_mode_sub';
   static const String media = 'media';
-  static const String mediaSub = 'media_sub';
   static const String language = 'language';
   static const String languageSub = 'language_sub';
   static const String preferredLanguage = 'preferred_language';
-  static const String region = 'region';
   static const String regionSub = 'region_sub';
   static const String regionPriority = 'region_priority';
   static const String regionPrioritySub = 'region_priority_sub';
@@ -564,9 +559,7 @@ mixin AppLocale {
   static const String logoutError = 'logout_error';
   static const String newContentOnly = 'new_content_only';
   static const String allContent = 'all_content';
-  static const String scrapeModeUpdated = 'scrape_mode_updated';
   static const String scrapeModeError = 'scrape_mode_error';
-  static const String languageUpdated = 'language_updated';
   static const String languageError = 'language_error';
   static const String mediaSettingsError = 'media_settings_error';
   static const String newContentOnlyDesc = 'new_content_only_desc';
@@ -732,6 +725,7 @@ mixin AppLocale {
   static const String requiresFreeAccount = 'requires_free_account';
   static const String createAccountAt = 'create_account_at';
   static const String toGetCredentials = 'to_get_credentials';
+  static const String screenScraperTitle = 'screenscraper_title';
   static const String screenScraperLogin = 'screen_scraper_login';
   static const String scanningSystemsRoms = 'scanning_systems_roms';
   static const String ofSystems = 'of_systems';
