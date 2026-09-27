@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/config_model.dart';
 
@@ -8,7 +11,7 @@ import 'package:neostation/models/config_model.dart';
 /// (`_selectedTabIndex`, `_buildCurrentTabContent`, the secondary-display tab
 /// names). Append new tabs at the end — inserting one renumbers every existing
 /// tab and silently repoints all of that dispatch.
-enum NavTab { systems, sync, achievements, romm, settings }
+enum NavTab { systems, sync, achievements, romm, settings, androidApps }
 
 /// Static description of one navigation tab: how it is drawn, whether the user
 /// may hide it, and how that preference is read and written.
@@ -93,6 +96,11 @@ const Map<NavTab, NavTabSpec> navTabSpecs = {
     icon: 'assets/images/icons/setting.webp',
     labelKey: AppLocale.settings,
   ),
+  NavTab.androidApps: NavTabSpec(
+    icon: '',
+    labelKey: AppLocale.androidApps,
+    iconData: Symbols.android_rounded,
+  ),
 };
 
 // Torn out as top-level functions so [navTabSpecs] can stay `const`.
@@ -114,9 +122,26 @@ NavTabSpec navTabSpec(NavTab tab) => navTabSpecs[tab] ?? _fallbackSpec;
 ///
 /// A tab is visible unless it has a registered hide-predicate that says
 /// otherwise, so an unregistered (i.e. newly added) tab is visible by default.
-List<NavTab> visibleNavTabs(ConfigModel config) => NavTab.values
-    .where((tab) => !(navTabSpec(tab).hidden?.call(config) ?? false))
-    .toList(growable: false);
+List<NavTab> visibleNavTabs(ConfigModel config) {
+  final visible = NavTab.values
+      .where((tab) {
+        if (tab == NavTab.androidApps) {
+          return Platform.isAndroid && config.androidAppsAsTab;
+        }
+        return !(navTabSpec(tab).hidden?.call(config) ?? false);
+      })
+      .toList(growable: true);
+  return orderNavTabs(visible);
+}
+
+/// Places Android Apps beside Systems without changing tab identities.
+List<NavTab> orderNavTabs(List<NavTab> tabs) {
+  final ordered = List<NavTab>.of(tabs);
+  if (ordered.remove(NavTab.androidApps)) {
+    ordered.insert(1, NavTab.androidApps);
+  }
+  return ordered;
+}
 
 /// Tabs the user can toggle, in canonical order. Drives the General settings
 /// rows, so wiring a future tab's spec is all it takes to give it a toggle.

@@ -615,6 +615,9 @@ class SqliteMigrations {
       case 160:
         await _migrateToVersion160(db);
         break;
+      case 161:
+        await _migrateToVersion161(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7070,6 +7073,20 @@ class SqliteMigrations {
       _log.e('Error in migration v160: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
+    }
+  }
+
+  /// Migration v161: stores whether Android apps appear as a top-level tab.
+  static Future<void> _migrateToVersion161(Database db) async {
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('android_apps_as_tab')) {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN android_apps_as_tab '
+        'INTEGER DEFAULT 0',
+      );
     }
   }
 }

@@ -21,6 +21,7 @@ import 'retro_achievements_screen/ra_content.dart';
 import 'settings_screen/new_settings_screen.dart';
 import 'neo_sync_screen/login_screen/neo_sync_content.dart';
 import 'romm_screen/romm_tab.dart';
+import 'game_screen/android_apps/android_apps_grid.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/repositories/emulator_repository.dart';
@@ -50,9 +51,10 @@ abstract final class AppTabs {
   static const int achievements = 2;
   static const int romm = 3;
   static const int settings = 4;
+  static const int androidApps = 5;
 
   /// Total number of tabs, used for wrap-around when cycling with the bumpers.
-  static const int count = 5;
+  static const int count = 6;
 }
 
 /// Bridge class providing static access to the main application navigation state.
@@ -600,6 +602,9 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
         case AppTabs.settings:
           tabName = 'Settings';
           break;
+        case AppTabs.androidApps:
+          tabName = AppLocale.androidApps.getString(context);
+          break;
       }
 
       secondaryState.updateState(
@@ -752,6 +757,22 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
         return const RommTab();
       case AppTabs.settings:
         return NewSettingsScreen();
+      case AppTabs.androidApps:
+        final androidSystem =
+            Provider.of<SqliteConfigProvider>(context, listen: false)
+                .detectedSystems
+                .where((system) => system.folderName == 'android')
+                .firstOrNull;
+        if (androidSystem == null) return const SizedBox.shrink();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _gamepadNav.deactivate();
+        });
+        return AndroidAppsGrid(
+          system: androidSystem,
+          embedded: true,
+          onPreviousTab: AppNavigation.previousTab,
+          onNextTab: AppNavigation.nextTab,
+        );
       default:
         return SystemContent(
           selectedIndex: _selectedSystemIndex,

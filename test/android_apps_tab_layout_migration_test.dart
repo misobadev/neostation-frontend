@@ -17,9 +17,9 @@ void main() {
       .map((column) => column['name'].toString())
       .toList();
 
-  group('migration v159', () {
+  group('migration v161', () {
     test('adds the Android apps tab layout preference', () async {
-      await SqliteMigrations.migrateToVersion(db, 159);
+      await SqliteMigrations.migrateToVersion(db, 161);
 
       expect(userConfigColumns(), contains('android_apps_as_tab'));
     });
@@ -30,7 +30,7 @@ void main() {
         'INTEGER DEFAULT 0',
       );
 
-      await SqliteMigrations.migrateToVersion(db, 159);
+      await SqliteMigrations.migrateToVersion(db, 161);
 
       expect(userConfigColumns(), contains('android_apps_as_tab'));
     });

@@ -5,7 +5,7 @@ void main() {
   test('places Android Apps after Systems from a fixed-length tab list', () {
     final tabs = List<NavTab>.of([
       NavTab.systems,
-      NavTab.search,
+      NavTab.sync,
       NavTab.settings,
       NavTab.androidApps,
     ], growable: false);
@@ -15,7 +15,7 @@ void main() {
       equals([
         NavTab.systems,
         NavTab.androidApps,
-        NavTab.search,
+        NavTab.sync,
         NavTab.settings,
       ]),
     );
