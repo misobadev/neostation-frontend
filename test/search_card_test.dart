@@ -19,7 +19,6 @@ void main() {
       expect(AppTabs.systems, NavTab.systems.index);
       expect(AppTabs.sync, NavTab.sync.index);
       expect(AppTabs.achievements, NavTab.achievements.index);
-      expect(AppTabs.scraper, NavTab.scraper.index);
       expect(AppTabs.romm, NavTab.romm.index);
       expect(AppTabs.settings, NavTab.settings.index);
       expect(AppTabs.count, NavTab.values.length);
