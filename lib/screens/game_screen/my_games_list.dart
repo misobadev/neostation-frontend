@@ -1768,6 +1768,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     String listSize, {
     required double baseTextScale,
   }) {
+    final isMusic = widget.system.folderName == 'music';
     if (_selectedGame == null) {
       return Center(
         child: Column(
@@ -1833,7 +1834,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
       return _buildFolderDetailsPanel(_selectedGame!);
     }
 
-    if (widget.system.folderName == 'music') {
+    if (isMusic) {
       return Padding(
         padding: EdgeInsets.all(8.r),
         child: MusicPlayer(
@@ -1852,7 +1853,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     return MediaQuery(
       data: MediaQuery.of(context).copyWith(
         textScaler: TextScaler.linear(
-          baseTextScale * GameListSize.getScale(listSize),
+          baseTextScale * (isMusic ? 1.0 : GameListSize.getScale(listSize)),
         ),
       ),
       child: Consumer<SyncManager>(
@@ -1860,7 +1861,11 @@ class _SystemGamesListState extends State<SystemGamesList> {
           game: _selectedGame!,
           system: widget.system,
           footerTextScaler: TextScaler.linear(
-            baseTextScale * GameListSize.getScale(listSize).clamp(1.0, 13 / 11),
+            baseTextScale *
+                (isMusic ? 1.0 : GameListSize.getScale(listSize)).clamp(
+                  1.0,
+                  13 / 11,
+                ),
           ),
           playTextScaler: TextScaler.linear(baseTextScale),
           fileProvider: _fileProvider,

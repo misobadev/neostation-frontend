@@ -454,7 +454,9 @@ void main() {
     );
     // The rest of the row is unaffected: the controls are what the row is for.
     // On a card this narrow, Play gives up its label and keeps the A action.
-    expect(find.byType(Image), findsOneWidget);
+    final playGlyph = find.byType(Image);
+    expect(playGlyph, findsOneWidget);
+    expect(tester.getSize(playGlyph).width, greaterThan(0));
     expect(find.byIcon(Symbols.settings_rounded), findsOneWidget);
   });
 

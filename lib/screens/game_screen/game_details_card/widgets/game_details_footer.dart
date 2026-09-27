@@ -180,11 +180,11 @@ class GameDetailsFooter extends StatelessWidget {
                     child: ExcludeFocus(
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          // Keep the achievement action readable before sizing
-                          // the primary action. The Play button first loses its
-                          // label, then contracts around the A glyph as the
+                          // Reserve the achievement action only when it fits
+                          // beside the primary action's A glyph. Play loses its
+                          // label before it contracts around that glyph as the
                           // available footer width narrows.
-                          final reservedAchievementsWidth = showsAchievements
+                          final minimumAchievementsWidth = showsAchievements
                               ? _minimumAchievementsWidth(context)
                               : 0.0;
                           final fullControlsWidth =
@@ -201,7 +201,7 @@ class GameDetailsFooter extends StatelessWidget {
                           final compact =
                               constraints.maxWidth <
                               fullControlsWidth +
-                                  reservedAchievementsWidth +
+                                  minimumAchievementsWidth +
                                   36.r;
                           final controlWidth =
                               (compact ? 34.0 : _controlSize).r;
@@ -215,11 +215,24 @@ class GameDetailsFooter extends StatelessWidget {
                                       (hasRating ? 1 : 0) +
                                       (onShowRandomGame != null ? 1 : 0)) *
                                   gap;
+                          // PLAY always retains enough space for its A glyph.
+                          // If the achievement pill cannot fit beside that
+                          // minimum, leave the pill unreserved so it can hide
+                          // instead of collapsing the primary action.
+                          final minimumPlayWidth = 32.r;
+                          final reservedAchievementsWidth =
+                              showsAchievements &&
+                                  constraints.maxWidth >=
+                                      fixedControlsWidth +
+                                          minimumAchievementsWidth +
+                                          minimumPlayWidth
+                              ? minimumAchievementsWidth
+                              : 0.0;
                           final playWidth =
                               (constraints.maxWidth -
                                       fixedControlsWidth -
                                       reservedAchievementsWidth)
-                                  .clamp(0.0, 88.r);
+                                  .clamp(minimumPlayWidth, 88.r);
 
                           return Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -475,10 +488,12 @@ class GameDetailsFooter extends StatelessWidget {
       progressText: progressText,
     );
 
-    // Keep the complete earned/total count visible. The Play action contracts
-    // before this slot does, so this is only reached when the whole footer is
-    // genuinely too narrow to hold the badge.
-    if (availableWidth < minimumWidth) return const SizedBox.shrink();
+    // Keep the complete earned/total count visible. The layout reserves this
+    // width only when it fits beside Play's minimum width, so this is reached
+    // only when the footer is genuinely too narrow to hold the badge.
+    if (availableWidth + 0.5 < minimumWidth) {
+      return const SizedBox.shrink();
+    }
 
     // The badge takes its slot up to [_pillMaxWidth] and no further; the slack
     // past that falls between it and the controls, so the row stays "readouts
