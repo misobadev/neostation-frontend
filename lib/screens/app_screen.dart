@@ -17,14 +17,10 @@ import 'package:flutter_localization/flutter_localization.dart';
 import '../widgets/fixed_header.dart';
 import 'systems_screen/system_content.dart';
 import 'systems_screen/my_systems_section/initial_setup_widget.dart';
-import 'search_screen/search_screen.dart';
 import 'retro_achievements_screen/ra_content.dart';
 import 'settings_screen/new_settings_screen.dart';
-import 'scraper_screen/new_scraper_options_screen.dart';
 import 'neo_sync_screen/login_screen/neo_sync_content.dart';
 import 'romm_screen/romm_tab.dart';
-import 'game_screen/android_apps/android_apps_grid.dart';
-import '../widgets/scraper_content.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/repositories/emulator_repository.dart';
@@ -34,7 +30,7 @@ import 'dart:io';
 /// The root screen of the application, managing high-level navigation tabs.
 ///
 /// Coordinates the lifecycle of main features including the System library,
-/// Cloud Sync, Achievements, Metadata Scraper, and Global Settings.
+/// Cloud Sync, Achievements, RomM, and Global Settings.
 class AppScreen extends StatefulWidget {
   const AppScreen({super.key});
 
@@ -50,18 +46,13 @@ class AppScreen extends StatefulWidget {
 /// delegation logic below is written against these names rather than literals.
 abstract final class AppTabs {
   static const int systems = 0;
-  static const int search = 1;
-  static const int sync = 2;
-  static const int achievements = 3;
-  static const int scraper = 4;
-  static const int romm = 5;
-  static const int settings = 6;
-  // Appended so existing index-based navigation keeps its identity. The header
-  // orders this tab after Systems when it is enabled.
-  static const int androidApps = 7;
+  static const int sync = 1;
+  static const int achievements = 2;
+  static const int romm = 3;
+  static const int settings = 4;
 
   /// Total number of tabs, used for wrap-around when cycling with the bumpers.
-  static const int count = 8;
+  static const int count = 5;
 }
 
 /// Bridge class providing static access to the main application navigation state.
@@ -478,10 +469,6 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
     if (_selectedTabIndex == AppTabs.systems) {
       return; // Grid navigation delegated to my_systems.dart via provider.
     }
-    if (_selectedTabIndex == AppTabs.scraper) {
-      NewScraperOptionsScreen.navigateRight();
-      return;
-    }
     if (_selectedTabIndex == AppTabs.settings) {
       NewSettingsScreen.navigateRight();
       return;
@@ -490,10 +477,6 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
 
   void _navigateContentLeft() {
     if (_selectedTabIndex == AppTabs.systems) return;
-    if (_selectedTabIndex == AppTabs.scraper) {
-      NewScraperOptionsScreen.navigateLeft();
-      return;
-    }
     if (_selectedTabIndex == AppTabs.settings) {
       NewSettingsScreen.navigateLeft();
       return;
@@ -509,10 +492,6 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
   /// double-dispatch bug fixed in #255.
   bool _navigateContentDown() {
     if (_selectedTabIndex == AppTabs.systems) return true;
-    if (_selectedTabIndex == AppTabs.scraper) {
-      NewScraperOptionsScreen.navigateDown();
-      return true;
-    }
     if (_selectedTabIndex == AppTabs.settings) {
       return NewSettingsScreen.navigateDown();
     }
@@ -521,10 +500,6 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
 
   bool _navigateContentUp() {
     if (_selectedTabIndex == AppTabs.systems) return true;
-    if (_selectedTabIndex == AppTabs.scraper) {
-      NewScraperOptionsScreen.navigateUp();
-      return true;
-    }
     if (_selectedTabIndex == AppTabs.settings) {
       return NewSettingsScreen.navigateUp();
     }
@@ -538,9 +513,7 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
   }
 
   void _handleBackNavigation() {
-    if (_selectedTabIndex == AppTabs.scraper) {
-      NewScraperOptionsScreen.backCurrent();
-    } else if (_selectedTabIndex == AppTabs.settings) {
+    if (_selectedTabIndex == AppTabs.settings) {
       NewSettingsScreen.backCurrent();
     }
   }
@@ -554,9 +527,7 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
       return;
     }
 
-    if (_selectedTabIndex == AppTabs.scraper) {
-      NewScraperOptionsScreen.selectCurrent();
-    } else if (_selectedTabIndex == AppTabs.settings) {
+    if (_selectedTabIndex == AppTabs.settings) {
       NewSettingsScreen.selectCurrent();
     }
   }
@@ -617,26 +588,17 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
 
       String tabName = '';
       switch (index) {
-        case AppTabs.search:
-          tabName = 'Search';
-          break;
         case AppTabs.sync:
           tabName = 'Sync';
           break;
         case AppTabs.achievements:
           tabName = 'Achievements';
           break;
-        case AppTabs.scraper:
-          tabName = 'Scraper';
-          break;
         case AppTabs.romm:
           tabName = 'RomM';
           break;
         case AppTabs.settings:
           tabName = 'Settings';
-          break;
-        case AppTabs.androidApps:
-          tabName = AppLocale.androidApps.getString(context);
           break;
       }
 
@@ -773,13 +735,6 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
           selectedIndex: _selectedSystemIndex,
           onCardTapped: _onSystemCardTapped,
         );
-      case AppTabs.search:
-        // Search owns its own gamepad layer (text field + filter menus), so the
-        // app-level handler steps aside while it is on screen.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _gamepadNav.deactivate();
-        });
-        return const SearchScreen();
       case AppTabs.sync:
         // NeoSync tab manages its own focus lifecycle due to complex login flows.
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -788,8 +743,6 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
         return const NeoSyncContent();
       case AppTabs.achievements:
         return RAContent();
-      case AppTabs.scraper:
-        return ScraperContent();
       case AppTabs.romm:
         // RomM tab hosts its own gamepad navigation layer (browse/connect),
         // so hand off focus like the NeoSync tab does.
@@ -799,25 +752,6 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
         return const RommTab();
       case AppTabs.settings:
         return NewSettingsScreen();
-      case AppTabs.androidApps:
-        // The apps grid owns D-pad/A and tab bumpers just like Search. The
-        // Android system exists after the platform scan; until then leave the
-        // tab calm rather than throwing while startup is settling.
-        final androidSystem =
-            Provider.of<SqliteConfigProvider>(context, listen: false)
-                .detectedSystems
-                .where((system) => system.folderName == 'android')
-                .firstOrNull;
-        if (androidSystem == null) return const SizedBox.shrink();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _gamepadNav.deactivate();
-        });
-        return AndroidAppsGrid(
-          system: androidSystem,
-          embedded: true,
-          onPreviousTab: AppNavigation.previousTab,
-          onNextTab: AppNavigation.nextTab,
-        );
       default:
         return SystemContent(
           selectedIndex: _selectedSystemIndex,

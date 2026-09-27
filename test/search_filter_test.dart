@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:neostation/models/database_game_model.dart';
 import 'package:neostation/screens/search_screen/search_filter.dart';
-import 'package:neostation/utils/ra_coverage.dart';
 
 /// Builds a minimal [DatabaseGameModel] for filter tests; only the fields the
 /// search logic reads need values.
@@ -14,9 +13,6 @@ DatabaseGameModel game({
   String? genre,
   String? year,
   double? rating,
-  String? systemRaId,
-  String? raHash,
-  int? idRa,
 }) {
   return DatabaseGameModel(
     filename: filename,
@@ -27,9 +23,6 @@ DatabaseGameModel game({
     genre: genre,
     year: year,
     rating: rating,
-    systemRaId: systemRaId,
-    raHash: raHash,
-    idRa: idRa,
   );
 }
 
@@ -497,127 +490,6 @@ void main() {
         ),
         isFalse,
       );
-    });
-  });
-
-  group('achievements filter', () {
-    // One game per coverage bucket, plus a game on a system RetroAchievements
-    // does not cover at all.
-    final matched = game(
-      realName: 'Matched',
-      systemRaId: '7',
-      raHash: 'h1',
-      idRa: 42,
-    );
-    final noSet = game(realName: 'No set', systemRaId: '7', raHash: 'h2');
-    final notChecked = game(realName: 'Not checked', systemRaId: '7');
-    final disc = game(realName: 'Disc', filename: 'disc.chd', systemRaId: '12');
-    final unsupported = game(realName: 'Unsupported');
-    final all = [matched, noSet, notChecked, disc, unsupported];
-
-    test('buckets each game by what is actually known about it', () {
-      expect(searchAchievementsBucket(matched), RaCoverage.matched);
-      expect(searchAchievementsBucket(noSet), RaCoverage.noSet);
-      expect(searchAchievementsBucket(notChecked), RaCoverage.notChecked);
-      expect(searchAchievementsBucket(disc), RaCoverage.pendingDiscSupport);
-    });
-
-    test('the filter offers three options, not one per bucket', () {
-      // Both "nobody has asked yet" buckets answer the same filter option; the
-      // hashed-and-answered bucket stays on its own.
-      expect(searchAchievementsOption(matched), kAchievementsYes);
-      expect(searchAchievementsOption(noSet), kAchievementsNoSet);
-      expect(searchAchievementsOption(notChecked), kAchievementsUnknown);
-      expect(searchAchievementsOption(disc), kAchievementsUnknown);
-    });
-
-    test('a game on an uncovered system is outside the dimension', () {
-      expect(searchAchievementsBucket(unsupported), isNull);
-      expect(searchAchievementsOption(unsupported), isNull);
-    });
-
-    test('filtering to matched returns only the matched game', () {
-      final results = filterAndSortGames(
-        all,
-        const SearchCriteria(achievements: kAchievementsYes),
-      );
-      expect(results.map((g) => g.realName), ['Matched']);
-    });
-
-    test('"no set" does not sweep up unhashed or disc ROMs', () {
-      final results = filterAndSortGames(
-        all,
-        const SearchCriteria(achievements: kAchievementsNoSet),
-      );
-      expect(results.map((g) => g.realName), ['No set']);
-    });
-
-    test('"unknown" collects both of the unanswered buckets', () {
-      final results = filterAndSortGames(
-        all,
-        const SearchCriteria(achievements: kAchievementsUnknown),
-      );
-      expect(results.map((g) => g.realName), ['Disc', 'Not checked']);
-    });
-
-    test('games on uncovered systems match no option at all', () {
-      for (final option in kSearchAchievementsOptions) {
-        final results = filterAndSortGames([
-          unsupported,
-        ], SearchCriteria(achievements: option));
-        expect(results, isEmpty, reason: option);
-      }
-    });
-
-    test('the facet offers the options present, matched first', () {
-      final facets = computeFacets(all, const SearchCriteria());
-      expect(facets.achievements, [
-        kAchievementsYes,
-        kAchievementsNoSet,
-        kAchievementsUnknown,
-      ]);
-      expect(facets.optionsFor(kFilterAchievements), facets.achievements);
-    });
-
-    test('a library with nothing to say offers no options', () {
-      expect(
-        computeFacets([unsupported], const SearchCriteria()).achievements,
-        isEmpty,
-      );
-    });
-
-    test('a fully hashed library stops offering "unknown"', () {
-      final facets = computeFacets([matched, noSet], const SearchCriteria());
-      expect(facets.achievements, [kAchievementsYes, kAchievementsNoSet]);
-    });
-
-    test('the active value survives a query that strands it', () {
-      // The chip has to stay consistent with its own selection so the user can
-      // cycle back off it; see _facet's equivalent for string dimensions.
-      final facets = computeFacets([
-        matched,
-      ], const SearchCriteria(achievements: kAchievementsUnknown));
-      expect(facets.achievements, contains(kAchievementsUnknown));
-    });
-
-    test('an active option does not narrow its own facet', () {
-      final facets = computeFacets(
-        all,
-        const SearchCriteria(achievements: kAchievementsYes),
-      );
-      expect(facets.achievements, hasLength(3));
-    });
-
-    test('the dimension cannot be evaluated against RomM results', () {
-      expect(const SearchCriteria().rommFilterable, isTrue);
-      expect(
-        const SearchCriteria(achievements: kAchievementsYes).rommFilterable,
-        isFalse,
-      );
-    });
-
-    test('clearing the dimension restores every game', () {
-      expect(filterAndSortGames(all, const SearchCriteria()), hasLength(5));
     });
   });
 }

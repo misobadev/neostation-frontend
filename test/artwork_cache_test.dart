@@ -4,6 +4,7 @@ import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/utils/artwork_cache.dart';
+import 'package:path/path.dart' as path;
 
 GameModel game(String romname) => GameModel(
   romname: romname,
@@ -46,7 +47,7 @@ void main() {
 
     expect(paths, hasLength(scrapedArtworkTypes.length));
     for (final type in scrapedArtworkTypes) {
-      expect(paths, contains(contains('nes/$type/mario.png')));
+      expect(paths, contains(contains(path.join('nes', type, 'mario.png'))));
     }
   });
 }

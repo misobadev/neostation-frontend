@@ -143,6 +143,7 @@ extension _DataLoading on _SystemGamesListState {
           _initialRomPathAnchored = true;
           _currentRelPath =
               folderRelPathFor(widget.initialRomPath, subfolderRoots) ?? '';
+          _deepLinkRelPath = _currentRelPath;
         }
         // Folders comingle with games only when subfolder view is off; otherwise
         // [_games] is the current folder level (folders first, then games).

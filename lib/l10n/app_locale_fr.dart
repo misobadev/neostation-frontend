@@ -42,9 +42,9 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.secondaryDisplay: 'Écran secondaire',
   AppLocale.directories: 'Répertoires',
   AppLocale.themes: 'Thèmes',
-  AppLocale.systemArt: 'System Art',
+  AppLocale.systemArt: 'Art des systèmes',
   AppLocale.systemArtSubtitle:
-      'Personnalisez les arrière-plans et logos des cartes de systèmes avec des packs System Art',
+      'Personnalisez les arrière-plans des cartes de systèmes avec des packs System Art',
   AppLocale.systemArtNone: 'Aucun',
   AppLocale.systemArtNoneSubtitle: 'Apparence par défaut',
   AppLocale.systemArtLoading: 'Chargement de System Art...',
@@ -56,6 +56,15 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.systemArtRedownloadBody:
       'Le pack en cache sera supprimé puis téléchargé à nouveau. Utilisez cette option si certains arrière-plans de systèmes sont manquants.',
   AppLocale.systemArtDownloading: 'Téléchargement du pack System Art...',
+  AppLocale.systemArtByAuthor: 'par {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} téléchargements',
+  AppLocale.systemArtSystemsCovered: '{count} systèmes',
+  AppLocale.systemArtSupport: 'Soutenir',
+  AppLocale.systemArtApplied: 'Appliqué',
+  AppLocale.systemArtHideLogos: 'Masquer les logos des systèmes',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Masque le logo des cartes de systèmes quand le fond l\'inclut déjà',
   AppLocale.about: 'À propos',
   AppLocale.exit: 'Quitter',
   AppLocale.launcher: 'Lanceur',
@@ -241,15 +250,11 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.showAchievementsTab: 'Afficher l’onglet Succès',
   AppLocale.showAchievementsTabSubtitle:
       'Affiche l’onglet RetroAchievements dans la barre de navigation',
-  AppLocale.showScraperTab: 'Afficher l’onglet Scraper',
-  AppLocale.showScraperTabSubtitle:
-      'Affiche l’onglet de scraping dans la barre de navigation',
   AppLocale.showRommTab: 'Afficher l’onglet RomM',
   AppLocale.showRommTabSubtitle:
       'Affiche l’onglet RomM dans la barre de navigation',
-  AppLocale.showSearchTab: 'Afficher l’onglet Rechercher',
-  AppLocale.showSearchTabSubtitle:
-      'Affiche l’onglet de recherche dans la barre de navigation',
+  AppLocale.searchCard: 'Carte Rechercher',
+  AppLocale.searchCardSubtitle: 'Afficher la carte de recherche dans la grille',
 
   AppLocale.configureDirectories: 'Configurer les Répertoires',
   AppLocale.configureRomsFolder: 'Configurer le Dossier des ROMs',
@@ -344,6 +349,11 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.thankYou: 'Merci d’utiliser NeoStation !',
   AppLocale.visitWebsite: 'Visitez notre site officiel',
   AppLocale.joinCommunity: 'Rejoignez notre communauté pour de l’aide',
+  AppLocale.exportLogs: 'Exporter les journaux',
+  AppLocale.exportLogsDesc:
+      'Pour les rapports de bug. Contient des chemins de fichiers et des noms de jeux.',
+  AppLocale.exportLogsSaved: 'Journaux enregistrés dans {path}',
+  AppLocale.exportLogsFailed: 'Impossible d’exporter les journaux',
   AppLocale.specialThanks: 'Remerciements Spéciaux',
   AppLocale.forInvaluableContributions: 'pour ses contributions inestimables',
   AppLocale.supportOnKofi: 'Soutenez-nous sur Ko-fi',
@@ -534,16 +544,12 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.applyToAll: 'Appliquer à tous les conflits',
   AppLocale.applyToAllDesc: 'Utiliser ce choix pour les conflits restants',
 
-  AppLocale.account: 'Compte',
   AppLocale.scraping: 'Scraping',
   AppLocale.scrapeMode: 'Mode de Scraping',
-  AppLocale.scrapeModeSub: 'Choisissez quoi rechercher',
   AppLocale.media: 'Médias',
-  AppLocale.mediaSub: 'Choisissez les types de médias à télécharger',
   AppLocale.language: 'Langue',
   AppLocale.languageSub: 'Langue préférée pour les métadonnées',
   AppLocale.preferredLanguage: 'Langue Préférée',
-  AppLocale.region: 'Région',
   AppLocale.regionSub: 'Définir la priorité de région pour le scraping',
   AppLocale.regionPriority: 'Priorité de Région',
   AppLocale.regionPrioritySub:
@@ -562,10 +568,8 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.logoutError: 'Erreur lors de la déconnexion',
   AppLocale.newContentOnly: 'Nouveau contenu uniquement',
   AppLocale.allContent: 'Tout le contenu',
-  AppLocale.scrapeModeUpdated: 'Mode de scraping mis à jour :',
   AppLocale.scrapeModeError:
       'Erreur lors de la mise à jour du mode de scraping',
-  AppLocale.languageUpdated: 'Langue mise à jour avec succès',
   AppLocale.languageError: 'Erreur lors de la mise à jour de la langue',
   AppLocale.mediaSettingsError:
       'Erreur lors de l’enregistrement des paramètres médias',
@@ -746,7 +750,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.progress: 'Progression',
   AppLocale.raLogin: 'Connexion RetroAchievements',
   AppLocale.raOfflineBanner:
-      'Hors ligne — affichage de vos derniers succès synchronisés',
+      'Hors ligne — affichage de vos derniers succès synchronisés. Nouvelle tentative…',
   AppLocale.raWhatIs: 'Qu’est-ce que RetroAchievements ?',
   AppLocale.raDescription:
       'RetroAchievements est une communauté qui propose des succès pour les jeux classiques via l’émulation.',
@@ -794,6 +798,8 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.requiresFreeAccount: 'Nécessite un compte gratuit',
   AppLocale.createAccountAt: 'Créez un compte sur',
   AppLocale.toGetCredentials: ' pour obtenir vos identifiants.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
+  AppLocale.metadata: 'Métadonnées',
   AppLocale.screenScraperLogin: 'Connexion ScreenScraper',
   AppLocale.scanningSystemsRoms: 'Analyse des systèmes et ROMs...',
   AppLocale.ofSystems: '{scanned} sur {total} systèmes',
@@ -1169,17 +1175,12 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.filterGenre: 'Genre',
   AppLocale.filterRating: 'Note',
   AppLocale.filterYear: 'Année',
-  AppLocale.filterAchievements: 'Succès',
-  AppLocale.raCoverageMatched: 'Oui',
-  AppLocale.raCoverageNoSet: 'Non',
   AppLocale.raCoverageUnknown: 'Inconnu',
   AppLocale.filterAny: 'Tous',
   AppLocale.filterSource: 'Source',
   AppLocale.sourceLocal: 'Sur cet appareil',
   AppLocale.searchRatingLocalOnly:
       'Le filtre de note ne s’applique qu’aux jeux locaux',
-  AppLocale.searchAchievementsLocalOnly:
-      'Le filtre de succès ne s’applique qu’aux jeux locaux',
   AppLocale.searchNoRommEquivalent: 'RomM n’a rien classé sous « {value} »',
   AppLocale.resetPlayTimeConfirm: 'Réinitialiser le temps de jeu',
   AppLocale.resetPlayTimeConfirmBody:
@@ -1311,18 +1312,18 @@ const Map<String, dynamic> appLocaleFr = {
       'jeux. Sélectionnez le dossier principal ES-DE contenant vos dossiers '
       '"gamelists" et "downloaded_media". Facultatif ; vous pourrez le faire '
       'plus tard depuis les Paramètres.',
-  AppLocale.wizardArtPackTitle: 'Obtenez le pack visuel NeoStation',
+  AppLocale.wizardArtPackTitle: 'Obtenez un System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'Nous vous recommandons vivement de télécharger le pack visuel des systèmes '
-      'NeoStation pour de superbes arrière-plans de console dans toute votre '
-      'bibliothèque. Il peut être modifié plus tard dans les Paramètres.',
-  AppLocale.wizardDownloadArtPack: 'Télécharger le pack visuel',
+      'Nous vous recommandons vivement de télécharger un System Art Pack (SAP) '
+      'pour de superbes arrière-plans de console dans toute votre bibliothèque. '
+      'Vous pourrez le modifier plus tard dans les Paramètres.',
+  AppLocale.wizardDownloadArtPack: 'Télécharger le System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      'Pack visuel installé ! Vous pourrez explorer d\'autres thèmes plus tard '
-      'dans les Paramètres.',
+      'System Art Pack installé ! Vous pourrez explorer d\'autres packs plus '
+      'tard dans les Paramètres.',
   AppLocale.wizardArtPackUnavailable:
-      'Le pack visuel est actuellement inaccessible. Vous pourrez l\'installer '
-      'plus tard depuis les Paramètres une fois en ligne.',
+      'Le System Art Pack est actuellement inaccessible. Vous pourrez '
+      'l\'installer plus tard depuis les Paramètres une fois en ligne.',
 
   // Hide / unhide games
   AppLocale.hideGame: 'Masquer le jeu',

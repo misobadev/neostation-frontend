@@ -30,7 +30,9 @@
     ],
     "extensions": [
       "cue",
-      "cdi"
+      "cdi",
+      "chd",
+      "bigpimg"
     ]
   },
   "emulators": [
@@ -38,7 +40,7 @@
       "name": "Standalone BigPEmu",
       "default_standalone": true,
       "unique_id": "jagcd.jaguarcd.bigpe.bigpemu",
-      "description": "Supported extensions: cue, cdi.",
+      "description": "Supported extensions: cue, cdi, chd, bigpimg.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "windows": {
@@ -56,7 +58,7 @@
       "name": "RetroArch64 Virtual Jaguar",
       "default_core": true,
       "unique_id": "jagcd.ra64.virtualjaguar",
-      "description": "Supported extensions: cue, cdi.",
+      "description": "Supported extensions: cue, cdi, chd, bigpimg.",
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
@@ -68,7 +70,7 @@
       "name": "RetroArch32 Virtual Jaguar",
       "default_core": true,
       "unique_id": "jagcd.ra32.virtualjaguar",
-      "description": "Supported extensions: cue, cdi.",
+      "description": "Supported extensions: cue, cdi, chd, bigpimg.",
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
@@ -80,7 +82,7 @@
       "name": "RetroArch Virtual Jaguar",
       "default_core": true,
       "unique_id": "jagcd.ra.virtualjaguar",
-      "description": "Supported extensions: cue, cdi.",
+      "description": "Supported extensions: cue, cdi, chd, bigpimg.",
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {

@@ -81,6 +81,24 @@
           "args": "-L same_cdi_libretro.dylib \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch CDi 2015",
+      "unique_id": "cdi.ra.cdi2015",
+      "description": "Supported extensions: chd.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L cdi2015_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L cdi2015_libretro.so \"{file.path}\""
+        }
+      }
     }
   ],
   "neosync": {

@@ -466,6 +466,10 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
     setState(() {
       _activeFieldIndex = node.hasFocus ? navIndex : null;
     });
+    // The keyboard reduces the dialog's scroll viewport on Android. Bring the
+    // focused row into that viewport so lower metadata fields remain readable
+    // while the user types.
+    if (node.hasFocus) _scrollToSelectedItem();
   }
 
   void _scrollToSelectedItem() {

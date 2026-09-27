@@ -540,6 +540,202 @@
           "launch_arguments": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top"
         }
       }
+    },
+    {
+      "name": "RetroArch Daphne",
+      "unique_id": "arc.ra.daphne",
+      "description": "Supported extensions: zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"daphne\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L daphne_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 Daphne",
+      "unique_id": "arc.ra64.daphne",
+      "description": "Supported extensions: zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"daphne\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 Daphne",
+      "unique_id": "arc.ra32.daphne",
+      "description": "Supported extensions: zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"daphne\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch DICE",
+      "unique_id": "arc.ra.dice",
+      "description": "Supported extensions: zip, dmy, k1, a1, 6c, c6, d2, s1, f4, a4, 1da, da1, C4, 4c, 4d, d7, d4.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"dice\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L dice_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L dice_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L dice_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 DICE",
+      "unique_id": "arc.ra64.dice",
+      "description": "Supported extensions: zip, dmy, k1, a1, 6c, c6, d2, s1, f4, a4, 1da, da1, C4, 4c, 4d, d7, d4.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"dice\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 DICE",
+      "unique_id": "arc.ra32.dice",
+      "description": "Supported extensions: zip, dmy, k1, a1, 6c, c6, d2, s1, f4, a4, 1da, da1, C4, 4c, 4d, d7, d4.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"dice\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch FB Alpha",
+      "unique_id": "arc.ra.fbalpha",
+      "description": "Supported extensions: zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbalpha\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L fbalpha_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L fbalpha_libretro.so \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 FB Alpha",
+      "unique_id": "arc.ra64.fbalpha",
+      "description": "Supported extensions: zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbalpha\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 FB Alpha",
+      "unique_id": "arc.ra32.fbalpha",
+      "description": "Supported extensions: zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbalpha\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch HBMAME",
+      "unique_id": "arc.ra.hbmame",
+      "description": "Supported extensions: zip, chd, 7z, cmd.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"hbmame\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L hbmame_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L hbmame_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L hbmame_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 HBMAME",
+      "unique_id": "arc.ra64.hbmame",
+      "description": "Supported extensions: zip, chd, 7z, cmd.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"hbmame\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 HBMAME",
+      "unique_id": "arc.ra32.hbmame",
+      "description": "Supported extensions: zip, chd, 7z, cmd.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"hbmame\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch MAME (Current)",
+      "unique_id": "arc.ra.mame",
+      "description": "Supported extensions: cmd, zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L mame_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L mame_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L mame_libretro.dylib \"{file.path}\""
+        }
+      }
     }
   ],
   "neosync": {

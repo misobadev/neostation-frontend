@@ -58,6 +58,15 @@ class LinuxEmulatorDiscovery {
     _launchersDirProbed = false;
   }
 
+  /// Stands in for the host platform under test.
+  ///
+  /// Discovery is Linux-only in production, but its resolution order is pure
+  /// path probing and has to be exercisable on any CI host (macOS included).
+  @visibleForTesting
+  static bool linuxOverride = false;
+
+  static bool get _isLinux => linuxOverride || Platform.isLinux;
+
   /// Resolves an absolute, existing path to an emulator executable, or `null`
   /// when none of the known locations hold it.
   ///
@@ -70,7 +79,7 @@ class LinuxEmulatorDiscovery {
     String? flatpakId,
     String? emudeckLauncher,
   }) async {
-    if (!Platform.isLinux) return null;
+    if (!_isLinux) return null;
 
     final cacheKey = '$executable|$flatpakId|$emudeckLauncher';
     if (_resolveCache.containsKey(cacheKey)) return _resolveCache[cacheKey];

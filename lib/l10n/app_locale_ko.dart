@@ -42,7 +42,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.directories: '폴더',
   AppLocale.themes: '테마',
   AppLocale.systemArt: '시스템 아트',
-  AppLocale.systemArtSubtitle: '시스템 아트 팩으로 시스템 카드의 배경과 로고를 꾸밉니다',
+  AppLocale.systemArtSubtitle: '시스템 아트 팩으로 시스템 카드의 배경을 꾸밉니다',
   AppLocale.systemArtNone: '없음',
   AppLocale.systemArtNoneSubtitle: '기본 디자인',
   AppLocale.systemArtLoading: '시스템 아트 불러오는 중...',
@@ -53,6 +53,14 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.systemArtRedownloadBody:
       '캐시된 팩을 삭제하고 다시 다운로드합니다. 일부 시스템 배경이 표시되지 않을 때 사용하세요.',
   AppLocale.systemArtDownloading: '시스템 아트 팩 다운로드 중...',
+  AppLocale.systemArtByAuthor: '{author} 제작',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '다운로드 {count}회',
+  AppLocale.systemArtSystemsCovered: '{count}개 시스템',
+  AppLocale.systemArtSupport: '후원하기',
+  AppLocale.systemArtApplied: '적용됨',
+  AppLocale.systemArtHideLogos: '시스템 로고 숨기기',
+  AppLocale.systemArtHideLogosSubtitle: '배경에 이미 로고가 포함된 경우 시스템 카드의 로고를 숨깁니다',
   AppLocale.about: '소개',
   AppLocale.exit: '종료',
   AppLocale.launcher: '런처',
@@ -197,12 +205,10 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.showSyncTabSubtitle: '내비게이션 바에 NeoSync 탭을 표시합니다',
   AppLocale.showAchievementsTab: '업적 탭 표시',
   AppLocale.showAchievementsTabSubtitle: '내비게이션 바에 RetroAchievements 탭을 표시합니다',
-  AppLocale.showScraperTab: '스크레이퍼 탭 표시',
-  AppLocale.showScraperTabSubtitle: '내비게이션 바에 스크래핑 탭을 표시합니다',
   AppLocale.showRommTab: 'RomM 탭 표시',
   AppLocale.showRommTabSubtitle: '내비게이션 바에 RomM 탭을 표시합니다',
-  AppLocale.showSearchTab: '검색 탭 표시',
-  AppLocale.showSearchTabSubtitle: '내비게이션 바에 검색 탭을 표시합니다',
+  AppLocale.searchCard: '검색 카드',
+  AppLocale.searchCardSubtitle: '시스템 그리드에 검색 카드를 표시합니다',
 
   AppLocale.configureDirectories: '폴더',
   AppLocale.configureRomsFolder: 'ROM 폴더 설정',
@@ -280,6 +286,10 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.thankYou: 'NeoStation을 이용해 주셔서 감사합니다!',
   AppLocale.visitWebsite: '공식 웹사이트 방문',
   AppLocale.joinCommunity: '커뮤니티 참여 및 지원받기',
+  AppLocale.exportLogs: '로그 내보내기',
+  AppLocale.exportLogsDesc: '버그 신고용. 파일 경로와 게임 이름이 포함됩니다.',
+  AppLocale.exportLogsSaved: '로그를 {path}에 저장했습니다',
+  AppLocale.exportLogsFailed: '로그를 내보낼 수 없습니다',
   AppLocale.specialThanks: '특별 감사',
   AppLocale.forInvaluableContributions: '소중한 기여에 감사드립니다',
   AppLocale.supportOnKofi: 'Ko-fi에서 후원하기',
@@ -454,16 +464,12 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.applyToAll: '모든 충돌에 적용',
   AppLocale.applyToAllDesc: '남아 있는 모든 충돌에 같은 선택을 적용합니다',
 
-  AppLocale.account: '계정',
   AppLocale.scraping: '게임 정보 가져오기',
   AppLocale.scrapeMode: '가져오기 방식',
-  AppLocale.scrapeModeSub: '가져올 콘텐츠 범위를 선택합니다',
   AppLocale.media: '미디어',
-  AppLocale.mediaSub: '다운로드할 미디어 종류를 선택합니다',
   AppLocale.language: '언어',
   AppLocale.languageSub: '게임 정보에 사용할 언어를 선택합니다',
   AppLocale.preferredLanguage: '선호 언어',
-  AppLocale.region: '지역',
   AppLocale.regionSub: '게임 정보를 가져올 때의 지역 우선순위를 설정합니다',
   AppLocale.regionPriority: '지역 우선순위',
   AppLocale.regionPrioritySub:
@@ -480,9 +486,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.logoutError: '로그아웃 중 오류 발생',
   AppLocale.newContentOnly: '새 콘텐츠만',
   AppLocale.allContent: '모든 콘텐츠',
-  AppLocale.scrapeModeUpdated: '가져오기 방식 변경:',
   AppLocale.scrapeModeError: '스크랩 모드를 업데이트하는 중에 오류가 발생했습니다',
-  AppLocale.languageUpdated: '언어가 업데이트되었습니다',
   AppLocale.languageError: '언어를 업데이트하는 중에 오류가 발생했습니다',
   AppLocale.mediaSettingsError: '미디어 설정을 저장하는 중에 오류가 발생했습니다',
   AppLocale.newContentOnlyDesc: '게임 정보가 완전하지 않은 게임만 가져옵니다',
@@ -653,7 +657,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.cancelScan: '스캔 취소',
   AppLocale.progress: '진행상황',
   AppLocale.raLogin: 'RetroAchievements 로그인',
-  AppLocale.raOfflineBanner: '오프라인 — 마지막으로 동기화된 업적을 표시합니다',
+  AppLocale.raOfflineBanner: '오프라인 — 마지막으로 동기화된 업적을 표시합니다. 다시 시도하는 중…',
   AppLocale.raWhatIs: 'RetroAchievements란?',
   AppLocale.raDescription:
       'RetroAchievements는 에뮬레이터로 즐기는 고전 게임에 업적 기능을 제공하는 커뮤니티 서비스입니다.',
@@ -698,6 +702,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.requiresFreeAccount: '무료 계정 필요',
   AppLocale.createAccountAt: '계정 만들기: ',
   AppLocale.toGetCredentials: ' 에서 계정 정보를 발급받으세요.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
+  AppLocale.metadata: '메타데이터',
   AppLocale.screenScraperLogin: 'ScreenScraper 로그인',
   AppLocale.scanningSystemsRoms: '시스템 및 ROM을 스캔하는 중...',
   AppLocale.ofSystems: '{scanned}/{total}개 시스템',
@@ -1140,15 +1146,15 @@ const Map<String, dynamic> appLocaleKo = {
       '이미 ES-DE를 사용 중이신가요? 게임 메타데이터와 아트워크를 가져오세요. '
       '"gamelists"와 "downloaded_media" 폴더가 포함된 ES-DE 메인 폴더를 '
       '선택하세요. 선택 사항이며, 나중에 설정에서 실행할 수 있습니다.',
-  AppLocale.wizardArtPackTitle: 'NeoStation 아트 팩 받기',
+  AppLocale.wizardArtPackTitle: 'System Art Pack 받기',
   AppLocale.wizardArtPackDesc:
-      '라이브러리 전체에 아름다운 콘솔 배경을 제공하는 NeoStation 시스템 '
-      '아트 팩 다운로드를 적극 권장합니다. 나중에 설정에서 변경할 수 있습니다.',
-  AppLocale.wizardDownloadArtPack: '아트 팩 다운로드',
+      '라이브러리 전체에 아름다운 콘솔 배경을 제공하는 System Art Pack(SAP) '
+      '다운로드를 적극 권장합니다. 나중에 설정에서 변경할 수 있습니다.',
+  AppLocale.wizardDownloadArtPack: 'System Art Pack 다운로드',
   AppLocale.wizardArtPackInstalled:
-      '아트 팩이 설치되었습니다! 나중에 설정에서 더 많은 테마를 살펴볼 수 있습니다.',
+      'System Art Pack이 설치되었습니다! 나중에 설정에서 더 많은 팩을 살펴볼 수 있습니다.',
   AppLocale.wizardArtPackUnavailable:
-      '현재 아트 팩에 접근할 수 없습니다. 온라인 상태가 되면 설정에서 설치할 수 있습니다.',
+      '현재 System Art Pack에 접근할 수 없습니다. 온라인 상태가 되면 설정에서 설치할 수 있습니다.',
 
   // Library search & filtering.
   AppLocale.searchTitle: '검색',
@@ -1165,16 +1171,12 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.filterGenre: '장르',
   AppLocale.filterRating: '평점',
   AppLocale.filterYear: '연도',
-  AppLocale.filterAchievements: '업적',
-  AppLocale.raCoverageMatched: '있음',
-  AppLocale.raCoverageNoSet: '없음',
   AppLocale.raCoverageUnknown: '알 수 없음',
   AppLocale.filterAny: '전체',
   AppLocale.filterSource: '출처',
   AppLocale.sourceLocal: '이 기기',
   AppLocale.searchRatingLocalOnly: '평점 필터는 로컬 게임에만 적용됩니다',
   AppLocale.searchNoRommEquivalent: 'RomM에 ‘{value}’로 분류된 항목이 없습니다',
-  AppLocale.searchAchievementsLocalOnly: '업적 필터는 로컬 게임에만 적용됩니다',
 
   // Hide / unhide games
   AppLocale.hideGame: '게임 숨기기',

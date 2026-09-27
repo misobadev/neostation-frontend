@@ -5,18 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'config_service.dart';
 import 'logger_service.dart';
+import '../utils/app_config.dart';
 import '../utils/bounded_concurrency.dart';
-
-/// Assets are served from the repository's `dist/` tree, not the source tree:
-/// CI re-encodes every image there against an SSIMULACRA2 floor of 80, which
-/// is the same pack at ~40% of the bytes. It is a complete mirror (same folder
-/// layout, same filenames), rebuilt and committed by the single-writer
-/// `optimize-assets` workflow on every push that touches the source art — the
-/// same workflow that already generates the `systems` list in each
-/// `theme.json`, so this adds no new dependency on CI having run.
-const _baseRaw =
-    'https://raw.githubusercontent.com/misobadev/neostation-assets/main/dist';
-const _manifestUrl = '$_baseRaw/manifest.json';
 
 final _log = LoggerService.instance;
 
@@ -47,71 +37,70 @@ class AssetFetchResult {
   bool get isNotFound => status == AssetFetchStatus.notFound;
 }
 
-/// Represents a plan for downloading or updating theme assets.
-class ThemeDownloadPlan {
-  /// Whether a full redownload is required due to a version mismatch.
-  final bool forceRedownload;
-
-  /// The total number of individual asset files that need to be fetched.
-  final int totalAssetsToDownload;
-
-  /// The version string of the theme currently stored locally.
-  final String? localVersion;
-
-  /// The version string of the theme available on the remote repository.
-  final String? remoteVersion;
-
-  /// Full metadata retrieved from the remote theme configuration.
-  final Map<String, dynamic>? remoteMetadata;
-
-  /// The system folders whose backgrounds this theme actually provides,
-  /// intersected with the user's systems. When the theme declares a `systems`
-  /// list in `theme.json` this excludes uncovered systems entirely (no 404
-  /// probes); otherwise it falls back to all of the user's systems.
-  final List<String> systemsToDownload;
-
-  const ThemeDownloadPlan({
-    required this.forceRedownload,
-    required this.totalAssetsToDownload,
-    required this.localVersion,
-    required this.remoteVersion,
-    required this.remoteMetadata,
-    required this.systemsToDownload,
-  });
-}
-
-/// Model representing a theme available in the NeoStation assets repository.
+/// A system art pack as listed by the NeoAssets catalog (`GET /api/v1/packs`).
 class NeoAssetsTheme {
-  /// Display name of the theme.
+  /// Display name of the pack.
   final String name;
 
-  /// The unique folder identifier for the theme.
+  /// The unique folder identifier for the pack.
   final String folder;
 
-  /// The direct URL to the theme's preview image.
+  /// Who made the pack.
+  final String author;
+
+  /// Short description shown in the list.
+  final String description;
+
+  /// Donation/support URL (usually Ko-fi, sometimes another profile).
+  final String donationUrl;
+
+  /// The pack version string.
+  final String version;
+
+  /// The direct CDN URL to the pack's preview image.
   final String previewUrl;
 
-  /// The raw source path or URL for the preview image.
-  final String previewSource;
+  /// The first four background image URLs (CDN), used by the list mosaic.
+  final List<String> backgrounds;
 
-  /// Whether the theme assets were generated using AI.
+  /// How many times the pack has been downloaded.
+  final int downloads;
+
+  /// How many systems the pack ships art for.
+  final int systemsCovered;
+
+  /// Whether the pack art was generated using AI.
   final bool isAi;
 
   const NeoAssetsTheme({
     required this.name,
     required this.folder,
+    required this.author,
+    required this.description,
+    required this.donationUrl,
+    required this.version,
     required this.previewUrl,
-    required this.previewSource,
+    required this.backgrounds,
+    required this.downloads,
+    required this.systemsCovered,
     required this.isAi,
   });
 
   factory NeoAssetsTheme.fromJson(Map<String, dynamic> json) {
-    final previewSource = json['preview']?.toString().trim() ?? '';
     return NeoAssetsTheme(
       name: json['name']?.toString() ?? '',
       folder: json['folder']?.toString() ?? '',
-      previewUrl: _resolvePreviewUrl(previewSource),
-      previewSource: previewSource,
+      author: json['author']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      donationUrl: json['donation_url']?.toString().trim() ?? '',
+      version: json['version']?.toString() ?? '',
+      previewUrl: normalizePreviewUrl(json['preview']?.toString() ?? ''),
+      backgrounds: (json['backgrounds'] as List? ?? [])
+          .map((e) => normalizePreviewUrl(e.toString()))
+          .where((url) => url.isNotEmpty)
+          .toList(),
+      downloads: _parseInt(json['downloads']),
+      systemsCovered: _parseInt(json['systems_covered']),
       isAi: _parseAi(json['ai']),
     );
   }
@@ -119,17 +108,47 @@ class NeoAssetsTheme {
   NeoAssetsTheme copyWith({
     String? name,
     String? folder,
+    String? author,
+    String? description,
+    String? donationUrl,
+    String? version,
     String? previewUrl,
-    String? previewSource,
+    List<String>? backgrounds,
+    int? downloads,
+    int? systemsCovered,
     bool? isAi,
   }) {
     return NeoAssetsTheme(
       name: name ?? this.name,
       folder: folder ?? this.folder,
+      author: author ?? this.author,
+      description: description ?? this.description,
+      donationUrl: donationUrl ?? this.donationUrl,
+      version: version ?? this.version,
       previewUrl: previewUrl ?? this.previewUrl,
-      previewSource: previewSource ?? this.previewSource,
+      backgrounds: backgrounds ?? this.backgrounds,
+      downloads: downloads ?? this.downloads,
+      systemsCovered: systemsCovered ?? this.systemsCovered,
       isAi: isAi ?? this.isAi,
     );
+  }
+
+  /// The images shown in the list mosaic: the preview plus the first three
+  /// backgrounds, de-duplicated and capped at four.
+  List<String> get mosaicImages {
+    final images = <String>[];
+    if (previewUrl.isNotEmpty) images.add(previewUrl);
+    for (final background in backgrounds) {
+      if (images.length >= 4) break;
+      if (!images.contains(background)) images.add(background);
+    }
+    return images.take(4).toList();
+  }
+
+  static int _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   /// Parses various dynamic types into a boolean flag for AI attribution.
@@ -143,92 +162,131 @@ class NeoAssetsTheme {
     return false;
   }
 
-  /// Resolves raw preview strings into usable image URLs, including GitHub blob
-  /// translation and WebP conversion heuristics.
-  static String _resolvePreviewUrl(dynamic rawPreview) {
-    final preview = rawPreview?.toString().trim() ?? '';
-    if (preview.isEmpty) return '';
-
-    final uri = Uri.tryParse(preview);
-    if (uri != null && uri.hasScheme) {
-      if (uri.host == 'github.com' && uri.pathSegments.length >= 5) {
-        final segments = uri.pathSegments;
-        if (segments[2] == 'blob') {
-          final owner = segments[0];
-          final repo = segments[1];
-          final branch = segments[3];
-          final filePath = segments.sublist(4).join('/');
-          return _forceWebpPreviewUrl(
-            'https://raw.githubusercontent.com/$owner/$repo/$branch/$filePath',
-          );
-        }
-      }
-      return _forceWebpPreviewUrl(preview);
-    }
-
-    final normalizedPath = preview.startsWith('/')
-        ? preview.substring(1)
-        : preview;
-    return _forceWebpPreviewUrl('$_baseRaw/$normalizedPath');
-  }
-
-  /// Appends or replaces the image extension with .webp if it's a standard format.
-  static String _forceWebpPreviewUrl(String url) {
-    final uri = Uri.tryParse(url);
-    if (uri == null || !uri.hasScheme) return url;
-
-    final path = uri.path;
-    final lowerPath = path.toLowerCase();
-    if (!lowerPath.endsWith('.jpg') &&
-        !lowerPath.endsWith('.jpeg') &&
-        !lowerPath.endsWith('.png')) {
-      return url;
-    }
-
-    final newPath = path.replaceFirst(
-      RegExp(r'\.(jpg|jpeg|png)$', caseSensitive: false),
-      '.webp',
-    );
-    return uri.replace(path: newPath).toString();
-  }
-
-  /// Public preview-URL normalizer shared by the UIs (system-art settings grid
-  /// and the setup wizard) so they render the exact same image. Handles legacy
-  /// embedded-GitHub URLs, GitHub blob→raw translation, and WebP conversion.
+  /// Resolves a raw pack image path into an absolute CDN URL.
+  ///
+  /// The catalog returns relative object keys (`packs/<folder>/backgrounds/x.webp`)
+  /// while the download endpoint returns absolute URLs; both are accepted.
   static String normalizePreviewUrl(String value) {
-    var url = value.trim();
-    if (url.isEmpty) return '';
+    final raw = value.trim();
+    if (raw.isEmpty) return '';
 
-    // Legacy malformed URLs like:
-    // https://raw.../https://github.com/owner/repo/blob/main/file.webp
-    final embeddedGithub = RegExp(
-      r'https?://github\.com/[^\s]+',
-    ).firstMatch(url);
-    if (embeddedGithub != null) {
-      url = embeddedGithub.group(0)!;
-    }
+    final uri = Uri.tryParse(raw);
+    if (uri != null && uri.hasScheme) return raw;
 
-    final uri = Uri.tryParse(url);
-    if (uri == null || !uri.hasScheme) return url;
-
-    if (uri.host == 'github.com' &&
-        uri.pathSegments.length >= 5 &&
-        uri.pathSegments[2] == 'blob') {
-      final owner = uri.pathSegments[0];
-      final repo = uri.pathSegments[1];
-      final branch = uri.pathSegments[3];
-      final filePath = uri.pathSegments.sublist(4).join('/');
-      return _forceWebpPreviewUrl(
-        'https://raw.githubusercontent.com/$owner/$repo/$branch/$filePath',
-      );
-    }
-
-    return _forceWebpPreviewUrl(url);
+    final normalized = raw.startsWith('/') ? raw.substring(1) : raw;
+    return '${AppConfig.neoAssetsCdnBaseUrl}/$normalized';
   }
 }
 
-/// Service responsible for fetching, downloading, and caching remote assets
-/// (themes, logos, backgrounds) from the NeoStation assets repository.
+/// One file inside a system art pack, as returned by
+/// `GET /api/v1/packs/{folder}/download`.
+class NeoAssetsPackFile {
+  /// `background`, `preview`, ... (currently every file is a background).
+  final String kind;
+
+  /// The system folder name the file belongs to (matches NeoStation's
+  /// `folder_name`, e.g. `neogeo`, `gb`, `snes`).
+  final String systemId;
+
+  /// The on-disk file name, e.g. `neogeo.webp`.
+  final String fileName;
+
+  /// Absolute CDN URL to download the file from.
+  final String url;
+
+  /// File size in bytes.
+  final int size;
+
+  /// MIME type, e.g. `image/webp`.
+  final String mime;
+
+  const NeoAssetsPackFile({
+    required this.kind,
+    required this.systemId,
+    required this.fileName,
+    required this.url,
+    required this.size,
+    required this.mime,
+  });
+
+  factory NeoAssetsPackFile.fromJson(Map<String, dynamic> json) {
+    return NeoAssetsPackFile(
+      kind: json['kind']?.toString() ?? 'background',
+      systemId: json['system_id']?.toString() ?? '',
+      fileName: json['file_name']?.toString() ?? '',
+      url: NeoAssetsTheme.normalizePreviewUrl(json['url']?.toString() ?? ''),
+      size: json['size'] is num ? (json['size'] as num).toInt() : 0,
+      mime: json['mime']?.toString() ?? '',
+    );
+  }
+
+  /// Whether this file is a system background.
+  bool get isBackground => kind == 'background';
+}
+
+/// A fully-resolved system art pack (metadata + files) ready to download.
+class NeoAssetsPack {
+  final String folder;
+  final String name;
+  final String author;
+  final String description;
+  final String donationUrl;
+  final String version;
+  final bool isAi;
+  final int downloads;
+  final int systemsCovered;
+  final List<NeoAssetsPackFile> files;
+
+  const NeoAssetsPack({
+    required this.folder,
+    required this.name,
+    required this.author,
+    required this.description,
+    required this.donationUrl,
+    required this.version,
+    required this.isAi,
+    required this.downloads,
+    required this.systemsCovered,
+    required this.files,
+  });
+
+  factory NeoAssetsPack.fromJson(Map<String, dynamic> json) {
+    return NeoAssetsPack(
+      folder: json['folder']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      author: json['author']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      donationUrl: json['donation_url']?.toString().trim() ?? '',
+      version: json['version']?.toString() ?? '',
+      isAi: NeoAssetsTheme._parseAi(json['ai']),
+      downloads: NeoAssetsTheme._parseInt(json['downloads']),
+      systemsCovered: NeoAssetsTheme._parseInt(json['systems_covered']),
+      files: (json['files'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => NeoAssetsPackFile.fromJson(e.cast<String, dynamic>()))
+          .where((f) => f.fileName.isNotEmpty && f.url.isNotEmpty)
+          .toList(),
+    );
+  }
+
+  /// The metadata persisted next to the downloaded files for offline reuse.
+  Map<String, dynamic> toMetadataJson() {
+    return {
+      'folder': folder,
+      'name': name,
+      'author': author,
+      'description': description,
+      'donation_url': donationUrl,
+      'version': version,
+      'ai': isAi,
+      'downloads': downloads,
+      'systems_covered': systemsCovered,
+    };
+  }
+}
+
+/// Service responsible for fetching, downloading, and caching system art packs
+/// from the public NeoAssets catalog (https://api.neoassets.dev).
 class NeoAssetsService {
   static List<NeoAssetsTheme>? _cachedThemes;
   static String? _cachedThemeDir;
@@ -237,15 +295,33 @@ class NeoAssetsService {
   /// 404-versus-transient-failure split without a network.
   static http.Client _client = http.Client();
 
+  /// How long a single request may take before it is retried.
+  static const Duration _requestTimeout = Duration(seconds: 20);
+
+  /// Attempts per asset before giving up.
+  static const int _maxFetchAttempts = 3;
+
+  /// Base backoff between attempts, multiplied by the attempt number.
+  static const Duration _retryBackoff = Duration(milliseconds: 500);
+
+  /// Max file downloads in flight at once.
+  static const int _downloadConcurrency = 8;
+
+  /// The public catalog listing endpoint.
+  static String get packsUrl => '${AppConfig.neoAssetsApiBaseUrl}/api/v1/packs';
+
+  /// The public download endpoint for one pack (counts a download).
+  static String packDownloadUrl(String folder) =>
+      '${AppConfig.neoAssetsApiBaseUrl}/api/v1/packs/'
+      '${Uri.encodeComponent(folder)}/download';
+
   /// Forgets the resolved theme-cache directory so the next call re-derives it
   /// from the current user-data path.
   ///
   /// [_cacheDir] memoises the path on first use, which is at app start — before
   /// the setup wizard's first step can move the user-data location. Without
   /// this, a wizard that relocates the user data downloads the art pack into
-  /// the *old* folder while the database records the pack at the new one: the
-  /// art shows for the rest of that session and is gone on the next launch,
-  /// with the pack still selected in System Art.
+  /// the *old* folder while the database records the pack at the new one.
   static void resetCacheDir() {
     _cachedThemeDir = null;
   }
@@ -266,76 +342,95 @@ class NeoAssetsService {
     _cachedThemes = null;
   }
 
-  /// Fetches the global manifest of available themes.
+  /// Fetches the catalog of available packs.
   ///
-  /// Tries the remote manifest first (caching it to disk on success), then
-  /// falls back to the last cached manifest when the network is unavailable.
-  /// The result is always floored with locally-downloaded theme folders so an
-  /// already-applied pack stays visible and selectable in the settings list
-  /// even offline — e.g. when NeoStation is the home launcher and cold-starts
-  /// at boot before wifi connects (the manifest fetch fails then, and without
-  /// this fallback the list collapses to just "None" while the theme is in
-  /// fact still applied and rendering from cache).
-  static Future<List<NeoAssetsTheme>> fetchThemes() async {
-    if (_cachedThemes != null) return _cachedThemes!;
+  /// Tries the remote catalog first (caching it to disk on success), then falls
+  /// back to the last cached catalog when the network is unavailable. The
+  /// result is floored with locally-downloaded packs so an already-applied pack
+  /// stays visible and selectable even offline.
+  ///
+  /// [forceRefresh] bypasses the in-memory cache. It is used after applying a
+  /// pack, because the server increments the pack's download count on the
+  /// download request while its response still carries the previous value, so
+  /// the only way to show the new count is to re-read the catalog.
+  static Future<List<NeoAssetsTheme>> fetchThemes({
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _cachedThemes != null) return _cachedThemes!;
 
     final remote = await _fetchRemoteThemes();
     if (remote != null) {
       final merged = await _mergeWithLocalThemes(remote);
+      merged.sort(_byDownloadsThenName);
       _cachedThemes = merged;
       return merged;
     }
 
-    // Offline: last cached manifest, floored by locally downloaded themes.
+    // A refresh that could not reach the network keeps the last known list
+    // rather than dropping it for the on-disk copy.
+    if (forceRefresh && _cachedThemes != null) return _cachedThemes!;
+
     final fallback = await _mergeWithLocalThemes(await _readCachedManifest());
     if (fallback.isNotEmpty) {
-      _log.i('Themes: offline fallback served ${fallback.length} theme(s)');
+      fallback.sort(_byDownloadsThenName);
+      _log.i('Themes: offline fallback served ${fallback.length} pack(s)');
       _cachedThemes = fallback;
       return fallback;
     }
-    return [];
+    return _cachedThemes ?? [];
   }
 
-  /// Fetches and enriches the remote theme manifest, persisting it to disk for
-  /// offline reuse. Returns null on any network failure so callers can fall
-  /// back to the on-disk copy.
+  /// Most-downloaded packs first, then alphabetical by name. Locally-downloaded
+  /// packs that carry no download count sink to the bottom.
+  static int _byDownloadsThenName(NeoAssetsTheme a, NeoAssetsTheme b) {
+    final byDownloads = b.downloads.compareTo(a.downloads);
+    if (byDownloads != 0) return byDownloads;
+    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  }
+
+  /// Fetches the remote pack catalog, persisting it to disk for offline reuse.
+  /// Returns null on any failure so callers can fall back to the on-disk copy.
   static Future<List<NeoAssetsTheme>?> _fetchRemoteThemes() async {
     try {
-      final response = await _client.get(Uri.parse(_manifestUrl));
+      final response = await _client
+          .get(Uri.parse(packsUrl))
+          .timeout(_requestTimeout);
       if (response.statusCode != 200) {
-        _log.w(
-          'Failed to fetch neostation-assets manifest: ${response.statusCode}',
-        );
+        _log.w('Failed to fetch NeoAssets packs: ${response.statusCode}');
         return null;
       }
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      // Persist the raw manifest so the theme list survives offline boots.
-      await _writeCachedManifest(response.body);
-      final baseList = (json['themes'] as List? ?? [])
-          .cast<Map<String, dynamic>>()
-          .map(NeoAssetsTheme.fromJson)
+      final json = jsonDecode(response.body);
+      if (json is! Map<String, dynamic>) return null;
+      final themes = (json['themes'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => NeoAssetsTheme.fromJson(e.cast<String, dynamic>()))
+          .where((t) => t.folder.isNotEmpty)
           .toList();
-      return await Future.wait(
-        baseList.map((theme) async {
-          final metadata = await _fetchThemeMetadata(theme.folder);
-          if (metadata == null) return theme;
-          final metadataAi = NeoAssetsTheme._parseAi(metadata['ai']);
-          if (metadataAi == theme.isAi) return theme;
-          return theme.copyWith(isAi: metadataAi);
+      // Persist with a source marker so a catalog left by the removed GitHub
+      // theme system is never mistaken for this one.
+      await _writeCachedManifest(
+        jsonEncode({
+          'source': _manifestSource,
+          'themes': json['themes'],
+          'total': json['total'],
         }),
       );
+      return themes;
     } catch (e) {
-      _log.e('Error fetching themes: $e');
+      _log.e('Error fetching NeoAssets packs: $e');
       return null;
     }
   }
 
-  /// On-disk path of the cached global manifest.
+  /// Marker written into the cached catalog by this service.
+  static const String _manifestSource = 'neoassets';
+
+  /// On-disk path of the cached catalog.
   static Future<String> _manifestCachePath() async {
     return path.join(await _cacheDir(), 'manifest.json');
   }
 
-  /// Persists the raw manifest JSON body to the theme cache directory.
+  /// Persists the catalog JSON body to the cache directory.
   static Future<void> _writeCachedManifest(String body) async {
     try {
       final file = File(await _manifestCachePath());
@@ -346,16 +441,21 @@ class NeoAssetsService {
     }
   }
 
-  /// Reads the last successfully-fetched manifest from disk. Empty if none.
+  /// Reads the last successfully-fetched catalog from disk. Empty if none.
+  ///
+  /// A catalog written by the removed GitHub theme system has no `source`
+  /// marker and is ignored outright.
   static Future<List<NeoAssetsTheme>> _readCachedManifest() async {
     try {
       final file = File(await _manifestCachePath());
       if (!await file.exists()) return [];
       final json = jsonDecode(await file.readAsString());
       if (json is! Map<String, dynamic>) return [];
+      if (json['source'] != _manifestSource) return [];
       return (json['themes'] as List? ?? [])
-          .cast<Map<String, dynamic>>()
-          .map(NeoAssetsTheme.fromJson)
+          .whereType<Map>()
+          .map((e) => NeoAssetsTheme.fromJson(e.cast<String, dynamic>()))
+          .where((t) => t.folder.isNotEmpty)
           .toList();
     } catch (e) {
       _log.w('Error reading cached manifest: $e');
@@ -363,10 +463,13 @@ class NeoAssetsService {
     }
   }
 
-  /// Builds theme entries from locally-downloaded theme folders (each carries a
-  /// `theme.json`). Guarantees an applied pack appears even if it is absent
-  /// from the cached manifest. Preview URLs are empty (previews are not cached),
-  /// so tiles render with a placeholder — the point is selectability.
+  /// Builds pack entries from locally-downloaded folders (each carries a
+  /// `pack.json`). Guarantees an applied pack appears even if it is absent from
+  /// the cached catalog. Preview URLs are empty (previews are not cached), so
+  /// tiles render a placeholder — the point is selectability.
+  ///
+  /// Only packs downloaded by this service are listed: the legacy `theme.json`
+  /// folders left by the removed GitHub system are ignored.
   static Future<List<NeoAssetsTheme>> _localThemes() async {
     try {
       final dir = Directory(await _cacheDir());
@@ -375,7 +478,7 @@ class NeoAssetsService {
       await for (final entry in dir.list()) {
         if (entry is! Directory) continue;
         final folder = path.basename(entry.path);
-        final metaFile = File(path.join(entry.path, 'theme.json'));
+        final metaFile = File(path.join(entry.path, 'pack.json'));
         if (!await metaFile.exists()) continue;
         try {
           final json = jsonDecode(await metaFile.readAsString());
@@ -385,87 +488,121 @@ class NeoAssetsService {
             NeoAssetsTheme(
               name: (name == null || name.isEmpty) ? folder : name,
               folder: folder,
+              author: json['author']?.toString() ?? '',
+              description: json['description']?.toString() ?? '',
+              donationUrl: json['donation_url']?.toString().trim() ?? '',
+              version: json['version']?.toString() ?? '',
               previewUrl: '',
-              previewSource: '',
+              backgrounds: const [],
+              downloads: NeoAssetsTheme._parseInt(json['downloads']),
+              systemsCovered: NeoAssetsTheme._parseInt(json['systems_covered']),
               isAi: NeoAssetsTheme._parseAi(json['ai']),
             ),
           );
         } catch (_) {
-          // Skip an unreadable theme.json rather than dropping the whole list.
+          // Skip an unreadable metadata file rather than dropping the list.
         }
       }
       return result;
     } catch (e) {
-      _log.w('Error enumerating local themes: $e');
+      _log.w('Error enumerating local packs: $e');
       return [];
     }
   }
 
-  /// Appends any locally-downloaded theme not already present in [base]
-  /// (matched by folder), preserving [base]'s order and preview metadata.
+  /// Appends any locally-downloaded pack not already present in [base],
+  /// matched case-insensitively by folder so a folder-casing difference can
+  /// never produce a duplicate entry. The remote entry wins.
   static Future<List<NeoAssetsTheme>> _mergeWithLocalThemes(
     List<NeoAssetsTheme> base,
   ) async {
     final local = await _localThemes();
     if (local.isEmpty) return base;
-    final seen = base.map((t) => t.folder).toSet();
+    final seen = base.map((t) => t.folder.toLowerCase()).toSet();
     final merged = [...base];
     for (final t in local) {
-      if (seen.add(t.folder)) merged.add(t);
+      if (seen.add(t.folder.toLowerCase())) merged.add(t);
     }
     return merged;
   }
 
-  /// Clears the in-memory theme list cache.
+  /// Clears the in-memory pack list cache.
   static void clearCache() {
     _cachedThemes = null;
   }
 
-  /// Returns the remote URL for a specific system background within a theme.
-  static String getBackgroundUrl(
-    String themeFolder,
-    String systemFolderName, {
-    String ext = 'webp',
-  }) {
-    return '$_baseRaw/themes/$themeFolder/backgrounds/$systemFolderName.$ext';
+  /// Downloads the full file list of a pack, including its metadata.
+  ///
+  /// Returns null when the pack is unreachable, so callers never apply a pack
+  /// they have no art for.
+  static Future<NeoAssetsPack?> fetchPack(String folder) async {
+    try {
+      final response = await _client
+          .get(Uri.parse(packDownloadUrl(folder)))
+          .timeout(_requestTimeout);
+      if (response.statusCode != 200) {
+        _log.w(
+          'Failed to fetch NeoAssets pack "$folder": ${response.statusCode}',
+        );
+        return null;
+      }
+      final json = jsonDecode(response.body);
+      if (json is! Map<String, dynamic>) return null;
+      return NeoAssetsPack.fromJson(json);
+    } catch (e) {
+      _log.e('Error fetching NeoAssets pack "$folder": $e');
+      return null;
+    }
   }
 
-  /// Returns the remote URL for a specific system logo within a theme.
-  static String getLogoUrl(
-    String themeFolder,
-    String systemFolderName, {
-    String ext = 'webp',
-  }) {
-    return '$_baseRaw/themes/$themeFolder/logos/$systemFolderName.$ext';
+  /// Downloads every file of [files] into the pack's cache folder.
+  ///
+  /// Backgrounds land under `<cache>/<folder>/backgrounds/<file_name>` so the
+  /// existing background resolvers keep working; other kinds land at the pack
+  /// root. Returns how many files were cached, so the caller can decide whether
+  /// the pack is usable.
+  static Future<int> downloadPack(
+    String folder,
+    List<NeoAssetsPackFile> files, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final total = files.length;
+    int done = 0;
+    int cached = 0;
+    await runBounded<NeoAssetsPackFile>(
+      files,
+      _downloadConcurrency,
+      (file) async {
+        final localPath = await _fileCachePath(folder, file);
+        final result = await fetchAndCacheAsset(file.url, localPath);
+        if (result.isCached) cached++;
+      },
+      onEach: () => onProgress?.call(++done, total),
+      label: 'NeoAssets pack download',
+    );
+    return cached;
   }
 
-  /// Returns the remote URL for a theme's metadata JSON file.
-  static String getThemeMetadataUrl(String themeFolder) {
-    return '$_baseRaw/themes/$themeFolder/theme.json';
+  /// The local cache path a pack file is written to.
+  static Future<String> _fileCachePath(
+    String folder,
+    NeoAssetsPackFile file,
+  ) async {
+    final dir = await _cacheDir();
+    if (file.isBackground) {
+      return path.join(dir, folder, 'backgrounds', file.fileName);
+    }
+    return path.join(dir, folder, file.fileName);
   }
-
-  /// How long a single asset request may take before it is retried.
-  static const Duration _requestTimeout = Duration(seconds: 20);
-
-  /// Attempts per asset before giving up. Theme packs are ~100 small files
-  /// pulled from a shared CDN, so the odd 429/timeout is routine.
-  static const int _maxFetchAttempts = 3;
-
-  /// Base backoff between attempts, multiplied by the attempt number.
-  static const Duration _retryBackoff = Duration(milliseconds: 500);
 
   /// Downloads a remote asset to the local filesystem.
   ///
   /// Distinguishes a definitive HTTP 404 ([AssetFetchStatus.notFound]) from an
   /// asset that could not be reached right now ([AssetFetchStatus.failed]:
-  /// timeout, socket error, 429, 5xx). Only a 404 proves the theme does not
-  /// ship the file, and only a 404 may be cached as a permanent negative
-  /// result — a flaky request must stay retryable, or one dropped connection
-  /// blanks a system's art for the life of the install.
-  ///
-  /// Bytes land in a sibling `.part` file that is renamed into place only once
-  /// the body is fully written, so an interrupted write can never leave a
-  /// truncated image that later reads as "already cached".
+  /// timeout, socket error, 429, 5xx). Bytes land in a sibling `.part` file
+  /// that is renamed into place only once the body is fully written, so an
+  /// interrupted write can never leave a truncated image that later reads as
+  /// "already cached".
   static Future<AssetFetchResult> fetchAndCacheAsset(
     String url,
     String localPath,
@@ -515,7 +652,7 @@ class NeoAssetsService {
     return const AssetFetchResult(AssetFetchStatus.failed);
   }
 
-  /// Returns the local directory used for theme asset caching.
+  /// Returns the local directory used for pack asset caching.
   static Future<String> _cacheDir() async {
     if (_cachedThemeDir != null) return _cachedThemeDir!;
     final base = await ConfigService.getUserDataPath();
@@ -523,7 +660,7 @@ class NeoAssetsService {
     return _cachedThemeDir!;
   }
 
-  /// Ensures the theme cache directory path is calculated and available.
+  /// Ensures the pack cache directory path is calculated and available.
   static Future<void> ensureCacheDirInitialized() async {
     await _cacheDir();
   }
@@ -537,17 +674,6 @@ class NeoAssetsService {
     final dir = _cachedThemeDir;
     if (dir == null) return null;
     return path.join(dir, themeFolder, 'backgrounds', '$systemFolderName.$ext');
-  }
-
-  /// Synchronous variant of logo path resolution, requires previous initialization.
-  static String? logoCachePathSync(
-    String themeFolder,
-    String systemFolderName, {
-    String ext = 'webp',
-  }) {
-    final dir = _cachedThemeDir;
-    if (dir == null) return null;
-    return path.join(dir, themeFolder, 'logos', '$systemFolderName.$ext');
   }
 
   /// Resolves the cached background path checking both .webp and .gif formats.
@@ -589,356 +715,28 @@ class NeoAssetsService {
     return path.join(dir, themeFolder, 'backgrounds', '$systemFolderName.$ext');
   }
 
-  /// Returns the local cache path for a specific logo.
-  static Future<String> logoCachePath(
-    String themeFolder,
-    String systemFolderName, {
-    String ext = 'webp',
-  }) async {
+  /// Returns the local cache path for a pack's metadata file.
+  static Future<String> packMetadataCachePath(String themeFolder) async {
     final dir = await _cacheDir();
-    return path.join(dir, themeFolder, 'logos', '$systemFolderName.$ext');
+    return path.join(dir, themeFolder, 'pack.json');
   }
 
-  /// Returns the local cache path for a theme's metadata file.
-  static Future<String> themeMetadataCachePath(String themeFolder) async {
-    final dir = await _cacheDir();
-    return path.join(dir, themeFolder, 'theme.json');
-  }
-
-  /// Fetches the metadata JSON for a specific theme from the remote repository.
-  static Future<Map<String, dynamic>?> _fetchThemeMetadata(
-    String themeFolder,
-  ) async {
-    try {
-      final response = await _client.get(
-        Uri.parse(getThemeMetadataUrl(themeFolder)),
-      );
-      if (response.statusCode != 200) {
-        _log.w(
-          'Failed to fetch theme metadata for "$themeFolder": ${response.statusCode}',
-        );
-        return null;
-      }
-      final json = jsonDecode(response.body);
-      if (json is! Map<String, dynamic>) return null;
-      return json;
-    } catch (e) {
-      _log.w('Error fetching theme metadata for "$themeFolder": $e');
-      return null;
-    }
-  }
-
-  /// Reads the version string from the locally cached theme metadata.
-  static Future<String?> readLocalThemeVersion(String themeFolder) async {
-    final json = await readLocalThemeMetadata(themeFolder);
-    return json?['version']?.toString();
-  }
-
-  /// Reads the cached `theme.json` for a theme, or null when it is absent or
-  /// unreadable. Lets a plan fall back to the last known coverage list when
-  /// the remote metadata cannot be reached.
-  static Future<Map<String, dynamic>?> readLocalThemeMetadata(
-    String themeFolder,
-  ) async {
-    try {
-      final metadataPath = await themeMetadataCachePath(themeFolder);
-      final file = File(metadataPath);
-      if (!await file.exists()) return null;
-      final json = jsonDecode(await file.readAsString());
-      if (json is! Map<String, dynamic>) return null;
-      return json;
-    } catch (e) {
-      _log.w('Error reading local theme metadata for "$themeFolder": $e');
-      return null;
-    }
-  }
-
-  /// Persists the theme metadata to the local cache.
-  static Future<void> writeLocalThemeMetadata(
+  /// Persists the pack metadata to the local cache so it survives offline.
+  static Future<void> writeLocalPackMetadata(
     String themeFolder,
     Map<String, dynamic> metadata,
   ) async {
     try {
-      final metadataPath = await themeMetadataCachePath(themeFolder);
+      final metadataPath = await packMetadataCachePath(themeFolder);
       final file = File(metadataPath);
       await file.parent.create(recursive: true);
       await file.writeAsString(jsonEncode(metadata));
     } catch (e) {
-      _log.w('Error writing local theme metadata for "$themeFolder": $e');
+      _log.w('Error writing local pack metadata for "$themeFolder": $e');
     }
   }
 
-  /// Counts the number of theme assets missing from the local cache for a list
-  /// of systems.
-  static Future<int> countMissingThemeAssets(
-    String themeFolder,
-    List<String> systemFolderNames,
-  ) async {
-    int missing = 0;
-    for (final system in systemFolderNames) {
-      if (!await _backgroundCached(themeFolder, system)) {
-        missing++;
-      }
-    }
-    return missing;
-  }
-
-  /// True when a system's background is already cached (`.webp` or `.gif`).
-  ///
-  /// Coverage itself is decided by the theme's declared `systems` list, so an
-  /// uncovered system is never probed and needs no negative-cache marker.
-  static Future<bool> _backgroundCached(
-    String themeFolder,
-    String systemFolderName,
-  ) async {
-    final bgWebp = await backgroundCachePath(themeFolder, systemFolderName);
-    final bgGif = await backgroundCachePath(
-      themeFolder,
-      systemFolderName,
-      ext: 'gif',
-    );
-    return await File(bgWebp).exists() || await File(bgGif).exists();
-  }
-
-  /// Resolves which of the user's systems this theme actually covers.
-  ///
-  /// The theme's declared `systems` list is authoritative: it is generated by
-  /// the same `optimize-assets` workflow that builds the `dist/` tree, so a
-  /// published pack always carries one. Returning the intersection means an
-  /// uncovered system is never probed, which is what makes the old `.missing`
-  /// negative cache unnecessary.
-  ///
-  /// [localMetadata] is the on-disk `theme.json`, used when the remote copy is
-  /// unreachable. If neither declares a list, coverage is empty rather than
-  /// "every system": blind-probing ~100 systems is what the negative cache
-  /// existed to prevent, and a visible "nothing to download" beats silently
-  /// re-probing on every selection.
-  static List<String> _resolveCoveredSystems(
-    Map<String, dynamic>? remoteMetadata,
-    Map<String, dynamic>? localMetadata,
-    List<String> systemFolderNames,
-  ) {
-    final declared = remoteMetadata?['systems'] ?? localMetadata?['systems'];
-    if (declared is! List) {
-      _log.w(
-        'Theme metadata declares no "systems" list; treating the pack as '
-        'covering nothing rather than probing every system',
-      );
-      return const [];
-    }
-    final covered = declared.map((e) => e.toString()).toSet();
-    return systemFolderNames.where(covered.contains).toList();
-  }
-
-  /// Compares local and remote versions to build a prioritized download plan.
-  static Future<ThemeDownloadPlan> buildThemeDownloadPlan(
-    String themeFolder,
-    List<String> systemFolderNames,
-  ) async {
-    // Shed `.missing` markers written by older builds. They could not tell a
-    // 404 from a dropped connection, so an unknown share of them are false
-    // negatives that would keep a system blank forever.
-    await deleteLegacyMissingMarkers();
-
-    final remoteMetadata = await _fetchThemeMetadata(themeFolder);
-    final localMetadata = await readLocalThemeMetadata(themeFolder);
-    final localVersion = localMetadata?['version']?.toString();
-    final remoteVersion = remoteMetadata?['version']?.toString();
-
-    final coveredSystems = _resolveCoveredSystems(
-      remoteMetadata,
-      localMetadata,
-      systemFolderNames,
-    );
-
-    final forceRedownload =
-        localVersion != null &&
-        remoteVersion != null &&
-        localVersion.isNotEmpty &&
-        remoteVersion.isNotEmpty &&
-        localVersion != remoteVersion;
-
-    final totalAssetsToDownload = forceRedownload
-        ? coveredSystems.length
-        : await countMissingThemeAssets(themeFolder, coveredSystems);
-
-    _log.i(
-      'buildThemeDownloadPlan[$themeFolder]: '
-      'localVersion=$localVersion remoteVersion=$remoteVersion '
-      'forceRedownload=$forceRedownload '
-      'covered=${coveredSystems.length}/${systemFolderNames.length} '
-      'missing=$totalAssetsToDownload',
-    );
-
-    return ThemeDownloadPlan(
-      forceRedownload: forceRedownload,
-      totalAssetsToDownload: totalAssetsToDownload,
-      localVersion: localVersion,
-      remoteVersion: remoteVersion,
-      remoteMetadata: remoteMetadata,
-      systemsToDownload: coveredSystems,
-    );
-  }
-
-  /// Retrieves a cached background image, downloading it if necessary.
-  /// Tries .webp first, then falls back to .gif.
-  static Future<String?> getCachedBackground(
-    String themeFolder,
-    String systemFolderName,
-  ) async {
-    final webpPath = await backgroundCachePath(themeFolder, systemFolderName);
-    final webpUrl = getBackgroundUrl(themeFolder, systemFolderName);
-    final webp = await fetchAndCacheAsset(webpUrl, webpPath);
-    if (webp.isCached) return webp.path;
-
-    // A transient webp failure says the server is unreachable, not that the
-    // system is uncovered — probing the legacy gif would only repeat the same
-    // failure (and, applied offline across ~100 systems, double the wait).
-    if (!webp.isNotFound) return _unresolved(themeFolder, systemFolderName);
-
-    final gifPath = await backgroundCachePath(
-      themeFolder,
-      systemFolderName,
-      ext: 'gif',
-    );
-    final gifUrl = getBackgroundUrl(themeFolder, systemFolderName, ext: 'gif');
-    final gif = await fetchAndCacheAsset(gifUrl, gifPath);
-    if (gif.isCached) return gif.path;
-    if (!gif.isNotFound) return _unresolved(themeFolder, systemFolderName);
-
-    // Both formats answered 404 for a system the theme's `systems` list claims
-    // to cover: the metadata has drifted from the published files. Nothing to
-    // cache — the next plan re-reads the list and this corrects itself when
-    // the pack is rebuilt.
-    _log.w(
-      'Theme "$themeFolder" declares "$systemFolderName" but ships no '
-      'background for it (both .webp and .gif returned 404)',
-    );
-    return null;
-  }
-
-  /// Leaves a system unresolved after a transient failure. Deliberately writes
-  /// no marker: the next download plan must retry it, or one flaky request
-  /// during the initial ~100-file download blanks that system's art for good
-  /// (the marker is cleared only by a full theme-version redownload).
-  static String? _unresolved(String themeFolder, String systemFolderName) {
-    _log.w(
-      'Background "$themeFolder/$systemFolderName" unresolved after retries; '
-      'leaving it retryable for the next theme refresh',
-    );
-    return null;
-  }
-
-  /// Retrieves a cached system logo image, downloading it if necessary.
-  static Future<String?> getCachedLogo(
-    String themeFolder,
-    String systemFolderName,
-  ) async {
-    final localPath = await logoCachePath(themeFolder, systemFolderName);
-    final url = getLogoUrl(themeFolder, systemFolderName);
-    return (await fetchAndCacheAsset(url, localPath)).path;
-  }
-
-  /// Max background downloads in flight at once. Theme assets are small,
-  /// independent HTTP GETs, so a bounded pool cuts wall-clock time roughly
-  /// linearly without overwhelming the network or the host.
-  static const int _downloadConcurrency = 8;
-
-  /// Downloads all background and logo assets for a theme, optionally
-  /// forcing a refresh.
-  static Future<void> downloadAllThemeAssets(
-    String themeFolder,
-    List<String> systemFolderNames, {
-    bool forceRedownload = false,
-    void Function(int done, int total)? onProgress,
-  }) async {
-    if (forceRedownload) {
-      await clearThemeCache(themeFolder);
-    }
-
-    final total = systemFolderNames.length;
-    int done = 0;
-    await runBounded<String>(
-      systemFolderNames,
-      _downloadConcurrency,
-      (system) => getCachedBackground(themeFolder, system),
-      onEach: () => onProgress?.call(++done, total),
-    );
-  }
-
-  /// Downloads only the missing background and logo assets for a theme.
-  static Future<void> downloadMissingThemeAssets(
-    String themeFolder,
-    List<String> systemFolderNames, {
-    required int missingTotal,
-    void Function(int done, int total)? onProgress,
-  }) async {
-    if (missingTotal <= 0) return;
-
-    // Skip systems already cached or known to be absent from the theme.
-    final pending = <String>[];
-    for (final system in systemFolderNames) {
-      if (!await _backgroundCached(themeFolder, system)) {
-        pending.add(system);
-      }
-    }
-
-    int done = 0;
-    // getCachedBackground tries .webp then .gif and records a negative-cache
-    // marker when neither exists remotely.
-    await runBounded<String>(
-      pending,
-      _downloadConcurrency,
-      (system) => getCachedBackground(themeFolder, system),
-      onEach: () => onProgress?.call(++done, missingTotal),
-    );
-  }
-
-  /// Sentinel recording that the one-time cleanup of legacy `.missing` markers
-  /// has already run for this install. Lives in the theme cache root, so
-  /// wiping the cache (which re-downloads everything anyway) resets it.
-  static Future<String> _markerCleanupSentinelPath() async {
-    final dir = await _cacheDir();
-    return path.join(dir, '.missing-markers-cleared');
-  }
-
-  /// Deletes every `.missing` marker left by older builds, once per install.
-  ///
-  /// The markers are no longer written or read: coverage now comes from the
-  /// theme's declared `systems` list, so an uncovered system is never probed
-  /// and needs no negative cache. Installs upgraded from an older build still
-  /// carry the files, and a stale marker used to make a system's background
-  /// read as "resolved" and stay permanently blank, so they are swept once.
-  ///
-  /// Called from [buildThemeDownloadPlan] rather than at startup: an install
-  /// that never opens System Art pays nothing.
-  static Future<void> deleteLegacyMissingMarkers() async {
-    try {
-      final sentinel = File(await _markerCleanupSentinelPath());
-      if (await sentinel.exists()) return;
-
-      final dir = Directory(await _cacheDir());
-      int cleared = 0;
-      if (await dir.exists()) {
-        await for (final entity in dir.list(recursive: true)) {
-          if (entity is File && entity.path.endsWith('.missing')) {
-            await entity.delete();
-            cleared++;
-          }
-        }
-      }
-
-      await sentinel.parent.create(recursive: true);
-      await sentinel.writeAsString('');
-      if (cleared > 0) {
-        _log.i('Cleared $cleared legacy .missing marker(s) (no longer used)');
-      }
-    } catch (e) {
-      _log.w('Error clearing legacy .missing markers: $e');
-    }
-  }
-
-  /// Deletes all cached assets for a specific theme folder.
+  /// Deletes all cached assets for a specific pack folder.
   static Future<void> clearThemeCache(String themeFolder) async {
     try {
       final dir = await _cacheDir();

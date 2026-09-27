@@ -20,6 +20,7 @@ import '../../../providers/system_background_provider.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
 import '../../collections_screen/collections_browser_screen.dart';
+import '../../search_screen/search_screen.dart';
 import '../../game_screen/android_apps/android_apps_grid.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
@@ -68,6 +69,7 @@ class MySystemsCarousel extends StatefulWidget {
     this.enableDynamicBackground = true,
     this.selectedItemKey,
     this.showCardCounts = false,
+    this.hideSystemLogos = false,
     this.showChipFor,
   });
 
@@ -112,6 +114,11 @@ class MySystemsCarousel extends StatefulWidget {
   /// it. The systems screen leaves it off — its footer carries the count, as
   /// it does on main.
   final bool showCardCounts;
+
+  /// Whether the cards hide their logo footer and render square. Set by the
+  /// systems screen from the global preference; the collections browser keeps
+  /// the default (its cards carry a name, not a console logo).
+  final bool hideSystemLogos;
 
   /// Whether an entry appears in the bottom indicator strip. Null shows them
   /// all.
@@ -524,6 +531,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           context,
           MaterialPageRoute(builder: (context) => targetScreen),
         );
+      } else if (systemInfo.folderName == SystemFolderNames.search) {
+        // Mirrors the grid's branch, for the same reason as Collections below.
+        await openSearch(context);
       } else if (systemInfo.folderName == SystemFolderNames.collections) {
         // Same branch as the grid's: miss one copy and Collections works in
         // only one of the two systems layouts.
@@ -895,6 +905,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
     final allSystems = _getSystemsList();
+    // When the logo footer is hidden the card is square, so the carousel drops
+    // its reserved footer height and uses square pages.
+    final hideSystemLogos = widget.hideSystemLogos;
 
     if (allSystems.isEmpty) {
       return Center(
@@ -996,7 +1009,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                     key: _carouselKey,
                     itemCount: allSystems.length,
                     initialIndex: _currentIndex,
-                    footerHeight: 60.r,
+                    footerHeight: hideSystemLogos ? 0 : 60.r,
                     // System cards are height-bound (square art + footer)
                     // so ~3.6 of them fit across the screen. With the
                     // default envelope the 4th card is already down to

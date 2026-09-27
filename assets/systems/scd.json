@@ -204,6 +204,100 @@
           "args": "-L picodrive_libretro.dylib \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch BlastEm",
+      "unique_id": "scd.ra.blastem",
+      "description": "Supported extensions: md, gen, smd, 68k, sgd, 32x, sms, gg, sg, sg1, sc, sc3, sf7, col, cue, toc, iso, chd, vgm, vgz, flac, wav, bin, rom, gz.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"blastem\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L blastem_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L blastem_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L blastem_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 BlastEm",
+      "unique_id": "scd.ra64.blastem",
+      "description": "Supported extensions: md, gen, smd, 68k, sgd, 32x, sms, gg, sg, sg1, sc, sc3, sf7, col, cue, toc, iso, chd, vgm, vgz, flac, wav, bin, rom, gz.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"blastem\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 BlastEm",
+      "unique_id": "scd.ra32.blastem",
+      "description": "Supported extensions: md, gen, smd, 68k, sgd, 32x, sms, gg, sg, sg1, sc, sc3, sf7, col, cue, toc, iso, chd, vgm, vgz, flac, wav, bin, rom, gz.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"blastem\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch ClownMDEmu",
+      "unique_id": "scd.ra.clownmdemu",
+      "description": "Supported extensions: bin, md, gen, cue, iso, chd.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"clownmdemu\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L clownmdemu_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L clownmdemu_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L clownmdemu_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 ClownMDEmu",
+      "unique_id": "scd.ra64.clownmdemu",
+      "description": "Supported extensions: bin, md, gen, cue, iso, chd.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"clownmdemu\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 ClownMDEmu",
+      "unique_id": "scd.ra32.clownmdemu",
+      "description": "Supported extensions: bin, md, gen, cue, iso, chd.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"clownmdemu\""
+        }
+      }
     }
   ],
   "neosync": {

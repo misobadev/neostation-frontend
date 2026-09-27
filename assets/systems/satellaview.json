@@ -482,6 +482,53 @@
           "args": "-L mesen-s_libretro.dylib \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch bsnes-jg",
+      "unique_id": "satellaview.ra.bsnes-jg",
+      "description": "Supported extensions: smc, sfc, st, gb, gbc, bs.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"bsnes-jg\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L bsnes-jg_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L bsnes-jg_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L bsnes-jg_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 bsnes-jg",
+      "unique_id": "satellaview.ra64.bsnes-jg",
+      "description": "Supported extensions: smc, sfc, st, gb, gbc, bs.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"bsnes-jg\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 bsnes-jg",
+      "unique_id": "satellaview.ra32.bsnes-jg",
+      "description": "Supported extensions: smc, sfc, st, gb, gbc, bs.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"bsnes-jg\""
+        }
+      }
     }
   ],
   "neosync": {

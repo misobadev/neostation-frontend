@@ -60,9 +60,9 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
 
   /// Calculates the total number of navigable settings (Global Card + Detected Systems).
   int getItemCount(SqliteConfigProvider provider) {
-    // hideRecent + recent card size + favorites + detectedSystems (excluding
-    // favorites to avoid duplication)
-    return 3 +
+    // hideRecent + recent card size + search card + favorites +
+    // detectedSystems (excluding favorites to avoid duplication)
+    return 4 +
         provider.detectedSystems
             .where((s) => s.folderName != SystemFolderNames.favorites)
             .length;
@@ -111,6 +111,14 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
               ? RecentCardSizes.defaultSize
               : RecentCardSizes.twoByOne,
         ),
+      ),
+      _SystemSettingRow(
+        icon: Symbols.search_rounded,
+        title: AppLocale.searchCard.getString(context),
+        subtitle: AppLocale.searchCardSubtitle.getString(context),
+        isEnabled: !provider.config.hideSearchCard,
+        onToggle: () =>
+            provider.updateHideSearchCard(!provider.config.hideSearchCard),
       ),
       _SystemSettingRow(
         icon: Symbols.favorite_rounded,

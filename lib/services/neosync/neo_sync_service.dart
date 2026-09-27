@@ -66,6 +66,7 @@ class NeoSyncService extends ChangeNotifier {
     String fileHash,
     int fileSize, {
     DateTime? localModifiedAt,
+    String? type,
   }) async {
     try {
       final headers = await _getHeaders();
@@ -77,6 +78,10 @@ class NeoSyncService extends ChangeNotifier {
         'hash': fileHash,
         'size': fileSize,
       };
+
+      if (type != null && type.isNotEmpty) {
+        requestBody['type'] = type;
+      }
 
       if (localModifiedAt != null) {
         final timestampMillis = localModifiedAt.millisecondsSinceEpoch;
@@ -151,6 +156,7 @@ class NeoSyncService extends ChangeNotifier {
         fileHash,
         fileBytes.length,
         localModifiedAt: localModifiedAt,
+        type: fileType,
       );
 
       if (!checkResult['needs_sync']) {
@@ -176,6 +182,51 @@ class NeoSyncService extends ChangeNotifier {
       }
 
       if (checkResult['remote_newer']) {
+        // The cloud copy is newer: pull it over the stale local file instead of
+        // reporting a false success. The exact local path is known, so no game
+        // context is needed and it behaves the same on every OS.
+        final metadata = checkResult['metadata'];
+        final cloudId = metadata is Map ? metadata['id']?.toString() : null;
+        if (cloudId != null && cloudId.isNotEmpty) {
+          final download = await downloadFile(cloudId);
+          if (download['success'] == true && download['data'] != null) {
+            final bytes = download['data'] as List<int>;
+            try {
+              if (await file.exists()) {
+                await file.copy('${file.path}.neosync.bak');
+              }
+            } catch (e) {
+              _log.w('Could not back up ${file.path}: $e');
+            }
+            await file.parent.create(recursive: true);
+            await file.writeAsBytes(bytes, flush: true);
+
+            int cloudTime = localModifiedAt.millisecondsSinceEpoch;
+            if (metadata is Map &&
+                metadata['file_modified_at_timestamp'] != null) {
+              final ts = metadata['file_modified_at_timestamp'];
+              if (ts is int) cloudTime = ts;
+              if (ts is String) cloudTime = int.tryParse(ts) ?? cloudTime;
+            }
+            final stat = await file.stat();
+            await SyncRepository.saveSyncState(
+              'neosync',
+              file.path,
+              stat.modified.millisecondsSinceEpoch,
+              cloudTime,
+              stat.size,
+              fileHash: metadata is Map
+                  ? metadata['file_hash']?.toString()
+                  : null,
+            );
+            return {
+              'success': true,
+              'skipped': true,
+              'downloaded': true,
+              'message': 'Remote file is newer, downloaded',
+            };
+          }
+        }
         return {
           'success': true,
           'skipped': true,

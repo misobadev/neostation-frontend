@@ -239,6 +239,24 @@
           "args": "-L yabause_libretro.dylib \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch Kronos",
+      "unique_id": "sat.ra.kronos",
+      "description": "Supported extensions: ccd, chd, cue, iso, mds, zip, m3u.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L kronos_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L kronos_libretro.so \"{file.path}\""
+        }
+      }
     }
   ],
   "neosync": {

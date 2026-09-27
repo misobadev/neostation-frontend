@@ -1,3 +1,5 @@
+import '../models/neo_sync_models.dart';
+
 /// Builds and parses the canonical NeoSync cloud paths.
 ///
 /// Format (applies to both saves and states), always under the `v2/` namespace
@@ -94,6 +96,84 @@ class CloudPathBuilder {
   /// Sanitizes a game name so it can be used as a path segment.
   static String sanitizeGameName(String name) {
     return name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+  }
+
+  /// Canonical, OS-independent key for a save path.
+  ///
+  /// Drops the `saves/`/`states/` root and normalizes separators and case, so
+  /// Windows/macOS (case-insensitive filesystems) and Android/Linux
+  /// (case-sensitive) agree on the identity of a save. This is what lets a save
+  /// stay in sync across every operating system.
+  static String canonicalSaveKey(String rawPath) {
+    var p = rawPath.replaceAll('\\', '/');
+    if (p.startsWith(legacySavePrefix)) {
+      p = p.substring(legacySavePrefix.length);
+    } else if (p.startsWith(legacyStatePrefix)) {
+      p = p.substring(legacyStatePrefix.length);
+    }
+    return p.toLowerCase();
+  }
+
+  /// Canonical NeoSync file kind for [path]: `state`, `shared` or `save`.
+  ///
+  /// Derived only from the file itself, never from the cloud namespace, so the
+  /// same save is classified identically on every device and OS.
+  static String syncTypeForPath(String path, {required bool isState}) {
+    if (isState) return 'state';
+    final lower = path.toLowerCase();
+    final isSharedCard =
+        lower.endsWith('.ps2') ||
+        lower.endsWith('.mcr') ||
+        lower.endsWith('.mcd') ||
+        lower.endsWith('.vmu') ||
+        lower.endsWith('.vmp') ||
+        lower.contains('vmu_save');
+    return isSharedCard ? 'shared' : 'save';
+  }
+
+  /// Whether [cloudPath] refers to the same save as the local [localPath].
+  ///
+  /// The `type` is cross-checked against the local `saves/`/`states/` root so a
+  /// save and a save state that share a basename never match each other.
+  static bool cloudMatchesLocalPath(
+    String cloudPath,
+    String localPath, {
+    required String cloudType,
+  }) {
+    if (canonicalSaveKey(cloudPath) != canonicalSaveKey(localPath)) {
+      return false;
+    }
+    final localIsState = localPath
+        .replaceAll('\\', '/')
+        .toLowerCase()
+        .startsWith(legacyStatePrefix);
+    return localIsState ? cloudType == 'state' : cloudType != 'state';
+  }
+
+  /// Collapses cloud rows that represent the same logical save (same canonical
+  /// path + kind) keeping the one with the newest content.
+  ///
+  /// Legacy duplicate rows (from the unstable cloud namespace) must never make
+  /// the client pick an older version just because it was uploaded later.
+  static List<NeoSyncFile> dedupeCloudFiles(List<NeoSyncFile> files) {
+    final byKey = <String, NeoSyncFile>{};
+    for (final file in files) {
+      final pathKey = file.filePath.isNotEmpty ? file.filePath : file.fileName;
+      final key = '${canonicalSaveKey(pathKey)}|${file.type}';
+      final current = byKey[key];
+      if (current == null) {
+        byKey[key] = file;
+        continue;
+      }
+      final currentTs = current.fileModifiedAtTimestamp ?? 0;
+      final candidateTs = file.fileModifiedAtTimestamp ?? 0;
+      if (candidateTs > currentTs ||
+          (candidateTs == currentTs &&
+              file.uploadedAt.isAfter(current.uploadedAt))) {
+        byKey[key] = file;
+      }
+    }
+    return byKey.values.toList();
   }
 
   /// Derives a RetroArch core slug from the core identifier or display name.

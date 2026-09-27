@@ -7,6 +7,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_locale.dart';
+import '../../services/game_service.dart';
 import '../../models/retro_achievements_dashboard_models.dart';
 import '../../models/retro_achievements_gotw.dart';
 import '../../models/retro_achievements_user_awards.dart';
@@ -43,6 +44,34 @@ class RADashboardHubState extends State<RADashboardHub> {
   /// Timer used to avoid starting heavy dashboard network loads when the user
   /// is just quickly passing through this tab.
   Timer? _dashboardLoadTimer;
+
+  /// Re-check while the offline banner is up, as well as on tab entry.
+  ///
+  /// Entering the tab is the app's refresh gesture, which covers the player
+  /// who opens RetroAchievements after the network is back. It does nothing
+  /// for the player already sitting on the tab when it comes back — and on a
+  /// handheld that is the normal case, because the tab is where they were when
+  /// they powered the device on. Observed on an AYN Thor: Wi-Fi associated
+  /// four and a half minutes after boot, long after every startup retry had
+  /// given up, and the banner stayed until the tab was left and re-entered.
+  ///
+  /// Armed only while [RetroAchievementsProvider.isOffline] — a state the
+  /// player wants resolved — so a healthy session never polls.
+  ///
+  /// The interval widens after each failed check. A flat 30s would be right
+  /// for a Wi-Fi outage that lasts a minute and wrong for everything else:
+  /// RetroAchievements answering 5xx (an outage) marks the key stale just as a
+  /// dropped network does, and a 4xx — 429 rate limiting included — leaves an
+  /// already-stale key marked, so a fixed interval would have every open tab
+  /// asking twice a minute for as long as the outage lasted. Reset on success.
+  static const List<Duration> _offlineRecheckBackoff = [
+    Duration(seconds: 30),
+    Duration(seconds: 60),
+    Duration(minutes: 2),
+    Duration(minutes: 5),
+  ];
+  int _offlineRecheckStep = 0;
+  Timer? _offlineRecheckTimer;
 
   /// The provider this hub is subscribed to, and the invalidation generation
   /// it has already acted on. Watching the generation is what makes a refresh
@@ -168,6 +197,12 @@ class RADashboardHubState extends State<RADashboardHub> {
     // and the stamp is what stops a second entry starting a duplicate run
     // while this one is still going.
     provider.markDashboardAttempted();
+    // Only while the session itself is stale, so this costs two extra requests
+    // on a cold-boot launch and none afterwards. Without it the profile and
+    // summary read at sign-in stay marked as served-from-cache for the life of
+    // the process — nothing else re-reads them — and the offline banner
+    // survived long after the network came back (issue #482).
+    if (provider.isOffline) await provider.revalidateSession();
     // Load sequentially rather than with Future.wait: firing every RA endpoint
     // at once trips the rate limiter (HTTP 429). AOTW goes first because it is
     // the dashboard's primary task; each section still resolves independently.
@@ -187,8 +222,11 @@ class RADashboardHubState extends State<RADashboardHub> {
       _provider = provider;
       _seenCacheGeneration = provider.cacheGeneration;
       provider.addListener(_onProviderChanged);
+      GameService.deviceScreenOn.removeListener(_onScreenPowerChanged);
+      GameService.deviceScreenOn.addListener(_onScreenPowerChanged);
     }
     _resolveRommWeekGame(provider);
+    _syncOfflineRecheck(provider);
     // Entering the tab re-reads anything past its staleness window, which is
     // what stands in for a refresh control: leaving and coming back is the
     // gesture. Without it the dashboard was a once-per-app-session snapshot —
@@ -214,6 +252,7 @@ class RADashboardHubState extends State<RADashboardHub> {
     final provider = _provider;
     if (provider == null || !mounted) return;
     _resolveRommWeekGame(provider);
+    _syncOfflineRecheck(provider);
     if (provider.cacheGeneration == _seenCacheGeneration) return;
     _seenCacheGeneration = provider.cacheGeneration;
     if (!provider.isConnected) return;
@@ -223,9 +262,92 @@ class RADashboardHubState extends State<RADashboardHub> {
     _loadDashboard(provider);
   }
 
+  /// Arms the re-check while the session is stale and disarms it once it is
+  /// live, so the timer exists only for as long as it has something to fix.
+  void _syncOfflineRecheck(RetroAchievementsProvider provider) {
+    if (provider.isOffline) {
+      _armOfflineRecheck();
+    } else {
+      _offlineRecheckStep = 0;
+      _cancelOfflineRecheck();
+    }
+  }
+
+  /// Schedules the next check, unless the screen is off.
+  ///
+  /// NeoStation runs as a HOME launcher, so the activity is never paused when
+  /// the device locks: without this gate a tab left open with the banner up
+  /// would poll RetroAchievements all night behind a dark screen, which is the
+  /// regression #451 fixed for the in-game poll. Nothing is missed by waiting
+  /// — the player cannot see the banner either — and [_onScreenPowerChanged]
+  /// rearms on wake.
+  void _armOfflineRecheck() {
+    _offlineRecheckTimer?.cancel();
+    if (!GameService.deviceScreenOn.value) {
+      _offlineRecheckTimer = null;
+      return;
+    }
+    final delay =
+        _offlineRecheckBackoff[_offlineRecheckStep.clamp(
+          0,
+          _offlineRecheckBackoff.length - 1,
+        )];
+    _offlineRecheckTimer = Timer(delay, _recheckOffline);
+  }
+
+  void _cancelOfflineRecheck() {
+    _offlineRecheckTimer?.cancel();
+    _offlineRecheckTimer = null;
+  }
+
+  void _onScreenPowerChanged() {
+    if (!mounted) return;
+    final provider = _provider;
+    if (provider == null) return;
+    if (GameService.deviceScreenOn.value && provider.isOffline) {
+      // Waking up is itself a moment worth checking: the network may have come
+      // back while the screen was off.
+      _offlineRecheckStep = 0;
+      _armOfflineRecheck();
+    } else {
+      _cancelOfflineRecheck();
+    }
+  }
+
+  Future<void> _recheckOffline() async {
+    final provider = _provider;
+    if (provider == null || !mounted) return;
+    if (!provider.isOffline) {
+      _offlineRecheckStep = 0;
+      return;
+    }
+    if (provider.isDashboardLoading) {
+      _armOfflineRecheck();
+      return;
+    }
+
+    if (!await provider.revalidateSession()) {
+      if (!mounted) return;
+      // Still stale: wait longer before the next one.
+      if (_offlineRecheckStep < _offlineRecheckBackoff.length - 1) {
+        _offlineRecheckStep++;
+      }
+      _armOfflineRecheck();
+      return;
+    }
+
+    if (!mounted) return;
+    _offlineRecheckStep = 0;
+    // The session is live again, but every section on screen is still the copy
+    // that was replayed from disk, so re-read them too.
+    await _loadDashboard(provider);
+  }
+
   @override
   void dispose() {
     _dashboardLoadTimer?.cancel();
+    _cancelOfflineRecheck();
+    GameService.deviceScreenOn.removeListener(_onScreenPowerChanged);
     _provider?.removeListener(_onProviderChanged);
     super.dispose();
   }

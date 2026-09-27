@@ -205,6 +205,53 @@
           "args": "-L frodo_libretro.dylib \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch VICE xscpu64",
+      "unique_id": "c64.ra.vice_xscpu64",
+      "description": "Supported extensions: d64, d71, d80, d81, d82, g64, g41, x64, t64, tap, prg, p00, crt, bin, zip, gz, d6z, d7z, d8z, g6z, g4z, x6z, cmd, m3u, vfl, vsf, nib, nbz, d2m, d4m, /.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"vice_xscpu64\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L vice_xscpu64_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L vice_xscpu64_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L vice_xscpu64_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 VICE xscpu64",
+      "unique_id": "c64.ra64.vice_xscpu64",
+      "description": "Supported extensions: d64, d71, d80, d81, d82, g64, g41, x64, t64, tap, prg, p00, crt, bin, zip, gz, d6z, d7z, d8z, g6z, g4z, x6z, cmd, m3u, vfl, vsf, nib, nbz, d2m, d4m, /.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"vice_xscpu64\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 VICE xscpu64",
+      "unique_id": "c64.ra32.vice_xscpu64",
+      "description": "Supported extensions: d64, d71, d80, d81, d82, g64, g41, x64, t64, tap, prg, p00, crt, bin, zip, gz, d6z, d7z, d8z, g6z, g4z, x6z, cmd, m3u, vfl, vsf, nib, nbz, d2m, d4m, /.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"vice_xscpu64\""
+        }
+      }
     }
   ],
   "neosync": {

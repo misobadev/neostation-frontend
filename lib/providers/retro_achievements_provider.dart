@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/logger_service.dart';
 import '../models/retro_achievements_user.dart';
@@ -20,9 +21,15 @@ import 'retro_achievements_credentials.dart';
 /// Handles user authentication, profile synchronization, achievement progress
 /// tracking, and ROM identification via console-specific hashing algorithms.
 class RetroAchievementsProvider extends ChangeNotifier {
-  RetroAchievementsProvider() {
+  RetroAchievementsProvider({this.sessionHttpClient}) {
     GameSessionManager.addSessionEndListener(invalidateCachedReads);
   }
+
+  /// HTTP client for the two session reads (profile and summary). Null in the
+  /// app, where the service uses its own; tests swap it between phases to take
+  /// the network away and give it back.
+  @visibleForTesting
+  http.Client? sessionHttpClient;
 
   @override
   void dispose() {
@@ -32,6 +39,19 @@ class RetroAchievementsProvider extends ChangeNotifier {
 
   static const String _dashboardApiKeyError =
       'A RetroAchievements web API key is required for this dashboard data.';
+
+  /// How long to keep reaching for the API after signing in from the offline
+  /// cache. A handheld's Wi-Fi associates anywhere between a few seconds and
+  /// a few minutes after power-on, so the schedule widens rather than
+  /// repeating one short delay; past the end of it, entering the tab and the
+  /// dashboard's own re-check take over.
+  static const List<Duration> _liveRetryBackoff = [
+    Duration(seconds: 4),
+    Duration(seconds: 8),
+    Duration(seconds: 15),
+    Duration(seconds: 30),
+    Duration(seconds: 60),
+  ];
 
   static const String _rateLimitError =
       'RetroAchievements is rate-limiting requests. Please wait a moment and try again.';
@@ -258,6 +278,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
       final userProfile = await RetroAchievementsService.getUserProfile(
         _username,
         apiKey: _apiKey,
+        client: sessionHttpClient,
       );
 
       if (userProfile != null) {
@@ -310,6 +331,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
       final summary = await RetroAchievementsService.getUserSummary(
         _username,
         apiKey: _apiKey,
+        client: sessionHttpClient,
       );
 
       if (summary != null) {
@@ -332,6 +354,55 @@ class RetroAchievementsProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  /// Re-runs the two reads that only ever happen at sign-in — the profile and
+  /// the summary — so a session restored from the offline cache can become
+  /// live again without the user signing out and back in.
+  ///
+  /// Every other dashboard endpoint is re-read when the tab is entered, and a
+  /// live answer drops its own key from the stale set. These two had no such
+  /// path: [connect] is their only caller. A launch with no network (a
+  /// handheld powering on before Wi-Fi associates, which is the normal case
+  /// when NeoStation is the device's launcher) therefore signed in from disk
+  /// and left [isOffline] true for the rest of the process, however long the
+  /// network had been back.
+  ///
+  /// Returns true when the profile came from the API rather than from disk.
+  Future<bool> revalidateSession() async {
+    if (!_isConnected || _username.isEmpty || !hasResolvedApiKey) return false;
+
+    try {
+      final profile = await RetroAchievementsService.getUserProfile(
+        _username,
+        apiKey: _apiKey,
+        client: sessionHttpClient,
+      );
+      // A null profile means the API answered "no such user" or nothing could
+      // be read at all. Neither is a reason to drop a session the user is
+      // still signed into, so keep what we have and report "still stale".
+      if (profile != null) _user = profile;
+    } catch (e) {
+      _log.w('RA: session revalidation failed: $e');
+      return false;
+    }
+
+    final live = !RetroAchievementsCache.servedFromCache(
+      RetroAchievementsService.profileCacheKey(_username),
+    );
+    // The summary is only worth a request once the API has actually answered:
+    // while still offline it would replay the same stale copy from disk and
+    // re-mark its own key.
+    if (live) {
+      // A live read logs nothing of its own, so without this line a bug report
+      // shows the session going stale and never shows it recovering.
+      _log.i(
+        'RA: session live again after being served from the offline cache',
+      );
+      await loadUserSummary();
+    }
+    notifyListeners();
+    return live;
   }
 
   /// Fetches metadata for the current site-wide "Game of the Week".
@@ -568,9 +639,24 @@ class RetroAchievementsProvider extends ChangeNotifier {
       // the user restarted the app. Retry only during initialization and only
       // while a stored account exists; manual login remains a single attempt.
       const maxAttempts = 5;
+      const retryDelay = Duration(seconds: 4);
       for (var attempt = 1; attempt <= maxAttempts; attempt++) {
         final loggedIn = await tryAutoLogin();
         if (loggedIn) {
+          // Signing in is not proof the network was up: the profile may have
+          // been replayed from the offline cache, which leaves the session
+          // stale and the offline banner showing. Keep reaching for the API on
+          // a widening schedule, so the cold-boot Wi-Fi window is covered here
+          // instead of the banner outliving it.
+          for (final delay in _liveRetryBackoff) {
+            if (!isOffline) break;
+            _log.i(
+              'RetroAchievements signed in from the offline cache; '
+              'retrying the live session read in ${delay.inSeconds}s',
+            );
+            await Future<void>.delayed(delay);
+            if (await revalidateSession()) break;
+          }
           await fetchGOTW();
           return;
         }
@@ -589,7 +675,7 @@ class RetroAchievementsProvider extends ChangeNotifier {
         _log.i(
           'RetroAchievements auto-login attempt $attempt failed; retrying after startup delay',
         );
-        await Future<void>.delayed(const Duration(seconds: 4));
+        await Future<void>.delayed(retryDelay);
       }
     } catch (e) {
       _log.e('Error initializing RA: $e');

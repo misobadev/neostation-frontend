@@ -1000,6 +1000,75 @@
           "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbneo\""
         }
       }
+    },
+    {
+      "name": "RetroArch bsnes-jg",
+      "unique_id": "sfc-hacks.ra.bsnes-jg",
+      "description": "Supported extensions: smc, sfc, st, gb, gbc, bs.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"bsnes-jg\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L bsnes-jg_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L bsnes-jg_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L bsnes-jg_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 bsnes-jg",
+      "unique_id": "sfc-hacks.ra64.bsnes-jg",
+      "description": "Supported extensions: smc, sfc, st, gb, gbc, bs.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"bsnes-jg\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 bsnes-jg",
+      "unique_id": "sfc-hacks.ra32.bsnes-jg",
+      "description": "Supported extensions: smc, sfc, st, gb, gbc, bs.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"bsnes-jg\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch nSide Balanced",
+      "unique_id": "sfc-hacks.ra.nside_sfc_balanced",
+      "description": "Supported extensions: sfc, smc, gb, gbc, bml, rom.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L nside_sfc_balanced_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L nside_sfc_balanced_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L nside_sfc_balanced_libretro.dylib \"{file.path}\""
+        }
+      }
     }
   ],
   "neosync": {

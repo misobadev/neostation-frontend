@@ -52,7 +52,8 @@
       "rp9",
       "slave",
       "uae",
-      "zip"
+      "zip",
+      "fs-uae"
     ]
   },
   "emulators": [
@@ -150,6 +151,20 @@
         "macos": {
           "executable": "RetroArch.App",
           "args": "-L puae2021_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch FS-UAE",
+      "unique_id": "amiga.ra.fsuae",
+      "description": "Supported extensions: adf, ipf, fs-uae.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L fsuae_libretro.so \"{file.path}\""
         }
       }
     }

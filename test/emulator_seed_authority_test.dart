@@ -70,7 +70,12 @@ void main() {
     await db.execute(
       "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('xbox360', 'Xbox 360', 'xbox360')",
     );
-    osMap = {'windows': 1, 'android': androidOsId, 'linux': linuxOsId};
+    osMap = {
+      'windows': 1,
+      'android': androidOsId,
+      'linux': linuxOsId,
+      'macos': 4,
+    };
   });
 
   tearDown(() async => dbHelper.tearDown());

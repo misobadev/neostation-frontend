@@ -39,7 +39,8 @@
       "m3u8",
       "vhd",
       "zip",
-      "7z"
+      "7z",
+      "conf"
     ]
   },
   "emulators": [
@@ -184,6 +185,118 @@
         "macos": {
           "executable": "RetroArch.App",
           "args": "-L dosbox_core_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch DOSBox",
+      "unique_id": "dos.ra.dosbox",
+      "description": "Supported extensions: exe, com, bat, conf.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"dosbox\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L dosbox_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L dosbox_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L dosbox_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 DOSBox",
+      "unique_id": "dos.ra64.dosbox",
+      "description": "Supported extensions: exe, com, bat, conf.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"dosbox\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 DOSBox",
+      "unique_id": "dos.ra32.dosbox",
+      "description": "Supported extensions: exe, com, bat, conf.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"dosbox\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch PCem",
+      "unique_id": "dos.ra.pcem",
+      "description": "Supported extensions: exe, com, bat, conf.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L pcem_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L pcem_libretro.so \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch VirtualXT",
+      "unique_id": "dos.ra.virtualxt",
+      "description": "Supported extensions: img, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"virtualxt\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L virtualxt_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L virtualxt_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L virtualxt_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 VirtualXT",
+      "unique_id": "dos.ra64.virtualxt",
+      "description": "Supported extensions: img, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"virtualxt\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 VirtualXT",
+      "unique_id": "dos.ra32.virtualxt",
+      "description": "Supported extensions: img, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"virtualxt\""
         }
       }
     }

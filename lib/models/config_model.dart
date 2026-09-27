@@ -138,13 +138,10 @@ class ConfigModel {
   /// Whether the RomM navigation tab is hidden. See [hideTabSync].
   final bool hideTabRomm;
 
-  /// Whether the Search navigation tab is hidden. See [hideTabSync].
-  final bool hideTabSearch;
-
-  /// Whether Android apps live in their own top-level navigation tab instead
-  /// of appearing as a virtual system card. Android-only; `false` preserves
-  /// the original Systems layout on every device.
-  final bool androidAppsAsTab;
+  /// Whether the Search card is left off the systems screen. Hidden unless
+  /// the user turns it on in Systems settings (`user_config.hide_search_card`,
+  /// migration v158); search stays reachable from every card's Y menu.
+  final bool hideSearchCard;
 
   /// Seconds of inactivity before the secondary "Now Playing" panel dims, or `0`
   /// to never dim. Only meaningful when a secondary display is active.
@@ -226,6 +223,13 @@ class ConfigModel {
   /// by a later systems update inherits.
   final bool subfolderViewAll;
 
+  /// Whether system cards hide their logo strip and render as a square.
+  ///
+  /// Some System Art backgrounds already include the console logo, so the
+  /// card's own logo would appear twice. When enabled, the card drops the logo
+  /// footer and becomes a 1:1 tile.
+  final bool hideSystemLogos;
+
   /// Gaussian blur sigma of the frosted-glass chrome (NeoGlass), clamped to
   /// 0–2. `0` (the default) disables the blur entirely (flat translucent
   /// panel, cheapest). Higher values are only smooth on a powerful GPU.
@@ -272,8 +276,7 @@ class ConfigModel {
     this.hideTabAchievements = false,
     this.hideTabScraper = false,
     this.hideTabRomm = false,
-    this.hideTabSearch = false,
-    this.androidAppsAsTab = false,
+    this.hideSearchCard = true,
     this.activeSyncProvider = 'neosync',
     this.autoUpdateApp = true,
     this.autoUpdateSystems = true,
@@ -291,6 +294,7 @@ class ConfigModel {
     this.showCloudSyncIcon = true,
     this.raMatchOnStartup = false,
     this.subfolderViewAll = false,
+    this.hideSystemLogos = false,
     this.neoglassBlur = 0,
     this.neoglassTransparency = 10,
     this.neoglassBorderWidth = 2,
@@ -426,16 +430,11 @@ class ConfigModel {
           (json['hideTabRomm'] ?? json['hide_tab_romm'] ?? 0).toString() ==
               '1' ||
           (json['hideTabRomm'] ?? false).toString().toLowerCase() == 'true',
-      hideTabSearch:
-          (json['hideTabSearch'] ?? json['hide_tab_search'] ?? 0).toString() ==
-              '1' ||
-          (json['hideTabSearch'] ?? false).toString().toLowerCase() == 'true',
-      androidAppsAsTab:
-          (json['androidAppsAsTab'] ?? json['android_apps_as_tab'] ?? 0)
+      hideSearchCard:
+          (json['hideSearchCard'] ?? json['hide_search_card'] ?? 1)
                   .toString() ==
               '1' ||
-          (json['androidAppsAsTab'] ?? false).toString().toLowerCase() ==
-              'true',
+          (json['hideSearchCard'] ?? false).toString().toLowerCase() == 'true',
       activeSyncProvider:
           (json['activeSyncProvider'] ??
                   json['active_sync_provider'] ??
@@ -525,6 +524,12 @@ class ConfigModel {
               '1' ||
           (json['subfolderViewAll'] ?? false).toString().toLowerCase() ==
               'true',
+      // Absent => 0 => logos shown (the default).
+      hideSystemLogos:
+          (json['hideSystemLogos'] ?? json['hide_system_logos'] ?? 0)
+                  .toString() ==
+              '1' ||
+          (json['hideSystemLogos'] ?? false).toString().toLowerCase() == 'true',
       // Absent => 0 => blur off (the default). The frosted blur is only smooth
       // on a powerful GPU, so it starts disabled.
       neoglassBlur:
@@ -608,8 +613,7 @@ class ConfigModel {
       'hideTabAchievements': hideTabAchievements,
       'hideTabScraper': hideTabScraper,
       'hideTabRomm': hideTabRomm,
-      'hideTabSearch': hideTabSearch,
-      'androidAppsAsTab': androidAppsAsTab,
+      'hideSearchCard': hideSearchCard,
       'activeSyncProvider': activeSyncProvider,
       'autoUpdateApp': autoUpdateApp,
       'autoUpdateSystems': autoUpdateSystems,
@@ -627,6 +631,7 @@ class ConfigModel {
       'showCloudSyncIcon': showCloudSyncIcon,
       'raMatchOnStartup': raMatchOnStartup,
       'subfolderViewAll': subfolderViewAll,
+      'hideSystemLogos': hideSystemLogos,
       'neoglassBlur': neoglassBlur,
       'neoglassTransparency': neoglassTransparency,
       'neoglassBorderWidth': neoglassBorderWidth,
@@ -664,8 +669,7 @@ class ConfigModel {
     bool? hideTabAchievements,
     bool? hideTabScraper,
     bool? hideTabRomm,
-    bool? hideTabSearch,
-    bool? androidAppsAsTab,
+    bool? hideSearchCard,
     String? activeSyncProvider,
     bool? autoUpdateApp,
     bool? autoUpdateSystems,
@@ -683,6 +687,7 @@ class ConfigModel {
     bool? showCloudSyncIcon,
     bool? raMatchOnStartup,
     bool? subfolderViewAll,
+    bool? hideSystemLogos,
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
@@ -717,8 +722,7 @@ class ConfigModel {
       hideTabAchievements: hideTabAchievements ?? this.hideTabAchievements,
       hideTabScraper: hideTabScraper ?? this.hideTabScraper,
       hideTabRomm: hideTabRomm ?? this.hideTabRomm,
-      hideTabSearch: hideTabSearch ?? this.hideTabSearch,
-      androidAppsAsTab: androidAppsAsTab ?? this.androidAppsAsTab,
+      hideSearchCard: hideSearchCard ?? this.hideSearchCard,
       activeSyncProvider: activeSyncProvider ?? this.activeSyncProvider,
       autoUpdateApp: autoUpdateApp ?? this.autoUpdateApp,
       autoUpdateSystems: autoUpdateSystems ?? this.autoUpdateSystems,
@@ -738,6 +742,7 @@ class ConfigModel {
       showCloudSyncIcon: showCloudSyncIcon ?? this.showCloudSyncIcon,
       raMatchOnStartup: raMatchOnStartup ?? this.raMatchOnStartup,
       subfolderViewAll: subfolderViewAll ?? this.subfolderViewAll,
+      hideSystemLogos: hideSystemLogos ?? this.hideSystemLogos,
       neoglassBlur: neoglassBlur ?? this.neoglassBlur,
       neoglassTransparency: neoglassTransparency ?? this.neoglassTransparency,
       neoglassBorderWidth: neoglassBorderWidth ?? this.neoglassBorderWidth,

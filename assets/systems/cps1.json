@@ -183,6 +183,49 @@
           "args": "-L fbalpha2012_cps1_libretro.dylib \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch FB Alpha",
+      "unique_id": "cps1.ra.fbalpha",
+      "description": "Supported extensions: zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbalpha\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L fbalpha_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L fbalpha_libretro.so \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch64 FB Alpha",
+      "unique_id": "cps1.ra64.fbalpha",
+      "description": "Supported extensions: zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbalpha\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 FB Alpha",
+      "unique_id": "cps1.ra32.fbalpha",
+      "description": "Supported extensions: zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"fbalpha\""
+        }
+      }
     }
   ],
   "neosync": {

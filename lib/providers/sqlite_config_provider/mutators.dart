@@ -84,6 +84,13 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Shows or hides the Search card on the systems screen.
+  Future<void> updateHideSearchCard(bool value) async {
+    _config = _config.copyWith(hideSearchCard: value);
+    await SqliteConfigService.saveConfig(_config);
+    _notify();
+  }
+
   /// Persists the cell span of the "Recently Played" card in the systems grid
   /// ('default' for the 3x2 block, '2x1' for the compact wide card).
   Future<void> updateRecentCardSize(String value) async {
@@ -184,6 +191,17 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     await SystemRepository.setSubfolderViewForAll(value);
     // The in-memory system models still carry the old per-system flag.
     await refreshDetectedSystems();
+    _notify();
+  }
+
+  /// Updates whether system cards hide their logo footer and render square.
+  ///
+  /// Purely visual, so unlike [updateSubfolderViewAll] it needs no per-system
+  /// stamping: the grid and carousel read the config directly.
+  Future<void> updateHideSystemLogos(bool value) async {
+    if (_config.hideSystemLogos == value) return;
+    _config = _config.copyWith(hideSystemLogos: value);
+    await SqliteConfigService.saveConfig(_config);
     _notify();
   }
 

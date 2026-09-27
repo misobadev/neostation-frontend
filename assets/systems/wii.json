@@ -195,6 +195,18 @@
           "args": "-L dolphin_libretro.dylib \"{file.path}\""
         }
       }
+    },
+    {
+      "name": "RetroArch Ishiiruka",
+      "unique_id": "wii.ra.ishiiruka",
+      "description": "Supported extensions: gcm, iso, wbfs, ciso, gcz, elf, dol, dff, tgc, wad.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L ishiiruka_libretro.dylib \"{file.path}\""
+        }
+      }
     }
   ],
   "neosync": {

@@ -205,15 +205,10 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['hide_tab_romm']?.toString() ?? '0') ??
                 0) ==
             1,
-        hideTabSearch:
-            (int.tryParse(userConfig?['hide_tab_search']?.toString() ?? '0') ??
-                0) ==
-            1,
-        androidAppsAsTab:
-            (int.tryParse(
-                  userConfig?['android_apps_as_tab']?.toString() ?? '0',
-                ) ??
-                0) ==
+        // Unset reads as hidden: the card is opt-in (see migration v160).
+        hideSearchCard:
+            (int.tryParse(userConfig?['hide_search_card']?.toString() ?? '1') ??
+                1) ==
             1,
         activeSyncProvider:
             userConfig?['active_sync_provider']?.toString() ?? 'neosync',
@@ -286,6 +281,13 @@ class SqliteConfigService {
                 ) ??
                 0) ==
             1,
+        // Missing column/row => 0 => logos shown (the default).
+        hideSystemLogos:
+            (int.tryParse(
+                  userConfig?['hide_system_logos']?.toString() ?? '0',
+                ) ??
+                0) ==
+            1,
         // Missing column/row => 0 => blur off (the default). The frosted blur
         // is only smooth on a powerful GPU, so it starts disabled.
         neoglassBlur:
@@ -353,8 +355,7 @@ class SqliteConfigService {
         hideTabAchievements: config.hideTabAchievements ? 1 : 0,
         hideTabScraper: config.hideTabScraper ? 1 : 0,
         hideTabRomm: config.hideTabRomm ? 1 : 0,
-        hideTabSearch: config.hideTabSearch ? 1 : 0,
-        androidAppsAsTab: config.androidAppsAsTab ? 1 : 0,
+        hideSearchCard: config.hideSearchCard ? 1 : 0,
         activeSyncProvider: config.activeSyncProvider,
         autoUpdateApp: config.autoUpdateApp ? 1 : 0,
         autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
@@ -372,6 +373,7 @@ class SqliteConfigService {
         showCloudSyncIcon: config.showCloudSyncIcon ? 1 : 0,
         raMatchOnStartup: config.raMatchOnStartup ? 1 : 0,
         subfolderViewAll: config.subfolderViewAll ? 1 : 0,
+        hideSystemLogos: config.hideSystemLogos ? 1 : 0,
         neoglassBlur: config.neoglassBlur,
         neoglassTransparency: config.neoglassTransparency,
         neoglassBorderWidth: config.neoglassBorderWidth,

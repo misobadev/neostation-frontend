@@ -10,6 +10,7 @@ import '../../sync/sync_manager.dart';
 import '../game_session_persistence.dart';
 import '../retroachievements_hash_service.dart';
 import '../romm_playtime_service.dart';
+import 'playtime_meter.dart';
 
 /// Owns the game-session lifecycle and its mutable tracking state.
 ///
@@ -87,8 +88,33 @@ class GameSessionManager {
   /// Periodic timer for persisting playtime statistics to the database.
   static Timer? _playtimeTimer;
 
-  /// Timestamp of the last successful playtime persistence operation.
-  static DateTime? _lastPlaytimeSave;
+  /// Measures the time actually played in the current session: stops while
+  /// the device sleeps or its screen is off. See [PlaytimeMeter].
+  static final PlaytimeMeter _playtimeMeter = PlaytimeMeter();
+
+  /// Last screen power state reported by the platform (Android only; desktop
+  /// never reports one, so it stays true there).
+  static bool _screenOn = true;
+
+  /// Pauses the playtime meter while the screen is off, and resumes it when it
+  /// comes back on.
+  ///
+  /// Putting a handheld to sleep leaves the emulator open in the foreground,
+  /// so nothing ends the session: without this the night went into the
+  /// playtime. The monotonic clock behind the meter already skips a deep
+  /// suspend, but a device kept awake by a wakelock or a charger still runs it
+  /// with the screen dark. What was played before the screen went off is saved
+  /// straight away, so a session the OS then kills in its sleep keeps it.
+  static void onDeviceScreenChanged(bool screenOn) {
+    _screenOn = screenOn;
+    if (!_isGameLaunched) return;
+    if (screenOn) {
+      _playtimeMeter.resume();
+    } else {
+      _persistPlaytime();
+      _playtimeMeter.pause();
+    }
+  }
 
   static void setOnGameReturnedCallback(Function(int) callback) {
     _onGameReturnedCallback = callback;
@@ -156,13 +182,16 @@ class GameSessionManager {
       final filename = session['filename'].toString();
       final startTimestamp =
           int.tryParse(session['startTimestamp']?.toString() ?? '0') ?? 0;
+      final playedSeconds =
+          int.tryParse(session['playedSeconds']?.toString() ?? '0') ?? 0;
 
-      final currentTimestamp = DateTime.now().millisecondsSinceEpoch;
-      final elapsedSeconds = ((currentTimestamp - startTimestamp) / 1000)
-          .round();
-
-      // Only process sessions that lasted at least 5 seconds to filter out launch failures
-      if (elapsedSeconds >= 5) {
+      // The local total needs nothing here: the session saved its playtime
+      // every few seconds while it ran, so it already holds everything up to
+      // the kill. Adding the launch-to-now gap on top (as this used to) counted
+      // the session twice, and counted every hour the device then slept. Only
+      // RomM still needs telling, since it takes the session as a whole.
+      // Sessions under 5 seconds are almost always failed launches.
+      if (playedSeconds >= 5) {
         final system = await SystemRepository.getSystemByFolderName(
           systemFolderName,
         );
@@ -170,13 +199,13 @@ class GameSessionManager {
         final game = await GameRepository.getSingleGame(system.id!, filename);
 
         if (game != null && game.romPath.isNotEmpty) {
-          await GameRepository.updatePlayTime(game.romPath, elapsedSeconds);
           await _recordRommPlaySession(
             romname: filename,
             systemFolder: game.systemFolderName ?? systemFolderName,
             romPath: game.romPath,
             start: DateTime.fromMillisecondsSinceEpoch(startTimestamp),
-            end: DateTime.fromMillisecondsSinceEpoch(currentTimestamp),
+            end: DateTime.now(),
+            played: Duration(seconds: playedSeconds),
           );
         }
       }
@@ -199,7 +228,7 @@ class GameSessionManager {
     // opened the pending window would otherwise leave the pass running.
     _pauseBackgroundHashing();
     _gameLaunchTime = DateTime.now();
-    _lastPlaytimeSave = _gameLaunchTime;
+    _playtimeMeter.start(paused: !_screenOn);
     _launchedEmulatorExe = emulatorExeName;
     _currentGameSystem = system;
     _currentGame = game;
@@ -219,27 +248,27 @@ class GameSessionManager {
   static void _startPlaytimeTimer() {
     _playtimeTimer?.cancel();
 
-    _playtimeTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (_isGameLaunched &&
-          _gameLaunchTime != null &&
-          _lastPlaytimeSave != null &&
-          _currentGameSystem != null &&
-          _currentGame != null) {
-        final now = DateTime.now();
-        final elapsedSinceLastSave = now
-            .difference(_lastPlaytimeSave!)
-            .inSeconds;
+    _playtimeTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _persistPlaytime(),
+    );
+  }
 
-        if (elapsedSinceLastSave > 0) {
-          _savePlayTime(
-            _currentGameSystem!,
-            _currentGame!,
-            elapsedSinceLastSave,
-          );
-          _lastPlaytimeSave = now;
-        }
-      }
-    });
+  /// Saves the playtime counted since the last save, and on Android records
+  /// the session's running total for [checkPendingGameSession].
+  static void _persistPlaytime() {
+    final system = _currentGameSystem;
+    final game = _currentGame;
+    if (!_isGameLaunched || system == null || game == null) return;
+
+    final unsaved = _playtimeMeter.takeUnreported();
+    if (unsaved <= 0) return;
+    _savePlayTime(system, game, unsaved);
+    if (Platform.isAndroid) {
+      GameSessionPersistence.savePlayedSeconds(
+        _playtimeMeter.elapsed.inSeconds,
+      );
+    }
   }
 
   static void _stopPlaytimeTimer() {
@@ -274,16 +303,13 @@ class GameSessionManager {
       final system = _currentGameSystem;
       final game = _currentGame;
       final launchTime = _gameLaunchTime;
-      final lastPlaytimeSave = _lastPlaytimeSave;
 
-      if (launchTime != null &&
-          lastPlaytimeSave != null &&
-          system != null &&
-          game != null) {
+      if (launchTime != null && system != null && game != null) {
         final now = DateTime.now();
-        final elapsedSinceLastSave = now.difference(lastPlaytimeSave).inSeconds;
-        if (elapsedSinceLastSave > 0) {
-          await _savePlayTime(system, game, elapsedSinceLastSave);
+        _playtimeMeter.pause();
+        final unsaved = _playtimeMeter.takeUnreported();
+        if (unsaved > 0) {
+          await _savePlayTime(system, game, unsaved);
         }
 
         // Report the session as a whole (not just the un-persisted tail) to the
@@ -296,6 +322,7 @@ class GameSessionManager {
             romPath: game.romPath!,
             start: launchTime,
             end: now,
+            played: _playtimeMeter.elapsed,
           );
         }
         _syncSavesAfterClose(game);
@@ -315,7 +342,6 @@ class GameSessionManager {
 
       _isGameLaunched = false;
       _gameLaunchTime = null;
-      _lastPlaytimeSave = null;
       _launchedEmulatorExe = null;
       _currentGameSystem = null;
       _currentGame = null;
@@ -379,6 +405,7 @@ class GameSessionManager {
     required String romPath,
     required DateTime start,
     required DateTime end,
+    required Duration played,
   }) async {
     try {
       await RommPlaytimeService.recordCompletedSession(
@@ -387,6 +414,7 @@ class GameSessionManager {
         romPath: romPath,
         startTime: start,
         endTime: end,
+        played: played,
       );
     } catch (e) {
       _log.e('Error queueing RomM play session: $e');

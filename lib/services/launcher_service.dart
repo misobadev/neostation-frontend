@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import '../models/system_model.dart';
 import '../models/game_model.dart';
@@ -21,6 +22,24 @@ class LauncherService {
   final Map<String, Map<String, dynamic>> _configs = {};
 
   LauncherService._internal();
+
+  /// Forces the platform [getLaunchCommand] resolves against.
+  ///
+  /// Tests use it to exercise a platform's JSON block (e.g. Linux discovery
+  /// hints) on any CI host, macOS included, without a Linux machine.
+  @visibleForTesting
+  static String? platformOverride;
+
+  /// The host platform name, or [platformOverride] under test.
+  static String get _platform {
+    final override = platformOverride;
+    if (override != null) return override;
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isWindows) return 'windows';
+    if (Platform.isMacOS) return 'macos';
+    if (Platform.isLinux) return 'linux';
+    return 'unknown';
+  }
 
   /// Loads a system-specific JSON configuration from the application assets.
   ///
@@ -175,13 +194,14 @@ class LauncherService {
     if (platforms == null) return {};
 
     Map<String, dynamic>? platformConfig;
-    if (Platform.isAndroid) {
+    final platform = _platform;
+    if (platform == 'android') {
       platformConfig = platforms['android'];
-    } else if (Platform.isWindows) {
+    } else if (platform == 'windows') {
       platformConfig = platforms['windows'];
-    } else if (Platform.isMacOS) {
+    } else if (platform == 'macos') {
       platformConfig = platforms['macos'];
-    } else if (Platform.isLinux) {
+    } else if (platform == 'linux') {
       platformConfig = platforms['linux'];
     }
 
@@ -195,7 +215,7 @@ class LauncherService {
 
     final result = <String, dynamic>{'player_name': player['name']};
 
-    if (Platform.isAndroid) {
+    if (platform == 'android') {
       // Per-emulator opt-out: emulators that need the original SAF content:// URI
       // (instead of our FileProvider rewrap) declare `"keep_saf_uri": true` in
       // their android config. Keeps the launcher free of hardcoded package names.
@@ -274,6 +294,9 @@ class LauncherService {
       if (platformConfig.containsKey('emudeck_launcher')) {
         result['emudeck_launcher'] = platformConfig['emudeck_launcher'];
       }
+      if (platformConfig.containsKey('launch_via_open')) {
+        result['launch_via_open'] = platformConfig['launch_via_open'] == true;
+      }
 
       if (player.containsKey('unique_id')) {
         result['unique_id'] = player['unique_id'];
@@ -282,7 +305,7 @@ class LauncherService {
       final rawArgs = platformConfig['args']?.toString() ?? '';
       var resolvedArgs = resolvePlaceholdersDesktop(rawArgs, game);
 
-      if (Platform.isMacOS &&
+      if (platform == 'macos' &&
           (result['executable']?.toString())?.toLowerCase().contains(
                 'retroarch',
               ) ==
@@ -500,7 +523,10 @@ class LauncherService {
   String resolvePlaceholdersDesktop(String template, GameModel game) {
     if (template.isEmpty) return template;
 
-    String result = template;
+    // Expand profile paths before inserting ROM names, which can themselves
+    // contain literal placeholder text. HOME uses the real macOS user home,
+    // not the frontend's sandbox container.
+    String result = ConfigService.resolvePath(template);
     if (game.romPath != null) {
       if (game.romPath!.contains(' ') && !template.contains('"{file.path}"')) {
         result = result.replaceAll('{file.path}', '"${game.romPath!}"');
