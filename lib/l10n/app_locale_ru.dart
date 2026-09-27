@@ -1132,17 +1132,12 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.filterGenre: 'Жанр',
   AppLocale.filterRating: 'Рейтинг',
   AppLocale.filterYear: 'Год',
-  AppLocale.filterAchievements: 'Достижения',
-  AppLocale.raCoverageMatched: 'Есть',
-  AppLocale.raCoverageNoSet: 'Нет',
   AppLocale.raCoverageUnknown: 'Неизвестно',
   AppLocale.filterAny: 'Любой',
   AppLocale.filterSource: 'Источник',
   AppLocale.sourceLocal: 'На этом устройстве',
   AppLocale.searchRatingLocalOnly:
       'Фильтр рейтинга применяется только к локальным играм',
-  AppLocale.searchAchievementsLocalOnly:
-      'Фильтр достижений применяется только к локальным играм',
   AppLocale.searchNoRommEquivalent: 'В RomM ничего не отнесено к «{value}»',
   AppLocale.resetPlayTimeConfirm: 'Сбросить время игры',
   AppLocale.resetPlayTimeConfirmBody:

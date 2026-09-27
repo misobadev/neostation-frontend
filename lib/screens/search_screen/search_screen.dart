@@ -143,7 +143,6 @@ class _SearchScreenState extends State<SearchScreen> {
   String? _year;
   int? _rating;
   String? _source;
-  String? _achievements;
 
   /// Whether the route may pop. Kept false so system back routes through
   /// [_handleBack] and unwinds a menu or the results before leaving.
@@ -369,7 +368,6 @@ class _SearchScreenState extends State<SearchScreen> {
       year: _year,
       rating: _rating,
       source: _source,
-      achievements: _achievements,
     );
 
     _criteria = criteria;
@@ -671,7 +669,6 @@ class _SearchScreenState extends State<SearchScreen> {
       if (shown('developer')) 'developer',
       if (shown('genre')) 'genre',
       if (shown('year')) 'year',
-      if (shown(kFilterAchievements)) kFilterAchievements,
     ];
   }
 
@@ -687,7 +684,6 @@ class _SearchScreenState extends State<SearchScreen> {
         _genre,
         _year,
         _source,
-        _achievements,
       ].where((v) => v != null).length +
       (_rating != null ? 1 : 0);
 
@@ -1184,9 +1180,6 @@ class _SearchScreenState extends State<SearchScreen> {
 
   List<String> _menuOptions(String key) => switch (key) {
     kFilterSource => const [kSourceLocal, kSourceRomm],
-    // Coverage buckets are ordered by meaning, not alphabetically, and RomM has
-    // no vocabulary to merge in — take the facet list as it stands.
-    kFilterAchievements => _facets.achievements,
     _ => _mergedOptions(key),
   };
 
@@ -1196,7 +1189,6 @@ class _SearchScreenState extends State<SearchScreen> {
     'developer' => _developer,
     'genre' => _genre,
     'year' => _year,
-    kFilterAchievements => _achievements,
     _ => null,
   };
 
@@ -1212,8 +1204,6 @@ class _SearchScreenState extends State<SearchScreen> {
         _genre = value;
       case 'year':
         _year = value;
-      case kFilterAchievements:
-        _achievements = value;
     }
   }
 
@@ -1242,7 +1232,6 @@ class _SearchScreenState extends State<SearchScreen> {
       _year = null;
       _rating = null;
       _source = null;
-      _achievements = null;
       _recompute();
     });
     _scheduleRemoteSearch();
@@ -2013,7 +2002,6 @@ class _SearchScreenState extends State<SearchScreen> {
     'genre' => AppLocale.filterGenre.getString(context),
     'rating' => AppLocale.filterRating.getString(context),
     'year' => AppLocale.filterYear.getString(context),
-    kFilterAchievements => AppLocale.filterAchievements.getString(context),
     _ => key,
   };
 
@@ -2025,9 +2013,6 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     if (key == kFilterSource) {
       return [any, ..._menuOptions(key).map(_sourceDisplay)];
-    }
-    if (key == kFilterAchievements) {
-      return [any, ..._menuOptions(key).map(_achievementsDisplay)];
     }
     return [any, ..._menuOptions(key)];
   }
@@ -2043,20 +2028,6 @@ class _SearchScreenState extends State<SearchScreen> {
     _ => AppLocale.filterAny.getString(context),
   };
 
-  /// Display label for a [kFilterAchievements] value.
-  ///
-  /// Reads as a plain Yes / No / Unknown, but the three are not a yes-no
-  /// question with a spare slot: only [kAchievementsNoSet] may say "No",
-  /// because it is the one option where the ROM was hashed and
-  /// RetroAchievements answered. Everything the app could not read is
-  /// "Unknown", never folded into the "No".
-  String _achievementsDisplay(String value) => switch (value) {
-    kAchievementsYes => AppLocale.raCoverageMatched.getString(context),
-    kAchievementsNoSet => AppLocale.raCoverageNoSet.getString(context),
-    kAchievementsUnknown => AppLocale.raCoverageUnknown.getString(context),
-    _ => AppLocale.filterAny.getString(context),
-  };
-
   bool _isFilterActive(String key) => switch (key) {
     kFilterSource => _source != null,
     'platform' => _platform != null,
@@ -2064,7 +2035,6 @@ class _SearchScreenState extends State<SearchScreen> {
     'genre' => _genre != null,
     'year' => _year != null,
     'rating' => _rating != null,
-    kFilterAchievements => _achievements != null,
     _ => false,
   };
 
@@ -2085,9 +2055,6 @@ class _SearchScreenState extends State<SearchScreen> {
       case 'rating':
         final t = _rating;
         return t == null ? any : _ratingDisplay(t);
-      case kFilterAchievements:
-        final a = _achievements;
-        return a == null ? any : _achievementsDisplay(a);
       default:
         return any;
     }
@@ -2190,13 +2157,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
     if (status == RemoteStatus.unsupported ||
         status == RemoteStatus.noEquivalent) {
-      // Two dimensions gate the remote section, so the notice has to name the
-      // one that did it. Rating takes precedence when both are set: clearing it
-      // then reveals the achievements notice, which is the next thing to clear.
       final text = status == RemoteStatus.unsupported
-          ? (_rating != null
-                ? AppLocale.searchRatingLocalOnly.getString(context)
-                : AppLocale.searchAchievementsLocalOnly.getString(context))
+          ? AppLocale.searchRatingLocalOnly.getString(context)
           : AppLocale.searchNoRommEquivalent
                 .getString(context)
                 .replaceFirst('{value}', _remoteUnmatchedFilter ?? '');

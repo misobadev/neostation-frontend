@@ -1133,17 +1133,12 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.filterGenre: 'Genre',
   AppLocale.filterRating: 'Peringkat',
   AppLocale.filterYear: 'Tahun',
-  AppLocale.filterAchievements: 'Prestasi',
-  AppLocale.raCoverageMatched: 'Ya',
-  AppLocale.raCoverageNoSet: 'Tidak',
   AppLocale.raCoverageUnknown: 'Tidak diketahui',
   AppLocale.filterAny: 'Semua',
   AppLocale.filterSource: 'Sumber',
   AppLocale.sourceLocal: 'Di perangkat ini',
   AppLocale.searchRatingLocalOnly:
       'Filter peringkat hanya berlaku untuk gim lokal',
-  AppLocale.searchAchievementsLocalOnly:
-      'Filter prestasi hanya berlaku untuk gim lokal',
   AppLocale.searchNoRommEquivalent:
       'RomM tidak punya apa pun dengan nama “{value}”',
   AppLocale.resetPlayTimeConfirm: 'Atur Ulang Waktu Bermain',

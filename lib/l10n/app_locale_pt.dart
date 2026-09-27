@@ -1144,17 +1144,12 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.filterGenre: 'Gênero',
   AppLocale.filterRating: 'Avaliação',
   AppLocale.filterYear: 'Ano',
-  AppLocale.filterAchievements: 'Conquistas',
-  AppLocale.raCoverageMatched: 'Sim',
-  AppLocale.raCoverageNoSet: 'Não',
   AppLocale.raCoverageUnknown: 'Desconhecido',
   AppLocale.filterAny: 'Qualquer',
   AppLocale.filterSource: 'Origem',
   AppLocale.sourceLocal: 'Neste dispositivo',
   AppLocale.searchRatingLocalOnly:
       'O filtro de avaliação se aplica apenas aos jogos locais',
-  AppLocale.searchAchievementsLocalOnly:
-      'O filtro de conquistas se aplica apenas aos jogos locais',
   AppLocale.searchNoRommEquivalent:
       'O RomM não tem nada classificado como “{value}”',
   AppLocale.resetPlayTimeConfirm: 'Redefinir tempo de jogo',

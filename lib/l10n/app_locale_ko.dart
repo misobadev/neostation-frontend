@@ -1166,16 +1166,12 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.filterGenre: '장르',
   AppLocale.filterRating: '평점',
   AppLocale.filterYear: '연도',
-  AppLocale.filterAchievements: '업적',
-  AppLocale.raCoverageMatched: '있음',
-  AppLocale.raCoverageNoSet: '없음',
   AppLocale.raCoverageUnknown: '알 수 없음',
   AppLocale.filterAny: '전체',
   AppLocale.filterSource: '출처',
   AppLocale.sourceLocal: '이 기기',
   AppLocale.searchRatingLocalOnly: '평점 필터는 로컬 게임에만 적용됩니다',
   AppLocale.searchNoRommEquivalent: 'RomM에 ‘{value}’로 분류된 항목이 없습니다',
-  AppLocale.searchAchievementsLocalOnly: '업적 필터는 로컬 게임에만 적용됩니다',
 
   // Hide / unhide games
   AppLocale.hideGame: '게임 숨기기',
