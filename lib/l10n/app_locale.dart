@@ -114,6 +114,8 @@ mixin AppLocale {
   static const String hideRecentCardSubtitle = 'hide_recent_card_subtitle';
   static const String recentCardSize = 'recent_card_size';
   static const String recentCardSizeSubtitle = 'recent_card_size_subtitle';
+  static const String searchCard = 'search_card';
+  static const String searchCardSubtitle = 'search_card_subtitle';
   static const String recentCardSizeDefault = 'recent_card_size_default';
   static const String recentCardSize2x1 = 'recent_card_size_2x1';
 
@@ -237,12 +239,8 @@ mixin AppLocale {
   static const String showAchievementsTab = 'show_achievements_tab';
   static const String showAchievementsTabSubtitle =
       'show_achievements_tab_subtitle';
-  static const String showScraperTab = 'show_scraper_tab';
-  static const String showScraperTabSubtitle = 'show_scraper_tab_subtitle';
   static const String showRommTab = 'show_romm_tab';
   static const String showRommTabSubtitle = 'show_romm_tab_subtitle';
-  static const String showSearchTab = 'show_search_tab';
-  static const String showSearchTabSubtitle = 'show_search_tab_subtitle';
 
   // ---------------------------------------------------------------------------
   // Directories
@@ -546,18 +544,14 @@ mixin AppLocale {
   // ---------------------------------------------------------------------------
   // Scraper
   // ---------------------------------------------------------------------------
-  static const String account = 'account';
   static const String scraping = 'scraping';
   static const String scrapingData = 'scraping_data';
   static const String scrapingMedia = 'scraping_media';
   static const String scrapeMode = 'scrape_mode';
-  static const String scrapeModeSub = 'scrape_mode_sub';
   static const String media = 'media';
-  static const String mediaSub = 'media_sub';
   static const String language = 'language';
   static const String languageSub = 'language_sub';
   static const String preferredLanguage = 'preferred_language';
-  static const String region = 'region';
   static const String regionSub = 'region_sub';
   static const String regionPriority = 'region_priority';
   static const String regionPrioritySub = 'region_priority_sub';
@@ -573,9 +567,7 @@ mixin AppLocale {
   static const String logoutError = 'logout_error';
   static const String newContentOnly = 'new_content_only';
   static const String allContent = 'all_content';
-  static const String scrapeModeUpdated = 'scrape_mode_updated';
   static const String scrapeModeError = 'scrape_mode_error';
-  static const String languageUpdated = 'language_updated';
   static const String languageError = 'language_error';
   static const String mediaSettingsError = 'media_settings_error';
   static const String newContentOnlyDesc = 'new_content_only_desc';
@@ -742,6 +734,8 @@ mixin AppLocale {
   static const String requiresFreeAccount = 'requires_free_account';
   static const String createAccountAt = 'create_account_at';
   static const String toGetCredentials = 'to_get_credentials';
+  static const String screenScraperTitle = 'screenscraper_title';
+  static const String metadata = 'metadata';
   static const String screenScraperLogin = 'screen_scraper_login';
   static const String scanningSystemsRoms = 'scanning_systems_roms';
   static const String ofSystems = 'of_systems';
@@ -1236,12 +1230,7 @@ mixin AppLocale {
   static const String filterGenre = 'filter_genre';
   static const String filterRating = 'filter_rating';
   static const String filterYear = 'filter_year';
-  static const String filterAchievements = 'filter_achievements';
-  static const String raCoverageMatched = 'ra_coverage_matched';
-  static const String raCoverageNoSet = 'ra_coverage_no_set';
   static const String raCoverageUnknown = 'ra_coverage_unknown';
-  static const String searchAchievementsLocalOnly =
-      'search_achievements_local_only';
   static const String filterAny = 'filter_any';
   static const String filterSource = 'filter_source';
   static const String sourceLocal = 'source_local';

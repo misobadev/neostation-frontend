@@ -237,15 +237,11 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.showAchievementsTab: 'Erfolge-Tab anzeigen',
   AppLocale.showAchievementsTabSubtitle:
       'Zeigt den RetroAchievements-Tab in der Navigationsleiste an',
-  AppLocale.showScraperTab: 'Scraper-Tab anzeigen',
-  AppLocale.showScraperTabSubtitle:
-      'Zeigt den Scraping-Tab in der Navigationsleiste an',
   AppLocale.showRommTab: 'RomM-Tab anzeigen',
   AppLocale.showRommTabSubtitle:
       'Zeigt den RomM-Tab in der Navigationsleiste an',
-  AppLocale.showSearchTab: 'Suche-Tab anzeigen',
-  AppLocale.showSearchTabSubtitle:
-      'Zeigt den Suche-Tab in der Navigationsleiste an',
+  AppLocale.searchCard: 'Suche',
+  AppLocale.searchCardSubtitle: 'Karte für die Suche im Raster anzeigen',
 
   AppLocale.configureDirectories: 'Verzeichnisse konfigurieren',
   AppLocale.configureRomsFolder: 'ROM-Ordner konfigurieren',
@@ -538,16 +534,12 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.applyToAll: 'Auf alle Konflikte anwenden',
   AppLocale.applyToAllDesc: 'Diese Wahl für die restlichen Konflikte verwenden',
 
-  AppLocale.account: 'Konto',
   AppLocale.scraping: 'Scraping',
   AppLocale.scrapeMode: 'Scraping-Modus',
-  AppLocale.scrapeModeSub: 'Wähle, wonach gesucht werden soll',
   AppLocale.media: 'Medien',
-  AppLocale.mediaSub: 'Wähle die Medientypen zum Herunterladen',
   AppLocale.language: 'Sprache',
   AppLocale.languageSub: 'Bevorzugte Sprache für Metadaten',
   AppLocale.preferredLanguage: 'Bevorzugte Sprache',
-  AppLocale.region: 'Region',
   AppLocale.regionSub: 'Regionpriorität für Scraping festlegen',
   AppLocale.regionPriority: 'Regionpriorität',
   AppLocale.regionPrioritySub:
@@ -565,9 +557,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.logoutError: 'Fehler beim Abmelden',
   AppLocale.newContentOnly: 'Nur neue Inhalte',
   AppLocale.allContent: 'Alle Inhalte',
-  AppLocale.scrapeModeUpdated: 'Scraping-Modus aktualisiert auf:',
   AppLocale.scrapeModeError: 'Fehler beim Aktualisieren des Scraping-Modus',
-  AppLocale.languageUpdated: 'Sprache erfolgreich aktualisiert',
   AppLocale.languageError: 'Fehler beim Aktualisieren der Sprache',
   AppLocale.mediaSettingsError: 'Fehler beim Speichern der Medieneinstellungen',
   AppLocale.newContentOnlyDesc:
@@ -796,6 +786,8 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.requiresFreeAccount: 'Erfordert ein kostenloses Konto',
   AppLocale.createAccountAt: 'Erstelle ein Konto auf',
   AppLocale.toGetCredentials: ' , um deine Anmeldedaten zu erhalten.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
+  AppLocale.metadata: 'Metadaten',
   AppLocale.screenScraperLogin: 'ScreenScraper Login',
   AppLocale.scanningSystemsRoms: 'Systeme und ROMs werden gescannt...',
   AppLocale.ofSystems: '{scanned} von {total} Systemen',
@@ -1174,17 +1166,12 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.filterGenre: 'Genre',
   AppLocale.filterRating: 'Bewertung',
   AppLocale.filterYear: 'Jahr',
-  AppLocale.filterAchievements: 'Erfolge',
-  AppLocale.raCoverageMatched: 'Ja',
-  AppLocale.raCoverageNoSet: 'Nein',
   AppLocale.raCoverageUnknown: 'Unbekannt',
   AppLocale.filterAny: 'Alle',
   AppLocale.filterSource: 'Quelle',
   AppLocale.sourceLocal: 'Auf diesem Gerät',
   AppLocale.searchRatingLocalOnly:
       'Der Bewertungsfilter gilt nur für lokale Spiele',
-  AppLocale.searchAchievementsLocalOnly:
-      'Der Erfolgsfilter gilt nur für lokale Spiele',
   AppLocale.searchNoRommEquivalent:
       'RomM kennt „{value}“ nicht unter diesem Namen',
   AppLocale.resetPlayTimeConfirm: 'Spielzeit zurücksetzen',

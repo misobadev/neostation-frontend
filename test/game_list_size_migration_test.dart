@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:neostation/data/datasources/sqlite_migrations.dart';
 
-/// Migration v160 adds the saved List view size to `user_config`.
+/// Migration v161 adds the saved List view size to `user_config`.
 void main() {
   late Database db;
 
@@ -19,7 +19,7 @@ void main() {
 
   tearDown(() => db.close());
 
-  Future<void> runV160() => SqliteMigrations.migrateToVersion(db, 160);
+  Future<void> runV161() => SqliteMigrations.migrateToVersion(db, 161);
 
   List<String> configColumns() => db
       .select('PRAGMA table_info(user_config)')
@@ -31,7 +31,7 @@ void main() {
     () async {
       expect(configColumns(), isNot(contains('game_list_size')));
 
-      await runV160();
+      await runV161();
 
       expect(configColumns(), contains('game_list_size'));
       expect(
@@ -49,7 +49,7 @@ void main() {
     );
     db.execute("UPDATE user_config SET game_list_size = 'XL' WHERE id = 1");
 
-    await runV160();
+    await runV161();
 
     expect(
       db

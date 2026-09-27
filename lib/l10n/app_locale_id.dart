@@ -231,14 +231,10 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.showAchievementsTab: 'Tampilkan tab Pencapaian',
   AppLocale.showAchievementsTabSubtitle:
       'Menampilkan tab RetroAchievements di bilah navigasi',
-  AppLocale.showScraperTab: 'Tampilkan tab Scraper',
-  AppLocale.showScraperTabSubtitle:
-      'Menampilkan tab scraping di bilah navigasi',
   AppLocale.showRommTab: 'Tampilkan tab RomM',
   AppLocale.showRommTabSubtitle: 'Menampilkan tab RomM di bilah navigasi',
-  AppLocale.showSearchTab: 'Tampilkan tab Cari',
-  AppLocale.showSearchTabSubtitle:
-      'Menampilkan tab pencarian di bilah navigasi',
+  AppLocale.searchCard: 'Kartu Cari',
+  AppLocale.searchCardSubtitle: 'Tampilkan kartu pencarian di grid sistem',
 
   AppLocale.configureDirectories: 'Konfigurasi Direktori',
   AppLocale.configureRomsFolder: 'Konfigurasi Folder ROM',
@@ -517,16 +513,12 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.applyToAll: 'Terapkan ke semua konflik',
   AppLocale.applyToAllDesc: 'Gunakan pilihan ini untuk konflik yang tersisa',
 
-  AppLocale.account: 'Akun',
   AppLocale.scraping: 'Scraping',
   AppLocale.scrapeMode: 'Mode Scraping',
-  AppLocale.scrapeModeSub: 'Pilih apa yang akan dicari',
   AppLocale.media: 'Media',
-  AppLocale.mediaSub: 'Pilih jenis media yang akan diunduh',
   AppLocale.language: 'Bahasa',
   AppLocale.languageSub: 'Bahasa pilihan untuk metadata',
   AppLocale.preferredLanguage: 'Bahasa Pilihan',
-  AppLocale.region: 'Wilayah',
   AppLocale.regionSub: 'Atur prioritas wilayah untuk scraping',
   AppLocale.regionPriority: 'Prioritas Wilayah',
   AppLocale.regionPrioritySub:
@@ -544,9 +536,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.logoutError: 'Kesalahan saat keluar',
   AppLocale.newContentOnly: 'Hanya konten baru',
   AppLocale.allContent: 'Semua konten',
-  AppLocale.scrapeModeUpdated: 'Mode scraping diperbarui ke:',
   AppLocale.scrapeModeError: 'Kesalahan saat memperbarui mode scraping',
-  AppLocale.languageUpdated: 'Bahasa berhasil diperbarui',
   AppLocale.languageError: 'Kesalahan saat memperbarui bahasa',
   AppLocale.mediaSettingsError: 'Kesalahan saat menyimpan pengaturan media',
   AppLocale.newContentOnlyDesc: 'Hanya cari game yang belum pernah di-scrape',
@@ -773,6 +763,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.requiresFreeAccount: 'Memerlukan akun gratis',
   AppLocale.createAccountAt: 'Buat akun di',
   AppLocale.toGetCredentials: ' untuk mendapatkan kredensial Anda.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
+  AppLocale.metadata: 'Metadata',
   AppLocale.screenScraperLogin: 'Login ScreenScraper',
   AppLocale.scanningSystemsRoms: 'Memindai sistem dan ROM...',
   AppLocale.ofSystems: '{scanned} dari {total} sistem',
@@ -1142,17 +1134,12 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.filterGenre: 'Genre',
   AppLocale.filterRating: 'Peringkat',
   AppLocale.filterYear: 'Tahun',
-  AppLocale.filterAchievements: 'Prestasi',
-  AppLocale.raCoverageMatched: 'Ya',
-  AppLocale.raCoverageNoSet: 'Tidak',
   AppLocale.raCoverageUnknown: 'Tidak diketahui',
   AppLocale.filterAny: 'Semua',
   AppLocale.filterSource: 'Sumber',
   AppLocale.sourceLocal: 'Di perangkat ini',
   AppLocale.searchRatingLocalOnly:
       'Filter peringkat hanya berlaku untuk gim lokal',
-  AppLocale.searchAchievementsLocalOnly:
-      'Filter prestasi hanya berlaku untuk gim lokal',
   AppLocale.searchNoRommEquivalent:
       'RomM tidak punya apa pun dengan nama “{value}”',
   AppLocale.resetPlayTimeConfirm: 'Atur Ulang Waktu Bermain',

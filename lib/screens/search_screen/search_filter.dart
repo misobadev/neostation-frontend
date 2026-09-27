@@ -1,6 +1,5 @@
 import 'package:neostation/models/database_game_model.dart';
 import 'package:neostation/models/romm_rom.dart';
-import 'package:neostation/utils/ra_coverage.dart';
 
 /// Pure search / filter logic backing the library-wide [SearchScreen].
 ///
@@ -30,10 +29,6 @@ const String kFilterGenre = 'genre';
 const String kFilterYear = 'year';
 const String kFilterRating = 'rating';
 
-/// RetroAchievements coverage. Values are [RaCoverage] names; see
-/// [searchAchievementsBucket] for why the dimension is not a plain yes/no.
-const String kFilterAchievements = 'achievements';
-
 /// Which library a result comes from. Only offered while RomM is connected —
 /// with no remote source there is nothing to choose between.
 const String kFilterSource = 'source';
@@ -43,62 +38,6 @@ const String kFilterSource = 'source';
 const String kSourceAny = 'any';
 const String kSourceLocal = 'local';
 const String kSourceRomm = 'romm';
-
-/// The RetroAchievements coverage bucket a game is filed under.
-///
-/// Deliberately not a "has achievements" boolean. "No" would have to cover four
-/// different situations — a system RetroAchievements does not carry, a disc
-/// image the app cannot hash yet, a ROM nothing has hashed, and a ROM that was
-/// hashed and genuinely has no set — and reporting the first three as "no
-/// achievements" is what makes coverage look like a bug rather than a fact
-/// about RetroAchievements' catalogue.
-///
-/// Games on a system RetroAchievements does not cover return null and stay out
-/// of the dimension entirely: there is no question to answer for them.
-RaCoverage? searchAchievementsBucket(DatabaseGameModel g) {
-  final coverage = raCoverageOf(
-    systemRaId: g.systemRaId,
-    filename: g.filename,
-    raHash: g.raHash,
-    idRa: g.idRa,
-  );
-  return coverage == RaCoverage.unsupportedSystem ? null : coverage;
-}
-
-/// Values for [kFilterAchievements].
-///
-/// The filter asks a coarser question than [RaCoverage] answers: the two
-/// "nobody has asked yet" buckets ([RaCoverage.notChecked] and
-/// [RaCoverage.pendingDiscSupport]) are one option here, because the
-/// difference between them is about *why* the app cannot say and not about the
-/// game — nothing the user can act on while picking a filter, and four options
-/// where three answer the question is what made the filter read as noise.
-/// [RaCoverage] keeps the distinction for everything else that needs it.
-///
-/// [kAchievementsNoSet] stays separate from [kAchievementsUnknown]: it is the
-/// one option where the ROM was hashed and RetroAchievements answered, so it is
-/// the only one that may honestly be read as "no achievements".
-const String kAchievementsYes = 'matched';
-const String kAchievementsNoSet = 'noSet';
-const String kAchievementsUnknown = 'unknown';
-
-/// The achievements options, in the order the filter cycles them: the answer
-/// most people want first.
-const List<String> kSearchAchievementsOptions = [
-  kAchievementsYes,
-  kAchievementsNoSet,
-  kAchievementsUnknown,
-];
-
-/// The [kFilterAchievements] option a game answers, or null when the game is
-/// outside the dimension (see [searchAchievementsBucket]).
-String? searchAchievementsOption(DatabaseGameModel g) =>
-    switch (searchAchievementsBucket(g)) {
-      null => null,
-      RaCoverage.matched => kAchievementsYes,
-      RaCoverage.noSet => kAchievementsNoSet,
-      _ => kAchievementsUnknown,
-    };
 
 /// Active filter selection. A null field means "Any" for that dimension.
 class SearchCriteria {
@@ -110,7 +49,6 @@ class SearchCriteria {
     this.year,
     this.rating,
     this.source,
-    this.achievements,
   });
 
   final String query;
@@ -127,10 +65,6 @@ class SearchCriteria {
   /// which is why [matchesCriteria] ignores it.
   final String? source;
 
-  /// A [RaCoverage] name to match exactly (null == Any); see
-  /// [searchAchievementsBucket].
-  final String? achievements;
-
   /// This selection with [dimension] reset to "Any".
   ///
   /// Facets are derived per dimension from everything *except* that dimension,
@@ -143,7 +77,6 @@ class SearchCriteria {
     year: dimension == kFilterYear ? null : year,
     rating: dimension == kFilterRating ? null : rating,
     source: dimension == kFilterSource ? null : source,
-    achievements: dimension == kFilterAchievements ? null : achievements,
   );
 
   /// The active value for a string-valued [dimension] (null == Any).
@@ -153,7 +86,6 @@ class SearchCriteria {
     kFilterGenre => genre,
     kFilterYear => year,
     kFilterSource => source,
-    kFilterAchievements => achievements,
     _ => null,
   };
 
@@ -168,11 +100,9 @@ class SearchCriteria {
   /// Rating is one that can't: local scores come from the scraper on a
   /// 0..20 scale while RomM carries IGDB's 0..100 and populates it sparsely, so
   /// the same chip would return inconsistent sets across the two sources.
-  ///
-  /// Achievement coverage is the other: it is derived from the local hash and
-  /// match columns, which a ROM that only exists on RomM has never had. The
-  /// screen surfaces both rather than quietly leaving remote rows unfiltered.
-  bool get rommFilterable => rating == null && achievements == null;
+  /// The screen surfaces that rather than quietly leaving remote rows
+  /// unfiltered.
+  bool get rommFilterable => rating == null;
 
   /// The part of this selection RomM cannot apply server-side.
   ///
@@ -239,10 +169,6 @@ bool matchesCriteria(DatabaseGameModel g, SearchCriteria criteria) {
   if (criteria.year != null && searchYearOf(g) != criteria.year) return false;
   if (criteria.rating != null &&
       searchRatingBucket(g.rating) != criteria.rating) {
-    return false;
-  }
-  if (criteria.achievements != null &&
-      searchAchievementsOption(g) != criteria.achievements) {
     return false;
   }
   return true;
@@ -322,7 +248,6 @@ class SearchFacets {
     this.genres = const [],
     this.years = const [],
     this.ratings = const [],
-    this.achievements = const [],
   });
 
   final List<String> platforms;
@@ -333,11 +258,6 @@ class SearchFacets {
   /// Whole 1..10 scores at least one candidate game is filed under, ascending.
   final List<int> ratings;
 
-  /// [kSearchAchievementsOptions] at least one candidate game falls into, in
-  /// that order. A library that has been fully hashed and matched never offers
-  /// "unknown".
-  final List<String> achievements;
-
   static const SearchFacets empty = SearchFacets();
 
   /// String options for a dimension ([kFilterRating] has its own list).
@@ -346,7 +266,6 @@ class SearchFacets {
     kFilterDeveloper => developers,
     kFilterGenre => genres,
     kFilterYear => years,
-    kFilterAchievements => achievements,
     _ => const [],
   };
 }
@@ -363,7 +282,6 @@ SearchFacets computeFacets(
     genres: _facet(all, criteria, kFilterGenre, (g) => g.genre),
     years: _yearFacet(all, criteria),
     ratings: _ratingFacet(all, criteria),
-    achievements: _achievementsFacet(all, criteria),
   );
 }
 
@@ -427,27 +345,6 @@ List<int> _ratingFacet(List<DatabaseGameModel> games, SearchCriteria criteria) {
   final active = criteria.rating;
   if (active != null) scores.add(active);
   return scores.toList()..sort();
-}
-
-/// Coverage options actually present in the candidate set, in a fixed order
-/// rather than alphabetically: "has achievements" is the answer most people
-/// want and belongs at the head of the cycle.
-List<String> _achievementsFacet(
-  List<DatabaseGameModel> games,
-  SearchCriteria criteria,
-) {
-  final present = <String>{};
-  for (final g in _candidates(games, criteria, kFilterAchievements)) {
-    final option = searchAchievementsOption(g);
-    if (option != null) present.add(option);
-  }
-  final options = [
-    for (final o in kSearchAchievementsOptions)
-      if (present.contains(o)) o,
-  ];
-  final active = criteria.achievements;
-  if (active != null && !options.contains(active)) options.add(active);
-  return options;
 }
 
 /// One line in the results list.

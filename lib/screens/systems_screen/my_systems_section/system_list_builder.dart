@@ -87,5 +87,46 @@ List<SystemInfo> buildSystemsList({
         return info;
       });
 
-  return [...recentGames, ...detectedSystems];
+  final systems = configProvider.config.hideSearchCard
+      ? detectedSystems
+      : withSearchCard(
+          detectedSystems.toList(),
+          _searchCard(context, configProvider.totalGames),
+        );
+
+  return [...recentGames, ...systems];
+}
+
+/// [systems] with [searchCard] placed right after All Games, the list it
+/// searches. With no All Games card (a library of apps or music only) it leads
+/// the systems instead. Not gated on a game count: search also reaches the
+/// RomM library.
+@visibleForTesting
+List<SystemInfo> withSearchCard(
+  List<SystemInfo> systems,
+  SystemInfo searchCard,
+) {
+  final allIndex = systems.indexWhere(
+    (s) => s.folderName == SystemFolderNames.all,
+  );
+  return [...systems]..insert(allIndex + 1, searchCard);
+}
+
+/// The Search card, which opens `SearchScreen` rather than a games list.
+///
+/// It carries the whole library's game count, since that is what it searches.
+/// Its logo is the bundled `assets/images/logos/search.webp`, resolved from the
+/// folder name like every other card's, and a theme can give it a background
+/// by shipping one for `search`.
+SystemInfo _searchCard(BuildContext context, int totalGames) {
+  final title = AppLocale.searchTitle.getString(context);
+  return SystemInfo(
+    title: title,
+    shortName: title,
+    folderName: SystemFolderNames.search,
+    numOfRoms: totalGames,
+    color1: '#26A69A',
+    color2: '#B0BEC5',
+    percentage: 0,
+  );
 }

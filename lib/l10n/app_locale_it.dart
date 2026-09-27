@@ -238,15 +238,11 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.showAchievementsTab: 'Mostra scheda Obiettivi',
   AppLocale.showAchievementsTabSubtitle:
       'Mostra la scheda RetroAchievements nella barra di navigazione',
-  AppLocale.showScraperTab: 'Mostra scheda Scraper',
-  AppLocale.showScraperTabSubtitle:
-      'Mostra la scheda di scraping nella barra di navigazione',
   AppLocale.showRommTab: 'Mostra scheda RomM',
   AppLocale.showRommTabSubtitle:
       'Mostra la scheda RomM nella barra di navigazione',
-  AppLocale.showSearchTab: 'Mostra scheda Cerca',
-  AppLocale.showSearchTabSubtitle:
-      'Mostra la scheda di ricerca nella barra di navigazione',
+  AppLocale.searchCard: 'Scheda Cerca',
+  AppLocale.searchCardSubtitle: 'Mostra la scheda di ricerca nella griglia',
 
   AppLocale.configureDirectories: 'Configura Directory',
   AppLocale.configureRomsFolder: 'Configura Cartella ROM',
@@ -533,16 +529,12 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.applyToAll: 'Applica a tutti i conflitti',
   AppLocale.applyToAllDesc: 'Usa questa scelta per i conflitti rimanenti',
 
-  AppLocale.account: 'Account',
   AppLocale.scraping: 'Scraping',
   AppLocale.scrapeMode: 'Modalità Scraping',
-  AppLocale.scrapeModeSub: 'Scegli cosa cercare',
   AppLocale.media: 'Media',
-  AppLocale.mediaSub: 'Scegli i tipi di media da scaricare',
   AppLocale.language: 'Lingua',
   AppLocale.languageSub: 'Lingua preferita per i metadati',
   AppLocale.preferredLanguage: 'Lingua Prefererita',
-  AppLocale.region: 'Regione',
   AppLocale.regionSub: 'Imposta priorità regione per lo scraping',
   AppLocale.regionPriority: 'Priorità Regione',
   AppLocale.regionPrioritySub:
@@ -560,10 +552,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.logoutError: 'Errore durante la disconnessione',
   AppLocale.newContentOnly: 'Solo nuovo contenuto',
   AppLocale.allContent: 'Tutto il contenuto',
-  AppLocale.scrapeModeUpdated: 'Modalità scraping aggiornata a :',
   AppLocale.scrapeModeError:
       'Errore durante l’aggiornamento della modalità scraping',
-  AppLocale.languageUpdated: 'Lingua aggiornata con successo',
   AppLocale.languageError: 'Errore durante l’aggiornamento della lingua',
   AppLocale.mediaSettingsError:
       'Errore durante il salvataggio delle impostazioni media',
@@ -792,6 +782,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.requiresFreeAccount: 'Richiede un account gratuito',
   AppLocale.createAccountAt: 'Crea un account su',
   AppLocale.toGetCredentials: ' per ottenere le tue credenziali.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
+  AppLocale.metadata: 'Metadati',
   AppLocale.screenScraperLogin: 'Login ScreenScraper',
   AppLocale.scanningSystemsRoms: 'Scansione sistemi e ROM...',
   AppLocale.ofSystems: '{scanned} di {total} sistemi',
@@ -1169,17 +1161,12 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.filterGenre: 'Genere',
   AppLocale.filterRating: 'Valutazione',
   AppLocale.filterYear: 'Anno',
-  AppLocale.filterAchievements: 'Obiettivi',
-  AppLocale.raCoverageMatched: 'Sì',
-  AppLocale.raCoverageNoSet: 'No',
   AppLocale.raCoverageUnknown: 'Sconosciuto',
   AppLocale.filterAny: 'Tutti',
   AppLocale.filterSource: 'Origine',
   AppLocale.sourceLocal: 'Su questo dispositivo',
   AppLocale.searchRatingLocalOnly:
       'Il filtro valutazione si applica solo ai giochi locali',
-  AppLocale.searchAchievementsLocalOnly:
-      'Il filtro obiettivi si applica solo ai giochi locali',
   AppLocale.searchNoRommEquivalent:
       'RomM non ha nulla classificato come «{value}»',
   AppLocale.resetPlayTimeConfirm: 'Reimposta tempo di gioco',

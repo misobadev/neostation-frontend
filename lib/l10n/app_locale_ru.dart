@@ -237,14 +237,10 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.showAchievementsTab: 'Показывать вкладку достижений',
   AppLocale.showAchievementsTabSubtitle:
       'Отображает вкладку RetroAchievements на панели навигации',
-  AppLocale.showScraperTab: 'Показывать вкладку скрапера',
-  AppLocale.showScraperTabSubtitle:
-      'Отображает вкладку скрапинга на панели навигации',
   AppLocale.showRommTab: 'Показывать вкладку RomM',
   AppLocale.showRommTabSubtitle: 'Отображает вкладку RomM на панели навигации',
-  AppLocale.showSearchTab: 'Показывать вкладку поиска',
-  AppLocale.showSearchTabSubtitle:
-      'Отображает вкладку поиска на панели навигации',
+  AppLocale.searchCard: 'Карточка поиска',
+  AppLocale.searchCardSubtitle: 'Показать карточку поиска в сетке систем',
 
   AppLocale.configureDirectories: 'Директории',
   AppLocale.configureRomsFolder: 'Настроить папку ROM',
@@ -527,16 +523,12 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.applyToAll: 'Применить ко всем конфликтам',
   AppLocale.applyToAllDesc: 'Использовать этот выбор для остальных конфликтов',
 
-  AppLocale.account: 'Аккаунт',
   AppLocale.scraping: 'Скрапинг',
   AppLocale.scrapeMode: 'Режим скрапинга',
-  AppLocale.scrapeModeSub: 'Выберите контент для получения',
   AppLocale.media: 'Медиа',
-  AppLocale.mediaSub: 'Выберите типы медиа для загрузки',
   AppLocale.language: 'Язык',
   AppLocale.languageSub: 'Выберите предпочтительный язык для метаданных',
   AppLocale.preferredLanguage: 'Предпочтительный язык',
-  AppLocale.region: 'Регион',
   AppLocale.regionSub: 'Установить приоритет регионов для скрапинга',
   AppLocale.regionPriority: 'Приоритет регионов',
   AppLocale.regionPrioritySub:
@@ -554,9 +546,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.logoutError: 'Ошибка при выходе',
   AppLocale.newContentOnly: 'Только новый контент',
   AppLocale.allContent: 'Весь контент',
-  AppLocale.scrapeModeUpdated: 'Режим скрапинга обновлен на:',
   AppLocale.scrapeModeError: 'Ошибка при обновлении режима скрапинга',
-  AppLocale.languageUpdated: 'Язык успешно обновлен',
   AppLocale.languageError: 'Ошибка при обновлении языка',
   AppLocale.mediaSettingsError: 'Ошибка при сохранении настроек медиа',
   AppLocale.newContentOnlyDesc:
@@ -782,6 +772,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.requiresFreeAccount: 'Требуется бесплатный аккаунт',
   AppLocale.createAccountAt: 'Создайте аккаунт на ',
   AppLocale.toGetCredentials: ' , чтобы получить данные аккаунта.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
+  AppLocale.metadata: 'Метаданные',
   AppLocale.screenScraperLogin: 'Вход в ScreenScraper',
   AppLocale.scanningSystemsRoms: 'Сканирование систем и ROM...',
   AppLocale.ofSystems: '{scanned} из {total} систем',
@@ -1141,17 +1133,12 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.filterGenre: 'Жанр',
   AppLocale.filterRating: 'Рейтинг',
   AppLocale.filterYear: 'Год',
-  AppLocale.filterAchievements: 'Достижения',
-  AppLocale.raCoverageMatched: 'Есть',
-  AppLocale.raCoverageNoSet: 'Нет',
   AppLocale.raCoverageUnknown: 'Неизвестно',
   AppLocale.filterAny: 'Любой',
   AppLocale.filterSource: 'Источник',
   AppLocale.sourceLocal: 'На этом устройстве',
   AppLocale.searchRatingLocalOnly:
       'Фильтр рейтинга применяется только к локальным играм',
-  AppLocale.searchAchievementsLocalOnly:
-      'Фильтр достижений применяется только к локальным играм',
   AppLocale.searchNoRommEquivalent: 'В RomM ничего не отнесено к «{value}»',
   AppLocale.resetPlayTimeConfirm: 'Сбросить время игры',
   AppLocale.resetPlayTimeConfirmBody:
