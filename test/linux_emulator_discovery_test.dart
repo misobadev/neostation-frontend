@@ -15,6 +15,7 @@ import 'package:path/path.dart' as p;
 /// fixture tree shaped like the real thing.
 void main() {
   late Directory home;
+  final systemLibretroDirs = LinuxEmulatorDiscovery.systemLibretroDirs;
 
   /// Creates an executable file, and the directories leading to it.
   File exe(String relativePath, [String contents = '#!/bin/bash\n']) {
@@ -34,6 +35,8 @@ void main() {
     // Point the removable-media scan at an empty fixture path by default, so a
     // test never depends on whether the host running it has an SD card mounted.
     LinuxEmulatorDiscovery.removableMediaRoot = p.join(home.path, 'no-media');
+    // Likewise for system-wide RetroArch cores under /usr.
+    LinuxEmulatorDiscovery.systemLibretroDirs = const [];
     LinuxEmulatorDiscovery.invalidateCache();
   });
 
@@ -41,6 +44,7 @@ void main() {
     LinuxEmulatorDiscovery.homeOverride = null;
     LinuxEmulatorDiscovery.linuxOverride = false;
     LinuxEmulatorDiscovery.removableMediaRoot = '/run/media';
+    LinuxEmulatorDiscovery.systemLibretroDirs = systemLibretroDirs;
     LinuxEmulatorDiscovery.invalidateCache();
     if (home.existsSync()) home.deleteSync(recursive: true);
   });
@@ -345,6 +349,19 @@ void main() {
           p.join(home.path, 'bin/retroarch'),
         ),
         cores.path,
+      );
+    });
+
+    test('falls back to a system-wide cores dir', () async {
+      final systemCores = Directory(p.join(home.path, 'usr/lib/libretro'))
+        ..createSync(recursive: true);
+      LinuxEmulatorDiscovery.systemLibretroDirs = [systemCores.path];
+
+      expect(
+        await LinuxEmulatorDiscovery.resolveRetroArchCoresDir(
+          p.join(home.path, 'nowhere/retroarch'),
+        ),
+        systemCores.path,
       );
     });
 
