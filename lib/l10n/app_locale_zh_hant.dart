@@ -669,6 +669,14 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.errorSavingCredentials: '儲存憑證時發生錯誤',
   AppLocale.invalidCredentials: '憑證無效',
   AppLocale.loginError: '登入錯誤：{error}',
+  AppLocale.screenScraperUsernameHint: '請使用您的 ScreenScraper 使用者名稱，而不是電子郵件地址。',
+  AppLocale.screenScraperUseUsernameNotEmail:
+      '請輸入您的 ScreenScraper 使用者名稱，而不是電子郵件地址。API 不接受電子郵件。',
+  AppLocale.screenScraperApiClosed: 'ScreenScraper API 暫時無法使用。請稍後再試。',
+  AppLocale.screenScraperAppOutdated:
+      'ScreenScraper 不再接受此應用程式版本。請更新 NeoStation。',
+  AppLocale.screenScraperQuotaReached: '已達到 ScreenScraper 每日配額。請明天再試。',
+  AppLocale.screenScraperConnectionError: '無法連線到 ScreenScraper。請檢查您的網路連線並重試。',
   AppLocale.whatIsScreenScraper: '什麼是 ScreenScraper？',
   AppLocale.screenScraperDescription: 'ScreenScraper 是一個提供高品質中繼資料、封面和影片的協作資料庫。',
   AppLocale.automaticMetadataMedia: '自動中繼資料和媒體',

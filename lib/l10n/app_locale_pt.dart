@@ -765,6 +765,18 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.errorSavingCredentials: 'Erro ao salvar credenciais',
   AppLocale.invalidCredentials: 'As credenciais fornecidas são inválidas',
   AppLocale.loginError: 'Erro de login: {error}',
+  AppLocale.screenScraperUsernameHint:
+      'Use seu nome de usuário do ScreenScraper, não seu email.',
+  AppLocale.screenScraperUseUsernameNotEmail:
+      'Digite seu nome de usuário do ScreenScraper, não seu email. A API não aceita email.',
+  AppLocale.screenScraperApiClosed:
+      'A API do ScreenScraper está temporariamente indisponível. Tente novamente mais tarde.',
+  AppLocale.screenScraperAppOutdated:
+      'O ScreenScraper não aceita mais esta versão do app. Atualize o NeoStation.',
+  AppLocale.screenScraperQuotaReached:
+      'Cota diária do ScreenScraper atingida. Tente novamente amanhã.',
+  AppLocale.screenScraperConnectionError:
+      'Não foi possível alcançar o ScreenScraper. Verifique sua conexão e tente novamente.',
   AppLocale.whatIsScreenScraper: 'O que é ScreenScraper?',
   AppLocale.screenScraperDescription:
       'ScreenScraper é um banco de dados colaborativo que fornece metadados, capas e vídeos de alta qualidade para seus jogos.',

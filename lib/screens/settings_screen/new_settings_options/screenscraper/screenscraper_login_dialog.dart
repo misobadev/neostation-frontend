@@ -122,19 +122,23 @@ class _ScreenScraperLoginDialogState extends State<ScreenScraperLoginDialog>
     });
 
     try {
+      final username = _usernameController.text.trim();
+      final password = _passwordController.text;
+
       // Verify credentials with ScreenScraper
       final result = await ScreenScraperService.verifyCredentials(
-        _usernameController.text.trim(),
-        _passwordController.text,
+        username,
+        password,
       );
 
-      if (result != null) {
+      if (result.isSuccess) {
         // Valid credentials - save to DB with user information
-        final userInfo = result['response']['ssuser'] as Map<String, dynamic>;
+        final userInfo =
+            result.data!['response']['ssuser'] as Map<String, dynamic>;
 
         final saved = await ScreenScraperService.saveCredentials(
-          _usernameController.text.trim(),
-          _passwordController.text,
+          username,
+          password,
           userInfo,
         );
 
@@ -185,10 +189,9 @@ class _ScreenScraperLoginDialogState extends State<ScreenScraperLoginDialog>
         }
       } else {
         if (!mounted) return;
-        // Invalid credentials
         AppNotification.showNotification(
           context,
-          AppLocale.invalidCredentials.getString(context),
+          _loginFailureMessage(result.failure, username),
           type: NotificationType.error,
         );
       }
@@ -207,6 +210,33 @@ class _ScreenScraperLoginDialogState extends State<ScreenScraperLoginDialog>
           _isLoading = false;
         });
       }
+    }
+  }
+
+  /// Localized message for a refused login.
+  ///
+  /// When the credentials were rejected and the input looks like an email, the
+  /// message points at the username: the API only matches the ScreenScraper
+  /// username, while the website also accepts the account email.
+  String _loginFailureMessage(
+    ScreenScraperAuthFailure? failure,
+    String username,
+  ) {
+    switch (failure) {
+      case ScreenScraperAuthFailure.apiClosed:
+        return AppLocale.screenScraperApiClosed.getString(context);
+      case ScreenScraperAuthFailure.appOutdated:
+        return AppLocale.screenScraperAppOutdated.getString(context);
+      case ScreenScraperAuthFailure.quotaExceeded:
+        return AppLocale.screenScraperQuotaReached.getString(context);
+      case ScreenScraperAuthFailure.networkError:
+        return AppLocale.screenScraperConnectionError.getString(context);
+      case ScreenScraperAuthFailure.invalidCredentials:
+      case ScreenScraperAuthFailure.unknown:
+      case null:
+        return username.contains('@')
+            ? AppLocale.screenScraperUseUsernameNotEmail.getString(context)
+            : AppLocale.invalidCredentials.getString(context);
     }
   }
 
@@ -297,6 +327,11 @@ class _ScreenScraperLoginDialogState extends State<ScreenScraperLoginDialog>
             context,
             Symbols.verified_user_rounded,
             AppLocale.requiresFreeAccount.getString(context),
+          ),
+          _buildInfoItem(
+            context,
+            Symbols.person_rounded,
+            AppLocale.screenScraperUsernameHint.getString(context),
           ),
           SizedBox(height: 6.r),
           RichText(
@@ -416,6 +451,11 @@ class _ScreenScraperLoginDialogState extends State<ScreenScraperLoginDialog>
               child: TextField(
                 controller: _usernameController,
                 focusNode: _usernameFocus,
+                // A screen keyboard must not silently alter the username: no
+                // autocorrect, no suggestions and no auto-capitalization.
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.none,
                 decoration: InputDecoration(
                   labelText: AppLocale.username.getString(context),
                   labelStyle: TextStyle(

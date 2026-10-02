@@ -689,6 +689,18 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.errorSavingCredentials: '로그인 정보를 저장하지 못했습니다',
   AppLocale.invalidCredentials: '로그인 정보가 올바르지 않습니다',
   AppLocale.loginError: '로그인 오류: {error}',
+  AppLocale.screenScraperUsernameHint:
+      'ScreenScraper 사용자 이름을 사용하세요. 이메일 주소는 사용할 수 없습니다.',
+  AppLocale.screenScraperUseUsernameNotEmail:
+      'ScreenScraper 사용자 이름을 입력하세요. 이메일 주소는 사용할 수 없습니다. API는 이메일을 허용하지 않습니다.',
+  AppLocale.screenScraperApiClosed:
+      'ScreenScraper API를 일시적으로 사용할 수 없습니다. 나중에 다시 시도하세요.',
+  AppLocale.screenScraperAppOutdated:
+      'ScreenScraper에서 이 앱 버전을 더 이상 허용하지 않습니다. NeoStation을 업데이트하세요.',
+  AppLocale.screenScraperQuotaReached:
+      'ScreenScraper 일일 할당량에 도달했습니다. 내일 다시 시도하세요.',
+  AppLocale.screenScraperConnectionError:
+      'ScreenScraper에 연결할 수 없습니다. 인터넷 연결을 확인하고 다시 시도하세요.',
   AppLocale.whatIsScreenScraper: 'ScreenScraper란?',
   AppLocale.screenScraperDescription:
       'ScreenScraper는 게임의 고품질 메타데이터, 표지, 영상을 제공하는 공동 데이터베이스입니다.',
