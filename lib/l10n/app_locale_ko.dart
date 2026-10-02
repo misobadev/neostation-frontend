@@ -143,7 +143,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.nowPlayingDockEnabled: '앱 Dock',
   AppLocale.nowPlayingDockEnabledSubtitle: '보조 화면에 앱 Dock을 표시합니다',
   AppLocale.nowPlayingDockSlots: 'Dock 슬롯 수',
-  AppLocale.nowPlayingDockSlotsSubtitle: '앱 Dock에 표시할 슬롯 수를 설정합니다(1~5개)',
+  AppLocale.nowPlayingDockSlotsSubtitle: '앱 Dock에 표시할 슬롯 수를 설정합니다(0~5개)',
   AppLocale.nowPlayingFanartDim: '팬아트 어둡기',
   AppLocale.nowPlayingFanartDimSubtitle:
       '복잡한 팬아트가 로고를 방해하지 않도록 로고 뒤의 배경을 어둡게 표시합니다',

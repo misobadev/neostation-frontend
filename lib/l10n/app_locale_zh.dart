@@ -141,7 +141,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.nowPlayingDockEnabled: '应用坞',
   AppLocale.nowPlayingDockEnabledSubtitle: '在副屏上显示应用坞',
   AppLocale.nowPlayingDockSlots: '应用坞槽位',
-  AppLocale.nowPlayingDockSlotsSubtitle: '应用坞显示多少个应用槽位 (1-5)',
+  AppLocale.nowPlayingDockSlotsSubtitle: '应用坞显示多少个应用槽位 (0-5)',
   AppLocale.nowPlayingFanartDim: '变暗同人图',
   AppLocale.nowPlayingFanartDimSubtitle: '变暗标志后面的背景艺术，以免繁杂的同人图与之冲突',
   AppLocale.nowPlayingDimOff: '关闭',

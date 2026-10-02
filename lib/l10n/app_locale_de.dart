@@ -167,7 +167,7 @@ const Map<String, dynamic> appLocaleDe = {
       'App-Dock auf dem Zweitbildschirm anzeigen',
   AppLocale.nowPlayingDockSlots: 'Dock-Plätze',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'Wie viele App-Plätze das Dock anzeigt (1-5)',
+      'Wie viele App-Plätze das Dock anzeigt (0-5)',
   AppLocale.nowPlayingFanartDim: 'Fanart abdunkeln',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Hintergrundbild hinter dem Logo abdunkeln, damit ein unruhiges Fanart nicht stört',

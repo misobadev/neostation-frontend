@@ -11,7 +11,7 @@ class ConfigModel {
   static const int dockMaxSlots = 5;
 
   /// Smallest and largest number of dock slots the user may choose to show.
-  static const int dockMinSlotCount = 1;
+  static const int dockMinSlotCount = 0;
   static const int dockMaxSlotCount = dockMaxSlots;
 
   /// Coerces an arbitrary value into a fixed-length [dockMaxSlots] list of

@@ -166,7 +166,7 @@ const Map<String, dynamic> appLocaleRu = {
       'Показывать док приложений на втором экране',
   AppLocale.nowPlayingDockSlots: 'Слоты дока',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'Сколько слотов приложений показывает док (1-5)',
+      'Сколько слотов приложений показывает док (0-5)',
   AppLocale.nowPlayingFanartDim: 'Затемнять фанарт',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Затемнять фон за логотипом, чтобы яркий фанарт не мешал',

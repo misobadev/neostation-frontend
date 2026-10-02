@@ -174,7 +174,7 @@ const Map<String, dynamic> appLocaleFr = {
       'Afficher le dock d\'applications sur l\'écran secondaire',
   AppLocale.nowPlayingDockSlots: 'Emplacements du dock',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'Combien d\'emplacements le dock affiche (1-5)',
+      'Combien d\'emplacements le dock affiche (0-5)',
   AppLocale.nowPlayingFanartDim: 'Atténuer le fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Assombrir l\'arrière-plan derrière le logo pour éviter les conflits visuels',

@@ -169,7 +169,7 @@ const Map<String, dynamic> appLocaleIt = {
       'Mostra il dock app sullo schermo secondario',
   AppLocale.nowPlayingDockSlots: 'Posti dock',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'Quanti posti app mostra il dock (1-5)',
+      'Quanti posti app mostra il dock (0-5)',
   AppLocale.nowPlayingFanartDim: 'Oscura fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Oscura lo sfondo dietro il logo per evitare conflitti con fanart elaborati',

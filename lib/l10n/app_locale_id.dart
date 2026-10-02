@@ -164,7 +164,7 @@ const Map<String, dynamic> appLocaleId = {
       'Tampilkan dock aplikasi di layar sekunder',
   AppLocale.nowPlayingDockSlots: 'Slot dock',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'Berapa banyak slot aplikasi yang ditampilkan dock (1-5)',
+      'Berapa banyak slot aplikasi yang ditampilkan dock (0-5)',
   AppLocale.nowPlayingFanartDim: 'Redupkan fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Gelapkan seni latar belakang di belakang logo agar fanart yang ramai tidak bertabrakan',

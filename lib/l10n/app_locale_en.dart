@@ -162,7 +162,7 @@ const Map<String, dynamic> appLocaleEn = {
       'Show the app dock on the secondary screen',
   AppLocale.nowPlayingDockSlots: 'Dock slots',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'How many app slots the dock shows (1-5)',
+      'How many app slots the dock shows (0-5)',
   AppLocale.nowPlayingFanartDim: 'Dim fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Darken the background art behind the logo so a busy fanart does not clash with it',
