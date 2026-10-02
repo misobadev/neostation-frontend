@@ -56,6 +56,24 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Updates the preferred List view text and row size.
+  Future<void> updateGameListSize(String gameListSize) async {
+    final normalized = const {'S', 'M', 'L', 'XL'}.contains(gameListSize)
+        ? gameListSize
+        : 'S';
+    if (_config.gameListSize == normalized) return;
+
+    _config = _config.copyWith(gameListSize: normalized);
+    // Publish first so the open game screen updates on the same input event;
+    // serialize writes so rapid size changes cannot persist out of order.
+    _notify();
+    final save = _pendingGameListSizeSave.then(
+      (_) => SqliteConfigService.saveConfig(_config),
+    );
+    _pendingGameListSizeSave = save.catchError((_) {});
+    await save;
+  }
+
   /// Updates the preferred card style for the game carousel ('fanart' or 'box').
   Future<void> updateGameCarouselCardStyle(String cardStyle) async {
     _config = _config.copyWith(gameCarouselCardStyle: cardStyle);
@@ -80,6 +98,13 @@ extension SqliteConfigMutators on SqliteConfigProvider {
 
   Future<void> updateHideRecentCard(bool value) async {
     _config = _config.copyWith(hideRecentCard: value);
+    await SqliteConfigService.saveConfig(_config);
+    _notify();
+  }
+
+  /// Shows or hides the Search card on the systems screen.
+  Future<void> updateHideSearchCard(bool value) async {
+    _config = _config.copyWith(hideSearchCard: value);
     await SqliteConfigService.saveConfig(_config);
     _notify();
   }
@@ -177,6 +202,17 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     await SystemRepository.setSubfolderViewForAll(value);
     // The in-memory system models still carry the old per-system flag.
     await refreshDetectedSystems();
+    _notify();
+  }
+
+  /// Updates whether system cards hide their logo footer and render square.
+  ///
+  /// Purely visual, so unlike [updateSubfolderViewAll] it needs no per-system
+  /// stamping: the grid and carousel read the config directly.
+  Future<void> updateHideSystemLogos(bool value) async {
+    if (_config.hideSystemLogos == value) return;
+    _config = _config.copyWith(hideSystemLogos: value);
+    await SqliteConfigService.saveConfig(_config);
     _notify();
   }
 

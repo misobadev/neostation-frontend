@@ -149,7 +149,9 @@ class DatabaseTestHelper {
         hide_tab_scraper INTEGER DEFAULT 0,
         hide_tab_romm INTEGER DEFAULT 0,
         hide_tab_search INTEGER DEFAULT 0,
+        hide_search_card INTEGER DEFAULT 1,
         game_grid_columns TEXT DEFAULT 'M',
+        game_list_size TEXT DEFAULT 'S',
         game_carousel_card_style TEXT DEFAULT 'fanart',
         dock_apps TEXT,
         dock_enabled INTEGER DEFAULT 1,
@@ -161,6 +163,7 @@ class DatabaseTestHelper {
         show_cloud_sync_icon INTEGER DEFAULT 1,
         ra_match_on_startup INTEGER DEFAULT 0,
         subfolder_view_all INTEGER DEFAULT 0,
+        hide_system_logos INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
         neoglass_border_width REAL DEFAULT 2

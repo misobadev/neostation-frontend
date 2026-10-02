@@ -59,7 +59,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.themes: 'Themes',
   AppLocale.systemArt: 'System Art',
   AppLocale.systemArtSubtitle:
-      'Customize system card backgrounds and logos with System Art packs',
+      'Customize system card backgrounds with System Art packs',
   AppLocale.systemArtNone: 'None',
   AppLocale.systemArtNoneSubtitle: 'Default appearance',
   AppLocale.systemArtLoading: 'Loading System Art...',
@@ -71,6 +71,15 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.systemArtRedownloadBody:
       'The cached pack will be deleted and downloaded again. Use this if some system backgrounds are missing.',
   AppLocale.systemArtDownloading: 'Downloading System Art pack...',
+  AppLocale.systemArtByAuthor: 'by {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} downloads',
+  AppLocale.systemArtSystemsCovered: '{count} systems',
+  AppLocale.systemArtSupport: 'Support',
+  AppLocale.systemArtApplied: 'Applied',
+  AppLocale.systemArtHideLogos: 'Hide system logos',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Hide the logo on system cards when the background already includes one',
   AppLocale.about: 'About',
   AppLocale.exit: 'Exit',
   AppLocale.launcher: 'Launcher',
@@ -168,7 +177,7 @@ const Map<String, dynamic> appLocaleEn = {
       'Show the app dock on the secondary screen',
   AppLocale.nowPlayingDockSlots: 'Dock slots',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'How many app slots the dock shows (1-5)',
+      'How many app slots the dock shows (0-5)',
   AppLocale.nowPlayingFanartDim: 'Dim fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Darken the background art behind the logo so a busy fanart does not clash with it',
@@ -238,14 +247,10 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.showAchievementsTab: 'Show Achievements tab',
   AppLocale.showAchievementsTabSubtitle:
       'Display the RetroAchievements tab in the navigation bar',
-  AppLocale.showScraperTab: 'Show Scraper tab',
-  AppLocale.showScraperTabSubtitle:
-      'Display the Scraping tab in the navigation bar',
   AppLocale.showRommTab: 'Show RomM tab',
   AppLocale.showRommTabSubtitle: 'Display the RomM tab in the navigation bar',
-  AppLocale.showSearchTab: 'Show Search tab',
-  AppLocale.showSearchTabSubtitle:
-      'Display the Search tab in the navigation bar',
+  AppLocale.searchCard: 'Search Card',
+  AppLocale.searchCardSubtitle: 'Show the Search card in the systems grid',
 
   AppLocale.configureDirectories: 'Directories',
   AppLocale.configureRomsFolder: 'Configure ROMs folder',
@@ -523,16 +528,12 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.applyToAll: 'Apply to all conflicts',
   AppLocale.applyToAllDesc: 'Use this choice for remaining conflicts',
 
-  AppLocale.account: 'Account',
   AppLocale.scraping: 'Scraping',
   AppLocale.scrapeMode: 'Scrape Mode',
-  AppLocale.scrapeModeSub: 'Choose what content to scrape',
   AppLocale.media: 'Media',
-  AppLocale.mediaSub: 'Choose what content types to download',
   AppLocale.language: 'Language',
   AppLocale.languageSub: 'Select preferred language for game metadata',
   AppLocale.preferredLanguage: 'Preferred Language',
-  AppLocale.region: 'Region',
   AppLocale.regionSub: 'Set region priority for scraping',
   AppLocale.regionPriority: 'Region Priority',
   AppLocale.regionPrioritySub:
@@ -550,9 +551,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.logoutError: 'Error during logout',
   AppLocale.newContentOnly: 'New content only',
   AppLocale.allContent: 'All content',
-  AppLocale.scrapeModeUpdated: 'Scrape mode updated to:',
   AppLocale.scrapeModeError: 'Error updating scrape mode',
-  AppLocale.languageUpdated: 'Language updated successfully',
   AppLocale.languageError: 'Error updating language',
   AppLocale.mediaSettingsError: 'Error saving media settings',
   AppLocale.newContentOnlyDesc:
@@ -675,6 +674,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.descending: 'Descending',
   AppLocale.viewModeGroup: 'VIEW MODE',
   AppLocale.cardSizeGroup: 'CARD SIZE',
+  AppLocale.listSizeGroup: 'LIST SIZE',
   AppLocale.cardStyleGroup: 'CARD STYLE',
   AppLocale.fanartCard: 'Fanart',
   AppLocale.boxCard: 'Box',
@@ -767,6 +767,18 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.errorSavingCredentials: 'Error saving credentials',
   AppLocale.invalidCredentials: 'Invalid credentials provided',
   AppLocale.loginError: 'Login error: {error}',
+  AppLocale.screenScraperUsernameHint:
+      'Use your ScreenScraper username, not your email address.',
+  AppLocale.screenScraperUseUsernameNotEmail:
+      'Enter your ScreenScraper username, not your email address. The API does not accept email.',
+  AppLocale.screenScraperApiClosed:
+      "ScreenScraper's API is temporarily unavailable. Please try again later.",
+  AppLocale.screenScraperAppOutdated:
+      'This app version is no longer accepted by ScreenScraper. Please update NeoStation.',
+  AppLocale.screenScraperQuotaReached:
+      'ScreenScraper daily quota reached. Please try again tomorrow.',
+  AppLocale.screenScraperConnectionError:
+      'Could not reach ScreenScraper. Check your internet connection and try again.',
   AppLocale.whatIsScreenScraper: 'What is ScreenScraper?',
   AppLocale.screenScraperDescription:
       'ScreenScraper is a collaborative database that provides high-quality metadata, covers, and videos for your games.',
@@ -775,6 +787,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.requiresFreeAccount: 'Requires a free account',
   AppLocale.createAccountAt: 'Create an account at ',
   AppLocale.toGetCredentials: ' to get your Account credentials.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
+  AppLocale.metadata: 'Metadata',
   AppLocale.screenScraperLogin: 'ScreenScraper Login',
   AppLocale.scanningSystemsRoms: 'Scanning systems and ROMs...',
   AppLocale.ofSystems: '{scanned} of {total} systems',
@@ -1138,17 +1152,12 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.filterGenre: 'Genre',
   AppLocale.filterRating: 'Rating',
   AppLocale.filterYear: 'Year',
-  AppLocale.filterAchievements: 'Achievements',
-  AppLocale.raCoverageMatched: 'Yes',
-  AppLocale.raCoverageNoSet: 'No',
   AppLocale.raCoverageUnknown: 'Unknown',
   AppLocale.filterAny: 'Any',
   AppLocale.filterSource: 'Source',
   AppLocale.sourceLocal: 'On this device',
   AppLocale.searchRatingLocalOnly:
       'The rating filter applies to local games only',
-  AppLocale.searchAchievementsLocalOnly:
-      'The achievements filter applies to local games only',
   AppLocale.searchNoRommEquivalent: 'RomM has nothing filed under “{value}”',
   AppLocale.resetPlayTimeConfirm: 'Reset Play Time',
   AppLocale.resetPlayTimeConfirmBody:
@@ -1326,17 +1335,17 @@ const Map<String, dynamic> appLocaleEn = {
       'Already using ES-DE? Import your game metadata and artwork. Select the '
       'main ES-DE folder containing your "gamelists" and "downloaded_media" '
       'folders. Optional; you can run it later from Settings.',
-  AppLocale.wizardArtPackTitle: 'Get the NeoStation Art Pack',
+  AppLocale.wizardArtPackTitle: 'Get a System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'We strongly recommend downloading the NeoStation system art pack for '
-      'beautiful console backgrounds across your library. It can be changed '
-      'later in Settings.',
-  AppLocale.wizardDownloadArtPack: 'Download Art Pack',
+      'We strongly recommend downloading a System Art Pack (SAP) for beautiful '
+      'console backgrounds across your library. You can change it later in '
+      'Settings.',
+  AppLocale.wizardDownloadArtPack: 'Download System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      'Art pack installed! You can explore more themes later in Settings.',
+      'System Art Pack installed! You can explore more packs later in Settings.',
   AppLocale.wizardArtPackUnavailable:
-      'The art pack couldn\'t be reached right now. You can install it later '
-      'from Settings once you\'re online.',
+      'The System Art Pack couldn\'t be reached right now. You can install it '
+      'later from Settings once you\'re online.',
 
   // Hide / unhide games
   AppLocale.hideGame: 'Hide Game',

@@ -6,23 +6,38 @@ import 'package:neostation/widgets/custom_notification.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
-import '../../services/game_service.dart' show GamepadNavigationManager;
-import '../app_screen.dart' show AppNavigation;
+import 'package:neostation/services/game_service.dart'
+    show GamepadNavigationManager;
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
-import '../../utils/login_form_selection.dart';
+import 'package:neostation/utils/login_form_selection.dart';
 
-class ScraperLoginScreen extends StatefulWidget {
-  final VoidCallback? onLoginSuccess;
+/// ScreenScraper sign-in form, shown as a modal over the settings screen.
+///
+/// Owns its own gamepad layer while open. B leaves a focused text field first
+/// and closes the dialog on the next press.
+class ScreenScraperLoginDialog extends StatefulWidget {
+  const ScreenScraperLoginDialog({super.key});
 
-  const ScraperLoginScreen({super.key, this.onLoginSuccess});
+  /// Opens the dialog. Resolves to true once credentials were verified and
+  /// saved, false if the user backed out.
+  static Future<bool> show(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => const ScreenScraperLoginDialog(),
+    );
+    return result ?? false;
+  }
 
   @override
-  State<ScraperLoginScreen> createState() => _ScraperLoginScreenState();
+  State<ScreenScraperLoginDialog> createState() =>
+      _ScreenScraperLoginDialogState();
 }
 
-class _ScraperLoginScreenState extends State<ScraperLoginScreen>
-    with LoginFormSelection<ScraperLoginScreen> {
+class _ScreenScraperLoginDialogState extends State<ScreenScraperLoginDialog>
+    with LoginFormSelection<ScreenScraperLoginDialog> {
+  static const String _layerId = 'screenscraper_login_dialog';
+
   GamepadNavigation? _gamepadNav;
 
   final TextEditingController _usernameController = TextEditingController();
@@ -48,25 +63,32 @@ class _ScraperLoginScreenState extends State<ScraperLoginScreen>
       onNavigateUp: _navigateUp,
       onNavigateDown: _navigateDown,
       onSelectItem: _selectCurrentField,
-      onPreviousTab: AppNavigation.previousTab,
-      onNextTab: AppNavigation.nextTab,
-      onLeftBumper: AppNavigation.previousTab,
-      onRightBumper: AppNavigation.nextTab,
       allowRepeat: false,
       isTextFieldFocused: isAnyFieldFocused,
-      onBack: exitTextEntry,
+      onBack: _handleBack,
     );
-    _gamepadNav!.initialize();
-    GamepadNavigationManager.pushLayer(
-      'scraper_login_screen',
-      onActivate: () => _gamepadNav?.activate(),
-      onDeactivate: () => _gamepadNav?.deactivate(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _gamepadNav!.initialize();
+      GamepadNavigationManager.pushLayer(
+        _layerId,
+        onActivate: () => _gamepadNav?.activate(),
+        onDeactivate: () => _gamepadNav?.deactivate(),
+      );
+    });
+  }
+
+  void _handleBack() {
+    if (isAnyFieldFocused()) {
+      exitTextEntry();
+    } else if (!_isLoading) {
+      Navigator.of(context).pop(false);
+    }
   }
 
   @override
   void dispose() {
-    GamepadNavigationManager.popLayer('scraper_login_screen');
+    GamepadNavigationManager.popLayer(_layerId);
     _gamepadNav?.dispose();
     detachFocusSelectionListeners();
     _usernameController.dispose();
@@ -100,19 +122,23 @@ class _ScraperLoginScreenState extends State<ScraperLoginScreen>
     });
 
     try {
+      final username = _usernameController.text.trim();
+      final password = _passwordController.text;
+
       // Verify credentials with ScreenScraper
       final result = await ScreenScraperService.verifyCredentials(
-        _usernameController.text.trim(),
-        _passwordController.text,
+        username,
+        password,
       );
 
-      if (result != null) {
+      if (result.isSuccess) {
         // Valid credentials - save to DB with user information
-        final userInfo = result['response']['ssuser'] as Map<String, dynamic>;
+        final userInfo =
+            result.data!['response']['ssuser'] as Map<String, dynamic>;
 
         final saved = await ScreenScraperService.saveCredentials(
-          _usernameController.text.trim(),
-          _passwordController.text,
+          username,
+          password,
           userInfo,
         );
 
@@ -152,8 +178,7 @@ class _ScraperLoginScreenState extends State<ScraperLoginScreen>
             );
           }
 
-          // Notify parent to change view
-          widget.onLoginSuccess?.call();
+          if (mounted) Navigator.of(context).pop(true);
         } else {
           if (!mounted) return;
           AppNotification.showNotification(
@@ -164,10 +189,9 @@ class _ScraperLoginScreenState extends State<ScraperLoginScreen>
         }
       } else {
         if (!mounted) return;
-        // Invalid credentials
         AppNotification.showNotification(
           context,
-          AppLocale.invalidCredentials.getString(context),
+          _loginFailureMessage(result.failure, username),
           type: NotificationType.error,
         );
       }
@@ -181,40 +205,63 @@ class _ScraperLoginScreenState extends State<ScraperLoginScreen>
         type: NotificationType.error,
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// Localized message for a refused login.
+  ///
+  /// When the credentials were rejected and the input looks like an email, the
+  /// message points at the username: the API only matches the ScreenScraper
+  /// username, while the website also accepts the account email.
+  String _loginFailureMessage(
+    ScreenScraperAuthFailure? failure,
+    String username,
+  ) {
+    switch (failure) {
+      case ScreenScraperAuthFailure.apiClosed:
+        return AppLocale.screenScraperApiClosed.getString(context);
+      case ScreenScraperAuthFailure.appOutdated:
+        return AppLocale.screenScraperAppOutdated.getString(context);
+      case ScreenScraperAuthFailure.quotaExceeded:
+        return AppLocale.screenScraperQuotaReached.getString(context);
+      case ScreenScraperAuthFailure.networkError:
+        return AppLocale.screenScraperConnectionError.getString(context);
+      case ScreenScraperAuthFailure.invalidCredentials:
+      case ScreenScraperAuthFailure.unknown:
+      case null:
+        return username.contains('@')
+            ? AppLocale.screenScraperUseUsernameNotEmail.getString(context)
+            : AppLocale.invalidCredentials.getString(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors
-          .transparent, // Transparent to show the shared background shader
-      body: SafeArea(
+    final theme = Theme.of(context);
+    return Dialog(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      insetPadding: EdgeInsets.all(16.r),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(16.r),
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(vertical: 64.r, horizontal: 16.r),
-          child: Center(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.r),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      constraints: BoxConstraints(maxWidth: 260.r),
-                      child: _buildLoginForm(context),
-                    ),
-                    SizedBox(width: 16.r),
-                    SizedBox(width: 300.r, child: _buildInfoBox(context)),
-                  ],
-                ),
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                constraints: BoxConstraints(maxWidth: 260.r),
+                child: _buildLoginForm(context),
               ),
-            ),
+              SizedBox(width: 16.r),
+              SizedBox(width: 300.r, child: _buildInfoBox(context)),
+            ],
           ),
         ),
       ),
@@ -280,6 +327,11 @@ class _ScraperLoginScreenState extends State<ScraperLoginScreen>
             context,
             Symbols.verified_user_rounded,
             AppLocale.requiresFreeAccount.getString(context),
+          ),
+          _buildInfoItem(
+            context,
+            Symbols.person_rounded,
+            AppLocale.screenScraperUsernameHint.getString(context),
           ),
           SizedBox(height: 6.r),
           RichText(
@@ -399,6 +451,11 @@ class _ScraperLoginScreenState extends State<ScraperLoginScreen>
               child: TextField(
                 controller: _usernameController,
                 focusNode: _usernameFocus,
+                // A screen keyboard must not silently alter the username: no
+                // autocorrect, no suggestions and no auto-capitalization.
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.none,
                 decoration: InputDecoration(
                   labelText: AppLocale.username.getString(context),
                   labelStyle: TextStyle(

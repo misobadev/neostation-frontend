@@ -11,7 +11,7 @@ import 'package:neostation/services/user_data_location_service.dart';
 import 'package:neostation/services/screenshot_service.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
-import 'package:neostation/services/neo_assets_service.dart';
+import 'package:neostation/widgets/system_art_pack_tile.dart';
 import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/services/esde_import_service.dart';
 import 'package:neostation/services/global_notification_service.dart';
@@ -21,6 +21,7 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import '../widgets/tv_directory_picker.dart';
 import '../widgets/folder_not_empty_dialog.dart';
+import 'core_footer.dart';
 import '../models/secondary_display_state.dart';
 
 /// Initial configuration wizard for the first time the app is opened
@@ -49,6 +50,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
   // --- Art-pack step state (optional final step) ---
   bool _isDownloadingArt = false;
+
+  /// Folder of the pack selected in the art-pack list. Empty means "use the
+  /// recommended pack" (first non-AI), resolved when the list is built.
+  String _selectedArtPackFolder = '';
+
+  /// Scrolls the art-pack list so the D-pad selection stays on screen.
+  final ScrollController _artPackScrollController = ScrollController();
+  final List<GlobalKey> _artPackKeys = [];
 
   /// Whether All-Files (storage) access is currently granted.
   bool _storageGranted = false;
@@ -194,9 +203,43 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       onBack: () {
         _handleSkip();
       },
+      onNavigateUp: () => _moveArtPackSelection(-1),
+      onNavigateDown: () => _moveArtPackSelection(1),
     );
     _gamepadNav?.initialize();
     _gamepadNav?.activate();
+  }
+
+  /// Moves the art-pack list selection by [delta] (D-pad up/down). A no-op on
+  /// every other wizard step.
+  void _moveArtPackSelection(int delta) {
+    if (_currentStep != _stepArtPack) return;
+    final neoAssets = context.read<NeoAssetsProvider>();
+    final themes = neoAssets.themes;
+    if (themes.isEmpty) return;
+    final current = _effectiveArtPackFolder(neoAssets);
+    final index = themes.indexWhere((t) => t.folder == current);
+    final next = (index + delta).clamp(0, themes.length - 1);
+    if (next == index) return;
+    setState(() => _selectedArtPackFolder = themes[next].folder);
+    _ensureArtPackVisible(next);
+  }
+
+  /// Scrolls the art-pack list so the tile at [index] is visible. Runs after
+  /// the frame so the newly selected tile's key has a context to scroll to.
+  void _ensureArtPackVisible(int index) {
+    if (index < 0 || index >= _artPackKeys.length) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final tileContext = _artPackKeys[index].currentContext;
+      if (tileContext == null) return;
+      Scrollable.ensureVisible(
+        tileContext,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+      );
+    });
   }
 
   @override
@@ -204,6 +247,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _secondaryDisplayState?.removeListener(_onSecondaryStateChanged);
     _gamepadNav?.dispose();
+    _artPackScrollController.dispose();
     // Shared singleton — never dispose the instance.
     super.dispose();
   }
@@ -745,35 +789,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           SizedBox(height: isLandscape ? 12.r : 20.r),
 
           // "Change Location" inline button
-          OutlinedButton(
-            onPressed: _isSelectingUserDataFolder
+          GamepadControl(
+            icon: Symbols.folder_rounded,
+            label: AppLocale.selectUserDataFolder.getString(context),
+            onTap: _isSelectingUserDataFolder
                 ? null
                 : () => _selectUserDataLocationWizard(),
-            style: OutlinedButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 10.r),
-              side: BorderSide(
-                color: theme.colorScheme.primary.withValues(alpha: 0.5),
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.r),
-              ),
-            ),
-            child: _isSelectingUserDataFolder
-                ? SizedBox(
-                    width: 18.r,
-                    height: 18.r,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.r,
-                      color: theme.colorScheme.primary,
-                    ),
-                  )
-                : Text(
-                    AppLocale.selectUserDataFolder.getString(context),
-                    style: TextStyle(
-                      fontSize: textSize,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
+            busy: _isSelectingUserDataFolder,
+            textColor: theme.colorScheme.primary,
           ),
         ],
       ),
@@ -1376,7 +1399,23 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       builder: (context, neoAssets, child) {
         final hasTheme = neoAssets.hasActiveTheme;
         final unavailable = neoAssets.themes.isEmpty;
+        final themes = neoAssets.themes;
+        // The selected pack: the user's choice, or the recommended (first
+        // non-AI) pack until they pick one.
+        final selectedFolder = _selectedArtPackFolder.isNotEmpty
+            ? _selectedArtPackFolder
+            : (themes.isEmpty
+                  ? ''
+                  : themes
+                        .firstWhere((t) => !t.isAi, orElse: () => themes.first)
+                        .folder);
+        if (_artPackKeys.length != themes.length) {
+          _artPackKeys
+            ..clear()
+            ..addAll(List.generate(themes.length, (_) => GlobalKey()));
+        }
         return SingleChildScrollView(
+          controller: _artPackScrollController,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -1416,60 +1455,21 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                 textAlign: TextAlign.center,
               ),
 
-              // Small preview thumbnail of the recommended pack.
-              if (!hasTheme && !unavailable && !neoAssets.downloading) ...[
-                Builder(
-                  builder: (context) {
-                    final recommended = neoAssets.themes.firstWhere(
-                      (t) => !t.isAi,
-                      orElse: () => neoAssets.themes.first,
-                    );
-                    final previewUrl = NeoAssetsTheme.normalizePreviewUrl(
-                      recommended.previewUrl,
-                    );
-                    if (previewUrl.isEmpty) return const SizedBox.shrink();
-                    final thumbWidth = isLandscape ? 120.r : 150.r;
-                    return Padding(
-                      padding: EdgeInsets.only(top: isLandscape ? 10.r : 16.r),
-                      child: Container(
-                        width: thumbWidth,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10.r),
-                          border: Border.all(
-                            color: theme.colorScheme.primary.withValues(
-                              alpha: 0.3,
-                            ),
-                            width: 1.r,
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(9.r),
-                          child: AspectRatio(
-                            aspectRatio: 4 / 3,
-                            child: Image.network(
-                              previewUrl,
-                              fit: BoxFit.cover,
-                              loadingBuilder: (_, child, progress) =>
-                                  progress == null
-                                  ? child
-                                  : Container(color: theme.colorScheme.surface),
-                              errorBuilder: (_, _, _) => Container(
-                                color: theme.colorScheme.surface,
-                                child: Icon(
-                                  Symbols.image_rounded,
-                                  size: 24.r,
-                                  color: theme.colorScheme.onSurface.withValues(
-                                    alpha: 0.3,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+              // The pack list. Tapping a row selects it; the main button
+              // downloads the selected pack.
+              if (!unavailable && !neoAssets.downloading) ...[
+                SizedBox(height: isLandscape ? 10.r : 16.r),
+                for (int i = 0; i < themes.length; i++)
+                  SystemArtPackTile(
+                    key: _artPackKeys[i],
+                    pack: themes[i],
+                    mosaicSize: isLandscape ? 48 : 56,
+                    isSelected: themes[i].folder == selectedFolder,
+                    isActive: neoAssets.isThemeActive(themes[i].folder),
+                    onTap: () => setState(
+                      () => _selectedArtPackFolder = themes[i].folder,
+                    ),
+                  ),
               ],
 
               // Live download progress.
@@ -1679,9 +1679,11 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     final themes = neoAssets.themes;
     if (themes.isEmpty) return;
 
-    // Recommended pack: first non-AI theme, falling back to the first theme.
-    final recommended = themes.firstWhere(
-      (t) => !t.isAi,
+    // The pack the user selected in the list, or the recommended (first non-AI)
+    // pack until they pick one.
+    final selectedFolder = _effectiveArtPackFolder(neoAssets);
+    final selected = themes.firstWhere(
+      (t) => t.folder == selectedFolder,
       orElse: () => themes.first,
     );
 
@@ -1696,7 +1698,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     bool applied = false;
     try {
       applied = await neoAssets.downloadAndApplyTheme(
-        recommended.folder,
+        selected.folder,
         systemFolders,
       );
     } catch (e) {
@@ -1730,45 +1732,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               // Next button only when scan completes
-              ElevatedButton(
-                onPressed: provider.scanCompleted
+              GamepadControl(
+                iconPath: 'assets/images/gamepad/Xbox_A_button.png',
+                label: AppLocale.next.getString(context),
+                onTap: provider.scanCompleted
                     ? () => _handleMainAction()
                     : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 20.r,
-                    vertical: 12.r,
-                  ),
-                  elevation: 4,
-                  shadowColor: theme.colorScheme.primary.withValues(alpha: 0.4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                  ),
-                  disabledBackgroundColor: theme.colorScheme.primary.withValues(
-                    alpha: 0.3,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/images/gamepad/Xbox_A_button.png',
-                      width: 20.r,
-                      height: 20.r,
-                      color: theme.colorScheme.onPrimary,
-                    ),
-                    SizedBox(width: 8.r),
-                    Text(
-                      AppLocale.next.getString(context),
-                      style: TextStyle(
-                        fontSize: 14.r,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+                backgroundColor: theme.colorScheme.primary,
+                textColor: theme.colorScheme.onPrimary,
               ),
             ],
           );
@@ -1805,91 +1776,29 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             if (showSkip)
-              TextButton(
-                onPressed: () => _handleSkip(),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 16.r,
-                    vertical: 8.r,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/images/gamepad/Xbox_B_button.png',
-                      width: 20.r,
-                      height: 20.r,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                    SizedBox(width: 8.r),
-                    Text(
-                      AppLocale.skipForNow.getString(context),
-                      style: TextStyle(
-                        fontSize: 12.r,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              GamepadControl(
+                iconPath: 'assets/images/gamepad/Xbox_B_button.png',
+                label: AppLocale.skipForNow.getString(context),
+                onTap: () => _handleSkip(),
+                textColor: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               )
             else
               SizedBox(width: 64.r),
 
             // Main action button
-            ElevatedButton(
-              onPressed:
+            GamepadControl(
+              iconPath: 'assets/images/gamepad/Xbox_A_button.png',
+              label: _getButtonText(),
+              onTap:
                   (_isSelectingFolder ||
                       _isImportingEsde ||
                       _isDownloadingArt ||
                       artLoading)
                   ? null
                   : () => _handleMainAction(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                padding: EdgeInsets.symmetric(horizontal: 20.r, vertical: 12.r),
-                elevation: 4,
-                shadowColor: theme.colorScheme.primary.withValues(alpha: 0.4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16.r),
-                ),
-                disabledBackgroundColor: theme.colorScheme.primary.withValues(
-                  alpha: 0.3,
-                ),
-              ),
-              child: (_isSelectingFolder || artLoading)
-                  ? SizedBox(
-                      width: 20.r,
-                      height: 20.r,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.r,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          theme.colorScheme.onPrimary,
-                        ),
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          'assets/images/gamepad/Xbox_A_button.png',
-                          width: 20.r,
-                          height: 20.r,
-                          color: theme.colorScheme.onPrimary,
-                        ),
-                        SizedBox(width: 8.r),
-                        Text(
-                          _getButtonText(),
-                          style: TextStyle(
-                            fontSize: 14.r,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
+              busy: _isSelectingFolder || artLoading,
+              backgroundColor: theme.colorScheme.primary,
+              textColor: theme.colorScheme.onPrimary,
             ),
           ],
         );
@@ -1916,16 +1825,26 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           : AppLocale.esdeRunImport.getString(context);
     }
     if (_currentStep == _stepArtPack) {
-      // Offer download until a theme is installed (or none are available),
-      // then the primary action finishes setup.
+      // Offer download until the selected pack is installed (or none are
+      // available), then the primary action finishes setup.
       final neoAssets = context.read<NeoAssetsProvider>();
       final canDownload =
-          !neoAssets.hasActiveTheme && neoAssets.themes.isNotEmpty;
+          neoAssets.themes.isNotEmpty &&
+          _effectiveArtPackFolder(neoAssets) != neoAssets.activeThemeFolder;
       return canDownload
-          ? AppLocale.wizardDownloadArtPack.getString(context)
+          ? AppLocale.download.getString(context)
           : AppLocale.finish.getString(context);
     }
     return AppLocale.next.getString(context);
+  }
+
+  /// The pack the wizard would download: the user's selection, or the
+  /// recommended (first non-AI) pack until they pick one.
+  String _effectiveArtPackFolder(NeoAssetsProvider neoAssets) {
+    final themes = neoAssets.themes;
+    if (themes.isEmpty) return '';
+    if (_selectedArtPackFolder.isNotEmpty) return _selectedArtPackFolder;
+    return themes.firstWhere((t) => !t.isAi, orElse: () => themes.first).folder;
   }
 
   Future<void> _handleMainAction() async {
@@ -1975,7 +1894,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     if (_currentStep == _stepArtPack) {
       final neoAssets = context.read<NeoAssetsProvider>();
       final canDownload =
-          !neoAssets.hasActiveTheme && neoAssets.themes.isNotEmpty;
+          neoAssets.themes.isNotEmpty &&
+          _effectiveArtPackFolder(neoAssets) != neoAssets.activeThemeFolder;
       if (canDownload) {
         await _downloadWizardArtPack();
       } else {

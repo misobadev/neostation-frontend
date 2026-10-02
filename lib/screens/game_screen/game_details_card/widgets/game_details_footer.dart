@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
@@ -49,6 +51,8 @@ class GameDetailsFooter extends StatelessWidget {
 
   /// Opens the per-game settings dialog — the same one Start opens.
   final VoidCallback onOpenGameSettings;
+  final TextScaler? textScaler;
+  final TextScaler? playTextScaler;
 
   /// Walks the card to its game info tab. The score chip's tap target: the
   /// number is a summary of the facts that tab holds, so pressing it goes to
@@ -71,6 +75,8 @@ class GameDetailsFooter extends StatelessWidget {
     required this.onToggleFavorite,
     required this.onOpenGameSettings,
     required this.onShowGameInfo,
+    this.textScaler,
+    this.playTextScaler,
   });
 
   @override
@@ -122,111 +128,195 @@ class GameDetailsFooter extends StatelessWidget {
       bottom: -0.5.r,
       left: -0.5.r,
       right: -0.5.r,
-      child: ClipRRect(
-        child: RepaintBoundary(
-          child: Container(
-            padding: EdgeInsets.only(
-              left: 12.r,
-              right: 12.r,
-              bottom: _bottomPadding.r,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // The line above the row: the ROM filename on the left, the
-                // play-time clock on the right.
-                //
-                // The clock had this line to itself and the filename was not
-                // rendered anywhere on the card. They pair well: the reading is
-                // a fixed, short glyph+digits block that wants the right edge,
-                // and the name is the one variable-width thing here, so giving
-                // it whatever the clock leaves costs the clock nothing and puts
-                // the name back without a third line.
-                SizedBox(
-                  height: _clockLine.r,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Takes the line's whole width when there is no reading
-                      // beside it, and scrolls when it is longer than what it
-                      // gets.
-                      Expanded(child: _InlineRomFileName(game: game)),
-                      if (hasPlayTime) ...[
-                        SizedBox(width: 10.r),
-                        _InlinePlayTime(game: game),
-                      ],
-                    ],
-                  ),
-                ),
-                SizedBox(height: _clockRowGap.r),
-                SizedBox(
-                  height: _bottomRowHeight,
-                  // The whole row is touch-only. Every action on it has a
-                  // hardware binding already (A launches, Y opens the context
-                  // menu, Start opens settings), and a focusable widget inside
-                  // the card would put a second cursor in a view that owns its
-                  // own selection.
-                  child: ExcludeFocus(
+      child: MediaQuery(
+        data: textScaler == null
+            ? MediaQuery.of(context)
+            : MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: ClipRRect(
+          child: RepaintBoundary(
+            child: Container(
+              padding: EdgeInsets.only(
+                left: 12.r,
+                right: 12.r,
+                bottom: _bottomPadding.r,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // The line above the row: the ROM filename on the left, the
+                  // play-time clock on the right.
+                  //
+                  // The clock had this line to itself and the filename was not
+                  // rendered anywhere on the card. They pair well: the reading is
+                  // a fixed, short glyph+digits block that wants the right edge,
+                  // and the name is the one variable-width thing here, so giving
+                  // it whatever the clock leaves costs the clock nothing and puts
+                  // the name back without a third line.
+                  SizedBox(
+                    height: _clockLine.r,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Readouts first: the score, then the achievements pill
-                        // taking whatever the controls leave it.
-                        if (hasRating) ...[
-                          _InlineRating(game: game, onTap: onShowGameInfo),
-                          SizedBox(width: _rowGap),
+                        // Takes the line's whole width when there is no reading
+                        // beside it, and scrolls when it is longer than what it
+                        // gets.
+                        Expanded(child: _InlineRomFileName(game: game)),
+                        if (hasPlayTime) ...[
+                          SizedBox(width: 10.r),
+                          _InlinePlayTime(game: game),
                         ],
-                        Expanded(
-                          child: showsAchievements
-                              ? Align(
-                                  // Left, so a capped pill leaves its slack between
-                                  // itself and the controls rather than beside the
-                                  // score.
-                                  alignment: Alignment.centerLeft,
-                                  child: LayoutBuilder(
-                                    builder: (context, constraints) =>
-                                        _buildCompactAchievementsIndicator(
-                                          context,
-                                          availableWidth: constraints.maxWidth,
-                                        ),
-                                  ),
-                                )
-                              // Nothing to report, but the slot stays: it is what
-                              // pushes the controls to the right margin.
-                              : const SizedBox.shrink(),
-                        ),
-                        SizedBox(width: _rowGap),
-                        // Controls, in the order the removed rail had them.
-                        if (onShowRandomGame != null) ...[
-                          _FooterActionButton(
-                            // The same dice the Y context menu gives Random, so the
-                            // action carries one glyph wherever it is offered.
-                            icon: Symbols.casino_rounded,
-                            onTap: onShowRandomGame!,
-                          ),
-                          SizedBox(width: _rowGap),
-                        ],
-                        _FooterActionButton(
-                          icon: Symbols.favorite_rounded,
-                          // Filled and tinted when the game is already a
-                          // favourite: the button is a toggle, so its state has to
-                          // be readable without pressing it.
-                          isOn: game.isFavorite == true,
-                          onTap: onToggleFavorite,
-                        ),
-                        SizedBox(width: _rowGap),
-                        _FooterActionButton(
-                          icon: Symbols.settings_rounded,
-                          onTap: onOpenGameSettings,
-                        ),
-                        SizedBox(width: _rowGap),
-                        _buildPlayButton(context),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  SizedBox(height: _clockRowGap.r),
+                  SizedBox(
+                    height: _bottomRowHeight,
+                    // The whole row is touch-only. Every action on it has a
+                    // hardware binding already (A launches, Y opens the context
+                    // menu, Start opens settings), and a focusable widget inside
+                    // the card would put a second cursor in a view that owns its
+                    // own selection.
+                    child: ExcludeFocus(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          // Reserve the achievement action only when it fits
+                          // beside the primary action's A glyph. Play loses its
+                          // label before it contracts around that glyph as the
+                          // available footer width narrows.
+                          final minimumAchievementsWidth = showsAchievements
+                              ? _minimumAchievementsWidth(context)
+                              : 0.0;
+                          final fullControlsWidth =
+                              (hasRating ? _scoreWidth.r : 0) +
+                              (onShowRandomGame != null ? _controlSize.r : 0) +
+                              2 * _controlSize.r +
+                              (3 +
+                                      (hasRating ? 1 : 0) +
+                                      (onShowRandomGame != null ? 1 : 0)) *
+                                  _rowGap;
+                          // Narrower list panels leave less room in the details
+                          // card. Contract the score and icon controls after
+                          // Play loses its label, keeping every action visible.
+                          final compact =
+                              constraints.maxWidth <
+                              fullControlsWidth +
+                                  minimumAchievementsWidth +
+                                  36.r;
+                          final controlWidth =
+                              (compact ? 34.0 : _controlSize).r;
+                          final scoreWidth = (compact ? 56.0 : _scoreWidth).r;
+                          final gap = compact ? 4.r : _rowGap;
+                          final fixedControlsWidth =
+                              (hasRating ? scoreWidth : 0) +
+                              (onShowRandomGame != null ? controlWidth : 0) +
+                              2 * controlWidth +
+                              (3 +
+                                      (hasRating ? 1 : 0) +
+                                      (onShowRandomGame != null ? 1 : 0)) *
+                                  gap;
+                          // PLAY always retains enough space for its A glyph.
+                          // If the achievement pill cannot fit beside that
+                          // minimum, leave the pill unreserved so it can hide
+                          // instead of collapsing the primary action.
+                          final minimumPlayWidth = 32.r;
+                          final reservedAchievementsWidth =
+                              showsAchievements &&
+                                  constraints.maxWidth >=
+                                      fixedControlsWidth +
+                                          minimumAchievementsWidth +
+                                          minimumPlayWidth
+                              ? minimumAchievementsWidth
+                              : 0.0;
+                          final playWidth =
+                              (constraints.maxWidth -
+                                      fixedControlsWidth -
+                                      reservedAchievementsWidth)
+                                  .clamp(minimumPlayWidth, 88.r);
+
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Readouts first: the score, then the achievements pill
+                              // taking whatever the controls leave it.
+                              if (hasRating) ...[
+                                _InlineRating(
+                                  game: game,
+                                  onTap: onShowGameInfo,
+                                  width: scoreWidth,
+                                ),
+                                SizedBox(width: gap),
+                              ],
+                              Expanded(
+                                child: showsAchievements
+                                    ? Align(
+                                        // Left, so a capped pill leaves its slack between
+                                        // itself and the controls rather than beside the
+                                        // score.
+                                        alignment: Alignment.centerLeft,
+                                        child: LayoutBuilder(
+                                          builder: (context, constraints) =>
+                                              _buildCompactAchievementsIndicator(
+                                                context,
+                                                availableWidth:
+                                                    constraints.maxWidth,
+                                              ),
+                                        ),
+                                      )
+                                    // Nothing to report, but the slot stays: it is what
+                                    // pushes the controls to the right margin.
+                                    : const SizedBox.shrink(),
+                              ),
+                              SizedBox(width: gap),
+                              // Controls, in the order the removed rail had them.
+                              if (onShowRandomGame != null) ...[
+                                _FooterActionButton(
+                                  // The same dice the Y context menu gives Random, so the
+                                  // action carries one glyph wherever it is offered.
+                                  icon: Symbols.casino_rounded,
+                                  onTap: onShowRandomGame!,
+                                  size: controlWidth,
+                                ),
+                                SizedBox(width: gap),
+                              ],
+                              _FooterActionButton(
+                                icon: Symbols.favorite_rounded,
+                                // Filled and tinted when the game is already a
+                                // favourite: the button is a toggle, so its state has to
+                                // be readable without pressing it.
+                                isOn: game.isFavorite == true,
+                                onTap: onToggleFavorite,
+                                size: controlWidth,
+                              ),
+                              SizedBox(width: gap),
+                              _FooterActionButton(
+                                icon: Symbols.settings_rounded,
+                                onTap: onOpenGameSettings,
+                                size: controlWidth,
+                              ),
+                              SizedBox(width: gap),
+                              MediaQuery(
+                                data: playTextScaler == null
+                                    ? MediaQuery.of(context)
+                                    : MediaQuery.of(
+                                        context,
+                                      ).copyWith(textScaler: playTextScaler),
+                                child: SizedBox(
+                                  width: playWidth,
+                                  child: _buildPlayButton(
+                                    context,
+                                    width: playWidth,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -241,7 +331,8 @@ class GameDetailsFooter extends StatelessWidget {
   /// routes there are: the rail that carried every other touch affordance went
   /// with it, and a games view whose one visible control was an achievements
   /// pill gave touch nothing to press.
-  Widget _buildPlayButton(BuildContext context) {
+  Widget _buildPlayButton(BuildContext context, {required double width}) {
+    final showLabel = width >= 88.r;
     // The one control on the row that keeps the theme's corner. Fully rounded
     // it read as one more chip in the set, and PLAY is not one of the set --
     // it is the row's primary action, and the squarer corner is part of what
@@ -251,13 +342,11 @@ class GameDetailsFooter extends StatelessWidget {
         BorderRadius.circular(14.r);
 
     return Container(
-      // Deliberately a fixed width. The achievements pill beside it is
-      // Expanded, so anything this button takes comes straight out of that
-      // pill; long labels are absorbed by scaling the text down rather than by
-      // growing the button (see the FittedBox below). 88 rather than 80 since
-      // the row grew: the badge and the label grew with it, and at 80 the
-      // English label was the one being scaled down to fit.
-      width: 88.r,
+      // The row gives this button whatever width remains after reserving the
+      // achievements pill and the other controls. At its preferred width the
+      // localized label fits; when space is tight the row removes the label
+      // first and keeps the A-button action visible.
+      width: width,
       height: _controlSize.r,
       decoration: BoxDecoration(
         color: const Color(0xFF2ECC71),
@@ -285,29 +374,35 @@ class GameDetailsFooter extends StatelessWidget {
             onPlayGame();
           },
           child: Padding(
-            padding: EdgeInsets.only(right: 8.r),
+            // The trailing inset balances the label in the wide button. With
+            // just the A glyph it would shift the glyph off the button centre.
+            padding: EdgeInsets.only(right: showLabel ? 8.r : 0),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Image.asset(
                   'assets/images/gamepad/Xbox_A_button.png',
-                  width: 28.r,
-                  height: 28.r,
+                  width: math.min(
+                    28.r,
+                    math.max(0, width - (showLabel ? 8.r : 4.r)),
+                  ),
+                  height: math.min(
+                    28.r,
+                    math.max(0, width - (showLabel ? 8.r : 4.r)),
+                  ),
                   color: Theme.of(context).colorScheme.onPrimary,
                 ),
-                SizedBox(width: 6.r),
-                // The label is localized and the button is a fixed width, so
-                // only the English "PLAY" fits at the full 13.r: the German,
-                // Russian and CJK labels used to render past its right edge.
-                // scaleDown shrinks just those to fit and never scales up, so
-                // the button's footprint stays constant either way.
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
+                if (showLabel) SizedBox(width: 6.r),
+                // The label is localized and the button is a fixed width. Keep
+                // the type size stable and ellipsize labels that are too long.
+                if (showLabel)
+                  Flexible(
                     child: Text(
                       AppLocale.playButton.getString(context),
                       maxLines: 1,
                       softWrap: false,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onPrimary,
                         fontWeight: FontWeight.w900,
@@ -317,7 +412,6 @@ class GameDetailsFooter extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -388,8 +482,18 @@ class GameDetailsFooter extends StatelessWidget {
   }) {
     if (!_showsAchievements(context)) return const SizedBox.shrink();
 
-    // Nothing rather than a splinter — see [_pillMinWidth].
-    if (availableWidth < _pillMinWidth.r) return const SizedBox.shrink();
+    final String progressText = _achievementProgressText(context);
+    final double minimumWidth = _minimumAchievementsWidth(
+      context,
+      progressText: progressText,
+    );
+
+    // Keep the complete earned/total count visible. The layout reserves this
+    // width only when it fits beside Play's minimum width, so this is reached
+    // only when the footer is genuinely too narrow to hold the badge.
+    if (availableWidth + 0.5 < minimumWidth) {
+      return const SizedBox.shrink();
+    }
 
     // The badge takes its slot up to [_pillMaxWidth] and no further; the slack
     // past that falls between it and the controls, so the row stays "readouts
@@ -409,14 +513,6 @@ class GameDetailsFooter extends StatelessWidget {
     // "Unknown" rather than "No Achievements" when the zero is a gap in what
     // the app could hash instead of an answer from RetroAchievements. See
     // _CompactAchievementsIndicator, which makes the same distinction.
-    final String progressText = total > 0
-        ? (knowsProgress ? '$awarded/$total' : '\u2013/$total')
-        : (isLoadingAchievements
-              ? AppLocale.loading.getString(context)
-              : raCoverageAnswersZero(game.raCoverage)
-              ? AppLocale.noAchievements.getString(context)
-              : AppLocale.raCoverageUnknown.getString(context));
-
     // Whether the earned count is still outstanding for a game that has
     // achievements to earn. The bundled snapshot gives us the total instantly,
     // so this gap is every single selection change: the pill knows "49
@@ -459,7 +555,10 @@ class GameDetailsFooter extends StatelessWidget {
         child: NeoGlass(
           cornerRadius: _bottomRow.r,
           child: SizedBox(
-            width: availableWidth.clamp(0.0, _pillMaxWidth.r),
+            width: availableWidth.clamp(
+              0.0,
+              math.max(_pillMaxWidth.r, minimumWidth),
+            ),
             height: _bottomRowHeight,
             child: Padding(
               // Symmetric 8.r horizontal inset so neither the trophy icon nor the
@@ -548,6 +647,42 @@ class GameDetailsFooter extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _achievementProgressText(BuildContext context) {
+    final int total = _achievementTotal;
+    final int? awarded = currentGameInfo?.numAwardedToUser;
+    final bool knowsProgress = awarded != null && currentGameInfo != null;
+    return total > 0
+        ? (knowsProgress ? '$awarded/$total' : '\u2013/$total')
+        : (isLoadingAchievements
+              ? AppLocale.loading.getString(context)
+              : raCoverageAnswersZero(game.raCoverage)
+              ? AppLocale.noAchievements.getString(context)
+              : AppLocale.raCoverageUnknown.getString(context));
+  }
+
+  double _minimumAchievementsWidth(
+    BuildContext context, {
+    String? progressText,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: (progressText ?? _achievementProgressText(context)).toUpperCase(),
+        style: DefaultTextStyle.of(context).style.copyWith(
+          fontSize: 11.r,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+
+    // Icon + icon/count gap + measured count + horizontal pill padding and a
+    // few pixels of optical breathing room.
+    return _pillIconSize + 6.r + painter.width + 12.r + 10.r;
   }
 }
 
@@ -650,17 +785,6 @@ const double _scoreWidth = 64;
 /// happens to leave would make every change to the row a change to the cap.
 const double _pillMaxWidth = 132;
 
-/// The narrowest the achievements pill can be and still say anything: its
-/// icon, the count and a bar with somewhere to fill.
-///
-/// Below this it is omitted outright rather than drawn as a sliver. The row's
-/// budget is fixed items plus whatever is left, and "whatever is left" has no
-/// floor of its own -- a card narrow enough leaves a few pixels, which is a
-/// dark splinter between two chips rather than a control. Losing the pill on a
-/// card that cannot hold one is the honest outcome; the D-pad still reaches
-/// the achievements tab.
-const double _pillMinWidth = 64;
-
 /// [_bottomRow] unscaled, for the widgets that take a bare `double` and apply
 /// `.r` themselves.
 const double _controlSize = _bottomRow;
@@ -731,11 +855,13 @@ class _FooterActionButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool isOn;
+  final double size;
 
   const _FooterActionButton({
     required this.icon,
     required this.onTap,
     this.isOn = false,
+    required this.size,
   });
 
   @override
@@ -759,11 +885,11 @@ class _FooterActionButton extends StatelessWidget {
         child: NeoGlass(
           cornerRadius: _bottomRow.r,
           child: SizedBox(
-            width: _bottomRowHeight,
-            height: _bottomRowHeight,
+            width: size,
+            height: size,
             child: Icon(
               icon,
-              size: 21.r,
+              size: math.min(21.r, size * 0.55),
               fill: isOn ? 1 : 0,
               color: isOn
                   ? AppThemes.getCustomColors(context).errorColor
@@ -808,11 +934,16 @@ class _FooterActionButton extends StatelessWidget {
 /// to spare.
 class _InlineRating extends StatelessWidget {
   final GameModel game;
+  final double width;
 
   /// Opens the game info tab.
   final VoidCallback onTap;
 
-  const _InlineRating({required this.game, required this.onTap});
+  const _InlineRating({
+    required this.game,
+    required this.onTap,
+    required this.width,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -850,7 +981,7 @@ class _InlineRating extends StatelessWidget {
         child: NeoGlass(
           cornerRadius: _bottomRow.r,
           child: SizedBox(
-            width: _scoreWidth.r,
+            width: width,
             height: _bottomRowHeight,
             child: Padding(
               // Tighter than the row's own gap, because this chip is mostly air at the

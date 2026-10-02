@@ -18,6 +18,32 @@ import '../providers/scraping_provider.dart';
 import '../l10n/app_locale.dart';
 import '../widgets/scraping_summary_dialog.dart';
 
+/// Why ScreenScraper refused a login attempt.
+///
+/// Kept distinct from the raw HTTP status so the UI can explain the failure:
+/// an overloaded API or a blacklisted app version is not a wrong password, and
+/// telling the user to re-check their credentials sends them the wrong way.
+enum ScreenScraperAuthFailure {
+  invalidCredentials,
+  apiClosed,
+  appOutdated,
+  quotaExceeded,
+  networkError,
+  unknown,
+}
+
+/// Outcome of [ScreenScraperService.verifyCredentials].
+class ScreenScraperAuthResult {
+  final Map<String, dynamic>? data;
+  final ScreenScraperAuthFailure? failure;
+
+  const ScreenScraperAuthResult.success(this.data) : failure = null;
+
+  const ScreenScraperAuthResult.failure(this.failure) : data = null;
+
+  bool get isSuccess => data != null;
+}
+
 /// Service responsible for scraping game metadata and media from the
 /// ScreenScraper.fr API.
 ///
@@ -49,22 +75,24 @@ class ScreenScraperService {
   static bool _isMetadataScrapingRunning = false;
 
   /// Authenticates user credentials against the ScreenScraper API.
-  static Future<Map<String, dynamic>?> verifyCredentials(
+  ///
+  /// [username] must be the ScreenScraper account username, not the email the
+  /// website also accepts: `ssid` only matches the username, so an email is
+  /// answered with the same 403 as a wrong password.
+  static Future<ScreenScraperAuthResult> verifyCredentials(
     String username,
     String password,
   ) async {
     try {
       final softname = await ScreenscraperClient.getSoftname();
-      final url = Uri.parse('$_baseUrl/ssuserInfos.php').replace(
-        queryParameters: {
-          'devid': _devId,
-          'devpassword': _devPassword,
-          'softname': softname,
-          'output': 'json',
-          'ssid': username,
-          'sspassword': password,
-        },
-      );
+      final url = buildApiUrl('ssuserInfos.php', {
+        'devid': _devId,
+        'devpassword': _devPassword,
+        'softname': softname,
+        'output': 'json',
+        'ssid': username,
+        'sspassword': password,
+      });
 
       final response = await ScreenscraperClient.httpGetWithRetry(
         url,
@@ -72,24 +100,95 @@ class ScreenScraperService {
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final data = json.decode(response.body) as Map<String, dynamic>;
         if (data['header']['success'] == 'true') {
-          return data;
-        } else {
-          _log.e('Invalid credentials: ${data['header']['error']}');
-          return null;
+          return ScreenScraperAuthResult.success(data);
         }
-      } else if (response.statusCode == 403) {
-        _log.e('Error 403: Invalid credentials');
-        return null;
-      } else {
-        _log.e('HTTP Error ${response.statusCode}: ${response.body}');
-        return null;
+        _log.e(
+          'ScreenScraper rejected the login: ${_summarizeBody(response.body)}',
+        );
+        return const ScreenScraperAuthResult.failure(
+          ScreenScraperAuthFailure.invalidCredentials,
+        );
       }
+
+      return _failureFromResponse(
+        response.statusCode,
+        response.body,
+        endpoint: 'ssuserInfos.php',
+      );
     } catch (e) {
       _log.e('Error verifying credentials: $e');
-      return null;
+      return const ScreenScraperAuthResult.failure(
+        ScreenScraperAuthFailure.networkError,
+      );
     }
+  }
+
+  /// Builds an API URL with every query value percent-encoded.
+  ///
+  /// [Uri.replace] encodes spaces as `+`, but ScreenScraper documents and
+  /// expects `%20` (see its own request examples), and a server-side decoder
+  /// that reads `+` literally would corrupt a password containing a space.
+  /// Encoding each component keeps special characters in usernames and
+  /// passwords intact.
+  @visibleForTesting
+  static Uri buildApiUrl(String endpoint, Map<String, String> params) {
+    final query = params.entries
+        .map(
+          (e) =>
+              '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}',
+        )
+        .join('&');
+    return Uri.parse('$_baseUrl/$endpoint?$query');
+  }
+
+  /// Maps a ScreenScraper HTTP status to a failure the UI can act on.
+  @visibleForTesting
+  static ScreenScraperAuthFailure failureForStatus(int statusCode) {
+    switch (statusCode) {
+      case 403:
+        return ScreenScraperAuthFailure.invalidCredentials;
+      case 401:
+      case 423:
+        // 401: API closed to non-members / overloaded (CPU > 60%).
+        // 423: API closed entirely.
+        return ScreenScraperAuthFailure.apiClosed;
+      case 426:
+        return ScreenScraperAuthFailure.appOutdated;
+      case 429:
+      case 430:
+      case 431:
+        return ScreenScraperAuthFailure.quotaExceeded;
+      default:
+        return ScreenScraperAuthFailure.unknown;
+    }
+  }
+
+  /// Maps a ScreenScraper HTTP error to a failure the UI can act on.
+  ///
+  /// ScreenScraper sends the real reason in the body even on a 403, but it uses
+  /// the same "check the user credentials" wording whether the user or the
+  /// developer credentials are wrong, so the endpoint is what attributes the
+  /// refusal: only `ssuserInfos.php` checks the account password. The body is
+  /// logged so a bug report carries the provider's exact words; the central
+  /// logger redacts any credential that appears in it.
+  static ScreenScraperAuthResult _failureFromResponse(
+    int statusCode,
+    String body, {
+    required String endpoint,
+  }) {
+    final detail = _summarizeBody(body);
+    _log.e(
+      'ScreenScraper $endpoint failed: HTTP $statusCode'
+      '${detail.isEmpty ? '' : ' - $detail'}',
+    );
+    return ScreenScraperAuthResult.failure(failureForStatus(statusCode));
+  }
+
+  /// Collapses a response body to a single log-safe line.
+  static String _summarizeBody(String body) {
+    return body.replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
   /// Persists encrypted ScreenScraper credentials and user tier information
@@ -122,12 +221,12 @@ class ScreenScraperService {
       final username = credentials['username']!;
       final password = credentials['password']!;
 
-      final userInfo = await verifyCredentials(username, password);
-      if (userInfo != null) {
+      final result = await verifyCredentials(username, password);
+      if (result.isSuccess) {
         return await saveCredentials(
           username,
           password,
-          userInfo['response']['ssuser'] as Map<String, dynamic>?,
+          result.data!['response']['ssuser'] as Map<String, dynamic>?,
           credentials['preferred_language'],
         );
       }
@@ -209,16 +308,14 @@ class ScreenScraperService {
       }
 
       final softname = await ScreenscraperClient.getSoftname();
-      final url = Uri.parse('$_baseUrl/systemesListe.php').replace(
-        queryParameters: {
-          'devid': _devId,
-          'devpassword': _devPassword,
-          'softname': softname,
-          'output': 'json',
-          'ssid': credentials['username'],
-          'sspassword': credentials['password'],
-        },
-      );
+      final url = buildApiUrl('systemesListe.php', {
+        'devid': _devId,
+        'devpassword': _devPassword,
+        'softname': softname,
+        'output': 'json',
+        'ssid': credentials['username']!,
+        'sspassword': credentials['password']!,
+      });
 
       final response = await ScreenscraperClient.httpGetWithRetry(
         url,
@@ -424,13 +521,13 @@ class ScreenScraperService {
         targetAppSystemId,
       );
 
-      final queryParameters = {
+      final queryParameters = <String, String>{
         'devid': _devId,
         'devpassword': _devPassword,
         'softname': softname,
         'output': 'json',
-        'ssid': credentials['username'],
-        'sspassword': credentials['password'],
+        'ssid': credentials['username']!,
+        'sspassword': credentials['password']!,
         'systemeid': systemId,
         'romtype': 'rom',
         'romnom': cleanRomName,
@@ -455,9 +552,7 @@ class ScreenScraperService {
         queryParameters['romtaille'] = romSize.toString();
       }
 
-      final url = Uri.parse(
-        '$_baseUrl/jeuInfos.php',
-      ).replace(queryParameters: queryParameters);
+      final url = buildApiUrl('jeuInfos.php', queryParameters);
 
       final response = await ScreenscraperClient.httpGetWithRetry(
         url,

@@ -57,9 +57,9 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.secondaryDisplay: 'Schermo Secondario',
   AppLocale.directories: 'Directory',
   AppLocale.themes: 'Temi',
-  AppLocale.systemArt: 'System Art',
+  AppLocale.systemArt: 'Arte dei sistemi',
   AppLocale.systemArtSubtitle:
-      'Personalizza sfondi e loghi delle schede di sistema con i pacchetti System Art',
+      'Personalizza gli sfondi delle schede di sistema con i pacchetti System Art',
   AppLocale.systemArtNone: 'Nessuno',
   AppLocale.systemArtNoneSubtitle: 'Aspetto predefinito',
   AppLocale.systemArtLoading: 'Caricamento System Art...',
@@ -71,6 +71,15 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.systemArtRedownloadBody:
       'Il pacchetto nella cache verrà eliminato e scaricato di nuovo. Usa questa opzione se mancano alcuni sfondi dei sistemi.',
   AppLocale.systemArtDownloading: 'Download del pacchetto System Art...',
+  AppLocale.systemArtByAuthor: 'di {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} download',
+  AppLocale.systemArtSystemsCovered: '{count} sistemi',
+  AppLocale.systemArtSupport: 'Sostieni',
+  AppLocale.systemArtApplied: 'Applicato',
+  AppLocale.systemArtHideLogos: 'Nascondi i loghi dei sistemi',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Nasconde il logo delle schede di sistema quando lo sfondo lo include già',
   AppLocale.about: 'Informazioni',
   AppLocale.exit: 'Esci',
   AppLocale.launcher: 'Launcher',
@@ -175,7 +184,7 @@ const Map<String, dynamic> appLocaleIt = {
       'Mostra il dock app sullo schermo secondario',
   AppLocale.nowPlayingDockSlots: 'Posti dock',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'Quanti posti app mostra il dock (1-5)',
+      'Quanti posti app mostra il dock (0-5)',
   AppLocale.nowPlayingFanartDim: 'Oscura fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Oscura lo sfondo dietro il logo per evitare conflitti con fanart elaborati',
@@ -244,15 +253,11 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.showAchievementsTab: 'Mostra scheda Obiettivi',
   AppLocale.showAchievementsTabSubtitle:
       'Mostra la scheda RetroAchievements nella barra di navigazione',
-  AppLocale.showScraperTab: 'Mostra scheda Scraper',
-  AppLocale.showScraperTabSubtitle:
-      'Mostra la scheda di scraping nella barra di navigazione',
   AppLocale.showRommTab: 'Mostra scheda RomM',
   AppLocale.showRommTabSubtitle:
       'Mostra la scheda RomM nella barra di navigazione',
-  AppLocale.showSearchTab: 'Mostra scheda Cerca',
-  AppLocale.showSearchTabSubtitle:
-      'Mostra la scheda di ricerca nella barra di navigazione',
+  AppLocale.searchCard: 'Scheda Cerca',
+  AppLocale.searchCardSubtitle: 'Mostra la scheda di ricerca nella griglia',
 
   AppLocale.configureDirectories: 'Configura Directory',
   AppLocale.configureRomsFolder: 'Configura Cartella ROM',
@@ -539,16 +544,12 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.applyToAll: 'Applica a tutti i conflitti',
   AppLocale.applyToAllDesc: 'Usa questa scelta per i conflitti rimanenti',
 
-  AppLocale.account: 'Account',
   AppLocale.scraping: 'Scraping',
   AppLocale.scrapeMode: 'Modalità Scraping',
-  AppLocale.scrapeModeSub: 'Scegli cosa cercare',
   AppLocale.media: 'Media',
-  AppLocale.mediaSub: 'Scegli i tipi di media da scaricare',
   AppLocale.language: 'Lingua',
   AppLocale.languageSub: 'Lingua preferita per i metadati',
   AppLocale.preferredLanguage: 'Lingua Prefererita',
-  AppLocale.region: 'Regione',
   AppLocale.regionSub: 'Imposta priorità regione per lo scraping',
   AppLocale.regionPriority: 'Priorità Regione',
   AppLocale.regionPrioritySub:
@@ -566,10 +567,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.logoutError: 'Errore durante la disconnessione',
   AppLocale.newContentOnly: 'Solo nuovo contenuto',
   AppLocale.allContent: 'Tutto il contenuto',
-  AppLocale.scrapeModeUpdated: 'Modalità scraping aggiornata a :',
   AppLocale.scrapeModeError:
       'Errore durante l’aggiornamento della modalità scraping',
-  AppLocale.languageUpdated: 'Lingua aggiornata con successo',
   AppLocale.languageError: 'Errore durante l’aggiornamento della lingua',
   AppLocale.mediaSettingsError:
       'Errore durante il salvataggio delle impostazioni media',
@@ -695,6 +694,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.descending: 'Decrescente',
   AppLocale.viewModeGroup: 'Modalità Vista',
   AppLocale.cardSizeGroup: 'Dimensione Carta',
+  AppLocale.listSizeGroup: 'DIMENSIONE ELENCO',
   AppLocale.cardStyleGroup: 'Stile Carta',
   AppLocale.fanartCard: 'Fanart',
   AppLocale.boxCard: 'Scatola',
@@ -789,6 +789,18 @@ const Map<String, dynamic> appLocaleIt = {
       'Errore durante il salvataggio delle credenziali',
   AppLocale.invalidCredentials: 'Le credenziali fornite non sono valide',
   AppLocale.loginError: 'Errore di accesso : {error}',
+  AppLocale.screenScraperUsernameHint:
+      'Usa il tuo nome utente ScreenScraper, non la tua email.',
+  AppLocale.screenScraperUseUsernameNotEmail:
+      "Inserisci il tuo nome utente ScreenScraper, non la tua email. L'API non accetta l'email.",
+  AppLocale.screenScraperApiClosed:
+      "L'API di ScreenScraper è temporaneamente non disponibile. Riprova più tardi.",
+  AppLocale.screenScraperAppOutdated:
+      "ScreenScraper non accetta più questa versione dell'app. Aggiorna NeoStation.",
+  AppLocale.screenScraperQuotaReached:
+      'Quota giornaliera ScreenScraper raggiunta. Riprova domani.',
+  AppLocale.screenScraperConnectionError:
+      'Impossibile raggiungere ScreenScraper. Controlla la connessione a internet e riprova.',
   AppLocale.whatIsScreenScraper: 'Cos’è ScreenScraper ?',
   AppLocale.screenScraperDescription:
       'ScreenScraper è un database collaborativo che fornisce metadati, copertine e video di alta qualità per i tuoi giochi.',
@@ -797,6 +809,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.requiresFreeAccount: 'Richiede un account gratuito',
   AppLocale.createAccountAt: 'Crea un account su',
   AppLocale.toGetCredentials: ' per ottenere le tue credenziali.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
+  AppLocale.metadata: 'Metadati',
   AppLocale.screenScraperLogin: 'Login ScreenScraper',
   AppLocale.scanningSystemsRoms: 'Scansione sistemi e ROM...',
   AppLocale.ofSystems: '{scanned} di {total} sistemi',
@@ -1174,17 +1188,12 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.filterGenre: 'Genere',
   AppLocale.filterRating: 'Valutazione',
   AppLocale.filterYear: 'Anno',
-  AppLocale.filterAchievements: 'Obiettivi',
-  AppLocale.raCoverageMatched: 'Sì',
-  AppLocale.raCoverageNoSet: 'No',
   AppLocale.raCoverageUnknown: 'Sconosciuto',
   AppLocale.filterAny: 'Tutti',
   AppLocale.filterSource: 'Origine',
   AppLocale.sourceLocal: 'Su questo dispositivo',
   AppLocale.searchRatingLocalOnly:
       'Il filtro valutazione si applica solo ai giochi locali',
-  AppLocale.searchAchievementsLocalOnly:
-      'Il filtro obiettivi si applica solo ai giochi locali',
   AppLocale.searchNoRommEquivalent:
       'RomM non ha nulla classificato come «{value}»',
   AppLocale.resetPlayTimeConfirm: 'Reimposta tempo di gioco',
@@ -1381,17 +1390,17 @@ const Map<String, dynamic> appLocaleIt = {
       'Seleziona la cartella principale di ES-DE che contiene le cartelle '
       '"gamelists" e "downloaded_media". Facoltativo; puoi eseguirlo più tardi '
       'dalle Impostazioni.',
-  AppLocale.wizardArtPackTitle: 'Ottieni il pacchetto grafico NeoStation',
+  AppLocale.wizardArtPackTitle: 'Ottieni un System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'Consigliamo vivamente di scaricare il pacchetto grafico dei sistemi '
-      'NeoStation per splendidi sfondi delle console in tutta la tua libreria. '
-      'Può essere modificato in seguito nelle Impostazioni.',
-  AppLocale.wizardDownloadArtPack: 'Scarica pacchetto grafico',
+      'Consigliamo vivamente di scaricare un System Art Pack (SAP) per '
+      'splendidi sfondi delle console in tutta la tua libreria. Puoi cambiarlo '
+      'in seguito nelle Impostazioni.',
+  AppLocale.wizardDownloadArtPack: 'Scarica System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      'Pacchetto grafico installato! Puoi esplorare altri temi in seguito nelle '
+      'System Art Pack installato! Puoi esplorare altri pack in seguito nelle '
       'Impostazioni.',
   AppLocale.wizardArtPackUnavailable:
-      'Al momento non è stato possibile raggiungere il pacchetto grafico. Puoi '
+      'Al momento non è stato possibile raggiungere il System Art Pack. Puoi '
       'installarlo in seguito dalle Impostazioni una volta online.',
 
   // Hide / unhide games

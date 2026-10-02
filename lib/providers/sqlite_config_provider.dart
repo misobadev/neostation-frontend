@@ -58,6 +58,7 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool _isFastScan = false;
   bool _initialized = false;
   SecondaryDisplayState? _secondaryDisplayState;
+  Future<void> _pendingGameListSizeSave = Future<void>.value();
   bool _lifecycleObserverAdded = false;
   int _lastMuteToggleTrigger = 0;
   int _lastScreenshotTrigger = 0;

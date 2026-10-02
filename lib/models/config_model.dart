@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'package:neostation/constants/recent_card_sizes.dart';
 import 'emulator_model.dart';
 
+String _normalizeGameListSize(String value) =>
+    const {'S', 'M', 'L', 'XL'}.contains(value) ? value : 'S';
+
 /// Represents the global application configuration and user preferences.
 class ConfigModel {
   /// Maximum number of storable slots in the secondary "Now Playing" app dock.
@@ -11,7 +14,7 @@ class ConfigModel {
   static const int dockMaxSlots = 5;
 
   /// Smallest and largest number of dock slots the user may choose to show.
-  static const int dockMinSlotCount = 1;
+  static const int dockMinSlotCount = 0;
   static const int dockMaxSlotCount = dockMaxSlots;
 
   /// Coerces an arbitrary value into a fixed-length [dockMaxSlots] list of
@@ -138,8 +141,10 @@ class ConfigModel {
   /// Whether the RomM navigation tab is hidden. See [hideTabSync].
   final bool hideTabRomm;
 
-  /// Whether the Search navigation tab is hidden. See [hideTabSync].
-  final bool hideTabSearch;
+  /// Whether the Search card is left off the systems screen. Hidden unless
+  /// the user turns it on in Systems settings (`user_config.hide_search_card`,
+  /// migration v158); search stays reachable from every card's Y menu.
+  final bool hideSearchCard;
 
   /// Seconds of inactivity before the secondary "Now Playing" panel dims, or `0`
   /// to never dim. Only meaningful when a secondary display is active.
@@ -179,6 +184,9 @@ class ConfigModel {
 
   /// Preferred grid column density for the games grid ('S', 'M', 'L', 'XL').
   final String gameGridColumns;
+
+  /// Preferred text and row size for the game list ('S', 'M', 'L', 'XL').
+  final String gameListSize;
 
   /// Preferred card style for the game carousel ('fanart' or 'box').
   final String gameCarouselCardStyle;
@@ -220,6 +228,13 @@ class ConfigModel {
   /// afterwards. This is the value the switch shows, and the one a system added
   /// by a later systems update inherits.
   final bool subfolderViewAll;
+
+  /// Whether system cards hide their logo strip and render as a square.
+  ///
+  /// Some System Art backgrounds already include the console logo, so the
+  /// card's own logo would appear twice. When enabled, the card drops the logo
+  /// footer and becomes a 1:1 tile.
+  final bool hideSystemLogos;
 
   /// Gaussian blur sigma of the frosted-glass chrome (NeoGlass), clamped to
   /// 0–2. `0` (the default) disables the blur entirely (flat translucent
@@ -267,12 +282,13 @@ class ConfigModel {
     this.hideTabAchievements = false,
     this.hideTabScraper = false,
     this.hideTabRomm = false,
-    this.hideTabSearch = false,
+    this.hideSearchCard = true,
     this.activeSyncProvider = 'neosync',
     this.autoUpdateApp = true,
     this.autoUpdateSystems = true,
     this.systemGridColumns = 'M',
     this.gameGridColumns = 'M',
+    this.gameListSize = 'S',
     this.gameCarouselCardStyle = 'fanart',
     this.nowPlayingDimDelay = 3,
     this.nowPlayingDimLevel = 100,
@@ -285,6 +301,7 @@ class ConfigModel {
     this.showCloudSyncIcon = true,
     this.raMatchOnStartup = false,
     this.subfolderViewAll = false,
+    this.hideSystemLogos = false,
     this.neoglassBlur = 0,
     this.neoglassTransparency = 10,
     this.neoglassBorderWidth = 2,
@@ -420,10 +437,11 @@ class ConfigModel {
           (json['hideTabRomm'] ?? json['hide_tab_romm'] ?? 0).toString() ==
               '1' ||
           (json['hideTabRomm'] ?? false).toString().toLowerCase() == 'true',
-      hideTabSearch:
-          (json['hideTabSearch'] ?? json['hide_tab_search'] ?? 0).toString() ==
+      hideSearchCard:
+          (json['hideSearchCard'] ?? json['hide_search_card'] ?? 1)
+                  .toString() ==
               '1' ||
-          (json['hideTabSearch'] ?? false).toString().toLowerCase() == 'true',
+          (json['hideSearchCard'] ?? false).toString().toLowerCase() == 'true',
       activeSyncProvider:
           (json['activeSyncProvider'] ??
                   json['active_sync_provider'] ??
@@ -445,6 +463,9 @@ class ConfigModel {
       gameGridColumns:
           (json['gameGridColumns'] ?? json['game_grid_columns'] ?? 'M')
               .toString(),
+      gameListSize: _normalizeGameListSize(
+        (json['gameListSize'] ?? json['game_list_size'] ?? 'S').toString(),
+      ),
       gameCarouselCardStyle:
           (json['gameCarouselCardStyle'] ??
                   json['game_carousel_card_style'] ??
@@ -513,6 +534,12 @@ class ConfigModel {
               '1' ||
           (json['subfolderViewAll'] ?? false).toString().toLowerCase() ==
               'true',
+      // Absent => 0 => logos shown (the default).
+      hideSystemLogos:
+          (json['hideSystemLogos'] ?? json['hide_system_logos'] ?? 0)
+                  .toString() ==
+              '1' ||
+          (json['hideSystemLogos'] ?? false).toString().toLowerCase() == 'true',
       // Absent => 0 => blur off (the default). The frosted blur is only smooth
       // on a powerful GPU, so it starts disabled.
       neoglassBlur:
@@ -596,12 +623,13 @@ class ConfigModel {
       'hideTabAchievements': hideTabAchievements,
       'hideTabScraper': hideTabScraper,
       'hideTabRomm': hideTabRomm,
-      'hideTabSearch': hideTabSearch,
+      'hideSearchCard': hideSearchCard,
       'activeSyncProvider': activeSyncProvider,
       'autoUpdateApp': autoUpdateApp,
       'autoUpdateSystems': autoUpdateSystems,
       'systemGridColumns': systemGridColumns,
       'gameGridColumns': gameGridColumns,
+      'gameListSize': gameListSize,
       'gameCarouselCardStyle': gameCarouselCardStyle,
       'nowPlayingDimDelay': nowPlayingDimDelay,
       'nowPlayingDimLevel': nowPlayingDimLevel,
@@ -614,6 +642,7 @@ class ConfigModel {
       'showCloudSyncIcon': showCloudSyncIcon,
       'raMatchOnStartup': raMatchOnStartup,
       'subfolderViewAll': subfolderViewAll,
+      'hideSystemLogos': hideSystemLogos,
       'neoglassBlur': neoglassBlur,
       'neoglassTransparency': neoglassTransparency,
       'neoglassBorderWidth': neoglassBorderWidth,
@@ -651,12 +680,13 @@ class ConfigModel {
     bool? hideTabAchievements,
     bool? hideTabScraper,
     bool? hideTabRomm,
-    bool? hideTabSearch,
+    bool? hideSearchCard,
     String? activeSyncProvider,
     bool? autoUpdateApp,
     bool? autoUpdateSystems,
     String? systemGridColumns,
     String? gameGridColumns,
+    String? gameListSize,
     String? gameCarouselCardStyle,
     int? nowPlayingDimDelay,
     int? nowPlayingDimLevel,
@@ -669,6 +699,7 @@ class ConfigModel {
     bool? showCloudSyncIcon,
     bool? raMatchOnStartup,
     bool? subfolderViewAll,
+    bool? hideSystemLogos,
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
@@ -703,12 +734,13 @@ class ConfigModel {
       hideTabAchievements: hideTabAchievements ?? this.hideTabAchievements,
       hideTabScraper: hideTabScraper ?? this.hideTabScraper,
       hideTabRomm: hideTabRomm ?? this.hideTabRomm,
-      hideTabSearch: hideTabSearch ?? this.hideTabSearch,
+      hideSearchCard: hideSearchCard ?? this.hideSearchCard,
       activeSyncProvider: activeSyncProvider ?? this.activeSyncProvider,
       autoUpdateApp: autoUpdateApp ?? this.autoUpdateApp,
       autoUpdateSystems: autoUpdateSystems ?? this.autoUpdateSystems,
       systemGridColumns: systemGridColumns ?? this.systemGridColumns,
       gameGridColumns: gameGridColumns ?? this.gameGridColumns,
+      gameListSize: gameListSize ?? this.gameListSize,
       gameCarouselCardStyle:
           gameCarouselCardStyle ?? this.gameCarouselCardStyle,
       nowPlayingDimDelay: nowPlayingDimDelay ?? this.nowPlayingDimDelay,
@@ -723,6 +755,7 @@ class ConfigModel {
       showCloudSyncIcon: showCloudSyncIcon ?? this.showCloudSyncIcon,
       raMatchOnStartup: raMatchOnStartup ?? this.raMatchOnStartup,
       subfolderViewAll: subfolderViewAll ?? this.subfolderViewAll,
+      hideSystemLogos: hideSystemLogos ?? this.hideSystemLogos,
       neoglassBlur: neoglassBlur ?? this.neoglassBlur,
       neoglassTransparency: neoglassTransparency ?? this.neoglassTransparency,
       neoglassBorderWidth: neoglassBorderWidth ?? this.neoglassBorderWidth,

@@ -56,8 +56,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.secondaryDisplay: 'セカンダリ画面',
   AppLocale.directories: 'ディレクトリ',
   AppLocale.themes: 'テーマ',
-  AppLocale.systemArt: 'System Art',
-  AppLocale.systemArtSubtitle: 'System Art パックでシステムカードの背景とロゴをカスタマイズ',
+  AppLocale.systemArt: 'システムアート',
+  AppLocale.systemArtSubtitle: 'System Art パックでシステムカードの背景をカスタマイズ',
   AppLocale.systemArtNone: 'なし',
   AppLocale.systemArtNoneSubtitle: 'デフォルトの外観',
   AppLocale.systemArtLoading: 'System Art を読み込み中...',
@@ -69,6 +69,14 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.systemArtRedownloadBody:
       'キャッシュされたパックを削除して再度ダウンロードします。一部のシステム背景が表示されない場合に使用してください。',
   AppLocale.systemArtDownloading: 'System Art パックをダウンロード中...',
+  AppLocale.systemArtByAuthor: '{author} 作',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: 'ダウンロード {count} 回',
+  AppLocale.systemArtSystemsCovered: '{count} システム',
+  AppLocale.systemArtSupport: '支援する',
+  AppLocale.systemArtApplied: '適用済み',
+  AppLocale.systemArtHideLogos: 'システムロゴを非表示',
+  AppLocale.systemArtHideLogosSubtitle: '背景にロゴが含まれている場合、システムカードのロゴを隠します',
   AppLocale.about: 'NeoStationについて',
   AppLocale.exit: '終了',
   AppLocale.launcher: 'ランチャー',
@@ -152,7 +160,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.nowPlayingDockEnabled: 'アプリドック',
   AppLocale.nowPlayingDockEnabledSubtitle: 'セカンダリ画面にアプリドックを表示',
   AppLocale.nowPlayingDockSlots: 'ドックスロット',
-  AppLocale.nowPlayingDockSlotsSubtitle: 'ドックに表示するアプリスロット数 (1-5)',
+  AppLocale.nowPlayingDockSlotsSubtitle: 'ドックに表示するアプリスロット数 (0-5)',
   AppLocale.nowPlayingFanartDim: 'ファンアートを暗くする',
   AppLocale.nowPlayingFanartDimSubtitle: 'ロゴの背後を暗くして、派手なファンアートが視認性を妨げないようにする',
   AppLocale.nowPlayingDimOff: 'オフ',
@@ -208,12 +216,10 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.showSyncTabSubtitle: 'ナビゲーションバーにNeoSyncタブを表示します',
   AppLocale.showAchievementsTab: '実績タブを表示',
   AppLocale.showAchievementsTabSubtitle: 'ナビゲーションバーにRetroAchievementsタブを表示します',
-  AppLocale.showScraperTab: 'スクレイパータブを表示',
-  AppLocale.showScraperTabSubtitle: 'ナビゲーションバーにスクレイピングタブを表示します',
   AppLocale.showRommTab: 'RomM タブを表示',
   AppLocale.showRommTabSubtitle: 'ナビゲーションバーに RomM タブを表示します',
-  AppLocale.showSearchTab: '検索タブを表示',
-  AppLocale.showSearchTabSubtitle: 'ナビゲーションバーに検索タブを表示します',
+  AppLocale.searchCard: '検索カード',
+  AppLocale.searchCardSubtitle: 'システムグリッドに検索カードを表示する',
 
   AppLocale.configureDirectories: 'ディレクトリの設定',
   AppLocale.configureRomsFolder: 'ROMフォルダの設定',
@@ -463,16 +469,12 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.applyToAll: 'すべての競合に適用',
   AppLocale.applyToAllDesc: '残りの競合にもこの選択を使用',
 
-  AppLocale.account: 'アカウント',
   AppLocale.scraping: 'スクレイピング',
   AppLocale.scrapeMode: 'スクレイピングモード',
-  AppLocale.scrapeModeSub: '検索対象を選択',
   AppLocale.media: 'メディア',
-  AppLocale.mediaSub: 'ダウンロードするメディアの種類を選択',
   AppLocale.language: '言語',
   AppLocale.languageSub: 'メタデータの優先言語',
   AppLocale.preferredLanguage: '優先言語',
-  AppLocale.region: '地域',
   AppLocale.regionSub: 'スクレイピングの地域優先度を設定',
   AppLocale.regionPriority: '地域優先度',
   AppLocale.regionPrioritySub: '優先度の高い地域が名前、日付、メディアの選択で優先されます。Aで選択、上下で移動、Bで配置。',
@@ -488,9 +490,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.logoutError: 'ログアウト中にエラーが発生しました',
   AppLocale.newContentOnly: '新規コンテンツのみ',
   AppLocale.allContent: 'すべてのコンテンツ',
-  AppLocale.scrapeModeUpdated: 'スクレイピングモードを以下に更新しました:',
   AppLocale.scrapeModeError: 'スクレイピングモードの更新中にエラーが発生しました',
-  AppLocale.languageUpdated: '言語が正常に更新されました',
   AppLocale.languageError: '言語の更新中にエラーが発生しました',
   AppLocale.mediaSettingsError: 'メディア設定の保存中にエラーが発生しました',
   AppLocale.newContentOnlyDesc: 'まだスクレイピングされていないゲームのみを検索',
@@ -610,6 +610,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.descending: '降順',
   AppLocale.viewModeGroup: '表示モード',
   AppLocale.cardSizeGroup: 'カードサイズ',
+  AppLocale.listSizeGroup: 'リストサイズ',
   AppLocale.cardStyleGroup: 'カードスタイル',
   AppLocale.fanartCard: 'ファンアート',
   AppLocale.boxCard: 'ボックス',
@@ -698,6 +699,17 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.errorSavingCredentials: '資格情報の保存中にエラーが発生しました',
   AppLocale.invalidCredentials: '指定された資格情報が無効です',
   AppLocale.loginError: 'ログインエラー: {error}',
+  AppLocale.screenScraperUsernameHint:
+      'ScreenScraperのユーザー名を使用してください。メールアドレスは使用できません。',
+  AppLocale.screenScraperUseUsernameNotEmail:
+      'ScreenScraperのユーザー名を入力してください。メールアドレスは使用できません。APIはメールを受け付けません。',
+  AppLocale.screenScraperApiClosed:
+      'ScreenScraperのAPIは一時的に利用できません。しばらくしてから再試行してください。',
+  AppLocale.screenScraperAppOutdated:
+      'ScreenScraperはこのアプリバージョンを受け付けなくなりました。NeoStationを更新してください。',
+  AppLocale.screenScraperQuotaReached: 'ScreenScraperの1日の上限に達しました。明日再試行してください。',
+  AppLocale.screenScraperConnectionError:
+      'ScreenScraperに接続できませんでした。インターネット接続を確認して再試行してください。',
   AppLocale.whatIsScreenScraper: 'ScreenScraperとは？',
   AppLocale.screenScraperDescription:
       'ScreenScraperは、ゲームの高品質なメタデータ、カバー、ビデオを提供するコミュニティベースのデータベースです。',
@@ -706,6 +718,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.requiresFreeAccount: '無料のアカウントが必要',
   AppLocale.createAccountAt: 'アカウント作成: ',
   AppLocale.toGetCredentials: ' 資格情報を取得するには。',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
+  AppLocale.metadata: 'メタデータ',
   AppLocale.screenScraperLogin: 'ScreenScraperログイン',
   AppLocale.scanningSystemsRoms: 'システムとROMをスキャン中...',
   AppLocale.ofSystems: '{scanned} / {total} システム',
@@ -1042,16 +1056,12 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.filterGenre: 'ジャンル',
   AppLocale.filterRating: '評価',
   AppLocale.filterYear: '年',
-  AppLocale.filterAchievements: '実績',
-  AppLocale.raCoverageMatched: 'あり',
-  AppLocale.raCoverageNoSet: 'なし',
   AppLocale.raCoverageUnknown: '不明',
   AppLocale.filterAny: 'すべて',
   AppLocale.filterSource: 'ソース',
   AppLocale.sourceLocal: 'この端末',
   AppLocale.searchRatingLocalOnly: '評価フィルターはローカルのゲームにのみ適用されます',
   AppLocale.searchNoRommEquivalent: 'RomM に「{value}」に該当するものはありません',
-  AppLocale.searchAchievementsLocalOnly: '実績フィルターはローカルのゲームにのみ適用されます',
   AppLocale.resetPlayTimeConfirm: 'プレイ時間をリセット',
   AppLocale.resetPlayTimeConfirmBody:
       'このゲームの記録されたプレイ時間を完全にゼロにリセットします。この操作は元に戻せません。',
@@ -1222,16 +1232,16 @@ const Map<String, dynamic> appLocaleJa = {
       'インポートできます。「gamelists」と「downloaded_media」フォルダーが含まれる '
       'ES-DE のメインフォルダーを選択してください。任意です。後で設定から'
       '実行できます。',
-  AppLocale.wizardArtPackTitle: 'NeoStation アートパックを入手',
+  AppLocale.wizardArtPackTitle: 'System Art Pack を入手',
   AppLocale.wizardArtPackDesc:
-      'ライブラリ全体で美しいコンソール背景を表示するために、NeoStation '
-      'システムアートパックのダウンロードを強くおすすめします。後で設定から'
-      '変更できます。',
-  AppLocale.wizardDownloadArtPack: 'アートパックをダウンロード',
-  AppLocale.wizardArtPackInstalled: 'アートパックをインストールしました！他のテーマは後で設定から確認できます。',
+      'ライブラリ全体で美しいコンソール背景を表示するために、System Art Pack'
+      '（SAP）のダウンロードを強くおすすめします。後で設定から変更できます。',
+  AppLocale.wizardDownloadArtPack: 'System Art Pack をダウンロード',
+  AppLocale.wizardArtPackInstalled:
+      'System Art Pack をインストールしました！他のパックは後で設定から確認できます。',
   AppLocale.wizardArtPackUnavailable:
-      '現在アートパックにアクセスできませんでした。オンラインになったら、後で'
-      '設定からインストールできます。',
+      '現在 System Art Pack にアクセスできませんでした。オンラインになったら、'
+      '後で設定からインストールできます。',
 
   // Hide / unhide games
   AppLocale.hideGame: 'ゲームを非表示',

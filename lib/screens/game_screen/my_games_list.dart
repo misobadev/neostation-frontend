@@ -35,7 +35,9 @@ import '../../providers/neo_sync_provider.dart';
 import '../../repositories/neosync_save_folder_repository.dart';
 import '../../models/system_model.dart';
 import '../../models/game_model.dart';
+import '../../models/database_game_model.dart';
 import '../../utils/rom_tree.dart';
+import '../../utils/game_list_size.dart';
 import 'game_details_card/game_details_card_list.dart';
 import 'game_details_card/detail_tab.dart';
 import 'game_details_card/random_game_dialog.dart';
@@ -52,6 +54,7 @@ import '../../widgets/context_menu/game_context_menu.dart';
 import '../../widgets/game_view_mode_dropdown.dart';
 import '../../widgets/letter_indicator.dart';
 import '../../constants/system_folder_names.dart';
+import '../search_screen/search_screen.dart';
 import '../../utils/artwork_cache.dart';
 import '../../utils/game_list_update.dart';
 import 'package:neostation/themes/chrome_surface.dart';
@@ -137,6 +140,27 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// anchored the folder level. Applied on the first load only, so a later
   /// refresh cannot yank the user out of the folder they are browsing.
   bool _initialRomPathAnchored = false;
+
+  /// Per-instance gamepad layer ids for this list and its grid/carousel view.
+  ///
+  /// [GamepadNavigationManager.popLayer] resolves an id to the *first* matching
+  /// entry, and a games list can sit on the route stack twice: search's "Go to
+  /// game" opens one over another. With shared ids the top copy's pops removed
+  /// the bottom copy's layers instead of its own, so backing out to the bottom
+  /// list left the systems screen's layer on top — the D-pad drove the hidden
+  /// systems carousel while the games list stayed on screen.
+  static int _navLayerSeq = 0;
+  late final int _navInstance = ++_navLayerSeq;
+  String get _listLayerId => 'system_games_list#$_navInstance';
+  String get _gridLayerId => 'games_grid#$_navInstance';
+  String get _carouselLayerId => 'games_carousel#$_navInstance';
+
+  /// The folder level a deep link opened on, or null when the list was opened
+  /// at its root. Back treats it as the root: the user arrived *at* the game
+  /// (from search or the RA dashboard) and never walked down to it, so the
+  /// folders above it are not somewhere they came from. Back from here leaves
+  /// the list, straight back to the screen that linked in.
+  String? _deepLinkRelPath;
 
   int get _folderCount => _currentFolderEntries.length;
   bool _isFolderEntry(GameModel? g) =>
@@ -289,6 +313,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
   ); // Debounce for video playback.
   bool _lastShowInfo = false; // Memoizes 'showGameInfo' config state.
   String? _lastGameViewMode; // Memoizes 'gameViewMode' config state.
+  String? _lastGameListSize; // Memoizes the active List view size.
   bool _isGameLaunching =
       false; // Critical flag to suppress media tasks during transitions.
   bool _standaloneSyncTriggered = false;
@@ -387,6 +412,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
     _invalidateArtworkCaches();
 
     _lastShowInfo = _configProvider.config.showGameInfo;
+    _lastGameListSize = _configProvider.config.gameListSize;
+    _lastGameViewMode = _configProvider.config.gameViewMode;
 
     MusicPlayerService().addListener(_onMusicPlayerStateChanged);
 
@@ -511,6 +538,14 @@ class _SystemGamesListState extends State<SystemGamesList> {
     final configProvider = context.read<SqliteConfigProvider>();
     final newShowInfo = configProvider.config.showGameInfo;
     final gameViewMode = configProvider.config.gameViewMode;
+    final gameListSize = configProvider.config.gameListSize;
+
+    if (gameListSize != _lastGameListSize) {
+      _lastGameListSize = gameListSize;
+      // Keep the currently open game's panel width, row geometry and details
+      // text in sync with the preference as soon as its write completes.
+      setState(() {});
+    }
 
     // Hand input to whichever layer owns the new view mode — but ONLY on an
     // actual mode change. Re-asserting this on every config write is not free:
@@ -613,7 +648,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
   /// Terminates all active multimedia and background processing tasks.
   void _cleanupResources() {
-    GamepadNavigationManager.popLayer('system_games_list');
+    GamepadNavigationManager.popLayer(_listLayerId);
 
     _videoTimer?.cancel();
     _saveDetectionTimer?.cancel();
@@ -703,8 +738,11 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
   /// Orchestrates a graceful exit from the game list, synchronizing state with previous screens.
   Future<void> _goBack() async {
-    // Subfolder navigation: Back ascends one level before leaving the system.
-    if (_subfolderViewEnabled && _currentRelPath.isNotEmpty) {
+    // Subfolder navigation: Back ascends one level before leaving the system,
+    // stopping at the level a deep link opened on (see [_deepLinkRelPath]).
+    if (_subfolderViewEnabled &&
+        _currentRelPath.isNotEmpty &&
+        _currentRelPath != _deepLinkRelPath) {
       _ascendFolder();
       return;
     }
@@ -730,9 +768,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
     // left the D-pad dead for the whole transition: the press played its nav
     // sound and moved the dying carousel's own index, while the systems screen
     // underneath never saw it.
-    GamepadNavigationManager.popLayer('games_carousel');
-    GamepadNavigationManager.popLayer('games_grid');
-    GamepadNavigationManager.popLayer('system_games_list');
+    GamepadNavigationManager.popLayer(_carouselLayerId);
+    GamepadNavigationManager.popLayer(_gridLayerId);
+    GamepadNavigationManager.popLayer(_listLayerId);
 
     // Restore secondary display to original system branding. Resolve the logo
     // and background the same way the systems grid does (custom → active-theme
@@ -861,6 +899,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
   @override
   Widget build(BuildContext context) {
     final isOled = context.select<ThemeProvider, bool>((t) => t.isOled);
+    final baseTextScale = MediaQuery.textScalerOf(context).scale(1);
 
     return PopScope(
       canPop: _canPop,
@@ -892,8 +931,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
                     ? _buildEmptyState()
                     : Consumer<SqliteConfigProvider>(
                         builder: (context, configProvider, child) {
+                          final listSize = configProvider.config.gameListSize;
                           if (widget.system.folderName == 'music') {
-                            return _buildGamesList();
+                            return _buildGamesList(
+                              listSize,
+                              baseTextScale: baseTextScale,
+                            );
                           }
                           if (configProvider.config.gameViewMode == 'grid') {
                             return _buildGamesGrid();
@@ -901,7 +944,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
                               'carousel') {
                             return _buildGamesCarousel();
                           }
-                          return _buildGamesList();
+                          return _buildGamesList(
+                            listSize,
+                            baseTextScale: baseTextScale,
+                          );
                         },
                       ),
               ),
@@ -1329,6 +1375,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
   Widget _buildGamesCarousel() {
     return GamesCarousel(
       key: ValueKey('carousel_$_viewStructureSignature'),
+      navLayerId: _carouselLayerId,
       system: widget.system,
       games: _games,
       selectedIndex: _selectedGameIndex,
@@ -1367,6 +1414,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
   Widget _buildGamesGrid() {
     return GamesGrid(
       key: ValueKey('grid_$_viewStructureSignature'),
+      navLayerId: _gridLayerId,
       system: widget.system,
       games: _games,
       selectedIndex: _selectedGameIndex,
@@ -1405,7 +1453,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// Divides the viewport into a specialized browsing panel (left) and a detailed
   /// info/preview panel (right). The selected game's fanart is rendered behind
   /// the entire viewport so it peeks through both panels.
-  Widget _buildGamesList() {
+  Widget _buildGamesList(String gameListSize, {required double baseTextScale}) {
     final isMusic = widget.system.folderName == 'music';
 
     return Stack(
@@ -1442,9 +1490,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
           children: [
             // Sidebar: Interactive list of games or music tracks.
             AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
+              duration: Duration.zero,
               curve: Curves.easeOutCubic,
-              width: 200.r,
+              width:
+                  (isMusic ? 200 : GameListSize.getPanelWidth(gameListSize)).r,
               margin: EdgeInsets.only(left: 12.r, top: 12.r, bottom: 12.r),
               // Frosted glass pane over the fanart: a single engine blur +
               // tint + rim (native NeoGlass, no refraction shader).
@@ -1454,11 +1503,16 @@ class _SystemGamesListState extends State<SystemGamesList> {
                       context,
                     ).extension<CornerRadii>()?.radiusExternalRadius ??
                     14.r,
-                child: _buildGamesListPanel(),
+                child: _buildGamesListPanel(gameListSize),
               ),
             ),
             // Main Viewport: Rich metadata, video previews, and launch controls.
-            Expanded(child: _buildGameDetailsPanel()),
+            Expanded(
+              child: _buildGameDetailsPanel(
+                gameListSize,
+                baseTextScale: baseTextScale,
+              ),
+            ),
           ],
         ),
       ],
@@ -1523,7 +1577,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     );
   }
 
-  Widget _buildGamesListPanel() {
+  Widget _buildGamesListPanel(String gameListSize) {
     return Column(
       children: [
         Expanded(
@@ -1549,6 +1603,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
                   system: widget.system,
                   games: _games,
                   selectedIndex: _selectedGameIndex,
+                  listSize: gameListSize,
                   systemColor: widget.system.colorAsColor,
                   onGameSelected: _selectGame,
                   onGameConfirmed: _selectCurrentGame,
@@ -1714,7 +1769,11 @@ class _SystemGamesListState extends State<SystemGamesList> {
     );
   }
 
-  Widget _buildGameDetailsPanel() {
+  Widget _buildGameDetailsPanel(
+    String listSize, {
+    required double baseTextScale,
+  }) {
+    final isMusic = widget.system.folderName == 'music';
     if (_selectedGame == null) {
       return Center(
         child: Column(
@@ -1780,7 +1839,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
       return _buildFolderDetailsPanel(_selectedGame!);
     }
 
-    if (widget.system.folderName == 'music') {
+    if (isMusic) {
       return Padding(
         padding: EdgeInsets.all(8.r),
         child: MusicPlayer(
@@ -1796,73 +1855,88 @@ class _SystemGamesListState extends State<SystemGamesList> {
       );
     }
 
-    return Consumer<SyncManager>(
-      builder: (context, syncManager, child) => GameDetailsCardList(
-        game: _selectedGame!,
-        system: widget.system,
-        fileProvider: _fileProvider,
-        showVideo: _showVideo,
-        videoController: _videoController,
-        isVideoLoading: _isVideoLoading,
-        isAllMode: SystemFolderNames.isAggregate(widget.system.folderName),
-        initialDetailTab: widget.initialDetailTab,
-        retroAchievementsProvider: _retroAchievementsProvider,
-        syncProvider: syncManager.active!,
-        localizedDescription: _localizedDescription,
-        artworkVersion: _artworkVersion,
-        isExternallyScraping: _scrapingGameRomnames.contains(
-          _selectedGame!.romname,
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        textScaler: TextScaler.linear(
+          baseTextScale * (isMusic ? 1.0 : GameListSize.getScale(listSize)),
         ),
-        externalScrapeProgress: _scrapeProgress[_selectedGame!.romname],
-        externalScrapeStatus: _selectedScrapeStatus,
-        isNavigatingFast: _isNavigatingFast,
-        isSecondaryScreenActive:
-            _secondaryDisplayState?.value?.isSecondaryActive ?? false,
-        onDeactivateNavigation: () => _gamepadNav.deactivate(),
-        onReactivateNavigation: () => _gamepadNav.activate(),
-        onRegisterOverlayState: (isOverlayOpen, isPanelActive) {
-          _isDetailsPanelActive = isPanelActive;
-        },
-        onRegisterNavigation:
-            ({
-              required moveUp,
-              required moveDown,
-              required moveLeft,
-              required moveRight,
-            }) {
-              _movePanelUp = moveUp;
-              _movePanelDown = moveDown;
-              _movePanelLeft = moveLeft;
-              _movePanelRight = moveRight;
-            },
-        onRegisterCloseOverlays: null,
-        onRegisterTriggerAction: (triggerAction) {
-          _triggerOverlayAction = triggerAction;
-        },
-        onRegisterTabNavigation: (tabNav) {
-          _tabNavigationAction = tabNav;
-        },
-        onRegisterPanelFocus: (enter, exit) {
-          _activateDetailsPanel = enter;
-          _dismissDetailsPanel = exit;
-        },
-        onRegisterSelectButton: (action) {
-          _selectButtonAction = action;
-        },
-        onRegisterScrapeAction: (action) {
-          _scrapeAction = action;
-        },
-        onRegisterIsPlayingGameBlocked: (isBlocked) {
-          _isPlayingGameBlocked = isBlocked;
-        },
-        onShowRandomGame: _showRandomGameDialog,
-        onPlayGame: _selectCurrentGame,
-        onToggleFavorite: _toggleFavorite,
-        onOpenGameSettings: _openGameSettingsDialog,
-        onBack: _goBack,
-        onGameUpdated: _handleGameUpdated, // Sync UI after metadata edits.
-        onFavoriteToggled: _handleFavoriteToggledFromCard,
-        onGameDeleted: _handleGameDeleted,
+      ),
+      child: Consumer<SyncManager>(
+        builder: (context, syncManager, child) => GameDetailsCardList(
+          game: _selectedGame!,
+          system: widget.system,
+          footerTextScaler: TextScaler.linear(
+            baseTextScale *
+                (isMusic ? 1.0 : GameListSize.getScale(listSize)).clamp(
+                  1.0,
+                  13 / 11,
+                ),
+          ),
+          playTextScaler: TextScaler.linear(baseTextScale),
+          fileProvider: _fileProvider,
+          showVideo: _showVideo,
+          videoController: _videoController,
+          isVideoLoading: _isVideoLoading,
+          isAllMode: SystemFolderNames.isAggregate(widget.system.folderName),
+          initialDetailTab: widget.initialDetailTab,
+          retroAchievementsProvider: _retroAchievementsProvider,
+          syncProvider: syncManager.active!,
+          localizedDescription: _localizedDescription,
+          artworkVersion: _artworkVersion,
+          isExternallyScraping: _scrapingGameRomnames.contains(
+            _selectedGame!.romname,
+          ),
+          externalScrapeProgress: _scrapeProgress[_selectedGame!.romname],
+          externalScrapeStatus: _selectedScrapeStatus,
+          isNavigatingFast: _isNavigatingFast,
+          isSecondaryScreenActive:
+              _secondaryDisplayState?.value?.isSecondaryActive ?? false,
+          onDeactivateNavigation: () => _gamepadNav.deactivate(),
+          onReactivateNavigation: () => _gamepadNav.activate(),
+          onRegisterOverlayState: (isOverlayOpen, isPanelActive) {
+            _isDetailsPanelActive = isPanelActive;
+          },
+          onRegisterNavigation:
+              ({
+                required moveUp,
+                required moveDown,
+                required moveLeft,
+                required moveRight,
+              }) {
+                _movePanelUp = moveUp;
+                _movePanelDown = moveDown;
+                _movePanelLeft = moveLeft;
+                _movePanelRight = moveRight;
+              },
+          onRegisterCloseOverlays: null,
+          onRegisterTriggerAction: (triggerAction) {
+            _triggerOverlayAction = triggerAction;
+          },
+          onRegisterTabNavigation: (tabNav) {
+            _tabNavigationAction = tabNav;
+          },
+          onRegisterPanelFocus: (enter, exit) {
+            _activateDetailsPanel = enter;
+            _dismissDetailsPanel = exit;
+          },
+          onRegisterSelectButton: (action) {
+            _selectButtonAction = action;
+          },
+          onRegisterScrapeAction: (action) {
+            _scrapeAction = action;
+          },
+          onRegisterIsPlayingGameBlocked: (isBlocked) {
+            _isPlayingGameBlocked = isBlocked;
+          },
+          onShowRandomGame: _showRandomGameDialog,
+          onPlayGame: _selectCurrentGame,
+          onToggleFavorite: _toggleFavorite,
+          onOpenGameSettings: _openGameSettingsDialog,
+          onBack: _goBack,
+          onGameUpdated: _handleGameUpdated, // Sync UI after metadata edits.
+          onFavoriteToggled: _handleFavoriteToggledFromCard,
+          onGameDeleted: _handleGameDeleted,
+        ),
       ),
     );
   }

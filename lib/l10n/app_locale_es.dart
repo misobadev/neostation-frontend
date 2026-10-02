@@ -57,9 +57,9 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.secondaryDisplay: 'Pantalla secundaria',
   AppLocale.directories: 'Directorios',
   AppLocale.themes: 'Themes',
-  AppLocale.systemArt: 'System Art',
+  AppLocale.systemArt: 'Arte de sistemas',
   AppLocale.systemArtSubtitle:
-      'Personaliza fondos y logos de las cards de sistemas con paquetes de System Art',
+      'Personaliza los fondos de las cards de sistemas con paquetes de System Art',
   AppLocale.systemArtNone: 'Ninguno',
   AppLocale.systemArtNoneSubtitle: 'Apariencia predeterminada',
   AppLocale.systemArtLoading: 'Cargando System Art...',
@@ -71,6 +71,15 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.systemArtRedownloadBody:
       'El paquete en caché se eliminará y se descargará de nuevo. Usa esta opción si faltan algunos fondos de sistemas.',
   AppLocale.systemArtDownloading: 'Descargando el paquete de System Art...',
+  AppLocale.systemArtByAuthor: 'por {author}',
+  AppLocale.systemArtVersion: 'v{version}',
+  AppLocale.systemArtDownloads: '{count} descargas',
+  AppLocale.systemArtSystemsCovered: '{count} sistemas',
+  AppLocale.systemArtSupport: 'Apoyar',
+  AppLocale.systemArtApplied: 'Aplicado',
+  AppLocale.systemArtHideLogos: 'Ocultar logos de sistemas',
+  AppLocale.systemArtHideLogosSubtitle:
+      'Oculta el logo de las cards de sistemas cuando el fondo ya lo incluye',
   AppLocale.about: 'Acerca de',
   AppLocale.exit: 'Salir',
   AppLocale.launcher: 'Lanzador',
@@ -174,7 +183,7 @@ const Map<String, dynamic> appLocaleEs = {
       'Muestra el dock de apps en la pantalla secundaria',
   AppLocale.nowPlayingDockSlots: 'Ranuras del dock',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'Cuántas ranuras de apps muestra el dock (1-5)',
+      'Cuántas ranuras de apps muestra el dock (0-5)',
   AppLocale.nowPlayingFanartDim: 'Atenuar fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Oscurece el arte de fondo tras el logo para que un fanart recargado no choque con él',
@@ -246,15 +255,11 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.showAchievementsTab: 'Mostrar pestaña Logros',
   AppLocale.showAchievementsTabSubtitle:
       'Muestra la pestaña de RetroAchievements en la barra de navegación',
-  AppLocale.showScraperTab: 'Mostrar pestaña Scraper',
-  AppLocale.showScraperTabSubtitle:
-      'Muestra la pestaña de scraping en la barra de navegación',
   AppLocale.showRommTab: 'Mostrar pestaña RomM',
   AppLocale.showRommTabSubtitle:
       'Muestra la pestaña de RomM en la barra de navegación',
-  AppLocale.showSearchTab: 'Mostrar pestaña Buscar',
-  AppLocale.showSearchTabSubtitle:
-      'Muestra la pestaña de búsqueda en la barra de navegación',
+  AppLocale.searchCard: 'Tarjeta de Búsqueda',
+  AppLocale.searchCardSubtitle: 'Muestra la tarjeta de búsqueda en la grilla',
 
   AppLocale.configureDirectories: 'Directorios',
   AppLocale.configureRomsFolder: 'Configurar carpeta de ROMs',
@@ -540,16 +545,12 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.applyToAll: 'Aplicar a todos los conflictos',
   AppLocale.applyToAllDesc: 'Usar esta elección para los conflictos restantes',
 
-  AppLocale.account: 'Cuenta',
   AppLocale.scraping: 'Scraping',
   AppLocale.scrapeMode: 'Modo de Scraping',
-  AppLocale.scrapeModeSub: 'Elige qué contenido descargar',
   AppLocale.media: 'Multimedia',
-  AppLocale.mediaSub: 'Elige qué tipos de contenido descargar',
   AppLocale.language: 'Idioma',
   AppLocale.languageSub: 'Selecciona el idioma preferido para los metadatos',
   AppLocale.preferredLanguage: 'Idioma Preferido',
-  AppLocale.region: 'Región',
   AppLocale.regionSub: 'Configura la prioridad de región para el scraping',
   AppLocale.regionPriority: 'Prioridad de Región',
   AppLocale.regionPrioritySub:
@@ -567,9 +568,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.logoutError: 'Error al cerrar sesión',
   AppLocale.newContentOnly: 'Solo contenido nuevo',
   AppLocale.allContent: 'Todo el contenido',
-  AppLocale.scrapeModeUpdated: 'Modo de scraping actualizado a:',
   AppLocale.scrapeModeError: 'Error al actualizar el modo de scraping',
-  AppLocale.languageUpdated: 'Idioma actualizado con éxito',
   AppLocale.languageError: 'Error al actualizar el idioma',
   AppLocale.mediaSettingsError: 'Error al guardar los ajustes multimedia',
   AppLocale.newContentOnlyDesc:
@@ -696,6 +695,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.descending: 'Descendente',
   AppLocale.viewModeGroup: 'MODO DE VISTA',
   AppLocale.cardSizeGroup: 'TAMAÑO DE CARTA',
+  AppLocale.listSizeGroup: 'TAMAÑO DE LISTA',
   AppLocale.cardStyleGroup: 'ESTILO DE CARTA',
   AppLocale.fanartCard: 'Fanart',
   AppLocale.boxCard: 'Caja',
@@ -790,6 +790,18 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.errorSavingCredentials: 'Error al guardar las credenciales',
   AppLocale.invalidCredentials: 'Credenciales proporcionadas no válidas',
   AppLocale.loginError: 'Error en el login: {error}',
+  AppLocale.screenScraperUsernameHint:
+      'Usa tu nombre de usuario de ScreenScraper, no tu email.',
+  AppLocale.screenScraperUseUsernameNotEmail:
+      'Introduce tu nombre de usuario de ScreenScraper, no tu email. La API no acepta el email.',
+  AppLocale.screenScraperApiClosed:
+      'La API de ScreenScraper no está disponible temporalmente. Inténtalo de nuevo más tarde.',
+  AppLocale.screenScraperAppOutdated:
+      'ScreenScraper ya no acepta esta versión de la app. Actualiza NeoStation.',
+  AppLocale.screenScraperQuotaReached:
+      'Has alcanzado la cuota diaria de ScreenScraper. Inténtalo de nuevo mañana.',
+  AppLocale.screenScraperConnectionError:
+      'No se pudo conectar con ScreenScraper. Comprueba tu conexión a internet e inténtalo de nuevo.',
   AppLocale.whatIsScreenScraper: '¿Qué es ScreenScraper?',
   AppLocale.screenScraperDescription:
       'ScreenScraper es una base de datos colaborativa que proporciona metadatos, carátulas y videos de alta calidad para tus juegos.',
@@ -798,6 +810,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.requiresFreeAccount: 'Requiere una cuenta gratuita',
   AppLocale.createAccountAt: 'Crea una cuenta en ',
   AppLocale.toGetCredentials: ' para obtener tus credenciales de cuenta.',
+  AppLocale.screenScraperTitle: 'ScreenScraper',
+  AppLocale.metadata: 'Metadatos',
   AppLocale.screenScraperLogin: 'Login de ScreenScraper',
   AppLocale.scanningSystemsRoms: 'Escaneando sistemas y ROMs...',
   AppLocale.ofSystems: '{scanned} de {total} sistemas',
@@ -1175,17 +1189,12 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.filterGenre: 'Género',
   AppLocale.filterRating: 'Valoración',
   AppLocale.filterYear: 'Año',
-  AppLocale.filterAchievements: 'Logros',
-  AppLocale.raCoverageMatched: 'Sí',
-  AppLocale.raCoverageNoSet: 'No',
   AppLocale.raCoverageUnknown: 'Desconocido',
   AppLocale.filterAny: 'Cualquiera',
   AppLocale.filterSource: 'Origen',
   AppLocale.sourceLocal: 'En este dispositivo',
   AppLocale.searchRatingLocalOnly:
       'El filtro de valoración solo se aplica a los juegos locales',
-  AppLocale.searchAchievementsLocalOnly:
-      'El filtro de logros solo se aplica a los juegos locales',
   AppLocale.searchNoRommEquivalent:
       'RomM no tiene nada clasificado como «{value}»',
   AppLocale.resetPlayTimeConfirm: 'Restablecer tiempo de juego',
@@ -1383,17 +1392,17 @@ const Map<String, dynamic> appLocaleEs = {
       'Selecciona la carpeta principal de ES-DE que contiene tus carpetas '
       '"gamelists" y "downloaded_media". Opcional; puedes ejecutarlo más tarde '
       'desde Ajustes.',
-  AppLocale.wizardArtPackTitle: 'Consigue el paquete de arte de NeoStation',
+  AppLocale.wizardArtPackTitle: 'Consigue un System Art Pack',
   AppLocale.wizardArtPackDesc:
-      'Recomendamos encarecidamente descargar el paquete de arte de sistemas de '
-      'NeoStation para tener bonitos fondos de consola en toda tu biblioteca. '
-      'Se puede cambiar más tarde en Ajustes.',
-  AppLocale.wizardDownloadArtPack: 'Descargar paquete de arte',
+      'Recomendamos encarecidamente descargar un System Art Pack (SAP) para '
+      'tener bonitos fondos de consola en toda tu biblioteca. Puedes cambiarlo '
+      'más tarde en Ajustes.',
+  AppLocale.wizardDownloadArtPack: 'Descargar System Art Pack',
   AppLocale.wizardArtPackInstalled:
-      '¡Paquete de arte instalado! Puedes explorar más temas más tarde en '
+      '¡System Art Pack instalado! Puedes explorar más packs más tarde en '
       'Ajustes.',
   AppLocale.wizardArtPackUnavailable:
-      'No se pudo acceder al paquete de arte en este momento. Puedes instalarlo '
+      'No se pudo acceder al System Art Pack en este momento. Puedes instalarlo '
       'más tarde desde Ajustes cuando estés en línea.',
 
   // Hide / unhide games

@@ -205,9 +205,10 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['hide_tab_romm']?.toString() ?? '0') ??
                 0) ==
             1,
-        hideTabSearch:
-            (int.tryParse(userConfig?['hide_tab_search']?.toString() ?? '0') ??
-                0) ==
+        // Unset reads as hidden: the card is opt-in (see migration v160).
+        hideSearchCard:
+            (int.tryParse(userConfig?['hide_search_card']?.toString() ?? '1') ??
+                1) ==
             1,
         activeSyncProvider:
             userConfig?['active_sync_provider']?.toString() ?? 'neosync',
@@ -224,6 +225,15 @@ class SqliteConfigService {
         systemGridColumns:
             userConfig?['system_grid_columns']?.toString() ?? 'M',
         gameGridColumns: userConfig?['game_grid_columns']?.toString() ?? 'M',
+        gameListSize:
+            const {
+              'S',
+              'M',
+              'L',
+              'XL',
+            }.contains(userConfig?['game_list_size']?.toString())
+            ? userConfig!['game_list_size'].toString()
+            : 'S',
         gameCarouselCardStyle:
             userConfig?['game_carousel_card_style']?.toString() ?? 'fanart',
         dockApps: ConfigModel.normalizeDock(userConfig?['dock_apps']),
@@ -277,6 +287,13 @@ class SqliteConfigService {
         subfolderViewAll:
             (int.tryParse(
                   userConfig?['subfolder_view_all']?.toString() ?? '0',
+                ) ??
+                0) ==
+            1,
+        // Missing column/row => 0 => logos shown (the default).
+        hideSystemLogos:
+            (int.tryParse(
+                  userConfig?['hide_system_logos']?.toString() ?? '0',
                 ) ??
                 0) ==
             1,
@@ -347,12 +364,13 @@ class SqliteConfigService {
         hideTabAchievements: config.hideTabAchievements ? 1 : 0,
         hideTabScraper: config.hideTabScraper ? 1 : 0,
         hideTabRomm: config.hideTabRomm ? 1 : 0,
-        hideTabSearch: config.hideTabSearch ? 1 : 0,
+        hideSearchCard: config.hideSearchCard ? 1 : 0,
         activeSyncProvider: config.activeSyncProvider,
         autoUpdateApp: config.autoUpdateApp ? 1 : 0,
         autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
         systemGridColumns: config.systemGridColumns,
         gameGridColumns: config.gameGridColumns,
+        gameListSize: config.gameListSize,
         gameCarouselCardStyle: config.gameCarouselCardStyle,
         dockApps: jsonEncode(config.dockApps),
         dockEnabled: config.dockEnabled ? 1 : 0,
@@ -365,6 +383,7 @@ class SqliteConfigService {
         showCloudSyncIcon: config.showCloudSyncIcon ? 1 : 0,
         raMatchOnStartup: config.raMatchOnStartup ? 1 : 0,
         subfolderViewAll: config.subfolderViewAll ? 1 : 0,
+        hideSystemLogos: config.hideSystemLogos ? 1 : 0,
         neoglassBlur: config.neoglassBlur,
         neoglassTransparency: config.neoglassTransparency,
         neoglassBorderWidth: config.neoglassBorderWidth,
