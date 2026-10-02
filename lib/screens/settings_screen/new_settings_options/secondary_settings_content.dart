@@ -142,7 +142,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
     provider.updateFanartDimLevel(next);
   }
 
-  /// Advances the visible dock slot count 1→2→…→max→1 and persists it.
+  /// Advances the visible dock slot count 0→1→…→max→0 and persists it.
   void _cycleDockSlotCount(SqliteConfigProvider provider) {
     final cur = provider.config.dockSlotCount;
     final next = cur >= ConfigModel.dockMaxSlotCount

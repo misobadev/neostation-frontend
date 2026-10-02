@@ -135,6 +135,11 @@ class ScreenscraperClient {
         }
 
         return response;
+      } on ScreenscraperQuotaExceededException {
+        // Thrown above after the slot was already released. Retrying would
+        // spend another refused request, and the generic handler below would
+        // release the slot a second time.
+        rethrow;
       } on TimeoutException {
         _requestSemaphore.release();
         if (attempt < maxRetries - 1) {

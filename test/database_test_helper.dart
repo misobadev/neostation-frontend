@@ -152,6 +152,7 @@ class DatabaseTestHelper {
         hide_search_card INTEGER DEFAULT 1,
         android_apps_as_tab INTEGER DEFAULT 0,
         game_grid_columns TEXT DEFAULT 'M',
+        game_list_size TEXT DEFAULT 'S',
         game_carousel_card_style TEXT DEFAULT 'fanart',
         dock_apps TEXT,
         dock_enabled INTEGER DEFAULT 1,

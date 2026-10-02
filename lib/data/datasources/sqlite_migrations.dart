@@ -618,6 +618,9 @@ class SqliteMigrations {
       case 161:
         await _migrateToVersion161(db);
         break;
+      case 162:
+        await _migrateToVersion162(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7076,8 +7079,29 @@ class SqliteMigrations {
     }
   }
 
-  /// Migration v161: stores whether Android apps appear as a top-level tab.
+  /// Migration v161: adds the independent List view size preference.
+  ///
+  /// v160 is already occupied by the Search-card preference on main. This
+  /// remains idempotent for databases that reached a branch with the former
+  /// v160 list-size migration before the branches were merged.
   static Future<void> _migrateToVersion161(Database db) async {
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name'] as String)
+        .toSet();
+    if (!columns.contains('game_list_size')) {
+      db.execute(
+        "ALTER TABLE user_config ADD COLUMN game_list_size TEXT DEFAULT 'S'",
+      );
+    }
+  }
+
+  /// Migration v162: stores whether Android apps appear as a top-level tab.
+  ///
+  /// The Android Apps branch previously used v161, so devices on that branch
+  /// may have skipped main's list-size migration. Backfill it idempotently.
+  static Future<void> _migrateToVersion162(Database db) async {
+    await _migrateToVersion161(db);
     final columns = db
         .select('PRAGMA table_info(user_config)')
         .map((row) => row['name'].toString())

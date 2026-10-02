@@ -231,6 +231,15 @@ class SqliteConfigService {
         systemGridColumns:
             userConfig?['system_grid_columns']?.toString() ?? 'M',
         gameGridColumns: userConfig?['game_grid_columns']?.toString() ?? 'M',
+        gameListSize:
+            const {
+              'S',
+              'M',
+              'L',
+              'XL',
+            }.contains(userConfig?['game_list_size']?.toString())
+            ? userConfig!['game_list_size'].toString()
+            : 'S',
         gameCarouselCardStyle:
             userConfig?['game_carousel_card_style']?.toString() ?? 'fanart',
         dockApps: ConfigModel.normalizeDock(userConfig?['dock_apps']),
@@ -368,6 +377,7 @@ class SqliteConfigService {
         autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
         systemGridColumns: config.systemGridColumns,
         gameGridColumns: config.gameGridColumns,
+        gameListSize: config.gameListSize,
         gameCarouselCardStyle: config.gameCarouselCardStyle,
         dockApps: jsonEncode(config.dockApps),
         dockEnabled: config.dockEnabled ? 1 : 0,

@@ -200,6 +200,16 @@ class LinuxEmulatorDiscovery {
   @visibleForTesting
   static String removableMediaRoot = '/run/media';
 
+  /// The distro library directories that hold system-wide RetroArch cores.
+  /// Overridable so a test does not depend on whether the host running it has
+  /// RetroArch installed.
+  @visibleForTesting
+  static List<String> systemLibretroDirs = const [
+    '/usr/lib/libretro',
+    '/usr/lib64/libretro',
+    '/usr/local/lib/libretro',
+  ];
+
   static String _rememberLaunchersDir(String dir) {
     _log.i('LinuxEmulatorDiscovery: EmuDeck launchers at $dir');
     _launchersDir = dir;
@@ -451,9 +461,7 @@ class LinuxEmulatorDiscovery {
     if (retroArchPath.isNotEmpty) {
       candidates.add(p.join(p.dirname(retroArchPath), 'cores'));
     }
-    candidates.add('/usr/lib/libretro');
-    candidates.add('/usr/lib64/libretro');
-    candidates.add('/usr/local/lib/libretro');
+    candidates.addAll(systemLibretroDirs);
 
     return candidates.toSet().toList();
   }

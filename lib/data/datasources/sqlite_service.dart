@@ -459,7 +459,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 161;
+  static const int _databaseVersion = 162;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1947,6 +1947,7 @@ class SqliteService {
         auto_update_systems INTEGER DEFAULT 1,
         system_grid_columns TEXT DEFAULT 'M',
         game_grid_columns TEXT DEFAULT 'M',
+        game_list_size TEXT DEFAULT 'S',
         game_carousel_card_style TEXT DEFAULT 'fanart',
         use_12_hour_clock INTEGER DEFAULT 0,
         dock_apps TEXT,
@@ -2793,6 +2794,7 @@ class SqliteService {
     int? autoUpdateSystems,
     String? systemGridColumns,
     String? gameGridColumns,
+    String? gameListSize,
     String? gameCarouselCardStyle,
     String? dockApps,
     int? dockEnabled,
@@ -2924,6 +2926,9 @@ class SqliteService {
     }
     if (gameGridColumns != null) {
       updates['game_grid_columns'] = gameGridColumns;
+    }
+    if (gameListSize != null) {
+      updates['game_list_size'] = gameListSize;
     }
     if (gameCarouselCardStyle != null) {
       updates['game_carousel_card_style'] = gameCarouselCardStyle;

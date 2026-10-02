@@ -62,6 +62,17 @@
       }
     },
     {
+      "name": "Standalone SUPER ZSNES",
+      "unique_id": "snes-hacks.com.zsnes.superzsnes",
+      "description": "Supported extensions: fig, sfc, smc, swc, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.zsnes.superzsnes/com.unity3d.player.UnityPlayerActivity -a android.intent.action.VIEW -d \"{file.path}\" -t application/x-snes-rom"
+        }
+      }
+    },
+    {
       "name": "RetroArch64 Snes9x",
       "default_core": true,
       "unique_id": "snes-hacks.ra64.snes9x",

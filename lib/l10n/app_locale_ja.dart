@@ -150,7 +150,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.nowPlayingDockEnabled: 'アプリドック',
   AppLocale.nowPlayingDockEnabledSubtitle: 'セカンダリ画面にアプリドックを表示',
   AppLocale.nowPlayingDockSlots: 'ドックスロット',
-  AppLocale.nowPlayingDockSlotsSubtitle: 'ドックに表示するアプリスロット数 (1-5)',
+  AppLocale.nowPlayingDockSlotsSubtitle: 'ドックに表示するアプリスロット数 (0-5)',
   AppLocale.nowPlayingFanartDim: 'ファンアートを暗くする',
   AppLocale.nowPlayingFanartDimSubtitle: 'ロゴの背後を暗くして、派手なファンアートが視認性を妨げないようにする',
   AppLocale.nowPlayingDimOff: 'オフ',
@@ -600,6 +600,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.descending: '降順',
   AppLocale.viewModeGroup: '表示モード',
   AppLocale.cardSizeGroup: 'カードサイズ',
+  AppLocale.listSizeGroup: 'リストサイズ',
   AppLocale.cardStyleGroup: 'カードスタイル',
   AppLocale.fanartCard: 'ファンアート',
   AppLocale.boxCard: 'ボックス',
@@ -688,6 +689,17 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.errorSavingCredentials: '資格情報の保存中にエラーが発生しました',
   AppLocale.invalidCredentials: '指定された資格情報が無効です',
   AppLocale.loginError: 'ログインエラー: {error}',
+  AppLocale.screenScraperUsernameHint:
+      'ScreenScraperのユーザー名を使用してください。メールアドレスは使用できません。',
+  AppLocale.screenScraperUseUsernameNotEmail:
+      'ScreenScraperのユーザー名を入力してください。メールアドレスは使用できません。APIはメールを受け付けません。',
+  AppLocale.screenScraperApiClosed:
+      'ScreenScraperのAPIは一時的に利用できません。しばらくしてから再試行してください。',
+  AppLocale.screenScraperAppOutdated:
+      'ScreenScraperはこのアプリバージョンを受け付けなくなりました。NeoStationを更新してください。',
+  AppLocale.screenScraperQuotaReached: 'ScreenScraperの1日の上限に達しました。明日再試行してください。',
+  AppLocale.screenScraperConnectionError:
+      'ScreenScraperに接続できませんでした。インターネット接続を確認して再試行してください。',
   AppLocale.whatIsScreenScraper: 'ScreenScraperとは？',
   AppLocale.screenScraperDescription:
       'ScreenScraperは、ゲームの高品質なメタデータ、カバー、ビデオを提供するコミュニティベースのデータベースです。',

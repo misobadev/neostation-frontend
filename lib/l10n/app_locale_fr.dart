@@ -180,7 +180,7 @@ const Map<String, dynamic> appLocaleFr = {
       'Afficher le dock d\'applications sur l\'écran secondaire',
   AppLocale.nowPlayingDockSlots: 'Emplacements du dock',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'Combien d\'emplacements le dock affiche (1-5)',
+      'Combien d\'emplacements le dock affiche (0-5)',
   AppLocale.nowPlayingFanartDim: 'Atténuer le fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Assombrir l\'arrière-plan derrière le logo pour éviter les conflits visuels',
@@ -697,6 +697,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.descending: 'Décroissant',
   AppLocale.viewModeGroup: 'Mode de Vue',
   AppLocale.cardSizeGroup: 'Taille de Carte',
+  AppLocale.listSizeGroup: 'TAILLE DE LISTE',
   AppLocale.cardStyleGroup: 'Style de Carte',
   AppLocale.fanartCard: 'Fanart',
   AppLocale.boxCard: 'Boîte',
@@ -790,6 +791,18 @@ const Map<String, dynamic> appLocaleFr = {
       'Erreur lors de l’enregistrement des identifiants',
   AppLocale.invalidCredentials: 'Les identifiants fournis sont invalides',
   AppLocale.loginError: 'Erreur de connexion : {error}',
+  AppLocale.screenScraperUsernameHint:
+      "Utilisez votre nom d'utilisateur ScreenScraper, pas votre adresse e-mail.",
+  AppLocale.screenScraperUseUsernameNotEmail:
+      "Saisissez votre nom d'utilisateur ScreenScraper, pas votre adresse e-mail. L'API n'accepte pas l'e-mail.",
+  AppLocale.screenScraperApiClosed:
+      "L'API ScreenScraper est temporairement indisponible. Réessayez plus tard.",
+  AppLocale.screenScraperAppOutdated:
+      "ScreenScraper n'accepte plus cette version de l'application. Veuillez mettre à jour NeoStation.",
+  AppLocale.screenScraperQuotaReached:
+      'Quota quotidien ScreenScraper atteint. Réessayez demain.',
+  AppLocale.screenScraperConnectionError:
+      "Impossible de joindre ScreenScraper. Vérifiez votre connexion internet et réessayez.",
   AppLocale.whatIsScreenScraper: 'Qu’est-ce que ScreenScraper ?',
   AppLocale.screenScraperDescription:
       'ScreenScraper est une base de données collaborative qui fournit des métadonnées, couvertures et vidéos de haute qualité pour vos jeux.',

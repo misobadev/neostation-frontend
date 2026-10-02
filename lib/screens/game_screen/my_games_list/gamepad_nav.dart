@@ -67,6 +67,8 @@ extension _GamepadNav on _SystemGamesListState {
   /// Registers gamepad and keyboard input mappings for the screen.
   void _initializeGamepad() {
     _gamepadNav = GamepadNavigation(
+      canHandleInput: () =>
+          !(GameViewModeDropdown.globalKey.currentState?.isOpen ?? false),
       onNavigateUp: _navigateUp,
       onNavigateDown: _navigateDown,
       onNavigateLeft: _navigateLeft, // Previous details tab.

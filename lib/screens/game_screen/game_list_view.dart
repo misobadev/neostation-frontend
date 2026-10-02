@@ -19,6 +19,7 @@ import '../../providers/collections_provider.dart';
 import '../../sync/i_sync_provider.dart';
 import '../../sync/sync_manager.dart';
 import '../../utils/effective_system.dart';
+import '../../utils/game_list_size.dart';
 import '../../widgets/achievements_badge.dart';
 import '../../widgets/collection_badge.dart';
 import '../../widgets/marquee_text.dart';
@@ -33,6 +34,7 @@ class GameListView extends StatefulWidget {
   final SystemModel system;
   final List<GameModel> games;
   final int selectedIndex;
+  final String listSize;
   final Color systemColor;
   final Function(GameModel) onGameSelected;
 
@@ -64,6 +66,7 @@ class GameListView extends StatefulWidget {
     required this.system,
     required this.games,
     required this.selectedIndex,
+    this.listSize = 'S',
     required this.systemColor,
     required this.onGameSelected,
     required this.onGameConfirmed,
@@ -89,8 +92,6 @@ class GameListViewState extends State<GameListView>
   late Animation<double> _selectionAnimation;
 
   // Constants for pixel-perfect highlight positioning.
-  static const double _itemHeightBase = 26.0;
-
   /// Slack under the last row, so the list does not sit on the panel's edge.
   /// Mirrors the value the details footer keeps under its RA pill.
   static const double _bottomSlack = 11.0;
@@ -183,6 +184,14 @@ class GameListViewState extends State<GameListView>
     if (oldWidget.games.length != widget.games.length) {
       _centeredScrollController.updateTotalItems(widget.games.length);
       _updateFocusNodes();
+    }
+
+    if (oldWidget.listSize != widget.listSize) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.games.isNotEmpty) {
+          _centeredScrollController.jumpToIndex(widget.selectedIndex);
+        }
+      });
     }
 
     if (oldWidget.selectedIndex != widget.selectedIndex) {
@@ -306,7 +315,8 @@ class GameListViewState extends State<GameListView>
     _syncProvider = context.watch<SyncManager?>()?.active;
 
     final theme = Theme.of(context);
-    final itemHeight = _itemHeightBase.r;
+    final itemHeight = GameListSize.getRowHeight(widget.listSize).r;
+    final titleFontSize = GameListSize.getFontSize(widget.listSize).r;
     final totalItemHeight = itemHeight;
     _centeredScrollController.setItemExtent(totalItemHeight, paddingTop: 2.r);
 
@@ -373,7 +383,9 @@ class GameListViewState extends State<GameListView>
                 valueListenable: _centeredScrollController.rebuildNotifier,
                 builder: (context, rebuildCount, _) {
                   return ListView.builder(
-                    key: ValueKey('games_list_rebuild_$rebuildCount'),
+                    key: ValueKey(
+                      'games_list_${widget.listSize}_rebuild_$rebuildCount',
+                    ),
                     controller: _centeredScrollController.scrollController,
                     padding: EdgeInsets.symmetric(
                       vertical: 2.r,
@@ -430,7 +442,7 @@ class GameListViewState extends State<GameListView>
                                     margin: EdgeInsets.only(right: 4.r),
                                     child: Icon(
                                       Symbols.favorite_rounded,
-                                      size: 11.r,
+                                      size: titleFontSize,
                                       color: isSelected
                                           ? theme.colorScheme.onPrimary
                                           : Colors.redAccent,
@@ -439,15 +451,13 @@ class GameListViewState extends State<GameListView>
                                 Expanded(
                                   child: RepaintBoundary(
                                     child: AnimatedDefaultTextStyle(
-                                      duration: const Duration(
-                                        milliseconds: 200,
-                                      ),
+                                      duration: Duration.zero,
                                       curve: Curves.easeOut,
                                       style: TextStyle(
                                         fontWeight: isSelected
                                             ? FontWeight.bold
                                             : FontWeight.normal,
-                                        fontSize: 11.r,
+                                        fontSize: titleFontSize,
                                         color: isSelected
                                             ? theme.colorScheme.onPrimary
                                             : theme.colorScheme.onSurface,
@@ -507,7 +517,7 @@ class GameListViewState extends State<GameListView>
                                     // A mark among the row's other marks: the
                                     // badges' own size, no chip, and no shadow
                                     // — this row is flat surface, not artwork.
-                                    size: 11,
+                                    size: titleFontSize,
                                     showBackground: false,
                                     showGlyphShadow: false,
                                     // The selected row's foreground, for the
@@ -530,6 +540,7 @@ class GameListViewState extends State<GameListView>
                                   Padding(
                                     padding: EdgeInsets.only(left: 4.r),
                                     child: CollectionBadge.inline(
+                                      inlineSize: titleFontSize,
                                       // The row's own foreground, so the mark
                                       // stays legible on the selected row's
                                       // inverted background — same rule as the
@@ -545,6 +556,7 @@ class GameListViewState extends State<GameListView>
                                     padding: EdgeInsets.only(left: 4.r),
                                     child: AchievementsBadge.inline(
                                       game: game,
+                                      inlineSize: titleFontSize,
                                       // The same colour as the row's title, so
                                       // the trophy reads as part of the line
                                       // rather than a warning next to it.
@@ -650,7 +662,7 @@ class GameListViewState extends State<GameListView>
                 margin: EdgeInsets.only(right: 4.r),
                 child: Icon(
                   Symbols.folder_rounded,
-                  size: 12.r,
+                  size: GameListSize.getFontSize(widget.listSize).r * 1.1,
                   fill: 1,
                   color: isSelected ? fg : theme.colorScheme.secondary,
                 ),
@@ -665,7 +677,7 @@ class GameListViewState extends State<GameListView>
                       fontWeight: isSelected
                           ? FontWeight.bold
                           : FontWeight.w500,
-                      fontSize: 11.r,
+                      fontSize: GameListSize.getFontSize(widget.listSize).r,
                       color: fg,
                       fontFamily: theme.textTheme.bodyMedium?.fontFamily,
                     ),
@@ -676,7 +688,7 @@ class GameListViewState extends State<GameListView>
               Text(
                 '${folder.gameCount}',
                 style: TextStyle(
-                  fontSize: 9.r,
+                  fontSize: GameListSize.getFontSize(widget.listSize).r * 0.82,
                   color: fg.withValues(alpha: 0.7),
                   fontFamily: theme.textTheme.bodyMedium?.fontFamily,
                 ),

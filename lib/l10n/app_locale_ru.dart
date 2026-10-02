@@ -172,7 +172,7 @@ const Map<String, dynamic> appLocaleRu = {
       'Показывать док приложений на втором экране',
   AppLocale.nowPlayingDockSlots: 'Слоты дока',
   AppLocale.nowPlayingDockSlotsSubtitle:
-      'Сколько слотов приложений показывает док (1-5)',
+      'Сколько слотов приложений показывает док (0-5)',
   AppLocale.nowPlayingFanartDim: 'Затемнять фанарт',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Затемнять фон за логотипом, чтобы яркий фанарт не мешал',
@@ -677,6 +677,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.descending: 'По убыванию',
   AppLocale.viewModeGroup: 'РЕЖИМ ПРОСМОТРА',
   AppLocale.cardSizeGroup: 'РАЗМЕР КАРТОЧКИ',
+  AppLocale.listSizeGroup: 'РАЗМЕР СПИСКА',
   AppLocale.cardStyleGroup: 'СТИЛЬ КАРТОЧКИ',
   AppLocale.fanartCard: 'Фанарт',
   AppLocale.boxCard: 'Коробка',
@@ -769,6 +770,18 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.errorSavingCredentials: 'Ошибка при сохранении учетных данных',
   AppLocale.invalidCredentials: 'Указаны неверные учетные данные',
   AppLocale.loginError: 'Ошибка входа: {error}',
+  AppLocale.screenScraperUsernameHint:
+      'Используйте имя пользователя ScreenScraper, а не адрес электронной почты.',
+  AppLocale.screenScraperUseUsernameNotEmail:
+      'Введите имя пользователя ScreenScraper, а не адрес электронной почты. API не принимает email.',
+  AppLocale.screenScraperApiClosed:
+      'API ScreenScraper временно недоступен. Попробуйте позже.',
+  AppLocale.screenScraperAppOutdated:
+      'ScreenScraper больше не принимает эту версию приложения. Обновите NeoStation.',
+  AppLocale.screenScraperQuotaReached:
+      'Дневная квота ScreenScraper исчерпана. Попробуйте завтра.',
+  AppLocale.screenScraperConnectionError:
+      'Не удалось подключиться к ScreenScraper. Проверьте подключение к интернету и повторите попытку.',
   AppLocale.whatIsScreenScraper: 'Что такое ScreenScraper?',
   AppLocale.screenScraperDescription:
       'ScreenScraper — это совместная база данных с метаданными и обложками игр.',

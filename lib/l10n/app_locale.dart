@@ -645,6 +645,7 @@ mixin AppLocale {
   static const String sortByGroup = 'sort_by_group';
   static const String orderGroup = 'order_group';
   static const String cardSizeGroup = 'card_size_group';
+  static const String listSizeGroup = 'list_size_group';
   static const String cardStyleGroup = 'card_style_group';
   static const String fanartCard = 'fanart_card';
   static const String boxCard = 'box_card';
@@ -731,6 +732,18 @@ mixin AppLocale {
   static const String errorSavingCredentials = 'error_saving_credentials';
   static const String invalidCredentials = 'invalid_credentials';
   static const String loginError = 'login_error';
+
+  /// ScreenScraper login guidance and per-cause failure messages. The API only
+  /// accepts the account username, so [screenScraperUsernameHint] and
+  /// [screenScraperUseUsernameNotEmail] steer users away from their email.
+  static const String screenScraperUsernameHint = 'screenscraper_username_hint';
+  static const String screenScraperUseUsernameNotEmail =
+      'screenscraper_use_username_not_email';
+  static const String screenScraperApiClosed = 'screenscraper_api_closed';
+  static const String screenScraperAppOutdated = 'screenscraper_app_outdated';
+  static const String screenScraperQuotaReached = 'screenscraper_quota_reached';
+  static const String screenScraperConnectionError =
+      'screenscraper_connection_error';
   static const String whatIsScreenScraper = 'what_is_screen_scraper';
   static const String screenScraperDescription = 'screen_scraper_description';
   static const String automaticMetadataMedia = 'automatic_metadata_media';

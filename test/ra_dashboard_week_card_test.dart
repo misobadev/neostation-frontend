@@ -186,10 +186,19 @@ void main() {
     );
     await tester.pump();
 
+    // The week start is shown in local time, so west of UTC it is Aug 31.
+    final weekStart = DateTime.utc(2026, 9, 1).toLocal();
+    String two(int v) => v.toString().padLeft(2, '0');
+
     expect(find.text('Earned this week · Hardcore'), findsOneWidget);
     expect(find.text('12 True Ratio'), findsOneWidget);
     expect(find.text('4 of 10 players · 40%'), findsOneWidget);
-    expect(find.text('Week started 2026-09-01'), findsOneWidget);
+    expect(
+      find.text(
+        'Week started ${weekStart.year}-${two(weekStart.month)}-${two(weekStart.day)}',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Not in your library'), findsOneWidget);
   });
 

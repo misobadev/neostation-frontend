@@ -136,6 +136,8 @@ class GameDetailsCardList extends StatefulWidget {
   final bool isSecondaryScreenActive;
   final bool isNavigatingFast;
   final VoidCallback? onBack;
+  final TextScaler? footerTextScaler;
+  final TextScaler? playTextScaler;
 
   const GameDetailsCardList({
     super.key,
@@ -179,6 +181,8 @@ class GameDetailsCardList extends StatefulWidget {
     this.isSecondaryScreenActive = false,
     this.isNavigatingFast = false,
     this.onBack,
+    this.footerTextScaler,
+    this.playTextScaler,
   });
 
   @override
@@ -880,6 +884,8 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
             hasRetroAchievements: _hasRetroAchievements,
             isLoadingAchievements: _showsAchievementsLoading,
             currentGameInfo: _currentGameInfo,
+            textScaler: widget.footerTextScaler,
+            playTextScaler: widget.playTextScaler,
             onPlayGame: widget.onPlayGame,
             onShowRandomGame: widget.onShowRandomGame,
             onToggleFavorite: widget.onToggleFavorite,
