@@ -230,6 +230,7 @@ void main() {
     final game = _game(romname, cloudSync: cloudSync);
     if (romId != null) {
       await RommSaveMapRepository.putMapping(
+        source: RommLinkSource.download,
         romname: romname,
         systemFolder: 'snes',
         rommRomId: romId,

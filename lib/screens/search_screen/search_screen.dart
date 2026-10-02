@@ -22,14 +22,17 @@ import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
+import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/services/secondary_achievements_controller.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/utils/romm_local_matcher.dart';
 import 'package:neostation/utils/game_launch_utils.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/screens/game_screen/game_settings_dialog/romm_match_picker_dialog.dart';
 import 'package:neostation/screens/game_screen/my_games_list.dart';
 
 /// Opens [SearchScreen], then the game list for a result picked with "Go to
@@ -114,13 +117,6 @@ class SearchScreen extends StatefulWidget {
 /// selected, so launching is always an explicit step.
 enum _FocusRegion { search, filters, results, filterMenu, action }
 
-/// Ordered choices offered when a search result is selected.
-///
-/// [download] only ever appears for a RomM result that isn't on this device
-/// yet; once it is downloaded a remote result offers the same [goTo] / [play]
-/// as a local one.
-enum _ResultAction { goTo, play, download }
-
 class _SearchScreenState extends State<SearchScreen> {
   late GamepadNavigation _gamepadNav;
 
@@ -179,7 +175,7 @@ class _SearchScreenState extends State<SearchScreen> {
   RommRom? _actionRemoteTarget;
 
   /// Actions offered by the currently open chooser, in display order.
-  List<_ResultAction> _actionOptions = const [];
+  List<SearchResultAction> _actionOptions = const [];
 
   List<DatabaseGameModel> _results = [];
 
@@ -930,10 +926,15 @@ class _SearchScreenState extends State<SearchScreen> {
         return;
 
       case LocalRow(:final game):
+        final canLink = _rommConfigured;
         setState(() {
           _actionTarget = game;
           _actionRemoteTarget = null;
-          _actionOptions = const [_ResultAction.goTo, _ResultAction.play];
+          _actionOptions = searchResultActionsFor(
+            isRemote: false,
+            hasLocal: true,
+            canLink: canLink,
+          );
           _actionIndex = 0;
           _region = _FocusRegion.action;
         });
@@ -950,30 +951,45 @@ class _SearchScreenState extends State<SearchScreen> {
 
       case RemoteRow(:final rom):
         SfxService().playNavSound();
-        final local = (_remoteDownloaded[rom.id] ?? false)
-            ? await _localGameForRemote(rom)
-            : null;
+        // Asked for every remote result, not only ones the badge probe flagged
+        // as downloaded. That flag is `isDownloaded`, which is itself a
+        // filename match, so gating on it meant the one case manual linking
+        // exists for — a local copy under a different name — could never reach
+        // the Link action at all.
+        final local = await _localGameForRemote(rom);
         if (!mounted) return;
         setState(() {
           _actionTarget = local;
           _actionRemoteTarget = rom;
-          // A downloaded ROM we can't map back to a local row (renamed or not
-          // yet rescanned) falls back to the download action, which reports
-          // "already downloaded" rather than fetching it twice.
-          _actionOptions = local != null
-              ? const [_ResultAction.goTo, _ResultAction.play]
-              : const [_ResultAction.download];
+          // Still no local candidate (nothing on disk, or a rename no name
+          // comparison can bridge) falls back to the download action, which
+          // reports "already downloaded" rather than fetching twice. Linking
+          // such a game is the Manage tab picker's job, which starts from the
+          // local game rather than the remote one.
+          _actionOptions = searchResultActionsFor(
+            isRemote: true,
+            hasLocal: local != null,
+          );
           _actionIndex = 0;
           _region = _FocusRegion.action;
         });
     }
   }
 
-  /// Finds the locally indexed game for a downloaded RomM ROM.
+  /// Finds the locally indexed game a RomM ROM corresponds to, or null.
   ///
-  /// The rom map records the exact on-disk name written at download time,
-  /// which is the only reliable key for multi-disc games whose `.m3u` basename
-  /// can't be reconstructed from the ROM's `fsName`.
+  /// The rom map's recorded name comes first: it is the exact on-disk name
+  /// written at download time, and the only reliable key for multi-disc games
+  /// whose `.m3u` basename can't be reconstructed from the ROM's `fsName`.
+  ///
+  /// Beyond that it compares through [RommLocalMatcher], the same equivalence
+  /// the library link pass uses — [RommLocalMatcher.candidateNames] for the
+  /// names a ROM may land under, folded by
+  /// [RommLocalMatcher.normalizeName]. An exact `filename ==` test was the
+  /// original rule and it made the Link action unreachable for the case it was
+  /// added for: a local copy whose spelling drifted from the server's. Sharing
+  /// the matcher also means search and the link pass agree about what "the same
+  /// file" is, rather than having two rules that disagree in the margins.
   Future<DatabaseGameModel?> _localGameForRemote(RommRom rom) async {
     final provider = context.read<RommProvider>();
     final system = await provider.resolveSystem(rom);
@@ -986,29 +1002,76 @@ class _SearchScreenState extends State<SearchScreen> {
     );
     if (!mounted) return null;
 
-    final candidates = <String>{?indexed, rom.fsName}
-      ..removeWhere((n) => n.isEmpty);
+    final candidates = <String>{
+      ?indexed,
+      ...RommLocalMatcher.candidateNames(rom),
+    }..removeWhere((n) => n.isEmpty);
+    final folded = candidates.map(RommLocalMatcher.normalizeName).toSet();
 
     for (final g in _all) {
-      if (g.systemFolderName == folder && candidates.contains(g.filename)) {
-        return g;
-      }
+      if (g.systemFolderName != folder) continue;
+      if (g.filename.isEmpty) continue;
+      if (folded.contains(RommLocalMatcher.normalizeName(g.filename))) return g;
     }
     return null;
   }
 
-  void _runResultAction(_ResultAction action) {
+  void _runResultAction(SearchResultAction action) {
     final target = _actionTarget;
     final remote = _actionRemoteTarget;
     setState(() => _region = _FocusRegion.results);
     switch (action) {
-      case _ResultAction.play:
+      case SearchResultAction.play:
         if (target != null) _launch(target);
-      case _ResultAction.goTo:
+      case SearchResultAction.goTo:
         if (target != null) _goToGame(target);
-      case _ResultAction.download:
+      case SearchResultAction.download:
         if (remote != null) _downloadRemote(remote);
+      case SearchResultAction.link:
+        // No remote target when the link was started from a local row: the
+        // picker opens on the game's system with nothing pre-selected.
+        if (target != null) _linkRemote(target, remote);
     }
+  }
+
+  /// Opens the manual RomM link picker for a local game, pre-selected on the
+  /// remote result it was reached from when there is one.
+  ///
+  /// A `true` result means a manual row was written and the sync state already
+  /// invalidated by the dialog. Nothing on this screen caches the link — the
+  /// next selection re-runs [_localGameForRemote] — so only the toast remains,
+  /// and it reads the row back because the user may have picked a different
+  /// ROM than the one pre-selected.
+  Future<void> _linkRemote(DatabaseGameModel dbGame, RommRom? rom) async {
+    final folder = dbGame.systemFolderName;
+    if (folder == null || folder.isEmpty) return;
+
+    // Through the repository (not SqliteService) so an unknown folder is a
+    // null, not an unhandled throw from the datasource.
+    final system = await SystemRepository.getSystemByFolderName(folder);
+    if (!mounted || system == null) return;
+
+    final game = GameModel.fromDatabaseModel(dbGame);
+    final changed = await RommMatchPickerDialog.show(
+      context,
+      game,
+      system,
+      preselectedRom: rom,
+    );
+    if (!mounted || changed != true) return;
+
+    final mapping = await RommSaveMapRepository.getMapping(
+      game.romname,
+      folder,
+    );
+    if (!mounted) return;
+    AppNotification.showNotification(
+      context,
+      AppLocale.rommLinkSaved
+          .getString(context)
+          .replaceFirst('{name}', mapping?.fsName ?? rom?.name ?? game.romname),
+      type: NotificationType.success,
+    );
   }
 
   /// Downloads a RomM ROM straight from the results list.
@@ -1477,21 +1540,29 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildActionOption(ThemeData theme, _ResultAction action, int index) {
+  Widget _buildActionOption(
+    ThemeData theme,
+    SearchResultAction action,
+    int index,
+  ) {
     final scheme = theme.colorScheme;
     final isFocused = _actionIndex == index;
     final (icon, label) = switch (action) {
-      _ResultAction.goTo => (
+      SearchResultAction.goTo => (
         Symbols.my_location_rounded,
         AppLocale.searchGoToGame.getString(context),
       ),
-      _ResultAction.play => (
+      SearchResultAction.play => (
         Symbols.play_arrow_rounded,
         AppLocale.play.getString(context),
       ),
-      _ResultAction.download => (
+      SearchResultAction.download => (
         Symbols.cloud_download_rounded,
         AppLocale.download.getString(context),
+      ),
+      SearchResultAction.link => (
+        Symbols.link_rounded,
+        AppLocale.searchLinkToRomm.getString(context),
       ),
     };
     return GestureDetector(
