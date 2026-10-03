@@ -333,6 +333,9 @@ class GamepadNavigation {
 
   bool _keyboardInitialized = false;
 
+  /// Set by [dispose]; a disposed navigator never starts listening again.
+  bool _disposed = false;
+
   bool get isAndroid => Platform.isAndroid;
   bool get isWindows => Platform.isWindows;
   bool get isLinux => Platform.isLinux;
@@ -373,6 +376,11 @@ class GamepadNavigation {
     _subscription?.cancel();
 
     await _initializeGamepadInfo();
+
+    // The owner may have been disposed while the gamepad list was loading — a
+    // screen opened and closed straight away. Subscribing now would attach a
+    // handler that nothing will ever remove.
+    if (_disposed) return;
 
     _subscription = Gamepads.events.listen(
       (event) {
@@ -638,6 +646,8 @@ class GamepadNavigation {
 
   /// Releases resources held by the navigator.
   void dispose() {
+    _disposed = true;
+    _isActive = false;
     _subscription?.cancel();
     _subscription = null;
     _resetSelectModifier();
@@ -647,7 +657,10 @@ class GamepadNavigation {
       _stopShoulderHold();
     }
 
-    if (_keyboardInitialized && isDesktop) {
+    // Removed wherever it was added — every platform, Android included.
+    // Leaving it attached kept every closed screen's navigator (and the State
+    // its callbacks capture) running on each key event for the whole session.
+    if (_keyboardInitialized) {
       ServicesBinding.instance.keyboard.removeHandler(_handleKeyEvent);
       _keyboardInitialized = false;
     }
