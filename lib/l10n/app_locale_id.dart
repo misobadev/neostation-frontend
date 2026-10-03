@@ -591,6 +591,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.stoppingScraping: 'Menghentikan proses scraping...',
   AppLocale.syncError: 'Kesalahan saat menyinkronkan ID sistem',
   AppLocale.metadataError: 'Kesalahan selama proses scraping',
+  AppLocale.identifyGame: 'Identifikasi…',
+  AppLocale.identifySearchHint: 'Cari di ScreenScraper berdasarkan nama',
+  AppLocale.identifySearchFailed: 'Pencarian gagal. Silakan coba lagi nanti.',
   AppLocale.scrapeQuotaExceeded:
       'Kuota harian scraping ScreenScraper terlampaui',
   AppLocale.start: 'Mulai',

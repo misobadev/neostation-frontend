@@ -1216,4 +1216,51 @@ class ScraperRepository {
       _log.e('Error marking ROM fingerprint skipped for $romPath: $e');
     }
   }
+
+  // ── Games identified by hand ──────────────────────────────────────────────
+
+  /// Records the ScreenScraper game the user picked for [romPath] with
+  /// Identify…. Every later scrape of this ROM asks for that game by id
+  /// instead of matching it by dump hash or filename.
+  ///
+  /// Returns false when no ROM row has that path, so the pick was not stored.
+  static Future<bool> setManualScreenScraperGameId(
+    String romPath,
+    int gameId,
+  ) async {
+    final db = await SqliteService.getDatabase();
+    final updated = await db.rawUpdate(
+      'UPDATE user_roms SET ss_manual_game_id = ? WHERE rom_path = ?',
+      [gameId, romPath],
+    );
+    return updated > 0;
+  }
+
+  /// Forgets the user's pick, so the ROM is matched automatically again.
+  static Future<void> clearManualScreenScraperGameId(String romPath) async {
+    final db = await SqliteService.getDatabase();
+    await db.rawUpdate(
+      'UPDATE user_roms SET ss_manual_game_id = NULL WHERE rom_path = ?',
+      [romPath],
+    );
+  }
+
+  /// The ScreenScraper game the user picked for [romPath], or null when the
+  /// ROM is matched automatically.
+  static Future<int?> getManualScreenScraperGameId(String romPath) async {
+    try {
+      final db = await SqliteService.getDatabase();
+      final rows = await db.rawQuery(
+        'SELECT ss_manual_game_id FROM user_roms WHERE rom_path = ? LIMIT 1',
+        [romPath],
+      );
+      if (rows.isEmpty) return null;
+      final value = rows.first['ss_manual_game_id'];
+      if (value == null) return null;
+      return int.tryParse(value.toString());
+    } catch (e) {
+      _log.e('Error reading the identified game for $romPath: $e');
+      return null;
+    }
+  }
 }

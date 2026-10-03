@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:neostation/screens/game_screen/game_details_card/dialogs/screenscraper_match_picker_dialog.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/system_model.dart';
@@ -59,15 +60,17 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
   _ScrappingSubTab _currentSubTab = _ScrappingSubTab.data;
 
   // ── Navigation entries (per sub-tab) ────────────────────────────────────
-  // Data tab: rescrape, title, developer, publisher, genre, 6 descriptions, save.
+  // Data tab: rescrape, identify, title, developer, publisher, genre,
+  // 6 descriptions, save.
   static const int _idxRescrape = 0;
-  static const int _idxTitle = 1;
-  static const int _idxDeveloper = 2;
-  static const int _idxPublisher = 3;
-  static const int _idxGenre = 4;
-  static const int _idxDescStart = 5;
-  static const int _idxSave = 11;
-  static const int _totalDataItems = 12;
+  static const int _idxIdentify = 1;
+  static const int _idxTitle = 2;
+  static const int _idxDeveloper = 3;
+  static const int _idxPublisher = 4;
+  static const int _idxGenre = 5;
+  static const int _idxDescStart = 6;
+  static const int _idxSave = 12;
+  static const int _totalDataItems = 13;
 
   // Media tab: screenshot, wheel, fanart, boxart.
   static const int _idxImageStart = 0;
@@ -251,7 +254,9 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
   List<String> _artworkPaths() =>
       scrapedArtworkPaths(widget.game, _folder, widget.fileProvider);
 
-  Future<void> _forceRescrape() async {
+  /// With [identifyAs], the ROM is first pointed at that ScreenScraper game
+  /// (Identify…) and scraped from it.
+  Future<void> _forceRescrape({int? identifyAs}) async {
     if (_isScraping) return;
     final romPath = widget.game.romPath;
     if (romPath == null) return;
@@ -277,17 +282,29 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
     }
 
     try {
-      final result = await ScreenScraperService.scrapeSingleGame(
-        appSystemId: systemId,
-        romName: widget.game.romname,
-        systemFolder: targetSystem.primaryFolderName,
-        romPath: romPath,
-        gameName: widget.game.name,
-        forceOverwrite: true,
-        onProgress: (status, progress) {
-          if (mounted) setState(() => _scrapeProgress = progress);
-        },
-      );
+      void onProgress(String status, double progress) {
+        if (mounted) setState(() => _scrapeProgress = progress);
+      }
+
+      final result = identifyAs != null
+          ? await ScreenScraperService.identifyGame(
+              appSystemId: systemId,
+              romName: widget.game.romname,
+              systemFolder: targetSystem.primaryFolderName,
+              romPath: romPath,
+              gameId: identifyAs,
+              gameName: widget.game.name,
+              onProgress: onProgress,
+            )
+          : await ScreenScraperService.scrapeSingleGame(
+              appSystemId: systemId,
+              romName: widget.game.romname,
+              systemFolder: targetSystem.primaryFolderName,
+              romPath: romPath,
+              gameName: widget.game.name,
+              forceOverwrite: true,
+              onProgress: onProgress,
+            );
 
       // Bust cached artwork so the fresh media shows up everywhere.
       await evictScrapedArtwork(_artworkPaths());
@@ -295,9 +312,9 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
       GamesCarousel.evictArtworkCaches(_artworkPaths());
 
       if (mounted) {
-        final message = result['success'] == true
-            ? 'Scraping completed'
-            : 'Scraping failed: ${result['message'].toString().getString(context)}';
+        // The service reports its outcome as an AppLocale key, success
+        // included, as on the games list's own scrape action.
+        final message = result['message'].toString().getString(context);
         AppNotification.showNotification(
           context,
           message,
@@ -316,6 +333,45 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
     } finally {
       if (mounted) setState(() => _isScraping = false);
     }
+  }
+
+  /// Identify…: lets the user search ScreenScraper for this game and point it
+  /// at the right one, then scrapes it like Force Rescrape.
+  Future<void> _identify() async {
+    final romPath = widget.game.romPath;
+    final systemId = _systemId;
+    if (_isScraping || romPath == null || romPath.isEmpty || systemId == null) {
+      return;
+    }
+
+    final currentGameId = await ScreenScraperService.getIdentifiedGameId(
+      romPath,
+    );
+    if (!mounted) return;
+
+    final choice = await ScreenScraperMatchPickerDialog.show(
+      context,
+      game: widget.game,
+      appSystemId: systemId,
+      currentGameId: currentGameId,
+    );
+    if (choice == null || !mounted) return;
+
+    final picked = choice.game;
+    if (picked != null) {
+      await _forceRescrape(identifyAs: picked.id);
+      return;
+    }
+
+    final cleared = await ScreenScraperService.clearIdentifiedGame(romPath);
+    if (!mounted) return;
+    AppNotification.showNotification(
+      context,
+      cleared
+          ? AppLocale.raFixMatchUpdated.getString(context)
+          : AppLocale.failedToSaveSetting.getString(context),
+      type: cleared ? NotificationType.success : NotificationType.error,
+    );
   }
 
   // ── Artwork replacement ─────────────────────────────────────────────────
@@ -439,6 +495,8 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
     if (_currentSubTab == _ScrappingSubTab.data) {
       if (idx == _idxRescrape) {
         _forceRescrape();
+      } else if (idx == _idxIdentify) {
+        _identify();
       } else if (idx >= _idxTitle && idx < _idxSave) {
         _focusFieldAt(idx);
       } else if (idx == _idxSave) {
@@ -577,6 +635,20 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
               SfxService().playNavSound();
               setState(() => _selectedIndex = _idxRescrape);
               _forceRescrape();
+            },
+          ),
+
+          // Identify….
+          _NavRow(
+            key: _itemKey(_idxIdentify),
+            isSelected: _selectedIndex == _idxIdentify,
+            icon: Symbols.manage_search_rounded,
+            label: AppLocale.identifyGame.getString(context),
+            subtitle: AppLocale.identifySearchHint.getString(context),
+            onTap: () {
+              SfxService().playNavSound();
+              setState(() => _selectedIndex = _idxIdentify);
+              _identify();
             },
           ),
 
