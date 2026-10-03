@@ -621,6 +621,9 @@ class SqliteMigrations {
       case 162:
         await _migrateToVersion162(db);
         break;
+      case 163:
+        await _migrateToVersion163(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7111,6 +7114,41 @@ class SqliteMigrations {
         'ALTER TABLE user_config ADD COLUMN android_apps_as_tab '
         'INTEGER DEFAULT 0',
       );
+    }
+  }
+
+  /// Migration v163: adds `user_roms.ss_manual_game_id`, the ScreenScraper game
+  /// a user picked by hand for a ROM with Identify….
+  ///
+  /// Matching by dump hash or filename cannot reach every ROM: hacks,
+  /// translations and untidy names match the wrong game or none at all. Once
+  /// the user has pointed a ROM at the right game, every later scrape asks for
+  /// that game by id, so a bulk "all content" pass cannot put the wrong one
+  /// back. NULL means match automatically, which is every existing row.
+  ///
+  /// Numbered 163: main holds v161 (List view size, #553) and v162 (Android
+  /// Apps tab, #526), and open PRs #516 and #566 still hold a v161 and a v162.
+  ///
+  /// Idempotent — a device already past 163 when it first sees this binary
+  /// skips the case, so nothing may assume it ran.
+  static Future<void> _migrateToVersion163(Database db) async {
+    _log.i('Migration v163: Adding ss_manual_game_id to user_roms');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_roms)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+      if (!columns.contains('ss_manual_game_id')) {
+        db.execute(
+          'ALTER TABLE user_roms ADD COLUMN ss_manual_game_id INTEGER',
+        );
+        _log.i('Column ss_manual_game_id added via v163');
+      } else {
+        _log.i('Column ss_manual_game_id already exists');
+      }
+      _log.i('Migration v163 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v163: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
     }
   }
 }

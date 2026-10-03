@@ -82,6 +82,7 @@ class DatabaseTestHelper {
         rom_crc32 TEXT,
         rom_size INTEGER,
         rom_fingerprint_skipped TEXT,
+        ss_manual_game_id INTEGER,
         id_ra INTEGER,
         ra_match_source TEXT,
         ra_hash_skipped TEXT,
