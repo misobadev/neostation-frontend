@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -63,6 +64,38 @@ void main() {
     await offline.connect('Player', apiKey: 'secret-key');
     await offline.loadUserSummary();
     return offline;
+  }
+
+  for (final fails in [false, true]) {
+    test(
+      'summary completion after disposal is ignored (failure: $fails)',
+      () async {
+        final provider = RetroAchievementsProvider(
+          sessionHttpClient: onlineClient(),
+        );
+        final signedInSummary = Completer<void>();
+        void summaryReady() {
+          if (provider.summaryLoaded && !signedInSummary.isCompleted) {
+            signedInSummary.complete();
+          }
+        }
+
+        provider.addListener(summaryReady);
+        await provider.connect('Player', apiKey: 'secret-key');
+        await signedInSummary.future;
+        provider.removeListener(summaryReady);
+        final response = Completer<http.Response>();
+        provider.sessionHttpClient = MockClient((_) => response.future);
+        final loading = provider.loadUserSummary();
+        provider.dispose();
+        if (fails) {
+          response.complete(http.Response('{}', 401));
+        } else {
+          response.complete(http.Response(summaryBody, 200));
+        }
+        expect(await loading, isFalse);
+      },
+    );
   }
 
   group('a RetroAchievements session restored from the offline cache', () {

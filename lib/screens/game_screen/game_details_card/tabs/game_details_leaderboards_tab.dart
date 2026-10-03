@@ -220,7 +220,7 @@ class GameDetailsLeaderboardsTabState
         _selectedIndex = 0;
         _error = null;
       });
-      _scrollController.jumpTo(0);
+      if (_scrollController.hasClients) _scrollController.jumpTo(0);
       return true;
     }
     setState(() => _isPanelActive = false);
