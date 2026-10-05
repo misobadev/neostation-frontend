@@ -1,6 +1,9 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <shellapi.h>
+#include <flutter/method_channel.h>
+#include <flutter/standard_method_codec.h>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -25,6 +28,42 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  flutter::MethodChannel<flutter::EncodableValue> shortcuts(
+      flutter_controller_->engine()->messenger(),
+      "com.neogamelab.neostation/shortcuts",
+      &flutter::StandardMethodCodec::GetInstance());
+  shortcuts.SetMethodCallHandler([](const auto& call, auto result) {
+    const auto* value = call.arguments();
+    const auto* file = value ? std::get_if<std::string>(value) : nullptr;
+    if (call.method_name() != "launch") {
+      result->NotImplemented();
+      return;
+    }
+    if (!file || file->empty()) {
+      result->Error("invalid_path", "Missing shortcut path");
+      return;
+    }
+    const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                         file->data(), static_cast<int>(file->size()), nullptr, 0);
+    if (!count) {
+      result->Error("invalid_path", "Invalid UTF-8 path");
+      return;
+    }
+    std::wstring wide(count, L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, file->data(),
+                        static_cast<int>(file->size()), wide.data(), count);
+    SHELLEXECUTEINFOW info = {};
+    info.cbSize = sizeof(info);
+    info.fMask = SEE_MASK_FLAG_NO_UI;
+    info.lpVerb = L"open";
+    info.lpFile = wide.c_str();
+    info.nShow = SW_SHOWNORMAL;
+    if (!ShellExecuteExW(&info)) {
+      result->Error("launch_failed", "Windows rejected shortcut: " + std::to_string(GetLastError()));
+      return;
+    }
+    result->Success();
+  });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
   return true;
 }

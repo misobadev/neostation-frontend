@@ -68,6 +68,9 @@ class GameSessionManager {
   static DateTime? _gameLaunchTime;
   static DateTime? get gameLaunchTime => _gameLaunchTime;
 
+  /// Shortcut sessions end on frontend focus return instead of process exit.
+  static bool isShortcutSession = false;
+
   /// Filename of the standalone emulator executable currently running.
   static String? _launchedEmulatorExe;
   static String? get launchedEmulatorExe => _launchedEmulatorExe;
@@ -221,7 +224,9 @@ class GameSessionManager {
     SystemModel system,
     GameModel game, [
     String? emulatorExeName,
+    bool shortcutSession = false,
   ]) {
+    isShortcutSession = shortcutSession;
     _isGameLaunched = true;
     _launchPending = false;
     // Also here, not only in beginLaunchPending: a launch path that never
@@ -343,6 +348,7 @@ class GameSessionManager {
       _isGameLaunched = false;
       _gameLaunchTime = null;
       _launchedEmulatorExe = null;
+      isShortcutSession = false;
       _currentGameSystem = null;
       _currentGame = null;
 

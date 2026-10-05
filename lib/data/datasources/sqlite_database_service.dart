@@ -1,3 +1,4 @@
+import '../../repositories/desktop_shortcut_repository.dart';
 import '../../models/database_game_model.dart';
 import '../../models/system_model.dart';
 import '../../models/emulator_model.dart';
@@ -258,6 +259,7 @@ class SqliteDatabaseService {
                 validExtensionsSet,
                 system.recursiveScan,
                 ignoreHiddenFiles: ignoreHiddenFiles,
+                desktopShortcuts: system.id == 'pc',
               );
 
         _log.i(
@@ -1368,7 +1370,32 @@ class SqliteDatabaseService {
     Set<String> validExtensions,
     bool recursive, {
     bool ignoreHiddenFiles = true,
+    bool desktopShortcuts = false,
   }) async {
+    if (desktopShortcuts) {
+      final entries = <RomEntry>[];
+      await for (final entity in Directory(
+        pathStr,
+      ).list(recursive: recursive, followLinks: false)) {
+        if (entity is! File ||
+            _shouldSkipStandardEntity(
+              entity,
+              ignoreHiddenFiles: ignoreHiddenFiles,
+            )) {
+          continue;
+        }
+        if (await DesktopShortcutRepository.isShortcut(entity.path)) {
+          entries.add(
+            RomEntry(
+              path: entity.path,
+              filename: path.basename(entity.path),
+              size: await entity.length(),
+            ),
+          );
+        }
+      }
+      return entries;
+    }
     final result = await Isolate.run(
       () => _walkStandardPath(
         pathStr,

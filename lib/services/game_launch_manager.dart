@@ -1,3 +1,5 @@
+import 'shortcut_focus_tracker.dart';
+import 'package:window_manager/window_manager.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/widgets.dart';
@@ -26,7 +28,8 @@ enum GameLaunchPhase {
 /// Acts as the single source of truth for platform process monitoring, audio management
 /// (music and SFX), and state transitions between launching, playing, and syncing.
 /// Implements [WidgetsBindingObserver] to track app lifecycle changes on Android.
-class GameLaunchManager extends ChangeNotifier with WidgetsBindingObserver {
+class GameLaunchManager extends ChangeNotifier
+    with WidgetsBindingObserver, WindowListener {
   static final GameLaunchManager _instance = GameLaunchManager._internal();
   factory GameLaunchManager() => _instance;
   GameLaunchManager._internal();
@@ -53,6 +56,8 @@ class GameLaunchManager extends ChangeNotifier with WidgetsBindingObserver {
   /// Flag for Android to detect if the app was resumed before monitoring started
   /// (indicating an immediate emulator failure).
   bool _resumedBeforeMonitoring = false;
+  bool _shortcutSession = false;
+  final _shortcutFocus = ShortcutFocusTracker();
 
   GameLaunchPhase? get phase => _phase;
   bool get isActive => _phase != null;
@@ -68,6 +73,8 @@ class GameLaunchManager extends ChangeNotifier with WidgetsBindingObserver {
   ///
   /// Pauses background music, disables UI SFX, and registers lifecycle observers.
   Future<void> beginSession() async {
+    _shortcutFocus.reset();
+    if (!Platform.isAndroid) windowManager.addListener(this);
     _phase = GameLaunchPhase.launching;
     _canDismiss = false;
     _isClosing = false;
@@ -79,10 +86,13 @@ class GameLaunchManager extends ChangeNotifier with WidgetsBindingObserver {
     _log.i('[GameLaunchManager] Session started — SFX disabled, music paused.');
   }
 
+  /// Ignore focus events caused by the loading overlay before OS handoff.
+  void prepareLaunchHandoff() => _shortcutFocus.reset();
+
   /// Transitions the session to the playing phase and starts platform monitoring.
   ///
   /// Should be called after the emulator process has been successfully created.
-  void onGameStarted({String? emulatorExe}) {
+  void onGameStarted({String? emulatorExe, bool shortcutSession = false}) {
     if (_phase == null || _isClosing) return;
 
     if (Platform.isAndroid && _resumedBeforeMonitoring) {
@@ -93,9 +103,14 @@ class GameLaunchManager extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
+    _shortcutSession = shortcutSession;
     _phase = GameLaunchPhase.playing;
     notifyListeners();
-    _startPlatformMonitoring(emulatorExe);
+    if (shortcutSession) {
+      if (_shortcutFocus.returned) _triggerClose();
+    } else {
+      _startPlatformMonitoring(emulatorExe);
+    }
     _log.i('[GameLaunchManager] Game started — monitoring active.');
   }
 
@@ -154,6 +169,9 @@ class GameLaunchManager extends ChangeNotifier with WidgetsBindingObserver {
     GameService.clearOnGameReturnedCallback();
     GameService.clearOnProcessExitCallback();
     WidgetsBinding.instance.removeObserver(this);
+    if (!Platform.isAndroid) windowManager.removeListener(this);
+    _shortcutSession = false;
+    _shortcutFocus.reset();
     MusicPlayerService().resumeAfterGame();
     SfxService().setEnabled(_sfxWasEnabled);
     _phase = null;
@@ -165,6 +183,21 @@ class GameLaunchManager extends ChangeNotifier with WidgetsBindingObserver {
     _log.i(
       '[GameLaunchManager] Session finalized — music resumed, SFX re-enabled.',
     );
+  }
+
+  @override
+  void onWindowBlur() {
+    if (_phase == GameLaunchPhase.launching ||
+        _phase == GameLaunchPhase.playing) {
+      _shortcutFocus.blur();
+    }
+  }
+
+  @override
+  void onWindowFocus() {
+    _shortcutFocus.focus();
+    if (!_shortcutFocus.returned) return;
+    if (_shortcutSession && _phase == GameLaunchPhase.playing) _triggerClose();
   }
 
   /// Monitors Android app lifecycle states to detect user return from the emulator.

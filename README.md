@@ -257,3 +257,19 @@ These co-maintainers and collaborators work very hard to make NeoStation what it
 This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**. See [`LICENSE.md`](LICENSE.md) for details.
 
 Third-party components and assets have their own licenses — see [`NOTICE`](NOTICE.md).
+
+### Desktop shortcut games
+
+Create a `pc` folder inside a configured ROM root, place game shortcuts in it,
+and rescan to see **PC Games**. No emulator configuration is required.
+
+- Windows: `.lnk` and `.url` (including store links).
+- macOS: Finder aliases and `.webloc` files.
+- Linux: `.desktop` files; `gio` must be installed on the host.
+
+Only the current OS's formats are recognised. Existing recursive and hidden-file
+scan settings apply. Shortcuts retain their original paths and launch through the
+OS, preserving their launch arguments and store associations. Playtime ends when
+you return to NeoStation after it loses focus; dismiss the launch dialog manually
+if a shortcut does not transfer focus. A successful handoff to a store client does
+not guarantee that the client subsequently starts the game.

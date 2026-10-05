@@ -1,0 +1,38 @@
+{
+  "system": {
+    "id": "pc",
+    "multidisc": false,
+    "name": "PC Games",
+    "short_name": "PC Games",
+    "details": {
+      "manufacturer": "",
+      "description": "Desktop games launched from native shortcuts.",
+      "type": "computer"
+    },
+    "ids": {
+      "screenscraper": null,
+      "retroachievements": null
+    },
+    "folders": [
+      "pc"
+    ],
+    "colors": [
+      "#455A64",
+      "#263238"
+    ],
+    "extensions": [
+      "lnk",
+      "url",
+      "desktop",
+      "webloc"
+    ]
+  },
+  "emulators": [],
+  "neosync": {
+    "sync": false,
+    "android_sync_folder": [],
+    "windows_sync_folder": [],
+    "linux_sync_folder": [],
+    "macos_sync_folder": []
+  }
+}

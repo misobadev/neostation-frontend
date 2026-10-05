@@ -82,6 +82,7 @@ Future<void> launchGameWithDialog({
     return;
   }
 
+  GameLaunchManager().prepareLaunchHandoff();
   final result = await GameService.launchGame(context, system, game);
 
   if (result.success) {
@@ -90,6 +91,7 @@ Future<void> launchGameWithDialog({
     // (isGameLaunched now covers it).
     GameLaunchManager().onGameStarted(
       emulatorExe: GameService.launchedEmulatorExe,
+      shortcutSession: result.shortcutSession,
     );
   } else {
     // Clean up session and close dialog on failure.

@@ -1,3 +1,5 @@
+import '../../repositories/system_repository.dart';
+import '../desktop_shortcut_service.dart';
 import 'dart:io';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -28,6 +30,7 @@ import '../gamepad/gamepad_navigation_manager.dart';
 class GameLaunchResult {
   /// Whether the launch was successful.
   final bool success;
+  final bool shortcutSession;
 
   /// Human-readable error message.
   final String? errorMessage;
@@ -35,13 +38,14 @@ class GameLaunchResult {
   /// Technical details or raw error information for debugging.
   final String? errorDetails;
 
-  GameLaunchResult.success()
+  GameLaunchResult.success({this.shortcutSession = false})
     : success = true,
       errorMessage = null,
       errorDetails = null;
 
   GameLaunchResult.failure(this.errorMessage, [this.errorDetails])
-    : success = false;
+    : success = false,
+      shortcutSession = false;
 }
 
 /// Executes game launches across all supported platforms and monitors the
@@ -104,6 +108,24 @@ class GameLaunchService {
           AppLocale.romFileNotFound.getString(context),
           game.romPath ?? AppLocale.noData.getString(context),
         );
+      }
+
+      if (!Platform.isAndroid &&
+          (game.systemId == 'pc' ||
+              game.systemFolderName == 'pc' ||
+              system.id == 'pc')) {
+        await DesktopShortcutService.launch(game.romPath!);
+        final pcSystem = system.id == 'pc'
+            ? system
+            : await SystemRepository.getSystemByFolderName('pc');
+        GameSessionManager.registerGameLaunch(
+          pcSystem ?? system,
+          game,
+          null,
+          true,
+        );
+        await FavoritesService.recordGamePlayed(game);
+        return GameLaunchResult.success(shortcutSession: true);
       }
 
       final configFileName = '${system.folderName}.json';
@@ -1679,6 +1701,7 @@ class GameLaunchService {
   /// Handles application re-entry (foregrounding) to detect session termination.
   static Future<void> handleAppResumed() async {
     if (GameSessionManager.isGameLaunched) {
+      if (GameSessionManager.isShortcutSession) return;
       if (Platform.isLinux) return;
 
       final isDesktop =

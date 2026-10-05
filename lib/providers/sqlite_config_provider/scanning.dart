@@ -387,11 +387,14 @@ extension SqliteConfigScanning on SqliteConfigProvider {
         detectedSystems = await SqliteConfigService.detectSystems(
           romFolders: _config.romFolders,
           availableSystems: _availableSystems,
+          ignoreHiddenFiles: _config.ignoreHiddenFiles,
         );
       }
 
       // Determine the systems to use for initial detection
-      List<SystemModel> systemsForMapping = _availableSystems;
+      List<SystemModel> systemsForMapping = _availableSystems
+          .where((system) => !(Platform.isAndroid && system.id == 'pc'))
+          .toList();
 
       // Filter systems if it's a Fast Scan for instant progress
       if (isFastScan) {

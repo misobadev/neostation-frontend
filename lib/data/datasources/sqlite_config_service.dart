@@ -1,3 +1,4 @@
+import '../../repositories/desktop_shortcut_repository.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:neostation/constants/recent_card_sizes.dart';
@@ -27,6 +28,7 @@ class SqliteConfigService {
     String directoryPath, {
     String? systemId,
     bool recursive = true,
+    bool ignoreHiddenFiles = true,
   }) async {
     Set<String> validExtensions;
     try {
@@ -50,11 +52,18 @@ class SqliteConfigService {
 
       int count = 0;
       for (final file in files) {
+        if (systemId == 'pc' &&
+            ignoreHiddenFiles &&
+            path.basename(file.path).startsWith('.')) {
+          continue;
+        }
         String extension = path.extension(file.path).toLowerCase();
         if (extension.startsWith('.')) {
           extension = extension.substring(1);
         }
-        if (validExtensions.contains(extension)) {
+        if (systemId == 'pc'
+            ? await DesktopShortcutRepository.isShortcut(file.path)
+            : validExtensions.contains(extension)) {
           count++;
         }
       }
@@ -440,6 +449,7 @@ class SqliteConfigService {
   static Future<List<SystemModel>> detectSystems({
     required List<String> romFolders,
     required List<SystemModel> availableSystems,
+    bool ignoreHiddenFiles = true,
   }) async {
     final detectedSystemsMap = <String, SystemModel>{};
 
@@ -467,11 +477,13 @@ class SqliteConfigService {
             availableSystems,
           );
 
-          if (matchingSystem != null) {
+          if (matchingSystem != null &&
+              !(matchingSystem.id == 'pc' && Platform.isAndroid)) {
             final romCount = await SqliteConfigService._countRomsInDirectory(
               entity.path,
               systemId: matchingSystem.id,
               recursive: matchingSystem.recursiveScan,
+              ignoreHiddenFiles: ignoreHiddenFiles,
             );
 
             final systemId = matchingSystem.id.toString();
