@@ -1,7 +1,7 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleKo = {
-  AppLocale.rommSavesSubtitle: '게임별로 정리된 세이브 파일과 상태입니다.',
+  AppLocale.rommSavesSubtitle: '세이브 동기화는 RomM에서 처리합니다.',
   AppLocale.rommSavesAutoDownload: '연결된 게임을 실행하면 최신 클라우드 저장 데이터를 다운로드합니다.',
   AppLocale.rommSavesRecent: '최근 활동순',
   AppLocale.rommSaveFile: '세이브 파일',
@@ -11,6 +11,12 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.rommUploadsFailed: '일부 업로드에 실패했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',
   AppLocale.rommSavesHelp:
       'RomM 저장 파일과 상태를 확인합니다. 업로드 재시도는 동기화가 활성화된 RomM 연결 로컬 게임을 확인합니다. 최신 원격 저장 파일은 게임 시작 시 다운로드됩니다.',
+  AppLocale.rommDeleteTitle: 'RomM에서 삭제',
+  AppLocale.rommDeleteConfirm:
+      '{file} 파일이 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
+  AppLocale.rommDeleted: 'RomM에서 삭제했습니다.',
+  AppLocale.rommDeleteFailed:
+      'RomM에서 삭제하지 못했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',
   AppLocale.raEvents: '이벤트',
   AppLocale.raAotwYearTitle: '이번 주 업적 ({year})',
   AppLocale.raAotw: 'AOTW',

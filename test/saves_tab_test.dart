@@ -209,6 +209,62 @@ void main() {
     expect(romm.calls, 1);
   });
 
+  testWidgets('a focused file is deleted from RomM only once confirmed', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    // Saves and states share id 1 here; only the state may go.
+    await tester.tap(find.byKey(const ValueKey('save-file-true-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('save-delete')));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete from RomM'), findsOneWidget);
+    // The long confirmation wraps rather than spanning the screen.
+    expect(tester.getSize(find.byType(AlertDialog)).width, lessThan(640));
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    expect(connection.inventory.deleted, isEmpty);
+    expect(find.text('Game.state'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('save-delete')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(connection.inventory.deleted, ['state:1']);
+    expect(find.text('Game.state'), findsNothing);
+    expect(find.text('Game.srm'), findsOneWidget);
+    expect(romm.calls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('controller focus on the selected filter shows a glow', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    double glow(int filter) {
+      final box = tester.widget<AnimatedContainer>(
+        find
+            .ancestor(
+              of: find.byKey(ValueKey('save-filter-$filter')),
+              matching: find.byType(AnimatedContainer),
+            )
+            .first,
+      );
+      return (box.decoration! as ShapeDecoration).shadows!.single.color.a;
+    }
+
+    expect(glow(0), 0);
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 180)),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown); // filters
+    await tester.pumpAndSettle();
+    expect(glow(0), greaterThan(0));
+    expect(glow(1), 0);
+  });
+
   for (final size in [
     const Size(640, 480),
     const Size(960, 540),

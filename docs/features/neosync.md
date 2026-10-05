@@ -33,6 +33,11 @@ not download all remote saves: downloads run before a linked game launches.
 Per-game and per-system sync settings still apply. Failed requests show an
 error rather than an empty inventory or a successful upload check.
 
+**Delete** (Select) permanently removes the focused file from the RomM server
+after you confirm. Files on your devices are not touched, so a device that
+still syncs the game uploads its copy again on its next sync. Deleting needs
+the same `assets.write` permission as uploading.
+
 Use the D-pad to navigate the controls and files, A to activate a control,
 L1/R1 to change tabs, and B to return to Systems.
 

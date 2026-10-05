@@ -1,7 +1,7 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleJa = {
-  AppLocale.rommSavesSubtitle: 'セーブデータとステートをゲームごとに表示します。',
+  AppLocale.rommSavesSubtitle: 'セーブの同期はRomMが行います。',
   AppLocale.rommSavesAutoDownload: '連携したゲームの起動時に、新しいクラウドセーブをダウンロードします。',
   AppLocale.rommSavesRecent: '更新が新しい順',
   AppLocale.rommSaveFile: 'セーブデータ',
@@ -11,6 +11,11 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.rommUploadsFailed: '一部のアップロードに失敗しました。接続とRomMの権限を確認して再試行してください。',
   AppLocale.rommSavesHelp:
       'RomMのセーブとステートを表示します。アップロードの再試行では、RomMにリンクされ同期が有効なローカルゲームを確認します。新しいリモートセーブはゲーム起動時にダウンロードされます。',
+  AppLocale.rommDeleteTitle: 'RomMから削除',
+  AppLocale.rommDeleteConfirm:
+      '{file} をRomMサーバーから完全に削除します。デバイス上のコピーは残り、このゲームの同期を続けているデバイスからは再びアップロードされます。',
+  AppLocale.rommDeleted: 'RomMから削除しました。',
+  AppLocale.rommDeleteFailed: 'RomMから削除できませんでした。接続とRomMの権限を確認して再試行してください。',
   AppLocale.raEvents: 'イベント',
   AppLocale.raAotwYearTitle: '今週のアチーブメント（{year}）',
   AppLocale.raAotw: 'AOTW',

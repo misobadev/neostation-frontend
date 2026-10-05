@@ -6,6 +6,7 @@ import '../models/romm_rom.dart';
 import '../models/romm_save_game.dart';
 import '../models/sync_models.dart';
 import '../repositories/romm_save_map_repository.dart';
+import '../services/romm_service.dart' show RommException;
 import '../sync/providers/romm_provider.dart';
 import '../sync/sync_manager.dart';
 import '../utils/lifo_semaphore.dart';
@@ -33,6 +34,7 @@ class RommSavesProvider extends ChangeNotifier {
   List<RommAsset> _assets = [];
   bool _loading = false;
   bool _syncing = false;
+  bool _deleting = false;
   bool _disposed = false;
   int _generation = 0;
   Object? _loadError;
@@ -41,6 +43,7 @@ class RommSavesProvider extends ChangeNotifier {
   List<RommAsset> get assets => List.unmodifiable(_assets);
   bool get loading => _loading;
   bool get syncing => _syncing;
+  bool get deleting => _deleting;
   Object? get loadError => _loadError;
   SyncResult? get syncResult => _syncResult;
 
@@ -181,6 +184,44 @@ class RommSavesProvider extends ChangeNotifier {
       if (!_disposed) notifyListeners();
     }
     if (!_disposed && generation == _generation) await refresh();
+  }
+
+  /// Permanently removes [asset] from the server. Local copies are untouched,
+  /// so a device that still syncs the game uploads its copy again.
+  Future<bool> delete(RommAsset asset) async {
+    if (_disposed ||
+        _loading ||
+        _syncing ||
+        _deleting ||
+        !_browse.isConnected) {
+      return false;
+    }
+    _deleting = true;
+    notifyListeners();
+    var deleted = false;
+    try {
+      final ids = [asset.id];
+      await (asset.isState
+          ? _browse.service.deleteStates(ids)
+          : _browse.service.deleteSaves(ids));
+      deleted = true;
+    } on RommException catch (error) {
+      // Already gone, e.g. deleted from another device: what the user asked for.
+      deleted = error.statusCode == 404;
+    } catch (_) {
+      // Reported to the caller as a failed delete.
+    }
+    if (_disposed) return deleted;
+    _deleting = false;
+    // Drop it locally rather than refreshing, which would reload every game's
+    // artwork. Saves and states are numbered independently, so match both.
+    if (deleted) {
+      _assets = _assets
+          .where((a) => a.isState != asset.isState || a.id != asset.id)
+          .toList();
+    }
+    notifyListeners();
+    return deleted;
   }
 
   @override

@@ -2,7 +2,7 @@ part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleDe = {
   AppLocale.rommSavesSubtitle:
-      'Deine Spielstände und Speicherstände, nach Spiel geordnet.',
+      'Die Synchronisierung der Spielstände übernimmt RomM.',
   AppLocale.rommSavesAutoDownload:
       'Neuere Cloud-Spielstände werden beim Start eines verknüpften Spiels heruntergeladen.',
   AppLocale.rommSavesRecent: 'Neueste Aktivität zuerst',
@@ -15,6 +15,12 @@ const Map<String, dynamic> appLocaleDe = {
       'Einige Uploads sind fehlgeschlagen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
   AppLocale.rommSavesHelp:
       'RomM-Spielstände ansehen. Uploads wiederholen prüft lokale, mit RomM verknüpfte Spiele mit aktivierter Synchronisierung. Neuere Spielstände werden beim Spielstart heruntergeladen.',
+  AppLocale.rommDeleteTitle: 'Aus RomM löschen',
+  AppLocale.rommDeleteConfirm:
+      '{file} wird dauerhaft von deinem RomM-Server gelöscht. Kopien auf deinen Geräten bleiben erhalten, und jedes Gerät, das dieses Spiel noch synchronisiert, lädt seine Kopie erneut hoch.',
+  AppLocale.rommDeleted: 'Aus RomM gelöscht.',
+  AppLocale.rommDeleteFailed:
+      'Löschen aus RomM fehlgeschlagen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
   AppLocale.raEvents: 'Events',
   AppLocale.raAotwYearTitle: 'Achievement der Woche ({year})',
   AppLocale.raAotw: 'AOTW',

@@ -1449,6 +1449,42 @@ class RommService {
     );
   }
 
+  /// Permanently deletes save files from the server (`POST /api/saves/delete`,
+  /// body `{"saves": [...]}`). Requires the `assets.write` scope.
+  Future<void> deleteSaves(List<int> assetIds) =>
+      _deleteAssets('/api/saves', field: 'saves', assetIds: assetIds);
+
+  /// Permanently deletes save states from the server
+  /// (`POST /api/states/delete`, body `{"states": [...]}`).
+  Future<void> deleteStates(List<int> assetIds) =>
+      _deleteAssets('/api/states', field: 'states', assetIds: assetIds);
+
+  /// RomM answers 404 when any id is not one of the current user's assets.
+  Future<void> _deleteAssets(
+    String basePath, {
+    required String field,
+    required List<int> assetIds,
+  }) async {
+    if (assetIds.isEmpty) return;
+    final body = jsonEncode({field: assetIds});
+    final resp = await _sendWithAuthRetry<http.Response>(
+      () => _httpClient
+          .post(
+            _uri('$basePath/delete'),
+            headers: {..._authHeaders, 'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 30)),
+      statusOf: (r) => r.statusCode,
+    );
+    if (resp.statusCode != 200) {
+      throw RommException(
+        'Delete failed (${resp.statusCode})',
+        statusCode: resp.statusCode,
+      );
+    }
+  }
+
   // ── Play sessions (playtime sync) ─────────────────────────────────────────
 
   /// Uploads finished play sessions (`POST /api/play-sessions`).

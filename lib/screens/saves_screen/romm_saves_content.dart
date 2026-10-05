@@ -15,13 +15,17 @@ import '../../services/game_service.dart' show GamepadNavigationManager;
 import '../../sync/sync_manager.dart';
 import '../../themes/corner_radii.dart';
 import '../../utils/gamepad_nav.dart';
+import '../../widgets/confirm_action_dialog.dart';
+import '../../widgets/core_footer.dart' show GamepadControl;
+import '../../widgets/custom_notification.dart';
 import '../../widgets/romm_sync_banner.dart' show rommFormatBytes;
 import '../app_screen.dart';
 import 'romm_save_artwork.dart';
 
 enum _FocusArea { actions, filters, games, files }
 
-/// A game-first view of RomM's inventory. Browsing is always read-only.
+/// A game-first view of RomM's inventory. Browsing is always read-only; the
+/// only change it can make is a confirmed delete of the focused file.
 class RommSavesContent extends StatefulWidget {
   const RommSavesContent({super.key});
 
@@ -47,7 +51,14 @@ class _RommSavesContentState extends State<RommSavesContent> {
         .where((asset) => _filter == 0 || asset.isState == (_filter == 2))
         .toList(),
   );
-  bool get _busy => _saves.loading || _saves.syncing;
+  bool get _busy => _saves.loading || _saves.syncing || _saves.deleting;
+
+  RommAsset? get _focusedFile {
+    final games = _games;
+    if (_focus != _FocusArea.files || games.isEmpty) return null;
+    final files = games[_gameIndex].assets;
+    return _fileIndex < files.length ? files[_fileIndex] : null;
+  }
 
   // Accommodate both ScreenUtil and accessibility text scaling.
   double get _gameExtent => math.max(
@@ -79,6 +90,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
       onSelectItem: _activate,
       onXButton: _refresh,
       onFavorite: _retryUploads,
+      onSelectButton: _select,
       onBack: _back,
       onPreviousTab: AppNavigation.previousTab,
       onNextTab: AppNavigation.nextTab,
@@ -199,6 +211,60 @@ class _RommSavesContentState extends State<RommSavesContent> {
     if (!_busy) _saves.retryUploads();
   }
 
+  /// Select deletes the focused file, as it does in the NeoSync save list.
+  /// Elsewhere it keeps its app-wide meaning instead of doing nothing.
+  void _select() {
+    if (_focus == _FocusArea.files) {
+      _deleteFocusedFile();
+    } else {
+      GamepadNavigation.globalSelectTap?.call();
+    }
+  }
+
+  Future<void> _deleteFocusedFile() async {
+    final file = _focusedFile;
+    if (file == null || _busy) return;
+    _navigation.deactivate();
+    final confirmed = await ConfirmActionDialog.show(
+      context,
+      title: AppLocale.rommDeleteTitle.getString(context),
+      body: AppLocale.rommDeleteConfirm
+          .getString(context)
+          .replaceFirst('{file}', file.fileName),
+      confirmLabel: AppLocale.delete.getString(context),
+      icon: Icons.delete_forever_rounded,
+      maxWidth: 320.r,
+    );
+    if (!mounted) return;
+    _navigation.activate();
+    if (!confirmed) return;
+    final deleted = await _saves.delete(file);
+    if (!mounted) return;
+    AppNotification.showNotification(
+      context,
+      (deleted ? AppLocale.rommDeleted : AppLocale.rommDeleteFailed).getString(
+        context,
+      ),
+      type: deleted ? NotificationType.success : NotificationType.error,
+    );
+    if (!deleted) return;
+    // The build keeps the cursor on a neighbouring file. When the game's last
+    // file went, stay at the same spot in the game list rather than letting the
+    // build fall back to the first game.
+    final games = _games;
+    setState(() {
+      if (games.isEmpty) {
+        _focus = _FocusArea.filters;
+      } else if (games.every((game) => game.key != _gameKey)) {
+        _focus = _FocusArea.games;
+        _selectGame(math.min(_gameIndex, games.length - 1), games);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _revealSelection();
+    });
+  }
+
   void _setFilter(int index) {
     setState(() {
       _filter = _filterFocus = index;
@@ -314,8 +380,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
               SizedBox(height: 12.r),
               _filters(),
               SizedBox(height: 10.r),
-              if (_saves.loading || _saves.syncing)
-                LinearProgressIndicator(minHeight: 2.r),
+              if (_busy) LinearProgressIndicator(minHeight: 2.r),
               if (_saves.loadError != null)
                 _notice(AppLocale.failedToRefreshCloud, true)
               else if (_saves.syncResult case final result?)
@@ -354,6 +419,21 @@ class _RommSavesContentState extends State<RommSavesContent> {
                         height: 1.3,
                         color: scheme.onSurfaceVariant,
                       ),
+                    ),
+                  ),
+                  SizedBox(width: 8.r),
+                  // Only offered while a file is focused, which is also when
+                  // Select means Delete. Its space is kept so the note beside
+                  // it doesn't reflow as the cursor moves between panes.
+                  Visibility.maintain(
+                    visible: _focus == _FocusArea.files,
+                    child: GamepadControl(
+                      key: const ValueKey('save-delete'),
+                      label: AppLocale.delete.getString(context),
+                      iconPath: 'assets/images/gamepad/Xbox_View_button.png',
+                      onTap: _busy ? null : _deleteFocusedFile,
+                      textColor: scheme.onError,
+                      backgroundColor: scheme.error,
                     ),
                   ),
                 ],
@@ -417,38 +497,61 @@ class _RommSavesContentState extends State<RommSavesContent> {
       AppLocale.statSaves,
       AppLocale.statStates,
     ];
+    final focusedFilter = _focus == _FocusArea.filters ? _filterFocus : -1;
+    // Material animates border changes. Fading from Colors.transparent (black)
+    // would flash a dark ring around the filled, selected filter.
+    final unfocused = scheme.primary.withValues(alpha: 0);
     return Row(
       children: [
         for (var i = 0; i < 3; i++) ...[
           if (i > 0) SizedBox(width: 6.r),
-          Semantics(
-            selected: _filter == i,
-            child: OutlinedButton(
-              key: ValueKey('save-filter-$i'),
-              onPressed: () => _setFilter(i),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _filter == i
-                    ? scheme.onPrimary
-                    : scheme.onSurfaceVariant,
-                backgroundColor: _filter == i
-                    ? scheme.primary
-                    : Colors.transparent,
-                side: BorderSide(
-                  color: _focus == _FocusArea.filters && _filterFocus == i
+          // The app's gamepad-selection glow. The border alone is invisible
+          // on the selected filter, whose fill is the same colour.
+          AnimatedContainer(
+            duration: kThemeChangeDuration,
+            decoration: ShapeDecoration(
+              shape: const StadiumBorder(),
+              shadows: [
+                BoxShadow(
+                  color: focusedFilter == i
+                      ? scheme.primary.withValues(alpha: 0.5)
+                      : unfocused,
+                  blurRadius: 8.r,
+                  spreadRadius: 2.r,
+                ),
+              ],
+            ),
+            child: Semantics(
+              selected: _filter == i,
+              child: OutlinedButton(
+                key: ValueKey('save-filter-$i'),
+                onPressed: () => _setFilter(i),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _filter == i
+                      ? scheme.onPrimary
+                      : scheme.onSurfaceVariant,
+                  backgroundColor: _filter == i
                       ? scheme.primary
                       : Colors.transparent,
-                  width: 2.r,
+                  side: BorderSide(
+                    color: focusedFilter == i ? scheme.primary : unfocused,
+                    width: 2.r,
+                  ),
+                  shape: const StadiumBorder(),
+                  minimumSize: Size(0, 28.r),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.r,
+                    vertical: 6.r,
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontSize: 10.sp,
+                    height: 1.2,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                minimumSize: Size(0, 28.r),
-                padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  fontSize: 10.sp,
-                  height: 1.2,
-                  fontWeight: FontWeight.w600,
-                ),
+                child: Text('${labels[i].getString(context)}  ${counts[i]}'),
               ),
-              child: Text('${labels[i].getString(context)}  ${counts[i]}'),
             ),
           ),
         ],
@@ -521,9 +624,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
                 side: BorderSide(
                   color: focused
                       ? scheme.primary
-                      : selected
-                      ? scheme.primary.withValues(alpha: 0.35)
-                      : Colors.transparent,
+                      : scheme.primary.withValues(alpha: selected ? 0.35 : 0),
                   width: 2.r,
                 ),
               ),
@@ -734,7 +835,9 @@ class _RommSavesContentState extends State<RommSavesContent> {
         shape: RoundedRectangleBorder(
           borderRadius: CornerRadii.of(context).radiusInternal,
           side: BorderSide(
-            color: focused ? scheme.primary : Colors.transparent,
+            color: focused
+                ? scheme.primary
+                : scheme.primary.withValues(alpha: 0),
             width: 2.r,
           ),
         ),

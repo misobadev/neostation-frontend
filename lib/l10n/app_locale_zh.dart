@@ -1,7 +1,7 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleZh = {
-  AppLocale.rommSavesSubtitle: '按游戏整理的存档与即时存档。',
+  AppLocale.rommSavesSubtitle: '存档同步由 RomM 负责。',
   AppLocale.rommSavesAutoDownload: '启动已关联的游戏时，会下载较新的云端存档。',
   AppLocale.rommSavesRecent: '最近更新优先',
   AppLocale.rommSaveFile: '存档文件',
@@ -11,6 +11,11 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.rommUploadsFailed: '部分上传失败。请检查连接和 RomM 权限，然后重试。',
   AppLocale.rommSavesHelp:
       '浏览 RomM 存档和即时存档。重试上传会检查已关联 RomM 且启用同步的本地游戏。启动游戏时会下载较新的远程存档。',
+  AppLocale.rommDeleteTitle: '从 RomM 删除',
+  AppLocale.rommDeleteConfirm:
+      '{file} 将从你的 RomM 服务器永久删除。设备上的副本会保留，仍在同步此游戏的设备会再次上传其副本。',
+  AppLocale.rommDeleted: '已从 RomM 删除。',
+  AppLocale.rommDeleteFailed: '无法从 RomM 删除。请检查连接和 RomM 权限，然后重试。',
   AppLocale.raEvents: '活动',
   AppLocale.raAotwYearTitle: '本周成就（{year}）',
   AppLocale.raAotw: 'AOTW',

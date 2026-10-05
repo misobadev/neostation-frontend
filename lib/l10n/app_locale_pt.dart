@@ -1,7 +1,7 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocalePt = {
-  AppLocale.rommSavesSubtitle: 'Seus saves e estados, organizados por jogo.',
+  AppLocale.rommSavesSubtitle: 'A sincronização de saves é feita pelo RomM.',
   AppLocale.rommSavesAutoDownload:
       'Saves mais recentes da nuvem são baixados ao iniciar um jogo vinculado.',
   AppLocale.rommSavesRecent: 'Atividade mais recente',
@@ -14,6 +14,12 @@ const Map<String, dynamic> appLocalePt = {
       'Alguns envios falharam. Verifique a conexão e as permissões do RomM e tente novamente.',
   AppLocale.rommSavesHelp:
       'Veja seus salvamentos e estados do RomM. Tentar envios novamente verifica jogos locais vinculados ao RomM com sincronização ativa. Salvamentos remotos mais recentes são baixados ao iniciar um jogo.',
+  AppLocale.rommDeleteTitle: 'Excluir do RomM',
+  AppLocale.rommDeleteConfirm:
+      '{file} será excluído permanentemente do seu servidor RomM. As cópias nos seus dispositivos são mantidas, e qualquer dispositivo que ainda sincronize este jogo enviará sua cópia novamente.',
+  AppLocale.rommDeleted: 'Excluído do RomM.',
+  AppLocale.rommDeleteFailed:
+      'Não foi possível excluir do RomM. Verifique a conexão e as permissões do RomM e tente novamente.',
   AppLocale.raEvents: 'Eventos',
   AppLocale.raAotwYearTitle: 'Conquista da Semana ({year})',
   AppLocale.raAotw: 'AOTW',

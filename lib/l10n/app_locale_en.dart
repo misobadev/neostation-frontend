@@ -1,7 +1,7 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleEn = {
-  AppLocale.rommSavesSubtitle: 'Your saves and states, organised by game.',
+  AppLocale.rommSavesSubtitle: 'Save sync is handled by RomM.',
   AppLocale.rommSavesAutoDownload:
       'Newer cloud saves download when you launch a linked game.',
   AppLocale.rommSavesRecent: 'Latest activity first',
@@ -14,6 +14,12 @@ const Map<String, dynamic> appLocaleEn = {
       'Some uploads failed. Check your connection and RomM permissions, then retry.',
   AppLocale.rommSavesHelp:
       'Browse your RomM saves and states. Retry uploads checks local games linked to RomM with save sync enabled. Newer remote saves download when you launch a game.',
+  AppLocale.rommDeleteTitle: 'Delete from RomM',
+  AppLocale.rommDeleteConfirm:
+      '{file} will be permanently deleted from your RomM server. Copies on your devices are kept, and any device that still syncs this game will upload its copy again.',
+  AppLocale.rommDeleted: 'Deleted from RomM.',
+  AppLocale.rommDeleteFailed:
+      "Couldn't delete from RomM. Check your connection and RomM permissions, then try again.",
   AppLocale.raEvents: 'Events',
   AppLocale.raAotwYearTitle: 'Achievement of the Week ({year})',
   AppLocale.raAotw: 'AOTW',

@@ -69,6 +69,37 @@ void main() {
     },
   );
 
+  test('deletes saves and states through their own endpoints', () async {
+    final requests = <String, Object?>{};
+    var status = 200;
+    RommService.debugUseHttpClient(
+      MockClient((request) async {
+        expect(request.method, 'POST');
+        requests[request.url.path] = jsonDecode(request.body);
+        return http.Response('[]', status);
+      }),
+    );
+    final service = RommService()
+      ..configure(serverUrl: 'https://romm.test', apiKey: 'test');
+    await service.deleteSaves([3]);
+    await service.deleteStates([4]);
+    expect(requests, {
+      '/api/saves/delete': {
+        'saves': [3],
+      },
+      '/api/states/delete': {
+        'states': [4],
+      },
+    });
+    status = 403;
+    await expectLater(
+      service.deleteSaves([3]),
+      throwsA(
+        isA<RommException>().having((e) => e.statusCode, 'statusCode', 403),
+      ),
+    );
+  });
+
   group('inventory state', () {
     late InventoryConnection connection;
     late InventorySync sync;
@@ -160,6 +191,48 @@ void main() {
         await pending;
         expect(inventory.syncResult?.success, isFalse);
         expect(inventory.syncing, isFalse);
+      },
+    );
+
+    test('delete removes only that file, without refetching', () async {
+      connection.inventory.load = () async => [
+        inventoryAsset('Game.srm'),
+        inventoryAsset('Game.state', state: true),
+      ];
+      await inventory.refresh();
+      final request = Completer<void>();
+      connection.inventory.beforeDelete = () => request.future;
+      final pending = inventory.delete(inventory.assets.last);
+      expect(inventory.deleting, isTrue);
+      expect(await inventory.delete(inventory.assets.first), isFalse);
+      request.complete();
+      expect(await pending, isTrue);
+      // Saves and states share id 1 here; only the state may go.
+      expect(connection.inventory.deleted, ['state:1']);
+      expect(inventory.assets.map((a) => a.fileName), ['Game.srm']);
+      expect(inventory.deleting, isFalse);
+      expect(connection.inventory.calls, 1);
+      expect(sync.calls, 0);
+    });
+
+    test(
+      'a file already gone counts as deleted; other failures keep it',
+      () async {
+        connection.inventory.load = () async => [
+          inventoryAsset('a.srm', id: 1),
+          inventoryAsset('b.srm', id: 2),
+        ];
+        await inventory.refresh();
+        final a = inventory.assets.firstWhere((x) => x.fileName == 'a.srm');
+        final b = inventory.assets.firstWhere((x) => x.fileName == 'b.srm');
+        connection.inventory.beforeDelete = () async =>
+            throw RommException('Delete failed (404)', statusCode: 404);
+        expect(await inventory.delete(a), isTrue);
+        connection.inventory.beforeDelete = () async =>
+            throw RommException('Delete failed (403)', statusCode: 403);
+        expect(await inventory.delete(b), isFalse);
+        expect(inventory.assets.map((x) => x.fileName), ['b.srm']);
+        expect(inventory.deleting, isFalse);
       },
     );
   });

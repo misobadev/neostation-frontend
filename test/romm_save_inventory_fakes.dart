@@ -22,6 +22,21 @@ class InventoryService extends RommService {
     calls++;
     return load();
   }
+
+  /// `save:<id>` / `state:<id>` for every successful delete.
+  final List<String> deleted = [];
+  Future<void> Function() beforeDelete = () async {};
+
+  @override
+  Future<void> deleteSaves(List<int> assetIds) => _delete('save', assetIds);
+
+  @override
+  Future<void> deleteStates(List<int> assetIds) => _delete('state', assetIds);
+
+  Future<void> _delete(String kind, List<int> assetIds) async {
+    await beforeDelete();
+    deleted.addAll([for (final id in assetIds) '$kind:$id']);
+  }
 }
 
 class InventoryConnection extends RommProvider {

@@ -1,8 +1,7 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleId = {
-  AppLocale.rommSavesSubtitle:
-      'Simpanan dan status Anda, dikelompokkan menurut game.',
+  AppLocale.rommSavesSubtitle: 'Sinkronisasi simpanan ditangani oleh RomM.',
   AppLocale.rommSavesAutoDownload:
       'Simpanan cloud yang lebih baru diunduh saat Anda memulai game yang ditautkan.',
   AppLocale.rommSavesRecent: 'Aktivitas terbaru dahulu',
@@ -15,6 +14,12 @@ const Map<String, dynamic> appLocaleId = {
       'Beberapa unggahan gagal. Periksa koneksi dan izin RomM, lalu coba lagi.',
   AppLocale.rommSavesHelp:
       'Lihat simpanan dan status RomM. Coba unggah lagi memeriksa game lokal yang tertaut ke RomM dengan sinkronisasi aktif. Simpanan jarak jauh yang lebih baru diunduh saat game dimulai.',
+  AppLocale.rommDeleteTitle: 'Hapus dari RomM',
+  AppLocale.rommDeleteConfirm:
+      '{file} akan dihapus permanen dari server RomM Anda. Salinan di perangkat Anda tetap disimpan, dan perangkat yang masih menyinkronkan game ini akan mengunggah salinannya lagi.',
+  AppLocale.rommDeleted: 'Dihapus dari RomM.',
+  AppLocale.rommDeleteFailed:
+      'Gagal menghapus dari RomM. Periksa koneksi dan izin RomM, lalu coba lagi.',
   AppLocale.raEvents: 'Acara',
   AppLocale.raAotwYearTitle: 'Pencapaian Minggu Ini ({year})',
   AppLocale.raAotw: 'AOTW',

@@ -27,6 +27,10 @@ mixin AppLocale {
   static const String rommUploadsChecked = 'rommUploadsChecked';
   static const String rommUploadsFailed = 'rommUploadsFailed';
   static const String rommSavesHelp = 'rommSavesHelp';
+  static const String rommDeleteTitle = 'rommDeleteTitle';
+  static const String rommDeleteConfirm = 'rommDeleteConfirm';
+  static const String rommDeleted = 'rommDeleted';
+  static const String rommDeleteFailed = 'rommDeleteFailed';
 
   // ---------------------------------------------------------------------------
   // Navigation / Controls
