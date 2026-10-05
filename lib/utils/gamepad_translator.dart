@@ -171,12 +171,14 @@ class GamepadEventTranslator {
       // Android keycode buttons: ACTION_DOWN=0.0 (pressed), ACTION_UP=1.0
       // (released). Standardize to 1.0 = pressed / 0.0 = released so these fire
       // on press rather than release. Applied to the dpad, the shoulder buttons
-      // (L1/R1) and the face buttons (A/B/X/Y) — all of which otherwise fired
-      // their action on release instead of press.
+      // (L1/R1), the triggers (L2/R2) and the face buttons (A/B/X/Y) — all of
+      // which otherwise fired their action on release instead of press.
       final isAndroidKeycodeButton =
           Platform.isAndroid &&
           (key == 'keycode_button_l1' ||
               key == 'keycode_button_r1' ||
+              key == 'keycode_button_l2' ||
+              key == 'keycode_button_r2' ||
               key == 'keycode_button_a' ||
               key == 'keycode_button_b' ||
               key == 'keycode_button_x' ||

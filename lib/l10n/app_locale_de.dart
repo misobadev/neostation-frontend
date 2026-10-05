@@ -1,16 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleDe = {
-  AppLocale.rommSavesSubtitle:
-      'Die Synchronisierung der Spielstände übernimmt RomM.',
   AppLocale.rommSavesAutoDownload:
       'Neuere Cloud-Spielstände werden beim Start eines verknüpften Spiels heruntergeladen.',
-  AppLocale.rommSavesRecent: 'Neueste Aktivität zuerst',
   AppLocale.rommSaveFile: 'Spielstand',
   AppLocale.rommSaveState: 'Speicherstand',
   AppLocale.rommRetryUploads: 'Uploads wiederholen',
-  AppLocale.rommUploadsChecked:
-      'Upload-Prüfung abgeschlossen. Downloads starten beim Start eines verknüpften Spiels.',
   AppLocale.rommUploadsFailed:
       'Einige Uploads sind fehlgeschlagen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
   AppLocale.rommSavesHelp:

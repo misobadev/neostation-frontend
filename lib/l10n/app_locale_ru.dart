@@ -1,15 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleRu = {
-  AppLocale.rommSavesSubtitle: 'Синхронизацией сохранений управляет RomM.',
   AppLocale.rommSavesAutoDownload:
       'Более новые облачные сохранения загружаются при запуске связанной игры.',
-  AppLocale.rommSavesRecent: 'Сначала недавние',
   AppLocale.rommSaveFile: 'Файл сохранения',
   AppLocale.rommSaveState: 'Состояние игры',
   AppLocale.rommRetryUploads: 'Повторить отправку',
-  AppLocale.rommUploadsChecked:
-      'Проверка отправки завершена. Скачивание выполняется при запуске связанной игры.',
   AppLocale.rommUploadsFailed:
       'Некоторые файлы не отправлены. Проверьте подключение и разрешения RomM, затем повторите попытку.',
   AppLocale.rommSavesHelp:

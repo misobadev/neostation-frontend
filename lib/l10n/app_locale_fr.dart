@@ -1,16 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleFr = {
-  AppLocale.rommSavesSubtitle:
-      'La synchronisation des sauvegardes est gérée par RomM.',
   AppLocale.rommSavesAutoDownload:
       'Les sauvegardes cloud plus récentes sont téléchargées au lancement d’un jeu lié.',
-  AppLocale.rommSavesRecent: 'Activité la plus récente',
   AppLocale.rommSaveFile: 'Fichier de sauvegarde',
   AppLocale.rommSaveState: 'État sauvegardé',
   AppLocale.rommRetryUploads: 'Réessayer les envois',
-  AppLocale.rommUploadsChecked:
-      'Vérification des envois terminée. Les téléchargements ont lieu au lancement d’un jeu lié.',
   AppLocale.rommUploadsFailed:
       'Certains envois ont échoué. Vérifiez la connexion et les autorisations RomM, puis réessayez.',
   AppLocale.rommSavesHelp:

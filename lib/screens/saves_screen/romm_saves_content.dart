@@ -38,13 +38,19 @@ class _RommSavesContentState extends State<RommSavesContent> {
   late final GamepadNavigation _navigation;
   final _gamesScroll = ScrollController();
   final _filesScroll = ScrollController();
-  _FocusArea _focus = _FocusArea.actions;
+  _FocusArea _focus = _FocusArea.filters;
+  // The toolbar half (filters or actions) that Up returns to from the lists.
+  _FocusArea _lastToolbar = _FocusArea.filters;
   int _actionIndex = 0;
   int _filter = 0;
   int _filterFocus = 0;
   int _gameIndex = 0;
   int _fileIndex = 0;
   String? _gameKey;
+  // The panes stay hidden until the first screenful of games has its RomM
+  // metadata, so file-derived names never flash up before the real ones.
+  Future<void>? _firstPage;
+  bool _ready = false;
 
   List<RommSaveGame> get _games => RommSaveGame.group(
     _saves.assets
@@ -73,6 +79,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
         MediaQuery.textScalerOf(context).scale(9.sp) * 2.6 +
         30.r,
   );
+  double get _filesInset => 6.r;
 
   @override
   void initState() {
@@ -96,6 +103,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
       onNextTab: AppNavigation.nextTab,
       onLeftBumper: AppNavigation.previousTab,
       onRightBumper: AppNavigation.nextTab,
+      onLeftTrigger: () => _stepFilter(-1),
+      onRightTrigger: () => _stepFilter(1),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -131,23 +140,20 @@ class _RommSavesContentState extends State<RommSavesContent> {
     final games = _games;
     setState(() {
       switch (_focus) {
-        case _FocusArea.actions:
-          if (delta > 0) _focus = _FocusArea.filters;
-        case _FocusArea.filters:
-          if (delta < 0) {
-            _focus = _FocusArea.actions;
-          } else if (games.isNotEmpty) {
+        case _FocusArea.actions || _FocusArea.filters:
+          if (delta > 0 && games.isNotEmpty) {
+            _lastToolbar = _focus;
             _focus = _FocusArea.games;
           }
         case _FocusArea.games:
           if (_gameIndex == 0 && delta < 0) {
-            _focus = _FocusArea.filters;
+            _focus = _lastToolbar;
           } else if (games.isNotEmpty) {
             _selectGame((_gameIndex + delta).clamp(0, games.length - 1), games);
           }
         case _FocusArea.files:
           if (_fileIndex == 0 && delta < 0) {
-            _focus = _FocusArea.filters;
+            _focus = _lastToolbar;
           } else if (games.isNotEmpty) {
             _fileIndex = (_fileIndex + delta).clamp(
               0,
@@ -161,11 +167,22 @@ class _RommSavesContentState extends State<RommSavesContent> {
 
   void _horizontal(int delta) {
     setState(() {
+      // The toolbar is one row: All, Saves, States, Refresh, Retry uploads.
       switch (_focus) {
-        case _FocusArea.actions:
-          _actionIndex = (_actionIndex + delta).clamp(0, 1);
         case _FocusArea.filters:
-          _filterFocus = (_filterFocus + delta).clamp(0, 2);
+          if (delta > 0 && _filterFocus == 2) {
+            _focus = _FocusArea.actions;
+            _actionIndex = 0;
+          } else {
+            _filterFocus = (_filterFocus + delta).clamp(0, 2);
+          }
+        case _FocusArea.actions:
+          if (delta < 0 && _actionIndex == 0) {
+            _focus = _FocusArea.filters;
+            _filterFocus = 2;
+          } else {
+            _actionIndex = (_actionIndex + delta).clamp(0, 1);
+          }
         case _FocusArea.games:
           if (delta > 0 && _games.isNotEmpty) _focus = _FocusArea.files;
         case _FocusArea.files:
@@ -176,18 +193,25 @@ class _RommSavesContentState extends State<RommSavesContent> {
   }
 
   void _revealSelection() {
-    final controller = _focus == _FocusArea.files ? _filesScroll : _gamesScroll;
-    final index = _focus == _FocusArea.files ? _fileIndex : _gameIndex;
-    final extent = _focus == _FocusArea.files ? _fileExtent : _gameExtent;
-    if (!controller.hasClients) return;
-    final top = index * extent;
+    final games = _games;
+    final files = _focus == _FocusArea.files;
+    final controller = files ? _filesScroll : _gamesScroll;
+    if (_gameIndex >= games.length || !controller.hasClients) return;
+    final position = controller.position;
+    final index = files ? _fileIndex : _gameIndex;
+    final count = files ? games[_gameIndex].assets.length : games.length;
+    final extent = files ? _fileExtent : _gameExtent;
+    // The first and last rows scroll fully to the ends, list padding included.
+    final top = (files ? _filesInset : 0.0) + index * extent;
     final bottom = top + extent;
-    final offset = top < controller.offset
-        ? top
-        : bottom > controller.offset + controller.position.viewportDimension
-        ? bottom - controller.position.viewportDimension
-        : controller.offset;
-    controller.jumpTo(offset.clamp(0, controller.position.maxScrollExtent));
+    final offset = top < position.pixels
+        ? (index == 0 ? 0.0 : top)
+        : bottom > position.pixels + position.viewportDimension
+        ? (index == count - 1
+              ? position.maxScrollExtent
+              : bottom - position.viewportDimension)
+        : position.pixels;
+    controller.jumpTo(offset.clamp(0, position.maxScrollExtent));
   }
 
   void _activate() {
@@ -234,6 +258,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
       confirmLabel: AppLocale.delete.getString(context),
       icon: Icons.delete_forever_rounded,
       maxWidth: 320.r,
+      padding: 15.r,
     );
     if (!mounted) return;
     _navigation.activate();
@@ -265,10 +290,15 @@ class _RommSavesContentState extends State<RommSavesContent> {
     });
   }
 
-  void _setFilter(int index) {
+  /// L2/R2 cycle the filters, wrapping like L1/R1 do the tabs. Focus stays
+  /// where it is, so the list can be re-filtered without leaving it.
+  void _stepFilter(int delta) =>
+      _setFilter((_filter + delta) % 3, moveFocus: false);
+
+  void _setFilter(int index, {bool moveFocus = true}) {
     setState(() {
       _filter = _filterFocus = index;
-      _focus = _FocusArea.filters;
+      if (moveFocus) _focus = _FocusArea.filters;
       _fileIndex = 0;
     });
     if (_gamesScroll.hasClients) _gamesScroll.jumpTo(0);
@@ -294,6 +324,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
       final scheme = Theme.of(context).colorScheme;
       final games = _games;
       if (games.isNotEmpty) {
+        _firstPage ??= _loadFirstPage(games);
         final previousKey = _gameKey;
         final previousIndex = _gameIndex;
         final preserved = games.indexWhere((game) => game.key == _gameKey);
@@ -309,138 +340,116 @@ class _RommSavesContentState extends State<RommSavesContent> {
       } else if (_focus == _FocusArea.games || _focus == _FocusArea.files) {
         _focus = _FocusArea.filters;
       }
-      return SafeArea(
-        child: Padding(
-          // The app header overlays tab content and occupies 46 design pixels.
-          padding: EdgeInsets.fromLTRB(18.r, 54.r, 18.r, 12.r),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 16.r,
-                  runSpacing: 8.r,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          AppLocale.statSaves.getString(context),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 22.sp,
-                            height: 1.2,
-                            fontWeight: FontWeight.w700,
-                            color: scheme.onSurface,
-                          ),
-                        ),
-                        SizedBox(width: 10.r),
-                        _badge(
-                          Icons.cloud_outlined,
-                          AppLocale.romm.getString(context),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _action(
-                          0,
-                          Icons.refresh_rounded,
-                          AppLocale.refresh,
-                          _refresh,
-                        ),
-                        SizedBox(width: 6.r),
-                        _action(
-                          1,
-                          Icons.cloud_upload_outlined,
-                          _saves.syncing
-                              ? AppLocale.syncing
-                              : AppLocale.rommRetryUploads,
-                          _retryUploads,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 6.r),
-              Text(
-                AppLocale.rommSavesSubtitle.getString(context),
-                style: TextStyle(
-                  fontSize: 10.sp,
-                  height: 1.35,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              SizedBox(height: 12.r),
-              _filters(),
-              SizedBox(height: 10.r),
-              if (_busy) LinearProgressIndicator(minHeight: 2.r),
-              if (_saves.loadError != null)
-                _notice(AppLocale.failedToRefreshCloud, true)
-              else if (_saves.syncResult case final result?)
-                _notice(
-                  result.success
-                      ? AppLocale.rommUploadsChecked
-                      : AppLocale.rommUploadsFailed,
-                  !result.success,
-                ),
-              Expanded(
-                child: games.isEmpty
-                    ? _empty()
-                    : Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(flex: 2, child: _gameList(games)),
-                          SizedBox(width: 12.r),
-                          Expanded(flex: 3, child: _details(games[_gameIndex])),
-                        ],
-                      ),
-              ),
-              SizedBox(height: 8.r),
-              Row(
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          SafeArea(
+            child: Padding(
+              // The app header overlays tab content and occupies 46 design pixels.
+              padding: EdgeInsets.fromLTRB(18.r, 54.r, 18.r, 12.r),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.cloud_download_outlined,
-                    size: 12.r,
-                    color: scheme.onSurfaceVariant,
+                  // Filters left, actions right. On a narrow screen the filters
+                  // wrap among themselves, so the actions stay on the first line.
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _filters()),
+                      SizedBox(width: 16.r),
+                      _action(
+                        0,
+                        Icons.refresh_rounded,
+                        AppLocale.refresh,
+                        _refresh,
+                      ),
+                      SizedBox(width: 6.r),
+                      _action(
+                        1,
+                        Icons.cloud_upload_outlined,
+                        _saves.syncing
+                            ? AppLocale.syncing
+                            : AppLocale.rommRetryUploads,
+                        _retryUploads,
+                      ),
+                    ],
                   ),
-                  SizedBox(width: 5.r),
+                  SizedBox(height: 12.r),
+                  if (_saves.loadError != null)
+                    _notice(AppLocale.failedToRefreshCloud, true)
+                  // A successful retry needs no message; only failures are shown.
+                  else if (_saves.syncResult?.success == false)
+                    _notice(AppLocale.rommUploadsFailed, true),
                   Expanded(
-                    child: Text(
-                      AppLocale.rommSavesAutoDownload.getString(context),
-                      style: TextStyle(
-                        fontSize: 9.sp,
-                        height: 1.3,
+                    child: games.isEmpty || !_ready
+                        ? _empty(loading: _saves.loading || games.isNotEmpty)
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(flex: 2, child: _gameList(games)),
+                              // The game list's own gutter makes up the rest of
+                              // the gap; see [_gameTile].
+                              SizedBox(width: 6.r),
+                              Expanded(
+                                flex: 3,
+                                child: _details(games[_gameIndex]),
+                              ),
+                            ],
+                          ),
+                  ),
+                  SizedBox(height: 8.r),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.cloud_download_outlined,
+                        size: 12.r,
                         color: scheme.onSurfaceVariant,
                       ),
-                    ),
-                  ),
-                  SizedBox(width: 8.r),
-                  // Only offered while a file is focused, which is also when
-                  // Select means Delete. Its space is kept so the note beside
-                  // it doesn't reflow as the cursor moves between panes.
-                  Visibility.maintain(
-                    visible: _focus == _FocusArea.files,
-                    child: GamepadControl(
-                      key: const ValueKey('save-delete'),
-                      label: AppLocale.delete.getString(context),
-                      iconPath: 'assets/images/gamepad/Xbox_View_button.png',
-                      onTap: _busy ? null : _deleteFocusedFile,
-                      textColor: scheme.onError,
-                      backgroundColor: scheme.error,
-                    ),
+                      SizedBox(width: 5.r),
+                      Expanded(
+                        child: Text(
+                          AppLocale.rommSavesAutoDownload.getString(context),
+                          style: TextStyle(
+                            fontSize: 9.sp,
+                            height: 1.3,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8.r),
+                      // Only offered while a file is focused, which is also when
+                      // Select means Delete. Its space is kept so the note beside
+                      // it doesn't reflow as the cursor moves between panes.
+                      Visibility.maintain(
+                        visible: _focus == _FocusArea.files,
+                        child: GamepadControl(
+                          key: const ValueKey('save-delete'),
+                          label: AppLocale.delete.getString(context),
+                          iconPath:
+                              'assets/images/gamepad/Xbox_View_button.png',
+                          onTap: _busy ? null : _deleteFocusedFile,
+                          textColor: scheme.onError,
+                          backgroundColor: scheme.error,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
+          // Overlaid on the screen's bottom edge, outside the safe area, so
+          // starting or finishing a refresh never moves anything.
+          if (_busy)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: LinearProgressIndicator(minHeight: 2.r),
+              ),
+            ),
+        ],
       );
     },
   );
@@ -453,6 +462,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
         context,
       ),
       child: OutlinedButton.icon(
+        key: ValueKey('save-action-$index'),
         onPressed: _busy
             ? null
             : () {
@@ -462,20 +472,11 @@ class _RommSavesContentState extends State<RommSavesContent> {
                 });
                 action();
               },
-        style: OutlinedButton.styleFrom(
-          foregroundColor: focused ? scheme.onPrimary : scheme.onSurface,
-          backgroundColor: focused ? scheme.primary : scheme.surfaceContainer,
-          disabledForegroundColor: scheme.onSurfaceVariant,
+        style: _toolbarStyle(
+          foreground: focused ? scheme.onPrimary : scheme.onSurface,
+          background: focused ? scheme.primary : scheme.surfaceContainer,
           side: BorderSide(
             color: focused ? scheme.primary : scheme.outlineVariant,
-          ),
-          minimumSize: Size(0, 30.r),
-          padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 7.r),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-            fontSize: 10.sp,
-            height: 1.2,
-            fontWeight: FontWeight.w600,
           ),
         ),
         icon: Icon(icon, size: 14.r),
@@ -483,6 +484,29 @@ class _RommSavesContentState extends State<RommSavesContent> {
       ),
     );
   }
+
+  /// Shared by the filters and actions so the toolbar is one row of buttons
+  /// with the same height and type. The minimum height exceeds the padded
+  /// action icon, so a label-only filter comes out exactly as tall.
+  ButtonStyle _toolbarStyle({
+    required Color foreground,
+    required Color background,
+    required BorderSide side,
+  }) => OutlinedButton.styleFrom(
+    foregroundColor: foreground,
+    backgroundColor: background,
+    disabledForegroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+    side: side,
+    shape: const StadiumBorder(),
+    minimumSize: Size(0, 30.r),
+    padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+      fontSize: 10.sp,
+      height: 1.2,
+      fontWeight: FontWeight.w600,
+    ),
+  );
 
   Widget _filters() {
     final scheme = Theme.of(context).colorScheme;
@@ -501,10 +525,11 @@ class _RommSavesContentState extends State<RommSavesContent> {
     // Material animates border changes. Fading from Colors.transparent (black)
     // would flash a dark ring around the filled, selected filter.
     final unfocused = scheme.primary.withValues(alpha: 0);
-    return Row(
+    return Wrap(
+      spacing: 6.r,
+      runSpacing: 8.r,
       children: [
-        for (var i = 0; i < 3; i++) ...[
-          if (i > 0) SizedBox(width: 6.r),
+        for (var i = 0; i < 3; i++)
           // The app's gamepad-selection glow. The border alone is invisible
           // on the selected filter, whose fill is the same colour.
           AnimatedContainer(
@@ -526,79 +551,36 @@ class _RommSavesContentState extends State<RommSavesContent> {
               child: OutlinedButton(
                 key: ValueKey('save-filter-$i'),
                 onPressed: () => _setFilter(i),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _filter == i
+                style: _toolbarStyle(
+                  foreground: _filter == i
                       ? scheme.onPrimary
                       : scheme.onSurfaceVariant,
-                  backgroundColor: _filter == i
+                  background: _filter == i
                       ? scheme.primary
                       : Colors.transparent,
                   side: BorderSide(
                     color: focusedFilter == i ? scheme.primary : unfocused,
                     width: 2.r,
                   ),
-                  shape: const StadiumBorder(),
-                  minimumSize: Size(0, 28.r),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 12.r,
-                    vertical: 6.r,
-                  ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontSize: 10.sp,
-                    height: 1.2,
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
                 child: Text('${labels[i].getString(context)}  ${counts[i]}'),
               ),
             ),
           ),
-        ],
-        const Spacer(),
-        Flexible(
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              AppLocale.rommSavesRecent.getString(context),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 9.sp, color: scheme.onSurfaceVariant),
-            ),
-          ),
-        ),
       ],
     );
   }
 
-  Widget _gameList(List<RommSaveGame> games) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: EdgeInsets.fromLTRB(4.r, 4.r, 4.r, 8.r),
-        child: Text(
-          AppLocale.gamesCount
-              .getString(context)
-              .replaceFirst('{count}', '${games.length}'),
-          style: TextStyle(
-            fontSize: 10.sp,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ),
-      Expanded(
-        child: Scrollbar(
-          controller: _gamesScroll,
-          child: ListView.builder(
-            controller: _gamesScroll,
-            itemExtent: _gameExtent,
-            itemCount: games.length,
-            itemBuilder: (context, index) => _gameTile(games, index),
-          ),
-        ),
-      ),
-    ],
+  // No heading above the list, so its first tile lines up with the top of the
+  // details pane beside it.
+  Widget _gameList(List<RommSaveGame> games) => Scrollbar(
+    controller: _gamesScroll,
+    child: ListView.builder(
+      controller: _gamesScroll,
+      itemExtent: _gameExtent,
+      itemCount: games.length,
+      itemBuilder: (context, index) => _gameTile(games, index),
+    ),
   );
 
   Widget _gameTile(List<RommSaveGame> games, int index) {
@@ -609,10 +591,12 @@ class _RommSavesContentState extends State<RommSavesContent> {
     return FutureBuilder<RommSaveGameInfo>(
       key: ValueKey(game.key),
       future: _saves.gameInfo(game.romId),
+      initialData: _saves.loadedGameInfo(game.romId),
       builder: (context, snapshot) {
         final info = snapshot.data;
         return Padding(
-          padding: EdgeInsets.only(bottom: 6.r, right: 4.r),
+          // The right gutter holds the scrollbar clear of the tiles.
+          padding: EdgeInsets.only(bottom: 6.r, right: 10.r),
           child: Semantics(
             selected: selected,
             child: Material(
@@ -647,7 +631,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              info?.rom?.name ?? game.fallbackTitle,
+                              _title(game, info),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -722,6 +706,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
     return LayoutBuilder(
       builder: (context, constraints) => Container(
         key: const ValueKey('save-details'),
+        // Keeps scrolled file rows inside the rounded corners.
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: scheme.surfaceContainer.withValues(alpha: 0.65),
           borderRadius: CornerRadii.of(context).radiusExternal,
@@ -738,6 +724,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
               FutureBuilder<RommSaveGameInfo>(
                 key: ValueKey(game.key),
                 future: _saves.gameInfo(game.romId),
+                initialData: _saves.loadedGameInfo(game.romId),
                 builder: (context, snapshot) => Padding(
                   padding: EdgeInsets.all(14.r),
                   child: Row(
@@ -749,7 +736,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              snapshot.data?.rom?.name ?? game.fallbackTitle,
+                              _title(game, snapshot.data),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -800,7 +787,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
                   controller: _filesScroll,
                   padding: EdgeInsets.symmetric(
                     horizontal: 10.r,
-                    vertical: 6.r,
+                    vertical: _filesInset,
                   ),
                   itemExtent: _fileExtent,
                   itemCount: game.assets.length,
@@ -918,33 +905,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
     );
   }
 
-  Widget _badge(IconData icon, String label) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
-      decoration: BoxDecoration(
-        color: scheme.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20.r),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12.r, color: scheme.primary),
-          SizedBox(width: 5.r),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 9.sp,
-              height: 1.2,
-              fontWeight: FontWeight.w600,
-              color: scheme.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _notice(String message, bool error) => Padding(
     padding: EdgeInsets.only(bottom: 8.r, top: 4.r),
     child: Text(
@@ -959,7 +919,23 @@ class _RommSavesContentState extends State<RommSavesContent> {
     ),
   );
 
-  Widget _empty() {
+  /// Blank while the lookup is pending; the file-derived name only when RomM
+  /// has nothing better.
+  String _title(RommSaveGame game, RommSaveGameInfo? info) =>
+      info == null ? '' : info.rom?.name ?? game.fallbackTitle;
+
+  Future<void> _loadFirstPage(List<RommSaveGame> games) async {
+    // No more tiles than this can be on screen at once.
+    final visible = (MediaQuery.sizeOf(context).height / _gameExtent).ceil();
+    // Capped so slow metadata can't hold the inventory back for long; anything
+    // still pending fills in when it arrives.
+    await Future.wait([
+      for (final game in games.take(visible)) _saves.gameInfo(game.romId),
+    ]).timeout(const Duration(seconds: 5), onTimeout: () => const []);
+    if (mounted) setState(() => _ready = true);
+  }
+
+  Widget _empty({required bool loading}) {
     final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Column(
@@ -974,7 +950,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
           ),
           SizedBox(height: 12.r),
           Text(
-            (_saves.loading
+            (loading
                     ? AppLocale.loading
                     : _saves.loadError != null
                     ? AppLocale.failedToRefreshCloud

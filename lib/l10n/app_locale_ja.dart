@@ -1,13 +1,10 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleJa = {
-  AppLocale.rommSavesSubtitle: 'セーブの同期はRomMが行います。',
   AppLocale.rommSavesAutoDownload: '連携したゲームの起動時に、新しいクラウドセーブをダウンロードします。',
-  AppLocale.rommSavesRecent: '更新が新しい順',
   AppLocale.rommSaveFile: 'セーブデータ',
   AppLocale.rommSaveState: 'セーブステート',
   AppLocale.rommRetryUploads: 'アップロードを再試行',
-  AppLocale.rommUploadsChecked: 'アップロードの確認が完了しました。ダウンロードはリンク済みゲームの起動時に行われます。',
   AppLocale.rommUploadsFailed: '一部のアップロードに失敗しました。接続とRomMの権限を確認して再試行してください。',
   AppLocale.rommSavesHelp:
       'RomMのセーブとステートを表示します。アップロードの再試行では、RomMにリンクされ同期が有効なローカルゲームを確認します。新しいリモートセーブはゲーム起動時にダウンロードされます。',

@@ -1,13 +1,10 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleZhHant = {
-  AppLocale.rommSavesSubtitle: '存檔同步由 RomM 負責。',
   AppLocale.rommSavesAutoDownload: '啟動已連結的遊戲時，會下載較新的雲端存檔。',
-  AppLocale.rommSavesRecent: '最近更新優先',
   AppLocale.rommSaveFile: '存檔檔案',
   AppLocale.rommSaveState: '即時存檔',
   AppLocale.rommRetryUploads: '重試上傳',
-  AppLocale.rommUploadsChecked: '上傳檢查完成。啟動已關聯的遊戲時將下載存檔。',
   AppLocale.rommUploadsFailed: '部分上傳失敗。請檢查連線和 RomM 權限，然後重試。',
   AppLocale.rommSavesHelp:
       '瀏覽 RomM 存檔和即時存檔。重試上傳會檢查已關聯 RomM 且啟用同步的本機遊戲。啟動遊戲時會下載較新的遠端存檔。',

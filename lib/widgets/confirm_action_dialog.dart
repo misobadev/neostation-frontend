@@ -31,6 +31,11 @@ class ConfirmActionDialog extends StatefulWidget {
   /// dialog across the screen. Null keeps the default sizing.
   final double? maxWidth;
 
+  /// Inset between the dialog's edge and its contents. The gaps between the
+  /// title, body and buttons keep Material's proportions to it. Null keeps
+  /// Material's fixed 24-pixel default, which doesn't scale with the screen.
+  final double? padding;
+
   const ConfirmActionDialog({
     super.key,
     required this.title,
@@ -40,6 +45,7 @@ class ConfirmActionDialog extends StatefulWidget {
     this.cancelLabel,
     this.accentColor,
     this.maxWidth,
+    this.padding,
   });
 
   static Future<bool> show(
@@ -51,6 +57,7 @@ class ConfirmActionDialog extends StatefulWidget {
     String? cancelLabel,
     Color? accentColor,
     double? maxWidth,
+    double? padding,
   }) async {
     final result = await showDialog<bool>(
       context: context,
@@ -63,6 +70,7 @@ class ConfirmActionDialog extends StatefulWidget {
         cancelLabel: cancelLabel,
         accentColor: accentColor,
         maxWidth: maxWidth,
+        padding: padding,
       ),
     );
     return result ?? false;
@@ -113,8 +121,19 @@ class _ConfirmActionDialogState extends State<ConfirmActionDialog> {
         ? theme.colorScheme.onError
         : theme.colorScheme.onPrimary;
 
+    final inset = widget.padding;
     return AlertDialog(
       backgroundColor: theme.cardColor,
+      // Material's defaults are 24 at the edges and 16 from title to body.
+      titlePadding: inset == null
+          ? null
+          : EdgeInsets.fromLTRB(inset, inset, inset, 0),
+      contentPadding: inset == null
+          ? null
+          : EdgeInsets.fromLTRB(inset, inset * 2 / 3, inset, inset),
+      actionsPadding: inset == null
+          ? null
+          : EdgeInsets.fromLTRB(inset, 0, inset, inset),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.r),
         side: BorderSide(color: accentColor.withValues(alpha: 0.3)),

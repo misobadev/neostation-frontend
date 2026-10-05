@@ -1,15 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleEn = {
-  AppLocale.rommSavesSubtitle: 'Save sync is handled by RomM.',
   AppLocale.rommSavesAutoDownload:
       'Newer cloud saves download when you launch a linked game.',
-  AppLocale.rommSavesRecent: 'Latest activity first',
   AppLocale.rommSaveFile: 'Save file',
   AppLocale.rommSaveState: 'Save state',
   AppLocale.rommRetryUploads: 'Retry uploads',
-  AppLocale.rommUploadsChecked:
-      'Upload check complete. Downloads run when you launch a linked game.',
   AppLocale.rommUploadsFailed:
       'Some uploads failed. Check your connection and RomM permissions, then retry.',
   AppLocale.rommSavesHelp:

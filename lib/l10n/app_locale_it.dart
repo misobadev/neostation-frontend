@@ -1,16 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleIt = {
-  AppLocale.rommSavesSubtitle:
-      'La sincronizzazione dei salvataggi è gestita da RomM.',
   AppLocale.rommSavesAutoDownload:
       'I salvataggi cloud più recenti vengono scaricati quando avvii un gioco collegato.',
-  AppLocale.rommSavesRecent: 'Attività più recente',
   AppLocale.rommSaveFile: 'File di salvataggio',
   AppLocale.rommSaveState: 'Stato salvato',
   AppLocale.rommRetryUploads: 'Riprova caricamenti',
-  AppLocale.rommUploadsChecked:
-      'Controllo caricamenti completato. I download avvengono all’avvio di un gioco collegato.',
   AppLocale.rommUploadsFailed:
       'Alcuni caricamenti non sono riusciti. Controlla la connessione e i permessi RomM, poi riprova.',
   AppLocale.rommSavesHelp:

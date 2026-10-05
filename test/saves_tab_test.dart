@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -5,7 +7,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/main.dart' show NoFocusTraversalPolicy;
+import 'package:neostation/models/romm_asset.dart';
 import 'package:neostation/models/romm_rom.dart';
+import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/screens/neo_sync_screen/login_screen/neo_sync_content.dart';
@@ -135,6 +139,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opacity of a filter's focus glow; 0 when it is not focused.
+  double filterGlow(WidgetTester tester, int filter) {
+    final box = tester.widget<AnimatedContainer>(
+      find
+          .ancestor(
+            of: find.byKey(ValueKey('save-filter-$filter')),
+            matching: find.byType(AnimatedContainer),
+          )
+          .first,
+    );
+    return (box.decoration! as ShapeDecoration).shadows!.single.color.a;
+  }
+
   testWidgets(
     'defaults to NeoSync, follows RomM selection, and switches back',
     (tester) async {
@@ -178,14 +195,138 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Game.srm'), findsNothing);
     expect(find.text('Game.state'), findsOneWidget);
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Refresh'));
+    await tester.tap(find.byKey(const ValueKey('save-action-0')));
     await tester.pumpAndSettle();
     expect(connection.inventory.calls, 2);
     expect(romm.calls, 0);
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Retry uploads'));
+    await tester.tap(find.byKey(const ValueKey('save-action-1')));
     await tester.pumpAndSettle();
     expect(romm.calls, 1);
     expect(connection.inventory.calls, 3);
+    // Only a failed retry has anything to say.
+    final failed = find.textContaining('Some uploads failed');
+    expect(failed, findsNothing);
+    romm.run = () async => SyncResult.fail(SyncError.networkError);
+    await tester.tap(find.byKey(const ValueKey('save-action-1')));
+    await tester.pumpAndSettle();
+    expect(failed, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the busy bar overlays the bottom edge without moving content', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    final details = find.byKey(const ValueKey('save-details'));
+    final settled = tester.getRect(details);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+
+    final listing = connection.inventory.load;
+    final pending = Completer<List<RommAsset>>();
+    connection.inventory.load = () => pending.future;
+    await tester.tap(find.byKey(const ValueKey('save-action-0')));
+    // The bar animates indefinitely, so pump rather than settle while busy.
+    await tester.pump();
+    final bar = tester.getRect(find.byType(LinearProgressIndicator));
+    expect(bar.bottom, 720);
+    expect(bar.width, 1280);
+    expect(tester.getRect(details), settled);
+
+    pending.complete(await listing());
+    await tester.pumpAndSettle();
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(tester.getRect(details), settled);
+  });
+
+  testWidgets('game names are ready before the library is shown', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    connection.inventory.load = () async => [
+      inventoryAsset('Alpha.srm', time: 200),
+      inventoryAsset('Beta.state', state: true, romId: 2, id: 2, time: 100),
+    ];
+    final names = Completer<void>();
+    connection.inventory.loadRom = (id) async {
+      await names.future;
+      return RommRom.fromJson({
+        'id': id,
+        'name': id == 1 ? 'Alpha Quest' : 'Beta Saga',
+      });
+    };
+    await pumpTab(tester);
+    // Held back: neither the panes nor the file-derived names appear.
+    expect(find.text('Alpha.srm'), findsNothing);
+    expect(find.text('Alpha'), findsNothing);
+    expect(find.text('Beta'), findsNothing);
+
+    names.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Alpha Quest'), findsWidgets);
+    expect(find.text('Beta Saga'), findsOneWidget);
+    expect(find.text('Alpha'), findsNothing);
+
+    // States puts Beta first, in a newly built tile: its first frame must
+    // already have the name, not the file's.
+    await tester.tap(find.byKey(const ValueKey('save-filter-2')));
+    await tester.pump();
+    expect(find.text('Beta'), findsNothing);
+    expect(find.text('Beta Saga'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('L2/R2 cycle the filters without moving focus', (tester) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    Future<void> settle() async {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 180)),
+      );
+    }
+
+    // Through the real plugin channel, so translation and dispatch are covered.
+    // The axis keys map to the triggers on every desktop test host.
+    Future<void> pull(String axis) async {
+      for (final value in [1.0, 0.0]) {
+        await settle();
+        await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+          'xyz.luan/gamepads',
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall('onGamepadEvent', {
+              'gamepadId': 'pad',
+              'time': 0,
+              'type': 'analog',
+              'key': axis,
+              'value': value,
+            }),
+          ),
+          (_) {},
+        );
+        await tester.pumpAndSettle();
+      }
+    }
+
+    void expectShowing({required bool saves, required bool states}) {
+      expect(find.text('Game.srm'), saves ? findsOneWidget : findsNothing);
+      expect(find.text('Game.state'), states ? findsOneWidget : findsNothing);
+    }
+
+    await settle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown); // games
+    await tester.pumpAndSettle();
+    await pull('axis_rtrigger');
+    expectShowing(saves: true, states: false);
+    // Still in the games list: no filter took focus.
+    for (final i in [0, 1, 2]) {
+      expect(filterGlow(tester, i), 0);
+    }
+    await pull('axis_rtrigger');
+    expectShowing(saves: false, states: true);
+    await pull('axis_rtrigger'); // wraps to All
+    expectShowing(saves: true, states: true);
+    await pull('axis_ltrigger'); // and back round to States
+    expectShowing(saves: false, states: true);
     expect(tester.takeException(), isNull);
   });
 
@@ -202,8 +343,11 @@ void main() {
     }
 
     await settle();
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await settle();
+    // One toolbar row: All, Saves, States, Refresh, then Retry uploads.
+    for (var i = 0; i < 4; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await settle();
+    }
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await settle();
     expect(romm.calls, 1);
@@ -220,8 +364,17 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('save-delete')));
     await tester.pumpAndSettle();
     expect(find.text('Delete from RomM'), findsOneWidget);
+    // AlertDialog itself fills the route; its first Material is the panel.
+    final panel = tester.getRect(
+      find
+          .descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(Material),
+          )
+          .first,
+    );
     // The long confirmation wraps rather than spanning the screen.
-    expect(tester.getSize(find.byType(AlertDialog)).width, lessThan(640));
+    expect(panel.width, lessThan(640));
     await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
     await tester.pumpAndSettle();
     expect(connection.inventory.deleted, isEmpty);
@@ -243,26 +396,43 @@ void main() {
   ) async {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
-    double glow(int filter) {
-      final box = tester.widget<AnimatedContainer>(
-        find
-            .ancestor(
-              of: find.byKey(ValueKey('save-filter-$filter')),
-              matching: find.byType(AnimatedContainer),
-            )
-            .first,
+    double glow(int filter) => filterGlow(tester, filter);
+
+    Future<void> key(LogicalKeyboardKey key) async {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 180)),
       );
-      return (box.decoration! as ShapeDecoration).shadows!.single.color.a;
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
     }
 
-    expect(glow(0), 0);
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 180)),
-    );
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown); // filters
-    await tester.pumpAndSettle();
+    // Focus opens on the selected All filter.
     expect(glow(0), greaterThan(0));
     expect(glow(1), 0);
+    await key(LogicalKeyboardKey.arrowRight);
+    expect(glow(0), 0);
+    expect(glow(1), greaterThan(0));
+    await key(LogicalKeyboardKey.arrowDown); // games
+    expect(glow(1), 0);
+  });
+
+  testWidgets('toolbar buttons share one row and the panes start level', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    final filter = tester.getRect(find.byKey(const ValueKey('save-filter-2')));
+    for (final i in [0, 1]) {
+      final action = tester.getRect(find.byKey(ValueKey('save-action-$i')));
+      expect(action.height, filter.height, reason: 'action $i');
+      expect(action.center.dy, filter.center.dy, reason: 'action $i');
+      expect(action.left, greaterThan(filter.right), reason: 'action $i');
+    }
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('save-game-rom:1'))).dy,
+      tester.getTopLeft(find.byKey(const ValueKey('save-details'))).dy,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   for (final size in [
@@ -340,7 +510,6 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      await key(LogicalKeyboardKey.arrowDown); // filters
       await key(LogicalKeyboardKey.arrowDown); // games
       await key(LogicalKeyboardKey.arrowRight); // files
       for (var i = 0; i < 11; i++) {
@@ -361,7 +530,7 @@ void main() {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
     connection.inventory.load = () async => throw StateError('offline');
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Refresh'));
+    await tester.tap(find.byKey(const ValueKey('save-action-0')));
     await tester.pumpAndSettle();
     expect(find.text('Game.srm'), findsOneWidget);
     expect(find.text('Game.state'), findsOneWidget);

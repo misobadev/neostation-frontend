@@ -1,15 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleId = {
-  AppLocale.rommSavesSubtitle: 'Sinkronisasi simpanan ditangani oleh RomM.',
   AppLocale.rommSavesAutoDownload:
       'Simpanan cloud yang lebih baru diunduh saat Anda memulai game yang ditautkan.',
-  AppLocale.rommSavesRecent: 'Aktivitas terbaru dahulu',
   AppLocale.rommSaveFile: 'Berkas simpanan',
   AppLocale.rommSaveState: 'Status simpanan',
   AppLocale.rommRetryUploads: 'Coba unggah lagi',
-  AppLocale.rommUploadsChecked:
-      'Pemeriksaan unggahan selesai. Unduhan berjalan saat game tertaut dimulai.',
   AppLocale.rommUploadsFailed:
       'Beberapa unggahan gagal. Periksa koneksi dan izin RomM, lalu coba lagi.',
   AppLocale.rommSavesHelp:

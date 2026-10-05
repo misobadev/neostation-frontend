@@ -31,6 +31,9 @@ class RommSavesProvider extends ChangeNotifier {
   final Future<String?> Function(int)? _loadLocalCover;
   final _metadataGate = LifoSemaphore(3);
   final Map<int, Future<RommSaveGameInfo>> _gameInfo = {};
+  // Kept across refreshes (which only retry lookups) so the last good answer
+  // stays on screen until a new one replaces it.
+  final Map<int, RommSaveGameInfo> _loadedInfo = {};
   List<RommAsset> _assets = [];
   bool _loading = false;
   bool _syncing = false;
@@ -53,11 +56,20 @@ class RommSavesProvider extends ChangeNotifier {
     if (romId == null || _disposed || !_browse.isConnected) {
       return Future.value(const RommSaveGameInfo());
     }
+    final generation = _generation;
     return _gameInfo.putIfAbsent(
       romId,
-      () => _readGameInfo(romId, _generation),
+      () => _readGameInfo(romId, generation).then((info) {
+        if (generation == _generation) _loadedInfo[romId] = info;
+        return info;
+      }),
     );
   }
+
+  /// What [gameInfo] has already resolved for [romId], or null while it is
+  /// pending, so a newly built tile can show it in its first frame.
+  RommSaveGameInfo? loadedGameInfo(int? romId) =>
+      romId == null ? const RommSaveGameInfo() : _loadedInfo[romId];
 
   Future<RommSaveGameInfo> _readGameInfo(int romId, int generation) async {
     await _metadataGate.acquire();
@@ -125,6 +137,7 @@ class RommSavesProvider extends ChangeNotifier {
     if (_browse.isConnected) return;
     _generation++;
     _gameInfo.clear();
+    _loadedInfo.clear();
     _assets = [];
     _loading = false;
     _loadError = null;

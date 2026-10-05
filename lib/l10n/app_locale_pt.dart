@@ -1,15 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocalePt = {
-  AppLocale.rommSavesSubtitle: 'A sincronização de saves é feita pelo RomM.',
   AppLocale.rommSavesAutoDownload:
       'Saves mais recentes da nuvem são baixados ao iniciar um jogo vinculado.',
-  AppLocale.rommSavesRecent: 'Atividade mais recente',
   AppLocale.rommSaveFile: 'Arquivo de save',
   AppLocale.rommSaveState: 'Estado salvo',
   AppLocale.rommRetryUploads: 'Tentar envios novamente',
-  AppLocale.rommUploadsChecked:
-      'Verificação de envios concluída. Os downloads ocorrem ao iniciar um jogo vinculado.',
   AppLocale.rommUploadsFailed:
       'Alguns envios falharam. Verifique a conexão e as permissões do RomM e tente novamente.',
   AppLocale.rommSavesHelp:
