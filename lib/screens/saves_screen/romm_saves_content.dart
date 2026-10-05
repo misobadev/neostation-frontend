@@ -139,7 +139,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
     setState(() {
       switch (_focus) {
         case _FocusArea.actions || _FocusArea.filters:
-          if (delta > 0 && games.isNotEmpty) {
+          // Not into the panes while they are still hidden behind loading.
+          if (delta > 0 && games.isNotEmpty && _ready) {
             _lastToolbar = _focus;
             _focus = _FocusArea.games;
           }

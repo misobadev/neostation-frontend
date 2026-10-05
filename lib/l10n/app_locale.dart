@@ -18,17 +18,6 @@ part 'app_locale_ja.dart';
 part 'app_locale_ko.dart';
 
 mixin AppLocale {
-  static const String rommSavesAutoDownload = 'rommSavesAutoDownload';
-  static const String rommSaveFile = 'rommSaveFile';
-  static const String rommSaveState = 'rommSaveState';
-  static const String rommRetryUploads = 'rommRetryUploads';
-  static const String rommUploadsFailed = 'rommUploadsFailed';
-  static const String rommSavesHelp = 'rommSavesHelp';
-  static const String rommDeleteTitle = 'rommDeleteTitle';
-  static const String rommDeleteConfirm = 'rommDeleteConfirm';
-  static const String rommDeleted = 'rommDeleted';
-  static const String rommDeleteFailed = 'rommDeleteFailed';
-
   // ---------------------------------------------------------------------------
   // Navigation / Controls
   // ---------------------------------------------------------------------------
@@ -1472,6 +1461,18 @@ mixin AppLocale {
   static const String rommLinkFailed = 'romm_link_failed';
   static const String rommUnlinked = 'romm_unlinked';
   static const String rommUnlinkFailed = 'romm_unlink_failed';
+
+  // RomM saves (Saves tab)
+  static const String rommSavesAutoDownload = 'romm_saves_auto_download';
+  static const String rommSaveFile = 'romm_save_file';
+  static const String rommSaveState = 'romm_save_state';
+  static const String rommRetryUploads = 'romm_retry_uploads';
+  static const String rommUploadsFailed = 'romm_uploads_failed';
+  static const String rommSavesHelp = 'romm_saves_help';
+  static const String rommDeleteTitle = 'romm_delete_title';
+  static const String rommDeleteConfirm = 'romm_delete_confirm';
+  static const String rommDeleted = 'romm_deleted';
+  static const String rommDeleteFailed = 'romm_delete_failed';
 
   // Link action on search results
   static const String searchLinkToRomm = 'search_link_to_romm';

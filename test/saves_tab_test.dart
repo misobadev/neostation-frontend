@@ -282,9 +282,12 @@ void main() {
     expect(find.text('Alpha.srm'), findsNothing);
     expect(find.text('Alpha'), findsNothing);
     expect(find.text('Beta'), findsNothing);
+    // Nor can the controller wander into the hidden panes.
+    await press(tester, LogicalKeyboardKey.arrowDown);
 
     names.complete();
     await tester.pumpAndSettle();
+    expect(filterGlow(tester, 0), greaterThan(0));
     expect(find.text('Alpha Quest'), findsWidgets);
     expect(find.text('Beta Saga'), findsOneWidget);
     expect(find.text('Alpha'), findsNothing);

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,12 @@ import 'package:neostation/models/romm_save_game.dart';
 import 'package:neostation/screens/saves_screen/romm_save_artwork.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/themes/corner_radii.dart';
+
+/// A 1x1 PNG, so a found cover decodes into a real frame.
+final Uint8List _pixel = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA'
+  '60e6kgAAAABJRU5ErkJggg==',
+);
 
 class _ArtworkService extends RommService {
   final calls = <String>[];
@@ -21,77 +28,7 @@ class _ArtworkService extends RommService {
     if (failed.contains(url)) {
       return const RommImageFetch.missing(RommImageMiss.absent);
     }
-    return RommImageFetch.found(
-      Uint8List.fromList([
-        0x89,
-        0x50,
-        0x4e,
-        0x47,
-        0x0d,
-        0x0a,
-        0x1a,
-        0x0a,
-        0,
-        0,
-        0,
-        0x0d,
-        0x49,
-        0x48,
-        0x44,
-        0x52,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        1,
-        8,
-        6,
-        0,
-        0,
-        0,
-        0x1f,
-        0x15,
-        0xc4,
-        0x89,
-        0,
-        0,
-        0,
-        0x0a,
-        0x49,
-        0x44,
-        0x41,
-        0x54,
-        0x78,
-        0x9c,
-        0x63,
-        0,
-        1,
-        0,
-        0,
-        5,
-        0,
-        1,
-        0x0d,
-        0x0a,
-        0x2d,
-        0xb4,
-        0,
-        0,
-        0,
-        0,
-        0x49,
-        0x45,
-        0x4e,
-        0x44,
-        0xae,
-        0x42,
-        0x60,
-        0x82,
-      ]),
-    );
+    return RommImageFetch.found(_pixel);
   }
 }
 
