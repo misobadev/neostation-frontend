@@ -11,6 +11,10 @@ class InventoryService extends RommService {
   Future<RommRom> Function(int) loadRom = (id) async =>
       RommRom.fromJson({'id': id, 'name': 'Game', 'platform_slug': 'gba'});
 
+  /// `save:<id>` / `state:<id>` for every successful delete.
+  final List<String> deleted = [];
+  Future<void> Function() beforeDelete = () async {};
+
   @override
   Future<RommRom> getRom(int id) {
     detailCalls.add(id);
@@ -22,10 +26,6 @@ class InventoryService extends RommService {
     calls++;
     return load();
   }
-
-  /// `save:<id>` / `state:<id>` for every successful delete.
-  final List<String> deleted = [];
-  Future<void> Function() beforeDelete = () async {};
 
   @override
   Future<void> deleteSaves(List<int> assetIds) => _delete('save', assetIds);

@@ -101,8 +101,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
       onBack: _back,
       onPreviousTab: AppNavigation.previousTab,
       onNextTab: AppNavigation.nextTab,
-      onLeftBumper: AppNavigation.previousTab,
-      onRightBumper: AppNavigation.nextTab,
       onLeftTrigger: () => _stepFilter(-1),
       onRightTrigger: () => _stepFilter(1),
     );
@@ -233,7 +231,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
     if (_busy) return;
     await _saves.refresh();
     if (mounted && _saves.loadError != null && _saves.assets.isNotEmpty) {
-      _notifyError(AppLocale.failedToRefreshCloud);
+      _notify(AppLocale.failedToRefreshCloud);
     }
   }
 
@@ -242,15 +240,16 @@ class _RommSavesContentState extends State<RommSavesContent> {
     await _saves.retryUploads();
     // A successful retry needs no message.
     if (mounted && _saves.syncResult?.success == false) {
-      _notifyError(AppLocale.rommUploadsFailed);
+      _notify(AppLocale.rommUploadsFailed);
     }
   }
 
-  void _notifyError(String message) => AppNotification.showNotification(
-    context,
-    message.getString(context),
-    type: NotificationType.error,
-  );
+  void _notify(String message, {bool error = true}) =>
+      AppNotification.showNotification(
+        context,
+        message.getString(context),
+        type: error ? NotificationType.error : NotificationType.success,
+      );
 
   /// Select deletes the focused file, as it does in the NeoSync save list.
   /// Elsewhere it keeps its app-wide meaning instead of doing nothing.
@@ -265,7 +264,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
   Future<void> _deleteFocusedFile() async {
     final file = _focusedFile;
     if (file == null || _busy) return;
-    _navigation.deactivate();
     final confirmed = await ConfirmActionDialog.show(
       context,
       title: AppLocale.rommDeleteTitle.getString(context),
@@ -275,19 +273,13 @@ class _RommSavesContentState extends State<RommSavesContent> {
       confirmLabel: AppLocale.delete.getString(context),
       icon: Icons.delete_forever_rounded,
       maxWidth: 320.r,
-      padding: 15.r,
     );
-    if (!mounted) return;
-    _navigation.activate();
-    if (!confirmed) return;
+    if (!mounted || !confirmed) return;
     final deleted = await _saves.delete(file);
     if (!mounted) return;
-    AppNotification.showNotification(
-      context,
-      (deleted ? AppLocale.rommDeleted : AppLocale.rommDeleteFailed).getString(
-        context,
-      ),
-      type: deleted ? NotificationType.success : NotificationType.error,
+    _notify(
+      deleted ? AppLocale.rommDeleted : AppLocale.rommDeleteFailed,
+      error: !deleted,
     );
     if (!deleted) return;
     // The build keeps the cursor on a neighbouring file. When the game's last
@@ -388,6 +380,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
                             ? AppLocale.syncing
                             : AppLocale.rommRetryUploads,
                         _retryUploads,
+                        tooltip: AppLocale.rommSavesHelp,
                       ),
                     ],
                   ),
@@ -466,13 +459,17 @@ class _RommSavesContentState extends State<RommSavesContent> {
     },
   );
 
-  Widget _action(int index, IconData icon, String label, VoidCallback action) {
+  Widget _action(
+    int index,
+    IconData icon,
+    String label,
+    VoidCallback action, {
+    String? tooltip,
+  }) {
     final scheme = Theme.of(context).colorScheme;
     final focused = _focus == _FocusArea.actions && _actionIndex == index;
     return Tooltip(
-      message: (index == 1 ? AppLocale.rommSavesHelp : label).getString(
-        context,
-      ),
+      message: (tooltip ?? label).getString(context),
       child: OutlinedButton.icon(
         key: ValueKey('save-action-$index'),
         onPressed: _busy
@@ -653,10 +650,10 @@ class _RommSavesContentState extends State<RommSavesContent> {
                                 color: scheme.onSurface,
                               ),
                             ),
-                            if (info?.rom?.platformSlug.isNotEmpty == true) ...[
+                            if (_platform(info) case final platform?) ...[
                               SizedBox(height: 3.r),
                               Text(
-                                info!.rom!.platformSlug.toUpperCase(),
+                                platform,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -693,6 +690,11 @@ class _RommSavesContentState extends State<RommSavesContent> {
     );
   }
 
+  String? _platform(RommSaveGameInfo? info) {
+    final slug = info?.rom?.platformSlug;
+    return slug == null || slug.isEmpty ? null : slug.toUpperCase();
+  }
+
   String _counts(RommSaveGame game) => [
     if (game.saves > 0)
       '${AppLocale.statSaves.getString(context)} ${game.saves}',
@@ -716,101 +718,97 @@ class _RommSavesContentState extends State<RommSavesContent> {
   Widget _details(RommSaveGame game) {
     final scheme = Theme.of(context).colorScheme;
     return LayoutBuilder(
-      builder: (context, constraints) => Container(
-        key: const ValueKey('save-details'),
-        // Keeps scrolled file rows inside the rounded corners.
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainer.withValues(alpha: 0.65),
-          borderRadius: CornerRadii.of(context).radiusExternal,
-          border: Border.all(
-            color: scheme.outlineVariant.withValues(alpha: 0.6),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // The title is already in the game list. On short displays or with
-            // large text, devote this pane to the files instead of repeating it.
-            if (constraints.maxHeight >= 220.r)
-              FutureBuilder<RommSaveGameInfo>(
-                key: ValueKey(game.key),
-                future: _saves.gameInfo(game.romId),
-                initialData: _saves.loadedGameInfo(game.romId),
-                builder: (context, snapshot) => Padding(
-                  padding: EdgeInsets.all(14.r),
-                  child: Row(
-                    children: [
-                      _art(game, snapshot.data, 48.r, 64.r),
-                      SizedBox(width: 12.r),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _title(game, snapshot.data),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 16.sp,
-                                height: 1.2,
-                                fontWeight: FontWeight.w700,
-                                color: scheme.onSurface,
-                              ),
-                            ),
-                            SizedBox(height: 6.r),
-                            Text(
-                              [
-                                if (snapshot
-                                        .data
-                                        ?.rom
-                                        ?.platformSlug
-                                        .isNotEmpty ==
-                                    true)
-                                  snapshot.data!.rom!.platformSlug
-                                      .toUpperCase(),
-                                _counts(game),
-                              ].join(' · '),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 10.sp,
-                                height: 1.3,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (constraints.maxHeight >= 220.r)
-              Divider(
-                height: 1.r,
-                color: scheme.outlineVariant.withValues(alpha: 0.6),
-              ),
-            Expanded(
-              child: Scrollbar(
-                controller: _filesScroll,
-                child: ListView.builder(
-                  key: ValueKey('files-${game.key}-$_filter'),
-                  controller: _filesScroll,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 10.r,
-                    vertical: _filesInset,
-                  ),
-                  itemExtent: _fileExtent,
-                  itemCount: game.assets.length,
-                  itemBuilder: (context, index) =>
-                      _fileRow(game.assets[index], index),
-                ),
-              ),
+      builder: (context, constraints) {
+        // The title is already in the game list. On short displays or with
+        // large text, devote this pane to the files instead of repeating it.
+        final showHeader = constraints.maxHeight >= 220.r;
+        return Container(
+          key: const ValueKey('save-details'),
+          // Keeps scrolled file rows inside the rounded corners.
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainer.withValues(alpha: 0.65),
+            borderRadius: CornerRadii.of(context).radiusExternal,
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.6),
             ),
-          ],
-        ),
-      ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showHeader)
+                FutureBuilder<RommSaveGameInfo>(
+                  key: ValueKey(game.key),
+                  future: _saves.gameInfo(game.romId),
+                  initialData: _saves.loadedGameInfo(game.romId),
+                  builder: (context, snapshot) => Padding(
+                    padding: EdgeInsets.all(14.r),
+                    child: Row(
+                      children: [
+                        _art(game, snapshot.data, 48.r, 64.r),
+                        SizedBox(width: 12.r),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _title(game, snapshot.data),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.w700,
+                                  color: scheme.onSurface,
+                                ),
+                              ),
+                              SizedBox(height: 6.r),
+                              Text(
+                                [
+                                  ?_platform(snapshot.data),
+                                  _counts(game),
+                                ].join(' · '),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10.sp,
+                                  height: 1.3,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              if (showHeader)
+                Divider(
+                  height: 1.r,
+                  color: scheme.outlineVariant.withValues(alpha: 0.6),
+                ),
+              Expanded(
+                child: Scrollbar(
+                  controller: _filesScroll,
+                  child: ListView.builder(
+                    key: ValueKey('files-${game.key}-$_filter'),
+                    controller: _filesScroll,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 10.r,
+                      vertical: _filesInset,
+                    ),
+                    itemExtent: _fileExtent,
+                    itemCount: game.assets.length,
+                    itemBuilder: (context, index) =>
+                        _fileRow(game.assets[index], index),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

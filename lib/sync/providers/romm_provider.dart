@@ -1546,12 +1546,6 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       if (!_browse.isConnected) {
         return SyncResult.fail(SyncError.authRequired);
       }
-      if (failed > 0) {
-        return SyncResult.fail(
-          SyncError.unknown,
-          message: '$failed of $candidates pending games failed to sync',
-        );
-      }
       if (candidates == 0) {
         // Logged even when it does nothing: this is the only outward sign the
         // automatic sweep ran at all, and phase one costs no network.
@@ -1561,6 +1555,12 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       _log.i(
         'RomM upload sweep: $candidates pending, $synced synced, $failed failed',
       );
+      if (failed > 0) {
+        return SyncResult.fail(
+          SyncError.unknown,
+          message: '$failed of $candidates pending games failed to sync',
+        );
+      }
       return SyncResult.ok(
         message: '$synced of $candidates pending games synced',
       );

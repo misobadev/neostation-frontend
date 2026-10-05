@@ -141,6 +141,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Waits out the navigator's activation grace, which drops early input.
+  Future<void> pastGrace(WidgetTester tester) async {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 180)),
+    );
+  }
+
+  Future<void> press(WidgetTester tester, LogicalKeyboardKey key) async {
+    await pastGrace(tester);
+    await tester.sendKeyEvent(key);
+    await tester.pumpAndSettle();
+  }
+
   /// Messages posted to the app's notification popups, oldest first.
   List<String> notified() => [
     for (final n in GlobalNotificationService().notifier.value) n.message,
@@ -288,17 +301,11 @@ void main() {
   testWidgets('L2/R2 cycle the filters without moving focus', (tester) async {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
-    Future<void> settle() async {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 180)),
-      );
-    }
-
     // Through the real plugin channel, so translation and dispatch are covered.
     // The axis keys map to the triggers on every desktop test host.
     Future<void> pull(String axis) async {
       for (final value in [1.0, 0.0]) {
-        await settle();
+        await pastGrace(tester);
         await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
           'xyz.luan/gamepads',
           const StandardMethodCodec().encodeMethodCall(
@@ -321,9 +328,7 @@ void main() {
       expect(find.text('Game.state'), states ? findsOneWidget : findsNothing);
     }
 
-    await settle();
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown); // games
-    await tester.pumpAndSettle();
+    await press(tester, LogicalKeyboardKey.arrowDown); // games
     await pull('axis_rtrigger');
     expectShowing(saves: true, states: false);
     // Still in the games list: no filter took focus.
@@ -344,21 +349,11 @@ void main() {
   ) async {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
-    Future<void> settle() async {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 350)),
-      );
-      await tester.pumpAndSettle();
-    }
-
-    await settle();
     // One toolbar row: All, Saves, States, Refresh, then Retry uploads.
     for (var i = 0; i < 4; i++) {
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-      await settle();
+      await press(tester, LogicalKeyboardKey.arrowRight);
     }
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await settle();
+    await press(tester, LogicalKeyboardKey.enter);
     expect(romm.calls, 1);
   });
 
@@ -405,24 +400,14 @@ void main() {
   ) async {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
-    double glow(int filter) => filterGlow(tester, filter);
-
-    Future<void> key(LogicalKeyboardKey key) async {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 180)),
-      );
-      await tester.sendKeyEvent(key);
-      await tester.pumpAndSettle();
-    }
-
     // Focus opens on the selected All filter.
-    expect(glow(0), greaterThan(0));
-    expect(glow(1), 0);
-    await key(LogicalKeyboardKey.arrowRight);
-    expect(glow(0), 0);
-    expect(glow(1), greaterThan(0));
-    await key(LogicalKeyboardKey.arrowDown); // games
-    expect(glow(1), 0);
+    expect(filterGlow(tester, 0), greaterThan(0));
+    expect(filterGlow(tester, 1), 0);
+    await press(tester, LogicalKeyboardKey.arrowRight);
+    expect(filterGlow(tester, 0), 0);
+    expect(filterGlow(tester, 1), greaterThan(0));
+    await press(tester, LogicalKeyboardKey.arrowDown); // games
+    expect(filterGlow(tester, 1), 0);
   });
 
   testWidgets('toolbar buttons share one row and the panes start level', (
@@ -511,22 +496,14 @@ void main() {
         inventoryAsset('Other.srm', romId: 2, id: 20),
       ];
       await pumpTab(tester);
-      Future<void> key(LogicalKeyboardKey key) async {
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 180)),
-        );
-        await tester.sendKeyEvent(key);
-        await tester.pumpAndSettle();
-      }
-
-      await key(LogicalKeyboardKey.arrowDown); // games
-      await key(LogicalKeyboardKey.arrowRight); // files
+      await press(tester, LogicalKeyboardKey.arrowDown); // games
+      await press(tester, LogicalKeyboardKey.arrowRight); // files
       for (var i = 0; i < 11; i++) {
-        await key(LogicalKeyboardKey.arrowDown);
+        await press(tester, LogicalKeyboardKey.arrowDown);
       }
       expect(find.text('Game-11.srm').hitTestable(), findsOneWidget);
-      await key(LogicalKeyboardKey.backspace); // back to game selection
-      await key(LogicalKeyboardKey.arrowDown);
+      await press(tester, LogicalKeyboardKey.backspace); // back to the games
+      await press(tester, LogicalKeyboardKey.arrowDown);
       expect(find.text('Other.srm'), findsOneWidget);
       expect(romm.calls, 0);
       expect(tester.takeException(), isNull);

@@ -43,7 +43,7 @@ class _RommSaveArtworkState extends State<RommSaveArtwork> {
     final info = widget.info;
     final sources = <ImageProvider>[
       if (info?.localCover case final path?) FileImage(File(path)),
-      for (final url in info?.serverCovers ?? <String>[])
+      for (final url in info?.serverCovers ?? const <String>[])
         RommCoverImage(url, widget.service),
     ];
     var attempt = _attempt;
