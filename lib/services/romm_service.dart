@@ -1184,12 +1184,24 @@ class RommService {
   Future<List<RommAsset>> listStates({required int romId}) =>
       _listAssets('/api/states', romId: romId, isState: true);
 
+  /// Inventory for the Saves tab, including archival versions and backups.
+  /// Unlike per-game sync discovery, this lists all of the current user's files.
+  Future<List<RommAsset>> listSaveAssets() async {
+    final results = await Future.wait([
+      _listAssets('/api/saves', isState: false),
+      _listAssets('/api/states', isState: true),
+    ]);
+    return [...results[0], ...results[1]];
+  }
+
   Future<List<RommAsset>> _listAssets(
     String basePath, {
-    required int romId,
+    int? romId,
     required bool isState,
   }) async {
-    final resp = await _authedGet('$basePath?rom_id=$romId');
+    final resp = await _authedGet(
+      romId == null ? basePath : '$basePath?rom_id=$romId',
+    );
     return _itemsOf(jsonDecode(resp.body))
         .whereType<Map<String, dynamic>>()
         .map((j) => RommAsset.fromJson(j, isState: isState))

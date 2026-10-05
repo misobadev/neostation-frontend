@@ -1,6 +1,13 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleId = {
+  AppLocale.rommRetryUploads: 'Coba unggah lagi',
+  AppLocale.rommUploadsChecked:
+      'Pemeriksaan unggahan selesai. Unduhan berjalan saat game tertaut dimulai.',
+  AppLocale.rommUploadsFailed:
+      'Beberapa unggahan gagal. Periksa koneksi dan izin RomM, lalu coba lagi.',
+  AppLocale.rommSavesHelp:
+      'Lihat simpanan dan status RomM. Coba unggah lagi memeriksa game lokal yang tertaut ke RomM dengan sinkronisasi aktif. Simpanan jarak jauh yang lebih baru diunduh saat game dimulai.',
   AppLocale.raEvents: 'Acara',
   AppLocale.raAotwYearTitle: 'Pencapaian Minggu Ini ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -247,8 +254,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.bartopShutdown: 'Matikan BarTOP saat keluar',
   AppLocale.bartopShutdownSubtitle: 'Mematikan komputer saat menutup aplikasi',
 
-  AppLocale.showSyncTab: 'Tampilkan tab NeoSync',
-  AppLocale.showSyncTabSubtitle: 'Menampilkan tab NeoSync di bilah navigasi',
+  AppLocale.showSyncTab: 'Tampilkan tab Simpanan',
+  AppLocale.showSyncTabSubtitle: 'Tampilkan tab Simpanan di bilah navigasi',
   AppLocale.showAchievementsTab: 'Tampilkan tab Pencapaian',
   AppLocale.showAchievementsTabSubtitle:
       'Menampilkan tab RetroAchievements di bilah navigasi',

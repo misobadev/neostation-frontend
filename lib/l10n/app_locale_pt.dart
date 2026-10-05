@@ -1,6 +1,13 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocalePt = {
+  AppLocale.rommRetryUploads: 'Tentar envios novamente',
+  AppLocale.rommUploadsChecked:
+      'Verificação de envios concluída. Os downloads ocorrem ao iniciar um jogo vinculado.',
+  AppLocale.rommUploadsFailed:
+      'Alguns envios falharam. Verifique a conexão e as permissões do RomM e tente novamente.',
+  AppLocale.rommSavesHelp:
+      'Veja seus salvamentos e estados do RomM. Tentar envios novamente verifica jogos locais vinculados ao RomM com sincronização ativa. Salvamentos remotos mais recentes são baixados ao iniciar um jogo.',
   AppLocale.raEvents: 'Eventos',
   AppLocale.raAotwYearTitle: 'Conquista da Semana ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -253,8 +260,9 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.bartopShutdownSubtitle:
       'Desliga o computador ao fechar o aplicativo',
 
-  AppLocale.showSyncTab: 'Mostrar aba NeoSync',
-  AppLocale.showSyncTabSubtitle: 'Exibe a aba NeoSync na barra de navegação',
+  AppLocale.showSyncTab: 'Mostrar aba de salvamentos',
+  AppLocale.showSyncTabSubtitle:
+      'Exibir a aba de salvamentos na barra de navegação',
   AppLocale.showAchievementsTab: 'Mostrar aba Conquistas',
   AppLocale.showAchievementsTabSubtitle:
       'Exibe a aba do RetroAchievements na barra de navegação',

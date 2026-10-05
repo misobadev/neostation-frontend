@@ -1,6 +1,13 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleEs = {
+  AppLocale.rommRetryUploads: 'Reintentar subidas',
+  AppLocale.rommUploadsChecked:
+      'Comprobación de subidas finalizada. Las descargas se realizan al iniciar un juego vinculado.',
+  AppLocale.rommUploadsFailed:
+      'Algunas subidas fallaron. Revisa la conexión y los permisos de RomM e inténtalo de nuevo.',
+  AppLocale.rommSavesHelp:
+      'Consulta tus partidas y estados de RomM. Reintentar subidas comprueba los juegos locales vinculados a RomM con sincronización activada. Las partidas remotas más recientes se descargan al iniciar un juego.',
   AppLocale.raEvents: 'Eventos',
   AppLocale.raAotwYearTitle: 'Logro de la semana ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -255,9 +262,9 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.bartopShutdownSubtitle:
       'Apagar el equipo al salir de la aplicación',
 
-  AppLocale.showSyncTab: 'Mostrar pestaña NeoSync',
+  AppLocale.showSyncTab: 'Mostrar pestaña de partidas',
   AppLocale.showSyncTabSubtitle:
-      'Muestra la pestaña de NeoSync en la barra de navegación',
+      'Mostrar la pestaña de partidas en la barra de navegación',
   AppLocale.showAchievementsTab: 'Mostrar pestaña Logros',
   AppLocale.showAchievementsTabSubtitle:
       'Muestra la pestaña de RetroAchievements en la barra de navegación',

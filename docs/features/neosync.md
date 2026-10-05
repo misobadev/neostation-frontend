@@ -11,10 +11,30 @@ NeoSync is your cloud companion for NeoStation. It keeps your game saves, save s
 
 ## Before You Start
 
-The NeoSync tab is hidden by default. To show it:
+The **Saves** tab is hidden by default. To show it:
 
 1. Open **Settings → General**.
-2. Turn on **Show NeoSync tab**.
+2. Turn on **Show Saves tab**.
+
+The tab uses NeoSync by default. When **Use RomM for save sync** is enabled
+in the RomM tab, Saves instead shows your RomM saves and save states. Turn
+that option off to return to NeoSync, including its account and plan controls.
+
+### RomM Saves
+
+The RomM manager lists the connected user's remote saves and states, newest
+first, including archival versions and conflict backups. Use the filter button
+to switch between all files, saves, and states. **Refresh** (X) reloads the
+inventory without transferring saves.
+
+**Retry uploads** (Y) checks local games linked to RomM with save sync enabled
+and retries pending uploads using the existing conflict protections. It does
+not download all remote saves: downloads run before a linked game launches.
+Per-game and per-system sync settings still apply. Failed requests show an
+error rather than an empty inventory or a successful upload check.
+
+Use the D-pad to navigate the controls and files, A to activate a control,
+L1/R1 to change tabs, and B to return to Systems.
 
 ## The Official Site
 
@@ -22,7 +42,7 @@ The official NeoSync website is [https://neosync.cloud/](https://neosync.cloud/)
 
 ## Sign In or Create an Account
 
-Open the **NeoSync** tab and choose to create an account or sign in. You can also do this on the [official site](https://neosync.cloud/).
+Open the **Saves** tab with NeoSync selected and choose to create an account or sign in. You can also do this on the [official site](https://neosync.cloud/).
 
 - New accounts need email verification. NeoStation can resend the verification email.
 - If you forget your password, use the password recovery option.

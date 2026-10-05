@@ -1,6 +1,13 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleIt = {
+  AppLocale.rommRetryUploads: 'Riprova caricamenti',
+  AppLocale.rommUploadsChecked:
+      'Controllo caricamenti completato. I download avvengono all’avvio di un gioco collegato.',
+  AppLocale.rommUploadsFailed:
+      'Alcuni caricamenti non sono riusciti. Controlla la connessione e i permessi RomM, poi riprova.',
+  AppLocale.rommSavesHelp:
+      'Sfoglia salvataggi e stati RomM. Riprova caricamenti controlla i giochi locali collegati a RomM con sincronizzazione attiva. I salvataggi remoti più recenti vengono scaricati all’avvio del gioco.',
   AppLocale.raEvents: 'Eventi',
   AppLocale.raAotwYearTitle: 'Achievement della settimana ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -253,9 +260,9 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.bartopShutdown: 'Spegni BarTOP all’uscita',
   AppLocale.bartopShutdownSubtitle: 'Spegne il computer alla chiusura dell’app',
 
-  AppLocale.showSyncTab: 'Mostra scheda NeoSync',
+  AppLocale.showSyncTab: 'Mostra scheda Salvataggi',
   AppLocale.showSyncTabSubtitle:
-      'Mostra la scheda NeoSync nella barra di navigazione',
+      'Mostra la scheda Salvataggi nella barra di navigazione',
   AppLocale.showAchievementsTab: 'Mostra scheda Obiettivi',
   AppLocale.showAchievementsTabSubtitle:
       'Mostra la scheda RetroAchievements nella barra di navigazione',

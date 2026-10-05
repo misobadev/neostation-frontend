@@ -1,6 +1,13 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleFr = {
+  AppLocale.rommRetryUploads: 'Réessayer les envois',
+  AppLocale.rommUploadsChecked:
+      'Vérification des envois terminée. Les téléchargements ont lieu au lancement d’un jeu lié.',
+  AppLocale.rommUploadsFailed:
+      'Certains envois ont échoué. Vérifiez la connexion et les autorisations RomM, puis réessayez.',
+  AppLocale.rommSavesHelp:
+      'Consultez vos sauvegardes et états RomM. Réessayer les envois vérifie les jeux locaux liés à RomM dont la synchronisation est activée. Les sauvegardes distantes plus récentes sont téléchargées au lancement du jeu.',
   AppLocale.raEvents: 'Événements',
   AppLocale.raAotwYearTitle: 'Succès de la semaine ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -259,9 +266,9 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.bartopShutdownSubtitle:
       'Éteint l’ordinateur à la fermeture de l’application',
 
-  AppLocale.showSyncTab: 'Afficher l’onglet NeoSync',
+  AppLocale.showSyncTab: 'Afficher l’onglet Sauvegardes',
   AppLocale.showSyncTabSubtitle:
-      'Affiche l’onglet NeoSync dans la barre de navigation',
+      'Afficher l’onglet Sauvegardes dans la barre de navigation',
   AppLocale.showAchievementsTab: 'Afficher l’onglet Succès',
   AppLocale.showAchievementsTabSubtitle:
       'Affiche l’onglet RetroAchievements dans la barre de navigation',

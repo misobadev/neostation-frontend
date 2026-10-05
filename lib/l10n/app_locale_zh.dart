@@ -1,6 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleZh = {
+  AppLocale.rommRetryUploads: '重试上传',
+  AppLocale.rommUploadsChecked: '上传检查完成。启动已关联的游戏时将下载存档。',
+  AppLocale.rommUploadsFailed: '部分上传失败。请检查连接和 RomM 权限，然后重试。',
+  AppLocale.rommSavesHelp:
+      '浏览 RomM 存档和即时存档。重试上传会检查已关联 RomM 且启用同步的本地游戏。启动游戏时会下载较新的远程存档。',
   AppLocale.raEvents: '活动',
   AppLocale.raAotwYearTitle: '本周成就（{year}）',
   AppLocale.raAotw: 'AOTW',
@@ -212,8 +217,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.bartopShutdown: '退出时关闭 BarTOP',
   AppLocale.bartopShutdownSubtitle: '退出应用时关闭计算机',
 
-  AppLocale.showSyncTab: '显示 NeoSync 选项卡',
-  AppLocale.showSyncTabSubtitle: '在导航栏中显示 NeoSync 选项卡',
+  AppLocale.showSyncTab: '显示存档选项卡',
+  AppLocale.showSyncTabSubtitle: '在导航栏中显示存档选项卡',
   AppLocale.showAchievementsTab: '显示成就选项卡',
   AppLocale.showAchievementsTabSubtitle: '在导航栏中显示 RetroAchievements 选项卡',
   AppLocale.showRommTab: '显示 RomM 选项卡',

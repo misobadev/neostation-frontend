@@ -1,6 +1,13 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleEn = {
+  AppLocale.rommRetryUploads: 'Retry uploads',
+  AppLocale.rommUploadsChecked:
+      'Upload check complete. Downloads run when you launch a linked game.',
+  AppLocale.rommUploadsFailed:
+      'Some uploads failed. Check your connection and RomM permissions, then retry.',
+  AppLocale.rommSavesHelp:
+      'Browse your RomM saves and states. Retry uploads checks local games linked to RomM with save sync enabled. Newer remote saves download when you launch a game.',
   AppLocale.raEvents: 'Events',
   AppLocale.raAotwYearTitle: 'Achievement of the Week ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -247,9 +254,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.bartopShutdownSubtitle:
       'Shut down the computer when exiting the application',
 
-  AppLocale.showSyncTab: 'Show NeoSync tab',
-  AppLocale.showSyncTabSubtitle:
-      'Display the NeoSync tab in the navigation bar',
+  AppLocale.showSyncTab: 'Show Saves tab',
+  AppLocale.showSyncTabSubtitle: 'Display the Saves tab in the navigation bar',
   AppLocale.showAchievementsTab: 'Show Achievements tab',
   AppLocale.showAchievementsTabSubtitle:
       'Display the RetroAchievements tab in the navigation bar',

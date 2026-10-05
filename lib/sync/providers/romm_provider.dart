@@ -1543,6 +1543,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       // One notification for the whole sweep: it can touch hundreds of games,
       // and notifying per game would rebuild the library UI hundreds of times.
       if (touched.isNotEmpty) notifyListeners();
+      if (!_browse.isConnected) {
+        return SyncResult.fail(SyncError.authRequired);
+      }
+      if (failed > 0) {
+        return SyncResult.fail(
+          SyncError.unknown,
+          message: '$failed of $candidates pending games failed to sync',
+        );
+      }
       if (candidates == 0) {
         // Logged even when it does nothing: this is the only outward sign the
         // automatic sweep ran at all, and phase one costs no network.

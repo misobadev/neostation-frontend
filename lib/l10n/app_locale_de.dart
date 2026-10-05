@@ -1,6 +1,13 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleDe = {
+  AppLocale.rommRetryUploads: 'Uploads wiederholen',
+  AppLocale.rommUploadsChecked:
+      'Upload-Prüfung abgeschlossen. Downloads starten beim Start eines verknüpften Spiels.',
+  AppLocale.rommUploadsFailed:
+      'Einige Uploads sind fehlgeschlagen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
+  AppLocale.rommSavesHelp:
+      'RomM-Spielstände ansehen. Uploads wiederholen prüft lokale, mit RomM verknüpfte Spiele mit aktivierter Synchronisierung. Neuere Spielstände werden beim Spielstart heruntergeladen.',
   AppLocale.raEvents: 'Events',
   AppLocale.raAotwYearTitle: 'Achievement der Woche ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -252,9 +259,9 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.bartopShutdownSubtitle:
       'Schaltet den Computer beim Schließen der App aus',
 
-  AppLocale.showSyncTab: 'NeoSync-Tab anzeigen',
+  AppLocale.showSyncTab: 'Spielstände-Tab anzeigen',
   AppLocale.showSyncTabSubtitle:
-      'Zeigt den NeoSync-Tab in der Navigationsleiste an',
+      'Den Spielstände-Tab in der Navigationsleiste anzeigen',
   AppLocale.showAchievementsTab: 'Erfolge-Tab anzeigen',
   AppLocale.showAchievementsTabSubtitle:
       'Zeigt den RetroAchievements-Tab in der Navigationsleiste an',

@@ -48,6 +48,7 @@ class _FakeRommService extends RommService {
 
   /// rom ids whose asset listing was fetched — the sweep's network footprint.
   final List<int> listCalls = [];
+  final Set<int> failingListings = {};
 
   int _nextAssetId = 1;
   int _stampSeq = 0;
@@ -83,6 +84,9 @@ class _FakeRommService extends RommService {
   @override
   Future<List<RommAsset>> listSaves({required int romId}) async {
     listCalls.add(romId);
+    if (failingListings.contains(romId)) {
+      throw RommException('Listing unavailable', statusCode: 500);
+    }
     return List.of(savesByRom[romId] ?? const []);
   }
 
@@ -443,6 +447,20 @@ void main() {
   });
 
   group('sweep lifecycle', () {
+    test(
+      'partial failures reach the caller while other games still upload',
+      () async {
+        await linked('Unavailable', romId: 60);
+        await linked('Available', romId: 61);
+        svc.failingListings.add(60);
+
+        final result = await provider.fullSync();
+
+        expect(result.success, isFalse);
+        expect(svc.creates, contains('61/Available.srm'));
+      },
+    );
+
     test('a disconnected provider reports authRequired, not silence', () async {
       await linked('Zelda', romId: 1);
       browse.connected = false;

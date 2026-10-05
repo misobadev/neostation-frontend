@@ -18,6 +18,11 @@ part 'app_locale_ja.dart';
 part 'app_locale_ko.dart';
 
 mixin AppLocale {
+  static const String rommRetryUploads = 'rommRetryUploads';
+  static const String rommUploadsChecked = 'rommUploadsChecked';
+  static const String rommUploadsFailed = 'rommUploadsFailed';
+  static const String rommSavesHelp = 'rommSavesHelp';
+
   // ---------------------------------------------------------------------------
   // Navigation / Controls
   // ---------------------------------------------------------------------------

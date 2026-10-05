@@ -1,6 +1,13 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleRu = {
+  AppLocale.rommRetryUploads: 'Повторить отправку',
+  AppLocale.rommUploadsChecked:
+      'Проверка отправки завершена. Скачивание выполняется при запуске связанной игры.',
+  AppLocale.rommUploadsFailed:
+      'Некоторые файлы не отправлены. Проверьте подключение и разрешения RomM, затем повторите попытку.',
+  AppLocale.rommSavesHelp:
+      'Просматривайте сохранения и состояния RomM. Повторная отправка проверяет локальные игры, связанные с RomM, с включённой синхронизацией. Новые удалённые сохранения скачиваются при запуске игры.',
   AppLocale.raEvents: 'События',
   AppLocale.raAotwYearTitle: 'Достижение недели ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -252,9 +259,9 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.bartopShutdownSubtitle:
       'Выключать компьютер при выходе из приложения',
 
-  AppLocale.showSyncTab: 'Показывать вкладку NeoSync',
+  AppLocale.showSyncTab: 'Показывать вкладку сохранений',
   AppLocale.showSyncTabSubtitle:
-      'Отображает вкладку NeoSync на панели навигации',
+      'Отображать вкладку сохранений на панели навигации',
   AppLocale.showAchievementsTab: 'Показывать вкладку достижений',
   AppLocale.showAchievementsTabSubtitle:
       'Отображает вкладку RetroAchievements на панели навигации',

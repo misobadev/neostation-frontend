@@ -1,6 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleJa = {
+  AppLocale.rommRetryUploads: 'アップロードを再試行',
+  AppLocale.rommUploadsChecked: 'アップロードの確認が完了しました。ダウンロードはリンク済みゲームの起動時に行われます。',
+  AppLocale.rommUploadsFailed: '一部のアップロードに失敗しました。接続とRomMの権限を確認して再試行してください。',
+  AppLocale.rommSavesHelp:
+      'RomMのセーブとステートを表示します。アップロードの再試行では、RomMにリンクされ同期が有効なローカルゲームを確認します。新しいリモートセーブはゲーム起動時にダウンロードされます。',
   AppLocale.raEvents: 'イベント',
   AppLocale.raAotwYearTitle: '今週のアチーブメント（{year}）',
   AppLocale.raAotw: 'AOTW',
@@ -217,8 +222,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.bartopShutdown: '終了時にBarTOPをシャットダウン',
   AppLocale.bartopShutdownSubtitle: 'アプリ終了時にコンピュータをシャットダウン',
 
-  AppLocale.showSyncTab: 'NeoSyncタブを表示',
-  AppLocale.showSyncTabSubtitle: 'ナビゲーションバーにNeoSyncタブを表示します',
+  AppLocale.showSyncTab: 'セーブタブを表示',
+  AppLocale.showSyncTabSubtitle: 'ナビゲーションバーにセーブタブを表示します',
   AppLocale.showAchievementsTab: '実績タブを表示',
   AppLocale.showAchievementsTabSubtitle: 'ナビゲーションバーにRetroAchievementsタブを表示します',
   AppLocale.showRommTab: 'RomM タブを表示',

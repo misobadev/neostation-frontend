@@ -1,6 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleKo = {
+  AppLocale.rommRetryUploads: '업로드 재시도',
+  AppLocale.rommUploadsChecked: '업로드 확인이 완료되었습니다. 연결된 게임을 시작하면 다운로드됩니다.',
+  AppLocale.rommUploadsFailed: '일부 업로드에 실패했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',
+  AppLocale.rommSavesHelp:
+      'RomM 저장 파일과 상태를 확인합니다. 업로드 재시도는 동기화가 활성화된 RomM 연결 로컬 게임을 확인합니다. 최신 원격 저장 파일은 게임 시작 시 다운로드됩니다.',
   AppLocale.raEvents: '이벤트',
   AppLocale.raAotwYearTitle: '이번 주 업적 ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -216,8 +221,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.bartopShutdown: '종료할 때 BarTOP 전원 끄기',
   AppLocale.bartopShutdownSubtitle: '앱을 종료할 때 컴퓨터도 함께 종료합니다',
 
-  AppLocale.showSyncTab: 'NeoSync 탭 표시',
-  AppLocale.showSyncTabSubtitle: '내비게이션 바에 NeoSync 탭을 표시합니다',
+  AppLocale.showSyncTab: '저장 탭 표시',
+  AppLocale.showSyncTabSubtitle: '탐색 모음에 저장 탭 표시',
   AppLocale.showAchievementsTab: '업적 탭 표시',
   AppLocale.showAchievementsTabSubtitle: '내비게이션 바에 RetroAchievements 탭을 표시합니다',
   AppLocale.showRommTab: 'RomM 탭 표시',
