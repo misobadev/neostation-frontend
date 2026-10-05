@@ -1,6 +1,12 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleEs = {
+  AppLocale.rommSavesSubtitle: 'Tus partidas y estados, organizados por juego.',
+  AppLocale.rommSavesAutoDownload:
+      'Las partidas más recientes de la nube se descargan al iniciar un juego vinculado.',
+  AppLocale.rommSavesRecent: 'Actividad más reciente',
+  AppLocale.rommSaveFile: 'Partida guardada',
+  AppLocale.rommSaveState: 'Estado guardado',
   AppLocale.rommRetryUploads: 'Reintentar subidas',
   AppLocale.rommUploadsChecked:
       'Comprobación de subidas finalizada. Las descargas se realizan al iniciar un juego vinculado.',

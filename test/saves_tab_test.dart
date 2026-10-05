@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/main.dart' show NoFocusTraversalPolicy;
+import 'package:neostation/models/romm_rom.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/screens/neo_sync_screen/login_screen/neo_sync_content.dart';
@@ -73,17 +74,38 @@ void main() {
     connection.dispose();
   });
 
-  Future<void> pumpTab(WidgetTester tester) async {
-    await tester.binding.setSurfaceSize(const Size(1280, 720));
+  Future<void> pumpTab(
+    WidgetTester tester, {
+    Size size = const Size(1280, 720),
+    double textScale = 1,
+  }) async {
+    await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ScreenUtilInit(
-        designSize: const Size(1280, 720),
+        designSize: const Size(640, 480),
+        minTextAdapt: true,
         builder: (context, child) => MaterialApp(
           localizationsDelegates:
               FlutterLocalization.instance.localizationsDelegates,
           supportedLocales: FlutterLocalization.instance.supportedLocales,
-          theme: ThemeData(extensions: [CornerRadii.m()]),
+          theme: ThemeData(
+            extensions: [CornerRadii.m()],
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xff6258ff),
+              brightness: Brightness.dark,
+            ),
+          ),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(textScale)),
+            child: child!,
+          ),
           home: MultiProvider(
             providers: [
               ChangeNotifierProvider<SyncManager>.value(value: manager),
@@ -97,10 +119,13 @@ void main() {
                 create: (_) => _Notifications(),
               ),
             ],
-            child: Scaffold(
-              body: FocusTraversalGroup(
-                policy: NoFocusTraversalPolicy(),
-                child: const SavesTab(),
+            child: RepaintBoundary(
+              key: const ValueKey('saves-preview'),
+              child: Scaffold(
+                body: FocusTraversalGroup(
+                  policy: NoFocusTraversalPolicy(),
+                  child: const SavesTab(),
+                ),
               ),
             ),
           ),
@@ -145,11 +170,11 @@ void main() {
   testWidgets('filter, refresh, and upload retry are usable', (tester) async {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
-    await tester.tap(find.widgetWithText(OutlinedButton, 'All'));
+    await tester.tap(find.byKey(const ValueKey('save-filter-1')));
     await tester.pumpAndSettle();
     expect(find.text('Game.srm'), findsOneWidget);
     expect(find.text('Game.state'), findsNothing);
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Saves'));
+    await tester.tap(find.byKey(const ValueKey('save-filter-2')));
     await tester.pumpAndSettle();
     expect(find.text('Game.srm'), findsNothing);
     expect(find.text('Game.state'), findsOneWidget);
@@ -182,5 +207,108 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await settle();
     expect(romm.calls, 1);
+  });
+
+  for (final size in [
+    const Size(640, 480),
+    const Size(960, 540),
+    const Size(1567, 881),
+  ]) {
+    testWidgets('game library fits $size with long filenames and large text', (
+      tester,
+    ) async {
+      await manager.setActive('romm', persist: (_) async {});
+      connection.inventory.loadRom = (id) async => RommRom.fromJson({
+        'id': id,
+        'name': id == 1 ? 'Super Mario Advance' : 'Crash Bandicoot',
+        'platform_slug': id == 1 ? 'gba' : 'psx',
+      });
+      connection.inventory.load = () async => [
+        inventoryAsset(
+          'Super Mario Advance (USA, Europe).state.auto',
+          state: true,
+          time: 200,
+        ),
+        inventoryAsset(
+          'Super Mario Advance (USA, Europe) [2026-10-02_17-55-08].srm',
+          time: 150,
+        ),
+        inventoryAsset(
+          'Crash Bandicoot (USA).state.auto',
+          state: true,
+          romId: 2,
+          id: 2,
+          time: 100,
+        ),
+      ];
+      await pumpTab(tester, size: size, textScale: 1.5);
+      expect(tester.takeException(), isNull);
+      expect(find.text('Super Mario Advance'), findsWidgets);
+      final secondGame = find.byKey(const ValueKey('save-game-rom:2'));
+      await tester.scrollUntilVisible(
+        secondGame,
+        80,
+        scrollable: find.descendant(
+          of: find.byType(ListView).first,
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(secondGame);
+      await tester.pumpAndSettle();
+      expect(find.text('Crash Bandicoot (USA).state.auto'), findsOneWidget);
+      expect(
+        find.text('Super Mario Advance (USA, Europe).state.auto'),
+        findsNothing,
+      );
+      expect(connection.inventory.detailCalls, unorderedEquals([1, 2]));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'controller moves between games and scrolls every save into view',
+    (tester) async {
+      await manager.setActive('romm', persist: (_) async {});
+      connection.inventory.load = () async => [
+        for (var i = 0; i < 12; i++)
+          inventoryAsset('Game-$i.srm', id: i, time: 100 - i),
+        inventoryAsset('Other.srm', romId: 2, id: 20),
+      ];
+      await pumpTab(tester);
+      Future<void> key(LogicalKeyboardKey key) async {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 180)),
+        );
+        await tester.sendKeyEvent(key);
+        await tester.pumpAndSettle();
+      }
+
+      await key(LogicalKeyboardKey.arrowDown); // filters
+      await key(LogicalKeyboardKey.arrowDown); // games
+      await key(LogicalKeyboardKey.arrowRight); // files
+      for (var i = 0; i < 11; i++) {
+        await key(LogicalKeyboardKey.arrowDown);
+      }
+      expect(find.text('Game-11.srm').hitTestable(), findsOneWidget);
+      await key(LogicalKeyboardKey.backspace); // back to game selection
+      await key(LogicalKeyboardKey.arrowDown);
+      expect(find.text('Other.srm'), findsOneWidget);
+      expect(romm.calls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('failed refresh keeps the selected game and files visible', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    connection.inventory.load = () async => throw StateError('offline');
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Refresh'));
+    await tester.pumpAndSettle();
+    expect(find.text('Game.srm'), findsOneWidget);
+    expect(find.text('Game.state'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

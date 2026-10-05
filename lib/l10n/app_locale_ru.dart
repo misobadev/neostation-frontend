@@ -1,6 +1,13 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleRu = {
+  AppLocale.rommSavesSubtitle:
+      'Сохранения и состояния, сгруппированные по играм.',
+  AppLocale.rommSavesAutoDownload:
+      'Более новые облачные сохранения загружаются при запуске связанной игры.',
+  AppLocale.rommSavesRecent: 'Сначала недавние',
+  AppLocale.rommSaveFile: 'Файл сохранения',
+  AppLocale.rommSaveState: 'Состояние игры',
   AppLocale.rommRetryUploads: 'Повторить отправку',
   AppLocale.rommUploadsChecked:
       'Проверка отправки завершена. Скачивание выполняется при запуске связанной игры.',

@@ -1,4 +1,5 @@
 import 'package:neostation/models/romm_asset.dart';
+import 'package:neostation/models/romm_rom.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/i_sync_provider.dart';
@@ -6,6 +7,15 @@ import 'package:neostation/sync/i_sync_provider.dart';
 class InventoryService extends RommService {
   Future<List<RommAsset>> Function() load = () async => [];
   int calls = 0;
+  final List<int> detailCalls = [];
+  Future<RommRom> Function(int) loadRom = (id) async =>
+      RommRom.fromJson({'id': id, 'name': 'Game', 'platform_slug': 'gba'});
+
+  @override
+  Future<RommRom> getRom(int id) {
+    detailCalls.add(id);
+    return loadRom(id);
+  }
 
   @override
   Future<List<RommAsset>> listSaveAssets() {
@@ -44,11 +54,17 @@ class InventorySync implements ISyncProvider {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-RommAsset inventoryAsset(String name, {bool state = false, int time = 0}) =>
-    RommAsset(
-      id: 1,
-      fileName: name,
-      fileSizeBytes: 1024,
-      isState: state,
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(time),
-    );
+RommAsset inventoryAsset(
+  String name, {
+  bool state = false,
+  int time = 0,
+  int id = 1,
+  int? romId = 1,
+}) => RommAsset(
+  id: id,
+  romId: romId,
+  fileName: name,
+  fileSizeBytes: 1024,
+  isState: state,
+  updatedAt: DateTime.fromMillisecondsSinceEpoch(time),
+);

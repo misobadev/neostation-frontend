@@ -1,6 +1,11 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleKo = {
+  AppLocale.rommSavesSubtitle: '게임별로 정리된 세이브 파일과 상태입니다.',
+  AppLocale.rommSavesAutoDownload: '연결된 게임을 실행하면 최신 클라우드 저장 데이터를 다운로드합니다.',
+  AppLocale.rommSavesRecent: '최근 활동순',
+  AppLocale.rommSaveFile: '세이브 파일',
+  AppLocale.rommSaveState: '세이브 상태',
   AppLocale.rommRetryUploads: '업로드 재시도',
   AppLocale.rommUploadsChecked: '업로드 확인이 완료되었습니다. 연결된 게임을 시작하면 다운로드됩니다.',
   AppLocale.rommUploadsFailed: '일부 업로드에 실패했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',

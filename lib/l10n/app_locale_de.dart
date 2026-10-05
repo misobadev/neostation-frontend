@@ -1,6 +1,13 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleDe = {
+  AppLocale.rommSavesSubtitle:
+      'Deine Spielstände und Speicherstände, nach Spiel geordnet.',
+  AppLocale.rommSavesAutoDownload:
+      'Neuere Cloud-Spielstände werden beim Start eines verknüpften Spiels heruntergeladen.',
+  AppLocale.rommSavesRecent: 'Neueste Aktivität zuerst',
+  AppLocale.rommSaveFile: 'Spielstand',
+  AppLocale.rommSaveState: 'Speicherstand',
   AppLocale.rommRetryUploads: 'Uploads wiederholen',
   AppLocale.rommUploadsChecked:
       'Upload-Prüfung abgeschlossen. Downloads starten beim Start eines verknüpften Spiels.',

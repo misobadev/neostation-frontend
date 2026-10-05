@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -5,15 +7,21 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/app_locale.dart';
 import '../../models/romm_asset.dart';
+import '../../models/romm_save_game.dart';
+import '../../providers/file_provider.dart';
 import '../../providers/romm_provider.dart';
 import '../../providers/romm_saves_provider.dart';
 import '../../services/game_service.dart' show GamepadNavigationManager;
 import '../../sync/sync_manager.dart';
 import '../../themes/corner_radii.dart';
 import '../../utils/gamepad_nav.dart';
+import '../../widgets/romm_sync_banner.dart' show rommFormatBytes;
 import '../app_screen.dart';
+import 'romm_save_artwork.dart';
 
-/// RomM's inventory and manual upload retry, using the existing sync policy.
+enum _FocusArea { actions, filters, games, files }
+
+/// A game-first view of RomM's inventory. Browsing is always read-only.
 class RommSavesContent extends StatefulWidget {
   const RommSavesContent({super.key});
 
@@ -24,18 +32,36 @@ class RommSavesContent extends StatefulWidget {
 class _RommSavesContentState extends State<RommSavesContent> {
   late final RommSavesProvider _saves;
   late final GamepadNavigation _navigation;
-  final ScrollController _scroll = ScrollController();
-  int _selected = 0;
-  // All, saves, states. The first three navigation slots are the toolbar.
+  final _gamesScroll = ScrollController();
+  final _filesScroll = ScrollController();
+  _FocusArea _focus = _FocusArea.actions;
+  int _actionIndex = 0;
   int _filter = 0;
-  static const _toolbarCount = 3;
-  static const _rowHeight = 76.0;
+  int _filterFocus = 0;
+  int _gameIndex = 0;
+  int _fileIndex = 0;
+  String? _gameKey;
 
-  List<RommAsset> get _visible => _saves.assets.where((asset) {
-    return _filter == 0 || asset.isState == (_filter == 2);
-  }).toList();
-
+  List<RommSaveGame> get _games => RommSaveGame.group(
+    _saves.assets
+        .where((asset) => _filter == 0 || asset.isState == (_filter == 2))
+        .toList(),
+  );
   bool get _busy => _saves.loading || _saves.syncing;
+
+  // Accommodate both ScreenUtil and accessibility text scaling.
+  double get _gameExtent => math.max(
+    88.r,
+    MediaQuery.textScalerOf(context).scale(11.sp) * 2.6 +
+        MediaQuery.textScalerOf(context).scale(9.sp) * 2.6 +
+        32.r,
+  );
+  double get _fileExtent => math.max(
+    70.r,
+    MediaQuery.textScalerOf(context).scale(11.sp) * 1.3 +
+        MediaQuery.textScalerOf(context).scale(9.sp) * 2.6 +
+        30.r,
+  );
 
   @override
   void initState() {
@@ -43,16 +69,17 @@ class _RommSavesContentState extends State<RommSavesContent> {
     _saves = RommSavesProvider(
       context.read<RommProvider>(),
       context.read<SyncManager>(),
+      fileProvider: context.read<FileProvider?>(),
     );
     _navigation = GamepadNavigation(
-      onNavigateUp: () => _move(-1),
-      onNavigateDown: () => _move(1),
-      onNavigateLeft: () => _move(-1),
-      onNavigateRight: () => _move(1),
+      onNavigateUp: () => _vertical(-1),
+      onNavigateDown: () => _vertical(1),
+      onNavigateLeft: () => _horizontal(-1),
+      onNavigateRight: () => _horizontal(1),
       onSelectItem: _activate,
       onXButton: _refresh,
       onFavorite: _retryUploads,
-      onBack: () => AppNavigation.goToTab(AppTabs.systems),
+      onBack: _back,
       onPreviousTab: AppNavigation.previousTab,
       onNextTab: AppNavigation.nextTab,
       onLeftBumper: AppNavigation.previousTab,
@@ -75,33 +102,92 @@ class _RommSavesContentState extends State<RommSavesContent> {
     GamepadNavigationManager.popLayer('romm_saves');
     _navigation.dispose();
     _saves.dispose();
-    _scroll.dispose();
+    _gamesScroll.dispose();
+    _filesScroll.dispose();
     super.dispose();
   }
 
-  void _move(int delta) {
-    final count = _toolbarCount + _visible.length;
-    setState(() => _selected = (_selected + delta).clamp(0, count - 1));
-    if (_selected >= _toolbarCount && _scroll.hasClients) {
-      final top = (_selected - _toolbarCount) * _rowHeight.r;
-      final bottom = top + _rowHeight.r;
-      final offset = top < _scroll.offset
-          ? top
-          : bottom > _scroll.offset + _scroll.position.viewportDimension
-          ? bottom - _scroll.position.viewportDimension
-          : _scroll.offset;
-      _scroll.jumpTo(offset.clamp(0, _scroll.position.maxScrollExtent));
+  void _back() {
+    if (_focus == _FocusArea.files) {
+      setState(() => _focus = _FocusArea.games);
+    } else {
+      AppNavigation.goToTab(AppTabs.systems);
     }
   }
 
+  void _vertical(int delta) {
+    final games = _games;
+    setState(() {
+      switch (_focus) {
+        case _FocusArea.actions:
+          if (delta > 0) _focus = _FocusArea.filters;
+        case _FocusArea.filters:
+          if (delta < 0) {
+            _focus = _FocusArea.actions;
+          } else if (games.isNotEmpty) {
+            _focus = _FocusArea.games;
+          }
+        case _FocusArea.games:
+          if (_gameIndex == 0 && delta < 0) {
+            _focus = _FocusArea.filters;
+          } else if (games.isNotEmpty) {
+            _selectGame((_gameIndex + delta).clamp(0, games.length - 1), games);
+          }
+        case _FocusArea.files:
+          if (_fileIndex == 0 && delta < 0) {
+            _focus = _FocusArea.filters;
+          } else if (games.isNotEmpty) {
+            _fileIndex = (_fileIndex + delta).clamp(
+              0,
+              games[_gameIndex].assets.length - 1,
+            );
+          }
+      }
+    });
+    _revealSelection();
+  }
+
+  void _horizontal(int delta) {
+    setState(() {
+      switch (_focus) {
+        case _FocusArea.actions:
+          _actionIndex = (_actionIndex + delta).clamp(0, 1);
+        case _FocusArea.filters:
+          _filterFocus = (_filterFocus + delta).clamp(0, 2);
+        case _FocusArea.games:
+          if (delta > 0 && _games.isNotEmpty) _focus = _FocusArea.files;
+        case _FocusArea.files:
+          if (delta < 0) _focus = _FocusArea.games;
+      }
+    });
+    _revealSelection();
+  }
+
+  void _revealSelection() {
+    final controller = _focus == _FocusArea.files ? _filesScroll : _gamesScroll;
+    final index = _focus == _FocusArea.files ? _fileIndex : _gameIndex;
+    final extent = _focus == _FocusArea.files ? _fileExtent : _gameExtent;
+    if (!controller.hasClients) return;
+    final top = index * extent;
+    final bottom = top + extent;
+    final offset = top < controller.offset
+        ? top
+        : bottom > controller.offset + controller.position.viewportDimension
+        ? bottom - controller.position.viewportDimension
+        : controller.offset;
+    controller.jumpTo(offset.clamp(0, controller.position.maxScrollExtent));
+  }
+
   void _activate() {
-    switch (_selected) {
-      case 0:
-        _refresh();
-      case 1:
-        _retryUploads();
-      case 2:
-        _cycleFilter();
+    switch (_focus) {
+      case _FocusArea.actions:
+        _actionIndex == 0 ? _refresh() : _retryUploads();
+      case _FocusArea.filters:
+        _setFilter(_filterFocus);
+      case _FocusArea.games:
+        if (_games.isNotEmpty) setState(() => _focus = _FocusArea.files);
+      case _FocusArea.files:
+        break;
     }
   }
 
@@ -113,12 +199,26 @@ class _RommSavesContentState extends State<RommSavesContent> {
     if (!_busy) _saves.retryUploads();
   }
 
-  void _cycleFilter() {
+  void _setFilter(int index) {
     setState(() {
-      _filter = (_filter + 1) % 3;
-      _selected = 2;
+      _filter = _filterFocus = index;
+      _focus = _FocusArea.filters;
+      _fileIndex = 0;
     });
-    if (_scroll.hasClients) _scroll.jumpTo(0);
+    if (_gamesScroll.hasClients) _gamesScroll.jumpTo(0);
+    if (_filesScroll.hasClients) _filesScroll.jumpTo(0);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _revealSelection();
+    });
+  }
+
+  void _selectGame(int index, List<RommSaveGame> games) {
+    if (_gameKey != games[index].key) {
+      _fileIndex = 0;
+      if (_filesScroll.hasClients) _filesScroll.jumpTo(0);
+    }
+    _gameIndex = index;
+    _gameKey = games[index].key;
   }
 
   @override
@@ -126,189 +226,661 @@ class _RommSavesContentState extends State<RommSavesContent> {
     listenable: _saves,
     builder: (context, _) {
       final scheme = Theme.of(context).colorScheme;
-      final files = _visible;
-      _selected = _selected.clamp(0, _toolbarCount + files.length - 1);
-      final filterLabel = [
-        AppLocale.filterAll,
-        AppLocale.statSaves,
-        AppLocale.statStates,
-      ][_filter].getString(context);
-      return Padding(
-        padding: EdgeInsets.all(24.r),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              AppLocale.rommSaveSyncActive.getString(context),
-              style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8.r),
-            Text(
-              AppLocale.rommSavesHelp.getString(context),
-              style: TextStyle(fontSize: 14.sp, color: scheme.onSurfaceVariant),
-            ),
-            SizedBox(height: 16.r),
-            Wrap(
-              spacing: 12.r,
-              runSpacing: 8.r,
-              children: [
-                _action(
-                  0,
-                  Icons.refresh,
-                  AppLocale.refresh.getString(context),
-                  _refresh,
-                  enabled: !_busy,
-                ),
-                _action(
-                  1,
-                  Icons.cloud_upload_outlined,
-                  (_saves.syncing
-                          ? AppLocale.syncing
-                          : AppLocale.rommRetryUploads)
-                      .getString(context),
-                  _retryUploads,
-                  enabled: !_busy,
-                ),
-                _action(2, Icons.filter_list, filterLabel, _cycleFilter),
-              ],
-            ),
-            SizedBox(height: 12.r),
-            if (_saves.syncResult case final result?)
-              Padding(
-                padding: EdgeInsets.only(bottom: 8.r),
-                child: Text(
-                  (result.success
-                          ? AppLocale.rommUploadsChecked
-                          : AppLocale.rommUploadsFailed)
-                      .getString(context),
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    color: result.success ? scheme.onSurface : scheme.error,
-                  ),
+      final games = _games;
+      if (games.isNotEmpty) {
+        final previousKey = _gameKey;
+        final previousIndex = _gameIndex;
+        final preserved = games.indexWhere((game) => game.key == _gameKey);
+        _gameIndex = preserved >= 0 ? preserved : 0;
+        _gameKey = games[_gameIndex].key;
+        if (previousKey != _gameKey) _fileIndex = 0;
+        _fileIndex = _fileIndex.clamp(0, games[_gameIndex].assets.length - 1);
+        if (previousIndex != _gameIndex || previousKey != _gameKey) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _revealSelection();
+          });
+        }
+      } else if (_focus == _FocusArea.games || _focus == _FocusArea.files) {
+        _focus = _FocusArea.filters;
+      }
+      return SafeArea(
+        child: Padding(
+          // The app header overlays tab content and occupies 46 design pixels.
+          padding: EdgeInsets.fromLTRB(18.r, 54.r, 18.r, 12.r),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 16.r,
+                  runSpacing: 8.r,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          AppLocale.statSaves.getString(context),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 22.sp,
+                            height: 1.2,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                        SizedBox(width: 10.r),
+                        _badge(
+                          Icons.cloud_outlined,
+                          AppLocale.romm.getString(context),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _action(
+                          0,
+                          Icons.refresh_rounded,
+                          AppLocale.refresh,
+                          _refresh,
+                        ),
+                        SizedBox(width: 6.r),
+                        _action(
+                          1,
+                          Icons.cloud_upload_outlined,
+                          _saves.syncing
+                              ? AppLocale.syncing
+                              : AppLocale.rommRetryUploads,
+                          _retryUploads,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            Expanded(
-              child: _saves.loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _saves.loadError != null
-                  ? Center(
-                      child: Text(
-                        AppLocale.failedToRefreshCloud.getString(context),
-                        style: TextStyle(fontSize: 16.sp, color: scheme.error),
+              SizedBox(height: 6.r),
+              Text(
+                AppLocale.rommSavesSubtitle.getString(context),
+                style: TextStyle(
+                  fontSize: 10.sp,
+                  height: 1.35,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              SizedBox(height: 12.r),
+              _filters(),
+              SizedBox(height: 10.r),
+              if (_saves.loading || _saves.syncing)
+                LinearProgressIndicator(minHeight: 2.r),
+              if (_saves.loadError != null)
+                _notice(AppLocale.failedToRefreshCloud, true)
+              else if (_saves.syncResult case final result?)
+                _notice(
+                  result.success
+                      ? AppLocale.rommUploadsChecked
+                      : AppLocale.rommUploadsFailed,
+                  !result.success,
+                ),
+              Expanded(
+                child: games.isEmpty
+                    ? _empty()
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(flex: 2, child: _gameList(games)),
+                          SizedBox(width: 12.r),
+                          Expanded(flex: 3, child: _details(games[_gameIndex])),
+                        ],
                       ),
-                    )
-                  : files.isEmpty
-                  ? Center(
-                      child: Text(
-                        AppLocale.noOnlineSavesFound.getString(context),
-                        style: TextStyle(fontSize: 16.sp),
+              ),
+              SizedBox(height: 8.r),
+              Row(
+                children: [
+                  Icon(
+                    Icons.cloud_download_outlined,
+                    size: 12.r,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  SizedBox(width: 5.r),
+                  Expanded(
+                    child: Text(
+                      AppLocale.rommSavesAutoDownload.getString(context),
+                      style: TextStyle(
+                        fontSize: 9.sp,
+                        height: 1.3,
+                        color: scheme.onSurfaceVariant,
                       ),
-                    )
-                  : ListView.builder(
-                      controller: _scroll,
-                      itemExtent: _rowHeight.r,
-                      itemCount: files.length,
-                      itemBuilder: (context, index) =>
-                          _fileRow(files[index], index),
                     ),
-            ),
-          ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       );
     },
   );
 
-  Widget _action(
-    int index,
-    IconData icon,
-    String label,
-    VoidCallback action, {
-    bool enabled = true,
-  }) {
+  Widget _action(int index, IconData icon, String label, VoidCallback action) {
     final scheme = Theme.of(context).colorScheme;
-    return OutlinedButton.icon(
-      onPressed: enabled
-          ? () {
-              setState(() => _selected = index);
-              action();
-            }
-          : null,
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(
-          color: _selected == index ? scheme.primary : scheme.outline,
-          width: _selected == index ? 2.r : 1.r,
-        ),
-        backgroundColor: _selected == index ? scheme.primaryContainer : null,
-        padding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 12.r),
-        textStyle: TextStyle(fontSize: 14.sp),
+    final focused = _focus == _FocusArea.actions && _actionIndex == index;
+    return Tooltip(
+      message: (index == 1 ? AppLocale.rommSavesHelp : label).getString(
+        context,
       ),
-      icon: Icon(icon, size: 20.r),
-      label: Text(label),
+      child: OutlinedButton.icon(
+        onPressed: _busy
+            ? null
+            : () {
+                setState(() {
+                  _focus = _FocusArea.actions;
+                  _actionIndex = index;
+                });
+                action();
+              },
+        style: OutlinedButton.styleFrom(
+          foregroundColor: focused ? scheme.onPrimary : scheme.onSurface,
+          backgroundColor: focused ? scheme.primary : scheme.surfaceContainer,
+          disabledForegroundColor: scheme.onSurfaceVariant,
+          side: BorderSide(
+            color: focused ? scheme.primary : scheme.outlineVariant,
+          ),
+          minimumSize: Size(0, 30.r),
+          padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 7.r),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+            fontSize: 10.sp,
+            height: 1.2,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        icon: Icon(icon, size: 14.r),
+        label: Text(label.getString(context)),
+      ),
+    );
+  }
+
+  Widget _filters() {
+    final scheme = Theme.of(context).colorScheme;
+    final assets = _saves.assets;
+    final counts = [
+      assets.length,
+      assets.where((a) => !a.isState).length,
+      assets.where((a) => a.isState).length,
+    ];
+    final labels = [
+      AppLocale.filterAll,
+      AppLocale.statSaves,
+      AppLocale.statStates,
+    ];
+    return Row(
+      children: [
+        for (var i = 0; i < 3; i++) ...[
+          if (i > 0) SizedBox(width: 6.r),
+          Semantics(
+            selected: _filter == i,
+            child: OutlinedButton(
+              key: ValueKey('save-filter-$i'),
+              onPressed: () => _setFilter(i),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _filter == i
+                    ? scheme.onPrimary
+                    : scheme.onSurfaceVariant,
+                backgroundColor: _filter == i
+                    ? scheme.primary
+                    : Colors.transparent,
+                side: BorderSide(
+                  color: _focus == _FocusArea.filters && _filterFocus == i
+                      ? scheme.primary
+                      : Colors.transparent,
+                  width: 2.r,
+                ),
+                minimumSize: Size(0, 28.r),
+                padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontSize: 10.sp,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              child: Text('${labels[i].getString(context)}  ${counts[i]}'),
+            ),
+          ),
+        ],
+        const Spacer(),
+        Flexible(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              AppLocale.rommSavesRecent.getString(context),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 9.sp, color: scheme.onSurfaceVariant),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _gameList(List<RommSaveGame> games) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: EdgeInsets.fromLTRB(4.r, 4.r, 4.r, 8.r),
+        child: Text(
+          AppLocale.gamesCount
+              .getString(context)
+              .replaceFirst('{count}', '${games.length}'),
+          style: TextStyle(
+            fontSize: 10.sp,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+      Expanded(
+        child: Scrollbar(
+          controller: _gamesScroll,
+          child: ListView.builder(
+            controller: _gamesScroll,
+            itemExtent: _gameExtent,
+            itemCount: games.length,
+            itemBuilder: (context, index) => _gameTile(games, index),
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _gameTile(List<RommSaveGame> games, int index) {
+    final game = games[index];
+    final scheme = Theme.of(context).colorScheme;
+    final selected = index == _gameIndex;
+    final focused = selected && _focus == _FocusArea.games;
+    return FutureBuilder<RommSaveGameInfo>(
+      key: ValueKey(game.key),
+      future: _saves.gameInfo(game.romId),
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        return Padding(
+          padding: EdgeInsets.only(bottom: 6.r, right: 4.r),
+          child: Semantics(
+            selected: selected,
+            child: Material(
+              color: selected
+                  ? scheme.primary.withValues(alpha: 0.14)
+                  : scheme.surfaceContainer,
+              shape: RoundedRectangleBorder(
+                borderRadius: CornerRadii.of(context).radiusInternal,
+                side: BorderSide(
+                  color: focused
+                      ? scheme.primary
+                      : selected
+                      ? scheme.primary.withValues(alpha: 0.35)
+                      : Colors.transparent,
+                  width: 2.r,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                key: ValueKey('save-game-${game.key}'),
+                onTap: () => setState(() {
+                  _focus = _FocusArea.games;
+                  _selectGame(index, games);
+                }),
+                child: Padding(
+                  padding: EdgeInsets.all(8.r),
+                  child: Row(
+                    children: [
+                      _art(game, info, 42.r, 60.r),
+                      SizedBox(width: 10.r),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              info?.rom?.name ?? game.fallbackTitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                height: 1.25,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                            if (info?.rom?.platformSlug.isNotEmpty == true) ...[
+                              SizedBox(height: 3.r),
+                              Text(
+                                info!.rom!.platformSlug.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 9.sp,
+                                  height: 1.2,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                            SizedBox(height: 5.r),
+                            Text(
+                              _counts(game),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 9.sp,
+                                height: 1.2,
+                                color: selected
+                                    ? scheme.primary
+                                    : scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _counts(RommSaveGame game) => [
+    if (game.saves > 0)
+      '${AppLocale.statSaves.getString(context)} ${game.saves}',
+    if (game.states > 0)
+      '${AppLocale.statStates.getString(context)} ${game.states}',
+  ].join(' · ');
+
+  Widget _art(
+    RommSaveGame game,
+    RommSaveGameInfo? info,
+    double width,
+    double height,
+  ) => RommSaveArtwork(
+    key: ValueKey('art-${game.key}'),
+    info: info,
+    service: context.read<RommProvider>().service,
+    width: width,
+    height: height,
+  );
+
+  Widget _details(RommSaveGame game) {
+    final scheme = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) => Container(
+        key: const ValueKey('save-details'),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainer.withValues(alpha: 0.65),
+          borderRadius: CornerRadii.of(context).radiusExternal,
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.6),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // The title is already in the game list. On short displays or with
+            // large text, devote this pane to the files instead of repeating it.
+            if (constraints.maxHeight >= 220.r)
+              FutureBuilder<RommSaveGameInfo>(
+                key: ValueKey(game.key),
+                future: _saves.gameInfo(game.romId),
+                builder: (context, snapshot) => Padding(
+                  padding: EdgeInsets.all(14.r),
+                  child: Row(
+                    children: [
+                      _art(game, snapshot.data, 48.r, 64.r),
+                      SizedBox(width: 12.r),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              snapshot.data?.rom?.name ?? game.fallbackTitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 16.sp,
+                                height: 1.2,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                            SizedBox(height: 6.r),
+                            Text(
+                              [
+                                if (snapshot
+                                        .data
+                                        ?.rom
+                                        ?.platformSlug
+                                        .isNotEmpty ==
+                                    true)
+                                  snapshot.data!.rom!.platformSlug
+                                      .toUpperCase(),
+                                _counts(game),
+                              ].join(' · '),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10.sp,
+                                height: 1.3,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (constraints.maxHeight >= 220.r)
+              Divider(
+                height: 1.r,
+                color: scheme.outlineVariant.withValues(alpha: 0.6),
+              ),
+            Expanded(
+              child: Scrollbar(
+                controller: _filesScroll,
+                child: ListView.builder(
+                  key: ValueKey('files-${game.key}-$_filter'),
+                  controller: _filesScroll,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 10.r,
+                    vertical: 6.r,
+                  ),
+                  itemExtent: _fileExtent,
+                  itemCount: game.assets.length,
+                  itemBuilder: (context, index) =>
+                      _fileRow(game.assets[index], index),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _fileRow(RommAsset file, int index) {
     final scheme = Theme.of(context).colorScheme;
-    final selected = _selected == index + _toolbarCount;
-    final date = file.updatedAt ?? file.createdAt;
+    final focused = _focus == _FocusArea.files && _fileIndex == index;
+    final date = (file.updatedAt ?? file.createdAt)?.toLocal();
     final localizations = MaterialLocalizations.of(context);
     final details = [
-      (file.isState ? AppLocale.statStates : AppLocale.statSaves).getString(
-        context,
-      ),
-      '${(file.fileSizeBytes / 1024).toStringAsFixed(1)} KB',
-      if (file.emulator?.isNotEmpty == true) file.emulator!,
-      if (file.slot != null) file.slot!,
       if (date != null)
-        '${localizations.formatShortDate(date.toLocal())} '
-            '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(date.toLocal()))}',
+        '${localizations.formatShortDate(date)}  ${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(date))}',
+      rommFormatBytes(file.fileSizeBytes),
+      if (file.emulator?.isNotEmpty == true) file.emulator!,
     ].join(' · ');
     return Padding(
-      padding: EdgeInsets.only(bottom: 8.r),
+      padding: EdgeInsets.only(bottom: 5.r),
       child: Material(
-        color: selected ? scheme.primaryContainer : scheme.surfaceContainer,
-        borderRadius: CornerRadii.of(context).radiusInternal,
-        child: InkWell(
+        color: focused
+            ? scheme.primary.withValues(alpha: 0.12)
+            : scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        shape: RoundedRectangleBorder(
           borderRadius: CornerRadii.of(context).radiusInternal,
-          onTap: () => setState(() => _selected = index + _toolbarCount),
+          side: BorderSide(
+            color: focused ? scheme.primary : Colors.transparent,
+            width: 2.r,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: ValueKey('save-file-${file.isState}-${file.id}'),
+          onTap: () => setState(() {
+            _focus = _FocusArea.files;
+            _fileIndex = index;
+          }),
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 8.r),
-            child: Row(
+            padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 8.r),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  file.isState
-                      ? Icons.pause_circle_outline
-                      : Icons.save_outlined,
-                  size: 24.r,
-                ),
-                SizedBox(width: 12.r),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        file.fileName,
+                Row(
+                  children: [
+                    Icon(
+                      file.isState
+                          ? Icons.pause_circle_outline_rounded
+                          : Icons.save_outlined,
+                      size: 12.r,
+                      color: file.isState ? scheme.tertiary : scheme.primary,
+                    ),
+                    SizedBox(width: 5.r),
+                    Expanded(
+                      child: Text(
+                        [
+                          (file.isState
+                                  ? AppLocale.rommSaveState
+                                  : AppLocale.rommSaveFile)
+                              .getString(context),
+                          if (file.slot?.isNotEmpty == true) file.slot!,
+                        ].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 9.sp,
+                          height: 1.2,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
-                      Text(
-                        details,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12.sp),
-                      ),
-                    ],
+                    ),
+                  ],
+                ),
+                SizedBox(height: 4.r),
+                Tooltip(
+                  message: file.fileName,
+                  child: Text(
+                    file.fileName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      height: 1.25,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 3.r),
+                Text(
+                  details,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9.sp,
+                    height: 1.25,
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _badge(IconData icon, String label) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20.r),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12.r, color: scheme.primary),
+          SizedBox(width: 5.r),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9.sp,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
+              color: scheme.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _notice(String message, bool error) => Padding(
+    padding: EdgeInsets.only(bottom: 8.r, top: 4.r),
+    child: Text(
+      message.getString(context),
+      style: TextStyle(
+        fontSize: 10.sp,
+        height: 1.3,
+        color: error
+            ? Theme.of(context).colorScheme.error
+            : Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
+
+  Widget _empty() {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _saves.loadError != null
+                ? Icons.cloud_off_outlined
+                : Icons.cloud_queue_rounded,
+            size: 36.r,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+          SizedBox(height: 12.r),
+          Text(
+            (_saves.loading
+                    ? AppLocale.loading
+                    : _saves.loadError != null
+                    ? AppLocale.failedToRefreshCloud
+                    : AppLocale.noOnlineSavesFound)
+                .getString(context),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.sp, color: scheme.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }

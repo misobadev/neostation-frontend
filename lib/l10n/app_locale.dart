@@ -18,6 +18,11 @@ part 'app_locale_ja.dart';
 part 'app_locale_ko.dart';
 
 mixin AppLocale {
+  static const String rommSavesSubtitle = 'rommSavesSubtitle';
+  static const String rommSavesAutoDownload = 'rommSavesAutoDownload';
+  static const String rommSavesRecent = 'rommSavesRecent';
+  static const String rommSaveFile = 'rommSaveFile';
+  static const String rommSaveState = 'rommSaveState';
   static const String rommRetryUploads = 'rommRetryUploads';
   static const String rommUploadsChecked = 'rommUploadsChecked';
   static const String rommUploadsFailed = 'rommUploadsFailed';
