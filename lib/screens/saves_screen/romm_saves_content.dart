@@ -12,6 +12,7 @@ import '../../providers/file_provider.dart';
 import '../../providers/romm_provider.dart';
 import '../../providers/romm_saves_provider.dart';
 import '../../services/game_service.dart' show GamepadNavigationManager;
+import '../../services/sfx_service.dart';
 import '../../sync/sync_manager.dart';
 import '../../themes/corner_radii.dart';
 import '../../utils/gamepad_nav.dart';
@@ -22,7 +23,7 @@ import '../../widgets/romm_sync_banner.dart' show rommFormatBytes;
 import '../app_screen.dart';
 import 'romm_save_artwork.dart';
 
-enum _FocusArea { actions, filters, games, files }
+enum _FocusArea { filters, games, files }
 
 /// A game-first view of RomM's inventory. Browsing is always read-only; the
 /// only change it can make is a confirmed delete of the focused file.
@@ -39,9 +40,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
   final _gamesScroll = ScrollController();
   final _filesScroll = ScrollController();
   _FocusArea _focus = _FocusArea.filters;
-  // The toolbar half (filters or actions) that Up returns to from the lists.
-  _FocusArea _lastToolbar = _FocusArea.filters;
-  int _actionIndex = 0;
   int _filter = 0;
   int _filterFocus = 0;
   int _gameIndex = 0;
@@ -134,25 +132,30 @@ class _RommSavesContentState extends State<RommSavesContent> {
     }
   }
 
-  void _vertical(int delta) {
+  (_FocusArea, int, int, int) get _cursor =>
+      (_focus, _filterFocus, _gameIndex, _fileIndex);
+
+  /// Returns whether the cursor moved. The navigator plays the move sound, and
+  /// keeps repeating a held direction, only while it does.
+  bool _vertical(int delta) {
     final games = _games;
+    final before = _cursor;
     setState(() {
       switch (_focus) {
-        case _FocusArea.actions || _FocusArea.filters:
+        case _FocusArea.filters:
           // Not into the panes while they are still hidden behind loading.
           if (delta > 0 && games.isNotEmpty && _ready) {
-            _lastToolbar = _focus;
             _focus = _FocusArea.games;
           }
         case _FocusArea.games:
           if (_gameIndex == 0 && delta < 0) {
-            _focus = _lastToolbar;
+            _focus = _FocusArea.filters;
           } else if (games.isNotEmpty) {
             _selectGame((_gameIndex + delta).clamp(0, games.length - 1), games);
           }
         case _FocusArea.files:
           if (_fileIndex == 0 && delta < 0) {
-            _focus = _lastToolbar;
+            _focus = _FocusArea.filters;
           } else if (games.isNotEmpty) {
             _fileIndex = (_fileIndex + delta).clamp(
               0,
@@ -162,26 +165,16 @@ class _RommSavesContentState extends State<RommSavesContent> {
       }
     });
     _revealSelection();
+    return _cursor != before;
   }
 
-  void _horizontal(int delta) {
+  /// Refresh and Retry uploads are left out: X and Y reach them directly.
+  bool _horizontal(int delta) {
+    final before = _cursor;
     setState(() {
-      // The toolbar is one row: All, Saves, States, Refresh, Retry uploads.
       switch (_focus) {
         case _FocusArea.filters:
-          if (delta > 0 && _filterFocus == 2) {
-            _focus = _FocusArea.actions;
-            _actionIndex = 0;
-          } else {
-            _filterFocus = (_filterFocus + delta).clamp(0, 2);
-          }
-        case _FocusArea.actions:
-          if (delta < 0 && _actionIndex == 0) {
-            _focus = _FocusArea.filters;
-            _filterFocus = 2;
-          } else {
-            _actionIndex = (_actionIndex + delta).clamp(0, 1);
-          }
+          _filterFocus = (_filterFocus + delta).clamp(0, 2);
         case _FocusArea.games:
           if (delta > 0 && _games.isNotEmpty) _focus = _FocusArea.files;
         case _FocusArea.files:
@@ -189,6 +182,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
       }
     });
     _revealSelection();
+    return _cursor != before;
   }
 
   void _revealSelection() {
@@ -215,8 +209,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
 
   void _activate() {
     switch (_focus) {
-      case _FocusArea.actions:
-        _actionIndex == 0 ? _refresh() : _retryUploads();
       case _FocusArea.filters:
         _setFilter(_filterFocus);
       case _FocusArea.games:
@@ -245,6 +237,13 @@ class _RommSavesContentState extends State<RommSavesContent> {
     }
   }
 
+  /// Taps sound like the controller presses they stand in for, which the
+  /// navigator voices itself.
+  VoidCallback _tap(VoidCallback action) => () {
+    SfxService().playNavSound();
+    action();
+  };
+
   void _notify(String message, {bool error = true}) =>
       AppNotification.showNotification(
         context,
@@ -265,6 +264,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
   Future<void> _deleteFocusedFile() async {
     final file = _focusedFile;
     if (file == null || _busy) return;
+    // The navigator voices no Select tap, so this covers it as well as clicks.
+    SfxService().playNavSound();
     final confirmed = await ConfirmActionDialog.show(
       context,
       title: AppLocale.rommDeleteTitle.getString(context),
@@ -331,7 +332,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: _saves,
     builder: (context, _) {
-      final scheme = Theme.of(context).colorScheme;
       final games = _games;
       if (games.isNotEmpty) {
         _firstPage ??= _loadFirstPage(games);
@@ -350,162 +350,149 @@ class _RommSavesContentState extends State<RommSavesContent> {
       } else if (_focus == _FocusArea.games || _focus == _FocusArea.files) {
         _focus = _FocusArea.filters;
       }
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          SafeArea(
-            child: Padding(
-              // The app header overlays tab content and occupies 46 design pixels.
-              padding: EdgeInsets.fromLTRB(18.r, 54.r, 18.r, 12.r),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Filters left, actions right. On a narrow screen the filters
-                  // wrap among themselves, so the actions stay on the first line.
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: _filters()),
-                      SizedBox(width: 16.r),
-                      _action(
-                        0,
-                        Icons.refresh_rounded,
-                        AppLocale.refresh,
-                        _refresh,
-                      ),
-                      SizedBox(width: 6.r),
-                      _action(
-                        1,
-                        Icons.cloud_upload_outlined,
-                        _saves.syncing
-                            ? AppLocale.syncing
-                            : AppLocale.rommRetryUploads,
-                        _retryUploads,
-                        tooltip: AppLocale.rommSavesHelp,
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12.r),
-                  Expanded(
-                    child: games.isEmpty || !_ready
-                        ? _empty(loading: _saves.loading || games.isNotEmpty)
-                        : Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(flex: 2, child: _gameList(games)),
-                              // The game list's own gutter makes up the rest of
-                              // the gap; see [_gameTile].
-                              SizedBox(width: 6.r),
-                              Expanded(
-                                flex: 3,
-                                child: _details(games[_gameIndex]),
-                              ),
-                            ],
-                          ),
-                  ),
-                  SizedBox(height: 8.r),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.cloud_download_outlined,
-                        size: 12.r,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      SizedBox(width: 5.r),
-                      Expanded(
-                        child: Text(
-                          AppLocale.rommSavesAutoDownload.getString(context),
-                          style: TextStyle(
-                            fontSize: 9.sp,
-                            height: 1.3,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 8.r),
-                      // Only offered while a file is focused, which is also when
-                      // Select means Delete. Its space is kept so the note beside
-                      // it doesn't reflow as the cursor moves between panes.
-                      Visibility.maintain(
-                        visible: _focus == _FocusArea.files,
-                        child: GamepadControl(
-                          key: const ValueKey('save-delete'),
-                          label: AppLocale.delete.getString(context),
-                          iconPath:
-                              'assets/images/gamepad/Xbox_View_button.png',
-                          onTap: _busy ? null : _deleteFocusedFile,
-                          textColor: scheme.onError,
-                          backgroundColor: scheme.error,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+      // The navigator owns the cursor. Otherwise an arrow key hands Flutter's
+      // focus to the first button it finds, which then shows a highlight of
+      // its own and is activated by Enter alongside the navigator's choice.
+      return ExcludeFocus(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            SafeArea(
+              child: Padding(
+                // The app header overlays tab content and occupies 46 design
+                // pixels.
+                padding: EdgeInsets.fromLTRB(18.r, 54.r, 18.r, 12.r),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _filters(),
+                    SizedBox(height: 12.r),
+                    Expanded(
+                      child: games.isEmpty || !_ready
+                          ? _empty(loading: _saves.loading || games.isNotEmpty)
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(flex: 2, child: _gameList(games)),
+                                // The game list's own gutter makes up the
+                                // rest of the gap; see [_gameTile].
+                                SizedBox(width: 6.r),
+                                Expanded(
+                                  flex: 3,
+                                  child: _details(games[_gameIndex]),
+                                ),
+                              ],
+                            ),
+                    ),
+                    SizedBox(height: 8.r),
+                    _footer(),
+                  ],
+                ),
               ),
             ),
-          ),
-          // Overlaid on the screen's bottom edge, outside the safe area, so
-          // starting or finishing a refresh never moves anything.
-          if (_busy)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: IgnorePointer(
-                child: LinearProgressIndicator(minHeight: 2.r),
+            // Overlaid on the screen's bottom edge, outside the safe area, so
+            // starting or finishing a refresh never moves anything.
+            if (_busy)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  child: LinearProgressIndicator(minHeight: 2.r),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       );
     },
   );
 
-  Widget _action(
-    int index,
-    IconData icon,
-    String label,
-    VoidCallback action, {
-    String? tooltip,
-  }) {
+  /// The auto-download note, then the controls. The note keeps a readable
+  /// width: with long labels or large text on a narrow screen, the controls
+  /// wrap onto a second line instead of crushing it.
+  Widget _footer() {
     final scheme = Theme.of(context).colorScheme;
-    final focused = _focus == _FocusArea.actions && _actionIndex == index;
-    return Tooltip(
-      message: (tooltip ?? label).getString(context),
-      child: OutlinedButton.icon(
-        key: ValueKey('save-action-$index'),
-        onPressed: _busy
-            ? null
-            : () {
-                setState(() {
-                  _focus = _FocusArea.actions;
-                  _actionIndex = index;
-                });
-                action();
-              },
-        style: _toolbarStyle(
-          foreground: focused ? scheme.onPrimary : scheme.onSurface,
-          background: focused ? scheme.primary : scheme.surfaceContainer,
-          side: BorderSide(
-            color: focused ? scheme.primary : scheme.outlineVariant,
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        children: [
+          Icon(
+            Icons.cloud_download_outlined,
+            size: 12.r,
+            color: scheme.onSurfaceVariant,
           ),
-        ),
-        icon: Icon(icon, size: 14.r),
-        label: Text(label.getString(context)),
+          SizedBox(width: 5.r),
+          Expanded(
+            child: Text(
+              AppLocale.rommSavesAutoDownload.getString(context),
+              style: TextStyle(
+                fontSize: 9.sp,
+                height: 1.3,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          SizedBox(width: 8.r),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: math.max(0.0, constraints.maxWidth - 150.r),
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8.r,
+              runSpacing: 6.r,
+              children: [
+                // Only offered while a file is focused, which is also when
+                // Select means Delete. Its space is kept so the rest of the
+                // row doesn't move as the cursor goes between panes.
+                Visibility.maintain(
+                  visible: _focus == _FocusArea.files,
+                  child: GamepadControl(
+                    key: const ValueKey('save-delete'),
+                    label: AppLocale.delete.getString(context),
+                    iconPath: 'assets/images/gamepad/Xbox_View_button.png',
+                    onTap: _busy ? null : _deleteFocusedFile,
+                    textColor: scheme.onError,
+                    backgroundColor: scheme.error,
+                  ),
+                ),
+                GamepadControl(
+                  key: const ValueKey('save-refresh'),
+                  label: AppLocale.refresh.getString(context),
+                  iconPath: 'assets/images/gamepad/Xbox_X_button.png',
+                  onTap: _busy ? null : _tap(_refresh),
+                  textColor: scheme.onTertiaryFixed,
+                  backgroundColor: scheme.tertiaryFixed,
+                ),
+                Tooltip(
+                  message: AppLocale.rommSavesHelp.getString(context),
+                  child: GamepadControl(
+                    key: const ValueKey('save-retry-uploads'),
+                    label:
+                        (_saves.syncing
+                                ? AppLocale.syncing
+                                : AppLocale.rommRetryUploads)
+                            .getString(context),
+                    iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
+                    onTap: _busy ? null : _tap(_retryUploads),
+                    textColor: scheme.onTertiaryFixed,
+                    backgroundColor: scheme.tertiaryFixed,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  /// Shared by the filters and actions so the toolbar is one row of buttons
-  /// with the same height and type. The minimum height exceeds the padded
-  /// action icon, so a label-only filter comes out exactly as tall.
-  ButtonStyle _toolbarStyle({
+  ButtonStyle _filterStyle({
     required Color foreground,
     required Color background,
     required BorderSide side,
   }) => OutlinedButton.styleFrom(
     foregroundColor: foreground,
     backgroundColor: background,
-    disabledForegroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
     side: side,
     shape: const StadiumBorder(),
     minimumSize: Size(0, 30.r),
@@ -560,8 +547,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
               selected: _filter == i,
               child: OutlinedButton(
                 key: ValueKey('save-filter-$i'),
-                onPressed: () => _setFilter(i),
-                style: _toolbarStyle(
+                onPressed: _tap(() => _setFilter(i)),
+                style: _filterStyle(
                   foreground: _filter == i
                       ? scheme.onPrimary
                       : scheme.onSurfaceVariant,
@@ -625,10 +612,12 @@ class _RommSavesContentState extends State<RommSavesContent> {
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 key: ValueKey('save-game-${game.key}'),
-                onTap: () => setState(() {
-                  _focus = _FocusArea.games;
-                  _selectGame(index, games);
-                }),
+                onTap: _tap(
+                  () => setState(() {
+                    _focus = _FocusArea.games;
+                    _selectGame(index, games);
+                  }),
+                ),
                 child: Padding(
                   padding: EdgeInsets.all(8.r),
                   child: Row(
@@ -842,10 +831,12 @@ class _RommSavesContentState extends State<RommSavesContent> {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           key: ValueKey('save-file-${file.isState}-${file.id}'),
-          onTap: () => setState(() {
-            _focus = _FocusArea.files;
-            _fileIndex = index;
-          }),
+          onTap: _tap(
+            () => setState(() {
+              _focus = _FocusArea.files;
+              _fileIndex = index;
+            }),
+          ),
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 8.r),
             child: Column(

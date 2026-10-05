@@ -215,11 +215,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Game.srm'), findsNothing);
     expect(find.text('Game.state'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('save-action-0')));
+    await tester.tap(find.byKey(const ValueKey('save-refresh')));
     await tester.pumpAndSettle();
     expect(connection.inventory.calls, 2);
     expect(romm.calls, 0);
-    await tester.tap(find.byKey(const ValueKey('save-action-1')));
+    await tester.tap(find.byKey(const ValueKey('save-retry-uploads')));
     await tester.pumpAndSettle();
     expect(romm.calls, 1);
     expect(connection.inventory.calls, 3);
@@ -228,7 +228,7 @@ void main() {
     final failed = find.textContaining('Some uploads failed');
     expect(notified(), isEmpty);
     romm.run = () async => SyncResult.fail(SyncError.networkError);
-    await tester.tap(find.byKey(const ValueKey('save-action-1')));
+    await tester.tap(find.byKey(const ValueKey('save-retry-uploads')));
     await tester.pumpAndSettle();
     expect(failed, findsNothing);
     expect(notified().single, startsWith('Some uploads failed'));
@@ -247,7 +247,7 @@ void main() {
     final listing = connection.inventory.load;
     final pending = Completer<List<RommAsset>>();
     connection.inventory.load = () => pending.future;
-    await tester.tap(find.byKey(const ValueKey('save-action-0')));
+    await tester.tap(find.byKey(const ValueKey('save-refresh')));
     // The bar animates indefinitely, so pump rather than settle while busy.
     await tester.pump();
     final bar = tester.getRect(find.byType(LinearProgressIndicator));
@@ -347,16 +347,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('keyboard navigation activates retry without touching NeoSync', (
+  testWidgets('Y retries uploads, but the cursor never lands on the buttons', (
     tester,
   ) async {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
-    // One toolbar row: All, Saves, States, Refresh, then Retry uploads.
+    // Right stops at the last filter instead of running on into the actions.
     for (var i = 0; i < 4; i++) {
       await press(tester, LogicalKeyboardKey.arrowRight);
     }
+    expect(filterGlow(tester, 2), greaterThan(0));
     await press(tester, LogicalKeyboardKey.enter);
+    expect(find.text('Game.srm'), findsNothing);
+    expect(romm.calls, 0);
+    await press(tester, LogicalKeyboardKey.keyY);
     expect(romm.calls, 1);
   });
 
@@ -413,18 +417,20 @@ void main() {
     expect(filterGlow(tester, 1), 0);
   });
 
-  testWidgets('toolbar buttons share one row and the panes start level', (
+  testWidgets('refresh and retry sit bottom right and the panes start level', (
     tester,
   ) async {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
-    final filter = tester.getRect(find.byKey(const ValueKey('save-filter-2')));
-    for (final i in [0, 1]) {
-      final action = tester.getRect(find.byKey(ValueKey('save-action-$i')));
-      expect(action.height, filter.height, reason: 'action $i');
-      expect(action.center.dy, filter.center.dy, reason: 'action $i');
-      expect(action.left, greaterThan(filter.right), reason: 'action $i');
-    }
+    final details = tester.getRect(find.byKey(const ValueKey('save-details')));
+    final refresh = tester.getRect(find.byKey(const ValueKey('save-refresh')));
+    final retry = tester.getRect(
+      find.byKey(const ValueKey('save-retry-uploads')),
+    );
+    expect(refresh.top, greaterThan(details.bottom));
+    expect(retry.center.dy, refresh.center.dy);
+    expect(retry.left, greaterThan(refresh.right));
+    expect(retry.right, moreOrLessEquals(details.right));
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('save-game-rom:1'))).dy,
       tester.getTopLeft(find.byKey(const ValueKey('save-details'))).dy,
@@ -519,7 +525,7 @@ void main() {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
     connection.inventory.load = () async => throw StateError('offline');
-    await tester.tap(find.byKey(const ValueKey('save-action-0')));
+    await tester.tap(find.byKey(const ValueKey('save-refresh')));
     await tester.pumpAndSettle();
     expect(find.text('Game.srm'), findsOneWidget);
     expect(find.text('Game.state'), findsOneWidget);
@@ -538,7 +544,7 @@ void main() {
     expect(find.text('Failed to refresh cloud storage'), findsOneWidget);
     expect(notified(), isEmpty);
     // A manual refresh that fails again still shows nothing extra.
-    await tester.tap(find.byKey(const ValueKey('save-action-0')));
+    await tester.tap(find.byKey(const ValueKey('save-refresh')));
     await tester.pumpAndSettle();
     expect(find.text('Failed to refresh cloud storage'), findsOneWidget);
     expect(notified(), isEmpty);
