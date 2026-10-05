@@ -19,6 +19,7 @@ import 'package:neostation/screens/saves_screen/saves_tab.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/billing_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
+import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/notification_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/sync/sync_manager.dart';
@@ -63,6 +64,7 @@ void main() {
   });
 
   setUp(() {
+    GlobalNotificationService().notifier.value = [];
     connection = InventoryConnection();
     connection.inventory.load = () async => [
       inventoryAsset('Game.srm'),
@@ -139,6 +141,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Messages posted to the app's notification popups, oldest first.
+  List<String> notified() => [
+    for (final n in GlobalNotificationService().notifier.value) n.message,
+  ];
+
   /// Opacity of a filter's focus glow; 0 when it is not focused.
   double filterGlow(WidgetTester tester, int filter) {
     final box = tester.widget<AnimatedContainer>(
@@ -203,13 +210,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(romm.calls, 1);
     expect(connection.inventory.calls, 3);
-    // Only a failed retry has anything to say.
+    // Only a failed retry has anything to say, and it says it in a
+    // notification rather than as text in the layout.
     final failed = find.textContaining('Some uploads failed');
-    expect(failed, findsNothing);
+    expect(notified(), isEmpty);
     romm.run = () async => SyncResult.fail(SyncError.networkError);
     await tester.tap(find.byKey(const ValueKey('save-action-1')));
     await tester.pumpAndSettle();
-    expect(failed, findsOneWidget);
+    expect(failed, findsNothing);
+    expect(notified().single, startsWith('Some uploads failed'));
     expect(tester.takeException(), isNull);
   });
 
@@ -534,6 +543,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Game.srm'), findsOneWidget);
     expect(find.text('Game.state'), findsOneWidget);
+    // The list stays up, so the failure is reported in a notification.
+    expect(find.text('Failed to refresh cloud storage'), findsNothing);
+    expect(notified(), ['Failed to refresh cloud storage']);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a failed first load says so once, in the empty state', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    connection.inventory.load = () async => throw StateError('offline');
+    await pumpTab(tester);
+    expect(find.text('Failed to refresh cloud storage'), findsOneWidget);
+    expect(notified(), isEmpty);
+    // A manual refresh that fails again still shows nothing extra.
+    await tester.tap(find.byKey(const ValueKey('save-action-0')));
+    await tester.pumpAndSettle();
+    expect(find.text('Failed to refresh cloud storage'), findsOneWidget);
+    expect(notified(), isEmpty);
   });
 }

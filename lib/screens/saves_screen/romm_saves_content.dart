@@ -227,13 +227,30 @@ class _RommSavesContentState extends State<RommSavesContent> {
     }
   }
 
-  void _refresh() {
-    if (!_busy) _saves.refresh();
+  // Failures are reported as notifications, never as text in the layout. With
+  // nothing listed, the empty state already says the refresh failed.
+  Future<void> _refresh() async {
+    if (_busy) return;
+    await _saves.refresh();
+    if (mounted && _saves.loadError != null && _saves.assets.isNotEmpty) {
+      _notifyError(AppLocale.failedToRefreshCloud);
+    }
   }
 
-  void _retryUploads() {
-    if (!_busy) _saves.retryUploads();
+  Future<void> _retryUploads() async {
+    if (_busy) return;
+    await _saves.retryUploads();
+    // A successful retry needs no message.
+    if (mounted && _saves.syncResult?.success == false) {
+      _notifyError(AppLocale.rommUploadsFailed);
+    }
   }
+
+  void _notifyError(String message) => AppNotification.showNotification(
+    context,
+    message.getString(context),
+    type: NotificationType.error,
+  );
 
   /// Select deletes the focused file, as it does in the NeoSync save list.
   /// Elsewhere it keeps its app-wide meaning instead of doing nothing.
@@ -375,11 +392,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
                     ],
                   ),
                   SizedBox(height: 12.r),
-                  if (_saves.loadError != null)
-                    _notice(AppLocale.failedToRefreshCloud, true)
-                  // A successful retry needs no message; only failures are shown.
-                  else if (_saves.syncResult?.success == false)
-                    _notice(AppLocale.rommUploadsFailed, true),
                   Expanded(
                     child: games.isEmpty || !_ready
                         ? _empty(loading: _saves.loading || games.isNotEmpty)
@@ -904,20 +916,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
       ),
     );
   }
-
-  Widget _notice(String message, bool error) => Padding(
-    padding: EdgeInsets.only(bottom: 8.r, top: 4.r),
-    child: Text(
-      message.getString(context),
-      style: TextStyle(
-        fontSize: 10.sp,
-        height: 1.3,
-        color: error
-            ? Theme.of(context).colorScheme.error
-            : Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    ),
-  );
 
   /// Blank while the lookup is pending; the file-derived name only when RomM
   /// has nothing better.
