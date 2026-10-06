@@ -26,7 +26,7 @@ The official NeoSync website is [https://neosync.cloud/](https://neosync.cloud/)
 
 ## Sign In or Create an Account
 
-Open the **Saves** tab with NeoSync selected and choose to create an account or sign in. You can also do this on the [official site](https://neosync.cloud/).
+Open the **Saves** tab and choose to create an account or sign in. You can also do this on the [official site](https://neosync.cloud/).
 
 - New accounts need email verification. NeoStation can resend the verification email.
 - If you forget your password, use the password recovery option.
