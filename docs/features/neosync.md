@@ -20,27 +20,6 @@ The tab uses NeoSync by default. When **Use RomM for save sync** is enabled
 in the RomM tab, Saves instead shows your RomM saves and save states. Turn
 that option off to return to NeoSync, including its account and plan controls.
 
-### RomM Saves
-
-The RomM manager lists the connected user's remote saves and states, newest
-first, including archival versions and conflict backups. Use the filter buttons
-(or L2/R2 from anywhere on the screen) to switch between all files, saves, and
-states. **Refresh** (X) reloads the inventory without transferring saves.
-
-**Retry uploads** (Y) checks local games linked to RomM with save sync enabled
-and retries pending uploads using the existing conflict protections. It does
-not download all remote saves: downloads run before a linked game launches.
-Per-game and per-system sync settings still apply. A successful retry shows no
-message; failed requests show an error rather than an empty inventory.
-
-**Delete** (Select) permanently removes the focused file from the RomM server
-after you confirm. Files on your devices are not touched, so a device that
-still syncs the game uploads its copy again on its next sync. Deleting needs
-the same `assets.write` permission as uploading.
-
-Use the D-pad to navigate the controls and files, A to activate a control,
-L2/R2 to change filter, L1/R1 to change tabs, and B to return to Systems.
-
 ## The Official Site
 
 The official NeoSync website is [https://neosync.cloud/](https://neosync.cloud/). You can sign in or create an account there exactly as you can in the NeoStation app.
