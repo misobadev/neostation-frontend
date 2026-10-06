@@ -159,18 +159,19 @@ void main() {
     for (final n in GlobalNotificationService().notifier.value) n.message,
   ];
 
-  /// Opacity of a filter's focus glow; 0 when it is not focused.
-  double filterGlow(WidgetTester tester, int filter) {
-    final box = tester.widget<AnimatedContainer>(
-      find
-          .ancestor(
-            of: find.byKey(ValueKey('save-filter-$filter')),
-            matching: find.byType(AnimatedContainer),
-          )
-          .first,
-    );
-    return (box.decoration! as ShapeDecoration).shadows!.single.color.a;
+  /// Whether the box keyed [key] wears the controller-focus glow.
+  bool glows(WidgetTester tester, String key) {
+    final box = find.byKey(ValueKey(key));
+    final glow = Theme.of(
+      tester.element(box),
+    ).colorScheme.primary.withValues(alpha: 0.3);
+    final decoration =
+        tester.widget<AnimatedContainer>(box).decoration! as BoxDecoration;
+    return decoration.boxShadow!.any((shadow) => shadow.color == glow);
   }
+
+  bool filterFocused(WidgetTester tester, int filter) =>
+      glows(tester, 'save-filter-$filter');
 
   testWidgets(
     'defaults to NeoSync, follows RomM selection, and switches back',
@@ -287,7 +288,7 @@ void main() {
 
     names.complete();
     await tester.pumpAndSettle();
-    expect(filterGlow(tester, 0), greaterThan(0));
+    expect(filterFocused(tester, 0), isTrue);
     expect(find.text('Alpha Quest'), findsWidgets);
     expect(find.text('Beta Saga'), findsOneWidget);
     expect(find.text('Alpha'), findsNothing);
@@ -336,7 +337,7 @@ void main() {
     expectShowing(saves: true, states: false);
     // Still in the games list: no filter took focus.
     for (final i in [0, 1, 2]) {
-      expect(filterGlow(tester, i), 0);
+      expect(filterFocused(tester, i), isFalse);
     }
     await pull('axis_rtrigger');
     expectShowing(saves: false, states: true);
@@ -356,7 +357,7 @@ void main() {
     for (var i = 0; i < 4; i++) {
       await press(tester, LogicalKeyboardKey.arrowRight);
     }
-    expect(filterGlow(tester, 2), greaterThan(0));
+    expect(filterFocused(tester, 2), isTrue);
     await press(tester, LogicalKeyboardKey.enter);
     expect(find.text('Game.srm'), findsNothing);
     expect(romm.calls, 0);
@@ -402,19 +403,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('controller focus on the selected filter shows a glow', (
+  testWidgets('the glow follows controller focus across the screen', (
     tester,
   ) async {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
     // Focus opens on the selected All filter.
-    expect(filterGlow(tester, 0), greaterThan(0));
-    expect(filterGlow(tester, 1), 0);
+    expect(filterFocused(tester, 0), isTrue);
+    expect(filterFocused(tester, 1), isFalse);
     await press(tester, LogicalKeyboardKey.arrowRight);
-    expect(filterGlow(tester, 0), 0);
-    expect(filterGlow(tester, 1), greaterThan(0));
+    expect(filterFocused(tester, 0), isFalse);
+    expect(filterFocused(tester, 1), isTrue);
     await press(tester, LogicalKeyboardKey.arrowDown); // games
-    expect(filterGlow(tester, 1), 0);
+    expect(filterFocused(tester, 1), isFalse);
+    expect(glows(tester, 'save-game-rom:1'), isTrue);
+    await press(tester, LogicalKeyboardKey.arrowRight); // files
+    // The game keeps its selection, but only the focused file glows.
+    expect(glows(tester, 'save-game-rom:1'), isFalse);
+    expect(glows(tester, 'save-file-false-1'), isTrue);
+    expect(glows(tester, 'save-file-true-1'), isFalse);
   });
 
   testWidgets('refresh and retry sit bottom right and the panes start level', (

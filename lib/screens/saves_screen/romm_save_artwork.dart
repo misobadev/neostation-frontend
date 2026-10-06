@@ -1,12 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../models/romm_save_game.dart';
 import '../../services/romm/romm_cover_image_provider.dart';
 import '../../services/romm_service.dart';
 import '../../themes/corner_radii.dart';
+import '../../utils/cover_decode.dart';
 
 /// Tries existing device artwork, then RomM's stored covers. Failed images
 /// advance to the next source without hiding the game or its saves.
@@ -55,15 +56,22 @@ class _RommSaveArtworkState extends State<RommSaveArtwork> {
       }
       attempt++;
     }
+    // The NeoSync save list's thumbnail for a save without art.
     final placeholder = ColoredBox(
-      color: scheme.primary.withValues(alpha: 0.08),
+      color: scheme.primary.withValues(alpha: 0.1),
       child: Center(
         child: Icon(
-          Icons.videogame_asset_outlined,
-          size: 24.r,
-          color: scheme.onSurfaceVariant.withValues(alpha: 0.55),
+          Symbols.videogame_asset_rounded,
+          size: widget.width * 0.5,
+          color: scheme.primary,
         ),
       ),
+    );
+    // Cropped to fill, like covers everywhere else in the app.
+    final hint = coverDecodeHint(
+      logicalWidth: widget.width,
+      logicalHeight: widget.height,
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
     );
     return ExcludeSemantics(
       child: ClipRRect(
@@ -77,15 +85,10 @@ class _RommSaveArtworkState extends State<RommSaveArtwork> {
                   key: ValueKey(sources[attempt]),
                   image: ResizeImage(
                     sources[attempt],
-                    width:
-                        (widget.width * MediaQuery.devicePixelRatioOf(context))
-                            .ceil(),
-                    height:
-                        (widget.height * MediaQuery.devicePixelRatioOf(context))
-                            .ceil(),
-                    policy: ResizeImagePolicy.fit,
+                    width: hint.cacheWidth,
+                    height: hint.cacheHeight,
                   ),
-                  fit: BoxFit.contain,
+                  fit: BoxFit.cover,
                   frameBuilder: (context, child, frame, synchronouslyLoaded) =>
                       frame == null ? placeholder : child,
                   errorBuilder: (context, error, stackTrace) {

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_locale.dart';
@@ -64,20 +65,20 @@ class _RommSavesContentState extends State<RommSavesContent> {
     return _fileIndex < files.length ? files[_fileIndex] : null;
   }
 
-  // Accommodate both ScreenUtil and accessibility text scaling.
-  double get _gameExtent => math.max(
-    88.r,
-    MediaQuery.textScalerOf(context).scale(11.sp) * 2.6 +
-        MediaQuery.textScalerOf(context).scale(9.sp) * 2.6 +
-        32.r,
-  );
-  double get _fileExtent => math.max(
-    70.r,
-    MediaQuery.textScalerOf(context).scale(11.sp) * 1.3 +
-        MediaQuery.textScalerOf(context).scale(9.sp) * 2.6 +
-        30.r,
-  );
-  double get _filesInset => 6.r;
+  // Accommodate both ScreenUtil and accessibility text scaling. Each extent is
+  // the row's content, its padding and widest border, the gap below it, and a
+  // little slack.
+  double _scaled(double fontSize) =>
+      MediaQuery.textScalerOf(context).scale(fontSize);
+  double get _metaLine => math.max(12.r, _scaled(10.r) * 1.3);
+  double get _gameExtent =>
+      math.max(54.r, _scaled(12.r) * 2.5 + _metaLine * 2 + 7.r) + 30.r;
+  double get _fileExtent =>
+      math.max(30.r, _scaled(11.r) * 1.25 + _scaled(9.r) * 2.5 + 5.r) + 30.r;
+
+  /// Padding inside both lists. It is the room the focus glow draws into, so
+  /// the lists' clipping never cuts it off.
+  double get _listInset => 8.r;
 
   @override
   void initState() {
@@ -192,17 +193,16 @@ class _RommSavesContentState extends State<RommSavesContent> {
     if (_gameIndex >= games.length || !controller.hasClients) return;
     final position = controller.position;
     final index = files ? _fileIndex : _gameIndex;
-    final count = files ? games[_gameIndex].assets.length : games.length;
     final extent = files ? _fileExtent : _gameExtent;
-    // The first and last rows scroll fully to the ends, list padding included.
-    final top = (files ? _filesInset : 0.0) + index * extent;
-    final bottom = top + extent;
+    // The row and the list padding either side of it stay on screen, so it is
+    // never under the edge fade and its glow has room. That also scrolls the
+    // first and last rows fully to the ends.
+    final top = index * extent;
+    final bottom = top + extent + 2 * _listInset;
     final offset = top < position.pixels
-        ? (index == 0 ? 0.0 : top)
+        ? top
         : bottom > position.pixels + position.viewportDimension
-        ? (index == count - 1
-              ? position.maxScrollExtent
-              : bottom - position.viewportDimension)
+        ? bottom - position.viewportDimension
         : position.pixels;
     controller.jumpTo(offset.clamp(0, position.maxScrollExtent));
   }
@@ -273,7 +273,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
           .getString(context)
           .replaceFirst('{file}', file.fileName),
       confirmLabel: AppLocale.delete.getString(context),
-      icon: Icons.delete_forever_rounded,
+      icon: Symbols.delete_forever_rounded,
       maxWidth: 320.r,
     );
     if (!mounted || !confirmed) return;
@@ -357,48 +357,61 @@ class _RommSavesContentState extends State<RommSavesContent> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            SafeArea(
-              child: Padding(
-                // The app header overlays tab content and occupies 46 design
-                // pixels.
-                padding: EdgeInsets.fromLTRB(18.r, 54.r, 18.r, 12.r),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _filters(),
-                    SizedBox(height: 12.r),
-                    Expanded(
-                      child: games.isEmpty || !_ready
-                          ? _empty(loading: _saves.loading || games.isNotEmpty)
-                          : Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Expanded(flex: 2, child: _gameList(games)),
-                                // The game list's own gutter makes up the
-                                // rest of the gap; see [_gameTile].
-                                SizedBox(width: 6.r),
-                                Expanded(
-                                  flex: 3,
+            Padding(
+              // The same inset as the NeoSync face of this tab. The app header
+              // overlays tab content and occupies 46 design pixels.
+              padding: EdgeInsets.only(top: 52.r, bottom: 8.r),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8.r),
+                    child: _filters(),
+                  ),
+                  Expanded(
+                    child: games.isEmpty || !_ready
+                        ? _empty(loading: _saves.loading || games.isNotEmpty)
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // The game list's padding is the page margin
+                              // and the gutter, as the RomM ROM list's is.
+                              Expanded(flex: 2, child: _gameList(games)),
+                              Expanded(
+                                flex: 3,
+                                child: Padding(
+                                  padding: EdgeInsets.fromLTRB(
+                                    0,
+                                    _listInset,
+                                    8.r,
+                                    _listInset,
+                                  ),
                                   child: _details(games[_gameIndex]),
                                 ),
-                              ],
-                            ),
-                    ),
-                    SizedBox(height: 8.r),
-                    _footer(),
-                  ],
-                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8.r),
+                    child: _footer(),
+                  ),
+                ],
               ),
             ),
-            // Overlaid on the screen's bottom edge, outside the safe area, so
-            // starting or finishing a refresh never moves anything.
+            // Overlaid on the screen's bottom edge, so starting or finishing a
+            // refresh never moves anything.
             if (_busy)
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
                 child: IgnorePointer(
-                  child: LinearProgressIndicator(minHeight: 2.r),
+                  child: LinearProgressIndicator(
+                    minHeight: 2.r,
+                    color: Theme.of(context).colorScheme.primary,
+                    backgroundColor: Colors.transparent,
+                  ),
                 ),
               ),
           ],
@@ -412,23 +425,16 @@ class _RommSavesContentState extends State<RommSavesContent> {
   /// wrap onto a second line instead of crushing it.
   Widget _footer() {
     final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurface.withValues(alpha: 0.6);
     return LayoutBuilder(
       builder: (context, constraints) => Row(
         children: [
-          Icon(
-            Icons.cloud_download_outlined,
-            size: 12.r,
-            color: scheme.onSurfaceVariant,
-          ),
+          Icon(Symbols.cloud_download_rounded, size: 12.r, color: muted),
           SizedBox(width: 5.r),
           Expanded(
             child: Text(
               AppLocale.rommSavesAutoDownload.getString(context),
-              style: TextStyle(
-                fontSize: 9.sp,
-                height: 1.3,
-                color: scheme.onSurfaceVariant,
-              ),
+              style: TextStyle(fontSize: 9.r, height: 1.3, color: muted),
             ),
           ),
           SizedBox(width: 8.r),
@@ -486,25 +492,98 @@ class _RommSavesContentState extends State<RommSavesContent> {
     );
   }
 
-  ButtonStyle _filterStyle({
-    required Color foreground,
-    required Color background,
-    required BorderSide side,
-  }) => OutlinedButton.styleFrom(
-    foregroundColor: foreground,
-    backgroundColor: background,
-    side: side,
-    shape: const StadiumBorder(),
-    minimumSize: Size(0, 30.r),
-    padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
-    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-      fontSize: 10.sp,
-      height: 1.2,
-      fontWeight: FontWeight.w600,
-    ),
-  );
+  /// A selectable box in the app's gamepad focus treatment: the focused item
+  /// is tinted, ringed and glowing in the primary colour, and a selection the
+  /// cursor has moved away from keeps a fainter ring. At rest it shows [fill] and
+  /// [resting], so each caller keeps its own card, chip or row look.
+  ///
+  /// The key goes on the box itself, so it is what tests find and tap.
+  Widget _highlight({
+    required Key key,
+    required bool focused,
+    bool selected = false,
+    required BorderRadius radius,
+    required Color fill,
+    BorderSide? resting,
+    bool raised = false,
+    required EdgeInsetsGeometry padding,
+    required VoidCallback onTap,
+    required Widget child,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    // Borders animate. Fading in from Colors.transparent (black) would flash
+    // a dark ring, so the invisible border is a transparent primary.
+    final side = focused
+        ? BorderSide(color: scheme.primary, width: 2.r)
+        : selected
+        ? BorderSide(color: scheme.primary.withValues(alpha: 0.5), width: 2.r)
+        : resting ??
+              BorderSide(
+                color: scheme.primary.withValues(alpha: 0),
+                width: 2.r,
+              );
+    final tint = focused ? 0.18 : (selected ? 0.10 : 0.0);
+    return Semantics(
+      selected: selected,
+      child: AnimatedContainer(
+        key: key,
+        duration: const Duration(milliseconds: 140),
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(scheme.primary.withValues(alpha: tint), fill),
+          borderRadius: radius,
+          border: Border.fromBorderSide(side),
+          boxShadow: [
+            if (raised)
+              BoxShadow(
+                color: scheme.shadow.withValues(alpha: 0.1),
+                blurRadius: 4.r,
+                offset: Offset(2.0.r, 2.0.r),
+              ),
+            // The glow the RomM browser's cards wear under the controller.
+            if (focused)
+              BoxShadow(
+                color: scheme.primary.withValues(alpha: 0.3),
+                blurRadius: 8.r,
+                spreadRadius: 1.r,
+              ),
+          ],
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: radius,
+            canRequestFocus: false,
+            hoverColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            splashColor: scheme.onSurface.withValues(alpha: 0.1),
+            child: Padding(padding: padding, child: child),
+          ),
+        ),
+      ),
+    );
+  }
 
+  /// The card every top-level panel in the app wears (system cards, the
+  /// NeoSync dashboard): a surface fill, the theme outline and a soft shadow.
+  BoxDecoration _cardDecoration() {
+    final scheme = Theme.of(context).colorScheme;
+    return BoxDecoration(
+      color: scheme.surface,
+      borderRadius: CornerRadii.of(context).radiusExternal,
+      border: Border.all(color: scheme.outline, width: 1.r),
+      boxShadow: [
+        BoxShadow(
+          color: scheme.shadow.withValues(alpha: 0.1),
+          blurRadius: 4.r,
+          offset: Offset(2.0.r, 2.0.r),
+        ),
+      ],
+    );
+  }
+
+  /// The NeoSync save list's filter chips: tinted while active, ringed while
+  /// the controller is on them.
   Widget _filters() {
     final scheme = Theme.of(context).colorScheme;
     final assets = _saves.assets;
@@ -518,62 +597,61 @@ class _RommSavesContentState extends State<RommSavesContent> {
       AppLocale.statSaves,
       AppLocale.statStates,
     ];
-    final focusedFilter = _focus == _FocusArea.filters ? _filterFocus : -1;
-    // Material animates border changes. Fading from Colors.transparent (black)
-    // would flash a dark ring around the filled, selected filter.
-    final unfocused = scheme.primary.withValues(alpha: 0);
     return Wrap(
-      spacing: 6.r,
+      spacing: 8.r,
       runSpacing: 8.r,
       children: [
         for (var i = 0; i < 3; i++)
-          // The app's gamepad-selection glow. The border alone is invisible
-          // on the selected filter, whose fill is the same colour.
-          AnimatedContainer(
-            duration: kThemeChangeDuration,
-            decoration: ShapeDecoration(
-              shape: const StadiumBorder(),
-              shadows: [
-                BoxShadow(
-                  color: focusedFilter == i
-                      ? scheme.primary.withValues(alpha: 0.5)
-                      : unfocused,
-                  blurRadius: 8.r,
-                  spreadRadius: 2.r,
-                ),
-              ],
-            ),
-            child: Semantics(
-              selected: _filter == i,
-              child: OutlinedButton(
+          Builder(
+            builder: (context) {
+              final focused = _focus == _FocusArea.filters && _filterFocus == i;
+              final color = focused || _filter == i
+                  ? scheme.primary
+                  : scheme.onSurface;
+              return _highlight(
                 key: ValueKey('save-filter-$i'),
-                onPressed: _tap(() => _setFilter(i)),
-                style: _filterStyle(
-                  foreground: _filter == i
-                      ? scheme.onPrimary
-                      : scheme.onSurfaceVariant,
-                  background: _filter == i
-                      ? scheme.primary
-                      : Colors.transparent,
-                  side: BorderSide(
-                    color: focusedFilter == i ? scheme.primary : unfocused,
-                    width: 2.r,
-                  ),
+                focused: focused,
+                selected: _filter == i,
+                radius: CornerRadii.of(context).radiusInternal,
+                fill: scheme.surface.withValues(alpha: 0.5),
+                padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
+                onTap: _tap(() => _setFilter(i)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      labels[i].getString(context),
+                      style: TextStyle(
+                        fontSize: 11.r,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                    SizedBox(width: 6.r),
+                    Text(
+                      '${counts[i]}',
+                      style: TextStyle(
+                        fontSize: 11.r,
+                        fontWeight: FontWeight.w700,
+                        color: color.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
                 ),
-                child: Text('${labels[i].getString(context)}  ${counts[i]}'),
-              ),
-            ),
+              );
+            },
           ),
       ],
     );
   }
 
-  // No heading above the list, so its first tile lines up with the top of the
-  // details pane beside it.
-  Widget _gameList(List<RommSaveGame> games) => Scrollbar(
-    controller: _gamesScroll,
+  // No heading above the list, so its first card lines up with the top of the
+  // details card beside it.
+  Widget _gameList(List<RommSaveGame> games) => _EdgeFade(
+    extent: _listInset,
     child: ListView.builder(
       controller: _gamesScroll,
+      padding: EdgeInsets.all(_listInset),
       itemExtent: _gameExtent,
       itemCount: games.length,
       itemBuilder: (context, index) => _gameTile(games, index),
@@ -592,87 +670,59 @@ class _RommSavesContentState extends State<RommSavesContent> {
       builder: (context, snapshot) {
         final info = snapshot.data;
         return Padding(
-          // The right gutter holds the scrollbar clear of the tiles.
-          padding: EdgeInsets.only(bottom: 6.r, right: 10.r),
-          child: Semantics(
+          padding: EdgeInsets.only(bottom: 6.r),
+          child: _highlight(
+            key: ValueKey('save-game-${game.key}'),
+            focused: focused,
             selected: selected,
-            child: Material(
-              color: selected
-                  ? scheme.primary.withValues(alpha: 0.14)
-                  : scheme.surfaceContainer,
-              shape: RoundedRectangleBorder(
-                borderRadius: CornerRadii.of(context).radiusInternal,
-                side: BorderSide(
-                  color: focused
-                      ? scheme.primary
-                      : scheme.primary.withValues(alpha: selected ? 0.35 : 0),
-                  width: 2.r,
-                ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                key: ValueKey('save-game-${game.key}'),
-                onTap: _tap(
-                  () => setState(() {
-                    _focus = _FocusArea.games;
-                    _selectGame(index, games);
-                  }),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(8.r),
-                  child: Row(
+            radius: CornerRadii.of(context).radiusExternal,
+            fill: scheme.surface,
+            resting: BorderSide(color: scheme.outline, width: 1.r),
+            raised: true,
+            padding: EdgeInsets.all(8.r),
+            onTap: _tap(
+              () => setState(() {
+                _focus = _FocusArea.games;
+                _selectGame(index, games);
+              }),
+            ),
+            child: Row(
+              children: [
+                _art(game, info, 40.r, 54.r),
+                SizedBox(width: 10.r),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _art(game, info, 42.r, 60.r),
-                      SizedBox(width: 10.r),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _title(game, info),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11.sp,
-                                height: 1.25,
-                                fontWeight: FontWeight.w600,
-                                color: scheme.onSurface,
-                              ),
-                            ),
-                            if (_platform(info) case final platform?) ...[
-                              SizedBox(height: 3.r),
-                              Text(
-                                platform,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 9.sp,
-                                  height: 1.2,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                            SizedBox(height: 5.r),
-                            Text(
-                              _counts(game),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 9.sp,
-                                height: 1.2,
-                                color: selected
-                                    ? scheme.primary
-                                    : scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
+                      Text(
+                        _title(game, info),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.r,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
                         ),
+                      ),
+                      SizedBox(height: 4.r),
+                      if (_platform(info) case final platform?) ...[
+                        _meta(Symbols.videogame_asset_rounded, platform),
+                        SizedBox(height: 3.r),
+                      ],
+                      Row(
+                        children: [
+                          for (final (i, count) in _counts(game).indexed) ...[
+                            if (i > 0) SizedBox(width: 10.r),
+                            Flexible(child: count),
+                          ],
+                        ],
                       ),
                     ],
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         );
@@ -685,12 +735,54 @@ class _RommSavesContentState extends State<RommSavesContent> {
     return slug == null || slug.isEmpty ? null : slug.toUpperCase();
   }
 
-  String _counts(RommSaveGame game) => [
-    if (game.saves > 0)
-      '${AppLocale.statSaves.getString(context)} ${game.saves}',
-    if (game.states > 0)
-      '${AppLocale.statStates.getString(context)} ${game.states}',
-  ].join(' · ');
+  /// Saves in the primary colour, states in the tertiary, as their file rows
+  /// mark them.
+  List<Widget> _counts(RommSaveGame game) {
+    final scheme = Theme.of(context).colorScheme;
+    return [
+      if (game.saves > 0)
+        _meta(
+          Symbols.save_rounded,
+          '${AppLocale.statSaves.getString(context)} ${game.saves}',
+          iconColor: scheme.primary,
+        ),
+      if (game.states > 0)
+        _meta(
+          _stateIcon,
+          '${AppLocale.statStates.getString(context)} ${game.states}',
+          iconColor: scheme.tertiary,
+        ),
+    ];
+  }
+
+  static const IconData _stateIcon = Symbols.pause_circle_rounded;
+
+  /// One icon-led line of metadata, as the RomM ROM list draws them.
+  Widget _meta(IconData icon, String label, {Color? iconColor}) {
+    final muted = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.6);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12.r, color: iconColor ?? muted),
+        SizedBox(width: 3.r),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10.r,
+              height: 1.3,
+              fontWeight: FontWeight.w600,
+              color: muted,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _art(
     RommSaveGame game,
@@ -705,106 +797,111 @@ class _RommSavesContentState extends State<RommSavesContent> {
     height: height,
   );
 
-  Widget _details(RommSaveGame game) {
+  Widget _details(RommSaveGame game) => LayoutBuilder(
+    builder: (context, constraints) {
+      // The title is already in the game list. On short displays or with
+      // large text, devote this card to the files instead of repeating it.
+      final showHeader = constraints.maxHeight >= 220.r;
+      return Container(
+        key: const ValueKey('save-details'),
+        // Keeps scrolled file rows inside the rounded corners.
+        clipBehavior: Clip.antiAlias,
+        decoration: _cardDecoration(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (showHeader)
+              FutureBuilder<RommSaveGameInfo>(
+                key: ValueKey(game.key),
+                future: _saves.gameInfo(game.romId),
+                initialData: _saves.loadedGameInfo(game.romId),
+                builder: (context, snapshot) =>
+                    _detailsHeader(game, snapshot.data),
+              ),
+            Expanded(
+              child: _EdgeFade(
+                extent: _listInset,
+                child: ListView.builder(
+                  key: ValueKey('files-${game.key}-$_filter'),
+                  controller: _filesScroll,
+                  padding: EdgeInsets.all(_listInset),
+                  itemExtent: _fileExtent,
+                  itemCount: game.assets.length,
+                  itemBuilder: (context, index) =>
+                      _fileRow(game.assets[index], index),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+
+  /// The selected game, in the tinted block that heads the NeoSync dashboard.
+  Widget _detailsHeader(RommSaveGame game, RommSaveGameInfo? info) {
     final scheme = Theme.of(context).colorScheme;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // The title is already in the game list. On short displays or with
-        // large text, devote this pane to the files instead of repeating it.
-        final showHeader = constraints.maxHeight >= 220.r;
-        return Container(
-          key: const ValueKey('save-details'),
-          // Keeps scrolled file rows inside the rounded corners.
-          clipBehavior: Clip.antiAlias,
+    return Padding(
+      padding: EdgeInsets.fromLTRB(8.r, 8.r, 8.r, 0),
+      child: ClipRRect(
+        borderRadius: CornerRadii.of(context).radiusInternal,
+        child: Container(
+          padding: EdgeInsets.all(10.r),
           decoration: BoxDecoration(
-            color: scheme.surfaceContainer.withValues(alpha: 0.65),
-            borderRadius: CornerRadii.of(context).radiusExternal,
-            border: Border.all(
-              color: scheme.outlineVariant.withValues(alpha: 0.6),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                scheme.primary.withValues(alpha: 0.18),
+                scheme.primary.withValues(alpha: 0.04),
+              ],
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              if (showHeader)
-                FutureBuilder<RommSaveGameInfo>(
-                  key: ValueKey(game.key),
-                  future: _saves.gameInfo(game.romId),
-                  initialData: _saves.loadedGameInfo(game.romId),
-                  builder: (context, snapshot) => Padding(
-                    padding: EdgeInsets.all(14.r),
-                    child: Row(
+              _art(game, info, 48.r, 64.r),
+              SizedBox(width: 12.r),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _title(game, info),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16.r,
+                        height: 1.2,
+                        fontWeight: FontWeight.bold,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    SizedBox(height: 6.r),
+                    Wrap(
+                      spacing: 10.r,
+                      runSpacing: 4.r,
                       children: [
-                        _art(game, snapshot.data, 48.r, 64.r),
-                        SizedBox(width: 12.r),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _title(game, snapshot.data),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w700,
-                                  color: scheme.onSurface,
-                                ),
-                              ),
-                              SizedBox(height: 6.r),
-                              Text(
-                                [
-                                  ?_platform(snapshot.data),
-                                  _counts(game),
-                                ].join(' · '),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 10.sp,
-                                  height: 1.3,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        if (_platform(info) case final platform?)
+                          _meta(Symbols.videogame_asset_rounded, platform),
+                        ..._counts(game),
                       ],
                     ),
-                  ),
-                ),
-              if (showHeader)
-                Divider(
-                  height: 1.r,
-                  color: scheme.outlineVariant.withValues(alpha: 0.6),
-                ),
-              Expanded(
-                child: Scrollbar(
-                  controller: _filesScroll,
-                  child: ListView.builder(
-                    key: ValueKey('files-${game.key}-$_filter'),
-                    controller: _filesScroll,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 10.r,
-                      vertical: _filesInset,
-                    ),
-                    itemExtent: _fileExtent,
-                    itemCount: game.assets.length,
-                    itemBuilder: (context, index) =>
-                        _fileRow(game.assets[index], index),
-                  ),
+                  ],
                 ),
               ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
   Widget _fileRow(RommAsset file, int index) {
     final scheme = Theme.of(context).colorScheme;
+    final radius = CornerRadii.of(context).radiusInternal;
     final focused = _focus == _FocusArea.files && _fileIndex == index;
+    final accent = file.isState ? scheme.tertiary : scheme.primary;
+    final muted = scheme.onSurface.withValues(alpha: 0.6);
     final date = (file.updatedAt ?? file.createdAt)?.toLocal();
     final localizations = MaterialLocalizations.of(context);
     final details = [
@@ -814,94 +911,84 @@ class _RommSavesContentState extends State<RommSavesContent> {
       if (file.emulator?.isNotEmpty == true) file.emulator!,
     ].join(' · ');
     return Padding(
-      padding: EdgeInsets.only(bottom: 5.r),
-      child: Material(
-        color: focused
-            ? scheme.primary.withValues(alpha: 0.12)
-            : scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        shape: RoundedRectangleBorder(
-          borderRadius: CornerRadii.of(context).radiusInternal,
-          side: BorderSide(
-            color: focused
-                ? scheme.primary
-                : scheme.primary.withValues(alpha: 0),
-            width: 2.r,
-          ),
+      padding: EdgeInsets.only(bottom: 6.r),
+      child: _highlight(
+        key: ValueKey('save-file-${file.isState}-${file.id}'),
+        focused: focused,
+        radius: radius,
+        fill: scheme.primary.withValues(alpha: 0),
+        resting: BorderSide(color: scheme.outline, width: 1.r),
+        padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 8.r),
+        onTap: _tap(
+          () => setState(() {
+            _focus = _FocusArea.files;
+            _fileIndex = index;
+          }),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: ValueKey('save-file-${file.isState}-${file.id}'),
-          onTap: _tap(
-            () => setState(() {
-              _focus = _FocusArea.files;
-              _fileIndex = index;
-            }),
-          ),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 8.r),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      file.isState
-                          ? Icons.pause_circle_outline_rounded
-                          : Icons.save_outlined,
-                      size: 12.r,
-                      color: file.isState ? scheme.tertiary : scheme.primary,
-                    ),
-                    SizedBox(width: 5.r),
-                    Expanded(
-                      child: Text(
-                        [
-                          (file.isState
-                                  ? AppLocale.rommSaveState
-                                  : AppLocale.rommSaveFile)
-                              .getString(context),
-                          if (file.slot?.isNotEmpty == true) file.slot!,
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 9.sp,
-                          height: 1.2,
-                          color: scheme.onSurfaceVariant,
-                        ),
+        child: Row(
+          children: [
+            // The NeoSync dashboard's menu glyph.
+            Container(
+              padding: EdgeInsets.all(6.r),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.1),
+                borderRadius: radius,
+              ),
+              child: Icon(
+                file.isState ? _stateIcon : Symbols.save_rounded,
+                size: 18.r,
+                color: accent,
+              ),
+            ),
+            SizedBox(width: 10.r),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Tooltip(
+                    message: file.fileName,
+                    child: Text(
+                      file.fileName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11.r,
+                        height: 1.25,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
                       ),
                     ),
-                  ],
-                ),
-                SizedBox(height: 4.r),
-                Tooltip(
-                  message: file.fileName,
-                  child: Text(
-                    file.fileName,
+                  ),
+                  SizedBox(height: 3.r),
+                  Text(
+                    [
+                      (file.isState
+                              ? AppLocale.rommSaveState
+                              : AppLocale.rommSaveFile)
+                          .getString(context),
+                      if (file.slot?.isNotEmpty == true) file.slot!,
+                    ].join(' · '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 11.sp,
+                      fontSize: 9.r,
                       height: 1.25,
                       fontWeight: FontWeight.w600,
-                      color: scheme.onSurface,
+                      color: muted,
                     ),
                   ),
-                ),
-                SizedBox(height: 3.r),
-                Text(
-                  details,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 9.sp,
-                    height: 1.25,
-                    color: scheme.onSurfaceVariant,
+                  SizedBox(height: 2.r),
+                  Text(
+                    details,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 9.r, height: 1.25, color: muted),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -923,6 +1010,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
     if (mounted) setState(() => _ready = true);
   }
 
+  /// The RomM browser's centred message.
   Widget _empty({required bool loading}) {
     final scheme = Theme.of(context).colorScheme;
     return Center(
@@ -931,24 +1019,96 @@ class _RommSavesContentState extends State<RommSavesContent> {
         children: [
           Icon(
             _saves.loadError != null
-                ? Icons.cloud_off_outlined
-                : Icons.cloud_queue_rounded,
-            size: 36.r,
-            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                ? Symbols.cloud_off_rounded
+                : Symbols.cloud_rounded,
+            size: 48.r,
+            color: scheme.onSurface.withValues(alpha: 0.4),
           ),
           SizedBox(height: 12.r),
-          Text(
-            (loading
-                    ? AppLocale.loading
-                    : _saves.loadError != null
-                    ? AppLocale.failedToRefreshCloud
-                    : AppLocale.noOnlineSavesFound)
-                .getString(context),
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.sp, color: scheme.onSurfaceVariant),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32.r),
+            child: Text(
+              (loading
+                      ? AppLocale.loading
+                      : _saves.loadError != null
+                      ? AppLocale.failedToRefreshCloud
+                      : AppLocale.noOnlineSavesFound)
+                  .getString(context),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.r,
+                color: scheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Fades whichever edge of a list has content beyond it, as the header's sort
+/// menu does, so rows dissolve into the list's padding instead of being sliced
+/// off. An edge with nothing beyond it keeps a hard stop, so the first and last
+/// rows, and their glow, are never dimmed.
+class _EdgeFade extends StatefulWidget {
+  /// How far in from each edge the fade runs.
+  final double extent;
+  final Widget child;
+
+  const _EdgeFade({required this.extent, required this.child});
+
+  @override
+  State<_EdgeFade> createState() => _EdgeFadeState();
+}
+
+class _EdgeFadeState extends State<_EdgeFade> {
+  bool _before = false;
+  bool _after = false;
+
+  /// Never stops the notification, so it reaches anything else listening.
+  bool _update(ScrollMetrics metrics) {
+    final before = metrics.extentBefore > 0;
+    final after = metrics.extentAfter > 0;
+    if (before != _before || after != _after) {
+      setState(() {
+        _before = before;
+        _after = after;
+      });
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      // Metrics cover the first layout and changes of length; updates cover
+      // scrolling.
+      NotificationListener<ScrollMetricsNotification>(
+        onNotification: (n) => n.depth == 0 && _update(n.metrics),
+        child: NotificationListener<ScrollUpdateNotification>(
+          onNotification: (n) => n.depth == 0 && _update(n.metrics),
+          // Always in the tree, even with nothing to fade: adding and removing
+          // it would remount the list each time it reached an end.
+          child: ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (bounds) {
+              final stop = bounds.height > 0
+                  ? (widget.extent / bounds.height).clamp(0.0, 0.5)
+                  : 0.0;
+              return LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: [0, _before ? stop : 0, _after ? 1 - stop : 1, 1],
+                colors: const [
+                  Colors.transparent,
+                  Colors.white,
+                  Colors.white,
+                  Colors.transparent,
+                ],
+              ).createShader(bounds);
+            },
+            child: widget.child,
+          ),
+        ),
+      );
 }
