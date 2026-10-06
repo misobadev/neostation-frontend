@@ -415,7 +415,6 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.scrapingUnavailableAndroid: 'Scraping non disponibile su Android.',
   AppLocale.achievements: 'Obiettivi',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'Accesso NeoSync',
   AppLocale.neoSyncSynchronizing: 'NeoSync: Sincronizzazione...',
   AppLocale.neoSyncNotConnected: 'NeoSync: Non connesso',

@@ -344,7 +344,6 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.scrapingUnavailableAndroid: 'Android 应用无法抓取。',
   AppLocale.achievements: '成就',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'NeoSync 登录',
   AppLocale.neoSyncSynchronizing: 'NeoSync: 正在同步...',
   AppLocale.neoSyncNotConnected: 'NeoSync: 未连接',

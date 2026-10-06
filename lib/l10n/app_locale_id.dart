@@ -403,7 +403,6 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.scrapingUnavailableAndroid: 'Scraping tidak tersedia di Android.',
   AppLocale.achievements: 'Pencapaian',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'Masuk NeoSync',
   AppLocale.neoSyncSynchronizing: 'NeoSync: Menyingkronkan...',
   AppLocale.neoSyncNotConnected: 'NeoSync: Tidak terhubung',

@@ -494,8 +494,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
 
   /// A selectable box in the app's gamepad focus treatment: the focused item
   /// is tinted, ringed and glowing in the primary colour, and a selection the
-  /// cursor has moved away from keeps a fainter ring. At rest it shows [fill] and
-  /// [resting], so each caller keeps its own card, chip or row look.
+  /// cursor has moved away from keeps a fainter ring. At rest it shows [fill]
+  /// and [resting], so each caller keeps its own card, chip or row look.
   ///
   /// The key goes on the box itself, so it is what tests find and tap.
   Widget _highlight({
@@ -585,7 +585,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
   /// The NeoSync save list's filter chips: tinted while active, ringed while
   /// the controller is on them.
   Widget _filters() {
-    final scheme = Theme.of(context).colorScheme;
     final assets = _saves.assets;
     final counts = [
       assets.length,
@@ -602,46 +601,46 @@ class _RommSavesContentState extends State<RommSavesContent> {
       runSpacing: 8.r,
       children: [
         for (var i = 0; i < 3; i++)
-          Builder(
-            builder: (context) {
-              final focused = _focus == _FocusArea.filters && _filterFocus == i;
-              final color = focused || _filter == i
-                  ? scheme.primary
-                  : scheme.onSurface;
-              return _highlight(
-                key: ValueKey('save-filter-$i'),
-                focused: focused,
-                selected: _filter == i,
-                radius: CornerRadii.of(context).radiusInternal,
-                fill: scheme.surface.withValues(alpha: 0.5),
-                padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
-                onTap: _tap(() => _setFilter(i)),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      labels[i].getString(context),
-                      style: TextStyle(
-                        fontSize: 11.r,
-                        fontWeight: FontWeight.w600,
-                        color: color,
-                      ),
-                    ),
-                    SizedBox(width: 6.r),
-                    Text(
-                      '${counts[i]}',
-                      style: TextStyle(
-                        fontSize: 11.r,
-                        fontWeight: FontWeight.w700,
-                        color: color.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
+          _filterChip(i, labels[i].getString(context), counts[i]),
       ],
+    );
+  }
+
+  Widget _filterChip(int index, String label, int count) {
+    final scheme = Theme.of(context).colorScheme;
+    final focused = _focus == _FocusArea.filters && _filterFocus == index;
+    final selected = _filter == index;
+    final color = focused || selected ? scheme.primary : scheme.onSurface;
+    return _highlight(
+      key: ValueKey('save-filter-$index'),
+      focused: focused,
+      selected: selected,
+      radius: CornerRadii.of(context).radiusInternal,
+      fill: scheme.surface.withValues(alpha: 0.5),
+      padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
+      onTap: _tap(() => _setFilter(index)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.r,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+          SizedBox(width: 6.r),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 11.r,
+              fontWeight: FontWeight.w700,
+              color: color.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

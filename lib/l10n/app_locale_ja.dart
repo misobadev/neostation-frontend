@@ -355,7 +355,6 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.scrapingUnavailableAndroid: 'Androidではスクレイピングを利用できません。',
   AppLocale.achievements: '実績',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'NeoSync ログイン',
   AppLocale.neoSyncSynchronizing: 'NeoSync: 同期中...',
   AppLocale.neoSyncNotConnected: 'NeoSync: 未接続',

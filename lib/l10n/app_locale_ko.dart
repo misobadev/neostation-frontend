@@ -354,7 +354,6 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.scrapingUnavailableAndroid: 'Android 앱은 게임 정보 가져오기를 지원하지 않습니다.',
   AppLocale.achievements: '업적',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'NeoSync 로그인',
   AppLocale.neoSyncSynchronizing: 'NeoSync: 동기화 중...',
   AppLocale.neoSyncNotConnected: 'NeoSync: 연결 안 됨',

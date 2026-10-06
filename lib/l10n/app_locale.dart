@@ -416,7 +416,6 @@ mixin AppLocale {
   // ---------------------------------------------------------------------------
   // NeoSync
   // ---------------------------------------------------------------------------
-  static const String neoSync = 'neo_sync';
   static const String neoSyncLogin = 'neo_sync_login';
   static const String neoSyncSynchronizing = 'neo_sync_synchronizing';
   static const String neoSyncNotConnected = 'neo_sync_not_connected';

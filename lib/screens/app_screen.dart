@@ -750,7 +750,7 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
         return RAContent();
       case AppTabs.romm:
         // RomM tab hosts its own gamepad navigation layer (browse/connect),
-        // so hand off focus like the NeoSync tab does.
+        // so hand off focus like the Saves tab does.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _gamepadNav.deactivate();
         });
