@@ -403,6 +403,166 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final (filter, deleted, body) in [
+    (
+      0,
+      ['save:1', 'state:1'],
+      '1 save file and 1 save state for Alpha Quest will be permanently '
+          'deleted from your RomM server. Copies on your devices are kept, and '
+          'any device that still syncs this game will upload its copies again.',
+    ),
+    (
+      1,
+      ['save:1'],
+      '1 save file for Alpha Quest will be permanently deleted from your RomM '
+          'server. Copies on your devices are kept, and any device that still '
+          'syncs this game will upload its copies again.\n\n'
+          "This game's save states stay on RomM.",
+    ),
+    (
+      2,
+      ['state:1'],
+      '1 save state for Alpha Quest will be permanently deleted from your RomM '
+          'server. Copies on your devices are kept, and any device that still '
+          'syncs this game will upload its copies again.\n\n'
+          "This game's save files stay on RomM.",
+    ),
+  ]) {
+    testWidgets('a focused game deletes what filter $filter shows', (
+      tester,
+    ) async {
+      await manager.setActive('romm', persist: (_) async {});
+      connection.inventory.loadRom = (id) async => RommRom.fromJson({
+        'id': id,
+        'name': id == 1 ? 'Alpha Quest' : 'Beta Saga',
+      });
+      connection.inventory.load = () async => [
+        inventoryAsset('Alpha.srm', time: 300),
+        inventoryAsset('Alpha.state', state: true, time: 200),
+        inventoryAsset('Beta.srm', romId: 2, id: 2, time: 100),
+        inventoryAsset('Beta.state', state: true, romId: 2, id: 2, time: 0),
+      ];
+      await pumpTab(tester);
+      await tester.tap(find.byKey(ValueKey('save-filter-$filter')));
+      await tester.pumpAndSettle();
+      final delete = find.byKey(const ValueKey('save-delete'));
+      bool offered() => tester
+          .widget<Visibility>(
+            find.ancestor(of: delete, matching: find.byType(Visibility)).first,
+          )
+          .visible;
+      expect(offered(), isFalse);
+      await press(tester, LogicalKeyboardKey.arrowDown); // games
+      expect(glows(tester, 'save-game-rom:1'), isTrue);
+      expect(offered(), isTrue);
+
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      expect(find.text(body), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+      expect(connection.inventory.deleted, isEmpty);
+
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Delete'));
+      await tester.pumpAndSettle();
+      expect(connection.inventory.deleted, deleted);
+      expect(notified(), ['Deleted from RomM.']);
+      // The game left the list; the cursor stays in it, on the next game.
+      expect(find.byKey(const ValueKey('save-game-rom:1')), findsNothing);
+      expect(glows(tester, 'save-game-rom:2'), isTrue);
+      expect(offered(), isTrue);
+      expect(romm.calls, 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('the game header scrolls away with a long list of files', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    connection.inventory.load = () async => [
+      for (var i = 0; i < 12; i++)
+        inventoryAsset('Game-$i.srm', id: i, time: 100 - i),
+    ];
+    await pumpTab(tester);
+    Rect card() => tester.getRect(find.byKey(const ValueKey('save-details')));
+    // Scrolled out of view, the header counts as offstage.
+    Rect header() => tester.getRect(
+      find.byKey(const ValueKey('save-header'), skipOffstage: false),
+    );
+    expect(header().top, greaterThan(card().top));
+    await press(tester, LogicalKeyboardKey.arrowDown); // games
+    await press(tester, LogicalKeyboardKey.arrowRight); // files
+    for (var i = 0; i < 12; i++) {
+      if (i > 0) await press(tester, LogicalKeyboardKey.arrowDown);
+      // Below the header or not, each file the cursor reaches is wholly shown.
+      final row = tester.getRect(find.byKey(ValueKey('save-file-false-$i')));
+      expect(row.top, greaterThanOrEqualTo(card().top), reason: 'file $i');
+      expect(row.bottom, lessThanOrEqualTo(card().bottom), reason: 'file $i');
+    }
+    expect(header().bottom, lessThanOrEqualTo(card().top));
+    for (var i = 0; i < 11; i++) {
+      await press(tester, LogicalKeyboardKey.arrowUp);
+    }
+    // The first file brings the header back with it.
+    expect(header().top, greaterThan(card().top));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the first file stays visible below a tall header', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    connection.inventory.loadRom = (id) async => RommRom.fromJson({
+      'id': id,
+      'name': 'A Long Game Title That Wraps Onto Two Lines',
+      'platform_slug': 'snes',
+    });
+    connection.inventory.load = () async => [
+      for (var i = 0; i < 12; i++)
+        inventoryAsset('Game-$i.srm', id: i, time: 100 - i, state: i.isOdd),
+    ];
+    await pumpTab(tester, size: const Size(640, 480), textScale: 2);
+    await press(tester, LogicalKeyboardKey.arrowDown);
+    await press(tester, LogicalKeyboardKey.arrowRight);
+    await press(tester, LogicalKeyboardKey.arrowDown);
+    await press(tester, LogicalKeyboardKey.arrowUp);
+    final card = tester.getRect(find.byKey(const ValueKey('save-details')));
+    final row = tester.getRect(find.byKey(const ValueKey('save-file-false-0')));
+    expect(row.top, greaterThanOrEqualTo(card.top));
+    expect(row.bottom, lessThanOrEqualTo(card.bottom));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('file rows hide the glow beneath them, as game cards do', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    // The glow is a shadow under the box. Through a translucent fill it lit
+    // the whole row, and outlasted the fade as the cursor moved on.
+    void expectOpaque() {
+      for (final key in [
+        'save-game-rom:1',
+        'save-file-false-1',
+        'save-file-true-1',
+      ]) {
+        final box = find.byKey(ValueKey(key));
+        final decoration =
+            tester.widget<AnimatedContainer>(box).decoration! as BoxDecoration;
+        expect(decoration.color!.a, 1, reason: key);
+      }
+    }
+
+    expectOpaque();
+    await press(tester, LogicalKeyboardKey.arrowDown); // games
+    await press(tester, LogicalKeyboardKey.arrowRight); // files
+    expect(glows(tester, 'save-file-false-1'), isTrue);
+    expectOpaque();
+  });
+
   testWidgets('the glow follows controller focus across the screen', (
     tester,
   ) async {

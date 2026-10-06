@@ -13,6 +13,16 @@ const Map<String, dynamic> appLocaleZhHant = {
       '{file} 將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
   AppLocale.rommDeleted: '已從 RomM 刪除。',
   AppLocale.rommDeleteFailed: '無法從 RomM 刪除。請檢查連線和 RomM 權限，然後重試。',
+  AppLocale.rommSaveFileCount: '{count} 個存檔檔案',
+  AppLocale.rommSaveFilesCount: '{count} 個存檔檔案',
+  AppLocale.rommSaveStateCount: '{count} 個即時存檔',
+  AppLocale.rommSaveStatesCount: '{count} 個即時存檔',
+  AppLocale.rommDeleteGameBothConfirm:
+      '{game} 的 {saves}和{states}將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
+  AppLocale.rommDeleteGameConfirm:
+      '{game} 的 {files}將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
+  AppLocale.rommDeleteKeepsSaves: '此遊戲的存檔檔案會保留在 RomM 上。',
+  AppLocale.rommDeleteKeepsStates: '此遊戲的即時存檔會保留在 RomM 上。',
   AppLocale.raEvents: '活動',
   AppLocale.raAotwYearTitle: '本週成就（{year}）',
   AppLocale.raAotw: 'AOTW',

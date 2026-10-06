@@ -16,6 +16,18 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.rommDeleted: 'Eliminado de RomM.',
   AppLocale.rommDeleteFailed:
       'No se pudo eliminar de RomM. Revisa la conexión y los permisos de RomM e inténtalo de nuevo.',
+  AppLocale.rommSaveFileCount: '{count} partida guardada',
+  AppLocale.rommSaveFilesCount: '{count} partidas guardadas',
+  AppLocale.rommSaveStateCount: '{count} estado guardado',
+  AppLocale.rommSaveStatesCount: '{count} estados guardados',
+  AppLocale.rommDeleteGameBothConfirm:
+      'Esto eliminará de forma permanente de tu servidor RomM {saves} y {states} del juego {game}. Las copias de tus dispositivos se conservan, y cualquier dispositivo que aún sincronice este juego volverá a subir sus copias.',
+  AppLocale.rommDeleteGameConfirm:
+      'Esto eliminará de forma permanente de tu servidor RomM {files} del juego {game}. Las copias de tus dispositivos se conservan, y cualquier dispositivo que aún sincronice este juego volverá a subir sus copias.',
+  AppLocale.rommDeleteKeepsSaves:
+      'Las partidas guardadas de este juego se mantienen en RomM.',
+  AppLocale.rommDeleteKeepsStates:
+      'Los estados guardados de este juego se mantienen en RomM.',
   AppLocale.raEvents: 'Eventos',
   AppLocale.raAotwYearTitle: 'Logro de la semana ({year})',
   AppLocale.raAotw: 'AOTW',

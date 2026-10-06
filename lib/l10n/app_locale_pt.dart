@@ -16,6 +16,18 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.rommDeleted: 'Excluído do RomM.',
   AppLocale.rommDeleteFailed:
       'Não foi possível excluir do RomM. Verifique a conexão e as permissões do RomM e tente novamente.',
+  AppLocale.rommSaveFileCount: '{count} arquivo de save',
+  AppLocale.rommSaveFilesCount: '{count} arquivos de save',
+  AppLocale.rommSaveStateCount: '{count} estado salvo',
+  AppLocale.rommSaveStatesCount: '{count} estados salvos',
+  AppLocale.rommDeleteGameBothConfirm:
+      'Esta ação excluirá permanentemente do seu servidor RomM {saves} e {states} do jogo {game}. As cópias nos seus dispositivos são mantidas, e qualquer dispositivo que ainda sincronize este jogo enviará suas cópias novamente.',
+  AppLocale.rommDeleteGameConfirm:
+      'Esta ação excluirá permanentemente do seu servidor RomM {files} do jogo {game}. As cópias nos seus dispositivos são mantidas, e qualquer dispositivo que ainda sincronize este jogo enviará suas cópias novamente.',
+  AppLocale.rommDeleteKeepsSaves:
+      'Os arquivos de save deste jogo continuam no RomM.',
+  AppLocale.rommDeleteKeepsStates:
+      'Os estados salvos deste jogo continuam no RomM.',
   AppLocale.raEvents: 'Eventos',
   AppLocale.raAotwYearTitle: 'Conquista da Semana ({year})',
   AppLocale.raAotw: 'AOTW',

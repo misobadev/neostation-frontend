@@ -199,42 +199,78 @@ class RommSavesProvider extends ChangeNotifier {
     if (!_disposed && generation == _generation) await refresh();
   }
 
-  /// Permanently removes [asset] from the server. Local copies are untouched,
-  /// so a device that still syncs the game uploads its copy again.
-  Future<bool> delete(RommAsset asset) async {
+  /// Permanently removes [assets] from the server. Local copies are untouched,
+  /// so a device that still syncs the game uploads its copies again.
+  ///
+  /// Returns whether all of them are gone. Any that are leave the list even
+  /// when others could not be deleted.
+  Future<bool> delete(List<RommAsset> assets) async {
     if (_disposed ||
+        assets.isEmpty ||
         _loading ||
         _syncing ||
         _deleting ||
         !_browse.isConnected) {
       return false;
     }
+    final generation = _generation;
     _deleting = true;
     notifyListeners();
-    var deleted = false;
+    final gone = <RommAsset>[];
+    for (final isState in [false, true]) {
+      final batch = assets.where((a) => a.isState == isState).toList();
+      if (batch.isNotEmpty) {
+        gone.addAll(await _deleteBatch(batch, generation));
+      }
+    }
+    if (_disposed) return false;
+    _deleting = false;
+    if (generation != _generation) {
+      notifyListeners();
+      return false;
+    }
+    // Drop them locally rather than refreshing, which would reload every
+    // game's artwork. Saves and states are numbered independently, so match
+    // both.
+    _assets = _assets
+        .where((a) => !gone.any((g) => g.isState == a.isState && g.id == a.id))
+        .toList();
+    notifyListeners();
+    return gone.length == assets.length;
+  }
+
+  /// Deletes [batch], all saves or all states as each has its own endpoint, in
+  /// one request. Returns the files no longer on the server.
+  Future<List<RommAsset>> _deleteBatch(
+    List<RommAsset> batch,
+    int generation,
+  ) async {
+    // A connection change can reuse these IDs for unrelated files. Do not
+    // send queued batches or 404 retries after the original session ends.
+    if (_disposed || generation != _generation || !_browse.isConnected) {
+      return const [];
+    }
+    final ids = [for (final asset in batch) asset.id];
     try {
-      final ids = [asset.id];
-      await (asset.isState
+      await (batch.first.isState
           ? _browse.service.deleteStates(ids)
           : _browse.service.deleteSaves(ids));
-      deleted = true;
+      return batch;
     } on RommException catch (error) {
-      // Already gone, e.g. deleted from another device: what the user asked for.
-      deleted = error.statusCode == 404;
+      if (error.statusCode != 404) return const [];
+      // Already gone, e.g. deleted from another device: what the user asked
+      // for. RomM stops a batch with a 404 at the first file it no longer has,
+      // keeping the rest, so a batch goes again a file at a time to finish.
+      if (batch.length == 1) return batch;
+      final gone = <RommAsset>[];
+      for (final asset in batch) {
+        gone.addAll(await _deleteBatch([asset], generation));
+      }
+      return gone;
     } catch (_) {
       // Reported to the caller as a failed delete.
+      return const [];
     }
-    if (_disposed) return deleted;
-    _deleting = false;
-    // Drop it locally rather than refreshing, which would reload every game's
-    // artwork. Saves and states are numbered independently, so match both.
-    if (deleted) {
-      _assets = _assets
-          .where((a) => a.isState != asset.isState || a.id != asset.id)
-          .toList();
-    }
-    notifyListeners();
-    return deleted;
   }
 
   @override

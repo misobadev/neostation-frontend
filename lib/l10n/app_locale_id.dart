@@ -16,6 +16,17 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.rommDeleted: 'Dihapus dari RomM.',
   AppLocale.rommDeleteFailed:
       'Gagal menghapus dari RomM. Periksa koneksi dan izin RomM, lalu coba lagi.',
+  AppLocale.rommSaveFileCount: '{count} berkas simpanan',
+  AppLocale.rommSaveFilesCount: '{count} berkas simpanan',
+  AppLocale.rommSaveStateCount: '{count} status simpanan',
+  AppLocale.rommSaveStatesCount: '{count} status simpanan',
+  AppLocale.rommDeleteGameBothConfirm:
+      '{saves} dan {states} untuk {game} akan dihapus permanen dari server RomM Anda. Salinan di perangkat Anda tetap disimpan, dan perangkat yang masih menyinkronkan game ini akan mengunggah salinannya lagi.',
+  AppLocale.rommDeleteGameConfirm:
+      '{files} untuk {game} akan dihapus permanen dari server RomM Anda. Salinan di perangkat Anda tetap disimpan, dan perangkat yang masih menyinkronkan game ini akan mengunggah salinannya lagi.',
+  AppLocale.rommDeleteKeepsSaves: 'Berkas simpanan game ini tetap ada di RomM.',
+  AppLocale.rommDeleteKeepsStates:
+      'Status simpanan game ini tetap ada di RomM.',
   AppLocale.raEvents: 'Acara',
   AppLocale.raAotwYearTitle: 'Pencapaian Minggu Ini ({year})',
   AppLocale.raAotw: 'AOTW',

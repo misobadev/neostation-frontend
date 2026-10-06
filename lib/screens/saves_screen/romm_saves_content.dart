@@ -16,6 +16,7 @@ import '../../services/game_service.dart' show GamepadNavigationManager;
 import '../../services/sfx_service.dart';
 import '../../sync/sync_manager.dart';
 import '../../themes/corner_radii.dart';
+import '../../utils/count_label.dart';
 import '../../utils/gamepad_nav.dart';
 import '../../widgets/confirm_action_dialog.dart';
 import '../../widgets/core_footer.dart' show GamepadControl;
@@ -27,7 +28,8 @@ import 'romm_save_artwork.dart';
 enum _FocusArea { filters, games, files }
 
 /// A game-first view of RomM's inventory. Browsing is always read-only; the
-/// only change it can make is a confirmed delete of the focused file.
+/// only change it can make is a confirmed delete of the focused file, or of
+/// every file the filter shows for the focused game.
 class RommSavesContent extends StatefulWidget {
   const RommSavesContent({super.key});
 
@@ -40,6 +42,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
   late final GamepadNavigation _navigation;
   final _gamesScroll = ScrollController();
   final _filesScroll = ScrollController();
+  // The selected game's header, which scrolls with its files.
+  final _headerKey = GlobalKey();
   _FocusArea _focus = _FocusArea.filters;
   int _filter = 0;
   int _filterFocus = 0;
@@ -58,13 +62,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
   );
   bool get _busy => _saves.loading || _saves.syncing || _saves.deleting;
 
-  RommAsset? get _focusedFile {
-    final games = _games;
-    if (_focus != _FocusArea.files || games.isEmpty) return null;
-    final files = games[_gameIndex].assets;
-    return _fileIndex < files.length ? files[_fileIndex] : null;
-  }
-
   // Accommodate both ScreenUtil and accessibility text scaling. Each extent is
   // the row's content, its padding and widest border, the gap below it, and a
   // little slack.
@@ -79,6 +76,13 @@ class _RommSavesContentState extends State<RommSavesContent> {
   /// Padding inside both lists. It is the room the focus glow draws into, so
   /// the lists' clipping never cuts it off.
   double get _listInset => 8.r;
+
+  /// How far the selected game's header pushes its files down: nothing while
+  /// the card is too short to show it.
+  double get _headerExtent {
+    final header = _headerKey.currentContext?.findRenderObject();
+    return header is RenderBox && header.hasSize ? header.size.height : 0;
+  }
 
   @override
   void initState() {
@@ -194,11 +198,13 @@ class _RommSavesContentState extends State<RommSavesContent> {
     final position = controller.position;
     final index = files ? _fileIndex : _gameIndex;
     final extent = files ? _fileExtent : _gameExtent;
+    final header = files ? _headerExtent : 0.0;
     // The row and the list padding either side of it stay on screen, so it is
     // never under the edge fade and its glow has room. That also scrolls the
-    // first and last rows fully to the ends.
-    final top = index * extent;
-    final bottom = top + extent + 2 * _listInset;
+    // first and last rows fully to the ends, the first bringing the header
+    // back with it.
+    final top = index == 0 ? 0.0 : header + index * extent;
+    final bottom = header + (index + 1) * extent + 2 * _listInset;
     final offset = top < position.pixels
         ? top
         : bottom > position.pixels + position.viewportDimension
@@ -251,33 +257,47 @@ class _RommSavesContentState extends State<RommSavesContent> {
         type: error ? NotificationType.error : NotificationType.success,
       );
 
-  /// Select deletes the focused file, as it does in the NeoSync save list.
-  /// Elsewhere it keeps its app-wide meaning instead of doing nothing.
+  /// Select deletes the focused file, as it does in the NeoSync save list, or
+  /// from the game list, the game's files. On the filters it keeps its
+  /// app-wide meaning instead of doing nothing.
   void _select() {
-    if (_focus == _FocusArea.files) {
-      _deleteFocusedFile();
-    } else {
+    if (_focus == _FocusArea.filters) {
       GamepadNavigation.globalSelectTap?.call();
+    } else {
+      _deleteFocused();
     }
   }
 
-  Future<void> _deleteFocusedFile() async {
-    final file = _focusedFile;
-    if (file == null || _busy) return;
+  /// A game's delete takes every file the filter shows for it: saves and
+  /// states under All, and only the one kind under Saves or States.
+  Future<void> _deleteFocused() async {
+    final games = _games;
+    if (_busy || _gameIndex >= games.length) return;
+    final game = games[_gameIndex];
+    final files = switch (_focus) {
+      _FocusArea.games => game.assets,
+      _FocusArea.files when _fileIndex < game.assets.length => [
+        game.assets[_fileIndex],
+      ],
+      _ => const <RommAsset>[],
+    };
+    if (files.isEmpty) return;
     // The navigator voices no Select tap, so this covers it as well as clicks.
     SfxService().playNavSound();
     final confirmed = await ConfirmActionDialog.show(
       context,
       title: AppLocale.rommDeleteTitle.getString(context),
-      body: AppLocale.rommDeleteConfirm
-          .getString(context)
-          .replaceFirst('{file}', file.fileName),
+      body: _focus == _FocusArea.games
+          ? _gameDeleteBody(game)
+          : AppLocale.rommDeleteConfirm
+                .getString(context)
+                .replaceFirst('{file}', files.single.fileName),
       confirmLabel: AppLocale.delete.getString(context),
       icon: Symbols.delete_forever_rounded,
       maxWidth: 320.r,
     );
     if (!mounted || !confirmed) return;
-    final deleted = await _saves.delete(file);
+    final deleted = await _saves.delete(files);
     if (!mounted) return;
     _notify(
       deleted ? AppLocale.rommDeleted : AppLocale.rommDeleteFailed,
@@ -287,18 +307,47 @@ class _RommSavesContentState extends State<RommSavesContent> {
     // The build keeps the cursor on a neighbouring file. When the game's last
     // file went, stay at the same spot in the game list rather than letting the
     // build fall back to the first game.
-    final games = _games;
+    final remaining = _games;
     setState(() {
-      if (games.isEmpty) {
+      if (remaining.isEmpty) {
         _focus = _FocusArea.filters;
-      } else if (games.every((game) => game.key != _gameKey)) {
+      } else if (remaining.every((other) => other.key != _gameKey)) {
         _focus = _FocusArea.games;
-        _selectGame(math.min(_gameIndex, games.length - 1), games);
+        _selectGame(math.min(_gameIndex, remaining.length - 1), remaining);
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _revealSelection();
     });
+  }
+
+  /// Says exactly what deleting [game] from the game list removes: how many of
+  /// each kind, and that the kind the filter hides stays.
+  String _gameDeleteBody(RommSaveGame game) {
+    final title =
+        _saves.loadedGameInfo(game.romId)?.rom?.name ?? game.fallbackTitle;
+    final saves = saveFilesCountLabel(context, game.saves);
+    final states = saveStatesCountLabel(context, game.states);
+    final body = game.saves > 0 && game.states > 0
+        ? AppLocale.rommDeleteGameBothConfirm
+              .getString(context)
+              .replaceFirst('{saves}', saves)
+              .replaceFirst('{states}', states)
+        : AppLocale.rommDeleteGameConfirm
+              .getString(context)
+              .replaceFirst('{files}', game.saves > 0 ? saves : states);
+    final whole = RommSaveGame.group(
+      _saves.assets,
+    ).firstWhere((other) => other.key == game.key, orElse: () => game);
+    return [
+      // The title goes in last, so braces in it are never taken for one of
+      // the other placeholders.
+      body.replaceFirst('{game}', title),
+      if (whole.saves > game.saves)
+        AppLocale.rommDeleteKeepsSaves.getString(context),
+      if (whole.states > game.states)
+        AppLocale.rommDeleteKeepsStates.getString(context),
+    ].join('\n\n');
   }
 
   /// L2/R2 cycle the filters, wrapping like L1/R1 do the tabs. Focus stays
@@ -447,16 +496,16 @@ class _RommSavesContentState extends State<RommSavesContent> {
               spacing: 8.r,
               runSpacing: 6.r,
               children: [
-                // Only offered while a file is focused, which is also when
-                // Select means Delete. Its space is kept so the rest of the
-                // row doesn't move as the cursor goes between panes.
+                // Only offered while a game or a file is focused, which is
+                // also when Select means Delete. Its space is kept so the rest
+                // of the row doesn't move as the cursor reaches the filters.
                 Visibility.maintain(
-                  visible: _focus == _FocusArea.files,
+                  visible: _focus != _FocusArea.filters,
                   child: GamepadControl(
                     key: const ValueKey('save-delete'),
                     label: AppLocale.delete.getString(context),
                     iconPath: 'assets/images/gamepad/Xbox_View_button.png',
-                    onTap: _busy ? null : _deleteFocusedFile,
+                    onTap: _busy ? null : _deleteFocused,
                     textColor: scheme.onError,
                     backgroundColor: scheme.error,
                   ),
@@ -806,32 +855,39 @@ class _RommSavesContentState extends State<RommSavesContent> {
         // Keeps scrolled file rows inside the rounded corners.
         clipBehavior: Clip.antiAlias,
         decoration: _cardDecoration(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showHeader)
-              FutureBuilder<RommSaveGameInfo>(
-                key: ValueKey(game.key),
-                future: _saves.gameInfo(game.romId),
-                initialData: _saves.loadedGameInfo(game.romId),
-                builder: (context, snapshot) =>
-                    _detailsHeader(game, snapshot.data),
-              ),
-            Expanded(
-              child: _EdgeFade(
-                extent: _listInset,
-                child: ListView.builder(
-                  key: ValueKey('files-${game.key}-$_filter'),
-                  controller: _filesScroll,
-                  padding: EdgeInsets.all(_listInset),
+        child: _EdgeFade(
+          extent: _listInset,
+          // The header scrolls away with the files, so a long list gets the
+          // whole card.
+          child: CustomScrollView(
+            key: ValueKey('files-${game.key}-$_filter'),
+            controller: _filesScroll,
+            slivers: [
+              if (showHeader)
+                SliverToBoxAdapter(
+                  child: KeyedSubtree(
+                    key: _headerKey,
+                    child: FutureBuilder<RommSaveGameInfo>(
+                      key: ValueKey(game.key),
+                      future: _saves.gameInfo(game.romId),
+                      initialData: _saves.loadedGameInfo(game.romId),
+                      builder: (context, snapshot) =>
+                          _detailsHeader(game, snapshot.data),
+                    ),
+                  ),
+                ),
+              SliverPadding(
+                padding: EdgeInsets.all(_listInset),
+                sliver: SliverFixedExtentList(
                   itemExtent: _fileExtent,
-                  itemCount: game.assets.length,
-                  itemBuilder: (context, index) =>
-                      _fileRow(game.assets[index], index),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _fileRow(game.assets[index], index),
+                    childCount: game.assets.length,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     },
@@ -841,6 +897,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
   Widget _detailsHeader(RommSaveGame game, RommSaveGameInfo? info) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
+      key: const ValueKey('save-header'),
       padding: EdgeInsets.fromLTRB(8.r, 8.r, 8.r, 0),
       child: ClipRRect(
         borderRadius: CornerRadii.of(context).radiusInternal,
@@ -915,7 +972,11 @@ class _RommSavesContentState extends State<RommSavesContent> {
         key: ValueKey('save-file-${file.isState}-${file.id}'),
         focused: focused,
         radius: radius,
-        fill: scheme.primary.withValues(alpha: 0),
+        // The card's own colour, but opaque, as the game cards are. The glow
+        // is a shadow painted beneath the box: through a clear fill it tinted
+        // the whole row, and since a fading glow shrinks rather than dims, the
+        // old row stayed lit until the new one had finished lighting up.
+        fill: scheme.surface,
         resting: BorderSide(color: scheme.outline, width: 1.r),
         padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 8.r),
         onTap: _tap(

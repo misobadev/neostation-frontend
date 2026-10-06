@@ -13,6 +13,16 @@ const Map<String, dynamic> appLocaleJa = {
       '{file} をRomMサーバーから完全に削除します。デバイス上のコピーは残り、このゲームの同期を続けているデバイスからは再びアップロードされます。',
   AppLocale.rommDeleted: 'RomMから削除しました。',
   AppLocale.rommDeleteFailed: 'RomMから削除できませんでした。接続とRomMの権限を確認して再試行してください。',
+  AppLocale.rommSaveFileCount: 'セーブデータ{count}件',
+  AppLocale.rommSaveFilesCount: 'セーブデータ{count}件',
+  AppLocale.rommSaveStateCount: 'セーブステート{count}件',
+  AppLocale.rommSaveStatesCount: 'セーブステート{count}件',
+  AppLocale.rommDeleteGameBothConfirm:
+      '{game} の{saves}と{states}をRomMサーバーから完全に削除します。デバイス上のコピーは残り、このゲームの同期を続けているデバイスからは再びアップロードされます。',
+  AppLocale.rommDeleteGameConfirm:
+      '{game} の{files}をRomMサーバーから完全に削除します。デバイス上のコピーは残り、このゲームの同期を続けているデバイスからは再びアップロードされます。',
+  AppLocale.rommDeleteKeepsSaves: 'このゲームのセーブデータはRomMに残ります。',
+  AppLocale.rommDeleteKeepsStates: 'このゲームのセーブステートはRomMに残ります。',
   AppLocale.raEvents: 'イベント',
   AppLocale.raAotwYearTitle: '今週のアチーブメント（{year}）',
   AppLocale.raAotw: 'AOTW',

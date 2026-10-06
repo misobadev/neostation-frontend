@@ -16,6 +16,17 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.rommDeleted: 'Удалено из RomM.',
   AppLocale.rommDeleteFailed:
       'Не удалось удалить из RomM. Проверьте подключение и разрешения RomM, затем повторите попытку.',
+  AppLocale.rommSaveFileCount: '{count} файл сохранения',
+  AppLocale.rommSaveFilesCount: '{count} файлов сохранения',
+  AppLocale.rommSaveStateCount: '{count} состояние игры',
+  AppLocale.rommSaveStatesCount: '{count} состояний игры',
+  AppLocale.rommDeleteGameBothConfirm:
+      'Это безвозвратно удалит с вашего сервера RomM {saves} и {states} для {game}. Копии на ваших устройствах сохранятся, а устройства, которые всё ещё синхронизируют эту игру, снова отправят свои копии.',
+  AppLocale.rommDeleteGameConfirm:
+      'Это безвозвратно удалит с вашего сервера RomM {files} для {game}. Копии на ваших устройствах сохранятся, а устройства, которые всё ещё синхронизируют эту игру, снова отправят свои копии.',
+  AppLocale.rommDeleteKeepsSaves:
+      'Файлы сохранения этой игры останутся в RomM.',
+  AppLocale.rommDeleteKeepsStates: 'Состояния этой игры останутся в RomM.',
   AppLocale.raEvents: 'События',
   AppLocale.raAotwYearTitle: 'Достижение недели ({year})',
   AppLocale.raAotw: 'AOTW',

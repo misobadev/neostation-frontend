@@ -202,9 +202,9 @@ void main() {
       await inventory.refresh();
       final request = Completer<void>();
       connection.inventory.beforeDelete = () => request.future;
-      final pending = inventory.delete(inventory.assets.last);
+      final pending = inventory.delete([inventory.assets.last]);
       expect(inventory.deleting, isTrue);
-      expect(await inventory.delete(inventory.assets.first), isFalse);
+      expect(await inventory.delete([inventory.assets.first]), isFalse);
       request.complete();
       expect(await pending, isTrue);
       // Saves and states share id 1 here; only the state may go.
@@ -227,13 +227,106 @@ void main() {
         final b = inventory.assets.firstWhere((x) => x.fileName == 'b.srm');
         connection.inventory.beforeDelete = () async =>
             throw RommException('Delete failed (404)', statusCode: 404);
-        expect(await inventory.delete(a), isTrue);
+        expect(await inventory.delete([a]), isTrue);
         connection.inventory.beforeDelete = () async =>
             throw RommException('Delete failed (403)', statusCode: 403);
-        expect(await inventory.delete(b), isFalse);
+        expect(await inventory.delete([b]), isFalse);
         expect(inventory.assets.map((x) => x.fileName), ['b.srm']);
         expect(inventory.deleting, isFalse);
       },
     );
+
+    test(
+      'a game deletes with one request for saves and one for states',
+      () async {
+        connection.inventory.load = () async => [
+          inventoryAsset('a.srm', id: 1),
+          inventoryAsset('b.srm', id: 2),
+          inventoryAsset('c.state', state: true, id: 1),
+          inventoryAsset('other.srm', romId: 2, id: 3),
+        ];
+        await inventory.refresh();
+        final game = inventory.assets.where((a) => a.romId == 1).toList();
+        expect(await inventory.delete(game), isTrue);
+        expect(connection.inventory.deleteRequests, ['save:1,2', 'state:1']);
+        expect(inventory.assets.map((a) => a.fileName), ['other.srm']);
+        expect(connection.inventory.calls, 1);
+      },
+    );
+
+    test('a batch RomM stops short is finished a file at a time', () async {
+      connection.inventory.load = () async => [
+        inventoryAsset('a.srm', id: 1),
+        inventoryAsset('b.srm', id: 2),
+        inventoryAsset('c.srm', id: 3),
+      ];
+      await inventory.refresh();
+      // Deleted from another device: RomM removes a.srm, then stops at b.srm.
+      connection.inventory.gone.add('save:2');
+      expect(await inventory.delete(inventory.assets), isTrue);
+      expect(connection.inventory.deleteRequests, [
+        'save:1,2,3',
+        'save:1',
+        'save:2',
+        'save:3',
+      ]);
+      expect(connection.inventory.deleted, ['save:1', 'save:3']);
+      expect(inventory.assets, isEmpty);
+    });
+
+    test('a partly failed delete drops only what went', () async {
+      connection.inventory.load = () async => [
+        inventoryAsset('Game.srm'),
+        inventoryAsset('Game.state', state: true),
+      ];
+      await inventory.refresh();
+      var requests = 0;
+      // Saves go first; the states request is refused.
+      connection.inventory.beforeDelete = () async {
+        if (++requests == 2) {
+          throw RommException('Delete failed (403)', statusCode: 403);
+        }
+      };
+      expect(await inventory.delete(inventory.assets), isFalse);
+      expect(inventory.assets.map((a) => a.fileName), ['Game.state']);
+      expect(inventory.deleting, isFalse);
+    });
+
+    for (final missingFile in [false, true]) {
+      test(
+        'a connection change stops pending deletes (404: $missingFile)',
+        () async {
+          connection.inventory.load = () async => [
+            inventoryAsset('old.srm', id: 1, time: 100),
+            inventoryAsset('old-backup.srm', id: 2),
+            inventoryAsset('old.state', state: true, id: 1),
+          ];
+          await inventory.refresh();
+          final request = Completer<void>();
+          connection.inventory.beforeDelete = () => request.future;
+          if (missingFile) connection.inventory.gone.add('save:1');
+          final pending = inventory.delete(inventory.assets);
+
+          // IDs may be reused by another server/account. Neither queued state
+          // deletes nor single-file retries belong to the new connection.
+          connection.disconnectForTest();
+          connection.connected = true;
+          connection.inventory.load = () async => [
+            inventoryAsset('new.srm', id: 1),
+            inventoryAsset('new.state', state: true, id: 1),
+          ];
+          await inventory.refresh();
+          request.complete();
+
+          expect(await pending, isFalse);
+          expect(connection.inventory.deleteRequests, ['save:1,2']);
+          expect(inventory.assets.map((a) => a.fileName), [
+            'new.srm',
+            'new.state',
+          ]);
+          expect(inventory.deleting, isFalse);
+        },
+      );
+    }
   });
 }

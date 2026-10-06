@@ -1472,6 +1472,17 @@ mixin AppLocale {
   static const String rommDeleteConfirm = 'romm_delete_confirm';
   static const String rommDeleted = 'romm_deleted';
   static const String rommDeleteFailed = 'romm_delete_failed';
+  // Deleting a whole game from the game list. Counts follow the singular/plural
+  // pattern described at gamesCount; use lib/utils/count_label.dart.
+  static const String rommSaveFileCount = 'romm_save_file_count';
+  static const String rommSaveFilesCount = 'romm_save_files_count';
+  static const String rommSaveStateCount = 'romm_save_state_count';
+  static const String rommSaveStatesCount = 'romm_save_states_count';
+  static const String rommDeleteGameBothConfirm =
+      'romm_delete_game_both_confirm';
+  static const String rommDeleteGameConfirm = 'romm_delete_game_confirm';
+  static const String rommDeleteKeepsSaves = 'romm_delete_keeps_saves';
+  static const String rommDeleteKeepsStates = 'romm_delete_keeps_states';
 
   // Link action on search results
   static const String searchLinkToRomm = 'search_link_to_romm';

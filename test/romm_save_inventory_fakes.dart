@@ -13,6 +13,14 @@ class InventoryService extends RommService {
 
   /// `save:<id>` / `state:<id>` for every successful delete.
   final List<String> deleted = [];
+
+  /// Every delete request, as `save:<ids>` / `state:<ids>`.
+  final List<String> deleteRequests = [];
+
+  /// `save:<id>` / `state:<id>` for files no longer on the server. As RomM
+  /// does, a request deletes its files in order and stops with a 404 at the
+  /// first of these.
+  final Set<String> gone = {};
   Future<void> Function() beforeDelete = () async {};
 
   @override
@@ -34,8 +42,14 @@ class InventoryService extends RommService {
   Future<void> deleteStates(List<int> assetIds) => _delete('state', assetIds);
 
   Future<void> _delete(String kind, List<int> assetIds) async {
+    deleteRequests.add('$kind:${assetIds.join(',')}');
     await beforeDelete();
-    deleted.addAll([for (final id in assetIds) '$kind:$id']);
+    for (final id in assetIds) {
+      if (!gone.add('$kind:$id')) {
+        throw RommException('Delete failed (404)', statusCode: 404);
+      }
+      deleted.add('$kind:$id');
+    }
   }
 }
 
