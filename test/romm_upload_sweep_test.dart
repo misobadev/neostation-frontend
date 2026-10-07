@@ -537,19 +537,21 @@ void main() {
       },
     );
 
-    test('sweepRunning is up for exactly the length of a sweep', () async {
+    test('runningSweep is the sweep in progress, then null', () async {
       await linked('Watched', romId: 60);
-      final seen = <bool>[];
-      provider.sweepRunning.addListener(
-        () => seen.add(provider.sweepRunning.value),
+      final seen = <Future<SyncResult>?>[];
+      provider.runningSweep.addListener(
+        () => seen.add(provider.runningSweep.value),
       );
 
       final first = provider.retryPendingUploads();
-      expect(provider.sweepRunning.value, isTrue);
+      final running = provider.runningSweep.value;
+      expect(running, isNotNull);
       await provider.retryPendingUploads();
-      await first;
+      final result = await first;
 
-      expect(seen, [true, false], reason: 'a busy call changes nothing');
+      expect(seen, [running, null], reason: 'a busy call changes nothing');
+      expect(await running, same(result), reason: 'followers get its result');
     });
   });
 }

@@ -105,17 +105,17 @@ void main() {
     late InventoryConnection connection;
     late InventorySync sync;
     late RommSavesProvider inventory;
-    // The RomM provider's sweep state, which the fake sync does not have.
-    late ValueNotifier<bool> sweep;
+    // The RomM provider's running sweep, which the fake sync does not have.
+    late ValueNotifier<Future<SyncResult>?> sweep;
     final manager = SyncManager.instance;
     setUp(() async {
       connection = InventoryConnection();
       sync = InventorySync('romm');
-      sweep = ValueNotifier(false);
+      sweep = ValueNotifier(null);
       manager.register(sync);
       manager.register(InventorySync('neosync'));
       await manager.setActive('romm', persist: (_) async {});
-      inventory = RommSavesProvider(connection, manager, sweepRunning: sweep);
+      inventory = RommSavesProvider(connection, manager, runningSweep: sweep);
     });
     tearDown(() {
       inventory.dispose();
@@ -202,13 +202,16 @@ void main() {
     test(
       'a sweep started elsewhere shows as syncing, then refreshes',
       () async {
-        sweep.value = true;
+        final run = Completer<SyncResult>();
+        sweep.value = run.future;
         expect(inventory.syncing, isTrue);
         await inventory.retryUploads();
-        expect(sync.calls, 0, reason: 'a retry would only overlap it');
-        sweep.value = false;
-        expect(inventory.syncing, isFalse);
+        expect(sync.calls, 0, reason: 'a retry while it runs does nothing');
+        run.complete(SyncResult.ok());
+        sweep.value = null;
         await pumpEventQueue();
+        expect(inventory.syncing, isFalse);
+        expect(inventory.syncResult?.success, isTrue);
         expect(
           connection.inventory.calls,
           1,
@@ -217,12 +220,51 @@ void main() {
       },
     );
 
+    test('a failed sweep started elsewhere fails as a retry would', () async {
+      final run = Completer<SyncResult>();
+      sweep.value = run.future;
+      run.complete(SyncResult.fail(SyncError.unknown));
+      sweep.value = null;
+      await pumpEventQueue();
+      expect(inventory.syncResult?.success, isFalse);
+      expect(inventory.syncResult?.error, SyncError.unknown);
+    });
+
+    test('a sweep already running when the tab opens is followed', () async {
+      final run = Completer<SyncResult>();
+      sweep.value = run.future;
+      final opened = RommSavesProvider(
+        connection,
+        manager,
+        runningSweep: sweep,
+      );
+      addTearDown(opened.dispose);
+      expect(opened.syncing, isTrue);
+      run.complete(SyncResult.fail(SyncError.unknown));
+      sweep.value = null;
+      await pumpEventQueue();
+      expect(opened.syncing, isFalse);
+      expect(opened.syncResult?.success, isFalse);
+    });
+
+    test('a sweep that ends after a disconnect reports nothing', () async {
+      final run = Completer<SyncResult>();
+      sweep.value = run.future;
+      connection.disconnectForTest();
+      run.complete(SyncResult.fail(SyncError.authRequired));
+      sweep.value = null;
+      await pumpEventQueue();
+      expect(inventory.syncResult, isNull);
+      expect(connection.inventory.calls, 0);
+    });
+
     test('a retry refreshes once, not again when its sweep ends', () async {
       sync.run = () async {
-        sweep.value = true;
-        await Future<void>.delayed(Duration.zero);
-        sweep.value = false;
-        return SyncResult.ok();
+        final run = Future.value(SyncResult.ok());
+        sweep.value = run;
+        final result = await run;
+        sweep.value = null;
+        return result;
       };
       await inventory.retryUploads();
       await pumpEventQueue();
@@ -238,8 +280,10 @@ void main() {
       final request = Completer<void>();
       connection.inventory.beforeDelete = () => request.future;
       final pending = inventory.delete(inventory.assets.toList());
-      sweep.value = true;
-      sweep.value = false;
+      sweep.value = Future.value(SyncResult.ok());
+      sweep.value = null;
+      // Its end is handled while the delete still waits on the server.
+      await pumpEventQueue();
       request.complete();
       expect(await pending, isTrue);
       expect(connection.inventory.deleted, ['save:1', 'state:1']);

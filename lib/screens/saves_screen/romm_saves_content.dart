@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_locale.dart';
 import '../../models/romm_asset.dart';
 import '../../models/romm_save_game.dart';
-import '../../models/sync_models.dart' show SyncError;
+import '../../models/sync_models.dart' show SyncError, SyncResult;
 import '../../providers/file_provider.dart';
 import '../../providers/romm_provider.dart';
 import '../../providers/romm_saves_provider.dart';
@@ -55,6 +55,9 @@ class _RommSavesContentState extends State<RommSavesContent> {
   // metadata, so file-derived names never flash up before the real ones.
   Future<void>? _firstPage;
   bool _ready = false;
+  // The sync result last reported, so each is reported once however often the
+  // inventory notifies.
+  SyncResult? _reportedSync;
 
   List<RommSaveGame> get _games => RommSaveGame.group(
     _saves.assets
@@ -92,7 +95,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
       context.read<RommProvider>(),
       context.read<SyncManager>(),
       fileProvider: context.read<FileProvider?>(),
-    );
+    )..addListener(_reportSync);
     _navigation = GamepadNavigation(
       onNavigateUp: () => _vertical(-1),
       onNavigateDown: () => _vertical(1),
@@ -238,12 +241,20 @@ class _RommSavesContentState extends State<RommSavesContent> {
   Future<void> _retryUploads() async {
     if (_busy) return;
     await _saves.retryUploads();
-    // A successful retry needs no message, and nor does one that found a sweep
-    // already running: the button shows that one as it runs.
+  }
+
+  /// Reports a failed sync, whether a retry or a sweep this tab did not start
+  /// (the automatic one after connect), the same way. A success needs no
+  /// message, and nor does a retry that found a sweep already running: the
+  /// button shows that one as it runs.
+  void _reportSync() {
     final result = _saves.syncResult;
+    if (identical(result, _reportedSync)) return;
+    _reportedSync = result;
     if (mounted &&
-        result?.success == false &&
-        result?.error != SyncError.busy) {
+        result != null &&
+        !result.success &&
+        result.error != SyncError.busy) {
       _notify(AppLocale.rommUploadsFailed);
     }
   }

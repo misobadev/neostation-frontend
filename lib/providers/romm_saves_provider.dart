@@ -18,25 +18,28 @@ class RommSavesProvider extends ChangeNotifier {
   RommSavesProvider(
     this._browse,
     this._manager, {
-    ValueListenable<bool>? sweepRunning,
+    ValueListenable<Future<SyncResult>?>? runningSweep,
     FileProvider? fileProvider,
     Future<String?> Function(int)? loadLocalCover,
-  }) : _sweep = sweepRunning ?? _rommSweep(_manager),
+  }) : _sweep = runningSweep ?? _rommSweep(_manager),
        _files = fileProvider,
        _loadLocalCover = loadLocalCover {
     _browse.addListener(_connectionChanged);
     _sweep?.addListener(_sweepChanged);
+    // One already running when the tab opens is followed like a later one.
+    final running = _sweep?.value;
+    if (running != null) _followSweep(running);
   }
 
-  /// The RomM provider's sweep state, when RomM is registered.
-  static ValueListenable<bool>? _rommSweep(SyncManager manager) {
+  /// The RomM provider's running sweep, when RomM is registered.
+  static ValueListenable<Future<SyncResult>?>? _rommSweep(SyncManager manager) {
     final romm = manager.provider(RomMSyncProvider.kProviderId);
-    return romm is RomMSyncProvider ? romm.sweepRunning : null;
+    return romm is RomMSyncProvider ? romm.runningSweep : null;
   }
 
   final RommProvider _browse;
   final SyncManager _manager;
-  final ValueListenable<bool>? _sweep;
+  final ValueListenable<Future<SyncResult>?>? _sweep;
   final FileProvider? _files;
   final Future<String?> Function(int)? _loadLocalCover;
   final _metadataGate = LifoSemaphore(3);
@@ -58,7 +61,7 @@ class RommSavesProvider extends ChangeNotifier {
 
   /// True during a retry, and during a sweep this provider did not start, such
   /// as the automatic one after connect, since a retry would only overlap it.
-  bool get syncing => _syncing || (_sweep?.value ?? false);
+  bool get syncing => _syncing || _sweep?.value != null;
   bool get deleting => _deleting;
   Object? get loadError => _loadError;
   SyncResult? get syncResult => _syncResult;
@@ -159,14 +162,29 @@ class RommSavesProvider extends ChangeNotifier {
   }
 
   /// A sweep started elsewhere shows here as a retry would: busy while it
-  /// runs, then a refresh so its uploads appear. A retry's own sweep is left to
-  /// [retryUploads], which already does both.
+  /// runs, then its result and a refresh so its uploads appear. A retry's own
+  /// sweep is left to [retryUploads], which already does both.
   void _sweepChanged() {
     if (_disposed || _syncing) return;
     notifyListeners();
+    final running = _sweep!.value;
+    if (running != null) _followSweep(running);
+  }
+
+  Future<void> _followSweep(Future<SyncResult> sweep) async {
+    SyncResult result;
+    try {
+      result = await sweep;
+    } catch (_) {
+      result = SyncResult.fail(SyncError.unknown);
+    }
+    // A disconnect has already cleared this session's state.
+    if (_disposed || !_browse.isConnected) return;
+    _syncResult = result;
+    notifyListeners();
     // A refresh would make an in-flight delete abandon its remaining batches
     // and report failure; the next refresh shows the uploads instead.
-    if (!_sweep!.value && !_deleting) refresh();
+    if (!_deleting) await refresh();
   }
 
   Future<void> refresh() async {
@@ -222,7 +240,8 @@ class RommSavesProvider extends ChangeNotifier {
     }
     // A busy result means another sweep (the automatic one after connect) is
     // still uploading, so a refresh now would miss its files and reload every
-    // game's artwork for nothing. [_sweepChanged] refreshes when it ends.
+    // game's artwork for nothing. [_followSweep] takes its result and
+    // refreshes when it ends.
     if (!_disposed &&
         generation == _generation &&
         _syncResult?.error != SyncError.busy) {
