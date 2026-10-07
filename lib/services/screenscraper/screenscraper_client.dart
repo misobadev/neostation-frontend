@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -10,7 +11,7 @@ import '../../utils/semaphore.dart';
 
 /// HTTP transport, rate limiting, and request identity for ScreenScraper.
 ///
-/// Owns the shared HTTP client (with the legacy bad-cert bypass), the request
+/// Owns the shared HTTP client (certificate-verifying), the request
 /// semaphore and the rolling daily-request counter, and builds the softname that
 /// identifies NeoStation to the API. [httpGetWithRetry] performs every GET with
 /// exponential backoff, concurrency limiting and daily-quota enforcement; the
@@ -56,13 +57,19 @@ class ScreenscraperClient {
     }
   }
 
-  /// Persistent HTTP client with SSL certificate validation bypass for legacy compatibility.
-  static final http.Client _httpClient = () {
-    final client = HttpClient()
-      ..badCertificateCallback =
-          ((X509Certificate cert, String host, int port) => true);
-    return IOClient(client);
-  }();
+  /// Persistent HTTP client shared by every ScreenScraper request.
+  static final http.Client _httpClient = createHttpClient();
+
+  /// Builds the HTTP client used for ScreenScraper requests.
+  ///
+  /// Certificates are verified against the platform's trusted roots. Every
+  /// request carries the developer and user credentials in its query string,
+  /// so a client that accepted any certificate would hand them to anyone able
+  /// to intercept the connection. [context] replaces the trusted roots in
+  /// tests.
+  @visibleForTesting
+  static http.Client createHttpClient({SecurityContext? context}) =>
+      IOClient(HttpClient(context: context));
 
   static Semaphore _requestSemaphore = Semaphore(5);
 

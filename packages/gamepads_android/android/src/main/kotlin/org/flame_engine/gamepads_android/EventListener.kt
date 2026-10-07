@@ -39,7 +39,11 @@ class EventListener {
             "time" to keyEvent.eventTime,
             "type" to "button",
             "key" to KeyEvent.keyCodeToString(keyEvent.keyCode),
-            "value" to keyEvent.action.toDouble()
+            "value" to keyEvent.action.toDouble(),
+            // 0 for the physical press/release; 1+ for the ACTION_DOWNs Android
+            // auto-repeats while the button is held. Lets the Dart side tell a
+            // held button from a new press.
+            "repeat" to keyEvent.repeatCount
         )
         channel.invokeMethod("onGamepadEvent", arguments)
         return true

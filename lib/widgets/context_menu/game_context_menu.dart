@@ -40,6 +40,7 @@ class GameContextMenuTarget {
 const String _settingsId = 'settings';
 const String _createId = 'create';
 const String _scrapeId = 'scrape';
+const String _identifyId = 'identify';
 const String _viewModeId = 'view_mode';
 const String _randomId = 'random';
 const String _searchId = 'search';
@@ -72,6 +73,10 @@ const String _togglePrefix = 'toggle:';
 /// no ScreenScraper mapping — so the row is absent rather than present and
 /// silently inert.
 ///
+/// [onIdentify] follows `Scrape` and is bound under the same condition. It
+/// opens a ScreenScraper search so the user can point a game that was matched
+/// wrongly (or not at all) at the right one.
+///
 /// [onViewMode] and [onRandom] are the view-level actions that used to live on
 /// the vertical action rail. They are grouped below the membership row,
 /// separated from it, and each is omitted when the host has nothing to bind —
@@ -87,6 +92,7 @@ Future<void> showGameContextMenu({
   Future<void> Function()? onCreateTarget,
   String? createTargetLabel,
   VoidCallback? onScrape,
+  VoidCallback? onIdentify,
   VoidCallback? onViewMode,
   VoidCallback? onRandom,
   VoidCallback? onSearch,
@@ -125,6 +131,12 @@ Future<void> showGameContextMenu({
         id: _scrapeId,
         label: AppLocale.hintScrape.getString(context),
         icon: Symbols.cloud_download_rounded,
+      ),
+    if (onIdentify != null)
+      ContextMenuItem(
+        id: _identifyId,
+        label: AppLocale.identifyGame.getString(context),
+        icon: Symbols.manage_search_rounded,
       ),
     if (membershipChildren.isNotEmpty)
       ContextMenuItem(
@@ -186,6 +198,10 @@ Future<void> showGameContextMenu({
   }
   if (result == _scrapeId) {
     onScrape?.call();
+    return;
+  }
+  if (result == _identifyId) {
+    onIdentify?.call();
     return;
   }
   if (result == _createId) {

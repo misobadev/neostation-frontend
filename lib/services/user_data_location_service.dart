@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:neostation/services/config_service.dart';
+import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/neo_assets_service.dart';
 import 'package:neostation/services/retro_achievements_cache.dart';
@@ -47,6 +49,7 @@ class UserDataLocationService {
     NeoAssetsService.resetCacheDir();
     RetroAchievementsCache.resetCacheDir();
     ScreenscraperMediaResolver.resetMediaDirectory();
+    CredentialStore.resetFileStore();
   }
 
   /// Counts top-level entries in [dirPath].
@@ -200,8 +203,18 @@ class UserDataLocationService {
     return direct;
   }
 
+  /// Folders only NeoStation creates: imported colour themes and the
+  /// RetroAchievements response cache. Neither name is used by ES-DE.
+  static const Set<String> _ownedFolders = {'custom_themes', 'ra_cache'};
+
+  /// Folder holding NeoStation's art-pack cache. ES-DE keeps its own themes in
+  /// a folder of the same name, so only NeoStation's items in it are owned:
+  /// see [_collectArtPackJobs].
+  static const String _artPackFolder = 'themes';
+
   /// Top-level entry names under the user-data directory that NeoStation
-  /// creates and owns. Only these are ever migrated or deleted.
+  /// creates and owns. Only these, and NeoStation's items in the art-pack
+  /// folder ([_collectArtPackJobs]), are ever migrated or deleted.
   ///
   /// Any other file/folder sharing the directory — e.g. a user's pre-existing
   /// ES-DE `downloaded_media/`, `gamelists/`, `es_systems.xml` — is foreign
@@ -209,18 +222,25 @@ class UserDataLocationService {
   /// user's emulation library when the user-data location was pointed at their
   /// existing front-end folder.
   static bool _isOwnedEntry(String name) {
+    if (_ownedFolders.contains(name)) return true;
     return name == 'media' ||
         name == 'systems' ||
         name == 'temp' ||
         name == 'config.json' ||
         name.startsWith('data.sqlite') || // data.sqlite + -wal/-shm/-journal
-        name.startsWith('app.log'); // app.log + rotated variants
+        name.startsWith('app.log') || // app.log + rotated variants
+        // The desktop credential fallback (CredentialFileStore). Left behind,
+        // every sign-in is lost after a move and the old folder keeps a copy
+        // its own key file decrypts.
+        name == 'credentials.enc' ||
+        name == 'credentials.key';
   }
 
   /// Migrates NeoStation's own user data from [sourceUserDataPath] to
   /// [destPath], then removes the migrated copies from the source.
   ///
-  /// Only NeoStation-owned entries (see [_isOwnedEntry]) are copied or deleted.
+  /// Only NeoStation-owned entries (see [_isOwnedEntry] and
+  /// [_collectArtPackJobs]) are copied or deleted.
   /// Foreign files that happen to share the folder are never read or removed.
   ///
   /// A source file is deleted ONLY after its destination copy is verified
@@ -278,6 +298,15 @@ class UserDataLocationService {
 
     await for (final entity in sourceDir.list()) {
       final name = path.basename(entity.path);
+      if (name == _artPackFolder && entity is Directory) {
+        await _collectArtPackJobs(
+          sourceDir: entity.path,
+          destDir: path.join(destPath, name),
+          jobs: copyJobs,
+          ownedDirs: ownedSourceDirs,
+        );
+        continue;
+      }
       if (!_isOwnedEntry(name)) continue; // leave foreign data untouched
       if (entity is File) {
         copyJobs.add((entity.path, path.join(destPath, name)));
@@ -376,6 +405,44 @@ class UserDataLocationService {
 
     onProgress?.call(1.0, '');
     _log.i('Migration: source cleaned up');
+  }
+
+  /// Adds NeoStation's items in the art-pack folder [sourceDir]: the NeoAssets
+  /// `manifest.json` and each pack folder (one holding a `pack.json`).
+  ///
+  /// Anything else there — ES-DE's own themes live in a folder of the same
+  /// name — is left where it is.
+  static Future<void> _collectArtPackJobs({
+    required String sourceDir,
+    required String destDir,
+    required List<(String, String)> jobs,
+    required List<String> ownedDirs,
+  }) async {
+    await for (final entity in Directory(sourceDir).list()) {
+      final name = path.basename(entity.path);
+      if (entity is File && name == 'manifest.json') {
+        if (await _isNeoAssetsManifest(entity)) {
+          jobs.add((entity.path, path.join(destDir, name)));
+        }
+      } else if (entity is Directory &&
+          await File(path.join(entity.path, 'pack.json')).exists()) {
+        await _collectCopyJobs(
+          sourceDir: entity.path,
+          destDir: path.join(destDir, name),
+          jobs: jobs,
+        );
+        ownedDirs.add(entity.path);
+      }
+    }
+  }
+
+  static Future<bool> _isNeoAssetsManifest(File file) async {
+    try {
+      final json = jsonDecode(await file.readAsString());
+      return json is Map && json['source'] == 'neoassets';
+    } catch (_) {
+      return false;
+    }
   }
 
   static Future<void> _collectCopyJobs({

@@ -93,6 +93,14 @@ class CredentialStore {
     _session.clear();
   }
 
+  /// Replaces only the keyring for tests, leaving the real encrypted-file
+  /// fallback in the user-data folder.
+  @visibleForTesting
+  static void debugUseSecureBackend(CredentialBackend secure) {
+    debugReset();
+    _secureOverride = secure;
+  }
+
   @visibleForTesting
   static void debugReset() {
     _secureOverride = null;
@@ -212,6 +220,17 @@ class CredentialStore {
     } catch (e) {
       _log.w('CredentialStore: could not clear "$key" from the file store: $e');
     }
+  }
+
+  /// Forgets the encrypted file store's folder, so the next use re-derives it
+  /// from the current user-data path.
+  ///
+  /// The store is resolved on first use, at app start, so after the user-data
+  /// location changes without a restart (the setup wizard) credentials would
+  /// otherwise keep going to the folder the session started in, and the next
+  /// launch would not find them.
+  static void resetFileStore() {
+    _fileStore = null;
   }
 
   /// The encrypted file store, or null on platforms that do not use one.

@@ -6,6 +6,10 @@ class ConfigRepository {
   static Future<List<String>> getUserRomFolders() =>
       SqliteService.getUserRomFolders();
 
+  /// Removes one ROM folder from the configured list.
+  static Future<void> removeRomFolder(String folderPath) =>
+      SqliteService.removeRomFolder(folderPath);
+
   /// Returns the full user_config row, or null if not yet created.
   static Future<Map<String, dynamic>?> getUserConfig() =>
       SqliteService.getUserConfig();

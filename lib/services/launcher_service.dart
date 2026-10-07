@@ -304,6 +304,8 @@ class LauncherService {
 
       final rawArgs = platformConfig['args']?.toString() ?? '';
       var resolvedArgs = resolvePlaceholdersDesktop(rawArgs, game);
+      // What the desktop launch actually runs: see [buildDesktopArgs].
+      final argv = buildDesktopArgs(rawArgs, game);
 
       if (platform == 'macos' &&
           (result['executable']?.toString())?.toLowerCase().contains(
@@ -322,10 +324,17 @@ class LauncherService {
               (match) => '-L "$corePath${match.group(1)}"',
             );
           }
+          final coreToken = RegExp(r'^(?:cores[\\/])?([\w\-\.]+\.dylib)$');
+          for (var i = 0; i + 1 < argv.length; i++) {
+            if (argv[i] != '-L') continue;
+            final match = coreToken.firstMatch(argv[i + 1]);
+            if (match != null) argv[i + 1] = '$corePath${match.group(1)}';
+          }
         }
       }
 
       result['args'] = resolvedArgs;
+      result['argv'] = argv;
     }
 
     return result;
@@ -520,6 +529,49 @@ class LauncherService {
   ///
   /// Automatically applies quotes to paths containing spaces unless they are
   /// already quoted in the template.
+  /// Builds the desktop argument list for [template].
+  ///
+  /// The template is split into arguments first and placeholders are filled
+  /// in each argument afterwards, so a ROM path or tag value always stays
+  /// inside exactly one argument, whatever characters it contains. (Filling
+  /// the string first and splitting afterwards let a `"` in a file name end an
+  /// argument early: such games failed to launch, and the rest of the name
+  /// became extra arguments.)
+  List<String> buildDesktopArgs(String template, GameModel game) {
+    if (template.trim().isEmpty) return [];
+    return [
+      for (final token in splitArgs(template))
+        // Profile paths are expanded before ROM names are inserted, which
+        // can themselves contain literal placeholder text.
+        _fillDesktopPlaceholders(ConfigService.resolvePath(token), game),
+    ];
+  }
+
+  String _fillDesktopPlaceholders(String token, GameModel game) {
+    final romPath = game.romPath;
+    if (romPath == null) return token;
+    var result = token
+        .replaceAll('{file.path}', romPath)
+        .replaceAll('{file.uri}', Uri.file(romPath).toString());
+    final titleId = game.titleId;
+    if (titleId != null) {
+      for (final tag in _titleIdTags) {
+        result = result.replaceAll(tag, titleId);
+      }
+    }
+    return result;
+  }
+
+  static const List<String> _titleIdTags = [
+    '{tags.vita_game_id}',
+    '{tags.steamappid}',
+    '{tags.localgameid}',
+    '{tags.gog}',
+    '{tags.epicgame}',
+    '{tags.customgame}',
+    '{tags.amazon}',
+  ];
+
   String resolvePlaceholdersDesktop(String template, GameModel game) {
     if (template.isEmpty) return template;
 

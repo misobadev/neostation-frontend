@@ -2,10 +2,13 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/services/config_service.dart';
+import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/neo_assets_service.dart';
 import 'package:neostation/services/user_data_location_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'fake_credential_backends.dart';
 
 /// Regression test for art packs installed during the setup wizard vanishing on
 /// the next launch.
@@ -85,6 +88,28 @@ void main() {
       NeoAssetsService.backgroundCachePathSync('NeoStation', 'gb'),
       isNull,
       reason: 'the pinned directory must be dropped, not kept',
+    );
+  });
+  test('saved credentials follow a user-data location change', () async {
+    // No usable keyring (SteamOS has no Secret Service), so credentials go to
+    // the encrypted file in the user-data folder.
+    CredentialStore.debugUseSecureBackend(BrokenBackend());
+    addTearDown(CredentialStore.debugReset);
+    await UserDataLocationService.setCustomPath(first.path);
+
+    // App start reads a credential, which resolves the file store's folder.
+    await CredentialStore.write('auth_token', 'first-token');
+    expect(File(p.join(first.path, 'credentials.enc')).existsSync(), isTrue);
+
+    await UserDataLocationService.setCustomPath(second.path);
+    await CredentialStore.write('ra_api_key', 'second-key');
+
+    expect(
+      File(p.join(second.path, 'credentials.enc')).existsSync(),
+      isTrue,
+      reason:
+          'a sign-in after the wizard moved the user data must be saved in '
+          'the new location, which is the one the next launch reads',
     );
   });
 }

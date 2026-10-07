@@ -363,4 +363,43 @@ void main() {
     expect(await localSave().readAsString(), 'NEW-SLOTTED');
     expect(svc.savesByRom[1], hasLength(2));
   });
+
+  // Asset names come from the RomM server, which is often self-hosted and
+  // shared, so a crafted name must not place a file outside the save folder.
+  for (final (i, name) in [
+    '../../evil-a.srm',
+    '..\\..\\evil-b.srm',
+    'sub/../../../evil-c.srm',
+  ].indexed) {
+    test('a server save named "$name" is not written outside the saves '
+        'folder (#$i)', () async {
+      // Where the name lands if it is joined unchecked (with `\` read as a
+      // separator, as Windows does).
+      final escapePath = p.normalize(
+        p.join(tempDir.path, 'saves', name.replaceAll('\\', '/')),
+      );
+      addTearDown(() {
+        final f = File(escapePath);
+        if (!p.isWithin(tempDir.path, escapePath) && f.existsSync()) {
+          f.deleteSync();
+        }
+      });
+      svc.seedSave(
+        1,
+        name,
+        'EVIL'.codeUnits,
+        updatedAt: DateTime.utc(2026, 7, 24),
+      );
+
+      await provider.syncGameSavesBeforeLaunch(game);
+
+      expect(p.isWithin(tempDir.path, escapePath), isFalse);
+      expect(File(escapePath).existsSync(), isFalse);
+      expect(
+        paths.requestedNames.where((n) => n.contains('..') || n.contains('\\')),
+        isEmpty,
+        reason: 'no name that climbs out of the folder reaches the resolver',
+      );
+    });
+  }
 }

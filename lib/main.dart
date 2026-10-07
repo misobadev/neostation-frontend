@@ -28,6 +28,7 @@ import 'package:neostation/widgets/back_swipe_zone.dart';
 import 'package:neostation/services/startup_theme_cache.dart';
 import 'package:neostation/widgets/splash_status_layout.dart';
 import 'package:neostation/widgets/permission_check_wrapper.dart';
+import 'package:neostation/utils/app_shortcuts.dart';
 import 'package:neostation/utils/custom_scroll_behavior.dart';
 import 'package:neostation/utils/desktop_window_focus.dart';
 import 'package:neostation/utils/display_metrics_log.dart';
@@ -1037,6 +1038,9 @@ class _MyAppState extends State<MyApp> {
                     actions: {ToggleFullscreenIntent: ToggleFullscreenAction()},
                     child: MaterialApp(
                       navigatorKey: rootNavigatorKey,
+                      // Desktop: the arrow keys belong to GamepadNavigation,
+                      // not Flutter's focus traversal (see appShortcuts).
+                      shortcuts: appShortcuts(),
                       debugShowCheckedModeBanner: false,
                       title: 'NeoStation',
                       locale: _locale,

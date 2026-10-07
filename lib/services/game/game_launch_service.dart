@@ -776,7 +776,9 @@ class GameLaunchService {
       }
 
       final argsStr = launchCmd['args']?.toString() ?? '';
-      var args = LauncherService.splitArgs(argsStr);
+      var args = launchCmd['argv'] is List
+          ? List<String>.from(launchCmd['argv'] as List)
+          : LauncherService.splitArgs(argsStr);
       var processExecutable = executable;
       var launchedViaOpen = false;
 
@@ -1275,11 +1277,14 @@ class GameLaunchService {
       }
 
       final romPath = game.romPath!;
-      final args = launchArgs
-          .replaceAll('{rom_path}', romPath)
-          .replaceAll('{emulator_path}', emulatorPath);
-
-      final argList = _parseCommandArguments(args);
+      // Split first, then fill: the ROM path stays inside one argument
+      // whatever characters its file name contains.
+      final argList = [
+        for (final token in _parseCommandArguments(launchArgs))
+          token
+              .replaceAll('{rom_path}', romPath)
+              .replaceAll('{emulator_path}', emulatorPath),
+      ];
       final process = await LinuxHostProcess.start(emulatorPath, argList);
 
       final diagnostics = EmulatorLaunchDiagnostics.attach(

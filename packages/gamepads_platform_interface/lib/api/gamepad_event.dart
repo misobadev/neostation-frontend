@@ -35,12 +35,19 @@ class GamepadEvent {
   /// The current value of the key.
   final double value;
 
+  /// For a held [KeyType.button] on platforms that auto-repeat keys (Android),
+  /// how many repeats preceded this event: 0 for the physical press or
+  /// release, 1 and up for the auto-repeated presses that follow while the
+  /// button stays down. Always 0 where the platform does not report it.
+  final int repeat;
+
   GamepadEvent({
     required this.gamepadId,
     required this.timestamp,
     required this.type,
     required this.key,
     required this.value,
+    this.repeat = 0,
   });
 
   @override
@@ -54,6 +61,7 @@ class GamepadEvent {
     final type = KeyType.values.byName(map['type'].toString());
     final key = map['key'].toString();
     final value = map['value'] as double;
+    final repeat = (map['repeat'] as num?)?.toInt() ?? 0;
 
     return GamepadEvent(
       gamepadId: gamepadId,
@@ -61,6 +69,7 @@ class GamepadEvent {
       type: type,
       key: key,
       value: value,
+      repeat: repeat,
     );
   }
 }

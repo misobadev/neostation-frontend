@@ -403,7 +403,7 @@ class EsdeImportService {
       // inside downloaded_media, e.g. `<sys>/covers/<subdir>/<base>.png`. Capture
       // that subdir (empty when the ROM sits directly in the system folder) so
       // the read-time fallback can find nested artwork.
-      final mediaSubdir = _mediaSubdir(normalizedPath);
+      final mediaSubdir = _mediaSubdir(normalizedPath, esdeDirName);
 
       // Only import for ROMs NeoStation has already scanned.
       final rom = romsByName[filename.toLowerCase()];
@@ -589,9 +589,6 @@ class EsdeImportService {
     }
   }
 
-  /// Extracts the ES-DE media subfolder from a gamelist `<path>` — the ROM's
-  /// directory relative to the system folder, with a leading `./` stripped.
-  /// Returns `''` when the ROM sits directly in the system folder.
   /// De-duplicates a gamelist's `<game>` entries by ROM filename.
   ///
   /// ES-DE can list the same filename in several subfolders of one system
@@ -623,8 +620,9 @@ class EsdeImportService {
       final filename = path.basename(normalized);
       final existingSubdir = _mediaSubdir(
         (_text(existing, 'path') ?? '').replaceAll('\\', '/'),
+        esdeDirName,
       );
-      final newSubdir = _mediaSubdir(normalized);
+      final newSubdir = _mediaSubdir(normalized, esdeDirName);
       if (!_esdeMediaExists(mediaRoot, esdeDirName, filename, existingSubdir) &&
           _esdeMediaExists(mediaRoot, esdeDirName, filename, newSubdir)) {
         chosen[key] = game;
@@ -679,15 +677,38 @@ class EsdeImportService {
     });
   }
 
-  static String _mediaSubdir(String normalizedPath) {
+  /// Extracts the ES-DE media subfolder from a gamelist `<path>` — the ROM's
+  /// directory relative to the system folder, with a leading `./` stripped.
+  /// Returns `''` when the ROM sits directly in the system folder.
+  ///
+  /// ES-DE on Android writes absolute paths
+  /// (`/storage/<id>/Roms/arcade/MAME SPO/1on1gov.zip`). The subfolder ES-DE
+  /// mirrors in `downloaded_media` is still the part after the system folder
+  /// [esdeDirName] (`MAME SPO`), so an absolute path keeps only the folders
+  /// after the first segment naming it, or `''` when none does — the
+  /// category-root fallback then applies, as for any ROM without a subfolder.
+  static String _mediaSubdir(String normalizedPath, String esdeDirName) {
     var p = normalizedPath;
     while (p.startsWith('./')) {
       p = p.substring(2);
     }
-    final dir = path.dirname(p);
+    final dir = path.posix.dirname(p);
     if (dir == '.' || dir == '/' || dir.isEmpty) return '';
-    return dir.startsWith('/') ? dir.substring(1) : dir;
+    if (!_isAbsoluteEsdePath(dir)) return dir;
+
+    final segments = dir.split('/');
+    final system = esdeDirName.toLowerCase();
+    final at = segments.indexWhere((s) => s.toLowerCase() == system);
+    if (at < 0) return '';
+    return segments.skip(at + 1).where((s) => s.isNotEmpty).join('/');
   }
+
+  /// Whether a separator-normalised gamelist path is absolute: rooted (`/`),
+  /// a Windows drive (`C:/`), or home-relative (`~/`).
+  static bool _isAbsoluteEsdePath(String p) =>
+      p.startsWith('/') ||
+      p.startsWith('~/') ||
+      RegExp(r'^[A-Za-z]:/').hasMatch(p);
 
   /// Reads an ES-DE boolean metadata tag (`<favorite>`, `<hidden>`, …).
   /// ES-DE writes these as the literal strings `true` / `false`.
@@ -713,8 +734,10 @@ class EsdeImportService {
       _parseEsdeDateTime(raw);
 
   @visibleForTesting
-  static String mediaSubdirForTest(String normalizedPath) =>
-      _mediaSubdir(normalizedPath);
+  static String mediaSubdirForTest(
+    String normalizedPath, {
+    String esdeDirName = '',
+  }) => _mediaSubdir(normalizedPath, esdeDirName);
 
   @visibleForTesting
   static List<XmlElement> selectGamesForTest(

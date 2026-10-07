@@ -65,6 +65,71 @@ void main() {
         );
         expect(EsdeImportService.mediaSubdirForTest('./A/B/Sonic.md'), 'A/B');
       });
+
+      // ES-DE on Android writes absolute <path>s. The media subfolder is still
+      // the ROM's folder relative to the system folder (issue #486).
+      test(
+        'strips everything up to the system folder from an absolute path',
+        () {
+          expect(
+            EsdeImportService.mediaSubdirForTest(
+              '/storage/E7AB-61FB/Roms/arcade/MAME SPO/1on1gov.zip',
+              esdeDirName: 'arcade',
+            ),
+            'MAME SPO',
+          );
+          expect(
+            EsdeImportService.mediaSubdirForTest(
+              '/storage/E7AB-61FB/Roms/arcade/MAME SPO/Extra/1on1gov.zip',
+              esdeDirName: 'arcade',
+            ),
+            'MAME SPO/Extra',
+          );
+        },
+      );
+
+      test(
+        'returns empty for an absolute path directly in the system folder',
+        () {
+          expect(
+            EsdeImportService.mediaSubdirForTest(
+              '/storage/E7AB-61FB/Roms/famicom/1943.zip',
+              esdeDirName: 'famicom',
+            ),
+            '',
+          );
+        },
+      );
+
+      test('handles a Windows drive path and system folder casing', () {
+        expect(
+          EsdeImportService.mediaSubdirForTest(
+            'C:/Emulation/ROMs/Arcade/MAME SPO/1on1gov.zip',
+            esdeDirName: 'arcade',
+          ),
+          'MAME SPO',
+        );
+      });
+
+      test('returns empty when an absolute path lacks the system folder', () {
+        expect(
+          EsdeImportService.mediaSubdirForTest(
+            '/mnt/other/place/1on1gov.zip',
+            esdeDirName: 'arcade',
+          ),
+          '',
+        );
+      });
+
+      test('leaves a relative path alone even if it names the system', () {
+        expect(
+          EsdeImportService.mediaSubdirForTest(
+            './arcade/1on1gov.zip',
+            esdeDirName: 'arcade',
+          ),
+          'arcade',
+        );
+      });
     });
 
     group('selectGames', () {
@@ -98,6 +163,30 @@ void main() {
           'megadrive',
         );
         expect(chosen.length, 2);
+      });
+
+      test('prefers the absolute-path entry whose subfolder has media', () {
+        final mediaRoot = Directory.systemTemp.createTempSync('esde_media_');
+        addTearDown(() => mediaRoot.deleteSync(recursive: true));
+        Directory(
+          '${mediaRoot.path}/arcade/covers/MAME SPO',
+        ).createSync(recursive: true);
+        File(
+          '${mediaRoot.path}/arcade/covers/MAME SPO/1on1gov.jpg',
+        ).writeAsStringSync('x');
+
+        final doc = XmlDocument.parse('''
+          <gameList>
+            <game><path>/storage/X/Roms/arcade/MAME ACT/1on1gov.zip</path><name>Other</name></game>
+            <game><path>/storage/X/Roms/arcade/MAME SPO/1on1gov.zip</path><name>Spo</name></game>
+          </gameList>
+        ''');
+        final chosen = EsdeImportService.selectGamesForTest(
+          doc,
+          mediaRoot.path,
+          'arcade',
+        );
+        expect(chosen.single.getElement('name')!.innerText, 'Spo');
       });
 
       test('reads a gamelist with a second <alternativeEmulator> root', () {
@@ -483,5 +572,80 @@ void main() {
         expect(rows.first['esde_media_dir'], 'nes');
       },
     );
+
+    test(
+      'import records the nested media subfolder for absolute gamelist paths',
+      () async {
+        await db.execute(
+          "INSERT INTO app_systems (id, real_name, folder_name, screenscraper_id) VALUES ('arcade', 'Arcade', 'arcade', 75)",
+        );
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('1on1gov.zip', '/roms/arcade/MAME SPO/1on1gov.zip', 'arcade')",
+        );
+
+        final tempRoot = Directory.systemTemp.createTempSync('esde_test_');
+        addTearDown(() => tempRoot.deleteSync(recursive: true));
+        Directory(
+          '${tempRoot.path}/downloaded_media/arcade/covers/MAME SPO',
+        ).createSync(recursive: true);
+        File(
+          '${tempRoot.path}/downloaded_media/arcade/covers/MAME SPO/1on1gov.jpg',
+        ).writeAsStringSync('x');
+        final systemDir = Directory('${tempRoot.path}/gamelists/arcade')
+          ..createSync(recursive: true);
+        File('${systemDir.path}/gamelist.xml').writeAsStringSync('''
+          <gameList>
+            <game>
+              <path>/storage/E7AB-61FB/Roms/arcade/MAME SPO/1on1gov.zip</path>
+              <name>1 on 1</name>
+            </game>
+          </gameList>
+        ''');
+
+        await EsdeImportService.import(tempRoot.path);
+
+        final rows = await db.rawQuery(
+          "SELECT esde_media_subdir FROM user_screenscraper_metadata WHERE filename = '1on1gov.zip'",
+        );
+        expect(rows.single['esde_media_subdir'], 'MAME SPO');
+      },
+    );
+
+    test('re-importing corrects a subfolder stored from an absolute path', () async {
+      await db.execute(
+        "INSERT INTO app_systems (id, real_name, folder_name, screenscraper_id) VALUES ('arcade', 'Arcade', 'arcade', 75)",
+      );
+      await db.execute(
+        "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('1on1gov.zip', '/roms/arcade/1on1gov.zip', 'arcade')",
+      );
+      // What an import before the fix left behind.
+      await ScraperRepository.mergeEsdeMetadata('arcade', '1on1gov.zip', {
+        'real_name': '1 on 1',
+      }, mediaSubdir: 'storage/E7AB-61FB/Roms/arcade/MAME SPO');
+      final seeded = await db.rawQuery(
+        "SELECT esde_media_subdir FROM user_screenscraper_metadata WHERE filename = '1on1gov.zip'",
+      );
+      expect(
+        seeded.single['esde_media_subdir'],
+        'storage/E7AB-61FB/Roms/arcade/MAME SPO',
+      );
+
+      final tempRoot = Directory.systemTemp.createTempSync('esde_test_');
+      addTearDown(() => tempRoot.deleteSync(recursive: true));
+      final systemDir = Directory('${tempRoot.path}/gamelists/arcade')
+        ..createSync(recursive: true);
+      File('${systemDir.path}/gamelist.xml').writeAsStringSync(
+        '<gameList><game>'
+        '<path>/storage/E7AB-61FB/Roms/arcade/MAME SPO/1on1gov.zip</path>'
+        '<name>1 on 1</name></game></gameList>',
+      );
+
+      await EsdeImportService.import(tempRoot.path);
+
+      final rows = await db.rawQuery(
+        "SELECT esde_media_subdir FROM user_screenscraper_metadata WHERE filename = '1on1gov.zip'",
+      );
+      expect(rows.single['esde_media_subdir'], 'MAME SPO');
+    });
   });
 }

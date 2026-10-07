@@ -35,11 +35,23 @@ const List<String> _sensitiveQueryParams = ['y', ..._sensitiveFieldNames];
 /// [_jsonFieldPattern] swallow just the scheme and leave the token behind —
 /// `Authorization: Bearer abc` would become `Authorization: <redacted> abc`.
 /// The header name is not a credential shape on its own.
+///
+/// camelCase names are listed one by one rather than matched as `*Token` /
+/// `*Key`: a suffix rule would also redact `cacheKey`, `sortKey` and the like.
 const List<String> _sensitiveFieldNames = [
   'api_key',
   'apikey',
   'access_token',
   'refresh_token',
+  'accessToken',
+  'refreshToken',
+  'authToken',
+  'idToken',
+  'sessionToken',
+  'apiToken',
+  'bearerToken',
+  'clientSecret',
+  'apiSecret',
   'auth',
   'client_secret_id',
   'credential',
@@ -83,11 +95,28 @@ final RegExp _queryParamPattern = RegExp(
 /// The unquoted value must also stop at `&` and `<`: without that it runs past
 /// the end of a query parameter and swallows the remainder of a URL, and it
 /// re-matches an already-substituted `<redacted>`, breaking idempotence.
+///
+/// A quoted value runs to its own closing quote, skipping escaped quotes and
+/// quotes of the other kind (`"it's"`), or to the end of the line when the
+/// closing quote is missing — a value that stopped at the first quote of either
+/// kind wrote the rest of the secret to the log. It never crosses a newline:
+/// exported logs are redacted as one joined string.
 final RegExp _jsonFieldPattern = RegExp(
   '(?<![A-Za-z0-9])'
   '(["\']?(?:${_sensitiveFieldNames.join('|')})["\']?\\s*[:=]\\s*)'
-  '(["\'][^"\']*["\']|[^,\\s}\\]&<>"\']+)',
+  r'''("(?:[^"\\\n]|\\.)*"?|'(?:[^'\\\n]|\\.)*'?|[^,\s}\]&<>"']+)''',
   caseSensitive: false,
+);
+
+/// An exception or error type name, such as `PlatformException(...)` or
+/// `FileSystemException:`.
+///
+/// Prose like "Could not read the NeoSync token: PlatformException(...)" has the
+/// shape of a credential field, and redacting it hid the one part of an error
+/// line worth reading. No credential looks like a type name, so an unquoted
+/// value of this shape is kept.
+final RegExp _exceptionTypePattern = RegExp(
+  r'^_?[A-Z][A-Za-z0-9_]*(?:Exception|Error)\b',
 );
 
 /// `Authorization: Bearer abc` and `Basic dXNlcjpwYXNz`.
@@ -118,7 +147,9 @@ String redactSecrets(String text) {
   );
   result = result.replaceAllMapped(
     _jsonFieldPattern,
-    (m) => '${m[1]}$redactedPlaceholder',
+    (m) => _exceptionTypePattern.hasMatch(m[2]!)
+        ? m[0]!
+        : '${m[1]}$redactedPlaceholder',
   );
   result = result.replaceAllMapped(
     _authHeaderPattern,

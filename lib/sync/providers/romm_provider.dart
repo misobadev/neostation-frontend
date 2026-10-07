@@ -42,6 +42,7 @@ import 'package:neostation/services/romm_service.dart';
 import '../i_sync_provider.dart';
 import '../retroarch_state_signature.dart';
 import '../sync_manager.dart';
+import '../../utils/safe_path.dart';
 
 /// Locates the local save/state files belonging to a game.
 typedef LocateGameSaves = Future<List<LocalSaveFile>> Function(GameModel game);
@@ -708,6 +709,12 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     return remote.where((a) {
       if (a.fileName.toLowerCase().contains(conflictBackupMarker)) {
         _log.i('RomM: skipping remote conflict backup ${a.fileName}');
+        return false;
+      }
+      // The name becomes a local file name; the server must not be able to
+      // point it anywhere but the save/state folder.
+      if (!isSafeFileName(a.fileName)) {
+        _log.w('RomM: skipping remote asset with unsafe name ${a.fileName}');
         return false;
       }
       return true;

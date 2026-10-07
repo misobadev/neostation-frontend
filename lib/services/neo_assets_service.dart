@@ -7,6 +7,7 @@ import 'config_service.dart';
 import 'logger_service.dart';
 import '../utils/app_config.dart';
 import '../utils/bounded_concurrency.dart';
+import '../utils/safe_path.dart';
 
 final _log = LoggerService.instance;
 
@@ -574,6 +575,13 @@ class NeoAssetsService {
       _downloadConcurrency,
       (file) async {
         final localPath = await _fileCachePath(folder, file);
+        if (localPath == null) {
+          _log.w(
+            'NeoAssets: skipping ${file.fileName} in pack $folder: '
+            'the name would land outside the pack cache',
+          );
+          return;
+        }
         final result = await fetchAndCacheAsset(file.url, localPath);
         if (result.isCached) cached++;
       },
@@ -583,16 +591,18 @@ class NeoAssetsService {
     return cached;
   }
 
-  /// The local cache path a pack file is written to.
-  static Future<String> _fileCachePath(
+  /// The local cache path a pack file is written to, or null when the
+  /// catalog's folder or file name would place it outside the pack cache.
+  static Future<String?> _fileCachePath(
     String folder,
     NeoAssetsPackFile file,
   ) async {
-    final dir = await _cacheDir();
+    if (!isSafeFileName(folder)) return null;
+    final packDir = path.join(await _cacheDir(), folder);
     if (file.isBackground) {
-      return path.join(dir, folder, 'backgrounds', file.fileName);
+      return safeJoin(path.join(packDir, 'backgrounds'), file.fileName);
     }
-    return path.join(dir, folder, file.fileName);
+    return safeJoin(packDir, file.fileName);
   }
 
   /// Downloads a remote asset to the local filesystem.
@@ -738,6 +748,12 @@ class NeoAssetsService {
 
   /// Deletes all cached assets for a specific pack folder.
   static Future<void> clearThemeCache(String themeFolder) async {
+    // The folder name comes from the catalog; never let it point the
+    // recursive delete below at anything but a pack folder in the cache.
+    if (!isSafeFileName(themeFolder)) {
+      _log.w('NeoAssets: refusing to clear unsafe pack folder "$themeFolder"');
+      return;
+    }
     try {
       final dir = await _cacheDir();
       final themeDir = Directory(path.join(dir, themeFolder));

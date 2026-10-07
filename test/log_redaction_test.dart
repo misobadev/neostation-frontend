@@ -236,4 +236,118 @@ void main() {
       }
     });
   });
+
+  group('redactSecrets — camelCase credential fields', () {
+    // Dart/JSON payloads name tokens in camelCase as often as snake_case.
+    test('a camelCase token or secret field is redacted', () {
+      for (final line in [
+        'accessToken: hunter2',
+        '{"refreshToken":"hunter2"}',
+        'authToken=hunter2',
+        'idToken: hunter2',
+        'sessionToken: hunter2',
+        'apiToken=hunter2',
+        'bearerToken: hunter2',
+        "{'clientSecret': 'hunter2'}",
+        'apiSecret=hunter2',
+      ]) {
+        final redacted = redactSecrets(line);
+        expect(redacted, isNot(contains('hunter2')), reason: line);
+        expect(redacted, contains(redactedPlaceholder), reason: line);
+      }
+    });
+
+    test('ordinary camelCase keys are left alone', () {
+      for (final line in ['cacheKey: covers', 'sortKey: name']) {
+        expect(redactSecrets(line), line);
+      }
+    });
+  });
+
+  group('redactSecrets — quoted values', () {
+    // A quoted value used to end at the first quote of either kind, so the rest
+    // of the secret was written to the log.
+    test('a value containing the other quote kind is fully redacted', () {
+      final redacted = redactSecrets('{"password": "it\'s-hunter2"}');
+      expect(redacted, isNot(contains('hunter2')));
+      expect(redacted, '{"password": <redacted>}');
+    });
+
+    test('a value containing an escaped quote is fully redacted', () {
+      final redacted = redactSecrets(r'password: "ab\"hunter2", user: me');
+      expect(redacted, isNot(contains('hunter2')));
+      expect(redacted, contains('user: me'));
+    });
+
+    test('an unterminated quoted value is redacted to the end of the line', () {
+      final redacted = redactSecrets('body: {"token": "hunter2\nnext line');
+      expect(redacted, isNot(contains('hunter2')));
+      expect(redacted, contains('next line'));
+    });
+
+    test('the fields after a quoted value survive', () {
+      final redacted = redactSecrets(
+        '{"password": "hunter2", "username": "someone"}',
+      );
+      expect(redacted, isNot(contains('hunter2')));
+      expect(redacted, contains('"username": "someone"'));
+    });
+
+    test('redaction of quoted values is idempotent', () {
+      for (final line in [
+        '{"password": "it\'s-hunter2"}',
+        r'password: "ab\"hunter2"',
+        'accessToken: hunter2',
+      ]) {
+        final once = redactSecrets(line);
+        expect(redactSecrets(once), once, reason: line);
+      }
+    });
+  });
+
+  group('redactSecrets — keeps error messages readable', () {
+    // Prose such as "Could not read the NeoSync token: <error>" matched the
+    // field rule, so the exception type — the useful part — was redacted.
+    const survivors = <String, String>{
+      'Could not read the NeoSync token: PlatformException(error, x)':
+          'PlatformException',
+      'Error saving game session: FileSystemException: Cannot open file':
+          'FileSystemException',
+      'Error saving RA API key: SqliteException(5)': 'SqliteException',
+      'Could not read the NeoSync token: _TypeError': '_TypeError',
+      'secret: StateError (Bad state: closed)': 'StateError',
+    };
+
+    survivors.forEach((line, mustSurvive) {
+      test('keeps the exception type in "$line"', () {
+        expect(redactSecrets(line), contains(mustSurvive));
+      });
+    });
+
+    test('a credential after the same words is still redacted', () {
+      for (final line in [
+        'Could not read the NeoSync token: hunter2',
+        'session: hunter2',
+        'key: Exceptional-hunter2',
+        '"token": "PlatformException-hunter2"',
+      ]) {
+        final redacted = redactSecrets(line);
+        expect(redacted, isNot(contains('hunter2')), reason: line);
+      }
+    });
+  });
+
+  group('redactSecrets — raw input debug lines', () {
+    // GamepadNavigation's debug lines name the input; `key` is a credential name
+    // for the redactor, so they label it `input` instead.
+    test('a raw gamepad or keyboard line is left alone', () {
+      for (final line in [
+        '[GamepadRaw] gamepad="0" input="keycode_button_a" type=button '
+            'value=0.0000',
+        '[KeyboardRaw] input="Arrow Down" physical="70051" DOWN',
+      ]) {
+        expect(redactSecrets(line), line);
+      }
+    });
+  });
 }

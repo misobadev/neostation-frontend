@@ -122,6 +122,40 @@ void main() {
     expect(find.text(label(ctx, AppLocale.hintScrape)), findsNothing);
   });
 
+  testWidgets('identify is offered only when the host binds it, and fires', (
+    tester,
+  ) async {
+    final ctx = await pumpHost(tester);
+    // ignore: unawaited_futures
+    showGameContextMenu(
+      context: ctx,
+      targets: targets,
+      onSettings: () {},
+      onScrape: () {},
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(label(ctx, AppLocale.identifyGame)), findsNothing);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    var identified = 0;
+    // ignore: unawaited_futures
+    showGameContextMenu(
+      context: ctx,
+      targets: targets,
+      onSettings: () {},
+      onScrape: () {},
+      onIdentify: () => identified++,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text(label(ctx, AppLocale.identifyGame)));
+    await tester.pumpAndSettle();
+
+    expect(identified, 1);
+    expect(find.text(label(ctx, AppLocale.identifyGame)), findsNothing);
+  });
+
   testWidgets('opens on Settings, with no submenu pre-opened', (tester) async {
     final ctx = await pumpHost(tester);
     // ignore: unawaited_futures

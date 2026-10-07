@@ -23,6 +23,7 @@ import '../services/user_data_location_service.dart';
 import '../utils/romm_local_matcher.dart';
 import 'file_provider.dart';
 import 'romm_bulk_sync.dart';
+import '../utils/safe_path.dart';
 
 /// High-level connection state for the RomM integration.
 enum RommConnectionStatus { disconnected, connecting, connected, error }
@@ -1670,6 +1671,18 @@ class RommProvider extends ChangeNotifier {
     // their extension list) nor launches (the emulator boots the playlist/disc,
     // not the archive), so a multi-file ROM must always go through extraction.
     final isArchive = rom.isMultiFile;
+    // fsName comes from the server and names the file we create — and, below,
+    // the file we replace if it already exists. It must be a plain file name:
+    // a path would let the server write or overwrite anywhere the app can.
+    if (!isSafeFileName(rom.fsName)) {
+      _log.w('RomM: refusing to download ${rom.id}: unsafe file name');
+      tracker
+        ..status = RommDownloadStatus.failed
+        ..error = RommDownloadError.network
+        ..errorDetail = 'Unsafe file name from server';
+      _notifyDownloadState();
+      return tracker;
+    }
     // Only append .zip when fsName doesn't already end in it (avoid foo.zip.zip).
     final appendZipExt =
         isArchive && !rom.fsName.toLowerCase().endsWith('.zip');
@@ -2099,11 +2112,10 @@ class RommProvider extends ChangeNotifier {
 
       final paths = <ArchiveFile, List<String>>{};
       for (final file in files) {
-        final normalized = p.posix.normalize(file.name);
-        if (normalized == '.' ||
-            p.posix.isAbsolute(normalized) ||
-            normalized == '..' ||
-            normalized.startsWith('../')) {
+        // Entry names are checked with `\` as a separator too: a POSIX-only
+        // check lets `..\..\x` through, and Windows then joins it as a path.
+        final normalized = p.posix.normalize(file.name.replaceAll('\\', '/'));
+        if (safeJoin(destDir, normalized, context: p.posix) == null) {
           return null;
         }
         paths[file] = normalized.split('/');
@@ -2121,7 +2133,9 @@ class RommProvider extends ChangeNotifier {
       for (final file in files) {
         final segments = paths[file]!;
         final relative = (stripWrapper ? segments.skip(1) : segments).join('/');
-        final output = File(p.join(gameDir.path, relative));
+        final outputPath = safeJoin(gameDir.path, relative);
+        if (outputPath == null) return null;
+        final output = File(outputPath);
         await output.parent.create(recursive: true);
         final stream = OutputFileStream(output.path);
         file.writeContent(stream);

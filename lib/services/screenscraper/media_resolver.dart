@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 
 import 'package:path/path.dart' as path;
@@ -38,6 +39,12 @@ class ScreenscraperMediaResolver {
   /// scraped media into the previous location for the rest of the session.
   static void resetMediaDirectory() {
     _cachedMediaDirectory = null;
+  }
+
+  /// Points media at [path] for tests, or back to the derived folder (null).
+  @visibleForTesting
+  static void setMediaDirectoryForTesting(String? path) {
+    _cachedMediaDirectory = path;
   }
 
   /// Maps API media type names to NeoStation folder names.

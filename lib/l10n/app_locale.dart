@@ -1079,6 +1079,9 @@ mixin AppLocale {
   static const String scrapeSuccessful = 'scrape_successful';
   static const String scrapeErrorGame = 'scrape_error_game';
   static const String scrapeQuotaExceeded = 'scrape_quota_exceeded';
+  static const String identifyGame = 'identify_game';
+  static const String identifySearchHint = 'identify_search_hint';
+  static const String identifySearchFailed = 'identify_search_failed';
 
   // ---------------------------------------------------------------------------
   // User data location

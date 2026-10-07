@@ -407,7 +407,16 @@ extension NeoSyncDownload on NeoSyncProvider {
     final m = RegExp(r'^v2/custom/[^/]+/(.+)$').firstMatch(rel);
     if (m != null) rel = m.group(1)!;
 
-    final localFile = File(path.join(customFolder, rel));
+    // rel is the server's file_path: keep it inside the custom folder.
+    final target = safeJoin(customFolder, rel);
+    if (target == null) {
+      NeoSyncProvider._log.w(
+        'Download: refusing ${cloudFile.filePath}: it would land outside '
+        'the custom folder',
+      );
+      return false;
+    }
+    final localFile = File(target);
     await localFile.parent.create(recursive: true);
     if (!localFile.existsSync() ||
         await _shouldDownloadOverLocal(cloudFile, localFile)) {

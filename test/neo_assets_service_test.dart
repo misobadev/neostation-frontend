@@ -297,4 +297,83 @@ void main() {
       expect(backgroundFile('snes').existsSync(), isFalse);
     });
   });
+
+  // Pack folders and file names come from the catalog, so a malicious or
+  // compromised catalog must not be able to write or delete outside the cache.
+  group('catalog names stay inside the cache', () {
+    late Directory cache;
+
+    setUp(() {
+      cache = Directory(path.join(tempDir.path, 'cache'))..createSync();
+      NeoAssetsService.debugConfigure(
+        client: MockClient((_) async => http.Response.bytes([1, 2, 3], 200)),
+        cacheDir: cache.path,
+      );
+    });
+
+    NeoAssetsPackFile named(String fileName) => NeoAssetsPackFile(
+      kind: 'logo',
+      systemId: 'gb',
+      fileName: fileName,
+      url: 'https://cdn.neoassets.dev/packs/neostation/logos/gb.webp',
+      size: 3,
+      mime: 'image/webp',
+    );
+
+    test('a file name that climbs out of the pack is not written', () async {
+      final cached = await NeoAssetsService.downloadPack('neostation', [
+        named('../../escape.webp'),
+      ]);
+
+      expect(cached, 0);
+      expect(
+        File(path.join(tempDir.path, 'escape.webp')).existsSync(),
+        isFalse,
+      );
+    });
+
+    test('an absolute file name is not written', () async {
+      final target = path.join(tempDir.path, 'absolute.webp');
+
+      final cached = await NeoAssetsService.downloadPack('neostation', [
+        named(target),
+      ]);
+
+      expect(cached, 0);
+      expect(File(target).existsSync(), isFalse);
+    });
+
+    test('a pack folder that climbs out of the cache is not written', () async {
+      final cached = await NeoAssetsService.downloadPack('../outside', [
+        named('gb.webp'),
+      ]);
+
+      expect(cached, 0);
+      expect(
+        Directory(path.join(tempDir.path, 'outside')).existsSync(),
+        isFalse,
+      );
+    });
+
+    test('clearing a pack folder never deletes outside the cache', () async {
+      final victim = Directory(path.join(tempDir.path, 'victim'))..createSync();
+      File(path.join(victim.path, 'keep.txt')).writeAsStringSync('keep');
+
+      await NeoAssetsService.clearThemeCache('../victim');
+
+      expect(File(path.join(victim.path, 'keep.txt')).existsSync(), isTrue);
+    });
+
+    test('ordinary names still land in the pack folder', () async {
+      final cached = await NeoAssetsService.downloadPack('neostation', [
+        named('gb.webp'),
+      ]);
+
+      expect(cached, 1);
+      expect(
+        File(path.join(cache.path, 'neostation', 'gb.webp')).existsSync(),
+        isTrue,
+      );
+    });
+  });
 }

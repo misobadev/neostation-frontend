@@ -674,7 +674,14 @@ extension NeoSyncPathResolver on NeoSyncProvider {
           final m = RegExp(r'^v2/custom/[^/]+/(.+)$').firstMatch(rel);
           if (m != null) rel = m.group(1)!;
         }
-        final target = path.join(customFolder, rel);
+        final target = safeJoin(customFolder, rel);
+        if (target == null) {
+          NeoSyncProvider._log.w(
+            'Download: refusing ${cloudFile.filePath}: it would land outside '
+            'the custom folder',
+          );
+          return [];
+        }
         NeoSyncProvider._log.i(
           'Download: ${cloudFile.filePath} -> custom folder $target',
         );
@@ -802,8 +809,8 @@ extension NeoSyncPathResolver on NeoSyncProvider {
             );
 
             if (saveInfo != null) {
-              final fullPath = path.join(saveInfo.savePath, internalPath);
-              resultPaths.add(fullPath);
+              final fullPath = safeJoin(saveInfo.savePath, internalPath);
+              if (fullPath != null) resultPaths.add(fullPath);
             } else {
               // 2. Si no existe, construir la ruta en este NAND
               final saveBasePath = path.join(
@@ -823,13 +830,11 @@ extension NeoSyncPathResolver on NeoSyncProvider {
                 }
               }
 
-              final fullPath = path.join(
-                saveBasePath,
-                userId,
-                titleId,
+              final fullPath = safeJoin(
+                path.join(saveBasePath, userId, titleId),
                 internalPath,
               );
-              resultPaths.add(fullPath);
+              if (fullPath != null) resultPaths.add(fullPath);
             }
           }
         }
@@ -838,7 +843,15 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       }
     }
 
-    return [path.join(targetFolder, relativeName)];
+    // relativeName is the server's file_path: keep it inside the folder.
+    final target = safeJoin(targetFolder, relativeName);
+    if (target == null) {
+      NeoSyncProvider._log.w(
+        'Download: refusing $relativeName: it would land outside $targetFolder',
+      );
+      return [];
+    }
+    return [target];
   }
 
   // =========================================

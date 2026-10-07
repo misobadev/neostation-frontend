@@ -8,7 +8,7 @@ If you believe you've found a security vulnerability, please follow responsible 
 
 Instead, please report it through one of the following channels:
 
-- **Email:** [miguelsotobaez@gmail.com](mailto:miguelsotobaez@gmail.com)
+- **Email:** [miguelsotobaez@gmail.com](mailto:miguel.soto@misoba.dev)
 - **GitHub Security Advisory:** [Open a private advisory](https://github.com/misobadev/neostation-frontend/security/advisories/new)
 
 We will acknowledge your report promptly and work with you to understand and resolve the issue as quickly as possible.

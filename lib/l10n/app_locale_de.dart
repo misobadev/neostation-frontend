@@ -652,6 +652,10 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.stoppingScraping: 'Scraping-Prozess wird gestoppt...',
   AppLocale.syncError: 'Fehler beim Synchronisieren der System-IDs',
   AppLocale.metadataError: 'Fehler während des Scraping-Prozesses',
+  AppLocale.identifyGame: 'Identifizieren…',
+  AppLocale.identifySearchHint: 'ScreenScraper nach Namen durchsuchen',
+  AppLocale.identifySearchFailed:
+      'Die Suche ist fehlgeschlagen. Bitte später erneut versuchen.',
   AppLocale.scrapeQuotaExceeded:
       'ScreenScraper Tages-Scraping-Kontingent überschritten',
   AppLocale.start: 'Start',

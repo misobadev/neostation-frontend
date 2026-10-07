@@ -8,6 +8,8 @@ import '../services/saf_directory_service.dart';
 /// These specialized files contain the game's unique identifier as plain text
 /// for use within the NeoStation ecosystem.
 class VitaTitleExtractor {
+  static final RegExp _plainTitleId = RegExp(r'^[A-Za-z0-9_-]{1,32}$');
+
   static final _log = LoggerService.instance;
 
   /// Extracts the Title ID string from the specified file.
@@ -34,6 +36,13 @@ class VitaTitleExtractor {
 
       if (content != null && content.trim().isNotEmpty) {
         final titleId = content.trim();
+        // The ID is passed to emulators as a launch argument (on Android as
+        // an element of a comma-separated list), so accept only a plain ID
+        // such as PCSE00000.
+        if (!_plainTitleId.hasMatch(titleId)) {
+          _log.w('Ignoring Vita Title ID in $path: not a plain ID');
+          return null;
+        }
         _log.d('Extracted Vita Title ID: $titleId from $path');
         return titleId;
       }

@@ -129,10 +129,6 @@ class RommService {
 
   String _baseUrl = '';
 
-  /// Whether the user pinned the scheme (`http://`/`https://`) themselves. When
-  /// false we may transparently downgrade an https attempt to http on a TLS
-  /// handshake failure (common for plain-HTTP homelab servers).
-  bool _schemeExplicit = false;
   String _username = '';
   String _password = '';
   String _apiKey = '';
@@ -196,7 +192,6 @@ class RommService {
     // missing covers.
     _deadCovers.clear();
     final raw = serverUrl.trim();
-    _schemeExplicit = raw.startsWith('http://') || raw.startsWith('https://');
     _baseUrl = _normalizeBaseUrl(raw);
     _apiKey = apiKey.trim();
     _username = username;
@@ -238,33 +233,17 @@ class RommService {
 
   // ── Authentication ─────────────────────────────────────────────────────────
 
-  /// Runs [send] and, if an HTTPS TLS handshake fails while the user did not
-  /// pin the scheme, downgrades the base URL to HTTP and retries once
-  /// (plain-HTTP homelab servers are common). [send] must build its request
-  /// fresh so the retry picks up the rewritten [_baseUrl].
-  Future<http.Response> _withSchemeFallback(
-    Future<http.Response> Function() send,
-  ) async {
-    try {
-      return await send();
-    } on HandshakeException {
-      if (!_schemeExplicit && _baseUrl.startsWith('https://')) {
-        _baseUrl = _baseUrl.replaceFirst('https://', 'http://');
-        _log.w('RomM HTTPS handshake failed; retrying over HTTP at $_baseUrl');
-        return await send();
-      }
-      rethrow;
-    }
-  }
-
-  /// POSTs to `/api/token`, with the [_withSchemeFallback] HTTPS→HTTP retry.
+  /// POSTs to `/api/token`.
+  ///
+  /// Always over the scheme the user configured: a TLS failure is reported to
+  /// the user rather than retried over plain HTTP, since this request carries
+  /// the password or refresh token. A server that really is plain HTTP is
+  /// entered as `http://`.
   Future<http.Response> _postTokenRequest(Map<String, String> body) {
     const headers = {'Content-Type': 'application/x-www-form-urlencoded'};
-    return _withSchemeFallback(
-      () => _httpClient
-          .post(_uri('/api/token'), headers: headers, body: body)
-          .timeout(const Duration(seconds: 30)),
-    );
+    return _httpClient
+        .post(_uri('/api/token'), headers: headers, body: body)
+        .timeout(const Duration(seconds: 30));
   }
 
   /// Establishes (or confirms) a usable credential, dispatching on the mode the
@@ -286,11 +265,9 @@ class RommService {
   Future<void> _verifyApiKey() async {
     http.Response resp;
     try {
-      resp = await _withSchemeFallback(
-        () => _httpClient
-            .get(_uri('/api/users/me'), headers: _authHeaders)
-            .timeout(const Duration(seconds: 30)),
-      );
+      resp = await _httpClient
+          .get(_uri('/api/users/me'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 30));
     } on TimeoutException {
       throw RommException('Connection timed out');
     } on HandshakeException {
@@ -1023,8 +1000,22 @@ class RommService {
   /// Auth headers for fetching an image, but only when [url] points at the RomM
   /// server itself — never leak the bearer token to third-party CDNs (IGDB,
   /// RetroAchievements, etc. host many covers/logos).
-  Map<String, String> imageHeadersFor(String url) =>
-      (_hasCredential && url.startsWith(_baseUrl)) ? _authHeaders : const {};
+  Map<String, String> imageHeadersFor(String url) {
+    final uri = Uri.tryParse(url);
+    return (_hasCredential && uri != null && _isConfiguredOrigin(uri))
+        ? _authHeaders
+        : const {};
+  }
+
+  /// Whether [uri] has exactly the configured server's origin — scheme, host
+  /// and port — so credentials are never attached to any other server.
+  bool _isConfiguredOrigin(Uri uri) {
+    final base = Uri.tryParse(_baseUrl);
+    if (base == null || !uri.hasScheme || uri.host.isEmpty) return false;
+    return uri.scheme.toLowerCase() == base.scheme.toLowerCase() &&
+        uri.host.toLowerCase() == base.host.toLowerCase() &&
+        uri.port == base.port;
+  }
 
   /// URL of RomM's bundled SVG icon for [platform]. RomM only ships icons for
   /// some slugs, so this may 404.
@@ -1222,12 +1213,15 @@ class RommService {
   /// canonical route for BOTH saves and states — states have no `/content`
   /// endpoint.
   Future<Uint8List> downloadAssetByPath(String downloadPath) async {
+    final uri = _assetUri(downloadPath);
+    // The request carries our credentials, so it may only go to the
+    // configured server, whatever URL the server's listing returned.
+    if (!_isConfiguredOrigin(uri)) {
+      throw RommException('Asset is not on the configured RomM server');
+    }
     // Asset content can be large, so allow a longer per-attempt timeout than a
     // plain metadata GET.
-    final resp = await _authedGetUri(
-      _assetUri(downloadPath),
-      timeout: const Duration(seconds: 60),
-    );
+    final resp = await _authedGetUri(uri, timeout: const Duration(seconds: 60));
     return resp.bodyBytes;
   }
 

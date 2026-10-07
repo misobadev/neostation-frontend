@@ -120,6 +120,11 @@ extension _ContextMenu on _SystemGamesListState {
       // card's registered action — and grid and carousel, which have no card to
       // register one, work off the same call.
       onScrape: canScrape ? _scrapeSelectedGame : null,
+      // Identify… stores a pick against the ROM's own row, so it also needs a
+      // ROM path to store it on.
+      onIdentify: canScrape && (game.romPath?.isNotEmpty ?? false)
+          ? _identifySelectedGame
+          : null,
       onViewMode: () =>
           GameViewModeDropdown.globalKey.currentState?.showDropdown(),
       onRandom: _showRandomGameDialog,

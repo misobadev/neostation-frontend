@@ -460,7 +460,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 163;
+  static const int _databaseVersion = 165;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -2013,6 +2013,9 @@ class SqliteService {
         rom_crc32 TEXT,
         rom_size INTEGER,
         rom_fingerprint_skipped TEXT,
+        -- ScreenScraper game the user picked by hand (Identify…); NULL means
+        -- match automatically. See migration v165.
+        ss_manual_game_id INTEGER,
         id_ra INTEGER,
         ra_match_source TEXT,
         ra_hash_skipped TEXT,
@@ -2712,22 +2715,35 @@ class SqliteService {
   }
 
   /// Deletes all ROM records associated with a specific directory prefix.
+  ///
+  /// Compares prefixes with `substr` rather than `LIKE`: `%` and `_` in the
+  /// folder (every SAF tree URI is full of `%` escapes) would be wildcards, and
+  /// `LIKE` ignores case, so removing one folder deleted the games of others
+  /// that only looked alike. `substr` counts characters, hence the folder's
+  /// length in runes, not UTF-16 units. Handles both `/` and `\` separators.
   static Future<int> deleteRomsByFolderPath(String folderPath) async {
+    if (folderPath.isEmpty) return 0;
+    final base = folderPath.replaceFirst(RegExp(r'[/\\]+$'), '');
     final db = await instance.database;
-
-    // Remove ROM entries where the path starts with the specified folder.
-    // Handles both SAF URI separators (/) and Windows path separators (\).
+    if (base.isEmpty) {
+      // A folder at the filesystem root ("/"): every path under it.
+      return await db.delete(
+        'user_roms',
+        where: "substr(rom_path, 1, 1) IN ('/', '\\')",
+      );
+    }
     return await db.delete(
       'user_roms',
-      where: 'rom_path LIKE ? OR rom_path LIKE ? OR rom_path = ?',
-      whereArgs: ['$folderPath/%', '$folderPath\\%', folderPath],
+      where: 'rom_path = ? OR substr(rom_path, 1, ?) IN (?, ?)',
+      whereArgs: [base, base.runes.length + 1, '$base/', '$base\\'],
     );
   }
 
   /// Whether any `user_roms` row lives under the ROM root [folderPath].
   ///
   /// Compares prefixes with `substr` rather than `LIKE`: SAF tree URIs are
-  /// full of `%` escapes, which `LIKE` would read as wildcards.
+  /// full of `%` escapes, which `LIKE` would read as wildcards. `substr` counts
+  /// characters, hence the length in runes.
   static Future<bool> hasRomsUnderFolder(String folderPath) async {
     final base = folderPath.replaceFirst(RegExp(r'[/\\]+$'), '');
     if (base.isEmpty) return false;
@@ -2735,7 +2751,7 @@ class SqliteService {
     final rows = await db.rawQuery(
       'SELECT EXISTS(SELECT 1 FROM user_roms WHERE rom_path = ? '
       'OR substr(rom_path, 1, ?) IN (?, ?)) AS present',
-      [base, base.length + 1, '$base/', '$base\\'],
+      [base, base.runes.length + 1, '$base/', '$base\\'],
     );
     return rows.isNotEmpty && rows.first['present'] == 1;
   }

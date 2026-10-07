@@ -86,12 +86,17 @@ extension SqliteConfigScanning on SqliteConfigProvider {
       // 1. Surgical cleanup in the DB before updating the config
       await GameRepository.deleteRomsByFolderPath(folderPath);
 
-      // 2. Update local and persistent configuration
+      // 2. Remove the folder itself. Saving the config below can't do it when
+      // this is the last folder: saveUserRomFolders ignores an empty list so a
+      // blanket save never wipes the folders.
+      await ConfigRepository.removeRomFolder(folderPath);
+
+      // 3. Update local and persistent configuration
       final newList = _config.romFolders.where((p) => p != folderPath).toList();
       _config = _config.copyWith(romFolders: newList, lastScan: DateTime.now());
       await SqliteConfigService.saveConfig(_config);
 
-      // 3. Decide whether to scan or just finish
+      // 4. Decide whether to scan or just finish
       if (newList.isNotEmpty) {
         // Folders still remain, scan to ensure consistency
         await scanSystems();

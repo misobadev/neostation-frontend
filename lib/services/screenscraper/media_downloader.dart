@@ -21,6 +21,8 @@ class ScreenscraperMediaDownloader {
 
   static final _log = LoggerService.instance;
 
+  static final RegExp _safeExtension = RegExp(r'^[A-Za-z0-9]{1,8}$');
+
   /// Downloads and caches a media file.
   static Future<bool> _downloadMediaFileSmart(
     String url,
@@ -99,8 +101,14 @@ class ScreenscraperMediaDownloader {
           romName,
           appSystemId,
         );
-        final fileName =
-            '$romBaseName.${bestMedia['format']?.toString() ?? 'png'}';
+        // The extension comes from the API response; accept only a plain
+        // extension so it can't carry a path out of the media folder.
+        final format = bestMedia['format']?.toString() ?? 'png';
+        if (!_safeExtension.hasMatch(format)) {
+          _log.w('Skipping $mediaType for $romName: unexpected format');
+          continue;
+        }
+        final fileName = '$romBaseName.$format';
         final relativePath = '$systemFolder/$folderName/$fileName';
 
         downloadTasks.add({

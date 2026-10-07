@@ -9,7 +9,11 @@ class AppConfig {
   static const String billingBaseUrl = 'https://billing.neosync.cloud';
 
   /// WebSocket endpoint for the real-time notification service.
-  static const String notifyBaseUrl = 'ws://notify.neosync.cloud/ws';
+  ///
+  /// Must stay `wss://`: the connection authenticates with the session token
+  /// in its query string, and that token also authorises the sync and billing
+  /// APIs.
+  static const String notifyBaseUrl = 'wss://notify.neosync.cloud/ws';
 
   /// Base URL for the NeoAssets public catalog API (system art packs).
   ///
