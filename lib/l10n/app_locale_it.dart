@@ -750,7 +750,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.sortByGroup: 'Ordina per',
   AppLocale.orderGroup: 'Ordine',
   AppLocale.synced: 'Sincronizzato',
-  AppLocale.syncing: 'Sincronizzazione',
+  AppLocale.syncing: 'Sincronizzazione...',
   AppLocale.conflict: 'Conflitto',
   AppLocale.ready: 'Pronto',
   AppLocale.quota: 'Quota',

@@ -24,6 +24,7 @@ import 'package:neostation/services/notification_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/core_footer.dart' show GamepadControl;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -234,6 +235,38 @@ void main() {
     expect(failed, findsNothing);
     expect(notified().single, startsWith('Some uploads failed'));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('retry greys out and ignores presses while a sync runs', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    final button = find.byKey(const ValueKey('save-retry-uploads'));
+    GamepadControl retry() => tester.widget<GamepadControl>(button);
+    final idle = retry().backgroundColor;
+
+    final sync = Completer<SyncResult>();
+    romm.run = () => sync.future;
+    await tester.tap(button);
+    // The bar animates indefinitely, so pump rather than settle while busy.
+    await tester.pump();
+    expect(romm.calls, 1);
+    expect(retry().label, 'Syncing...');
+    expect(retry().backgroundColor, isNot(idle));
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    await tester.tap(button);
+    await pastGrace(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyY);
+    await tester.pump();
+    expect(romm.calls, 1, reason: 'neither a tap nor Y starts another');
+
+    sync.complete(SyncResult.ok());
+    await tester.pumpAndSettle();
+    expect(retry().label, 'Retry uploads');
+    expect(retry().backgroundColor, idle);
+    expect(notified(), isEmpty);
   });
 
   testWidgets('the busy bar overlays the bottom edge without moving content', (

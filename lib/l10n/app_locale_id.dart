@@ -415,7 +415,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.achievements: 'Pencapaian',
 
   AppLocale.neoSyncLogin: 'Masuk NeoSync',
-  AppLocale.neoSyncSynchronizing: 'NeoSync: Menyingkronkan...',
+  AppLocale.neoSyncSynchronizing: 'NeoSync: Menyinkronkan...',
   AppLocale.neoSyncNotConnected: 'NeoSync: Tidak terhubung',
   AppLocale.neoSyncSynchronized: 'NeoSync: Simpanan disinkronkan',
   AppLocale.neoSyncSavesSync: 'File simpanan akan disinkronkan dengan NeoSync',
@@ -730,7 +730,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.sortByGroup: 'Urutkan Berdasarkan',
   AppLocale.orderGroup: 'Urutan',
   AppLocale.synced: 'Disinkronkan',
-  AppLocale.syncing: 'Menyingkronkan',
+  AppLocale.syncing: 'Menyinkronkan...',
   AppLocale.conflict: 'Konflik',
   AppLocale.ready: 'Siap',
   AppLocale.quota: 'Kuota',

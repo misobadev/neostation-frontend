@@ -646,7 +646,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.sortByGroup: '排序方式',
   AppLocale.orderGroup: '順序',
   AppLocale.synced: '已同步',
-  AppLocale.syncing: '同步中',
+  AppLocale.syncing: '同步中...',
   AppLocale.conflict: '衝突',
   AppLocale.ready: '就緒',
   AppLocale.quota: '配額',

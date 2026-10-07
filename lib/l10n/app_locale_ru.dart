@@ -741,7 +741,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.sortByGroup: 'СОРТИРОВАТЬ ПО',
   AppLocale.orderGroup: 'ПОРЯДОК',
   AppLocale.synced: 'Синхронизировано',
-  AppLocale.syncing: 'Синхронизация',
+  AppLocale.syncing: 'Синхронизация...',
   AppLocale.conflict: 'Конфликт',
   AppLocale.ready: 'Готово',
   AppLocale.quota: 'Квота',

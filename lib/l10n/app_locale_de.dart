@@ -756,7 +756,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.sortByGroup: 'Sortieren nach',
   AppLocale.orderGroup: 'Reihenfolge',
   AppLocale.synced: 'Synchronisiert',
-  AppLocale.syncing: 'Wird synchronisiert',
+  AppLocale.syncing: 'Wird synchronisiert...',
   AppLocale.conflict: 'Konflikt',
   AppLocale.ready: 'Bereit',
   AppLocale.quota: 'Kontingent',

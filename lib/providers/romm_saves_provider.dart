@@ -18,15 +18,25 @@ class RommSavesProvider extends ChangeNotifier {
   RommSavesProvider(
     this._browse,
     this._manager, {
+    ValueListenable<bool>? sweepRunning,
     FileProvider? fileProvider,
     Future<String?> Function(int)? loadLocalCover,
-  }) : _files = fileProvider,
+  }) : _sweep = sweepRunning ?? _rommSweep(_manager),
+       _files = fileProvider,
        _loadLocalCover = loadLocalCover {
     _browse.addListener(_connectionChanged);
+    _sweep?.addListener(_sweepChanged);
+  }
+
+  /// The RomM provider's sweep state, when RomM is registered.
+  static ValueListenable<bool>? _rommSweep(SyncManager manager) {
+    final romm = manager.provider(RomMSyncProvider.kProviderId);
+    return romm is RomMSyncProvider ? romm.sweepRunning : null;
   }
 
   final RommProvider _browse;
   final SyncManager _manager;
+  final ValueListenable<bool>? _sweep;
   final FileProvider? _files;
   final Future<String?> Function(int)? _loadLocalCover;
   final _metadataGate = LifoSemaphore(3);
@@ -45,7 +55,10 @@ class RommSavesProvider extends ChangeNotifier {
 
   List<RommAsset> get assets => List.unmodifiable(_assets);
   bool get loading => _loading;
-  bool get syncing => _syncing;
+
+  /// True during a retry, and during a sweep this provider did not start, such
+  /// as the automatic one after connect, since a retry would only overlap it.
+  bool get syncing => _syncing || (_sweep?.value ?? false);
   bool get deleting => _deleting;
   Object? get loadError => _loadError;
   SyncResult? get syncResult => _syncResult;
@@ -145,6 +158,17 @@ class RommSavesProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// A sweep started elsewhere shows here as a retry would: busy while it
+  /// runs, then a refresh so its uploads appear. A retry's own sweep is left to
+  /// [retryUploads], which already does both.
+  void _sweepChanged() {
+    if (_disposed || _syncing) return;
+    notifyListeners();
+    // A refresh would make an in-flight delete abandon its remaining batches
+    // and report failure; the next refresh shows the uploads instead.
+    if (!_sweep!.value && !_deleting) refresh();
+  }
+
   Future<void> refresh() async {
     if (_disposed || !_browse.isConnected) return;
     final generation = ++_generation;
@@ -176,7 +200,7 @@ class RommSavesProvider extends ChangeNotifier {
   Future<void> retryUploads() async {
     final sync = _manager.active;
     if (_disposed ||
-        _syncing ||
+        syncing ||
         !_browse.isConnected ||
         sync?.providerId != RomMSyncProvider.kProviderId) {
       return;
@@ -196,7 +220,14 @@ class RommSavesProvider extends ChangeNotifier {
       _syncing = false;
       if (!_disposed) notifyListeners();
     }
-    if (!_disposed && generation == _generation) await refresh();
+    // A busy result means another sweep (the automatic one after connect) is
+    // still uploading, so a refresh now would miss its files and reload every
+    // game's artwork for nothing. [_sweepChanged] refreshes when it ends.
+    if (!_disposed &&
+        generation == _generation &&
+        _syncResult?.error != SyncError.busy) {
+      await refresh();
+    }
   }
 
   /// Permanently removes [assets] from the server. Local copies are untouched,
@@ -208,7 +239,7 @@ class RommSavesProvider extends ChangeNotifier {
     if (_disposed ||
         assets.isEmpty ||
         _loading ||
-        _syncing ||
+        syncing ||
         _deleting ||
         !_browse.isConnected) {
       return false;
@@ -278,6 +309,7 @@ class RommSavesProvider extends ChangeNotifier {
     _disposed = true;
     _generation++;
     _browse.removeListener(_connectionChanged);
+    _sweep?.removeListener(_sweepChanged);
     super.dispose();
   }
 }

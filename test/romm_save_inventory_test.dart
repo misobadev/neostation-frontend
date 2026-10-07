@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -104,17 +105,21 @@ void main() {
     late InventoryConnection connection;
     late InventorySync sync;
     late RommSavesProvider inventory;
+    // The RomM provider's sweep state, which the fake sync does not have.
+    late ValueNotifier<bool> sweep;
     final manager = SyncManager.instance;
     setUp(() async {
       connection = InventoryConnection();
       sync = InventorySync('romm');
+      sweep = ValueNotifier(false);
       manager.register(sync);
       manager.register(InventorySync('neosync'));
       await manager.setActive('romm', persist: (_) async {});
-      inventory = RommSavesProvider(connection, manager);
+      inventory = RommSavesProvider(connection, manager, sweepRunning: sweep);
     });
     tearDown(() {
       inventory.dispose();
+      sweep.dispose();
       connection.dispose();
       manager.unregister('romm');
       manager.unregister('neosync');
@@ -191,6 +196,70 @@ void main() {
         await pending;
         expect(inventory.syncResult?.success, isFalse);
         expect(inventory.syncing, isFalse);
+      },
+    );
+
+    test(
+      'a sweep started elsewhere shows as syncing, then refreshes',
+      () async {
+        sweep.value = true;
+        expect(inventory.syncing, isTrue);
+        await inventory.retryUploads();
+        expect(sync.calls, 0, reason: 'a retry would only overlap it');
+        sweep.value = false;
+        expect(inventory.syncing, isFalse);
+        await pumpEventQueue();
+        expect(
+          connection.inventory.calls,
+          1,
+          reason: 'the uploads it made should appear, as after a retry',
+        );
+      },
+    );
+
+    test('a retry refreshes once, not again when its sweep ends', () async {
+      sync.run = () async {
+        sweep.value = true;
+        await Future<void>.delayed(Duration.zero);
+        sweep.value = false;
+        return SyncResult.ok();
+      };
+      await inventory.retryUploads();
+      await pumpEventQueue();
+      expect(connection.inventory.calls, 1);
+    });
+
+    test('a sweep ending mid-delete does not cut the delete short', () async {
+      connection.inventory.load = () async => [
+        inventoryAsset('Game.srm'),
+        inventoryAsset('Game.state', state: true),
+      ];
+      await inventory.refresh();
+      final request = Completer<void>();
+      connection.inventory.beforeDelete = () => request.future;
+      final pending = inventory.delete(inventory.assets.toList());
+      sweep.value = true;
+      sweep.value = false;
+      request.complete();
+      expect(await pending, isTrue);
+      expect(connection.inventory.deleted, ['save:1', 'state:1']);
+      expect(connection.inventory.calls, 1);
+    });
+
+    test(
+      'retry during a running sweep reports busy and does not refresh',
+      () async {
+        sync.run = () async =>
+            SyncResult.fail(SyncError.busy, message: 'Sweep already running');
+        await inventory.retryUploads();
+        expect(inventory.syncResult?.success, isFalse);
+        expect(inventory.syncResult?.error, SyncError.busy);
+        expect(inventory.syncing, isFalse);
+        expect(
+          connection.inventory.calls,
+          0,
+          reason: 'the running sweep has not finished uploading yet',
+        );
       },
     );
 

@@ -169,6 +169,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   void dispose() {
     _disposed = true;
     if (_autoSweep) _browse.removeListener(_onBrowseChanged);
+    _sweeping.dispose();
     super.dispose();
   }
 
@@ -1455,7 +1456,13 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   static const Duration _sweepStartupDelay = Duration(seconds: 30);
 
   /// Guard against overlapping sweeps (connect + a manual [fullSync]).
-  bool _sweeping = false;
+  final _sweeping = ValueNotifier<bool>(false);
+
+  /// Whether a pending-upload sweep is running, automatic or manual, so the
+  /// Saves tab can show the one that starts after connect as busy. A separate
+  /// notifier, because notifying this provider's listeners would rebuild the
+  /// library UI twice per sweep for a change it does not show.
+  ValueListenable<bool> get sweepRunning => _sweeping;
 
   /// Guard against overlapping link passes, the same way [_sweeping] guards
   /// the sweep. A skipped pass is not rescheduled; the next connect runs it.
@@ -1491,9 +1498,12 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// and so ends the sweep.
   Future<SyncResult> retryPendingUploads() async {
     if (!_browse.isConnected) return SyncResult.fail(SyncError.authRequired);
-    // Not an error: whichever call got here first is doing the same work.
-    if (_sweeping) return SyncResult.ok(message: 'Sweep already running');
-    _sweeping = true;
+    // Whichever call got here first is doing the same work, but this one did
+    // nothing and cannot vouch for that sweep's outcome, so it is not a success.
+    if (_sweeping.value) {
+      return SyncResult.fail(SyncError.busy, message: 'Sweep already running');
+    }
+    _sweeping.value = true;
     try {
       final index = await RommSaveMapRepository.getRomIdIndex();
       if (index.isEmpty) {
@@ -1572,7 +1582,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         message: '$synced of $candidates pending games synced',
       );
     } finally {
-      _sweeping = false;
+      if (!_disposed) _sweeping.value = false;
     }
   }
 

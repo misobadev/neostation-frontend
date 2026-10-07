@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_locale.dart';
 import '../../models/romm_asset.dart';
 import '../../models/romm_save_game.dart';
+import '../../models/sync_models.dart' show SyncError;
 import '../../providers/file_provider.dart';
 import '../../providers/romm_provider.dart';
 import '../../providers/romm_saves_provider.dart';
@@ -237,10 +238,34 @@ class _RommSavesContentState extends State<RommSavesContent> {
   Future<void> _retryUploads() async {
     if (_busy) return;
     await _saves.retryUploads();
-    // A successful retry needs no message.
-    if (mounted && _saves.syncResult?.success == false) {
+    // A successful retry needs no message, and nor does one that found a sweep
+    // already running: the button shows that one as it runs.
+    final result = _saves.syncResult;
+    if (mounted &&
+        result?.success == false &&
+        result?.error != SyncError.busy) {
       _notify(AppLocale.rommUploadsFailed);
     }
+  }
+
+  /// Greyed out while a sync runs, whoever started it.
+  Widget _retryButton(ColorScheme scheme) {
+    final syncing = _saves.syncing;
+    return GamepadControl(
+      key: const ValueKey('save-retry-uploads'),
+      label: (syncing ? AppLocale.syncing : AppLocale.rommRetryUploads)
+          .getString(context),
+      iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
+      onTap: _busy ? null : _tap(_retryUploads),
+      textColor: syncing
+          ? scheme.onTertiaryFixed.withValues(alpha: 0.6)
+          : scheme.onTertiaryFixed,
+      // Toward its own text colour, so it lightens whatever the theme's
+      // neutral is rather than assuming one.
+      backgroundColor: syncing
+          ? Color.lerp(scheme.tertiaryFixed, scheme.onTertiaryFixed, 0.25)
+          : scheme.tertiaryFixed,
+    );
   }
 
   /// Taps sound like the controller presses they stand in for, which the
@@ -520,18 +545,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
                 ),
                 Tooltip(
                   message: AppLocale.rommSavesHelp.getString(context),
-                  child: GamepadControl(
-                    key: const ValueKey('save-retry-uploads'),
-                    label:
-                        (_saves.syncing
-                                ? AppLocale.syncing
-                                : AppLocale.rommRetryUploads)
-                            .getString(context),
-                    iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
-                    onTap: _busy ? null : _tap(_retryUploads),
-                    textColor: scheme.onTertiaryFixed,
-                    backgroundColor: scheme.tertiaryFixed,
-                  ),
+                  child: _retryButton(scheme),
                 ),
               ],
             ),

@@ -527,9 +527,29 @@ void main() {
         final second = await provider.retryPendingUploads();
         await first;
 
-        expect(second.message, 'Sweep already running');
+        expect(
+          second.success,
+          isFalse,
+          reason: 'it did nothing, so it cannot report the running sweep',
+        );
+        expect(second.error, SyncError.busy);
         expect(svc.uploads, hasLength(1));
       },
     );
+
+    test('sweepRunning is up for exactly the length of a sweep', () async {
+      await linked('Watched', romId: 60);
+      final seen = <bool>[];
+      provider.sweepRunning.addListener(
+        () => seen.add(provider.sweepRunning.value),
+      );
+
+      final first = provider.retryPendingUploads();
+      expect(provider.sweepRunning.value, isTrue);
+      await provider.retryPendingUploads();
+      await first;
+
+      expect(seen, [true, false], reason: 'a busy call changes nothing');
+    });
   });
 }

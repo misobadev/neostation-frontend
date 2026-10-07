@@ -658,7 +658,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.sortByGroup: '並べ替え',
   AppLocale.orderGroup: '順序',
   AppLocale.synced: '同期済み',
-  AppLocale.syncing: '同期中',
+  AppLocale.syncing: '同期中...',
   AppLocale.conflict: '競合',
   AppLocale.ready: '準備完了',
   AppLocale.quota: '容量',

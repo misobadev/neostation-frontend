@@ -664,7 +664,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.sortByGroup: '정렬 기준',
   AppLocale.orderGroup: '정렬 순서',
   AppLocale.synced: '동기화됨',
-  AppLocale.syncing: '동기화 중',
+  AppLocale.syncing: '동기화 중...',
   AppLocale.conflict: '충돌',
   AppLocale.ready: '준비',
   AppLocale.quota: '용량',
