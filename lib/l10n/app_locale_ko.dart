@@ -318,7 +318,6 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.exportLogsFailed: '로그를 내보낼 수 없습니다',
   AppLocale.specialThanks: '특별 감사',
   AppLocale.forInvaluableContributions: '소중한 기여에 감사드립니다',
-  AppLocale.supportOnKofi: 'Ko-fi에서 후원하기',
   AppLocale.supportOnPatreon: 'Patreon에서 후원하기',
   AppLocale.openSourceLicense: '오픈 소스 프로젝트',
   AppLocale.openSourceLicenseDesc: 'GPLv3 라이선스 적용',

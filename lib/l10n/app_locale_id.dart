@@ -365,7 +365,6 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.exportLogsFailed: 'Gagal mengekspor log',
   AppLocale.specialThanks: 'Terima Kasih Khusus',
   AppLocale.forInvaluableContributions: 'atas kontribusi yang sangat berharga',
-  AppLocale.supportOnKofi: 'Dukung kami di Ko-fi',
   AppLocale.supportOnPatreon: 'Dukung kami di Patreon',
   AppLocale.openSourceLicense: 'Proyek Sumber Terbuka',
   AppLocale.openSourceLicenseDesc: 'Dilisensikan di bawah GPLv3',

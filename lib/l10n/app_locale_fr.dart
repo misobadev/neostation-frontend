@@ -384,7 +384,6 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.exportLogsFailed: 'Impossible d’exporter les journaux',
   AppLocale.specialThanks: 'Remerciements Spéciaux',
   AppLocale.forInvaluableContributions: 'pour ses contributions inestimables',
-  AppLocale.supportOnKofi: 'Soutenez-nous sur Ko-fi',
   AppLocale.supportOnPatreon: 'Soutenez-nous sur Patreon',
   AppLocale.openSourceLicense: 'Projet Open Source',
   AppLocale.openSourceLicenseDesc: 'Sous licence GPLv3',

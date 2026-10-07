@@ -375,7 +375,6 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.exportLogsFailed: 'Não foi possível exportar os registros',
   AppLocale.specialThanks: 'Agradecimentos Especiais',
   AppLocale.forInvaluableContributions: 'por contribuições inestimáveis',
-  AppLocale.supportOnKofi: 'Apoie-nos no Ko-fi',
   AppLocale.supportOnPatreon: 'Apoie-nos no Patreon',
   AppLocale.openSourceLicense: 'Projeto de Código Aberto',
   AppLocale.openSourceLicenseDesc: 'Licenciado sob GPLv3',

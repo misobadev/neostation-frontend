@@ -309,7 +309,6 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.exportLogsFailed: '無法匯出日誌',
   AppLocale.specialThanks: '特別感謝',
   AppLocale.forInvaluableContributions: '感謝其寶貴的貢獻',
-  AppLocale.supportOnKofi: '在 Ko-fi 上支持我們',
   AppLocale.supportOnPatreon: '在 Patreon 上支持我們',
   AppLocale.openSourceLicense: '開源專案',
   AppLocale.openSourceLicenseDesc: '基於 GPLv3 許可',

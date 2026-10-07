@@ -29,7 +29,6 @@
   <url type="homepage">https://neostation.dev</url>
   <url type="bugtracker">https://github.com/misobadev/neostation-frontend/issues</url>
   <url type="donation">https://www.patreon.com/cw/NeoStation</url>
-  <url type="donation">https://ko-fi.com/neostation</url>
   <url type="vcs-browser">https://github.com/misobadev/neostation-frontend</url>
 
   <launchable type="desktop-id">com.neogamelab.neostation.desktop</launchable>

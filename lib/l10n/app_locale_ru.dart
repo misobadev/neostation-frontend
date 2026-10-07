@@ -372,7 +372,6 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.exportLogsFailed: 'Не удалось экспортировать журналы',
   AppLocale.specialThanks: 'Особая благодарность',
   AppLocale.forInvaluableContributions: 'За неоценимый вклад',
-  AppLocale.supportOnKofi: 'Поддержите нас на Ko-fi',
   AppLocale.supportOnPatreon: 'Поддержите нас на Patreon',
   AppLocale.openSourceLicense: 'Проект с открытым исходным кодом',
   AppLocale.openSourceLicenseDesc: 'Лицензия GPLv3',
