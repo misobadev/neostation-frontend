@@ -304,7 +304,7 @@ titlekek_source = 1edc7b3b60e6b4d878b81715985e629b
         if (internalName.toLowerCase().endsWith('.tik') &&
             internalName.length >= 16) {
           titleId = internalName.substring(0, 16).toUpperCase();
-          break;
+          if (!isAdditionalContent(titleId)) break;
         }
       }
 
@@ -405,12 +405,23 @@ titlekek_source = 1edc7b3b60e6b4d878b81715985e629b
     }
   }
 
+  /// Application IDs are aligned to 0x1000; patches use offset 0x800
+  /// and add-on content uses nonzero offsets in the next application range.
+  /// Reject malformed/non-application IDs rather than hiding unknown files.
+  static bool isAdditionalContent(String? titleId) {
+    if (titleId == null ||
+        !RegExp(r'^0100[0-9a-fA-F]{12}$').hasMatch(titleId)) {
+      return false;
+    }
+    return int.parse(titleId.substring(13), radix: 16) != 0;
+  }
+
   /// Main entry point to extract Title ID and metadata from a Switch ROM (NSP or XCI).
   static Future<SwitchGameInfo?> extractGameInfo(String path) async {
     if (!_keysLoaded) await loadKeys();
 
     final extension = path.toLowerCase().split('.').last;
-    if (extension == 'nsp') {
+    if (extension == 'nsp' || extension == 'nsz') {
       return await _extractFromNSP(path);
     } else if (extension == 'xci') {
       return await _extractFromXCI(path);

@@ -50,7 +50,15 @@ class RomEntry {
   /// File size in bytes.
   final int size;
 
-  RomEntry({required this.path, required this.filename, this.size = 0});
+  /// Metadata read while filtering Switch packages before database cleanup.
+  final SwitchGameInfo? switchInfo;
+
+  RomEntry({
+    required this.path,
+    required this.filename,
+    this.size = 0,
+    this.switchInfo,
+  });
 }
 
 /// Service responsible for managing ROM discovery, filesystem synchronization,
@@ -293,7 +301,15 @@ class SqliteDatabaseService {
       ..clear()
       ..addAll(deduplicatedEntries);
 
-    // Clean orphaned entries (files deleted from disk). Rows under a root that
+    if (system.id == 'switch' || system.id == 'nintendo-switch') {
+      final filtered = await filterSwitchContent(romEntries);
+      romEntries
+        ..clear()
+        ..addAll(filtered);
+    }
+
+    // Clean orphaned entries (files deleted from disk or excluded by filters).
+    // Rows under a root that
     // is not mounted right now are left alone: a missing SD card lists as an
     // empty root, and without this every game on it would read as deleted.
     final offlineRoots = offlineRomRoots(
@@ -519,6 +535,39 @@ class SqliteDatabaseService {
     return lower.endsWith('.psvita') || lower.endsWith('.steam');
   }
 
+  /// Excludes standalone updates and DLC before path reconciliation so a
+  /// rescan also removes their old library rows. Unidentified files are kept.
+  @visibleForTesting
+  static Future<List<RomEntry>> filterSwitchContent(
+    List<RomEntry> entries,
+  ) async {
+    final games = <RomEntry>[];
+    for (final entry in entries) {
+      final extension = path.extension(entry.filename).toLowerCase();
+      // Cartridge images can bundle updates alongside the base game. Their
+      // HEAD header does not contain an application title ID; keep them intact.
+      if (extension != '.nsp' && extension != '.nsz') {
+        games.add(entry);
+        continue;
+      }
+      final info = await SwitchTitleExtractor.extractGameInfo(entry.path);
+      final filenameId = RegExp(
+        r'(?<![0-9a-fA-F])0100[0-9a-fA-F]{12}(?![0-9a-fA-F])',
+      ).firstMatch(entry.filename)?.group(0);
+      final titleId = info?.titleId ?? filenameId;
+      if (SwitchTitleExtractor.isAdditionalContent(titleId)) continue;
+      games.add(
+        RomEntry(
+          path: entry.path,
+          filename: entry.filename,
+          size: entry.size,
+          switchInfo: info,
+        ),
+      );
+    }
+    return games;
+  }
+
   /// Calculates a tuned batch size for insertions based on the total file count.
   static int _calculateOptimalBatchSize(int totalFiles) {
     if (totalFiles <= 10) return totalFiles;
@@ -569,9 +618,11 @@ class SqliteDatabaseService {
         String? titleId;
         String? titleName;
 
-        if (isSwitch && !entry.path.startsWith('content://')) {
+        if (isSwitch) {
           try {
-            final info = await SwitchTitleExtractor.extractGameInfo(entry.path);
+            final info =
+                entry.switchInfo ??
+                await SwitchTitleExtractor.extractGameInfo(entry.path);
             if (info != null) {
               titleId = info.titleId;
               titleName = info.gameName;
