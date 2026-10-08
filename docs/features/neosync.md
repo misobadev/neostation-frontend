@@ -27,6 +27,15 @@ Open the **NeoSync** tab and choose to create an account or sign in. You can als
 - New accounts need email verification. NeoStation can resend the verification email.
 - If you forget your password, use the password recovery option.
 
+## How NeoStation Finds Your Saves
+
+NeoStation supports two kinds of emulators, and it locates each one differently:
+
+- **RetroArch and its libretro cores.** NeoStation reads your RetroArch configuration and syncs the folders you set there for saves and save states. The core that wrote a save is detected automatically, so the same save stays linked to the right core on every device. No setup is needed beyond having RetroArch configured.
+- **Standalone emulators** (Eden, Citron, Yuzu, DuckStation, ARMSX2, Flycast, PPSSPP and so on). These keep their saves in their own folders, which NeoStation cannot locate reliably on its own. For every standalone emulator you use, you must point NeoStation at its save folder once, per system and emulator, using **Custom Save Folders**. A standalone emulator without a configured folder is **not synced**.
+
+Every upload goes to the NeoSync v2 storage, and each file is stored together with the system and the emulator that produced it, so it is always placed back with the correct emulator on every device. Old NeoSync v1 saves are no longer uploaded or downloaded; only v2 is used.
+
 ## How Automatic Syncing Works
 
 NeoStation syncs automatically, but it does **not** sync all of your saves at once — syncing everything in a single pass would saturate NeoSync's servers. Instead, each game is synchronised as you reach it:
@@ -47,6 +56,7 @@ NeoStation saves each file with the system and the emulator (or RetroArch core) 
 - Game saves and save states are linked to the game they belong to.
 - Memory cards and other shared files are shared across the whole system.
 - RetroArch saves are tracked per core, so switching between devices keeps using the right emulator.
+- Standalone emulator saves are tracked per emulator, and only sync while their custom save folder is configured.
 
 ## Per-Game Status
 
@@ -76,14 +86,24 @@ The **Save List** shows every file you have in the cloud. You can:
 
 ## Custom Save Folders
 
-Some standalone emulators store their saves in a folder that NeoStation cannot find automatically. You can point NeoStation at it:
+Standalone emulators store their saves in folders that NeoStation cannot find on its own. You point NeoStation at the folder once, per system and emulator:
 
 1. Open **Custom Save Folders** in the NeoSync area.
-2. Choose the system and emulator.
+2. Choose the system and the emulator.
 3. Select the save folder on your device.
-4. Choose **Configure**, then **Sync now** when you want to back up or pull down that folder.
+4. Choose **Configure**. NeoStation uploads the folder's existing saves right away.
+5. Repeat this for every standalone emulator and system you use.
 
-> **Important:** For a custom folder to sync, it must be configured on **every device** you want to synchronise with. NeoStation cannot place a save into a custom folder that the target device has not been pointed at, so configure the same system + emulator + folder on each device.
+> **Important:** A custom folder only syncs when it is configured on **every device** you want to synchronise with. NeoStation cannot place a save into a custom folder that the target device has not been pointed at, so configure the same system + emulator + folder on each device.
+
+### Which Folder to Choose
+
+Select the folder that contains the emulator's saves on that device:
+
+- **Switch (Eden, Citron, Yuzu, ...):** the save data folder inside the emulator's NAND, for example `.../Android/data/dev.eden.eden_emulator/files/nand/user/save`. Each game lives under its Title ID inside this folder. Do not select the whole NAND, which also holds non-save data.
+- **Memory-card systems (PS2, Dreamcast, ...):** the folder that holds the memory cards or VMU files, for example a `memcards` or `data` folder.
+
+The path is stored **relative to the folder you select**, so any parent of the actual save files works, as long as the other devices have the same folder structure.
 
 Removing a custom save folder only disconnects it from syncing; it does not delete the local files.
 
@@ -103,7 +123,7 @@ There is **no manual download button** in NeoStation. If you want to download a 
 
 Saves from the previous NeoSync version are kept as **backup only**. Legacy saves are not synced by NeoStation and can only be downloaded as a backup from the [official site](https://neosync.cloud/).
 
-From now on, NeoStation only uses the new **NeoSync v2** cloud storage for normal synchronisation.
+From now on, NeoStation only uses the new **NeoSync v2** cloud storage for normal synchronisation. Standalone emulator saves are always uploaded to v2 through their custom save folder; nothing is uploaded to the old layout.
 
 ## Storage and Plans
 

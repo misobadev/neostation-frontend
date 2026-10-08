@@ -120,32 +120,16 @@ extension NeoSyncCore on NeoSyncProvider {
     }
     if (_isSyncing) return;
 
-    _setSyncing(true);
     _error = null;
-    _syncProgress = 0.0;
-    _syncStatus = 'Starting unified sync...';
-    _totalFiles = 0;
-    _processedFiles = 0;
-    _uploadedFiles = 0;
-    _skippedFiles = 0;
-    _downloadedFiles = 0;
     _processedItems = [];
 
-    notify();
-
     try {
-      final savesPath = await _getRetroArchSavesPath();
-      if (savesPath == null) {
-        _syncStatus = 'RetroArch saves directory not found';
-        _processedItems.add('RetroArch saves directory not found');
-        return;
-      }
-
-      // Phase 1: Upload local files
-      await _performUploadPhase(savesPath);
-
-      // Phase 2: Download cloud files
-      await _performDownloadPhase(savesPath);
+      // Both auto-sync passes already cover RetroArch cores and every
+      // configured standalone custom save folder, so the unified sync is just
+      // those two passes run back to back (standalone emulators are never
+      // auto-detected; they live in the user's custom folders).
+      await autoSyncUploads();
+      await autoSyncDownloads();
 
       _syncProgress = 1.0;
       _syncStatus =
@@ -167,8 +151,6 @@ extension NeoSyncCore on NeoSyncProvider {
         _processedItems.add('Sync error: $e');
         NeoSyncProvider._log.e('Unified sync error: $e');
       }
-    } finally {
-      _setSyncing(false);
     }
   }
 
@@ -409,58 +391,20 @@ extension NeoSyncCore on NeoSyncProvider {
       final isSharedSystem =
           system?.folderName == 'ps2' || system?.folderName == 'dreamcast';
 
-      // Verificar si hay configuración de emulador válida en Windows
+      // Verificar si hay configuración de emulador válida en Windows.
+      //
+      // Standalone emulators (including Switch/Eden) must have a NeoSync custom
+      // save folder configured; RetroArch systems resolve their JSON save paths.
+      // When nothing resolves, there is no emulator to sync with.
       if (system != null && Platform.isWindows) {
-        bool hasValidEmulator = true;
-
-        if (system.id == 'switch') {
-          final emulatorsList =
-              await EmulatorRepository.getStandaloneEmulatorsBySystemId(
-                'switch',
-              );
-          hasValidEmulator = false;
-
-          // Revisar primero el seleccionado por el usuario
-          for (final emu in emulatorsList) {
-            if (emu['is_user_default'].toString() == '1') {
-              final path = emu['emulator_path']?.toString();
-              if (path != null && path.trim().isNotEmpty) {
-                hasValidEmulator = true;
-              }
-              break;
-            }
-          }
-
-          // Si no hay de usuario, revisar el default del sistema
-          if (!hasValidEmulator &&
-              !emulatorsList.any(
-                (e) => e['is_user_default'].toString() == '1',
-              )) {
-            for (final emu in emulatorsList) {
-              if (emu['is_default'].toString() == '1') {
-                final path = emu['emulator_path']?.toString();
-                if (path != null && path.trim().isNotEmpty) {
-                  hasValidEmulator = true;
-                }
-                break;
-              }
-            }
-          }
-        } else {
-          // Para RetroArch y otros sistemas, verificar si las rutas se pueden resolver.
-          final resolvedPaths = await resolveUniversalPaths(
-            system,
-            game: game,
-            ensureExists: false,
-          );
-          if (resolvedPaths.isEmpty) {
-            hasValidEmulator = false;
-          }
-        }
-
-        if (!hasValidEmulator) {
+        final resolvedPaths = await resolveUniversalPaths(
+          system,
+          game: game,
+          ensureExists: false,
+        );
+        if (resolvedPaths.isEmpty) {
           NeoSyncProvider._log.w(
-            'No valid emulator path configured for ${system.realName} in Windows, marking as missingEmulator',
+            'No valid save path configured for ${system.realName} in Windows, marking as missingEmulator',
           );
           _updateGameSyncState(
             game.romname,
@@ -680,7 +624,7 @@ extension NeoSyncCore on NeoSyncProvider {
       final file = File(localSave.filePath);
       if (!file.existsSync()) return false;
 
-      // 1. Obtener el sistema para resolver sus rutas JSON
+      // Obtener el sistema para resolver sus rutas JSON
       final system = await _getSystemForGame(game);
       if (system == null) return false;
 
@@ -689,72 +633,112 @@ extension NeoSyncCore on NeoSyncProvider {
         return false;
       }
 
-      // 2. Determinar la ruta relativa de manera universal
-      final savesPath = await _getRetroArchSavesPath();
-      final statesPath = await _getRetroArchStatesPath();
-
-      String basePath = file.parent.path;
-      bool isState = false;
-
-      if (statesPath != null && path.isWithin(statesPath, file.path)) {
-        basePath = statesPath;
-        isState = true;
-      } else if (savesPath != null && path.isWithin(savesPath, file.path)) {
-        basePath = savesPath;
-        isState = false;
-      }
-
-      final relativePath = await _calculateSyncRelativePath(
-        game,
-        file,
-        basePath,
-        isState: isState,
-        explicitSystemFolder: game.systemFolderName,
-      );
-      if (relativePath == null) {
-        NeoSyncProvider._log.w(
-          'Auto-upload skipped for ${game.name}: no resolvable sync path',
-        );
-        return false;
-      }
-
-      final parsed = CloudPathBuilder.parse(relativePath);
-      // RetroArch saves use the v1-style relative path, which the cloud path
-      // parser cannot see an emulator in, so derive the RetroArch slug from the
-      // save's core folder (ground truth), falling back to the game metadata.
-      final emulatorId =
-          parsed?.emulatorSlug ??
-          await _resolveRetroArchEmulatorSlug(file, basePath) ??
-          _retroArchCoreSlugFromGame(game);
-      final result = await _neoSyncService.syncFile(
-        file,
-        game.name,
-        customFilename: relativePath,
-        systemId: parsed?.system ?? game.systemFolderName,
-        emulatorId: emulatorId,
-        gameHash: await _resolveGameHashForUpload(game),
-        isState: isState,
-        scope: parsed?.scope,
-        type: _syncTypeForFile(file, isState: isState),
-      );
-
+      final result = await _uploadLocalFileForGame(game, file);
       if (result['success']) {
         return true;
-      } else {
-        final errorMessage = result['message']?.toString().toLowerCase() ?? '';
-        if (errorMessage.contains('quota') &&
-            errorMessage.contains('exceeded')) {
-          _quotaExceededActive = true;
-          throw QuotaExceededException('Storage quota exceeded', 1);
-        }
-        return false;
       }
+      final errorMessage = result['message']?.toString().toLowerCase() ?? '';
+      if (errorMessage.contains('quota') && errorMessage.contains('exceeded')) {
+        _quotaExceededActive = true;
+        throw QuotaExceededException('Storage quota exceeded', 1);
+      }
+      return false;
     } on QuotaExceededException {
       rethrow;
     } catch (e) {
       NeoSyncProvider._log.w('Error auto-uploading save for ${game.name}: $e');
       return false;
     }
+  }
+
+  /// Uploads a single local save/state file for [game].
+  ///
+  /// Standalone emulators (Switch/Eden, ARMSX2, DuckStation, ...) are ALWAYS
+  /// routed through the user-configured custom save folder: the file is sent
+  /// with `type='custom'`, the system folder name and the emulator unique id so
+  /// the backend stores it under `v2/custom/<emulator>/<relative>`. Everything
+  /// else (RetroArch cores) keeps the standard `v2/saves|states/<system>/...`
+  /// layout resolved from the core folder. When the file is not inside a custom
+  /// folder and no RetroArch core can be resolved, the upload is skipped.
+  Future<Map<String, dynamic>> _uploadLocalFileForGame(
+    GameModel game,
+    File file,
+  ) async {
+    final system = await _getSystemForGame(game);
+    if (system == null) {
+      return {'success': false, 'message': 'system not found'};
+    }
+    if (!system.neosync.sync) {
+      return {'success': false, 'message': 'sync disabled'};
+    }
+
+    // 1. Standalone custom folder takes priority over everything else.
+    final customInfo = await customFolderSyncInfo(system, file);
+    if (customInfo != null) {
+      NeoSyncProvider._log.i(
+        'Upload: ${file.path} -> custom folder '
+        '(${customInfo.systemFolderName}/${customInfo.emulatorUniqueId})',
+      );
+      return _neoSyncService.syncFile(
+        file,
+        game.name,
+        customFilename: customInfo.relativePath,
+        systemId: customInfo.systemFolderName,
+        emulatorId: customInfo.emulatorUniqueId,
+        gameHash: await _resolveGameHashForUpload(game),
+        isState: false,
+        type: 'custom',
+      );
+    }
+
+    // 2. RetroArch / standard v2 layout.
+    final savesPath = await _getRetroArchSavesPath();
+    final statesPath = await _getRetroArchStatesPath();
+
+    String basePath = file.parent.path;
+    bool isState = false;
+
+    if (statesPath != null && path.isWithin(statesPath, file.path)) {
+      basePath = statesPath;
+      isState = true;
+    } else if (savesPath != null && path.isWithin(savesPath, file.path)) {
+      basePath = savesPath;
+      isState = false;
+    }
+
+    final relativePath = await _calculateSyncRelativePath(
+      game,
+      file,
+      basePath,
+      isState: isState,
+      explicitSystemFolder: game.systemFolderName,
+    );
+    if (relativePath == null) {
+      NeoSyncProvider._log.w(
+        'Upload skipped for ${game.name}: no resolvable sync path',
+      );
+      return {'success': false, 'message': 'no resolvable sync path'};
+    }
+
+    final parsed = CloudPathBuilder.parse(relativePath);
+    // RetroArch saves use the v1-style relative path, which the cloud path
+    // parser cannot see an emulator in, so derive the RetroArch slug from the
+    // save's core folder (ground truth), falling back to the game metadata.
+    final emulatorId =
+        parsed?.emulatorSlug ??
+        await _resolveRetroArchEmulatorSlug(file, basePath) ??
+        _retroArchCoreSlugFromGame(game);
+    return _neoSyncService.syncFile(
+      file,
+      game.name,
+      customFilename: relativePath,
+      systemId: parsed?.system ?? game.systemFolderName,
+      emulatorId: emulatorId,
+      gameHash: await _resolveGameHashForUpload(game),
+      isState: isState,
+      scope: parsed?.scope,
+      type: _syncTypeForFile(file, isState: isState),
+    );
   }
 
   /// Descarga automáticamente un save de la nube
@@ -909,6 +893,10 @@ extension NeoSyncCore on NeoSyncProvider {
 
       final statesPath = await _getRetroArchStatesPath();
       final savesPath = await _getRetroArchSavesPath();
+      final customFolders =
+          await NeoSyncSaveFolderRepository.getFoldersForSystem(
+            system.folderName,
+          );
 
       for (final file in allFiles) {
         try {
@@ -959,11 +947,15 @@ extension NeoSyncCore on NeoSyncProvider {
               isState = false;
             }
 
-            final relativePath = _calculateRelativePath(
-              file,
-              basePath,
-              isState: isState,
-            );
+            // Standalone custom folders store the save relative to the folder
+            // root, and that same relative path is what the cloud keeps, so the
+            // local/cloud match must use it too (never the default parent dir).
+            final customRoot = customRootForPath(customFolders, file.path);
+            final relativePath = customRoot != null
+                ? path
+                      .relative(file.path, from: customRoot)
+                      .replaceAll('\\', '/')
+                : _calculateRelativePath(file, basePath, isState: isState);
 
             matchingFiles.add(
               LocalSaveFile(
@@ -1066,10 +1058,21 @@ extension NeoSyncCore on NeoSyncProvider {
         } else {
           // Standard systems match by ROM name with a word boundary. The full
           // cloud path is checked too in case it lives in folders (e.g. Switch).
-          final fullCloudPathLower = cloudFile.fileName.toLowerCase();
+          final fullCloudPathLower =
+              (cloudFile.filePath.isNotEmpty
+                      ? cloudFile.filePath
+                      : cloudFile.fileName)
+                  .toLowerCase();
 
           if (_saveBelongsToRom(fileName, gameRomName) ||
               _saveBelongsToRom(fullCloudPathLower, gameRomName)) {
+            isMatch = true;
+          } else if (system.folderName == 'switch' &&
+              game.titleId != null &&
+              game.titleId!.isNotEmpty &&
+              fullCloudPathLower.contains(game.titleId!.toLowerCase())) {
+            // Switch standalone (Eden, ...) saves are keyed by Title ID in the
+            // custom folder relative path, not by the ROM file name.
             isMatch = true;
           }
         }
@@ -1306,44 +1309,16 @@ extension NeoSyncCore on NeoSyncProvider {
         // Subir save local que no está en la nube
         final file = File(gameState.localSave!.filePath);
         if (file.existsSync()) {
-          // Calcular la ruta relativa correcta
-          final savesPath = await _getRetroArchSavesPath();
-          if (savesPath != null) {
-            final relativePath = await _calculateSyncRelativePath(
-              game,
-              file,
-              savesPath,
-              explicitSystemFolder: game.systemFolderName,
-            );
-            if (relativePath == null) {
-              NeoSyncProvider._log.w(
-                'Pre-launch upload skipped for ${game.name}: no sync path',
-              );
-              return;
-            }
-
-            final parsed = CloudPathBuilder.parse(relativePath);
-            final result = await _neoSyncService.syncFile(
-              file,
-              game.name,
-              customFilename: relativePath,
-              systemId: parsed?.system ?? game.systemFolderName,
-              emulatorId: parsed?.emulatorSlug,
-              gameHash: await _resolveGameHashForUpload(game),
-              isState: false,
-              scope: parsed?.scope,
-            );
-
-            if (result['success']) {
-              // Actualizar estado después del sync
-              await detectGameSaveFiles(game);
-            }
+          final result = await _uploadLocalFileForGame(game, file);
+          if (result['success'] == true) {
+            // Actualizar estado después del sync
+            await detectGameSaveFiles(game);
           }
         }
       } else if (gameState.status == neo_sync.GameSyncStatus.cloudOnly &&
           gameState.cloudSave != null) {
         // Descargar save de la nube
-        await restoreCloudBackup(gameState.cloudSave!);
+        await _autoDownloadCloudSave(game, gameState.cloudSave!);
         // Actualizar estado
         await detectGameSaveFiles(game);
       }
@@ -1382,38 +1357,10 @@ extension NeoSyncCore on NeoSyncProvider {
       // Subir el save local (puede haber sido modificado durante el juego)
       final file = File(gameState.localSave!.filePath);
       if (file.existsSync()) {
-        // Calcular la ruta relativa correcta
-        final savesPath = await _getRetroArchSavesPath();
-        if (savesPath != null) {
-          final relativePath = await _calculateSyncRelativePath(
-            game,
-            file,
-            savesPath,
-            explicitSystemFolder: game.systemFolderName,
-          );
-          if (relativePath == null) {
-            NeoSyncProvider._log.w(
-              'Post-game upload skipped for ${game.name}: no sync path',
-            );
-            return;
-          }
-
-          final parsed = CloudPathBuilder.parse(relativePath);
-          final result = await _neoSyncService.syncFile(
-            file,
-            game.name,
-            customFilename: relativePath,
-            systemId: parsed?.system ?? game.systemFolderName,
-            emulatorId: parsed?.emulatorSlug,
-            gameHash: await _resolveGameHashForUpload(game),
-            isState: false,
-            scope: parsed?.scope,
-          );
-
-          if (result['success']) {
-            // Actualizar estado después del sync
-            await detectGameSaveFiles(game);
-          }
+        final result = await _uploadLocalFileForGame(game, file);
+        if (result['success'] == true) {
+          // Actualizar estado después del sync
+          await detectGameSaveFiles(game);
         }
       }
     } on QuotaExceededException {
@@ -1428,48 +1375,6 @@ extension NeoSyncCore on NeoSyncProvider {
       );
     } catch (e) {
       NeoSyncProvider._log.w('Error in post-game sync for ${game.name}: $e');
-    }
-  }
-
-  /// Restaura un backup desde la nube (descarga y sobreescribe local)
-  Future<void> restoreCloudBackup(NeoSyncFile cloudFile) async {
-    try {
-      final savesPath = await _getRetroArchSavesPath();
-      if (savesPath == null) {
-        throw Exception('RetroArch saves directory not found');
-      }
-
-      String targetPath;
-      final fileName = cloudFile.fileName.replaceAll('\\', '/'); // Normalize
-
-      // Manejo específico para Dreamcast VMU
-      if (fileName.toLowerCase().contains('vmu_save') &&
-          fileName.toLowerCase().endsWith('.bin')) {
-        final systemDir = await _getRetroArchSystemPath();
-        targetPath = path.join(
-          systemDir ?? savesPath,
-          'dc',
-          path.basename(fileName),
-        );
-      } else if (fileName.startsWith('saves/')) {
-        // Relativo a raiz (subir un nivel desde savesPath)
-        final rootPath = Directory(savesPath).parent.path;
-        targetPath = path.join(rootPath, fileName);
-      } else {
-        // Relativo a savesPath
-        targetPath = path.join(savesPath, fileName);
-      }
-
-      final file = File(targetPath);
-      NeoSyncProvider._log.i('Restore: ${cloudFile.fileName} -> ${file.path}');
-      // Asegurar directorio existe
-      await file.parent.create(recursive: true);
-
-      // Usar el método común de descarga
-      await _downloadCloudFile(cloudFile, file);
-    } catch (e) {
-      NeoSyncProvider._log.e('Restore: FAILED for ${cloudFile.fileName}: $e');
-      rethrow;
     }
   }
 }

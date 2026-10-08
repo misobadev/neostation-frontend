@@ -43,6 +43,64 @@ extension NeoSyncPathResolver on NeoSyncProvider {
     return result.toList();
   }
 
+  /// Returns the configured custom save folder + emulator unique id that
+  /// contains [file], or null when [file] does not live inside any of the
+  /// system's custom folders.
+  ///
+  /// Standalone emulators are always synced through a user-selected custom
+  /// folder (never auto-detected), so this is the single source of truth for
+  /// deciding whether a local file is a standalone save and which emulator
+  /// produced it. Nested configured folders win over their parent so the most
+  /// specific root is used.
+  Future<({String root, String emulatorUniqueId})?> customFolderForFile(
+    SystemModel system,
+    File file,
+  ) async {
+    final folders = await NeoSyncSaveFolderRepository.getFoldersForSystem(
+      system.folderName,
+    );
+    final root = customRootForPath(folders, file.path);
+    if (root == null) return null;
+    for (final entry in folders.entries) {
+      if (entry.value == root) {
+        return (root: root, emulatorUniqueId: entry.key);
+      }
+    }
+    return (root: root, emulatorUniqueId: folders.keys.first);
+  }
+
+  /// Returns the custom folder root from [folders] that contains [filePath],
+  /// preferring the most specific (longest) root, or null when none matches.
+  String? customRootForPath(Map<String, String> folders, String filePath) {
+    String? best;
+    for (final root in folders.values) {
+      if (path.equals(root, filePath) || path.isWithin(root, filePath)) {
+        if (best == null || root.length > best.length) best = root;
+      }
+    }
+    return best;
+  }
+
+  /// Resolves an absolute local file into the NeoSync v2 custom-folder metadata
+  /// used by uploads: the on-disk path relative to the custom folder root, the
+  /// system folder name and the emulator unique id. Returns null when [file] is
+  /// not inside a configured custom folder.
+  Future<
+    ({String relativePath, String systemFolderName, String emulatorUniqueId})?
+  >
+  customFolderSyncInfo(SystemModel system, File file) async {
+    final context = await customFolderForFile(system, file);
+    if (context == null) return null;
+    final relative = path
+        .relative(file.path, from: context.root)
+        .replaceAll('\\', '/');
+    return (
+      relativePath: relative,
+      systemFolderName: system.folderName,
+      emulatorUniqueId: context.emulatorUniqueId,
+    );
+  }
+
   /// Resuelve un string de ruta (con posibles placeholders) a una o más rutas absolutas
   Future<List<String>> _resolveSinglePath(
     String pathStr,
@@ -60,97 +118,7 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       return paths;
     }
 
-    // 2. Placeholder {NETHERSX2_MEMCARDS} (AetherSX2/NetherSX2 memcards)
-    if (pathStr == '{NETHERSX2_MEMCARDS}' && Platform.isAndroid) {
-      final possiblePaths = [
-        '/storage/emulated/0/Android/data/xyz.aethersx2.android/files/memcards',
-        '/storage/emulated/0/Android/data/com.aethersx2.android/files/memcards',
-        '/sdcard/Android/data/xyz.aethersx2.android/files/memcards',
-      ];
-      for (final p in possiblePaths) {
-        if (Directory(p).existsSync()) return [p];
-      }
-      if (!ensureExists) return [possiblePaths.first];
-      return [];
-    }
-
-    // 3. Placeholder {PCSX2_MEMCARDS} (PCSX2 on Windows/Android)
-    if (pathStr == '{PCSX2_MEMCARDS}') {
-      final List<String> paths = [];
-      final p = await _getPCSX2MemcardsPath();
-      if (p != null) paths.add(p);
-      return paths;
-    }
-
-    // 4. Placeholder {FLYCAST_SAVES} (Flycast on Windows/Android)
-    if (pathStr == '{FLYCAST_SAVES}') {
-      final List<String> paths = [];
-      final p = await _getFlycastSavesPath();
-      if (p != null) paths.add(p);
-      return paths;
-    }
-
-    // 3. Placeholder {SWITCH_NAND} o ${nandDir.path} (Switch NAND)
-    if (pathStr.contains('{SWITCH_NAND}') ||
-        pathStr.contains(r'${nandDir.path}')) {
-      final nands = await SwitchSaveDetector.detectEmulatorNandPaths();
-      final List<String> paths = [];
-
-      String? titleId = game?.titleId;
-
-      // If titleId not in DB, try extracting from ROM file and persist it.
-      if ((titleId == null || titleId.isEmpty) && game?.romPath != null) {
-        try {
-          final info = await SwitchTitleExtractor.extractGameInfo(
-            game!.romPath!,
-          );
-          if (info != null && info.titleId.isNotEmpty) {
-            titleId = info.titleId;
-            await GameRepository.updateGameTitleId(game.romname, titleId);
-          }
-        } catch (e) {
-          NeoSyncProvider._log.e(
-            'Error updating game titleId for ${game?.romname}: $e',
-          );
-        }
-      }
-
-      // Last resort: scan NAND save dirs and reverse-lookup by titleId in DB.
-      // Needed on Android when ROM file is inaccessible (installed titles, etc.).
-      if ((titleId == null || titleId.isEmpty) &&
-          game != null &&
-          nands.isNotEmpty) {
-        titleId = await _findTitleIdByNandScan(nands, game.romname);
-        if (titleId != null) {
-          await GameRepository.updateGameTitleId(game.romname, titleId);
-        }
-      }
-
-      for (final nand in nands) {
-        final placeholder = pathStr.contains('{SWITCH_NAND}')
-            ? '{SWITCH_NAND}'
-            : r'${nandDir.path}';
-
-        // Intentar resolver carpeta específica de guardado si tenemos titleId
-        if (titleId != null && titleId.isNotEmpty && pathStr == placeholder) {
-          final saveInfo = await SwitchSaveDetector.findSaveForTitleId(
-            nand.nandDirectory,
-            titleId,
-          );
-          if (saveInfo != null) {
-            paths.add(saveInfo.savePath);
-
-            continue;
-          }
-        }
-
-        final resolved = pathStr.replaceFirst(placeholder, nand.nandDirectory);
-        paths.add(resolved);
-      }
-      return paths;
-    }
-
-    // 4. RetroArch Placeholders
+    // 2. RetroArch Placeholders
     if (pathStr == '{RETROARCH_SAVES}') {
       final p = await _getRetroArchSavesPath();
       return p != null ? [p] : [];
@@ -199,14 +167,6 @@ extension NeoSyncPathResolver on NeoSyncProvider {
     bool isState = false,
     String? explicitSystemFolder,
   }) async {
-    // Switch saves are a tree under the Title ID (ExtraData1/data.bin, ...).
-    // They are NOT compatible with the v2 per-file layout: same-named files
-    // from different subtrees would overwrite each other in the cloud, so the
-    // emulator/Title-ID structure must be encoded first.
-    if (game.systemFolderName == 'switch') {
-      return await calculateSwitchRelativePath(file, game);
-    }
-
     // Try the NeoSync v2 standard path first. It carries system + emulator, so
     // the cloud always knows which emulator produced the save.
     final v2Path = await _buildV2CloudPath(
@@ -719,130 +679,6 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       }
     }
 
-    // Para sistemas con memory cards compartidas (PS2, Dreamcast), el relativeName ya es el filename
-    // si usamos el logic de _calculateSyncRelativePath inverso.
-    // Pero en general, cloudFile.fileName is 'saves/subfolder/file.ext'.
-    // The relativeName after removing 'saves/' is 'subfolder/file.ext'.
-
-    // Identificación robusta para Switch
-    final isSwitch =
-        system.id?.toLowerCase() == 'switch' ||
-        system.folderName.toLowerCase() == 'switch' ||
-        game.systemId?.toLowerCase() == 'switch' ||
-        game.systemFolderName?.toLowerCase() == 'switch';
-
-    if (isSwitch && !isState) {
-      String? titleId = game.titleId;
-
-      // Si no tenemos titleId, intentar recuperarlo de la BD con búsqueda más flexible
-      if (titleId == null || titleId.isEmpty) {
-        try {
-          titleId = await GameRepository.getTitleIdForGame(
-            game.romname,
-            game.name,
-          );
-        } catch (e) {
-          NeoSyncProvider._log.e(
-            'Error fetching titleId via flexible lookup: $e',
-          );
-        }
-      }
-
-      // FALLBACK: Si todavía no hay titleId, intentar extraerlo del ROM real
-      if ((titleId == null || titleId.isEmpty) && game.romPath != null) {
-        try {
-          final info = await SwitchTitleExtractor.extractGameInfo(
-            game.romPath!,
-          );
-          if (info != null) {
-            titleId = info.titleId;
-
-            try {
-              await GameRepository.updateGameTitleId(game.romname, titleId);
-            } catch (dbError) {
-              NeoSyncProvider._log.e(
-                'Error updating DB with extracted titleId: $dbError',
-              );
-            }
-          }
-        } catch (e) {
-          NeoSyncProvider._log.e('Error extracting titleId from ROM: $e');
-        }
-      }
-
-      if (titleId != null && titleId.isNotEmpty) {
-        final List<String> resultPaths = [];
-
-        // relativeName is similar to `eden/A Short Hike/ExtraData1/file.dat`
-        final parts = relativeName.split(RegExp(r'[/\\]'));
-        String internalPath = path.basename(relativeName);
-        String? emulatorPrefix;
-
-        // Si tenemos la estructura de 3 niveles (emulator/game/internal), extraemos el internal y el prefix
-        if (parts.length >= 3) {
-          emulatorPrefix = parts[0].toLowerCase();
-          internalPath = parts.sublist(2).join(Platform.pathSeparator);
-        }
-
-        final allEmulators = await SwitchSaveDetector.detectEmulatorNandPaths();
-
-        // Filtrar emuladores basándonos en el prefijo del archivo de la nube para independencia
-        List<EmulatorNandInfo> emulators = allEmulators;
-        if (emulatorPrefix != null) {
-          emulators = allEmulators.where((emu) {
-            final name = emu.emulatorName.toLowerCase();
-            // Match flexible: 'eden' -> 'Eden', 'Eden Legacy', 'Eden Optimized', etc.
-            return name.contains(emulatorPrefix!);
-          }).toList();
-
-          if (emulators.isEmpty) {
-            return [];
-          }
-        }
-
-        if (emulators.isNotEmpty) {
-          for (final emu in emulators) {
-            // 1. Intentar encontrar save existente para este emulador
-            final saveInfo = await SwitchSaveDetector.findSaveForTitleId(
-              emu.nandDirectory,
-              titleId,
-            );
-
-            if (saveInfo != null) {
-              final fullPath = safeJoin(saveInfo.savePath, internalPath);
-              if (fullPath != null) resultPaths.add(fullPath);
-            } else {
-              // 2. Si no existe, construir la ruta en este NAND
-              final saveBasePath = path.join(
-                emu.nandDirectory,
-                'user',
-                'save',
-                '0000000000000000',
-              );
-              final saveBaseDir = Directory(saveBasePath);
-
-              // Buscar el primer directorio de usuario disponible o usar default
-              String userId = '00000000000000000000000000000000';
-              if (saveBaseDir.existsSync()) {
-                final entities = saveBaseDir.listSync().whereType<Directory>();
-                if (entities.isNotEmpty) {
-                  userId = path.basename(entities.first.path);
-                }
-              }
-
-              final fullPath = safeJoin(
-                path.join(saveBasePath, userId, titleId),
-                internalPath,
-              );
-              if (fullPath != null) resultPaths.add(fullPath);
-            }
-          }
-        }
-
-        if (resultPaths.isNotEmpty) return resultPaths;
-      }
-    }
-
     // relativeName is the server's file_path: keep it inside the folder.
     final target = safeJoin(targetFolder, relativeName);
     if (target == null) {
@@ -911,187 +747,5 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       NeoSyncProvider._log.e('Error listing save files in $directoryPath: $e');
       return [];
     }
-  }
-
-  /// Calculates relative path for Switch saves
-  /// Format: saves/[emulator]/[Game Name]/[internal_structure]
-  Future<String> calculateSwitchRelativePath(File file, GameModel game) async {
-    final sanitizedGameName = game.name.replaceAll(
-      RegExp(r'[<>:"/\\|?*]'),
-      '_',
-    );
-
-    String emulatorName = 'switch';
-    final lowerPath = file.path.toLowerCase();
-
-    // First, try to detect based on known NAND directories
-    try {
-      final emulators = await SwitchSaveDetector.detectEmulatorNandPaths();
-      for (final emu in emulators) {
-        if (path.isWithin(emu.nandDirectory, file.path) ||
-            file.path.startsWith(emu.nandDirectory)) {
-          final nameLower = emu.emulatorName.toLowerCase();
-          if (nameLower.contains('eden')) {
-            emulatorName = 'eden';
-          } else if (nameLower.contains('citron')) {
-            emulatorName = 'citron';
-          } else if (nameLower.contains('yuzu')) {
-            emulatorName = 'yuzu';
-          } else if (nameLower.contains('suyu')) {
-            emulatorName = 'suyu';
-          } else if (nameLower.contains('sudachi')) {
-            emulatorName = 'sudachi';
-          }
-          break;
-        }
-      }
-    } catch (e) {
-      NeoSyncProvider._log.e('Error checking emulator nand paths: $e');
-    }
-
-    // Fallback if not found via NAND
-    if (emulatorName == 'switch') {
-      if (lowerPath.contains('eden') || lowerPath.contains('yuanshen')) {
-        emulatorName = 'eden';
-      } else if (lowerPath.contains('citron')) {
-        emulatorName = 'citron';
-      } else if (lowerPath.contains('yuzu')) {
-        emulatorName = 'yuzu';
-      } else if (lowerPath.contains('suyu')) {
-        emulatorName = 'suyu';
-      } else if (lowerPath.contains('sudachi')) {
-        emulatorName = 'sudachi';
-      }
-    }
-
-    String internalPath = path.basename(file.path);
-
-    // Try to preserve internal structure after the Title ID
-    final pathParts = file.path.split(Platform.pathSeparator);
-    final saveIndex = pathParts.indexOf('save');
-    if (saveIndex != -1 && saveIndex + 3 < pathParts.length) {
-      if (saveIndex + 4 < pathParts.length) {
-        internalPath = pathParts.sublist(saveIndex + 4).join('/');
-      }
-    }
-
-    return path
-        .join('saves', emulatorName, sanitizedGameName, internalPath)
-        .replaceAll('\\', '/');
-  }
-
-  Future<String?> _getPCSX2MemcardsPath() async {
-    if (Platform.isAndroid) {
-      final possiblePaths = [
-        '/storage/emulated/0/Android/data/xyz.aethersx2.android/files/memcards',
-        '/storage/emulated/0/Android/data/com.aethersx2.android/files/memcards',
-      ];
-      for (final p in possiblePaths) {
-        if (Directory(p).existsSync()) return p;
-      }
-      return null;
-    } else if (Platform.isWindows) {
-      // 1. Try database
-      try {
-        final exePath = await EmulatorRepository.getEmulatorPath(
-          '%pcsx2%',
-          '%PCSX2%',
-        );
-        if (exePath != null) {
-          final dir = path.dirname(exePath);
-          final portable = path.join(dir, 'memcards');
-          if (Directory(portable).existsSync()) return portable;
-        }
-      } catch (e) {
-        /* ignore */
-      }
-
-      // 2. Try standard Documents location
-      final docs = path.join(
-        Platform.environment['USERPROFILE'] ?? '',
-        'Documents',
-        'PCSX2',
-        'memcards',
-      );
-      if (Directory(docs).existsSync()) return docs;
-    }
-    return null;
-  }
-
-  Future<String?> _getFlycastSavesPath() async {
-    if (Platform.isAndroid) {
-      // RetroArch is usually used for DC on Android, or Flycast standalone
-      final possible =
-          '/storage/emulated/0/Android/data/com.flycast.emulator/files/data';
-      if (Directory(possible).existsSync()) return possible;
-      return null;
-    } else if (Platform.isWindows) {
-      // 1. Try database
-      try {
-        final exePath = await EmulatorRepository.getEmulatorPath(
-          '%flycast%',
-          '%Flycast%',
-        );
-        if (exePath != null) {
-          final dir = path.dirname(exePath);
-          final dataDir = path.join(dir, 'data');
-          if (Directory(dataDir).existsSync()) return dataDir;
-          if (Directory(dir).existsSync()) return dir;
-        }
-      } catch (e) {
-        /* ignore */
-      }
-    }
-    return null;
-  }
-
-  /// Scans NAND save directories across detected emulators to find which titleId
-  /// belongs to the given ROM. Used as last resort when titleId is not in the DB
-  /// and cannot be extracted from the ROM file (e.g., installed titles on Android).
-  Future<String?> _findTitleIdByNandScan(
-    List<EmulatorNandInfo> nands,
-    String romname,
-  ) async {
-    for (final nand in nands) {
-      try {
-        final saveBasePath = path.join(
-          nand.nandDirectory,
-          'user',
-          'save',
-          '0000000000000000',
-        );
-        final saveBaseDir = Directory(saveBasePath);
-        if (!saveBaseDir.existsSync()) continue;
-
-        // List userId dirs (one level deep — fast)
-        final userIdDirs = saveBaseDir.listSync().whereType<Directory>();
-        for (final userIdDir in userIdDirs) {
-          final titleIdDirs = userIdDir.listSync().whereType<Directory>();
-          for (final titleIdDir in titleIdDirs) {
-            final candidate = path.basename(titleIdDir.path);
-            try {
-              final row = await GameRepository.findSwitchGameByTitleId(
-                candidate,
-              );
-              if (row != null && row['filename'].toString() == romname) {
-                NeoSyncProvider._log.i(
-                  'Resolved titleId "$candidate" for $romname via NAND scan',
-                );
-                return candidate;
-              }
-            } catch (e) {
-              NeoSyncProvider._log.e(
-                'Error finding Switch game by titleId $candidate: $e',
-              );
-            }
-          }
-        }
-      } catch (e) {
-        NeoSyncProvider._log.e(
-          'Error scanning NAND directory for ${nand.emulatorName}: $e',
-        );
-      }
-    }
-    return null;
   }
 }
