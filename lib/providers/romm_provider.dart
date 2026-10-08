@@ -18,6 +18,7 @@ import '../repositories/system_repository.dart';
 import '../services/logger_service.dart';
 import '../services/romm_playtime_service.dart';
 import '../services/romm_service.dart';
+import '../services/romm_archive_service.dart';
 import '../services/storage_space_service.dart';
 import '../services/user_data_location_service.dart';
 import '../utils/romm_local_matcher.dart';
@@ -1329,14 +1330,14 @@ class RommProvider extends ChangeNotifier {
             );
           }
         }
-        // ScummVM game data lives in an ID-named subfolder. The descriptor is
+        // Extracted archives and ScummVM data can live in subfolders. The file is
         // what the scanner indexes, but it is no longer a direct child of the
         // system folder, so look for it recursively when checking whether this
         // RomM entry already exists locally. The copy still reports the system
         // folder as its directory (that is where a download would land), while
         // the filename is the descriptor's own, which is what the scan indexed
         // and therefore what a mapping row has to be keyed by.
-        if (system.folderName == 'scummvm') {
+        if (system.folderName == 'scummvm' || recorded != null) {
           final nested = await _findNamedFileRecursively(dir, candidates);
           if (nested != null) {
             return RommLocalCopy(
@@ -1666,10 +1667,9 @@ class RommProvider extends ChangeNotifier {
 
     // Multi-file (multi-disc) ROMs are served by RomM as a single zip archive
     // whose logical fsName may or may not already carry a .zip extension. We
-    // stream it to a .zip first, then always unpack it into the native scan
-    // layout below. A plain .zip neither scans (most disc systems omit it from
-    // their extension list) nor launches (the emulator boots the playlist/disc,
-    // not the archive), so a multi-file ROM must always go through extraction.
+    // stream it to a .zip first, then prepare it for the system below:
+    // playlist-based multi-disc games are unpacked, while other systems keep
+    // the archive only when ZIP is a supported launch format.
     final isArchive = rom.isMultiFile;
     // fsName comes from the server and names the file we create — and, below,
     // the file we replace if it already exists. It must be a plain file name:
@@ -1686,7 +1686,7 @@ class RommProvider extends ChangeNotifier {
     // Only append .zip when fsName doesn't already end in it (avoid foo.zip.zip).
     final appendZipExt =
         isArchive && !rom.fsName.toLowerCase().endsWith('.zip');
-    final destPath = p.join(
+    var destPath = p.join(
       destDir,
       appendZipExt ? '${rom.fsName}.zip' : rom.fsName,
     );
@@ -1705,6 +1705,7 @@ class RommProvider extends ChangeNotifier {
         shouldCancel: () => tracker.cancelRequested,
       );
       await _persistRefreshedTokens();
+      destPath = await RommArchiveService.ensureArchiveExtension(destPath);
     } on RommCancelledException {
       // User-cancelled: a distinct type (not a message-string match) keeps this
       // from being reported as a network failure if the message ever changes.
@@ -1732,24 +1733,29 @@ class RommProvider extends ChangeNotifier {
     // becomes the playlist (.m3u) we write below. Save-sync and metadata both
     // key on this, so it must match what the scan records as GameModel.romname.
     var indexedName = p.basename(destPath);
-    if (system.folderName == 'scummvm') {
-      final descriptorName = await extractScummVmDownload(destPath, destDir);
-      if (descriptorName != null) indexedName = descriptorName;
-    } else if (isArchive) {
+    final archiveExtension = p.extension(destPath).toLowerCase();
+    if (system.folderName == 'scummvm' ||
+        {'.zip', '.7z', '.rar'}.contains(archiveExtension)) {
       final exts = await SystemRepository.getExtensionsForSystem(
         system.id ?? '',
       );
-      // Only unpack for systems that drive multi-disc games via .m3u playlists
-      // (PS1, Saturn, Dreamcast, SegaCD, PCE-CD, 3DO, the m3u home computers…).
-      // Others (e.g. single-disc DVD systems) keep the archive untouched.
-      if (exts.contains('m3u')) {
-        final m3uName = await extractMultiDiscZip(
-          destPath,
-          destDir,
-          rom.fsName,
-        );
-        if (m3uName != null) indexedName = m3uName;
+      final extractedName = await prepareArchiveDownload(
+        destPath,
+        destDir,
+        rom.fsName,
+        exts,
+        isMultiFile: isArchive,
+        scummVm: system.folderName == 'scummvm',
+      );
+      if (extractedName == null) {
+        tracker
+          ..status = RommDownloadStatus.failed
+          ..error = RommDownloadError.network
+          ..errorDetail = 'Could not extract a playable ROM from the download';
+        _notifyDownloadState();
+        return tracker;
       }
+      indexedName = extractedName;
     }
 
     // Best-effort metadata + cover import from RomM (never fails the download).
@@ -1977,6 +1983,173 @@ class RommProvider extends ChangeNotifier {
   /// Mapping rows per transaction in [_writeBulkLinks].
   static const int _linkWriteChunk = 200;
 
+  /// Installs a single ROM in the system root and bundles in a game folder.
+  /// ScummVM uses its stable target ID; bundles use the server's game name.
+  @visibleForTesting
+  static Future<String?> prepareArchiveDownload(
+    String archivePath,
+    String systemDir,
+    String gameName,
+    Set<String> extensions, {
+    bool isMultiFile = false,
+    bool scummVm = false,
+  }) async {
+    final ext = p.extension(archivePath).toLowerCase();
+    if (scummVm && ext != '.7z' && ext != '.rar') {
+      return extractScummVmDownload(archivePath, systemDir);
+    }
+    var folderName = gameName;
+    if ({
+      '.zip',
+      '.7z',
+      '.rar',
+    }.contains(p.extension(folderName).toLowerCase())) {
+      folderName = p.basenameWithoutExtension(folderName);
+    }
+    if (!isSafeFileName(folderName)) return null;
+    final exts = extensions
+        .map((ext) => ext.toLowerCase().replaceFirst(RegExp(r'^\.'), ''))
+        .toSet();
+    if (!scummVm &&
+        exts.contains(ext.substring(1)) &&
+        !(ext == '.zip' && isMultiFile && exts.contains('m3u'))) {
+      return p.basename(archivePath);
+    }
+    final bool singleFile;
+    try {
+      singleFile =
+          !scummVm &&
+          await RommArchiveService.containsSingleGameFile(archivePath, exts);
+    } catch (e, st) {
+      _log.e('RomM archive inspection failed', error: e, stackTrace: st);
+      return null;
+    }
+    final gameDir = scummVm || singleFile
+        ? systemDir
+        : p.join(systemDir, folderName);
+    if (!scummVm &&
+        !singleFile &&
+        await FileSystemEntity.type(gameDir, followLinks: false) ==
+            FileSystemEntityType.link) {
+      return null;
+    }
+    if (ext == '.zip') {
+      return prepareZipDownload(
+        archivePath,
+        gameDir,
+        folderName,
+        extensions,
+        isMultiFile: isMultiFile,
+        flattenSingleFile: singleFile,
+      );
+    }
+    return RommArchiveService.prepareDownload(
+      archivePath,
+      gameDir,
+      extensions,
+      scummVm: scummVm,
+      flattenSingleFile: singleFile,
+    );
+  }
+
+  /// Keeps emulator-readable ZIPs compressed; otherwise installs their files.
+  /// Multi-file playlist systems retain the existing disc-switching layout.
+  @visibleForTesting
+  static Future<String?> prepareZipDownload(
+    String zipPath,
+    String destDir,
+    String fallbackBaseName,
+    Set<String> extensions, {
+    bool isMultiFile = false,
+    bool flattenSingleFile = false,
+  }) async {
+    final exts = extensions
+        .map((ext) => ext.toLowerCase().replaceFirst(RegExp(r'^\.'), ''))
+        .toSet();
+    if (!flattenSingleFile && isMultiFile && exts.contains('m3u')) {
+      return extractMultiDiscZip(zipPath, destDir, fallbackBaseName);
+    }
+    if (exts.contains('zip')) return p.basename(zipPath);
+    if (!flattenSingleFile && exts.contains('m3u')) {
+      return extractMultiDiscZip(zipPath, destDir, fallbackBaseName);
+    }
+
+    InputFileStream? input;
+    try {
+      input = InputFileStream(zipPath);
+      final archive = ZipDecoder().decodeStream(input);
+      final files = archive.files.where((file) => file.isFile).toList();
+      final stripWrapper =
+          files.isNotEmpty &&
+          files.every((file) {
+            final segments = file.name.replaceAll('\\', '/').split('/');
+            return segments.length > 1 && segments.first == p.basename(destDir);
+          });
+      final outputs = <ArchiveFile, String>{};
+      final targets = <String>{};
+      for (final file in files) {
+        if (safeJoin(destDir, file.name) == null) return null;
+        final relative = flattenSingleFile && files.length == 1
+            ? p.posix.basename(file.name.replaceAll('\\', '/'))
+            : stripWrapper
+            ? file.name.replaceAll('\\', '/').split('/').skip(1).join('/')
+            : file.name;
+        final target = safeJoin(destDir, relative);
+        if (target == null ||
+            file.isSymbolicLink ||
+            p.equals(target, zipPath) ||
+            !targets.add(target.toLowerCase())) {
+          return null;
+        }
+        // Do not follow a pre-existing symlink out of the ROM directory.
+        var current = target;
+        while (p.isWithin(destDir, current)) {
+          if (await FileSystemEntity.type(current, followLinks: false) ==
+              FileSystemEntityType.link) {
+            return null;
+          }
+          current = p.dirname(current);
+        }
+        outputs[file] = target;
+      }
+      final playable = files.where((file) {
+        final ext = p.extension(file.name).toLowerCase().replaceFirst('.', '');
+        return exts.contains(ext);
+      }).toList();
+      if (playable.isEmpty) return null;
+      // A cue sheet is the launch target of a cue/bin set, not its data tracks.
+      playable.sort((a, b) {
+        int priority(ArchiveFile file) =>
+            p.extension(file.name).toLowerCase() == '.cue' ? 0 : 1;
+        final order = priority(a).compareTo(priority(b));
+        return order != 0 ? order : a.name.compareTo(b.name);
+      });
+      for (final file in files) {
+        final output = File(outputs[file]!);
+        await output.parent.create(recursive: true);
+        final stream = OutputFileStream(output.path);
+        try {
+          file.writeContent(stream);
+        } finally {
+          stream.closeSync();
+        }
+      }
+      await input.close();
+      input = null;
+      await File(zipPath).delete();
+      return p.basename(playable.first.name);
+    } catch (e, st) {
+      _log.e(
+        'RomM ZIP extraction failed for $zipPath',
+        error: e,
+        stackTrace: st,
+      );
+      return null;
+    } finally {
+      await input?.close();
+    }
+  }
+
   /// Unpacks a downloaded multi-disc zip ([zipPath]) into NeoStation's native
   /// multi-disc layout under [destDir]: the `.m3u` playlist and the disc images
   /// all sit together in the ROM folder root (so the library scan indexes a
@@ -2017,6 +2190,7 @@ class RommProvider extends ChangeNotifier {
       }
       if (discEntries.isEmpty) return null;
 
+      await Directory(destDir).create(recursive: true);
       final extractedDiscs = <String>[];
       for (final f in discEntries) {
         final base = p.basename(f.name);

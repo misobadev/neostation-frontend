@@ -49,6 +49,7 @@ dependencies:
   flutter_svg: ^2.0.10
   crypto: ^3.0.7
   archive: ^4.3.0
+  koni_archive: ^0.9.0
   web_socket_channel: ^3.0.3
   url_launcher: ^6.3.2
   widget_mask: ^1.0.0
