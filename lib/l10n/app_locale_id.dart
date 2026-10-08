@@ -1,6 +1,26 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleId = {
+  AppLocale.customSounds: "Suara kustom",
+  AppLocale.customSoundsSubtitle:
+      "Pilih suara untuk navigasi, konfirmasi, dan kembali",
+  AppLocale.customSoundsHint:
+      "WAV, MP3, OGG, atau FLAC · Maksimal 5 detik dan 5 MiB",
+  AppLocale.customSoundsMovement: "Navigasi",
+  AppLocale.customSoundsConfirm: "Konfirmasi",
+  AppLocale.customSoundsBack: "Kembali",
+  AppLocale.customSoundsDefault: "Bawaan",
+  AppLocale.customSoundsImport: "Impor / Ganti",
+  AppLocale.customSoundsPreview: "Dengarkan",
+  AppLocale.customSoundsReset: "Pulihkan bawaan",
+  AppLocale.customSoundsClose: "Tutup",
+  AppLocale.customSoundsSizeError: "Pilih berkas maksimal 5 MiB.",
+  AppLocale.customSoundsDurationError: "Pilih suara maksimal 5 detik.",
+  AppLocale.customSoundsInvalidError:
+      "Berkas ini kosong, tidak didukung, atau tidak dapat diputar.",
+  AppLocale.customSoundsSaveError:
+      "Suara tidak dapat diimpor atau disimpan. Suara sebelumnya tetap digunakan.",
+
   AppLocale.ignoreArticlesInGameSort: "Abaikan artikel saat mengurutkan game",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Abaikan The, A, atau An di awal judul. Misalnya, The Legend of Zelda diurutkan di huruf L.",

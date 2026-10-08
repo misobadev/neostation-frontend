@@ -1,6 +1,22 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleZh = {
+  AppLocale.customSounds: "自定义音效",
+  AppLocale.customSoundsSubtitle: "选择移动、确认和返回的音效",
+  AppLocale.customSoundsHint: "WAV、MP3、OGG 或 FLAC · 最长 5 秒，最大 5 MiB",
+  AppLocale.customSoundsMovement: "移动",
+  AppLocale.customSoundsConfirm: "确认",
+  AppLocale.customSoundsBack: "返回",
+  AppLocale.customSoundsDefault: "默认",
+  AppLocale.customSoundsImport: "导入 / 替换",
+  AppLocale.customSoundsPreview: "试听",
+  AppLocale.customSoundsReset: "恢复默认",
+  AppLocale.customSoundsClose: "关闭",
+  AppLocale.customSoundsSizeError: "请选择不超过 5 MiB 的文件。",
+  AppLocale.customSoundsDurationError: "请选择不超过 5 秒的音效。",
+  AppLocale.customSoundsInvalidError: "文件为空、格式不受支持或无法播放。",
+  AppLocale.customSoundsSaveError: "无法导入或保存音效。原音效保持不变。",
+
   AppLocale.ignoreArticlesInGameSort: "排序游戏时忽略冠词",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "忽略标题开头的 The、A 或 An。例如，The Legend of Zelda 排在 L 下。",

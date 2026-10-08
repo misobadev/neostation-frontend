@@ -22,6 +22,7 @@ import 'settings_title.dart';
 import 'widgets/setting_row.dart';
 import 'widgets/setting_value_chip.dart';
 import 'widgets/language_picker_overlay.dart';
+import 'widgets/custom_sounds_dialog.dart';
 import '../../../services/permission_service.dart';
 import '../../../services/sfx_service.dart';
 
@@ -204,6 +205,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     count++; // Auto-update Systems
     count++; // SFX Sounds
     count++; // SFX volume (dimmed, but still navigable, while SFX are off)
+    count++; // Custom sounds
     count++; // 12-Hour Clock
     count++; // Ignore leading articles in game sorting
     count++; // Show subfolders (every system)
@@ -358,6 +360,16 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
       if (configProvider.config.sfxEnabled) {
         _cycleSfxVolume(configProvider);
       }
+      return;
+    }
+    currentItemIndex++;
+
+    if (index == currentItemIndex) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const CustomSoundsDialog(),
+      );
       return;
     }
     currentItemIndex++;
@@ -719,6 +731,21 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                         text: _sfxVolumeLabel(context, config.sfxVolume),
                       ),
                     ),
+                  );
+                }(),
+
+                SizedBox(height: 12.r),
+                () {
+                  final index = currentItemIdx++;
+                  return SettingRow(
+                    key: _itemKeys[index],
+                    onTap: () => selectItem(index),
+                    focused:
+                        widget.isContentFocused &&
+                        widget.selectedContentIndex == index,
+                    title: AppLocale.customSounds.getString(context),
+                    subtitle: AppLocale.customSoundsSubtitle.getString(context),
+                    trailing: Icon(Symbols.chevron_right_rounded, size: 18.r),
                   );
                 }(),
 

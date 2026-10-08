@@ -249,6 +249,51 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  Future<void> importCustomSfx(
+    SfxAction action,
+    String path,
+    String filename,
+  ) => _queueSfxMutation(() async {
+    final imported = await _sfxImporter.import(path, filename);
+    try {
+      await _saveCustomSfx(action, imported);
+    } catch (_) {
+      await _sfxImporter.repository.remove(imported);
+      rethrow;
+    }
+  });
+
+  Future<void> resetCustomSfx(SfxAction action) =>
+      _queueSfxMutation(() => _saveCustomSfx(action, null));
+
+  Future<void> _queueSfxMutation(Future<void> Function() operation) {
+    final next = _sfxMutation.then((_) => operation());
+    _sfxMutation = next.then((_) {}, onError: (Object _, StackTrace _) {});
+    return next;
+  }
+
+  Future<void> _saveCustomSfx(SfxAction action, CustomSfx? sound) async {
+    final previous = _config.customSfx[action];
+    final sounds = Map<SfxAction, CustomSfx>.from(_config.customSfx);
+    if (sound == null) {
+      sounds.remove(action);
+    } else {
+      sounds[action] = sound;
+    }
+    await ConfigRepository.updateCustomSfx(CustomSfx.encode(sounds));
+    _config = _config.copyWith(customSfx: Map.unmodifiable(sounds));
+    _secondaryDisplayState?.updateState(customSfx: _config.customSfx);
+    _notify();
+    await _customSfxPlayback.setCustomSounds(_config.customSfx);
+    if (previous != null) {
+      try {
+        await _sfxImporter.repository.remove(previous);
+      } catch (e) {
+        LoggerService.instance.w('Could not remove old SFX: $e');
+      }
+    }
+  }
+
   /// Updates whether UI navigation SFX sounds are enabled
   Future<void> updateSfxEnabled(bool value) async {
     _config = _config.copyWith(sfxEnabled: value);

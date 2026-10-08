@@ -38,6 +38,7 @@ import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/image_cache_budget.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'models/custom_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -471,12 +472,15 @@ void main() async {
   // suspend. This engine's screen-power truth is GameService.deviceScreenOn.
   SfxService.isScreenOn = () => GameService.deviceScreenOn.value;
 
-  // Initialize SFX service for navigation sounds (fire-and-forget).
-  SfxService().init().then((_) {
-    // Apply persisted SFX preferences immediately.
-    SfxService().setVolume(sqliteConfigProvider.config.sfxVolume);
-    SfxService().setEnabled(sqliteConfigProvider.config.sfxEnabled);
-  });
+  // Seed settings before initialization so the first interaction uses them.
+  final sfx = SfxService();
+  sfx.setVolume(sqliteConfigProvider.config.sfxVolume);
+  sfx.setEnabled(sqliteConfigProvider.config.sfxEnabled);
+  unawaited(
+    sfx
+        .setCustomSounds(sqliteConfigProvider.config.customSfx)
+        .then((_) => sfx.init()),
+  );
 }
 
 /// Startup strings for the current device locale.
@@ -872,6 +876,9 @@ Future<void> subDisplay() async {
     );
     SfxService().setVolume(
       double.tryParse(rawConfig?['sfx_volume']?.toString() ?? '0.75') ?? 0.75,
+    );
+    await SfxService().setCustomSounds(
+      CustomSfx.decode(rawConfig?['custom_sfx']),
     );
   } catch (e) {
     debugPrint('Secondary display could not load saved config: $e');

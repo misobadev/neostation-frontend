@@ -1,6 +1,27 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleDe = {
+  AppLocale.customSounds: "Eigene Sounds",
+  AppLocale.customSoundsSubtitle:
+      "Sounds für Navigation, Bestätigen und Zurück wählen",
+  AppLocale.customSoundsHint:
+      "WAV, MP3, OGG oder FLAC · Bis zu 5 Sekunden und 5 MiB",
+  AppLocale.customSoundsMovement: "Navigation",
+  AppLocale.customSoundsConfirm: "Bestätigen",
+  AppLocale.customSoundsBack: "Zurück",
+  AppLocale.customSoundsDefault: "Standard",
+  AppLocale.customSoundsImport: "Importieren / Ersetzen",
+  AppLocale.customSoundsPreview: "Anhören",
+  AppLocale.customSoundsReset: "Standard wiederherstellen",
+  AppLocale.customSoundsClose: "Schließen",
+  AppLocale.customSoundsSizeError: "Wähle eine Datei mit höchstens 5 MiB.",
+  AppLocale.customSoundsDurationError:
+      "Wähle einen Clip mit höchstens 5 Sekunden.",
+  AppLocale.customSoundsInvalidError:
+      "Diese Datei ist leer, wird nicht unterstützt oder kann nicht abgespielt werden.",
+  AppLocale.customSoundsSaveError:
+      "Der Sound konnte nicht importiert oder gespeichert werden. Der bisherige Sound bleibt erhalten.",
+
   AppLocale.ignoreArticlesInGameSort:
       "Artikel beim Sortieren von Spielen ignorieren",
   AppLocale.ignoreArticlesInGameSortSubtitle:

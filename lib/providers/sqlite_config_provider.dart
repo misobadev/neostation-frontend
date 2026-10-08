@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:file_picker/file_picker.dart';
+import '../models/custom_sfx.dart';
+import '../services/custom_sfx_import_service.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/screenshot_service.dart';
@@ -39,6 +41,20 @@ part 'sqlite_config_provider/secondary_display.dart';
 /// user preferences persistence, and secondary display state management.
 /// Replaces the legacy JSON-based configuration provider.
 class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
+  SqliteConfigProvider()
+    : _sfxImporter = CustomSfxImportService(),
+      _customSfxPlayback = SfxService();
+
+  @visibleForTesting
+  SqliteConfigProvider.forTesting({
+    required CustomSfxImportService sfxImporter,
+    required SfxService sfxPlayback,
+  }) : _sfxImporter = sfxImporter,
+       _customSfxPlayback = sfxPlayback;
+
+  final CustomSfxImportService _sfxImporter;
+  final SfxService _customSfxPlayback;
+  Future<void> _sfxMutation = Future.value();
   ConfigModel _config = ConfigModel.empty;
   List<SystemModel> _detectedSystems = [];
   List<SystemModel> _availableSystems = [];
@@ -301,6 +317,7 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
           fanartDimLevel: _config.fanartDimLevel,
           sfxEnabled: _config.sfxEnabled,
           sfxVolume: _config.sfxVolume,
+          customSfx: _config.customSfx,
           use12HourClock: _config.use12HourClock,
         );
       }

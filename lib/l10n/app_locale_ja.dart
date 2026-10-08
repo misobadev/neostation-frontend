@@ -1,6 +1,22 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleJa = {
+  AppLocale.customSounds: "カスタム効果音",
+  AppLocale.customSoundsSubtitle: "移動・決定・戻る操作の効果音を選択",
+  AppLocale.customSoundsHint: "WAV、MP3、OGG、FLAC · 5秒・5 MiBまで",
+  AppLocale.customSoundsMovement: "移動",
+  AppLocale.customSoundsConfirm: "決定",
+  AppLocale.customSoundsBack: "戻る",
+  AppLocale.customSoundsDefault: "標準",
+  AppLocale.customSoundsImport: "読み込み / 置き換え",
+  AppLocale.customSoundsPreview: "試聴",
+  AppLocale.customSoundsReset: "標準に戻す",
+  AppLocale.customSoundsClose: "閉じる",
+  AppLocale.customSoundsSizeError: "5 MiB以下のファイルを選択してください。",
+  AppLocale.customSoundsDurationError: "5秒以下の効果音を選択してください。",
+  AppLocale.customSoundsInvalidError: "ファイルが空か、未対応、または再生できません。",
+  AppLocale.customSoundsSaveError: "効果音を読み込みまたは保存できませんでした。以前の効果音は保持されます。",
+
   AppLocale.ignoreArticlesInGameSort: "ゲームの並び替えで冠詞を無視",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "タイトル先頭の The、A、An を無視します。例：The Legend of Zelda は L に分類されます。",

@@ -312,6 +312,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     final sfx = SfxService();
     if (sfx.isEnabled != state.sfxEnabled) sfx.setEnabled(state.sfxEnabled);
     if (sfx.volume != state.sfxVolume) sfx.setVolume(state.sfxVolume);
+    unawaited(sfx.setCustomSounds(state.customSfx));
   }
 
   /// Whether the device screen is on, according to *both* signals that carry

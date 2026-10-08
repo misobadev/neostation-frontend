@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'custom_sfx.dart';
 
 import 'package:neostation/constants/recent_card_sizes.dart';
 import 'emulator_model.dart';
@@ -90,6 +91,7 @@ class ConfigModel {
 
   /// Playback volume for UI sound effects, from silent (0.0) to full (0.75).
   final double sfxVolume;
+  final Map<SfxAction, CustomSfx> customSfx;
 
   /// Whether the header clock should use a 12-hour format with AM/PM (false = 24-hour).
   final bool use12HourClock;
@@ -275,6 +277,7 @@ class ConfigModel {
     this.videoSound = false,
     this.sfxEnabled = true,
     this.sfxVolume = 0.75,
+    this.customSfx = const {},
     this.use12HourClock = false,
     this.systemSortBy = 'alphabetical',
     this.systemSortOrder = 'asc',
@@ -378,6 +381,7 @@ class ConfigModel {
           (json['videoSound'] ?? false).toString().toLowerCase() == 'true' ||
           (json['video_sound'] ?? 0).toString() == '1' ||
           (json['video_sound'] ?? 'off').toString() == 'on',
+      customSfx: CustomSfx.decode(json['customSfx'] ?? json['custom_sfx']),
       sfxEnabled:
           (json['sfxEnabled'] ?? true).toString().toLowerCase() == 'true' ||
           (json['sfx_enabled'] ?? 1).toString() == '1',
@@ -628,6 +632,7 @@ class ConfigModel {
       'videoSound': videoSound,
       'sfxEnabled': sfxEnabled,
       'sfxVolume': sfxVolume,
+      'customSfx': jsonDecode(CustomSfx.encode(customSfx)),
       'use12HourClock': use12HourClock,
       'systemSortBy': systemSortBy,
       'systemSortOrder': systemSortOrder,
@@ -687,6 +692,7 @@ class ConfigModel {
     bool? videoSound,
     bool? sfxEnabled,
     double? sfxVolume,
+    Map<SfxAction, CustomSfx>? customSfx,
     bool? use12HourClock,
     String? systemSortBy,
     String? systemSortOrder,
@@ -744,6 +750,7 @@ class ConfigModel {
       videoSound: videoSound ?? this.videoSound,
       sfxEnabled: sfxEnabled ?? this.sfxEnabled,
       sfxVolume: sfxVolume ?? this.sfxVolume,
+      customSfx: customSfx ?? this.customSfx,
       use12HourClock: use12HourClock ?? this.use12HourClock,
       systemSortBy: systemSortBy ?? this.systemSortBy,
       systemSortOrder: systemSortOrder ?? this.systemSortOrder,

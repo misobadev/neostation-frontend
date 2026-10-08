@@ -1,6 +1,25 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleEs = {
+  AppLocale.customSounds: "Sonidos personalizados",
+  AppLocale.customSoundsSubtitle:
+      "Elige sonidos para moverte, confirmar y volver",
+  AppLocale.customSoundsHint: "WAV, MP3, OGG o FLAC · Hasta 5 segundos y 5 MiB",
+  AppLocale.customSoundsMovement: "Movimiento",
+  AppLocale.customSoundsConfirm: "Confirmar",
+  AppLocale.customSoundsBack: "Volver",
+  AppLocale.customSoundsDefault: "Predeterminado",
+  AppLocale.customSoundsImport: "Importar / Reemplazar",
+  AppLocale.customSoundsPreview: "Escuchar",
+  AppLocale.customSoundsReset: "Restaurar predeterminado",
+  AppLocale.customSoundsClose: "Cerrar",
+  AppLocale.customSoundsSizeError: "Elige un archivo de hasta 5 MiB.",
+  AppLocale.customSoundsDurationError: "Elige un sonido de hasta 5 segundos.",
+  AppLocale.customSoundsInvalidError:
+      "Este archivo está vacío, no es compatible o no se puede reproducir.",
+  AppLocale.customSoundsSaveError:
+      "No se pudo importar o guardar el sonido. Se conserva el sonido anterior.",
+
   AppLocale.ignoreArticlesInGameSort: "Ignorar artículos al ordenar juegos",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Ignorar The, A y An al inicio. Por ejemplo, The Legend of Zelda se ordena en la L.",

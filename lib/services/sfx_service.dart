@@ -4,6 +4,44 @@ import 'dart:math';
 import 'package:flutter_soloud/flutter_soloud.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
+import '../models/custom_sfx.dart';
+import '../repositories/custom_sfx_repository.dart';
+
+/// Small audio seam for testing selection and engine lifecycle without native audio.
+abstract class SfxAudioBackend {
+  bool get isInitialized;
+  Future<void> init();
+  Future<Object> loadAsset(String path);
+  Future<Object> loadFile(String path);
+  Duration length(Object source);
+  Future<void> disposeSource(Object source);
+  Future<Object> play(Object source, double volume);
+  Future<void> stop(Object handle);
+}
+
+class SoLoudSfxBackend implements SfxAudioBackend {
+  @override
+  bool get isInitialized => SoLoud.instance.isInitialized;
+  @override
+  Future<void> init() => SoLoud.instance.init();
+  @override
+  Future<Object> loadAsset(String path) => SoLoud.instance.loadAsset(path);
+  @override
+  Future<Object> loadFile(String path) => SoLoud.instance.loadFile(path);
+  @override
+  Duration length(Object source) =>
+      SoLoud.instance.getLength(source as AudioSource);
+  @override
+  Future<void> disposeSource(Object source) =>
+      SoLoud.instance.disposeSource(source as AudioSource);
+  @override
+  Future<Object> play(Object source, double volume) async =>
+      SoLoud.instance.play(source as AudioSource, volume: volume).id;
+  @override
+  Future<void> stop(Object handle) =>
+      SoLoud.instance.stop(SoundHandle(handle as int));
+}
 
 /// Independent service for managing user interface sound effects (SFX).
 ///
@@ -21,7 +59,115 @@ class SfxService {
   static const double maxVolume = 0.75;
   static final SfxService _instance = SfxService._internal();
   factory SfxService() => _instance;
-  SfxService._internal();
+  SfxService._internal()
+    : _audio = SoLoudSfxBackend(),
+      _files = CustomSfxRepository();
+  @visibleForTesting
+  SfxService.forTesting({
+    required SfxAudioBackend audio,
+    required CustomSfxRepository files,
+  }) : _audio = audio,
+       _files = files;
+  final SfxAudioBackend _audio;
+  final CustomSfxRepository _files;
+  Map<SfxAction, CustomSfx> _customSounds = const {};
+  final Map<SfxAction, Object> _customSources = {};
+  int _generation = 0;
+  int _engineEpoch = 0;
+  Object? _customHandle;
+  Future<void> _reload = Future.value();
+  Future<void> _playback = Future.value();
+
+  Future<void> validateClip(String path) async {
+    if (!isScreenOn()) {
+      throw const FormatException('invalid');
+    }
+    await init();
+    if (!_isInitialized) {
+      throw const FormatException('invalid');
+    }
+    Object? source;
+    try {
+      source = await _audio.loadFile(path);
+      final length = _audio.length(source);
+      if (length <= Duration.zero) throw const FormatException('invalid');
+      if (length > const Duration(seconds: 5)) {
+        throw const FormatException('duration');
+      }
+    } on FormatException {
+      rethrow;
+    } catch (_) {
+      throw const FormatException('invalid');
+    } finally {
+      if (source != null && _audio.isInitialized) {
+        await _audio.disposeSource(source);
+      }
+    }
+  }
+
+  Future<void> setCustomSounds(Map<SfxAction, CustomSfx> sounds) {
+    if (CustomSfx.encode(sounds) == CustomSfx.encode(_customSounds)) {
+      return _reload;
+    }
+    _customSounds = Map.unmodifiable(sounds);
+    _generation++;
+    _reload = _reload
+        .then((_) async {
+          if (_isInitialized) await _loadCustomSources();
+        })
+        .catchError((Object e) {
+          _log.w('Could not reload custom sounds: $e');
+        });
+    return _reload;
+  }
+
+  Future<void> _loadCustomSources() async {
+    final generation = _generation;
+    final sounds = _customSounds;
+    final previous = Map<SfxAction, Object>.from(_customSources);
+    _customSources.clear();
+    for (final source in previous.values) {
+      try {
+        await _audio.disposeSource(source);
+      } catch (_) {}
+    }
+    _customHandle = null;
+    for (final entry in sounds.entries) {
+      Object? source;
+      try {
+        source = await _audio.loadFile(await _files.resolve(entry.value));
+        if (generation != _generation || !_audio.isInitialized) {
+          if (_audio.isInitialized) await _audio.disposeSource(source);
+          continue;
+        }
+        final length = _audio.length(source);
+        if (length <= Duration.zero || length > const Duration(seconds: 5)) {
+          await _audio.disposeSource(source);
+          continue;
+        }
+        _customSources[entry.key] = source;
+      } catch (e) {
+        _log.w('Custom ${entry.key.name} sound unavailable: $e');
+        if (source != null && _audio.isInitialized) {
+          try {
+            await _audio.disposeSource(source);
+          } catch (_) {}
+        }
+      }
+    }
+  }
+
+  /// Explicit previews are not suppressed by a just-played navigation tick.
+  Future<void> preview(SfxAction action) async {
+    if (!_enabled || !isScreenOn()) return;
+    await _ensureInitialized();
+    final path = switch (action) {
+      SfxAction.movement => _navSounds[_pickRandomNavIndex()],
+      SfxAction.confirm => _enterSound,
+      SfxAction.back => _backSound,
+    };
+    await _play(path, action);
+  }
 
   /// List of navigation sound asset paths.
   static const List<String> _navSounds = [
@@ -43,7 +189,7 @@ class SfxService {
   final _random = Random();
 
   /// Cache of pre-loaded [AudioSource] objects for low-latency playback.
-  final Map<String, AudioSource> _sources = {};
+  final Map<String, Object> _sources = {};
 
   bool _isInitialized = false;
   bool _isInitializing = false;
@@ -98,12 +244,14 @@ class SfxService {
     }
 
     _isInitializing = true;
-    _initCompleter = Completer<void>();
+    final epoch = _engineEpoch;
+    final completer = Completer<void>();
+    _initCompleter = completer;
 
     try {
       _log.i('[SfxService] Initializing...');
 
-      if (!SoLoud.instance.isInitialized) {
+      if (!_audio.isInitialized) {
         // Pre-create the temp dir SoLoud uses for extracted asset files.
         // Prevents SoLoudTemporaryFolderFailedException on Android when the
         // directory isn't fully ready before the first loadAsset() call.
@@ -113,17 +261,18 @@ class SfxService {
             '${tempDir.path}/SoLoudLoader-Temp-Files',
           ).create(recursive: true);
         } catch (_) {}
-        await SoLoud.instance.init();
+        await _audio.init();
       }
 
+      if (epoch != _engineEpoch || !isScreenOn()) return;
       final allPaths = [..._navSounds, _enterSound, _backSound];
       for (final path in allPaths) {
         try {
-          AudioSource? source;
+          Object? source;
           int retries = 0;
           while (source == null && retries < 2) {
             try {
-              source = await SoLoud.instance.loadAsset(path);
+              source = await _audio.loadAsset(path);
             } catch (e) {
               retries++;
               if (retries < 2) {
@@ -135,6 +284,7 @@ class SfxService {
             }
           }
 
+          if (epoch != _engineEpoch) return;
           if (source != null) {
             _sources[path] = source;
             _log.d('[SfxService] Loaded: $path');
@@ -144,16 +294,27 @@ class SfxService {
         }
       }
 
+      _reload = _reload.then((_) async {
+        int generation;
+        do {
+          generation = _generation;
+          await _loadCustomSources();
+        } while (generation != _generation && epoch == _engineEpoch);
+      });
+      await _reload;
+      if (epoch != _engineEpoch) return;
       _isInitialized = true;
       _log.i(
         '[SfxService] Ready. ${_sources.length}/${allPaths.length} sounds loaded.',
       );
-      _initCompleter?.complete();
+      if (!completer.isCompleted) completer.complete();
     } catch (e) {
       _log.e('[SfxService] Init error: $e');
-      _initCompleter?.completeError(e);
+      // Playback remains optional when the native engine is unavailable.
+      if (!completer.isCompleted) completer.complete();
     } finally {
-      _isInitializing = false;
+      if (!completer.isCompleted) completer.complete();
+      if (epoch == _engineEpoch) _isInitializing = false;
     }
   }
 
@@ -165,7 +326,11 @@ class SfxService {
   /// stale handles and mark uninitialized; assets reload on the next
   /// [init]/playback call.
   void handleEngineTornDown() {
+    _engineEpoch++;
     _sources.clear();
+    _customSources.clear();
+    _customHandle = null;
+    _generation++;
     _isInitialized = false;
     _isInitializing = false;
     _initCompleter = null;
@@ -182,12 +347,20 @@ class SfxService {
   ///
   /// Note: This does NOT shut down the shared [SoLoud] engine.
   Future<void> dispose() async {
-    for (final source in _sources.values) {
+    _engineEpoch++;
+    _generation++;
+    _isInitialized = false;
+    await _playback;
+    await _reload;
+    for (final source in [..._sources.values, ..._customSources.values]) {
       try {
-        await SoLoud.instance.disposeSource(source);
+        await _audio.disposeSource(source);
       } catch (_) {}
     }
     _sources.clear();
+    _customSources.clear();
+    _customHandle = null;
+    _generation++;
     _isInitialized = false;
     _log.i('[SfxService] Disposed.');
   }
@@ -199,11 +372,11 @@ class SfxService {
     if (!_enabled) return;
     if (!_debounce()) return;
     await _ensureInitialized();
-    if (!_isInitialized || _sources.isEmpty) return;
+    if (!_isInitialized) return;
 
     final index = _pickRandomNavIndex();
     final path = _navSounds[index];
-    await _play(path);
+    await _play(path, SfxAction.movement);
     _log.d('[SfxService] nav[$index]: $path');
   }
 
@@ -213,7 +386,7 @@ class SfxService {
     if (!_debounce()) return;
     await _ensureInitialized();
     if (!_isInitialized) return;
-    await _play(_enterSound);
+    await _play(_enterSound, SfxAction.confirm);
     _log.d('[SfxService] enter');
   }
 
@@ -223,7 +396,7 @@ class SfxService {
     if (!_debounce()) return;
     await _ensureInitialized();
     if (!_isInitialized) return;
-    await _play(_backSound);
+    await _play(_backSound, SfxAction.back);
     _log.d('[SfxService] back');
   }
 
@@ -261,17 +434,39 @@ class SfxService {
   }
 
   /// Initiates playback for a pre-loaded source identified by its [path].
-  Future<void> _play(String path) async {
-    final source = _sources[path];
-    if (source == null) {
-      _log.w('[SfxService] Source not found for: $path');
-      return;
-    }
-    try {
-      SoLoud.instance.play(source, volume: _volume);
-    } catch (e) {
-      _log.w('[SfxService] Playback error for $path: $e');
-    }
+  Future<void> _play(String path, SfxAction action) {
+    final generation = _generation;
+    final next = _playback.then((_) async {
+      await _reload;
+      if (!_enabled ||
+          !isScreenOn() ||
+          !_isInitialized ||
+          generation != _generation) {
+        return;
+      }
+      final custom = _customSources[action];
+      final source = custom ?? _sources[path];
+      if (source == null) return;
+      try {
+        if (_customHandle != null) {
+          await _audio.stop(_customHandle!);
+          _customHandle = null;
+        }
+        if (generation != _generation || !_enabled || !isScreenOn()) return;
+        final handle = await _audio.play(source, _volume);
+        if (custom != null) {
+          if (generation == _generation) {
+            _customHandle = handle;
+          } else {
+            await _audio.stop(handle);
+          }
+        }
+      } catch (e) {
+        _log.w('[SfxService] Playback error for $path: $e');
+      }
+    });
+    _playback = next;
+    return next;
   }
 
   /// Selects a random navigation sound index that differs from the last played index.

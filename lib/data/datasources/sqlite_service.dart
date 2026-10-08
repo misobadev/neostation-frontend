@@ -460,7 +460,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 166;
+  static const int _databaseVersion = 168;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1918,6 +1918,7 @@ class SqliteService {
         hide_bottom_screen INTEGER DEFAULT 0,
         sfx_enabled INTEGER DEFAULT 1,
         sfx_volume REAL DEFAULT 0.75,
+        custom_sfx TEXT,
         system_sort_by TEXT DEFAULT 'alphabetical',
         ignore_articles_in_game_sort INTEGER DEFAULT 0,
         collection_sort_by TEXT DEFAULT 'name',
@@ -2789,6 +2790,7 @@ class SqliteService {
     int? hideBottomScreen,
     int? sfxEnabled,
     double? sfxVolume,
+    String? customSfx,
     int? use12HourClock,
     String? systemSortBy,
     String? systemSortOrder,
@@ -2871,6 +2873,7 @@ class SqliteService {
     if (sfxEnabled != null) {
       updates['sfx_enabled'] = sfxEnabled;
     }
+    if (customSfx != null) updates['custom_sfx'] = customSfx;
     if (sfxVolume != null) {
       updates['sfx_volume'] = sfxVolume;
     }

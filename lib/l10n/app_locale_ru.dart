@@ -1,6 +1,25 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleRu = {
+  AppLocale.customSounds: "Свои звуки",
+  AppLocale.customSoundsSubtitle:
+      "Выберите звуки навигации, подтверждения и возврата",
+  AppLocale.customSoundsHint: "WAV, MP3, OGG или FLAC · До 5 секунд и 5 МиБ",
+  AppLocale.customSoundsMovement: "Навигация",
+  AppLocale.customSoundsConfirm: "Подтверждение",
+  AppLocale.customSoundsBack: "Назад",
+  AppLocale.customSoundsDefault: "По умолчанию",
+  AppLocale.customSoundsImport: "Импорт / Замена",
+  AppLocale.customSoundsPreview: "Прослушать",
+  AppLocale.customSoundsReset: "Восстановить стандартный",
+  AppLocale.customSoundsClose: "Закрыть",
+  AppLocale.customSoundsSizeError: "Выберите файл размером до 5 МиБ.",
+  AppLocale.customSoundsDurationError: "Выберите звук длиной до 5 секунд.",
+  AppLocale.customSoundsInvalidError:
+      "Файл пуст, не поддерживается или не воспроизводится.",
+  AppLocale.customSoundsSaveError:
+      "Не удалось импортировать или сохранить звук. Предыдущий звук сохранён.",
+
   AppLocale.ignoreArticlesInGameSort: "Игнорировать артикли при сортировке игр",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Пропускать The, A и An в начале названия. Например, The Legend of Zelda сортируется под буквой L.",

@@ -636,8 +636,25 @@ class SqliteMigrations {
         // Backfill for installs that reached v165 without this PR’s v164.
         await _migrateToVersion164(db);
         break;
+      case 168:
+        await _migrateToVersion168(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
+    }
+  }
+
+  /// Migration v168: durable custom sounds, renumbered from v166.
+  static Future<void> _migrateToVersion168(Database db) async {
+    // Devices on the former v166 build skipped main’s sorting and manual
+    // ScreenScraper migrations. Backfill both without changing preferences.
+    await _migrateToVersion164(db);
+    await _migrateToVersion165(db);
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name']);
+    if (!columns.contains('custom_sfx')) {
+      db.execute('ALTER TABLE user_config ADD COLUMN custom_sfx TEXT');
     }
   }
 

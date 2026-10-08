@@ -14,6 +14,9 @@ class ConfigRepository {
   static Future<Map<String, dynamic>?> getUserConfig() =>
       SqliteService.getUserConfig();
 
+  static Future<void> updateCustomSfx(String json) =>
+      SqliteService.saveUserConfig(customSfx: json);
+
   // ── Theme settings ──────────────────────────────────────────────────────
 
   static Future<String> getThemeName() => SqliteService.getThemeName();
