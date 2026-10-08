@@ -4,7 +4,7 @@ import '../../models/game_model.dart';
 import '../../models/database_game_model.dart';
 import '../../models/system_model.dart';
 import '../../repositories/game_repository.dart';
-import '../../repositories/collection_repository.dart';
+import '../collections/smart_collections_service.dart';
 import '../../repositories/system_repository.dart';
 import '../../constants/system_folder_names.dart';
 
@@ -235,7 +235,7 @@ class GameListService {
     String collectionId,
   ) async {
     try {
-      final databaseGames = (await CollectionRepository.getGamesInCollection(
+      final databaseGames = (await SmartCollectionsService.gamesFor(
         collectionId,
       )).where((dbGame) => !dbGame.isHidden).toList();
 

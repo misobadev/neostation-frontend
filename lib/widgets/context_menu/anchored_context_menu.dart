@@ -82,6 +82,9 @@ typedef ContextMenuToggle =
 
 /// Which edge of the anchor the panel hangs off.
 enum ContextMenuAlignment {
+  /// Centre the entire panel in the viewport for a standalone chooser.
+  centerScreen,
+
   /// Panel starts just past the anchor's right edge. Right for a small anchor
   /// (an options button), where the menu should sit next to it.
   besideAnchor,
@@ -611,6 +614,11 @@ class _AnchoredContextMenuState extends State<AnchoredContextMenu> {
     );
     top = top.clamp(margin.clamp(0.0, maxTop), maxTop);
 
+    if (widget.alignment == ContextMenuAlignment.centerScreen) {
+      left = (screen.width - width) / 2;
+      top = (screen.height - height) / 2;
+    }
+
     return Stack(
       children: [
         Positioned(
@@ -625,7 +633,11 @@ class _AnchoredContextMenuState extends State<AnchoredContextMenu> {
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                  color: theme.colorScheme.primary.withValues(
+                    alpha: widget.alignment == ContextMenuAlignment.centerScreen
+                        ? 0.65
+                        : 0.2,
+                  ),
                   width: 1,
                 ),
                 boxShadow: [

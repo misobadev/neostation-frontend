@@ -38,6 +38,7 @@ SystemInfo collectionToSystemInfo(
   List<String> mosaicPaths = const [],
 }) {
   return SystemInfo(
+    isSmartCollection: collection.isSmart,
     title: collection.name,
     shortName: collection.name,
     folderName: '${SystemFolderNames.collectionPrefix}${collection.id}',

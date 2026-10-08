@@ -460,7 +460,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 166;
+  static const int _databaseVersion = 167;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -4665,7 +4665,7 @@ class SqliteService {
     return db.rawQuery('''
       SELECT
         c.id, c.name, c.image_path, c.color1, c.color2, c.sort_order,
-        c.created_at, c.updated_at,
+        c.created_at, c.updated_at, c.collection_type, c.rules_json,
         COALESCE(counts.game_count, 0) as game_count
       FROM user_collections c
       LEFT JOIN (
@@ -4684,7 +4684,7 @@ class SqliteService {
       '''
       SELECT
         c.id, c.name, c.image_path, c.color1, c.color2, c.sort_order,
-        c.created_at, c.updated_at,
+        c.created_at, c.updated_at, c.collection_type, c.rules_json,
         (SELECT COUNT(*) FROM user_collection_items ci
           WHERE ci.collection_id = c.id) as game_count
       FROM user_collections c
@@ -4706,6 +4706,7 @@ class SqliteService {
     String? color1,
     String? color2,
     int? sortOrder,
+    String? rulesJson,
   }) async {
     final db = await instance.database;
 
@@ -4718,6 +4719,8 @@ class SqliteService {
     }
 
     await db.insert('user_collections', {
+      'collection_type': rulesJson == null ? 'manual' : 'smart',
+      'rules_json': rulesJson,
       'id': id,
       'name': name,
       'image_path': imagePath,
@@ -4743,6 +4746,7 @@ class SqliteService {
     String? color2,
     bool clearColor2 = false,
     int? sortOrder,
+    String? rulesJson,
   }) async {
     final db = await instance.database;
 
@@ -4750,6 +4754,7 @@ class SqliteService {
       'updated_at': DateTime.now().toIso8601String(),
     };
     if (name != null) values['name'] = name;
+    if (rulesJson != null) values['rules_json'] = rulesJson;
     if (clearImagePath) {
       values['image_path'] = null;
     } else if (imagePath != null) {

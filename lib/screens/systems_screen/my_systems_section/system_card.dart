@@ -338,6 +338,32 @@ class _SystemCardState extends State<SystemCard> {
                                     key: _contentStackKey,
                                     children: [
                                       _buildSystemBackground(),
+                                      if (widget.info.isSmartCollection)
+                                        Positioned(
+                                          top: 8.r,
+                                          right: 8.r,
+                                          child: Tooltip(
+                                            message: AppLocale.smartCollection
+                                                .getString(context),
+                                            child: Container(
+                                              padding: EdgeInsets.all(5.r),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.surface,
+                                                borderRadius:
+                                                    BorderRadius.circular(8.r),
+                                              ),
+                                              child: Icon(
+                                                Symbols.auto_awesome_rounded,
+                                                size: 18.r,
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       if (widget.showCount)
                                         _buildCountPill(context),
                                     ],
@@ -353,6 +379,32 @@ class _SystemCardState extends State<SystemCard> {
                                     key: _contentStackKey,
                                     children: [
                                       _buildSystemBackground(),
+                                      if (widget.info.isSmartCollection)
+                                        Positioned(
+                                          top: 8.r,
+                                          right: 8.r,
+                                          child: Tooltip(
+                                            message: AppLocale.smartCollection
+                                                .getString(context),
+                                            child: Container(
+                                              padding: EdgeInsets.all(5.r),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.surface,
+                                                borderRadius:
+                                                    BorderRadius.circular(8.r),
+                                              ),
+                                              child: Icon(
+                                                Symbols.auto_awesome_rounded,
+                                                size: 18.r,
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       if (widget.showCount)
                                         _buildCountPill(context),
                                     ],

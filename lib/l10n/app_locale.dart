@@ -18,6 +18,44 @@ part 'app_locale_ja.dart';
 part 'app_locale_ko.dart';
 
 mixin AppLocale {
+  static const String smartMatchesOne = 'smartMatchesOne';
+  static const String smartCollection = 'smartCollection';
+  static const String manualCollection = 'manualCollection';
+  static const String smartEditRules = 'smartEditRules';
+  static const String smartMatchAll = 'smartMatchAll';
+  static const String smartMatchAny = 'smartMatchAny';
+  static const String smartAddRule = 'smartAddRule';
+  static const String smartChooseValue = 'smartChooseValue';
+  static const String smartCustomValue = 'smartCustomValue';
+  static const String smartMatches = 'smartMatches';
+  static const String smartInvalidRules = 'smartInvalidRules';
+  static const String smartInvalidValue = 'smartInvalidValue';
+  static const String smartNoMatches = 'smartNoMatches';
+  static const String smartPreviewError = 'smartPreviewError';
+  static const String smartYes = 'smartYes';
+  static const String smartNo = 'smartNo';
+  static const String smartDone = 'smartDone';
+  static const String smartLower = 'smartLower';
+  static const String smartUpper = 'smartUpper';
+  static const String smartSystem = 'smartSystem';
+  static const String smartTitle = 'smartTitle';
+  static const String smartYear = 'smartYear';
+  static const String smartRating = 'smartRating';
+  static const String smartPlayed = 'smartPlayed';
+  static const String smartIs = 'smartIs';
+  static const String smartIsNot = 'smartIsNot';
+  static const String smartContains = 'smartContains';
+  static const String smartNotContains = 'smartNotContains';
+  static const String smartBefore = 'smartBefore';
+  static const String smartAfter = 'smartAfter';
+  static const String smartAtLeast = 'smartAtLeast';
+  static const String smartAtMost = 'smartAtMost';
+  static const String smartBetween = 'smartBetween';
+  static const String smartWithinDays = 'smartWithinDays';
+  static const String smartNotWithinDays = 'smartNotWithinDays';
+  static const String smartDays = 'smartDays';
+  static const String smartRulesOnly = 'smartRulesOnly';
+
   static const String ignoreArticlesInGameSort = 'ignoreArticlesInGameSort';
   static const String ignoreArticlesInGameSortSubtitle =
       'ignoreArticlesInGameSortSubtitle';

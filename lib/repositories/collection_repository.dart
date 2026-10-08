@@ -26,6 +26,7 @@ class CollectionRepository {
     String? color1,
     String? color2,
     int? sortOrder,
+    String? rulesJson,
   }) => SqliteService.insertCollection(
     id: id,
     name: name,
@@ -33,6 +34,7 @@ class CollectionRepository {
     color1: color1,
     color2: color2,
     sortOrder: sortOrder,
+    rulesJson: rulesJson,
   );
 
   /// Updates a collection's mutable fields.
@@ -46,6 +48,7 @@ class CollectionRepository {
     String? color2,
     bool clearColor2 = false,
     int? sortOrder,
+    String? rulesJson,
   }) => SqliteService.updateCollection(
     id,
     name: name,
@@ -56,6 +59,7 @@ class CollectionRepository {
     color2: color2,
     clearColor2: clearColor2,
     sortOrder: sortOrder,
+    rulesJson: rulesJson,
   );
 
   /// Deletes a collection and its membership rows.

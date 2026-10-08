@@ -1,4 +1,8 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'package:flutter/widgets.dart';
+import '../models/smart_collection_rules.dart';
+import '../models/database_game_model.dart';
+import '../services/collections/smart_collections_service.dart';
 
 import '../models/collection_model.dart';
 import '../models/game_model.dart';
@@ -16,7 +20,62 @@ import '../services/collections/collections_service.dart';
 /// Nothing here is static. `subDisplay()` runs a second Flutter engine that
 /// shares the SQLite file and nothing in memory, so a process-wide cache would
 /// go stale the moment either engine wrote (CLAUDE.md, dual-display devices).
-class CollectionsProvider extends ChangeNotifier {
+class CollectionsProvider extends ChangeNotifier with WidgetsBindingObserver {
+  CollectionsProvider({List<ChangeNotifier> sources = const []})
+    : _sources = sources {
+    WidgetsBinding.instance.addObserver(this);
+    for (final source in _sources) {
+      source.addListener(_scheduleRefresh);
+    }
+  }
+
+  final List<ChangeNotifier> _sources;
+  Timer? _debounce;
+  Timer? _boundaryTimer;
+  bool _disposed = false;
+  bool _pending = false;
+  Future<void>? _loadFuture;
+  int _revision = 0;
+  int get revision => _revision;
+
+  void _scheduleRefresh() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () => load());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) load();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _debounce?.cancel();
+    _boundaryTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    for (final source in _sources) {
+      source.removeListener(_scheduleRefresh);
+    }
+    super.dispose();
+  }
+
+  Future<void> _readSnapshot() async {
+    final snapshot = await SmartCollectionsService.snapshot();
+    if (_disposed) return;
+    _collections = snapshot.collections;
+    _memberRomPaths = snapshot.memberPaths;
+    _revision++;
+    _boundaryTimer?.cancel();
+    if (snapshot.nextBoundary != null) {
+      final delay = snapshot.nextBoundary!.difference(DateTime.now());
+      _boundaryTimer = Timer(
+        delay.isNegative ? Duration.zero : delay,
+        () => load(),
+      );
+    }
+  }
+
   List<CollectionModel> _collections = const [];
   bool _isLoading = false;
   bool _hasLoaded = false;
@@ -99,30 +158,60 @@ class CollectionsProvider extends ChangeNotifier {
   /// Re-reads every collection (and its game count) from the database.
   ///
   /// Safe to call repeatedly; concurrent calls collapse into the first.
-  Future<void> load() async {
-    if (_isLoading) return;
+  Future<void> load() {
+    if (_disposed) return Future.value();
+    if (_loadFuture != null) {
+      _pending = true;
+      return _loadFuture!;
+    }
+    // Defer the first read so the future is installed before notifications.
+    _loadFuture = Future<void>.microtask(
+      _load,
+    ).whenComplete(() => _loadFuture = null);
+    return _loadFuture!;
+  }
+
+  Future<void> _load() async {
+    if (_disposed) return;
     _isLoading = true;
     notifyListeners();
-
     try {
-      _collections = await CollectionsService.getCollections();
-      _memberRomPaths = await CollectionsService.memberRomPaths();
+      do {
+        _pending = false;
+        await _readSnapshot();
+      } while (_pending && !_disposed);
+    } catch (error) {
+      // Preserve the last successful snapshot on transient database failure.
+      debugPrint('Collection refresh failed: $error');
     } finally {
       _isLoading = false;
       _hasLoaded = true;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
   /// Creates a collection and returns it, refreshing the list.
-  Future<CollectionModel> create(String name, {String? imageSourcePath}) async {
+  Future<CollectionModel> create(
+    String name, {
+    String? imageSourcePath,
+    SmartCollectionRules? rules,
+  }) async {
     final created = await CollectionsService.createCollection(
       name,
       imageSourcePath: imageSourcePath,
+      rules: rules,
     );
     await _refresh();
     return created;
   }
+
+  Future<void> updateRules(String id, SmartCollectionRules rules) async {
+    await CollectionsService.updateRules(id, rules);
+    await _refresh();
+  }
+
+  Future<List<DatabaseGameModel>> ruleLibrary() =>
+      SmartCollectionsService.library();
 
   /// Renames a collection and refreshes the list.
   Future<void> rename(String id, String name) async {
@@ -185,9 +274,6 @@ class CollectionsProvider extends ChangeNotifier {
 
   /// Re-reads after a mutation, bypassing [load]'s in-flight guard.
   Future<void> _refresh() async {
-    _collections = await CollectionsService.getCollections();
-    _memberRomPaths = await CollectionsService.memberRomPaths();
-    _hasLoaded = true;
-    notifyListeners();
+    await load();
   }
 }

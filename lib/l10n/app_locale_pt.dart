@@ -1,6 +1,47 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocalePt = {
+  AppLocale.smartMatchesOne: '1 jogo correspondente',
+  AppLocale.smartCollection: 'Coleção inteligente',
+  AppLocale.manualCollection: 'Coleção manual',
+  AppLocale.smartEditRules: 'Editar regras',
+  AppLocale.smartMatchAll: 'Cumprir todas as regras',
+  AppLocale.smartMatchAny: 'Cumprir qualquer regra',
+  AppLocale.smartAddRule: 'Adicionar regra',
+  AppLocale.smartChooseValue: 'Escolher um valor',
+  AppLocale.smartCustomValue: 'Introduzir um valor',
+  AppLocale.smartMatches: '{count} jogos correspondentes',
+  AppLocale.smartInvalidRules:
+      'Não é possível ler estas regras. Edite-as para restaurar a coleção.',
+  AppLocale.smartInvalidValue: 'Introduza um valor válido para esta regra.',
+  AppLocale.smartNoMatches: 'Ainda nenhum jogo corresponde a estas regras.',
+  AppLocale.smartPreviewError:
+      'Não foi possível carregar a prévia. Tente novamente.',
+  AppLocale.smartYes: 'Sim',
+  AppLocale.smartNo: 'Não',
+  AppLocale.smartDone: 'Concluído',
+  AppLocale.smartLower: 'Mínimo',
+  AppLocale.smartUpper: 'Máximo',
+  AppLocale.smartSystem: 'Sistema',
+  AppLocale.smartTitle: 'Título',
+  AppLocale.smartYear: 'Ano de lançamento',
+  AppLocale.smartRating: 'Avaliação (0–10)',
+  AppLocale.smartPlayed: 'Jogado',
+  AppLocale.smartIs: 'É',
+  AppLocale.smartIsNot: 'Não é',
+  AppLocale.smartContains: 'Contém',
+  AppLocale.smartNotContains: 'Não contém',
+  AppLocale.smartBefore: 'Antes de',
+  AppLocale.smartAfter: 'Depois de',
+  AppLocale.smartAtLeast: 'Pelo menos',
+  AppLocale.smartAtMost: 'No máximo',
+  AppLocale.smartBetween: 'Entre',
+  AppLocale.smartWithinDays: 'Nos últimos',
+  AppLocale.smartNotWithinDays: 'Não nos últimos',
+  AppLocale.smartDays: '{count} dias',
+  AppLocale.smartRulesOnly:
+      'Os jogos são incluídos automaticamente segundo estas regras.',
+
   AppLocale.ignoreArticlesInGameSort: "Ignorar artigos ao ordenar jogos",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Ignorar The, A e An no início do título. Por exemplo, The Legend of Zelda fica na letra L.",

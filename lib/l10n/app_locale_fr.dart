@@ -1,6 +1,46 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleFr = {
+  AppLocale.smartMatchesOne: '1 jeu correspondant',
+  AppLocale.smartCollection: 'Collection intelligente',
+  AppLocale.manualCollection: 'Collection manuelle',
+  AppLocale.smartEditRules: 'Modifier les règles',
+  AppLocale.smartMatchAll: 'Respecter toutes les règles',
+  AppLocale.smartMatchAny: 'Respecter une règle',
+  AppLocale.smartAddRule: 'Ajouter une règle',
+  AppLocale.smartChooseValue: 'Choisir une valeur',
+  AppLocale.smartCustomValue: 'Saisir une valeur',
+  AppLocale.smartMatches: '{count} jeux correspondants',
+  AppLocale.smartInvalidRules:
+      'Ces règles sont illisibles. Modifiez-les pour restaurer cette collection.',
+  AppLocale.smartInvalidValue: 'Saisissez une valeur valide pour cette règle.',
+  AppLocale.smartNoMatches: 'Aucun jeu ne correspond encore à ces règles.',
+  AppLocale.smartPreviewError: 'Impossible de charger l’aperçu. Réessayez.',
+  AppLocale.smartYes: 'Oui',
+  AppLocale.smartNo: 'Non',
+  AppLocale.smartDone: 'Terminé',
+  AppLocale.smartLower: 'Minimum',
+  AppLocale.smartUpper: 'Maximum',
+  AppLocale.smartSystem: 'Système',
+  AppLocale.smartTitle: 'Titre',
+  AppLocale.smartYear: 'Année de sortie',
+  AppLocale.smartRating: 'Note (0–10)',
+  AppLocale.smartPlayed: 'Joué',
+  AppLocale.smartIs: 'Est',
+  AppLocale.smartIsNot: 'N’est pas',
+  AppLocale.smartContains: 'Contient',
+  AppLocale.smartNotContains: 'Ne contient pas',
+  AppLocale.smartBefore: 'Avant',
+  AppLocale.smartAfter: 'Après',
+  AppLocale.smartAtLeast: 'Au moins',
+  AppLocale.smartAtMost: 'Au plus',
+  AppLocale.smartBetween: 'Entre',
+  AppLocale.smartWithinDays: 'Dans les derniers',
+  AppLocale.smartNotWithinDays: 'Pas dans les derniers',
+  AppLocale.smartDays: '{count} jours',
+  AppLocale.smartRulesOnly:
+      'Les jeux sont inclus automatiquement selon ces règles.',
+
   AppLocale.ignoreArticlesInGameSort:
       "Ignorer les articles dans le tri des jeux",
   AppLocale.ignoreArticlesInGameSortSubtitle:

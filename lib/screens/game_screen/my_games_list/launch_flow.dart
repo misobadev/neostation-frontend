@@ -99,9 +99,9 @@ extension _LaunchFlow on _SystemGamesListState {
       final updatedGames = await GameService.loadGamesForSystem(widget.system);
       if (!mounted) return;
 
-      final previousRomname = _selectedGame?.romname;
-      final gameIndex = previousRomname != null
-          ? updatedGames.indexWhere((g) => g.romname == previousRomname)
+      final previousRomPath = _selectedGame?.romPath;
+      final gameIndex = previousRomPath != null
+          ? updatedGames.indexWhere((g) => g.romPath == previousRomPath)
           : -1;
 
       rebuild(() {
@@ -112,8 +112,16 @@ extension _LaunchFlow on _SystemGamesListState {
         if (gameIndex != -1) {
           _selectedGame = updatedGames[gameIndex];
           _selectedGameIndex = gameIndex;
+        } else {
+          _selectedGameIndex = updatedGames.isEmpty
+              ? 0
+              : _selectedGameIndex.clamp(0, updatedGames.length - 1);
+          _selectedGame = updatedGames.isEmpty
+              ? null
+              : updatedGames[_selectedGameIndex];
         }
       });
+      _collectionsProvider.load();
       _databaseProvider.refresh();
     } catch (e) {
       _SystemGamesListState._log.e(

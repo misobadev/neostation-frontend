@@ -1,6 +1,47 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleDe = {
+  AppLocale.smartMatchesOne: '1 passendes Spiel',
+  AppLocale.smartCollection: 'Intelligente Sammlung',
+  AppLocale.manualCollection: 'Manuelle Sammlung',
+  AppLocale.smartEditRules: 'Regeln bearbeiten',
+  AppLocale.smartMatchAll: 'Alle Regeln erfüllen',
+  AppLocale.smartMatchAny: 'Eine Regel erfüllen',
+  AppLocale.smartAddRule: 'Regel hinzufügen',
+  AppLocale.smartChooseValue: 'Wert auswählen',
+  AppLocale.smartCustomValue: 'Wert eingeben',
+  AppLocale.smartMatches: '{count} passende Spiele',
+  AppLocale.smartInvalidRules:
+      'Diese Regeln können nicht gelesen werden. Bearbeite sie, um die Sammlung wiederherzustellen.',
+  AppLocale.smartInvalidValue: 'Gib einen gültigen Wert für diese Regel ein.',
+  AppLocale.smartNoMatches: 'Noch keine Spiele erfüllen diese Regeln.',
+  AppLocale.smartPreviewError:
+      'Vorschau konnte nicht geladen werden. Erneut versuchen.',
+  AppLocale.smartYes: 'Ja',
+  AppLocale.smartNo: 'Nein',
+  AppLocale.smartDone: 'Fertig',
+  AppLocale.smartLower: 'Minimum',
+  AppLocale.smartUpper: 'Maximum',
+  AppLocale.smartSystem: 'System',
+  AppLocale.smartTitle: 'Titel',
+  AppLocale.smartYear: 'Erscheinungsjahr',
+  AppLocale.smartRating: 'Bewertung (0–10)',
+  AppLocale.smartPlayed: 'Gespielt',
+  AppLocale.smartIs: 'Ist',
+  AppLocale.smartIsNot: 'Ist nicht',
+  AppLocale.smartContains: 'Enthält',
+  AppLocale.smartNotContains: 'Enthält nicht',
+  AppLocale.smartBefore: 'Vor',
+  AppLocale.smartAfter: 'Nach',
+  AppLocale.smartAtLeast: 'Mindestens',
+  AppLocale.smartAtMost: 'Höchstens',
+  AppLocale.smartBetween: 'Zwischen',
+  AppLocale.smartWithinDays: 'Innerhalb der letzten',
+  AppLocale.smartNotWithinDays: 'Nicht innerhalb der letzten',
+  AppLocale.smartDays: '{count} Tage',
+  AppLocale.smartRulesOnly:
+      'Spiele werden automatisch nach diesen Regeln aufgenommen.',
+
   AppLocale.ignoreArticlesInGameSort:
       "Artikel beim Sortieren von Spielen ignorieren",
   AppLocale.ignoreArticlesInGameSortSubtitle:

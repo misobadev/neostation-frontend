@@ -27,6 +27,7 @@ import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/widgets/context_menu/anchored_context_menu.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/header_sort_dropdown.dart';
+import 'package:neostation/widgets/systems_grid_footer.dart';
 import 'package:neostation/widgets/tv_directory_picker.dart';
 
 import '../game_screen/my_games_list.dart';
@@ -34,6 +35,7 @@ import '../systems_screen/my_systems_section/my_systems_carousel.dart';
 import '../systems_screen/my_systems_section/my_systems_grid.dart';
 import 'collection_cards.dart';
 import 'collection_name_dialog.dart';
+import 'smart_collection_editor.dart';
 
 /// Second level of the collections navigation: the user's collections as cards,
 /// with a trailing "New collection" card.
@@ -62,6 +64,7 @@ class CollectionsBrowserScreen extends StatefulWidget {
 
 /// Context-menu result ids. Local to this screen; the menu widget itself is
 /// domain-agnostic.
+const String _menuEditRules = 'edit_rules';
 const String _menuRename = 'rename';
 const String _menuChangeImage = 'change_image';
 const String _menuRemoveImage = 'remove_image';
@@ -83,11 +86,6 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
   late final String _gridLayerId = 'collections_browser_grid#$_instance';
   late final String _carouselLayerId =
       'collections_browser_carousel#$_instance';
-
-  /// Anchor for the context menu: the footer's Y control, so the menu drops off
-  /// the button that opens it. The cards belong to the systems widgets now, so
-  /// there is no card-level anchor to hang a [GlobalKey] on — and the footer
-  /// control is mounted exactly when the menu is reachable.
 
   /// Anchor for the per-collection menu: the selected card itself.
   ///
@@ -137,7 +135,7 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final provider = context.read<CollectionsProvider>();
-      if (!provider.hasLoaded) provider.load();
+      provider.load();
     });
   }
 
@@ -211,6 +209,14 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
   /// `GameListService.loadGamesForSystem` recognises the `collection:<uuid>`
   /// folder name and loads the membership.
   Future<void> _openCollection(CollectionModel collection) async {
+    if (collection.rulesInvalid) {
+      _notify(
+        AppLocale.smartInvalidRules.getString(context),
+        NotificationType.error,
+      );
+      await _editRules(collection);
+      return;
+    }
     final fileProvider = context.read<FileProvider>();
     final target = SystemGamesList(
       system: _createCollectionSystem(collection),
@@ -259,6 +265,12 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
     SfxService().playNavSound();
 
     final items = <ContextMenuItem>[
+      if (collection.isSmart)
+        ContextMenuItem(
+          id: _menuEditRules,
+          label: AppLocale.smartEditRules.getString(context),
+          icon: Symbols.auto_awesome_rounded,
+        ),
       ContextMenuItem(
         id: _menuRename,
         label: AppLocale.renameCollection.getString(context),
@@ -298,11 +310,8 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
     final result = await showAnchoredContextMenu(
       context: context,
       items: items,
-      // The card, not the Y button — see [_selectedCardAnchorKey]. Falls back
-      // to the button when no card is mounted (the key resolves to null and
-      // the menu centres itself).
-      // The card. With the footer gone there is no button to fall back to, so
-      // a null context leaves the menu to centre itself.
+      // Keep the menu next to the collection it acts on; without a mounted
+      // card, the menu falls back to the viewport centre.
       anchorKey: _selectedCardAnchorKey,
       alignment: ContextMenuAlignment.overAnchor,
       layerId: 'collection_context_menu',
@@ -312,6 +321,8 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
     if (!mounted || result == null) return;
 
     switch (result) {
+      case _menuEditRules:
+        await _editRules(collection);
       case _menuRename:
         await _renameCollection(collection);
       case _menuChangeImage:
@@ -355,6 +366,25 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
   /// Creates a collection, prompting for its name with the next unused
   /// generated name pre-filled.
   Future<void> _createCollection() async {
+    final type = await showAnchoredContextMenu(
+      context: context,
+      items: [
+        ContextMenuItem(
+          id: 'manual',
+          label: AppLocale.manualCollection.getString(context),
+          icon: Symbols.bookmark_rounded,
+        ),
+        ContextMenuItem(
+          id: 'smart',
+          label: AppLocale.smartCollection.getString(context),
+          icon: Symbols.auto_awesome_rounded,
+        ),
+      ],
+      layerId: 'collection_type#$_instance',
+      submenuLayerId: 'collection_type_submenu#$_instance',
+      alignment: ContextMenuAlignment.centerScreen,
+    );
+    if (type == null || !mounted) return;
     final provider = context.read<CollectionsProvider>();
     final template = AppLocale.newCollectionDefaultName.getString(context);
     final existing = provider.collections.map((c) => c.name).toSet();
@@ -366,15 +396,21 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
       suggestion = template.replaceFirst('{number}', '$index');
     }
 
-    final name = await _prompt(
-      title: AppLocale.createCollection.getString(context),
-      initialValue: suggestion,
-      confirmLabel: AppLocale.save.getString(context),
-    );
+    final smartDraft = type == 'smart'
+        ? await SmartCollectionEditor.show(context, initialName: suggestion)
+        : null;
+    if (!mounted || (type == 'smart' && smartDraft == null)) return;
+    final name =
+        smartDraft?.name ??
+        await _prompt(
+          title: AppLocale.createCollection.getString(context),
+          initialValue: suggestion,
+          confirmLabel: AppLocale.save.getString(context),
+        );
     if (name == null || !mounted) return;
 
     try {
-      final created = await provider.create(name);
+      final created = await provider.create(name, rules: smartDraft?.rules);
       if (!mounted) return;
       // Land the cursor on what was just made.
       final position = provider.collections.indexWhere(
@@ -390,6 +426,26 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
     } catch (e) {
       _log.e('Collection creation failed: $e');
       _reportSaveError();
+    }
+  }
+
+  Future<void> _editRules(CollectionModel collection) async {
+    final draft = await SmartCollectionEditor.show(
+      context,
+      collection: collection,
+      initialName: collection.name,
+    );
+    if (draft == null || !mounted) return;
+    try {
+      final provider = context.read<CollectionsProvider>();
+      await provider.updateRules(collection.id, draft.rules);
+      if (draft.name != collection.name) {
+        await provider.rename(collection.id, draft.name);
+      }
+      if (mounted) setState(() => _previewCache.clear());
+    } catch (e) {
+      _log.e('Updating smart collection failed: $e');
+      if (mounted) _reportSaveError();
     }
   }
 
@@ -568,7 +624,7 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
   /// card style between box art and fanart repaints rather than showing the
   /// other style's covers.
   String _previewKey(CollectionModel collection, String imageType) =>
-      '${collection.id}|$imageType|${collection.gameCount}';
+      '${collection.id}|$imageType|${collection.gameCount}|${collection.rules?.encode()}';
 
   /// The mosaic covers for [collection], resolving them in the background the
   /// first time they are asked for.
@@ -719,6 +775,16 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
                   ? _buildCarousel(items)
                   : _buildGrid(items, cols),
             ),
+            if (!showSpinner)
+              SafeArea(
+                top: false,
+                child: SystemsGridFooter(
+                  system: items[_selectedIndex],
+                  onEnter: _activateSelection,
+                  onOptions: _openContextMenu,
+                  enterLabel: AppLocale.hintSelect.getString(context),
+                ),
+              ),
           ],
         ),
       ),
@@ -772,8 +838,7 @@ class _CollectionsBrowserScreenState extends State<CollectionsBrowserScreen> {
       child: MySystemsCarousel(
         items: items,
         selectedIndex: _selectedIndex,
-        // The footer carried the selected collection's count; with it gone the
-        // cards say it themselves, as the systems carousel does.
+        // Keep counts visible on the cards as well as in the selected footer.
         showCardCounts: true,
         // "New collection" is an action, not a place, so it is left out of the
         // strip of collections you can jump to.

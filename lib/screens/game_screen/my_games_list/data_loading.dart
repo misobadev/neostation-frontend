@@ -59,7 +59,13 @@ extension _DataLoading on _SystemGamesListState {
   }
 
   Future<void> _loadGames() async {
-    if (!mounted || _isLoadingGames) return;
+    if (!mounted) return;
+    if (_isLoadingGames) {
+      if (SystemFolderNames.isCollection(widget.system.folderName)) {
+        _pendingCollectionRefresh = true;
+      }
+      return;
+    }
     _isLoadingGames = true;
 
     final isInitialLoad = _games.isEmpty;
@@ -185,14 +191,18 @@ extension _DataLoading on _SystemGamesListState {
             widget.system.folderName != 'music') {
           // Persistent Selection Logic: Retain current index if the game still exists post-reload.
           final selectedIndex = _games.indexWhere(
-            (game) => game.romname == _selectedGame!.romname,
+            (game) => game.romPath == _selectedGame!.romPath,
           );
           if (selectedIndex != -1) {
             _selectedGameIndex = selectedIndex;
             _selectedGame = _games[selectedIndex];
           } else {
-            _selectedGameIndex = 0;
-            _selectedGame = _games.isNotEmpty ? _games.first : null;
+            _selectedGameIndex = _games.isEmpty
+                ? 0
+                : _selectedGameIndex.clamp(0, _games.length - 1);
+            _selectedGame = _games.isNotEmpty
+                ? _games[_selectedGameIndex]
+                : null;
           }
         } else if (_selectedGame == null) {
           _selectedGameIndex = 0;
@@ -219,6 +229,12 @@ extension _DataLoading on _SystemGamesListState {
       if (mounted) {
         rebuild(() => _isLoading = false);
         _isLoadingGames = false;
+        if (_pendingCollectionRefresh &&
+            !_deferFavoriteReseat &&
+            !_isNavigatingBack) {
+          _pendingCollectionRefresh = false;
+          _loadGames();
+        }
       }
     }
   }

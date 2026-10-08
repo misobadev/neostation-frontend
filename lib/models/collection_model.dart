@@ -1,3 +1,5 @@
+import 'smart_collection_rules.dart';
+
 /// A user-defined collection of games.
 ///
 /// Backed by the `user_collections` table. Collections are deliberately *not*
@@ -15,6 +17,15 @@ class CollectionModel {
   /// Bare uuid v4. Carried by the `collection:<id>` synthesized system folder
   /// name and used to name the artwork file, so a rename never orphans it.
   final String id;
+
+  final bool isSmart;
+  final SmartCollectionRules? rules;
+
+  /// Invalid persisted definitions stay visible and editable, with no matches.
+  final bool rulesInvalid;
+
+  /// Preserved on round-trip when a newer or malformed definition cannot decode.
+  final String? unreadableRulesJson;
 
   /// User-supplied display name. Not unique — duplicates are allowed.
   final String name;
@@ -48,6 +59,10 @@ class CollectionModel {
   const CollectionModel({
     required this.id,
     required this.name,
+    this.isSmart = false,
+    this.rules,
+    this.rulesInvalid = false,
+    this.unreadableRulesJson,
     this.imagePath,
     this.color1,
     this.color2,
@@ -60,7 +75,22 @@ class CollectionModel {
   /// Builds a model from a `user_collections` row, including the joined
   /// `game_count` produced by the listing query when present.
   factory CollectionModel.fromJson(Map<String, dynamic> json) {
+    final isSmart = json['collection_type'] == 'smart';
+    SmartCollectionRules? rules;
+    if (isSmart) {
+      try {
+        rules = SmartCollectionRules.decode(json['rules_json'] as String);
+      } catch (_) {
+        // Keep the original database value until the user explicitly saves.
+      }
+    }
     return CollectionModel(
+      isSmart: isSmart,
+      rules: rules,
+      rulesInvalid: isSmart && rules == null,
+      unreadableRulesJson: isSmart && rules == null
+          ? json['rules_json'] as String?
+          : null,
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       imagePath: _nullIfEmpty(json['image_path']),
@@ -76,6 +106,8 @@ class CollectionModel {
   /// Serializes only the persisted columns — [gameCount] and [imageVersion]
   /// are derived and must never be written back to `user_collections`.
   Map<String, dynamic> toJson() => {
+    'collection_type': isSmart ? 'smart' : 'manual',
+    'rules_json': rules?.encode() ?? unreadableRulesJson,
     'id': id,
     'name': name,
     'image_path': imagePath,
@@ -104,6 +136,10 @@ class CollectionModel {
     DateTime? createdAt,
   }) {
     return CollectionModel(
+      isSmart: isSmart,
+      rules: rules,
+      rulesInvalid: rulesInvalid,
+      unreadableRulesJson: unreadableRulesJson,
       id: id ?? this.id,
       name: name ?? this.name,
       imagePath: clearImagePath ? null : (imagePath ?? this.imagePath),
@@ -120,6 +156,10 @@ class CollectionModel {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is CollectionModel &&
+          other.isSmart == isSmart &&
+          other.rules?.encode() == rules?.encode() &&
+          other.rulesInvalid == rulesInvalid &&
+          other.unreadableRulesJson == unreadableRulesJson &&
           other.id == id &&
           other.name == name &&
           other.imagePath == imagePath &&
@@ -131,6 +171,10 @@ class CollectionModel {
 
   @override
   int get hashCode => Object.hash(
+    isSmart,
+    rules?.encode(),
+    rulesInvalid,
+    unreadableRulesJson,
     id,
     name,
     imagePath,

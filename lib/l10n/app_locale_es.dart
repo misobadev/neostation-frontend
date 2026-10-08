@@ -1,6 +1,47 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleEs = {
+  AppLocale.smartMatchesOne: '1 juego coincidente',
+  AppLocale.smartCollection: 'Colección inteligente',
+  AppLocale.manualCollection: 'Colección manual',
+  AppLocale.smartEditRules: 'Editar reglas',
+  AppLocale.smartMatchAll: 'Cumplir todas las reglas',
+  AppLocale.smartMatchAny: 'Cumplir alguna regla',
+  AppLocale.smartAddRule: 'Añadir regla',
+  AppLocale.smartChooseValue: 'Elegir un valor',
+  AppLocale.smartCustomValue: 'Introducir un valor',
+  AppLocale.smartMatches: '{count} juegos coincidentes',
+  AppLocale.smartInvalidRules:
+      'No se pueden leer estas reglas. Edítalas para restaurar la colección.',
+  AppLocale.smartInvalidValue: 'Introduce un valor válido para esta regla.',
+  AppLocale.smartNoMatches: 'Todavía no hay juegos que cumplan estas reglas.',
+  AppLocale.smartPreviewError:
+      'No se pudo cargar la vista previa. Inténtalo de nuevo.',
+  AppLocale.smartYes: 'Sí',
+  AppLocale.smartNo: 'No',
+  AppLocale.smartDone: 'Listo',
+  AppLocale.smartLower: 'Mínimo',
+  AppLocale.smartUpper: 'Máximo',
+  AppLocale.smartSystem: 'Sistema',
+  AppLocale.smartTitle: 'Título',
+  AppLocale.smartYear: 'Año de lanzamiento',
+  AppLocale.smartRating: 'Valoración (0–10)',
+  AppLocale.smartPlayed: 'Jugado',
+  AppLocale.smartIs: 'Es',
+  AppLocale.smartIsNot: 'No es',
+  AppLocale.smartContains: 'Contiene',
+  AppLocale.smartNotContains: 'No contiene',
+  AppLocale.smartBefore: 'Antes de',
+  AppLocale.smartAfter: 'Después de',
+  AppLocale.smartAtLeast: 'Al menos',
+  AppLocale.smartAtMost: 'Como máximo',
+  AppLocale.smartBetween: 'Entre',
+  AppLocale.smartWithinDays: 'En los últimos',
+  AppLocale.smartNotWithinDays: 'Fuera de los últimos',
+  AppLocale.smartDays: '{count} días',
+  AppLocale.smartRulesOnly:
+      'Los juegos se incluyen automáticamente según estas reglas.',
+
   AppLocale.ignoreArticlesInGameSort: "Ignorar artículos al ordenar juegos",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Ignorar The, A y An al inicio. Por ejemplo, The Legend of Zelda se ordena en la L.",

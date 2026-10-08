@@ -88,6 +88,42 @@ void main() {
     return ctx;
   }
 
+  testWidgets(
+    'standalone collection chooser is centred with a visible border',
+    (tester) async {
+      useViewport(tester, const Size(1280, 720));
+      final ctx = await pumpHost(tester);
+      final result = showAnchoredContextMenu(
+        context: ctx,
+        items: const [
+          ContextMenuItem(id: 'manual', label: 'Manual Collection'),
+          ContextMenuItem(id: 'smart', label: 'Smart Collection'),
+        ],
+        alignment: ContextMenuAlignment.centerScreen,
+      );
+      await tester.pumpAndSettle();
+      final panel = find
+          .descendant(
+            of: find.byType(AnchoredContextMenu),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Container && widget.decoration is BoxDecoration,
+            ),
+          )
+          .first;
+      expect(tester.getRect(panel).center.dx, closeTo(640, 1));
+      expect(tester.getRect(panel).center.dy, closeTo(360, 1));
+      final decoration =
+          tester.widget<Container>(panel).decoration! as BoxDecoration;
+      final border = decoration.border! as Border;
+      expect(border.top.color.a, closeTo(0.65, 0.01));
+      await tester.tap(find.text('Smart Collection'));
+      await tester.pumpAndSettle();
+      expect(await result, 'smart');
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('renders one row per item', (tester) async {
     useViewport(tester, const Size(1920, 1080));
     final ctx = await pumpHost(tester);

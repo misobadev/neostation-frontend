@@ -144,6 +144,8 @@ class SqliteMigrations {
     CREATE TABLE IF NOT EXISTS user_collections (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      collection_type TEXT NOT NULL DEFAULT 'manual',
+      rules_json TEXT,
       image_path TEXT,
       color1 TEXT,
       color2 TEXT,
@@ -635,6 +637,9 @@ class SqliteMigrations {
       case 166:
         // Backfill for installs that reached v165 without this PR’s v164.
         await _migrateToVersion164(db);
+        break;
+      case 167:
+        await _migrateToVersion167(db);
         break;
       default:
         _log.w('No migration defined for version $version');
@@ -7178,6 +7183,27 @@ class SqliteMigrations {
       _log.e('Error in migration v163: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
+    }
+  }
+
+  /// Migration v167: adds smart definitions without changing manual memberships.
+  /// Renumbered from v164, which main uses for article-insensitive sorting.
+  static Future<void> _migrateToVersion167(Database db) async {
+    // Test devices on the smart collections branch already ran its former
+    // v163 and therefore skipped upstream's RomM migration at that version.
+    await _migrateToVersion163(db);
+    db.execute(createUserCollectionsTableSql);
+    final columns = db
+        .select('PRAGMA table_info(user_collections)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('collection_type')) {
+      db.execute(
+        "ALTER TABLE user_collections ADD COLUMN collection_type TEXT NOT NULL DEFAULT 'manual'",
+      );
+    }
+    if (!columns.contains('rules_json')) {
+      db.execute('ALTER TABLE user_collections ADD COLUMN rules_json TEXT');
     }
   }
 
