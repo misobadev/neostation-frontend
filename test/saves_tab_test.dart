@@ -37,6 +37,8 @@ class _SignedOut extends AuthService {
 }
 
 class _Notifications extends NotificationService {
+  _Notifications({required super.authService});
+
   // No socket was opened; avoid the real service scheduling a disconnect
   // notification after the test has disposed it.
   @override
@@ -123,7 +125,8 @@ void main() {
                 create: (_) => NeoSyncProvider(NeoSyncService()),
               ),
               ChangeNotifierProvider<NotificationService>(
-                create: (_) => _Notifications(),
+                create: (context) =>
+                    _Notifications(authService: context.read<AuthService>()),
               ),
             ],
             child: RepaintBoundary(
