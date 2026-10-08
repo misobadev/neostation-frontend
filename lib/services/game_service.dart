@@ -44,8 +44,9 @@ class GameService {
   static void clearLaunchPending() => GameSessionManager.clearLaunchPending();
 
   /// Callback for raw device screen on/off, registered by a context-aware
-  /// widget so context-only services (e.g. NotificationService) can be
-  /// suspended while locked. `true` = screen on, `false` = screen off.
+  /// widget so services it reaches through the widget tree (e.g.
+  /// NotificationService) can be suspended while locked. `true` = screen on,
+  /// `false` = screen off.
   static void Function(bool screenOn)? onScreenStateChanged;
 
   /// Whether the device screen is on, mirrored from the same native bridge.

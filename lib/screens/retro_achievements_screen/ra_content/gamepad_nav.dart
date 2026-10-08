@@ -5,6 +5,9 @@ part of '../ra_content.dart';
 /// Dashboard action indices follow the rendered geometry: 0 AOTW, 1–4 the
 /// destination rail, 5 logout, and 6–7 the two lower preview cards.
 extension _GamepadNav on _RAContentState {
+  bool get _dashboardPreviewsStacked =>
+      _dashboardKey.currentState?.previewsStacked ?? true;
+
   void _initControllerNavigation() {
     _gamepadNav = GamepadNavigation(
       onNavigateUp: _handleNavigateUp,
@@ -158,8 +161,9 @@ extension _GamepadNav on _RAContentState {
       case 4:
         return _setDashboardAction(5);
       case 6:
-      case 7:
         return _setDashboardAction(0);
+      case 7:
+        return _setDashboardAction(_dashboardPreviewsStacked ? 6 : 0);
       case 0:
         return _setDashboardAction(_lastNavigationRailIndex);
       default:
@@ -180,6 +184,8 @@ extension _GamepadNav on _RAContentState {
         return _setDashboardAction(0);
       case 0:
         return _setDashboardAction(6);
+      case 6:
+        return _dashboardPreviewsStacked ? _setDashboardAction(7) : false;
       default:
         return false;
     }
@@ -191,7 +197,9 @@ extension _GamepadNav on _RAContentState {
     if (_dashboardActionIndex >= 2 && _dashboardActionIndex <= 4) {
       return _setDashboardAction(_dashboardActionIndex - 1);
     }
-    if (_dashboardActionIndex == 7) return _setDashboardAction(6);
+    if (_dashboardActionIndex == 7 && !_dashboardPreviewsStacked) {
+      return _setDashboardAction(6);
+    }
     return false;
   }
 
@@ -201,7 +209,9 @@ extension _GamepadNav on _RAContentState {
     if (_dashboardActionIndex >= 1 && _dashboardActionIndex <= 3) {
       return _setDashboardAction(_dashboardActionIndex + 1);
     }
-    if (_dashboardActionIndex == 6) return _setDashboardAction(7);
+    if (_dashboardActionIndex == 6 && !_dashboardPreviewsStacked) {
+      return _setDashboardAction(7);
+    }
     return false;
   }
 }

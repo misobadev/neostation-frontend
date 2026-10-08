@@ -76,7 +76,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
 
     // Pre-allocate keys for maximum theoretical setting items (the fixed rows
     // plus one per navigation tab that can be toggled).
-    for (int i = 0; i < 17 + NavTab.values.length; i++) {
+    for (int i = 0; i < 18 + NavTab.values.length; i++) {
       _itemKeys.add(GlobalKey());
     }
   }
@@ -205,6 +205,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     count++; // SFX Sounds
     count++; // SFX volume (dimmed, but still navigable, while SFX are off)
     count++; // 12-Hour Clock
+    count++; // Ignore leading articles in game sorting
     count++; // Show subfolders (every system)
     count++; // Cloud-save mark in the game views
     count++; // Achievement badges on game tiles
@@ -365,6 +366,14 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     if (index == currentItemIndex) {
       configProvider.updateUse12HourClock(
         !configProvider.config.use12HourClock,
+      );
+      return;
+    }
+    currentItemIndex++;
+
+    if (index == currentItemIndex) {
+      configProvider.updateIgnoreArticlesInGameSort(
+        !configProvider.config.ignoreArticlesInGameSort,
       );
       return;
     }
@@ -739,9 +748,31 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                   );
                 }(),
 
-                // Setting: Show subfolders, applied to every system. The
-                // per-system toggle in a system's settings dialog stays
-                // available; this stamps them all at once.
+                // Setting: Ignore leading articles in game sorting.
+                SizedBox(height: 12.r),
+                () {
+                  final index = currentItemIdx++;
+                  return SettingRow(
+                    key: _itemKeys[index],
+                    onTap: () => selectItem(index),
+                    focused:
+                        widget.isContentFocused &&
+                        widget.selectedContentIndex == index,
+                    title: AppLocale.ignoreArticlesInGameSort.getString(
+                      context,
+                    ),
+                    subtitle: AppLocale.ignoreArticlesInGameSortSubtitle
+                        .getString(context),
+                    trailing: CustomToggleSwitch(
+                      value: config.ignoreArticlesInGameSort,
+                      onChanged: (value) => context
+                          .read<SqliteConfigProvider>()
+                          .updateIgnoreArticlesInGameSort(value),
+                      activeColor: theme.colorScheme.primary,
+                    ),
+                  );
+                }(),
+
                 SizedBox(height: 12.r),
                 () {
                   final index = currentItemIdx++;

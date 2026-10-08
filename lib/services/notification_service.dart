@@ -11,7 +11,6 @@ import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/sync/providers/neo_sync_adapter.dart';
-import 'package:provider/provider.dart';
 import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/logger_service.dart';
 
@@ -20,18 +19,66 @@ import 'package:neostation/services/logger_service.dart';
 /// Handles live updates for subscription plan changes, payment status, and
 /// synchronization events. Includes automatic reconnection logic, health checks,
 /// and UI integration for displaying system modals.
+///
+/// The socket follows the account: it opens as soon as a NeoSync user who may
+/// receive notifications is signed in (at startup, or on sign-in) and closes when
+/// they sign out or save sync moves to another provider. It used to open only on
+/// an app resume, and only if the Sync tab had handed the service a widget
+/// context it could read the account through.
 class NotificationService extends ChangeNotifier {
   static const String _tokenKey = 'auth_token';
   final _log = LoggerService.instance;
 
+  NotificationService({
+    required AuthService authService,
+    NeoSyncProvider? neoSyncProvider,
+    BuildContext? Function()? modalContext,
+    @visibleForTesting WebSocketChannel Function(Uri uri)? connectChannel,
+  }) : _authService = authService,
+       _neoSyncProvider = neoSyncProvider,
+       _modalContext = modalContext ?? _noContext,
+       _connectChannel = connectChannel ?? WebSocketChannel.connect {
+    _authService.addListener(_onAccountChanged);
+    SyncManager.instance.addListener(_onAccountChanged);
+    // Already signed in at startup: nothing else would open the socket.
+    _onAccountChanged();
+  }
+
+  final AuthService _authService;
+
+  /// Refreshed after a plan change; null where there is no NeoSync provider.
+  final NeoSyncProvider? _neoSyncProvider;
+
+  /// A context under the app's navigator, for the plan-change modals.
+  final BuildContext? Function() _modalContext;
+
+  final WebSocketChannel Function(Uri uri) _connectChannel;
+
+  static BuildContext? _noContext() => null;
+
+  /// Eligibility as last seen by [_onAccountChanged]. The socket reacts to the
+  /// change, not to every notification: [SyncManager] relays every provider
+  /// update, and a connect that failed must not be retried on each one.
+  bool _wasEligible = false;
+
+  /// Set while the app is in the background (or the screen is off). Account
+  /// changes then wait for the resume, which calls [connect] itself.
+  bool _suspended = false;
+
+  bool _disposed = false;
+
+  /// Bumped whenever the socket is closed on purpose ([disconnect], [suspend]).
+  /// A [connect] still awaiting the token or the handshake compares it after
+  /// each await, so a sign-out or a screen-off that lands mid-connect isn't
+  /// undone by the connect finishing afterwards.
+  int _generation = 0;
+
   WebSocketChannel? _channel;
+  StreamSubscription<dynamic>? _subscription;
   bool _isConnected = false;
   bool _isConnecting = false;
   String? _lastError;
   final List<NotificationMessage> _notifications = [];
-
-  /// Global build context used for triggering overlay modals from background events.
-  BuildContext? _context;
 
   bool _shouldAutoReconnect = true;
   int _reconnectAttempts = 0;
@@ -52,29 +99,35 @@ class NotificationService extends ChangeNotifier {
 
   void _safeNotifyListeners() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed) return;
       notifyListeners();
     });
   }
 
-  /// Sets the primary [BuildContext] for rendering system-wide notification modals.
-  void setContext(BuildContext? context) {
-    _context = context;
+  /// Opens the socket when the account becomes eligible for notifications and
+  /// closes it when it stops being so (sign-out, a free plan, or save sync
+  /// switched to another provider).
+  void _onAccountChanged() {
+    final eligible = _isUserAuthenticatedForNeoSync();
+    if (eligible == _wasEligible) return;
+    _wasEligible = eligible;
+
+    if (!eligible) {
+      disconnect();
+    } else if (!_suspended) {
+      // A new account (or provider) gets a fresh set of retries.
+      _reconnectAttempts = 0;
+      unawaited(connect());
+    }
   }
 
   /// Triggers the appropriate welcome or farewell modal based on plan changes.
   void _showPlanUpdateModalImmediately(NotificationMessage notification) {
-    if (_context == null || !_context!.mounted) {
-      return;
-    }
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_context != null && _context!.mounted) {
+      final context = _modalContext();
+      if (context != null && context.mounted) {
         try {
-          final authService = Provider.of<AuthService>(
-            _context!,
-            listen: false,
-          );
-          final currentPlan = authService.currentUser?.plan;
+          final currentPlan = _authService.currentUser?.plan;
 
           if (currentPlan != null) {
             final isUpgrade =
@@ -87,11 +140,11 @@ class NotificationService extends ChangeNotifier {
                     ));
 
             if (isUpgrade) {
-              PlanWelcomeModal.show(_context!, currentPlan);
+              PlanWelcomeModal.show(context, currentPlan);
             } else {
               final oldPlan = notification.data['old_plan'];
               if (oldPlan != null) {
-                PlanFarewellModal.show(_context!, oldPlan, currentPlan);
+                PlanFarewellModal.show(context, oldPlan, currentPlan);
               }
             }
           }
@@ -104,28 +157,11 @@ class NotificationService extends ChangeNotifier {
 
   /// Refreshes user profile and cloud synchronization data following a plan update.
   void _refreshDataOnPlanUpdate() {
-    if (_context == null || !_context!.mounted) return;
-
     try {
-      final authService = Provider.of<AuthService>(_context!, listen: false);
-      final neoSyncProvider = Provider.of<NeoSyncProvider>(
-        _context!,
-        listen: false,
-      );
+      _authService.getProfile().then((_) => _safeNotifyListeners());
 
-      authService.getProfile().then((_) {
-        try {
-          final profileWidgetState = _context?.findAncestorStateOfType<State>();
-          if (profileWidgetState != null) {
-            _safeNotifyListeners();
-          }
-        } catch (e) {
-          _log.e('Could not force profile widget refresh: $e');
-        }
-      });
-
-      neoSyncProvider.loadFiles().then((_) {});
-      neoSyncProvider.loadQuota().then((_) {});
+      _neoSyncProvider?.loadFiles().then((_) {});
+      _neoSyncProvider?.loadQuota().then((_) {});
     } catch (e) {
       _log.e('Error refreshing data on plan update: $e');
     }
@@ -156,14 +192,18 @@ class NotificationService extends ChangeNotifier {
   ///
   /// Authenticates using the stored JWT and initiates health monitoring and
   /// missed notification retrieval.
+  ///
+  /// Does nothing — and schedules no retry — while nobody eligible is signed
+  /// in: there is nothing to connect as, and [_onAccountChanged] connects once
+  /// there is.
   Future<void> connect() async {
+    _suspended = false;
     _shouldAutoReconnect = true;
     if (_isConnected || _isConnecting) {
       return;
     }
 
-    // Notifications are NeoSync-specific; gate behind provider check.
-    if (SyncManager.instance.active?.providerId != NeoSyncAdapter.kProviderId) {
+    if (!_isUserAuthenticatedForNeoSync()) {
       return;
     }
 
@@ -171,35 +211,42 @@ class NotificationService extends ChangeNotifier {
     _lastError = null;
     _safeNotifyListeners();
 
+    final generation = _generation;
+    WebSocketChannel? channel;
     try {
       final token = await _getToken();
+      if (generation != _generation) return;
       if (token == null) {
-        throw Exception('Not authenticated');
-      }
-
-      if (!_isUserAuthenticatedForNeoSync()) {
         _isConnecting = false;
-        _lastError = 'NeoSync authentication required';
         _safeNotifyListeners();
         return;
       }
 
       final wsUrl = '${AppConfig.notifyBaseUrl}?token=$token';
 
-      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      channel = _connectChannel(Uri.parse(wsUrl));
+      _channel = channel;
 
-      _channel!.stream.listen(
+      // Bound to this channel: a socket closed earlier can finish closing
+      // after a newer one opened, and its callbacks must not touch that one.
+      final current = channel;
+      _subscription = channel.stream.listen(
         _onMessage,
-        onError: _onError,
-        onDone: _onDisconnected,
+        onError: (Object error) {
+          if (identical(current, _channel)) _onError(error);
+        },
+        onDone: () {
+          if (identical(current, _channel)) _onDisconnected();
+        },
       );
 
-      await _channel!.ready.timeout(
+      await channel.ready.timeout(
         const Duration(seconds: 10),
         onTimeout: () {
           throw TimeoutException('WebSocket connection timeout');
         },
       );
+      if (generation != _generation) return;
 
       _isConnected = true;
       _isConnecting = false;
@@ -210,12 +257,15 @@ class NotificationService extends ChangeNotifier {
 
       _safeNotifyListeners();
     } catch (e) {
+      if (generation != _generation) return;
       _isConnecting = false;
       _lastError = 'Connection failed: $e';
 
       _log.w('WebSocket connection failed: $e');
 
-      _channel?.sink.close();
+      _subscription?.cancel();
+      _subscription = null;
+      channel?.sink.close();
       _channel = null;
 
       if (_reconnectAttempts < _maxReconnectAttempts) {
@@ -231,11 +281,7 @@ class NotificationService extends ChangeNotifier {
   /// Terminates the WebSocket connection and disables automatic reconnection.
   void disconnect() {
     _shouldAutoReconnect = false;
-
-    if (_channel != null) {
-      _channel!.sink.close(status.normalClosure);
-      _channel = null;
-    }
+    _closeChannel();
 
     _isConnected = false;
     _isConnecting = false;
@@ -248,16 +294,25 @@ class NotificationService extends ChangeNotifier {
   /// Disables auto-reconnect to prevent background activity; [connect] re-enables it on resume.
   void suspend() {
     _log.d('NotificationService: suspended (app backgrounded)');
+    _suspended = true;
     _shouldAutoReconnect = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _reconnectAttempts = 0;
     _stopConnectionMonitoring();
-    _channel?.sink.close(status.normalClosure);
-    _channel = null;
+    _closeChannel();
     _isConnected = false;
     _isConnecting = false;
     _safeNotifyListeners();
+  }
+
+  /// Closes the socket on purpose and invalidates any [connect] in flight.
+  void _closeChannel() {
+    _generation++;
+    _subscription?.cancel();
+    _subscription = null;
+    _channel?.sink.close(status.normalClosure);
+    _channel = null;
   }
 
   /// Internal handler for incoming WebSocket messages.
@@ -338,6 +393,7 @@ class NotificationService extends ChangeNotifier {
 
     _isConnected = false;
     _channel = null;
+    _subscription = null;
     _stopConnectionMonitoring();
 
     _scheduleReconnect();
@@ -476,23 +532,20 @@ class NotificationService extends ChangeNotifier {
   /// Validates that the current user has the necessary credentials and plan
   /// level to access real-time notifications.
   bool _isUserAuthenticatedForNeoSync() {
-    if (_context == null) {
-      return false;
-    }
-
     try {
+      // Notifications are NeoSync-specific.
       final syncProvider = SyncManager.instance.active;
-      if (syncProvider == null || !syncProvider.isAuthenticated) {
+      if (syncProvider == null ||
+          syncProvider.providerId != NeoSyncAdapter.kProviderId ||
+          !syncProvider.isAuthenticated) {
         return false;
       }
 
-      final authService = Provider.of<AuthService>(_context!, listen: false);
-
-      if (!authService.isLoggedIn) {
+      if (!_authService.isLoggedIn) {
         return false;
       }
 
-      final user = authService.currentUser;
+      final user = _authService.currentUser;
       if (user == null || !user.emailVerified) {
         return false;
       }
@@ -510,6 +563,9 @@ class NotificationService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _authService.removeListener(_onAccountChanged);
+    SyncManager.instance.removeListener(_onAccountChanged);
     _shouldAutoReconnect = false;
     disconnect();
     _reconnectTimer?.cancel();

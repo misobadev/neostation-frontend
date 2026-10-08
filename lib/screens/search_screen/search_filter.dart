@@ -1,3 +1,4 @@
+import '../../utils/game_name_sort.dart';
 import 'package:neostation/models/database_game_model.dart';
 import 'package:neostation/models/romm_rom.dart';
 
@@ -226,13 +227,14 @@ bool matchesRemoteCriteria(RemoteGameFields g, SearchCriteria criteria) {
 /// name (realName, falling back to filename), case-insensitively.
 List<DatabaseGameModel> filterAndSortGames(
   Iterable<DatabaseGameModel> games,
-  SearchCriteria criteria,
-) {
+  SearchCriteria criteria, {
+  bool ignoreArticles = false,
+}) {
   return games.where((g) => matchesCriteria(g, criteria)).toList()
     ..sort((a, b) {
       final an = (a.realName ?? a.filename).toLowerCase();
       final bn = (b.realName ?? b.filename).toLowerCase();
-      return an.compareTo(bn);
+      return compareGameTitles(an, bn, ignoreArticles: ignoreArticles);
     });
 }
 

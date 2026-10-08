@@ -1,4 +1,5 @@
 import 'package:neostation/models/game_model.dart';
+import 'game_name_sort.dart';
 
 /// ES-DE style alphabetical "letter jump" helpers.
 ///
@@ -18,15 +19,20 @@ class LetterJump {
   /// The alphabetical bucket a [game] belongs to: its first character upper
   /// cased, with a leading English article ignored, and anything that isn't a
   /// letter or digit collapsed into [other].
-  static String letterFor(GameModel game) {
+  static String letterFor(GameModel game, {bool ignoreArticles = true}) {
     final displayName = game.name.isNotEmpty ? game.name : game.romname;
-    return letterForName(displayName);
+    return letterForName(displayName, ignoreArticles: ignoreArticles);
   }
 
   /// [letterFor] for a bare display name. Returns [other] for empty names.
-  static String letterForName(String displayName) {
-    var cleanName = displayName.trim().toUpperCase();
-    if (cleanName.startsWith('THE ')) cleanName = cleanName.substring(4).trim();
+  static String letterForName(
+    String displayName, {
+    bool ignoreArticles = true,
+  }) {
+    final cleanName = gameNameSortKey(
+      displayName,
+      ignoreArticles: ignoreArticles,
+    ).trim().toUpperCase();
     if (cleanName.isEmpty) return other;
 
     final firstChar = cleanName[0];

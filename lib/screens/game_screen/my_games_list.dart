@@ -103,6 +103,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
   // Dataset management.
   List<GameModel> _games = [];
+  bool _lastIgnoreArticles = false;
+
+  bool get _ignoreArticles => _configProvider.config.ignoreArticlesInGameSort;
+
+  int _compareGames(GameModel a, GameModel b) =>
+      _byFavouriteThenName(a, b, ignoreArticles: _ignoreArticles);
   Map<GameModel, int> _gameIndexMap = {};
   GameModel? _selectedGame;
 
@@ -203,6 +209,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
       games: _allGames,
       rootFolders: _subfolderRoots,
       currentRelPath: _currentRelPath,
+      ignoreArticles: _ignoreArticles,
     );
 
     final folders = <RomFolderEntry>[];
@@ -405,6 +412,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
     _configProvider = context.read<SqliteConfigProvider>();
     _configProvider.addListener(_onConfigChanged);
+    _lastIgnoreArticles = _ignoreArticles;
 
     _scrapingProvider = context.read<ScrapingProvider>();
     _lastArtworkRevision = _scrapingProvider.artworkRevision;
@@ -537,6 +545,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
   void _onConfigChanged() {
     if (!mounted) return;
     final configProvider = context.read<SqliteConfigProvider>();
+    if (_lastIgnoreArticles != _ignoreArticles) {
+      _lastIgnoreArticles = _ignoreArticles;
+      _loadGames();
+    }
     final newShowInfo = configProvider.config.showGameInfo;
     final gameViewMode = configProvider.config.gameViewMode;
     final gameListSize = configProvider.config.gameListSize;
@@ -698,7 +710,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
     // Resolve current alphabetical letter for navigation overlays. Folder rows
     // sit outside the alphabet, so they show no letter at all.
     final game = _games[newIndex];
-    final letter = _isFolderEntry(game) ? null : LetterJump.letterFor(game);
+    final letter = _isFolderEntry(game)
+        ? null
+        : LetterJump.letterFor(game, ignoreArticles: _ignoreArticles);
 
     setState(() {
       _selectedGameIndex = newIndex;
@@ -1730,6 +1744,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
       games: _allGames,
       rootFolders: _subfolderRoots,
       folderRelPath: folderRelPath,
+      ignoreArticles: _ignoreArticles,
     ).toList()..shuffle(Random(folderRelPath.hashCode));
     final covers = <File>[];
     for (final game in games) {

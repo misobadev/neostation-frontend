@@ -18,6 +18,9 @@ part 'app_locale_ja.dart';
 part 'app_locale_ko.dart';
 
 mixin AppLocale {
+  static const String ignoreArticlesInGameSort = 'ignoreArticlesInGameSort';
+  static const String ignoreArticlesInGameSortSubtitle =
+      'ignoreArticlesInGameSortSubtitle';
   // ---------------------------------------------------------------------------
   // Navigation / Controls
   // ---------------------------------------------------------------------------
@@ -383,7 +386,6 @@ mixin AppLocale {
   static const String specialThanks = 'special_thanks';
   static const String forInvaluableContributions =
       'for_invaluable_contributions';
-  static const String supportOnKofi = 'support_on_kofi';
   static const String supportOnPatreon = 'support_on_patreon';
   static const String openSourceLicense = 'open_source_license';
   static const String openSourceLicenseDesc = 'open_source_license_desc';

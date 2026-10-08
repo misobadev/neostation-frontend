@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
+import 'package:neostation/utils/gamepad_nav.dart';
 
 /// Welcome modal shown after a successful plan upgrade
 class PlanWelcomeModal extends StatefulWidget {
@@ -31,35 +33,61 @@ class PlanWelcomeModal extends StatefulWidget {
 class PlanWelcomeModalState extends State<PlanWelcomeModal> {
   late FocusNode _focusNode;
 
+  /// The modal can open over any screen, so it takes the controller with its
+  /// own navigation layer (A, B and Start close it) instead of leaving the
+  /// screen underneath to handle the buttons. Modal, so a screen that mounts
+  /// behind it can't take the controller back; per instance, as a welcome and
+  /// a farewell modal can be open together.
+  late final GamepadNavigation _gamepadNav;
+  late final String _layerId = 'plan_welcome_modal#${identityHashCode(this)}';
+  bool _closed = false;
+
   @override
   void initState() {
     super.initState();
     _focusNode = FocusNode();
+    _gamepadNav = GamepadNavigation(
+      onSelectItem: _handleClose,
+      onBack: _handleClose,
+      onSettings: _handleClose,
+    );
 
-    // Auto-focus to capture gamepad keys
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Keyboard focus for Space (see _handleKeyPress).
       _focusNode.requestFocus();
+      _gamepadNav.initialize();
+      GamepadNavigationManager.pushLayer(
+        _layerId,
+        onActivate: _gamepadNav.activate,
+        onDeactivate: _gamepadNav.deactivate,
+        modal: true,
+      );
     });
   }
 
   @override
   void dispose() {
+    GamepadNavigationManager.popLayer(_layerId);
+    _gamepadNav.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
   void _handleClose() {
+    // Two inputs can arrive for the same close, and after a barrier tap the
+    // layer stays registered until the exit animation ends: a press then must
+    // not pop the screen underneath.
+    if (_closed || ModalRoute.of(context)?.isCurrent != true) return;
+    _closed = true;
     widget.onClose?.call();
   }
 
   void _handleKeyPress(KeyEvent event) {
-    if (event is KeyDownEvent) {
-      // Escape, Enter, or Space to close
-      if (event.logicalKey == LogicalKeyboardKey.escape ||
-          event.logicalKey == LogicalKeyboardKey.enter ||
-          event.logicalKey == LogicalKeyboardKey.space) {
-        _handleClose();
-      }
+    // Space closes too; Enter, Backspace and Escape arrive through the
+    // navigation layer.
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.space) {
+      _handleClose();
     }
   }
 

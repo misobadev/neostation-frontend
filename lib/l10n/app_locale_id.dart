@@ -27,6 +27,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.rommDeleteKeepsSaves: 'Berkas simpanan game ini tetap ada di RomM.',
   AppLocale.rommDeleteKeepsStates:
       'Status simpanan game ini tetap ada di RomM.',
+  AppLocale.ignoreArticlesInGameSort: "Abaikan artikel saat mengurutkan game",
+  AppLocale.ignoreArticlesInGameSortSubtitle:
+      "Abaikan The, A, atau An di awal judul. Misalnya, The Legend of Zelda diurutkan di huruf L.",
   AppLocale.raEvents: 'Acara',
   AppLocale.raAotwYearTitle: 'Pencapaian Minggu Ini ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -391,7 +394,6 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.exportLogsFailed: 'Gagal mengekspor log',
   AppLocale.specialThanks: 'Terima Kasih Khusus',
   AppLocale.forInvaluableContributions: 'atas kontribusi yang sangat berharga',
-  AppLocale.supportOnKofi: 'Dukung kami di Ko-fi',
   AppLocale.supportOnPatreon: 'Dukung kami di Patreon',
   AppLocale.openSourceLicense: 'Proyek Sumber Terbuka',
   AppLocale.openSourceLicenseDesc: 'Dilisensikan di bawah GPLv3',

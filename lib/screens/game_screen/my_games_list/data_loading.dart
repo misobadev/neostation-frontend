@@ -132,7 +132,7 @@ extension _DataLoading on _SystemGamesListState {
       rebuild(() {
         _subfolderViewEnabled = subfolderView;
         _subfolderRoots = subfolderRoots;
-        _allGames = games;
+        _allGames = List<GameModel>.of(games)..sort(_compareGames);
         // A deep link (search "Go to game", the RA dashboard) names a rom path
         // that only exists in [_games] once ITS OWN folder level is built —
         // otherwise the lookup below misses and the user lands at the top of the

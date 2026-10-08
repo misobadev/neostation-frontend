@@ -64,6 +64,17 @@
       }
     },
     {
+      "name": "Standalone Eden Duo",
+      "unique_id": "switch.dev.igawa6.edenduo",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n dev.igawa6.edenduo/org.yuzu.yuzu_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d \"{file.uri}\""
+        }
+      }
+    },
+    {
       "name": "Standalone Eden Optimized",
       "unique_id": "switch.com.miHoYo.Yuanshen",
       "description": "Supported extensions: nro, nso, nca, xci, nsp.",

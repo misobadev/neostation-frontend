@@ -24,6 +24,9 @@ const Map<String, dynamic> appLocaleKo = {
       '{game}의 {files}가 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
   AppLocale.rommDeleteKeepsSaves: '이 게임의 세이브 파일은 RomM에 그대로 남습니다.',
   AppLocale.rommDeleteKeepsStates: '이 게임의 세이브 상태는 RomM에 그대로 남습니다.',
+  AppLocale.ignoreArticlesInGameSort: "게임 정렬 시 관사 무시",
+  AppLocale.ignoreArticlesInGameSortSubtitle:
+      "제목 앞의 The, A, An을 무시합니다. 예: The Legend of Zelda는 L로 정렬됩니다.",
   AppLocale.raEvents: '이벤트',
   AppLocale.raAotwYearTitle: '이번 주 업적 ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -341,7 +344,6 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.exportLogsFailed: '로그를 내보낼 수 없습니다',
   AppLocale.specialThanks: '특별 감사',
   AppLocale.forInvaluableContributions: '소중한 기여에 감사드립니다',
-  AppLocale.supportOnKofi: 'Ko-fi에서 후원하기',
   AppLocale.supportOnPatreon: 'Patreon에서 후원하기',
   AppLocale.openSourceLicense: '오픈 소스 프로젝트',
   AppLocale.openSourceLicenseDesc: 'GPLv3 라이선스 적용',

@@ -1,4 +1,5 @@
 import '../models/game_model.dart';
+import 'game_list_update.dart';
 
 /// Builds the in-memory folder hierarchy used by the subfolder ROM view.
 ///
@@ -60,6 +61,7 @@ List<RomListEntry> buildRomLevel({
   required List<GameModel> games,
   required List<String> rootFolders,
   String currentRelPath = '',
+  bool ignoreArticles = false,
 }) {
   final normalizedRoots = rootFolders.map(_normalize).toList();
   final prefix = _normalize(currentRelPath);
@@ -111,7 +113,7 @@ List<RomListEntry> buildRomLevel({
     final aFav = a.isFavorite == true;
     final bFav = b.isFavorite == true;
     if (aFav != bFav) return aFav ? -1 : 1;
-    return a.name.compareTo(b.name);
+    return compareGameNames(a, b, ignoreArticles: ignoreArticles);
   });
 
   return [...folders, ...directGames.map(RomGameEntry.new)];
@@ -127,6 +129,7 @@ List<GameModel> gamesUnderFolder({
   required List<String> rootFolders,
   required String folderRelPath,
   int? limit,
+  bool ignoreArticles = false,
 }) {
   final normalizedRoots = rootFolders.map(_normalize).toList();
   final prefix = _normalize(folderRelPath);
@@ -143,7 +146,7 @@ List<GameModel> gamesUnderFolder({
     final aFav = a.isFavorite == true;
     final bFav = b.isFavorite == true;
     if (aFav != bFav) return aFav ? -1 : 1;
-    return a.name.compareTo(b.name);
+    return compareGameNames(a, b, ignoreArticles: ignoreArticles);
   });
 
   if (limit != null && matched.length > limit) {

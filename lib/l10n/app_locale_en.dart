@@ -26,6 +26,9 @@ const Map<String, dynamic> appLocaleEn = {
       '{files} for {game} will be permanently deleted from your RomM server. Copies on your devices are kept, and any device that still syncs this game will upload its copies again.',
   AppLocale.rommDeleteKeepsSaves: "This game's save files stay on RomM.",
   AppLocale.rommDeleteKeepsStates: "This game's save states stay on RomM.",
+  AppLocale.ignoreArticlesInGameSort: "Ignore articles when sorting games",
+  AppLocale.ignoreArticlesInGameSortSubtitle:
+      "Sort by title without leading The, A, or An. For example, The Legend of Zelda sorts under L.",
   AppLocale.raEvents: 'Events',
   AppLocale.raAotwYearTitle: 'Achievement of the Week ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -389,7 +392,6 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.exportLogsFailed: 'Couldn\'t export the logs',
   AppLocale.specialThanks: 'Special Thanks',
   AppLocale.forInvaluableContributions: 'For invaluable contributions',
-  AppLocale.supportOnKofi: 'Support us on Ko-fi',
   AppLocale.supportOnPatreon: 'Support us on Patreon',
   AppLocale.openSourceLicense: 'Open Source Project',
   AppLocale.openSourceLicenseDesc: 'Licensed under GPLv3',

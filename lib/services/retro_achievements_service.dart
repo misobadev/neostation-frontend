@@ -95,6 +95,9 @@ class RetroAchievementsService {
   /// provider detects by the `(429)` in the thrown message) must reach the
   /// caller rather than being masked by stale data that looks live.
   ///
+  /// [normalizeResponse] recognizes endpoint-specific non-200 empty results.
+  /// Returning null preserves the normal HTTP failure handling.
+  ///
   /// [onMiss] produces the caller's normal "nothing here" result (return null,
   /// throw, etc.) and receives the status code when there was one, so error
   /// messages keep carrying it. A bounded [timeout] keeps an unreachable
@@ -104,6 +107,7 @@ class RetroAchievementsService {
     required Future<http.Response> Function() send,
     required T Function(dynamic decoded) parse,
     required T Function(int? statusCode) onMiss,
+    Object? Function(http.Response response)? normalizeResponse,
     Duration timeout = const Duration(seconds: 10),
   }) async {
     int? statusCode;
@@ -119,6 +123,10 @@ class RetroAchievementsService {
       statusCode = response.statusCode;
       if (statusCode == 200) {
         live = json.decode(response.body);
+        haveLive = true;
+      } else if ((live = normalizeResponse?.call(response)) != null) {
+        // Endpoint-specific empty results can be encoded as a non-200 reply.
+        // Store their normalized body as live data, replacing stale results.
         haveLive = true;
       } else if (statusCode < 500) {
         // Rate limiting, auth failures and not-found are real answers; let the
@@ -724,6 +732,7 @@ class RetroAchievementsService {
     );
 
     return _fetchWithCache<RaUserGameLeaderboardsPage>(
+      normalizeResponse: _emptyUserGameLeaderboardsResponse,
       cacheKey:
           'user_game_leaderboards_${username}_${gameId}_${effectiveCount}_$effectiveOffset',
       send: () => client == null
@@ -749,6 +758,25 @@ class RetroAchievementsService {
     'User-Agent': 'NeoStation/1.0',
     'Accept': 'application/json',
   };
+
+  /// RA uses 422 for these two ordinary empty-result cases as well as for
+  /// validation errors. Match the body explicitly so invalid requests, auth
+  /// failures, and rate limits still reach the caller as errors.
+  static Object? _emptyUserGameLeaderboardsResponse(http.Response response) {
+    if (response.statusCode != 422) return null;
+    try {
+      final decoded = json.decode(response.body);
+      if (decoded is List &&
+          decoded.length == 1 &&
+          (decoded.single == 'Game has no leaderboards' ||
+              decoded.single == 'User has no leaderboards on this game')) {
+        return const {'Count': 0, 'Total': 0, 'Results': <dynamic>[]};
+      }
+    } on FormatException {
+      // Malformed responses are genuine failures, not empty game results.
+    }
+    return null;
+  }
 
   /// Retrieves the list of site-wide awards earned by a user.
   static Future<Map<String, dynamic>?> getUserAwards(

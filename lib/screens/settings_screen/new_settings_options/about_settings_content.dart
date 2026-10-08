@@ -36,7 +36,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
 
   /// Keys used for calculating viewport alignment during navigation, one per
   /// card.
-  final List<GlobalKey> _itemKeys = List.generate(6, (_) => GlobalKey());
+  final List<GlobalKey> _itemKeys = List.generate(5, (_) => GlobalKey());
 
   String _appVersion = '';
   String _systemsVersion = '';
@@ -142,7 +142,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
   }
 
   int getItemCount() {
-    return 6;
+    return 5;
   }
 
   void selectItem(int index) {
@@ -151,18 +151,15 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
         _launchUrl('https://github.com/misobadev/neostation-frontend');
         break;
       case 1:
-        _launchUrl('https://ko-fi.com/neostation');
-        break;
-      case 2:
         _launchUrl('https://www.patreon.com/cw/NeoStation');
         break;
-      case 3:
+      case 2:
         _launchUrl('https://discord.gg/xE2kgKsRVq');
         break;
-      case 4:
+      case 3:
         _launchUrl('https://neostation.dev/');
         break;
-      case 5:
+      case 4:
         _exportLogs();
         break;
     }
@@ -251,10 +248,10 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                       SizedBox(height: 8.h),
                       _buildInfoCard(
                         cardKey: _itemKeys[1],
-                        icon: Symbols.coffee_rounded,
-                        title: AppLocale.supportOnKofi.getString(context),
-                        value: 'ko-fi.com/neostation',
-                        url: 'https://ko-fi.com/neostation',
+                        icon: Symbols.favorite_rounded,
+                        title: AppLocale.supportOnPatreon.getString(context),
+                        value: 'patreon.com/NeoStation',
+                        url: 'https://www.patreon.com/cw/NeoStation',
                         theme: theme,
                         isFocused:
                             widget.isContentFocused &&
@@ -263,10 +260,10 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                       SizedBox(height: 8.h),
                       _buildInfoCard(
                         cardKey: _itemKeys[2],
-                        icon: Symbols.favorite_rounded,
-                        title: AppLocale.supportOnPatreon.getString(context),
-                        value: 'patreon.com/NeoStation',
-                        url: 'https://www.patreon.com/cw/NeoStation',
+                        icon: Symbols.chat_bubble_outline_rounded,
+                        title: AppLocale.joinCommunity.getString(context),
+                        value: 'discord.gg/xE2kgKsRVq',
+                        url: 'https://discord.gg/xE2kgKsRVq',
                         theme: theme,
                         isFocused:
                             widget.isContentFocused &&
@@ -275,10 +272,10 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                       SizedBox(height: 8.h),
                       _buildInfoCard(
                         cardKey: _itemKeys[3],
-                        icon: Symbols.chat_bubble_outline_rounded,
-                        title: AppLocale.joinCommunity.getString(context),
-                        value: 'discord.gg/xE2kgKsRVq',
-                        url: 'https://discord.gg/xE2kgKsRVq',
+                        icon: Symbols.language_rounded,
+                        title: AppLocale.visitWebsite.getString(context),
+                        value: 'neostation.dev',
+                        url: 'https://neostation.dev/',
                         theme: theme,
                         isFocused:
                             widget.isContentFocused &&
@@ -287,18 +284,6 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                       SizedBox(height: 8.h),
                       _buildInfoCard(
                         cardKey: _itemKeys[4],
-                        icon: Symbols.language_rounded,
-                        title: AppLocale.visitWebsite.getString(context),
-                        value: 'neostation.dev',
-                        url: 'https://neostation.dev/',
-                        theme: theme,
-                        isFocused:
-                            widget.isContentFocused &&
-                            widget.selectedContentIndex == 4,
-                      ),
-                      SizedBox(height: 8.h),
-                      _buildInfoCard(
-                        cardKey: _itemKeys[5],
                         icon: Symbols.bug_report_rounded,
                         title: AppLocale.exportLogs.getString(context),
                         value: AppLocale.exportLogsDesc.getString(context),
@@ -309,7 +294,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                         theme: theme,
                         isFocused:
                             widget.isContentFocused &&
-                            widget.selectedContentIndex == 5,
+                            widget.selectedContentIndex == 4,
                       ),
                     ],
                   ),

@@ -626,8 +626,15 @@ class SqliteMigrations {
       case 163:
         await _migrateToVersion163(db);
         break;
+      case 164:
+        await _migrateToVersion164(db);
+        break;
       case 165:
         await _migrateToVersion165(db);
+        break;
+      case 166:
+        // Backfill for installs that reached v165 without this PR’s v164.
+        await _migrateToVersion164(db);
         break;
       default:
         _log.w('No migration defined for version $version');
@@ -7118,6 +7125,19 @@ class SqliteMigrations {
       db.execute(
         'ALTER TABLE user_config ADD COLUMN android_apps_as_tab '
         'INTEGER DEFAULT 0',
+      );
+    }
+  }
+
+  /// Migration v164: persists optional article-insensitive game sorting.
+  static Future<void> _migrateToVersion164(Database db) async {
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('ignore_articles_in_game_sort')) {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN ignore_articles_in_game_sort INTEGER DEFAULT 0',
       );
     }
   }

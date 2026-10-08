@@ -87,6 +87,10 @@ class RADashboardHub extends StatefulWidget {
 
 class RADashboardHubState extends State<RADashboardHub> {
   bool _requestedInitialLoad = false;
+  bool _previewsStacked = true;
+
+  /// Uses the actual card constraints so navigation follows the rendered layout.
+  bool get previewsStacked => _previewsStacked;
 
   /// Timer used to avoid starting heavy dashboard network loads when the user
   /// is just quickly passing through this tab.
@@ -358,6 +362,7 @@ class RADashboardHubState extends State<RADashboardHub> {
                         // .r here double-scales it and forces stacked mode on wide
                         // landscape screens, wasting the right half of every card.
                         final twoColumn = constraints.maxWidth >= 720;
+                        _previewsStacked = !twoColumn;
                         final weekCard = KeyedSubtree(
                           key: widget.aotwFocusKey,
                           child: _buildWeekCard(context, raProvider),

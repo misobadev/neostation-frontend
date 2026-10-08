@@ -223,6 +223,14 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Updates article handling for game title sorting.
+  Future<void> updateIgnoreArticlesInGameSort(bool value) async {
+    if (_config.ignoreArticlesInGameSort == value) return;
+    _config = _config.copyWith(ignoreArticlesInGameSort: value);
+    await SqliteConfigService.saveConfig(_config);
+    _notify();
+  }
+
   /// Updates whether hidden files/folders are ignored during ROM scans.
   Future<void> updateIgnoreHiddenFiles(bool ignoreHiddenFiles) async {
     _config = _config.copyWith(ignoreHiddenFiles: ignoreHiddenFiles);

@@ -48,6 +48,8 @@ class RetroAchievementsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    // In-flight session reads must not update or notify a disposed provider.
+    _sessionGeneration++;
     _disposed = true;
     GameSessionManager.removeSessionEndListener(invalidateCachedReads);
     super.dispose();
@@ -478,13 +480,14 @@ class RetroAchievementsProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
+      if (sessionGeneration != _sessionGeneration) return false;
       _error = _describeApiError(e, AppLocale.raErrorLoadSummary);
       _summaryLoaded = false;
       _log.e('$_error');
       notifyListeners();
       return false;
     } finally {
-      _setLoading(false);
+      if (sessionGeneration == _sessionGeneration) _setLoading(false);
     }
   }
 

@@ -984,7 +984,16 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider.value(value: widget.neoSyncProvider),
         ChangeNotifierProvider.value(value: SyncManager.instance),
         ChangeNotifierProvider(create: (context) => BillingService()),
-        ChangeNotifierProvider(create: (context) => NotificationService()),
+        ChangeNotifierProvider(
+          // Eager: the socket has to open at startup for a signed-in user, not
+          // when some screen first reads the service.
+          lazy: false,
+          create: (context) => NotificationService(
+            authService: widget.authService,
+            neoSyncProvider: widget.neoSyncProvider,
+            modalContext: () => rootNavigatorKey.currentContext,
+          ),
+        ),
         ChangeNotifierProvider.value(value: widget.themeProvider),
         ChangeNotifierProvider(create: (context) => ScrapingProvider()),
         ChangeNotifierProvider(

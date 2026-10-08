@@ -144,7 +144,10 @@ extension _GamepadNav on _SystemGamesListState {
       // name's initial as its own alphabet boundary.
       letterAt: (index) => index < _folderCount
           ? _SystemGamesListState._folderJumpGroup
-          : LetterJump.letterFor(_games[index]),
+          : LetterJump.letterFor(
+              _games[index],
+              ignoreArticles: _ignoreArticles,
+            ),
     );
     if (target == null) return false;
 

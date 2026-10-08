@@ -1,4 +1,5 @@
 import '../models/game_model.dart';
+import 'game_name_sort.dart';
 
 /// Returns a new games list with [updatedGame] replacing the matching ROM.
 ///
@@ -18,8 +19,8 @@ List<GameModel> replaceGameInList(
 /// The load order's name rule: display name folded to lower case, matching
 /// `ORDER BY LOWER(game_display_name) ASC`. Kept here so the re-seat below and
 /// the list's own favourites-first comparator cannot disagree about it.
-int compareGameNames(GameModel a, GameModel b) =>
-    a.name.toLowerCase().compareTo(b.name.toLowerCase());
+int compareGameNames(GameModel a, GameModel b, {bool ignoreArticles = false}) =>
+    compareGameTitles(a.name, b.name, ignoreArticles: ignoreArticles);
 
 /// Returns a new list with [romname] moved out of the favourites block at the
 /// front and back to its alphabetical place among the rest.
@@ -37,7 +38,11 @@ int compareGameNames(GameModel a, GameModel b) =>
 ///
 /// The list is returned unchanged (same identity) when there is nothing to do:
 /// no such ROM, still flagged a favourite, or already in its place.
-List<GameModel> reseatUnfavoritedGame(List<GameModel> games, String romname) {
+List<GameModel> reseatUnfavoritedGame(
+  List<GameModel> games,
+  String romname, {
+  bool ignoreArticles = false,
+}) {
   final from = games.indexWhere((game) => game.romname == romname);
   if (from == -1) return games;
 
@@ -50,7 +55,9 @@ List<GameModel> reseatUnfavoritedGame(List<GameModel> games, String romname) {
   while (to < reseated.length && reseated[to].isFavorite == true) {
     to++;
   }
-  while (to < reseated.length && compareGameNames(reseated[to], game) < 0) {
+  while (to < reseated.length &&
+      compareGameNames(reseated[to], game, ignoreArticles: ignoreArticles) <
+          0) {
     to++;
   }
   if (to == from) return games;

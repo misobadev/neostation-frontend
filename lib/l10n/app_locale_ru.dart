@@ -27,6 +27,9 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.rommDeleteKeepsSaves:
       'Файлы сохранения этой игры останутся в RomM.',
   AppLocale.rommDeleteKeepsStates: 'Состояния этой игры останутся в RomM.',
+  AppLocale.ignoreArticlesInGameSort: "Игнорировать артикли при сортировке игр",
+  AppLocale.ignoreArticlesInGameSortSubtitle:
+      "Пропускать The, A и An в начале названия. Например, The Legend of Zelda сортируется под буквой L.",
   AppLocale.raEvents: 'События',
   AppLocale.raAotwYearTitle: 'Достижение недели ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -398,7 +401,6 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.exportLogsFailed: 'Не удалось экспортировать журналы',
   AppLocale.specialThanks: 'Особая благодарность',
   AppLocale.forInvaluableContributions: 'За неоценимый вклад',
-  AppLocale.supportOnKofi: 'Поддержите нас на Ko-fi',
   AppLocale.supportOnPatreon: 'Поддержите нас на Patreon',
   AppLocale.openSourceLicense: 'Проект с открытым исходным кодом',
   AppLocale.openSourceLicenseDesc: 'Лицензия GPLv3',

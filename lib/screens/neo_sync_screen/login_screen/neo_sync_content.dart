@@ -9,7 +9,6 @@ import 'package:neostation/widgets/custom_notification.dart' as custom;
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/widgets/auth_form.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
-import 'package:neostation/services/notification_service.dart';
 import 'package:neostation/services/neosync/billing_service.dart';
 import 'package:neostation/models/billing_models.dart';
 import 'package:neostation/models/neo_sync_models.dart';
@@ -369,12 +368,6 @@ class NeoSyncContentState extends State<NeoSyncContent>
 
   @override
   Widget build(BuildContext context) {
-    final notificationService = Provider.of<NotificationService>(
-      context,
-      listen: false,
-    );
-    notificationService.setContext(context);
-
     return Consumer<AuthService>(
       builder: (context, authService, child) {
         if (authService.isLoggedIn &&

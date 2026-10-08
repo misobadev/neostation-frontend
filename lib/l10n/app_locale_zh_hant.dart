@@ -23,6 +23,9 @@ const Map<String, dynamic> appLocaleZhHant = {
       '{game} 的 {files}將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
   AppLocale.rommDeleteKeepsSaves: '此遊戲的存檔檔案會保留在 RomM 上。',
   AppLocale.rommDeleteKeepsStates: '此遊戲的即時存檔會保留在 RomM 上。',
+  AppLocale.ignoreArticlesInGameSort: "排序遊戲時忽略冠詞",
+  AppLocale.ignoreArticlesInGameSortSubtitle:
+      "忽略標題開頭的 The、A 或 An。例如，The Legend of Zelda 排在 L 下。",
   AppLocale.raEvents: '活動',
   AppLocale.raAotwYearTitle: '本週成就（{year}）',
   AppLocale.raAotw: 'AOTW',
@@ -331,7 +334,6 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.exportLogsFailed: '無法匯出日誌',
   AppLocale.specialThanks: '特別感謝',
   AppLocale.forInvaluableContributions: '感謝其寶貴的貢獻',
-  AppLocale.supportOnKofi: '在 Ko-fi 上支持我們',
   AppLocale.supportOnPatreon: '在 Patreon 上支持我們',
   AppLocale.openSourceLicense: '開源專案',
   AppLocale.openSourceLicenseDesc: '基於 GPLv3 許可',

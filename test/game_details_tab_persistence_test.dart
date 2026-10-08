@@ -36,6 +36,14 @@ void main() {
       expect(ConfigModel.fromJson({}).gameDetailsTab, 'wheel');
     });
 
+    test('removed leaderboard preference falls back to the wheel', () {
+      final resolved = DetailTab.values.firstWhere(
+        (tab) => tab.name == 'leaderboards',
+        orElse: () => DetailTab.wheel,
+      );
+      expect(resolved, DetailTab.wheel);
+    });
+
     test('stored names line up with the DetailTab enum', () {
       // The column holds enum names, so every tab must survive a lookup.
       for (final tab in DetailTab.values) {

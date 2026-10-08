@@ -23,6 +23,9 @@ const Map<String, dynamic> appLocaleJa = {
       '{game} の{files}をRomMサーバーから完全に削除します。デバイス上のコピーは残り、このゲームの同期を続けているデバイスからは再びアップロードされます。',
   AppLocale.rommDeleteKeepsSaves: 'このゲームのセーブデータはRomMに残ります。',
   AppLocale.rommDeleteKeepsStates: 'このゲームのセーブステートはRomMに残ります。',
+  AppLocale.ignoreArticlesInGameSort: "ゲームの並び替えで冠詞を無視",
+  AppLocale.ignoreArticlesInGameSortSubtitle:
+      "タイトル先頭の The、A、An を無視します。例：The Legend of Zelda は L に分類されます。",
   AppLocale.raEvents: 'イベント',
   AppLocale.raAotwYearTitle: '今週のアチーブメント（{year}）',
   AppLocale.raAotw: 'AOTW',
@@ -342,7 +345,6 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.exportLogsFailed: 'ログをエクスポートできませんでした',
   AppLocale.specialThanks: '特別な感謝',
   AppLocale.forInvaluableContributions: '貴重な貢献に感謝します',
-  AppLocale.supportOnKofi: 'Ko-fiでサポート',
   AppLocale.supportOnPatreon: 'Patreonでサポート',
   AppLocale.openSourceLicense: 'オープンソースプロジェクト',
   AppLocale.openSourceLicenseDesc: 'GPLv3ライセンス',

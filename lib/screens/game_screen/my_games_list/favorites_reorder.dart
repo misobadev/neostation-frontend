@@ -153,7 +153,11 @@ extension _FavoritesReorder on _SystemGamesListState {
     // Same identity back means there was nothing to do: no such ROM, re-marked
     // before the flush reached it (a toggle and its undo inside one visit to
     // the menu), or already in its place.
-    final reseated = reseatUnfavoritedGame(_allGames, romname);
+    final reseated = reseatUnfavoritedGame(
+      _allGames,
+      romname,
+      ignoreArticles: _ignoreArticles,
+    );
     if (identical(reseated, _allGames)) return;
 
     final anchorIndex = _selectedGameIndex;
@@ -209,7 +213,7 @@ extension _FavoritesReorder on _SystemGamesListState {
     }
 
     rebuild(() {
-      _games = List<GameModel>.from(_games)..sort(_byFavouriteThenName);
+      _games = List<GameModel>.from(_games)..sort(_compareGames);
       _gameIndexMap = {for (int i = 0; i < _games.length; i++) _games[i]: i};
 
       final newIndex = _games.indexWhere((g) => g.romname == romname);
@@ -239,9 +243,13 @@ extension _FavoritesReorder on _SystemGamesListState {
 /// Only the post-scrape reorder uses this now. A favourite toggle deliberately
 /// leaves the loaded order alone — see [_FavoritesReorder]'s
 /// `_applyFavoriteToLoadedList`.
-int _byFavouriteThenName(GameModel a, GameModel b) {
+int _byFavouriteThenName(
+  GameModel a,
+  GameModel b, {
+  bool ignoreArticles = false,
+}) {
   final bool aFavourite = a.isFavorite == true;
   final bool bFavourite = b.isFavorite == true;
   if (aFavourite != bFavourite) return aFavourite ? -1 : 1;
-  return compareGameNames(a, b);
+  return compareGameNames(a, b, ignoreArticles: ignoreArticles);
 }

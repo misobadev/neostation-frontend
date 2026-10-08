@@ -368,7 +368,14 @@ class _SearchScreenState extends State<SearchScreen> {
 
     _criteria = criteria;
     _results = criteria.includesLocal
-        ? filterAndSortGames(_all, criteria)
+        ? filterAndSortGames(
+            _all,
+            criteria,
+            ignoreArticles: context
+                .read<SqliteConfigProvider>()
+                .config
+                .ignoreArticlesInGameSort,
+          )
         : const [];
     _rebuildRows();
 

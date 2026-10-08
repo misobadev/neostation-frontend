@@ -28,6 +28,9 @@ const Map<String, dynamic> appLocaleEs = {
       'Las partidas guardadas de este juego se mantienen en RomM.',
   AppLocale.rommDeleteKeepsStates:
       'Los estados guardados de este juego se mantienen en RomM.',
+  AppLocale.ignoreArticlesInGameSort: "Ignorar artículos al ordenar juegos",
+  AppLocale.ignoreArticlesInGameSortSubtitle:
+      "Ignorar The, A y An al inicio. Por ejemplo, The Legend of Zelda se ordena en la L.",
   AppLocale.raEvents: 'Eventos',
   AppLocale.raAotwYearTitle: 'Logro de la semana ({year})',
   AppLocale.raAotw: 'AOTW',
@@ -405,7 +408,6 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.exportLogsFailed: 'No se pudieron exportar los registros',
   AppLocale.specialThanks: 'Agradecimientos Especiales',
   AppLocale.forInvaluableContributions: 'Por sus invaluables contribuciones',
-  AppLocale.supportOnKofi: 'Apóyanos en Ko-fi',
   AppLocale.supportOnPatreon: 'Apóyanos en Patreon',
   AppLocale.openSourceLicense: 'Proyecto de Código Abierto',
   AppLocale.openSourceLicenseDesc: 'Licenciado bajo GPLv3',

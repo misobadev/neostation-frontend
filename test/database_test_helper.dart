@@ -119,6 +119,7 @@ class DatabaseTestHelper {
         bartop_exit_poweroff INTEGER DEFAULT 0,
         scan_on_startup INTEGER DEFAULT 1,
         ignore_hidden_files INTEGER DEFAULT 1,
+        ignore_articles_in_game_sort INTEGER DEFAULT 0,
         setup_completed INTEGER DEFAULT 0,
         hide_bottom_screen INTEGER DEFAULT 0,
         sfx_enabled INTEGER DEFAULT 1,

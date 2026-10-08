@@ -55,127 +55,135 @@ class _ThemeCardState extends State<ThemeCard> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 16:9 App Mockup Container
-        AspectRatio(
-          aspectRatio: 4 / 3,
-          child: Container(
-            margin: EdgeInsets.symmetric(vertical: 4.h),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8.r),
-              border: Border.all(
-                color: widget.isFocused
-                    ? theme.colorScheme.primary
-                    : Colors.transparent,
-                width: 2.r,
-              ),
-              boxShadow: widget.isFocused
-                  ? [
-                      BoxShadow(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                        blurRadius: 8.r,
-                        spreadRadius: 1.r,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(6.r),
-              child: Stack(
-                children: [
-                  // 1. App Mockup
-                  Positioned.fill(
-                    child: Builder(
-                      builder: (context) {
-                        ThemeData themeData;
-                        if (widget.themeName == 'system') {
-                          final brightness = WidgetsBinding
-                              .instance
-                              .platformDispatcher
-                              .platformBrightness;
-                          themeData = AppThemes.getThemeDataByName(
-                            brightness == Brightness.dark ? 'dark' : 'light',
-                          );
-                        } else {
-                          themeData = AppThemes.getThemeDataByName(
-                            widget.themeName,
-                          );
-                        }
-
-                        return CustomPaint(
-                          painter: _AppMockupPainter(
-                            surface: themeData.colorScheme.surface,
-                            primary: themeData.colorScheme.primary,
-                            secondary: themeData.colorScheme.secondary,
+        // 4:3 app mockup. The grid sizes its cells from their width alone,
+        // while the caption below follows the screen scale and text size, so
+        // the preview takes the height the caption leaves (Flexible) and keeps
+        // its shape by narrowing, instead of pushing the caption out of the
+        // cell.
+        Flexible(
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
+            child: Container(
+              margin: EdgeInsets.symmetric(vertical: 4.h),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(
+                  color: widget.isFocused
+                      ? theme.colorScheme.primary
+                      : Colors.transparent,
+                  width: 2.r,
+                ),
+                boxShadow: widget.isFocused
+                    ? [
+                        BoxShadow(
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.3,
                           ),
-                        );
-                      },
-                    ),
-                  ),
+                          blurRadius: 8.r,
+                          spreadRadius: 1.r,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6.r),
+                child: Stack(
+                  children: [
+                    // 1. App Mockup
+                    Positioned.fill(
+                      child: Builder(
+                        builder: (context) {
+                          ThemeData themeData;
+                          if (widget.themeName == 'system') {
+                            final brightness = WidgetsBinding
+                                .instance
+                                .platformDispatcher
+                                .platformBrightness;
+                            themeData = AppThemes.getThemeDataByName(
+                              brightness == Brightness.dark ? 'dark' : 'light',
+                            );
+                          } else {
+                            themeData = AppThemes.getThemeDataByName(
+                              widget.themeName,
+                            );
+                          }
 
-                  // Selection indicator: centered checkmark, only when selected
-                  if (widget.isSelected)
-                    Center(
-                      child: Container(
-                        width: 36.r,
-                        height: 36.r,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.greenAccent,
-                        ),
-                        child: Icon(
-                          Symbols.check_rounded,
-                          color: Colors.black,
-                          size: 24.r,
-                        ),
-                      ),
-                    ),
-                  // 5. InkWell Layer
-                  Positioned.fill(
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        canRequestFocus: false,
-                        focusColor: Colors.transparent,
-                        hoverColor: Colors.transparent,
-                        highlightColor: Colors.transparent,
-                        splashColor: Colors.transparent,
-                        focusNode: _focusNode,
-                        onTap: () {
-                          SfxService().playEnterSound();
-                          widget.onTap?.call();
+                          return CustomPaint(
+                            painter: _AppMockupPainter(
+                              surface: themeData.colorScheme.surface,
+                              primary: themeData.colorScheme.primary,
+                              secondary: themeData.colorScheme.secondary,
+                            ),
+                          );
                         },
-                        onLongPress: widget.onLongPress,
                       ),
                     ),
-                  ),
-                  // Delete badge for imported themes (on top of the InkWell so
-                  // it receives its own taps).
-                  if (widget.onDelete != null)
-                    Positioned(
-                      top: 4.r,
-                      right: 4.r,
+
+                    // Selection indicator: centered checkmark, only when selected
+                    if (widget.isSelected)
+                      Center(
+                        child: Container(
+                          width: 36.r,
+                          height: 36.r,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.greenAccent,
+                          ),
+                          child: Icon(
+                            Symbols.check_rounded,
+                            color: Colors.black,
+                            size: 24.r,
+                          ),
+                        ),
+                      ),
+                    // 5. InkWell Layer
+                    Positioned.fill(
                       child: Material(
-                        color: Colors.black.withValues(alpha: 0.55),
-                        shape: const CircleBorder(),
-                        clipBehavior: Clip.antiAlias,
+                        color: Colors.transparent,
                         child: InkWell(
                           canRequestFocus: false,
+                          focusColor: Colors.transparent,
+                          hoverColor: Colors.transparent,
+                          highlightColor: Colors.transparent,
+                          splashColor: Colors.transparent,
+                          focusNode: _focusNode,
                           onTap: () {
                             SfxService().playEnterSound();
-                            widget.onDelete!.call();
+                            widget.onTap?.call();
                           },
-                          child: Padding(
-                            padding: EdgeInsets.all(3.r),
-                            child: Icon(
-                              Symbols.close_rounded,
-                              color: Colors.white,
-                              size: 16.r,
+                          onLongPress: widget.onLongPress,
+                        ),
+                      ),
+                    ),
+                    // Delete badge for imported themes (on top of the InkWell so
+                    // it receives its own taps).
+                    if (widget.onDelete != null)
+                      Positioned(
+                        top: 4.r,
+                        right: 4.r,
+                        child: Material(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          shape: const CircleBorder(),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            canRequestFocus: false,
+                            onTap: () {
+                              SfxService().playEnterSound();
+                              widget.onDelete!.call();
+                            },
+                            child: Padding(
+                              padding: EdgeInsets.all(3.r),
+                              child: Icon(
+                                Symbols.close_rounded,
+                                color: Colors.white,
+                                size: 16.r,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -389,46 +397,51 @@ class ImportThemeCard extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AspectRatio(
-          aspectRatio: 4 / 3,
-          child: Container(
-            margin: EdgeInsets.symmetric(vertical: 4.h),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(8.r),
-              border: Border.all(
-                color: isFocused
-                    ? accent
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.25),
-                width: 2.r,
+        // Gives way to the caption like [ThemeCard]'s preview.
+        Flexible(
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
+            child: Container(
+              margin: EdgeInsets.symmetric(vertical: 4.h),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(
+                  color: isFocused
+                      ? accent
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.25),
+                  width: 2.r,
+                ),
+                boxShadow: isFocused
+                    ? [
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.3),
+                          blurRadius: 8.r,
+                          spreadRadius: 1.r,
+                        ),
+                      ]
+                    : null,
               ),
-              boxShadow: isFocused
-                  ? [
-                      BoxShadow(
-                        color: accent.withValues(alpha: 0.3),
-                        blurRadius: 8.r,
-                        spreadRadius: 1.r,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6.r),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    canRequestFocus: false,
+                    onTap: () {
+                      SfxService().playEnterSound();
+                      onTap?.call();
+                    },
+                    child: Center(
+                      child: Icon(
+                        Symbols.add_rounded,
+                        color: isFocused
+                            ? accent
+                            : theme.colorScheme.onSurface.withValues(
+                                alpha: 0.6,
+                              ),
+                        size: 32.r,
                       ),
-                    ]
-                  : null,
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(6.r),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  canRequestFocus: false,
-                  onTap: () {
-                    SfxService().playEnterSound();
-                    onTap?.call();
-                  },
-                  child: Center(
-                    child: Icon(
-                      Symbols.add_rounded,
-                      color: isFocused
-                          ? accent
-                          : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                      size: 32.r,
                     ),
                   ),
                 ),
