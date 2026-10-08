@@ -311,7 +311,7 @@ class _SystemCardState extends State<SystemCard> {
               child: Padding(
                 padding: EdgeInsets.only(
                   top: 4.r,
-                  bottom: 0.r,
+                  bottom: hideSystemLogos && !widget.info.isGame ? 4.r : 0.r,
                   left: 4.r,
                   right: 4.r,
                 ),

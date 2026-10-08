@@ -3,6 +3,7 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/models/config_model.dart';
 import 'package:neostation/models/my_systems.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
@@ -34,10 +35,13 @@ void main() {
     SystemInfo info, {
     VoidCallback? onLongPress,
     bool showCount = true,
+    bool hideSystemLogos = false,
   }) => MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => NeoAssetsProvider()),
-      ChangeNotifierProvider(create: (_) => SqliteConfigProvider()),
+      ChangeNotifierProvider<SqliteConfigProvider>(
+        create: (_) => _CardConfig(hideSystemLogos),
+      ),
     ],
     child: ScreenUtilInit(
       designSize: const Size(1280, 720),
@@ -52,7 +56,7 @@ void main() {
           body: Center(
             child: SizedBox(
               width: 220,
-              height: 260,
+              height: hideSystemLogos ? 220 : 260,
               child: SystemCard(
                 info: info,
                 onLongPress: onLongPress,
@@ -78,6 +82,28 @@ void main() {
   );
 
   group('SystemCard count', () {
+    testWidgets('hidden logos keep equal artwork insets and square artwork', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        host(system(folderName: 'nes', count: 12), hideSystemLogos: true),
+      );
+      await tester.pump();
+
+      final card = tester.getRect(find.byType(InkWell).first);
+      final artwork = tester.getRect(
+        find
+            .ancestor(of: find.text('12 GAMES'), matching: find.byType(Stack))
+            .first,
+      );
+      final inset = artwork.left - card.left;
+      expect(inset, greaterThan(0));
+      expect(card.right - artwork.right, closeTo(inset, 0.001));
+      expect(artwork.top - card.top, closeTo(inset, 0.001));
+      expect(card.bottom - artwork.bottom, closeTo(inset, 0.001));
+      expect(artwork.height, closeTo(artwork.width, 0.001));
+    });
+
     testWidgets('a system card names its game count', (tester) async {
       await tester.pumpWidget(host(system(folderName: 'nes', count: 12)));
       await tester.pump();
@@ -205,4 +231,13 @@ void main() {
       expect(inkWell.onLongPress, isNull);
     });
   });
+}
+
+class _CardConfig extends SqliteConfigProvider {
+  _CardConfig(this.hideLogos);
+
+  final bool hideLogos;
+
+  @override
+  ConfigModel get config => super.config.copyWith(hideSystemLogos: hideLogos);
 }
