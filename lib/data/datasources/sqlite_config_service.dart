@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:neostation/constants/recent_card_sizes.dart';
+import 'package:neostation/services/saf_directory_service.dart';
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
 import '../../models/config_model.dart';
@@ -41,6 +42,13 @@ class SqliteConfigService {
     }
 
     try {
+      if (systemId == 'ps3') {
+        return (await scanPs3Path(
+          directoryPath,
+          validExtensions,
+          recursive,
+        )).length;
+      }
       final directory = Directory(directoryPath);
       final files = await directory
           .list(recursive: recursive, followLinks: false)
@@ -64,6 +72,102 @@ class SqliteConfigService {
       _log.e('Error counting ROMs in $directoryPath: $e');
       return 0;
     }
+  }
+
+  /// Lists PS3 disc folders as single games while retaining ordinary ROM files.
+  ///
+  /// A folder is a game when it contains `PS3_GAME/PARAM.SFO`. Recognised game
+  /// folders are not traversed, so files below `PS3_GAME` and `PS3_UPDATE` are
+  /// never reported as separate games.
+  static Future<List<({String path, String filename, int size})>> scanPs3Path(
+    String root,
+    Set<String> extensions,
+    bool recursive, {
+    bool useSaf = false,
+    bool ignoreHiddenFiles = true,
+  }) async {
+    final entries = <({String path, String filename, int size})>[];
+
+    Future<List<Map<String, dynamic>>> children(String location) async {
+      if (useSaf) {
+        return SafDirectoryService.listFiles(location);
+      }
+      return [
+        await for (final entity in Directory(location).list(followLinks: false))
+          if (entity is File || entity is Directory)
+            {
+              'name': path.basename(entity.path),
+              'uri': entity.path,
+              'isDirectory': entity is Directory,
+            },
+      ];
+    }
+
+    Future<bool> isGame(List<Map<String, dynamic>> items) async {
+      for (final item in items) {
+        if (item['isDirectory'] != true ||
+            item['name'].toString().toUpperCase() != 'PS3_GAME') {
+          continue;
+        }
+        final gameItems = await children(item['uri'].toString());
+        if (gameItems.any(
+          (child) =>
+              child['isDirectory'] != true &&
+              child['name'].toString().toUpperCase() == 'PARAM.SFO',
+        )) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    Future<void> visit(String location, String name, bool isRoot) async {
+      final items = await children(location);
+      if (await isGame(items)) {
+        entries.add((path: location, filename: name, size: 0));
+        return;
+      }
+      for (final item in items) {
+        final childName = item['name'].toString();
+        final trimmedName = childName.trim();
+        if (ignoreHiddenFiles &&
+            trimmedName.isNotEmpty &&
+            trimmedName.startsWith('.')) {
+          continue;
+        }
+        final childPath = item['uri'].toString();
+        if (item['isDirectory'] == true) {
+          final upperName = childName.toUpperCase();
+          if (upperName == 'PS3_UPDATE' || upperName == 'PS3_GAME') {
+            continue;
+          }
+          if (recursive) {
+            await visit(childPath, childName, false);
+          } else if (isRoot && await isGame(await children(childPath))) {
+            entries.add((path: childPath, filename: childName, size: 0));
+          }
+        } else {
+          final extension = path
+              .extension(childName)
+              .toLowerCase()
+              .replaceAll('.', '');
+          if (extensions.contains(extension)) {
+            final size = useSaf
+                ? (item['size'] as num?)?.toInt() ?? 0
+                : await File(childPath).length();
+            entries.add((path: childPath, filename: childName, size: size));
+          }
+        }
+      }
+    }
+
+    try {
+      await visit(root, path.basename(root), true);
+    } catch (error) {
+      _log.e('Error scanning PS3 folders: $error');
+      rethrow;
+    }
+    return entries;
   }
 
   /// Retrieves the platform-specific user data directory path.
