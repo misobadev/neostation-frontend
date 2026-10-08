@@ -418,7 +418,6 @@ mixin AppLocale {
   // ---------------------------------------------------------------------------
   // NeoSync
   // ---------------------------------------------------------------------------
-  static const String neoSync = 'neo_sync';
   static const String neoSyncLogin = 'neo_sync_login';
   static const String neoSyncSynchronizing = 'neo_sync_synchronizing';
   static const String neoSyncNotConnected = 'neo_sync_not_connected';
@@ -1466,6 +1465,29 @@ mixin AppLocale {
   static const String rommLinkFailed = 'romm_link_failed';
   static const String rommUnlinked = 'romm_unlinked';
   static const String rommUnlinkFailed = 'romm_unlink_failed';
+
+  // RomM saves (Saves tab)
+  static const String rommSavesAutoDownload = 'romm_saves_auto_download';
+  static const String rommSaveFile = 'romm_save_file';
+  static const String rommSaveState = 'romm_save_state';
+  static const String rommRetryUploads = 'romm_retry_uploads';
+  static const String rommUploadsFailed = 'romm_uploads_failed';
+  static const String rommSavesHelp = 'romm_saves_help';
+  static const String rommDeleteTitle = 'romm_delete_title';
+  static const String rommDeleteConfirm = 'romm_delete_confirm';
+  static const String rommDeleted = 'romm_deleted';
+  static const String rommDeleteFailed = 'romm_delete_failed';
+  // Deleting a whole game from the game list. Counts follow the singular/plural
+  // pattern described at gamesCount; use lib/utils/count_label.dart.
+  static const String rommSaveFileCount = 'romm_save_file_count';
+  static const String rommSaveFilesCount = 'romm_save_files_count';
+  static const String rommSaveStateCount = 'romm_save_state_count';
+  static const String rommSaveStatesCount = 'romm_save_states_count';
+  static const String rommDeleteGameBothConfirm =
+      'romm_delete_game_both_confirm';
+  static const String rommDeleteGameConfirm = 'romm_delete_game_confirm';
+  static const String rommDeleteKeepsSaves = 'romm_delete_keeps_saves';
+  static const String rommDeleteKeepsStates = 'romm_delete_keeps_states';
 
   // Link action on search results
   static const String searchLinkToRomm = 'search_link_to_romm';

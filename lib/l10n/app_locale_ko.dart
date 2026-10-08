@@ -1,6 +1,29 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleKo = {
+  AppLocale.rommSavesAutoDownload: '연결된 게임을 실행하면 최신 클라우드 저장 데이터를 다운로드합니다.',
+  AppLocale.rommSaveFile: '세이브 파일',
+  AppLocale.rommSaveState: '세이브 상태',
+  AppLocale.rommRetryUploads: '업로드 재시도',
+  AppLocale.rommUploadsFailed: '일부 업로드에 실패했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',
+  AppLocale.rommSavesHelp:
+      'RomM 저장 파일과 상태를 확인합니다. 업로드 재시도는 동기화가 활성화된 RomM 연결 로컬 게임을 확인합니다. 최신 원격 저장 파일은 게임 시작 시 다운로드됩니다.',
+  AppLocale.rommDeleteTitle: 'RomM에서 삭제',
+  AppLocale.rommDeleteConfirm:
+      '{file} 파일이 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
+  AppLocale.rommDeleted: 'RomM에서 삭제했습니다.',
+  AppLocale.rommDeleteFailed:
+      'RomM에서 삭제하지 못했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',
+  AppLocale.rommSaveFileCount: '세이브 파일 {count}개',
+  AppLocale.rommSaveFilesCount: '세이브 파일 {count}개',
+  AppLocale.rommSaveStateCount: '세이브 상태 {count}개',
+  AppLocale.rommSaveStatesCount: '세이브 상태 {count}개',
+  AppLocale.rommDeleteGameBothConfirm:
+      '{game}의 {saves}와 {states}가 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
+  AppLocale.rommDeleteGameConfirm:
+      '{game}의 {files}가 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
+  AppLocale.rommDeleteKeepsSaves: '이 게임의 세이브 파일은 RomM에 그대로 남습니다.',
+  AppLocale.rommDeleteKeepsStates: '이 게임의 세이브 상태는 RomM에 그대로 남습니다.',
   AppLocale.ignoreArticlesInGameSort: "게임 정렬 시 관사 무시",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "제목 앞의 The, A, An을 무시합니다. 예: The Legend of Zelda는 L로 정렬됩니다.",
@@ -219,8 +242,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.bartopShutdown: '종료할 때 BarTOP 전원 끄기',
   AppLocale.bartopShutdownSubtitle: '앱을 종료할 때 컴퓨터도 함께 종료합니다',
 
-  AppLocale.showSyncTab: 'NeoSync 탭 표시',
-  AppLocale.showSyncTabSubtitle: '내비게이션 바에 NeoSync 탭을 표시합니다',
+  AppLocale.showSyncTab: '저장 탭 표시',
+  AppLocale.showSyncTabSubtitle: '탐색 모음에 저장 탭 표시',
   AppLocale.showAchievementsTab: '업적 탭 표시',
   AppLocale.showAchievementsTabSubtitle: '내비게이션 바에 RetroAchievements 탭을 표시합니다',
   AppLocale.showRommTab: 'RomM 탭 표시',
@@ -343,7 +366,6 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.scrapingUnavailableAndroid: 'Android 앱은 게임 정보 가져오기를 지원하지 않습니다.',
   AppLocale.achievements: '업적',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'NeoSync 로그인',
   AppLocale.neoSyncSynchronizing: 'NeoSync: 동기화 중...',
   AppLocale.neoSyncNotConnected: 'NeoSync: 연결 안 됨',
@@ -644,7 +666,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.sortByGroup: '정렬 기준',
   AppLocale.orderGroup: '정렬 순서',
   AppLocale.synced: '동기화됨',
-  AppLocale.syncing: '동기화 중',
+  AppLocale.syncing: '동기화 중...',
   AppLocale.conflict: '충돌',
   AppLocale.ready: '준비',
   AppLocale.quota: '용량',

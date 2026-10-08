@@ -169,6 +169,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   void dispose() {
     _disposed = true;
     if (_autoSweep) _browse.removeListener(_onBrowseChanged);
+    _sweeping.dispose();
     super.dispose();
   }
 
@@ -1454,8 +1455,16 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// waited for an offline stretch to end can wait another half minute.
   static const Duration _sweepStartupDelay = Duration(seconds: 30);
 
-  /// Guard against overlapping sweeps (connect + a manual [fullSync]).
-  bool _sweeping = false;
+  /// The sweep in progress, or null. Also the guard against overlapping sweeps
+  /// (connect + a manual [fullSync]).
+  final _sweeping = ValueNotifier<Future<SyncResult>?>(null);
+
+  /// The pending-upload sweep in progress, automatic or manual, or null when
+  /// none is. The Saves tab shows one it did not start as busy and reports its
+  /// result when it ends. A separate notifier, because notifying this
+  /// provider's listeners would rebuild the library UI twice per sweep for a
+  /// change it does not show.
+  ValueListenable<Future<SyncResult>?> get runningSweep => _sweeping;
 
   /// Guard against overlapping link passes, the same way [_sweeping] guards
   /// the sweep. A skipped pass is not rescheduled; the next connect runs it.
@@ -1491,80 +1500,98 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// and so ends the sweep.
   Future<SyncResult> retryPendingUploads() async {
     if (!_browse.isConnected) return SyncResult.fail(SyncError.authRequired);
-    // Not an error: whichever call got here first is doing the same work.
-    if (_sweeping) return SyncResult.ok(message: 'Sweep already running');
-    _sweeping = true;
-    try {
-      final index = await RommSaveMapRepository.getRomIdIndex();
-      if (index.isEmpty) {
-        _log.i('RomM upload sweep: no linked games');
-        return SyncResult.ok(message: 'No RomM-linked games to sweep');
-      }
-
-      var linked = 0, candidates = 0, synced = 0, failed = 0;
-      final touched = <String>[];
-      for (final game in await _listGames()) {
-        // A disconnect (or a sign-out) mid-sweep ends it; every remaining game
-        // would fail against a server we no longer have credentials for.
-        if (!_browse.isConnected) break;
-
-        final folder = game.systemFolderName;
-        if (folder == null || folder.isEmpty) continue;
-        if (index.lookup(game.romname, folder) == null) continue;
-        if (game.cloudSyncEnabled != true) continue;
-        linked++;
-        if (!await _hasPendingUpload(game)) continue;
-
-        candidates++;
-        try {
-          final status = await _syncGame(
-            game,
-            downloadOnly: false,
-            uploadOnly: true,
-          );
-          if (status == GameSyncStatus.error) {
-            failed++;
-          } else {
-            synced++;
-          }
-          _gameSyncStates[game.romname] = _buildState(game, status);
-          touched.add(game.romname);
-        } catch (e) {
-          if (isPermissionDenied(e)) {
-            _log.e('RomM upload sweep: permission denied, stopping: $e');
-            _gameSyncStates[game.romname] = _buildState(
-              game,
-              GameSyncStatus.error,
-              errorMessage: e.toString(),
-            );
-            if (touched.isNotEmpty) notifyListeners();
-            // Same error shape [_failGame] uses for a bubbled-up 403, so a
-            // sweep failure reads like any other hard sync failure.
-            return SyncResult.fail(SyncError.unknown, message: e.toString());
-          }
-          _log.e('RomM upload sweep: ${game.romname} failed: $e');
-          failed++;
-        }
-      }
-
-      // One notification for the whole sweep: it can touch hundreds of games,
-      // and notifying per game would rebuild the library UI hundreds of times.
-      if (touched.isNotEmpty) notifyListeners();
-      if (candidates == 0) {
-        // Logged even when it does nothing: this is the only outward sign the
-        // automatic sweep ran at all, and phase one costs no network.
-        _log.i('RomM upload sweep: nothing pending ($linked linked games)');
-        return SyncResult.ok(message: 'Nothing pending');
-      }
-      _log.i(
-        'RomM upload sweep: $candidates pending, $synced synced, $failed failed',
-      );
-      return SyncResult.ok(
-        message: '$synced of $candidates pending games synced',
-      );
-    } finally {
-      _sweeping = false;
+    // Whichever call got here first is doing the same work, but this one did
+    // nothing and cannot vouch for that sweep's outcome, so it is not a success.
+    if (_sweeping.value != null) {
+      return SyncResult.fail(SyncError.busy, message: 'Sweep already running');
     }
+    final sweep = _sweepPendingUploads();
+    _sweeping.value = sweep;
+    try {
+      return await sweep;
+    } finally {
+      if (!_disposed) _sweeping.value = null;
+    }
+  }
+
+  /// [retryPendingUploads] itself, run under its guard against overlap.
+  Future<SyncResult> _sweepPendingUploads() async {
+    final index = await RommSaveMapRepository.getRomIdIndex();
+    if (index.isEmpty) {
+      _log.i('RomM upload sweep: no linked games');
+      return SyncResult.ok(message: 'No RomM-linked games to sweep');
+    }
+
+    var linked = 0, candidates = 0, synced = 0, failed = 0;
+    final touched = <String>[];
+    for (final game in await _listGames()) {
+      // A disconnect (or a sign-out) mid-sweep ends it; every remaining game
+      // would fail against a server we no longer have credentials for.
+      if (!_browse.isConnected) break;
+
+      final folder = game.systemFolderName;
+      if (folder == null || folder.isEmpty) continue;
+      if (index.lookup(game.romname, folder) == null) continue;
+      if (game.cloudSyncEnabled != true) continue;
+      linked++;
+      if (!await _hasPendingUpload(game)) continue;
+
+      candidates++;
+      try {
+        final status = await _syncGame(
+          game,
+          downloadOnly: false,
+          uploadOnly: true,
+        );
+        if (status == GameSyncStatus.error) {
+          failed++;
+        } else {
+          synced++;
+        }
+        _gameSyncStates[game.romname] = _buildState(game, status);
+        touched.add(game.romname);
+      } catch (e) {
+        if (isPermissionDenied(e)) {
+          _log.e('RomM upload sweep: permission denied, stopping: $e');
+          _gameSyncStates[game.romname] = _buildState(
+            game,
+            GameSyncStatus.error,
+            errorMessage: e.toString(),
+          );
+          if (touched.isNotEmpty) notifyListeners();
+          // Same error shape [_failGame] uses for a bubbled-up 403, so a
+          // sweep failure reads like any other hard sync failure.
+          return SyncResult.fail(SyncError.unknown, message: e.toString());
+        }
+        _log.e('RomM upload sweep: ${game.romname} failed: $e');
+        failed++;
+      }
+    }
+
+    // One notification for the whole sweep: it can touch hundreds of games,
+    // and notifying per game would rebuild the library UI hundreds of times.
+    if (touched.isNotEmpty) notifyListeners();
+    if (!_browse.isConnected) {
+      return SyncResult.fail(SyncError.authRequired);
+    }
+    if (candidates == 0) {
+      // Logged even when it does nothing: this is the only outward sign the
+      // automatic sweep ran at all, and phase one costs no network.
+      _log.i('RomM upload sweep: nothing pending ($linked linked games)');
+      return SyncResult.ok(message: 'Nothing pending');
+    }
+    _log.i(
+      'RomM upload sweep: $candidates pending, $synced synced, $failed failed',
+    );
+    if (failed > 0) {
+      return SyncResult.fail(
+        SyncError.unknown,
+        message: '$failed of $candidates pending games failed to sync',
+      );
+    }
+    return SyncResult.ok(
+      message: '$synced of $candidates pending games synced',
+    );
   }
 
   /// True when [game] has a local save the server has not been told about —

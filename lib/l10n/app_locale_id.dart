@@ -1,6 +1,32 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleId = {
+  AppLocale.rommSavesAutoDownload:
+      'Simpanan cloud yang lebih baru diunduh saat Anda memulai game yang ditautkan.',
+  AppLocale.rommSaveFile: 'Berkas simpanan',
+  AppLocale.rommSaveState: 'Status simpanan',
+  AppLocale.rommRetryUploads: 'Coba unggah lagi',
+  AppLocale.rommUploadsFailed:
+      'Beberapa unggahan gagal. Periksa koneksi dan izin RomM, lalu coba lagi.',
+  AppLocale.rommSavesHelp:
+      'Lihat simpanan dan status RomM. Coba unggah lagi memeriksa game lokal yang tertaut ke RomM dengan sinkronisasi aktif. Simpanan jarak jauh yang lebih baru diunduh saat game dimulai.',
+  AppLocale.rommDeleteTitle: 'Hapus dari RomM',
+  AppLocale.rommDeleteConfirm:
+      '{file} akan dihapus permanen dari server RomM Anda. Salinan di perangkat Anda tetap disimpan, dan perangkat yang masih menyinkronkan game ini akan mengunggah salinannya lagi.',
+  AppLocale.rommDeleted: 'Dihapus dari RomM.',
+  AppLocale.rommDeleteFailed:
+      'Gagal menghapus dari RomM. Periksa koneksi dan izin RomM, lalu coba lagi.',
+  AppLocale.rommSaveFileCount: '{count} berkas simpanan',
+  AppLocale.rommSaveFilesCount: '{count} berkas simpanan',
+  AppLocale.rommSaveStateCount: '{count} status simpanan',
+  AppLocale.rommSaveStatesCount: '{count} status simpanan',
+  AppLocale.rommDeleteGameBothConfirm:
+      '{saves} dan {states} untuk {game} akan dihapus permanen dari server RomM Anda. Salinan di perangkat Anda tetap disimpan, dan perangkat yang masih menyinkronkan game ini akan mengunggah salinannya lagi.',
+  AppLocale.rommDeleteGameConfirm:
+      '{files} untuk {game} akan dihapus permanen dari server RomM Anda. Salinan di perangkat Anda tetap disimpan, dan perangkat yang masih menyinkronkan game ini akan mengunggah salinannya lagi.',
+  AppLocale.rommDeleteKeepsSaves: 'Berkas simpanan game ini tetap ada di RomM.',
+  AppLocale.rommDeleteKeepsStates:
+      'Status simpanan game ini tetap ada di RomM.',
   AppLocale.ignoreArticlesInGameSort: "Abaikan artikel saat mengurutkan game",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Abaikan The, A, atau An di awal judul. Misalnya, The Legend of Zelda diurutkan di huruf L.",
@@ -250,8 +276,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.bartopShutdown: 'Matikan BarTOP saat keluar',
   AppLocale.bartopShutdownSubtitle: 'Mematikan komputer saat menutup aplikasi',
 
-  AppLocale.showSyncTab: 'Tampilkan tab NeoSync',
-  AppLocale.showSyncTabSubtitle: 'Menampilkan tab NeoSync di bilah navigasi',
+  AppLocale.showSyncTab: 'Tampilkan tab Simpanan',
+  AppLocale.showSyncTabSubtitle: 'Tampilkan tab Simpanan di bilah navigasi',
   AppLocale.showAchievementsTab: 'Tampilkan tab Pencapaian',
   AppLocale.showAchievementsTabSubtitle:
       'Menampilkan tab RetroAchievements di bilah navigasi',
@@ -390,9 +416,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.scrapingUnavailableAndroid: 'Scraping tidak tersedia di Android.',
   AppLocale.achievements: 'Pencapaian',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'Masuk NeoSync',
-  AppLocale.neoSyncSynchronizing: 'NeoSync: Menyingkronkan...',
+  AppLocale.neoSyncSynchronizing: 'NeoSync: Menyinkronkan...',
   AppLocale.neoSyncNotConnected: 'NeoSync: Tidak terhubung',
   AppLocale.neoSyncSynchronized: 'NeoSync: Simpanan disinkronkan',
   AppLocale.neoSyncSavesSync: 'File simpanan akan disinkronkan dengan NeoSync',
@@ -707,7 +732,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.sortByGroup: 'Urutkan Berdasarkan',
   AppLocale.orderGroup: 'Urutan',
   AppLocale.synced: 'Disinkronkan',
-  AppLocale.syncing: 'Menyingkronkan',
+  AppLocale.syncing: 'Menyinkronkan...',
   AppLocale.conflict: 'Konflik',
   AppLocale.ready: 'Siap',
   AppLocale.quota: 'Kuota',

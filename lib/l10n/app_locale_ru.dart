@@ -1,6 +1,32 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleRu = {
+  AppLocale.rommSavesAutoDownload:
+      'Более новые облачные сохранения загружаются при запуске связанной игры.',
+  AppLocale.rommSaveFile: 'Файл сохранения',
+  AppLocale.rommSaveState: 'Состояние игры',
+  AppLocale.rommRetryUploads: 'Повторить отправку',
+  AppLocale.rommUploadsFailed:
+      'Некоторые файлы не отправлены. Проверьте подключение и разрешения RomM, затем повторите попытку.',
+  AppLocale.rommSavesHelp:
+      'Просматривайте сохранения и состояния RomM. Повторная отправка проверяет локальные игры, связанные с RomM, с включённой синхронизацией. Новые удалённые сохранения скачиваются при запуске игры.',
+  AppLocale.rommDeleteTitle: 'Удалить из RomM',
+  AppLocale.rommDeleteConfirm:
+      '{file} будет безвозвратно удалён с вашего сервера RomM. Копии на ваших устройствах сохранятся, а устройства, которые всё ещё синхронизируют эту игру, снова отправят свою копию.',
+  AppLocale.rommDeleted: 'Удалено из RomM.',
+  AppLocale.rommDeleteFailed:
+      'Не удалось удалить из RomM. Проверьте подключение и разрешения RomM, затем повторите попытку.',
+  AppLocale.rommSaveFileCount: '{count} файл сохранения',
+  AppLocale.rommSaveFilesCount: '{count} файлов сохранения',
+  AppLocale.rommSaveStateCount: '{count} состояние игры',
+  AppLocale.rommSaveStatesCount: '{count} состояний игры',
+  AppLocale.rommDeleteGameBothConfirm:
+      'Это безвозвратно удалит с вашего сервера RomM {saves} и {states} для {game}. Копии на ваших устройствах сохранятся, а устройства, которые всё ещё синхронизируют эту игру, снова отправят свои копии.',
+  AppLocale.rommDeleteGameConfirm:
+      'Это безвозвратно удалит с вашего сервера RomM {files} для {game}. Копии на ваших устройствах сохранятся, а устройства, которые всё ещё синхронизируют эту игру, снова отправят свои копии.',
+  AppLocale.rommDeleteKeepsSaves:
+      'Файлы сохранения этой игры останутся в RomM.',
+  AppLocale.rommDeleteKeepsStates: 'Состояния этой игры останутся в RomM.',
   AppLocale.ignoreArticlesInGameSort: "Игнорировать артикли при сортировке игр",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Пропускать The, A и An в начале названия. Например, The Legend of Zelda сортируется под буквой L.",
@@ -255,9 +281,9 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.bartopShutdownSubtitle:
       'Выключать компьютер при выходе из приложения',
 
-  AppLocale.showSyncTab: 'Показывать вкладку NeoSync',
+  AppLocale.showSyncTab: 'Показывать вкладку сохранений',
   AppLocale.showSyncTabSubtitle:
-      'Отображает вкладку NeoSync на панели навигации',
+      'Отображать вкладку сохранений на панели навигации',
   AppLocale.showAchievementsTab: 'Показывать вкладку достижений',
   AppLocale.showAchievementsTabSubtitle:
       'Отображает вкладку RetroAchievements на панели навигации',
@@ -398,7 +424,6 @@ const Map<String, dynamic> appLocaleRu = {
       'Получение данных недоступно для приложений Android.',
   AppLocale.achievements: 'Достижения',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'Вход в NeoSync',
   AppLocale.neoSyncSynchronizing: 'NeoSync: Синхронизация...',
   AppLocale.neoSyncNotConnected: 'NeoSync: Не подключено',
@@ -718,7 +743,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.sortByGroup: 'СОРТИРОВАТЬ ПО',
   AppLocale.orderGroup: 'ПОРЯДОК',
   AppLocale.synced: 'Синхронизировано',
-  AppLocale.syncing: 'Синхронизация',
+  AppLocale.syncing: 'Синхронизация...',
   AppLocale.conflict: 'Конфликт',
   AppLocale.ready: 'Готово',
   AppLocale.quota: 'Квота',

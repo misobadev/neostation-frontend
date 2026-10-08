@@ -1,6 +1,33 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleIt = {
+  AppLocale.rommSavesAutoDownload:
+      'I salvataggi cloud più recenti vengono scaricati quando avvii un gioco collegato.',
+  AppLocale.rommSaveFile: 'File di salvataggio',
+  AppLocale.rommSaveState: 'Stato salvato',
+  AppLocale.rommRetryUploads: 'Riprova caricamenti',
+  AppLocale.rommUploadsFailed:
+      'Alcuni caricamenti non sono riusciti. Controlla la connessione e i permessi RomM, poi riprova.',
+  AppLocale.rommSavesHelp:
+      'Sfoglia salvataggi e stati RomM. Riprova caricamenti controlla i giochi locali collegati a RomM con sincronizzazione attiva. I salvataggi remoti più recenti vengono scaricati all’avvio del gioco.',
+  AppLocale.rommDeleteTitle: 'Elimina da RomM',
+  AppLocale.rommDeleteConfirm:
+      '{file} verrà eliminato definitivamente dal tuo server RomM. Le copie sui tuoi dispositivi vengono mantenute e ogni dispositivo che sincronizza ancora questo gioco caricherà di nuovo la propria copia.',
+  AppLocale.rommDeleted: 'Eliminato da RomM.',
+  AppLocale.rommDeleteFailed:
+      'Impossibile eliminare da RomM. Controlla la connessione e i permessi RomM, poi riprova.',
+  AppLocale.rommSaveFileCount: '{count} file di salvataggio',
+  AppLocale.rommSaveFilesCount: '{count} file di salvataggio',
+  AppLocale.rommSaveStateCount: '{count} stato salvato',
+  AppLocale.rommSaveStatesCount: '{count} stati salvati',
+  AppLocale.rommDeleteGameBothConfirm:
+      'Questa azione eliminerà definitivamente dal tuo server RomM {saves} e {states} del gioco {game}. Le copie sui tuoi dispositivi vengono mantenute e ogni dispositivo che sincronizza ancora questo gioco caricherà di nuovo le proprie copie.',
+  AppLocale.rommDeleteGameConfirm:
+      'Questa azione eliminerà definitivamente dal tuo server RomM {files} del gioco {game}. Le copie sui tuoi dispositivi vengono mantenute e ogni dispositivo che sincronizza ancora questo gioco caricherà di nuovo le proprie copie.',
+  AppLocale.rommDeleteKeepsSaves:
+      'I file di salvataggio di questo gioco restano su RomM.',
+  AppLocale.rommDeleteKeepsStates:
+      'Gli stati salvati di questo gioco restano su RomM.',
   AppLocale.ignoreArticlesInGameSort:
       "Ignora gli articoli nel riordino dei giochi",
   AppLocale.ignoreArticlesInGameSortSubtitle:
@@ -257,9 +284,9 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.bartopShutdown: 'Spegni BarTOP all’uscita',
   AppLocale.bartopShutdownSubtitle: 'Spegne il computer alla chiusura dell’app',
 
-  AppLocale.showSyncTab: 'Mostra scheda NeoSync',
+  AppLocale.showSyncTab: 'Mostra scheda Salvataggi',
   AppLocale.showSyncTabSubtitle:
-      'Mostra la scheda NeoSync nella barra di navigazione',
+      'Mostra la scheda Salvataggi nella barra di navigazione',
   AppLocale.showAchievementsTab: 'Mostra scheda Obiettivi',
   AppLocale.showAchievementsTabSubtitle:
       'Mostra la scheda RetroAchievements nella barra di navigazione',
@@ -403,7 +430,6 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.scrapingUnavailableAndroid: 'Scraping non disponibile su Android.',
   AppLocale.achievements: 'Obiettivi',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'Accesso NeoSync',
   AppLocale.neoSyncSynchronizing: 'NeoSync: Sincronizzazione...',
   AppLocale.neoSyncNotConnected: 'NeoSync: Non connesso',
@@ -727,7 +753,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.sortByGroup: 'Ordina per',
   AppLocale.orderGroup: 'Ordine',
   AppLocale.synced: 'Sincronizzato',
-  AppLocale.syncing: 'Sincronizzazione',
+  AppLocale.syncing: 'Sincronizzazione...',
   AppLocale.conflict: 'Conflitto',
   AppLocale.ready: 'Pronto',
   AppLocale.quota: 'Quota',

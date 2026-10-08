@@ -151,6 +151,28 @@ typedef RommSaveMapEntry = ({
 class RommSaveMapRepository {
   static final _log = LoggerService.instance;
 
+  /// Exact local links for artwork lookup. This is read-only and does not
+  /// infer a link from a save filename (which need not identify a game).
+  static Future<List<({String romname, String systemFolder})>> localNamesForRom(
+    int romId,
+  ) async {
+    final db = await SqliteService.getDatabase();
+    final rows = await db.query(
+      'app_romm_rom_map',
+      columns: ['romname', 'system_folder'],
+      where: 'romm_rom_id = ?',
+      whereArgs: [romId],
+      orderBy: 'system_folder, romname',
+    );
+    return [
+      for (final row in rows)
+        (
+          romname: row['romname'] as String,
+          systemFolder: row['system_folder'] as String,
+        ),
+    ];
+  }
+
   /// Columns every row read goes through, so the two spellings of a lookup
   /// (see [_findRow]) decode the same way.
   static const List<String> _rowColumns = [

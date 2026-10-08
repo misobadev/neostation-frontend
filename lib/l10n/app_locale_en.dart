@@ -1,6 +1,31 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleEn = {
+  AppLocale.rommSavesAutoDownload:
+      'Newer cloud saves download when you launch a linked game.',
+  AppLocale.rommSaveFile: 'Save file',
+  AppLocale.rommSaveState: 'Save state',
+  AppLocale.rommRetryUploads: 'Retry uploads',
+  AppLocale.rommUploadsFailed:
+      'Some uploads failed. Check your connection and RomM permissions, then retry.',
+  AppLocale.rommSavesHelp:
+      'Browse your RomM saves and states. Retry uploads checks local games linked to RomM with save sync enabled. Newer remote saves download when you launch a game.',
+  AppLocale.rommDeleteTitle: 'Delete from RomM',
+  AppLocale.rommDeleteConfirm:
+      '{file} will be permanently deleted from your RomM server. Copies on your devices are kept, and any device that still syncs this game will upload its copy again.',
+  AppLocale.rommDeleted: 'Deleted from RomM.',
+  AppLocale.rommDeleteFailed:
+      "Couldn't delete from RomM. Check your connection and RomM permissions, then try again.",
+  AppLocale.rommSaveFileCount: '{count} save file',
+  AppLocale.rommSaveFilesCount: '{count} save files',
+  AppLocale.rommSaveStateCount: '{count} save state',
+  AppLocale.rommSaveStatesCount: '{count} save states',
+  AppLocale.rommDeleteGameBothConfirm:
+      '{saves} and {states} for {game} will be permanently deleted from your RomM server. Copies on your devices are kept, and any device that still syncs this game will upload its copies again.',
+  AppLocale.rommDeleteGameConfirm:
+      '{files} for {game} will be permanently deleted from your RomM server. Copies on your devices are kept, and any device that still syncs this game will upload its copies again.',
+  AppLocale.rommDeleteKeepsSaves: "This game's save files stay on RomM.",
+  AppLocale.rommDeleteKeepsStates: "This game's save states stay on RomM.",
   AppLocale.ignoreArticlesInGameSort: "Ignore articles when sorting games",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Sort by title without leading The, A, or An. For example, The Legend of Zelda sorts under L.",
@@ -250,9 +275,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.bartopShutdownSubtitle:
       'Shut down the computer when exiting the application',
 
-  AppLocale.showSyncTab: 'Show NeoSync tab',
-  AppLocale.showSyncTabSubtitle:
-      'Display the NeoSync tab in the navigation bar',
+  AppLocale.showSyncTab: 'Show Saves tab',
+  AppLocale.showSyncTabSubtitle: 'Display the Saves tab in the navigation bar',
   AppLocale.showAchievementsTab: 'Show Achievements tab',
   AppLocale.showAchievementsTabSubtitle:
       'Display the RetroAchievements tab in the navigation bar',
@@ -391,7 +415,6 @@ const Map<String, dynamic> appLocaleEn = {
       'Scraping unavailable for Android apps.',
   AppLocale.achievements: 'Achievements',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'NeoSync Login',
   AppLocale.neoSyncSynchronizing: 'NeoSync: Synchronizing...',
   AppLocale.neoSyncNotConnected: 'NeoSync: Not connected',
@@ -705,7 +728,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.sortByGroup: 'SORT BY',
   AppLocale.orderGroup: 'ORDER',
   AppLocale.synced: 'Synced',
-  AppLocale.syncing: 'Syncing',
+  AppLocale.syncing: 'Syncing...',
   AppLocale.conflict: 'Conflict',
   AppLocale.ready: 'Ready',
   AppLocale.quota: 'Quota',

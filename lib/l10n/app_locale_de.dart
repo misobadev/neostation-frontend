@@ -1,6 +1,33 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleDe = {
+  AppLocale.rommSavesAutoDownload:
+      'Neuere Cloud-Spielstände werden beim Start eines verknüpften Spiels heruntergeladen.',
+  AppLocale.rommSaveFile: 'Spielstand',
+  AppLocale.rommSaveState: 'Speicherstand',
+  AppLocale.rommRetryUploads: 'Uploads wiederholen',
+  AppLocale.rommUploadsFailed:
+      'Einige Uploads sind fehlgeschlagen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
+  AppLocale.rommSavesHelp:
+      'RomM-Spielstände ansehen. Uploads wiederholen prüft lokale, mit RomM verknüpfte Spiele mit aktivierter Synchronisierung. Neuere Spielstände werden beim Spielstart heruntergeladen.',
+  AppLocale.rommDeleteTitle: 'Aus RomM löschen',
+  AppLocale.rommDeleteConfirm:
+      '{file} wird dauerhaft von deinem RomM-Server gelöscht. Kopien auf deinen Geräten bleiben erhalten, und jedes Gerät, das dieses Spiel noch synchronisiert, lädt seine Kopie erneut hoch.',
+  AppLocale.rommDeleted: 'Aus RomM gelöscht.',
+  AppLocale.rommDeleteFailed:
+      'Löschen aus RomM fehlgeschlagen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
+  AppLocale.rommSaveFileCount: '{count} Spielstand',
+  AppLocale.rommSaveFilesCount: '{count} Spielstände',
+  AppLocale.rommSaveStateCount: '{count} Speicherstand',
+  AppLocale.rommSaveStatesCount: '{count} Speicherstände',
+  AppLocale.rommDeleteGameBothConfirm:
+      'Dies löscht {saves} und {states} für {game} dauerhaft von deinem RomM-Server. Kopien auf deinen Geräten bleiben erhalten, und jedes Gerät, das dieses Spiel noch synchronisiert, lädt seine Kopien erneut hoch.',
+  AppLocale.rommDeleteGameConfirm:
+      'Dies löscht {files} für {game} dauerhaft von deinem RomM-Server. Kopien auf deinen Geräten bleiben erhalten, und jedes Gerät, das dieses Spiel noch synchronisiert, lädt seine Kopien erneut hoch.',
+  AppLocale.rommDeleteKeepsSaves:
+      'Die Spielstände dieses Spiels bleiben auf RomM.',
+  AppLocale.rommDeleteKeepsStates:
+      'Die Speicherstände dieses Spiels bleiben auf RomM.',
   AppLocale.ignoreArticlesInGameSort:
       "Artikel beim Sortieren von Spielen ignorieren",
   AppLocale.ignoreArticlesInGameSortSubtitle:
@@ -256,9 +283,9 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.bartopShutdownSubtitle:
       'Schaltet den Computer beim Schließen der App aus',
 
-  AppLocale.showSyncTab: 'NeoSync-Tab anzeigen',
+  AppLocale.showSyncTab: 'Spielstände-Tab anzeigen',
   AppLocale.showSyncTabSubtitle:
-      'Zeigt den NeoSync-Tab in der Navigationsleiste an',
+      'Den Spielstände-Tab in der Navigationsleiste anzeigen',
   AppLocale.showAchievementsTab: 'Erfolge-Tab anzeigen',
   AppLocale.showAchievementsTabSubtitle:
       'Zeigt den RetroAchievements-Tab in der Navigationsleiste an',
@@ -404,7 +431,6 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.scrapingUnavailableAndroid: 'Scraping auf Android nicht verfügbar.',
   AppLocale.achievements: 'Erfolge',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'NeoSync-Anmeldung',
   AppLocale.neoSyncSynchronizing: 'NeoSync: Synchronisierung...',
   AppLocale.neoSyncNotConnected: 'NeoSync: Nicht verbunden',
@@ -733,7 +759,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.sortByGroup: 'Sortieren nach',
   AppLocale.orderGroup: 'Reihenfolge',
   AppLocale.synced: 'Synchronisiert',
-  AppLocale.syncing: 'Wird synchronisiert',
+  AppLocale.syncing: 'Wird synchronisiert...',
   AppLocale.conflict: 'Konflikt',
   AppLocale.ready: 'Bereit',
   AppLocale.quota: 'Kontingent',

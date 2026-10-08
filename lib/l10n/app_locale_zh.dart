@@ -1,6 +1,28 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleZh = {
+  AppLocale.rommSavesAutoDownload: '启动已关联的游戏时，会下载较新的云端存档。',
+  AppLocale.rommSaveFile: '存档文件',
+  AppLocale.rommSaveState: '即时存档',
+  AppLocale.rommRetryUploads: '重试上传',
+  AppLocale.rommUploadsFailed: '部分上传失败。请检查连接和 RomM 权限，然后重试。',
+  AppLocale.rommSavesHelp:
+      '浏览 RomM 存档和即时存档。重试上传会检查已关联 RomM 且启用同步的本地游戏。启动游戏时会下载较新的远程存档。',
+  AppLocale.rommDeleteTitle: '从 RomM 删除',
+  AppLocale.rommDeleteConfirm:
+      '{file} 将从你的 RomM 服务器永久删除。设备上的副本会保留，仍在同步此游戏的设备会再次上传其副本。',
+  AppLocale.rommDeleted: '已从 RomM 删除。',
+  AppLocale.rommDeleteFailed: '无法从 RomM 删除。请检查连接和 RomM 权限，然后重试。',
+  AppLocale.rommSaveFileCount: '{count} 个存档文件',
+  AppLocale.rommSaveFilesCount: '{count} 个存档文件',
+  AppLocale.rommSaveStateCount: '{count} 个即时存档',
+  AppLocale.rommSaveStatesCount: '{count} 个即时存档',
+  AppLocale.rommDeleteGameBothConfirm:
+      '{game} 的 {saves}和{states}将从你的 RomM 服务器永久删除。设备上的副本会保留，仍在同步此游戏的设备会再次上传其副本。',
+  AppLocale.rommDeleteGameConfirm:
+      '{game} 的 {files}将从你的 RomM 服务器永久删除。设备上的副本会保留，仍在同步此游戏的设备会再次上传其副本。',
+  AppLocale.rommDeleteKeepsSaves: '此游戏的存档文件会保留在 RomM 上。',
+  AppLocale.rommDeleteKeepsStates: '此游戏的即时存档会保留在 RomM 上。',
   AppLocale.ignoreArticlesInGameSort: "排序游戏时忽略冠词",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "忽略标题开头的 The、A 或 An。例如，The Legend of Zelda 排在 L 下。",
@@ -215,8 +237,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.bartopShutdown: '退出时关闭 BarTOP',
   AppLocale.bartopShutdownSubtitle: '退出应用时关闭计算机',
 
-  AppLocale.showSyncTab: '显示 NeoSync 选项卡',
-  AppLocale.showSyncTabSubtitle: '在导航栏中显示 NeoSync 选项卡',
+  AppLocale.showSyncTab: '显示存档选项卡',
+  AppLocale.showSyncTabSubtitle: '在导航栏中显示存档选项卡',
   AppLocale.showAchievementsTab: '显示成就选项卡',
   AppLocale.showAchievementsTabSubtitle: '在导航栏中显示 RetroAchievements 选项卡',
   AppLocale.showRommTab: '显示 RomM 选项卡',
@@ -334,7 +356,6 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.scrapingUnavailableAndroid: 'Android 应用无法抓取。',
   AppLocale.achievements: '成就',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'NeoSync 登录',
   AppLocale.neoSyncSynchronizing: 'NeoSync: 正在同步...',
   AppLocale.neoSyncNotConnected: 'NeoSync: 未连接',
@@ -627,7 +648,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.sortByGroup: '排序方式',
   AppLocale.orderGroup: '顺序',
   AppLocale.synced: '已同步',
-  AppLocale.syncing: '同步中',
+  AppLocale.syncing: '同步中...',
   AppLocale.conflict: '冲突',
   AppLocale.ready: '就绪',
   AppLocale.quota: '配额',

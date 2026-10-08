@@ -1175,12 +1175,24 @@ class RommService {
   Future<List<RommAsset>> listStates({required int romId}) =>
       _listAssets('/api/states', romId: romId, isState: true);
 
+  /// Inventory for the Saves tab, including archival versions and backups.
+  /// Unlike per-game sync discovery, this lists all of the current user's files.
+  Future<List<RommAsset>> listSaveAssets() async {
+    final results = await Future.wait([
+      _listAssets('/api/saves', isState: false),
+      _listAssets('/api/states', isState: true),
+    ]);
+    return [...results[0], ...results[1]];
+  }
+
   Future<List<RommAsset>> _listAssets(
     String basePath, {
-    required int romId,
+    int? romId,
     required bool isState,
   }) async {
-    final resp = await _authedGet('$basePath?rom_id=$romId');
+    final resp = await _authedGet(
+      romId == null ? basePath : '$basePath?rom_id=$romId',
+    );
     return _itemsOf(jsonDecode(resp.body))
         .whereType<Map<String, dynamic>>()
         .map((j) => RommAsset.fromJson(j, isState: isState))
@@ -1429,6 +1441,42 @@ class RommService {
       decoded as Map<String, dynamic>,
       isState: isState,
     );
+  }
+
+  /// Permanently deletes save files from the server (`POST /api/saves/delete`,
+  /// body `{"saves": [...]}`). Requires the `assets.write` scope.
+  Future<void> deleteSaves(List<int> assetIds) =>
+      _deleteAssets('/api/saves', field: 'saves', assetIds: assetIds);
+
+  /// Permanently deletes save states from the server
+  /// (`POST /api/states/delete`, body `{"states": [...]}`).
+  Future<void> deleteStates(List<int> assetIds) =>
+      _deleteAssets('/api/states', field: 'states', assetIds: assetIds);
+
+  /// RomM answers 404 when any id is not one of the current user's assets.
+  Future<void> _deleteAssets(
+    String basePath, {
+    required String field,
+    required List<int> assetIds,
+  }) async {
+    if (assetIds.isEmpty) return;
+    final body = jsonEncode({field: assetIds});
+    final resp = await _sendWithAuthRetry<http.Response>(
+      () => _httpClient
+          .post(
+            _uri('$basePath/delete'),
+            headers: {..._authHeaders, 'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 30)),
+      statusOf: (r) => r.statusCode,
+    );
+    if (resp.statusCode != 200) {
+      throw RommException(
+        'Delete failed (${resp.statusCode})',
+        statusCode: resp.statusCode,
+      );
+    }
   }
 
   // ── Play sessions (playtime sync) ─────────────────────────────────────────
