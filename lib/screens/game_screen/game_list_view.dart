@@ -141,6 +141,19 @@ class GameListViewState extends State<GameListView>
     _centeredScrollController.jumpToIndex(index);
   }
 
+  /// Number of complete rows in the current viewport, used for page navigation.
+  int get pageSize {
+    final controller = _centeredScrollController.scrollController;
+    if (!controller.hasClients || !controller.position.hasViewportDimension) {
+      return 1;
+    }
+    final rows =
+        (controller.position.viewportDimension /
+                GameListSize.getRowHeight(widget.listSize).r)
+            .floor();
+    return rows < 1 ? 1 : rows;
+  }
+
   @override
   void initState() {
     super.initState();

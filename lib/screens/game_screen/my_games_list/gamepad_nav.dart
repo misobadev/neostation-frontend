@@ -11,7 +11,7 @@ extension _GamepadNav on _SystemGamesListState {
   ///
   /// Bound to D-pad left/right: the fast alphabet jump on a held up/down made
   /// the old +/-10 page step redundant, so the horizontal axis drives the card
-  /// instead. The bumpers are deliberately unbound on this screen.
+  /// instead. The bumpers page through the games list.
   ///
   /// Always returns false so a held direction never auto-repeats through the
   /// tabs; the nav sound is played here instead of by the repeat dispatcher.
@@ -85,8 +85,8 @@ extension _GamepadNav on _SystemGamesListState {
       onSelectModifierA: () => _scrapeAction?.call(), // Select + A - Scrape.
       onSelectModifierY: _showRandomGameDialog, // Select + Y - Random.
       onRightStickClick: null,
-      // The bumpers (and their Q/E keyboard twins) bind nothing here: tab
-      // switching moved to D-pad left/right.
+      onLeftBumper: () => _navigatePage(false),
+      onRightBumper: () => _navigatePage(true),
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -97,6 +97,19 @@ extension _GamepadNav on _SystemGamesListState {
         onDeactivate: () => _gamepadNav.deactivate(),
       );
     });
+  }
+
+  /// Moves one viewport through the games, stopping at either end.
+  void _navigatePage(bool forward) {
+    if (_games.isEmpty) return;
+    if (_isDetailsPanelActive?.call() ?? false) return;
+
+    final pageSize = _gameListKey.currentState?.pageSize ?? 1;
+    final target = (_selectedGameIndex + (forward ? pageSize : -pageSize))
+        .clamp(0, _games.length - 1);
+    if (target == _selectedGameIndex) return;
+
+    _updateSelectedGame(target, forceFast: true);
   }
 
   /// Moves focus to the previous game in the list.
