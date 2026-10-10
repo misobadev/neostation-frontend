@@ -35,6 +35,7 @@
       "customgame",
       "amazon",
       "steam",
+      "droiddeck",
       "localgameid"
     ]
   },
@@ -311,6 +312,18 @@
       "platforms": {
         "android": {
           "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.steamappid}\" --es game_source STEAM"
+        }
+      }
+    },
+    {
+      "name": "Standalone DroidDeck",
+      "unique_id": "windows.com.droiddeck.launcher",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: steam, droiddeck. Launch files exported by DroidDeck; the game must be installed in DroidDeck.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a android.intent.action.VIEW -n com.droiddeck.launcher/.MainActivity -d \"{file.uri}\"",
+          "keep_saf_uri": true
         }
       }
     }
