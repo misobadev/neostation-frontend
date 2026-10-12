@@ -77,6 +77,7 @@ class SfxService {
   Object? _customHandle;
   Future<void> _reload = Future.value();
   Future<void> _playback = Future.value();
+  bool _movementQueued = false;
 
   Future<void> validateClip(String path) async {
     if (!isScreenOn()) {
@@ -435,8 +436,15 @@ class SfxService {
 
   /// Initiates playback for a pre-loaded source identified by its [path].
   Future<void> _play(String path, SfxAction action) {
+    // Held D-pad scrolling must not build a backlog of stale nav sounds behind
+    // the serialized queue: drop a movement sound while one is still waiting.
+    if (action == SfxAction.movement) {
+      if (_movementQueued) return _playback;
+      _movementQueued = true;
+    }
     final generation = _generation;
     final next = _playback.then((_) async {
+      if (action == SfxAction.movement) _movementQueued = false;
       await _reload;
       if (!_enabled ||
           !isScreenOn() ||
