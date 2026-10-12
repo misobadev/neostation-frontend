@@ -37,6 +37,7 @@ import 'tabs/game_details_box2d_tab.dart';
 import 'tabs/game_details_screenshot_video_tab.dart';
 import 'tabs/game_details_game_info_tab.dart';
 import 'tabs/game_details_achievements_tab.dart';
+import 'package:neostation/screens/retro_achievements_screen/ra_game_achievements_page.dart';
 
 /// A comprehensive details view for a selected game, providing access to metadata,
 /// achievements, system settings, and cloud synchronization status.
@@ -669,6 +670,24 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     });
   }
 
+  bool _achievementsPageInFlight = false;
+
+  Future<void> _openAchievementsPage() async {
+    final gameId = _currentGameInfo?.id;
+    if (_achievementsPageInFlight || gameId == null || gameId <= 0) return;
+    _achievementsPageInFlight = true;
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              RaGameAchievementsPage(gameId: gameId, fallbackTitle: _game.name),
+        ),
+      );
+    } finally {
+      _achievementsPageInFlight = false;
+    }
+  }
+
   /// Opens the manual match picker and reloads the tab when the user picked a
   /// different game, so the achievement list reflects the new set immediately.
   ///
@@ -993,6 +1012,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
                             : null,
                         onRefresh: refreshAchievements,
                         onFixMatch: _openMatchPicker,
+                        onOpenPage: _openAchievementsPage,
                         raHash: _game.raHash,
                       ),
                     ),

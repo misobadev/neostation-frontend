@@ -391,6 +391,7 @@ const Map<String, dynamic> appLocaleFr = {
       'En pause : {matched} jeu(x) associé(s) jusqu’ici. Relancez-le pour continuer.',
   AppLocale.rematchAchievementsFailed:
       'Échec de l\'association des jeux RetroAchievements : {error}',
+  AppLocale.raOpenPage: 'Ouvrir la page',
   AppLocale.raFixMatch: 'Corriger l’association',
   AppLocale.raFixMatchTitle: 'Choisir le bon jeu',
   AppLocale.raFixMatchSearchHint: 'Rechercher des titres RetroAchievements',

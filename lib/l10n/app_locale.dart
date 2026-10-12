@@ -339,6 +339,7 @@ mixin AppLocale {
   static const String rematchAchievementsPaused = 'rematch_achievements_paused';
   static const String rematchAchievementsFailed = 'rematch_achievements_failed';
 
+  static const String raOpenPage = 'ra_open_page';
   static const String raFixMatch = 'ra_fix_match';
   static const String raFixMatchTitle = 'ra_fix_match_title';
   static const String raFixMatchSearchHint = 'ra_fix_match_search_hint';

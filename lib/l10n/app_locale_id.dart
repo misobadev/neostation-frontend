@@ -371,6 +371,7 @@ const Map<String, dynamic> appLocaleId = {
       'Dijeda: {matched} gim cocok sejauh ini. Jalankan lagi untuk melanjutkan.',
   AppLocale.rematchAchievementsFailed:
       'Gagal mencocokkan game RetroAchievements: {error}',
+  AppLocale.raOpenPage: 'Buka halaman',
   AppLocale.raFixMatch: 'Perbaiki kecocokan',
   AppLocale.raFixMatchTitle: 'Pilih game yang benar',
   AppLocale.raFixMatchSearchHint: 'Cari judul RetroAchievements',

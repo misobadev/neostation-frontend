@@ -132,8 +132,7 @@
       "{SYNC_DIR}"
     ],
     "windows_sync_folder": [
-      "{SYNC_DIR}",
-      "{FLYCAST_SAVES}"
+      "{SYNC_DIR}"
     ],
     "linux_sync_folder": [
       "{SYNC_DIR}"

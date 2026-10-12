@@ -241,17 +241,9 @@
   ],
   "neosync": {
     "sync": true,
-    "android_sync_folder": [
-      "{SWITCH_NAND}"
-    ],
-    "windows_sync_folder": [
-      "{SWITCH_NAND}"
-    ],
-    "linux_sync_folder": [
-      "{SWITCH_NAND}"
-    ],
-    "macos_sync_folder": [
-      "{SWITCH_NAND}"
-    ]
+    "android_sync_folder": [],
+    "windows_sync_folder": [],
+    "linux_sync_folder": [],
+    "macos_sync_folder": []
   }
 }

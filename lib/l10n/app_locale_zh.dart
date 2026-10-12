@@ -311,6 +311,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.rematchAchievementsNothingToDo: '所有受支持的游戏都已检查过。',
   AppLocale.rematchAchievementsPaused: '已暂停：目前已匹配 {matched} 个游戏。再次运行即可继续。',
   AppLocale.rematchAchievementsFailed: '匹配 RetroAchievements 游戏失败：{error}',
+  AppLocale.raOpenPage: '打开页面',
   AppLocale.raFixMatch: '修正匹配',
   AppLocale.raFixMatchTitle: '选择正确的游戏',
   AppLocale.raFixMatchSearchHint: '搜索 RetroAchievements 标题',

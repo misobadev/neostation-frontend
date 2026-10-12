@@ -378,6 +378,7 @@ const Map<String, dynamic> appLocaleRu = {
       'Приостановлено: сопоставлено игр — {matched}. Запустите ещё раз, чтобы продолжить.',
   AppLocale.rematchAchievementsFailed:
       'Не удалось сопоставить игры RetroAchievements: {error}',
+  AppLocale.raOpenPage: 'Открыть страницу',
   AppLocale.raFixMatch: 'Исправить сопоставление',
   AppLocale.raFixMatchTitle: 'Выберите нужную игру',
   AppLocale.raFixMatchSearchHint: 'Поиск по названиям RetroAchievements',

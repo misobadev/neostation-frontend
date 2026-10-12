@@ -48,6 +48,9 @@ class GameDetailsAchievementsTab extends StatefulWidget {
   /// most likely to want it.
   final VoidCallback? onFixMatch;
 
+  /// Opens the full achievements page for the matched game.
+  final VoidCallback? onOpenPage;
+
   /// The ROM's RetroAchievements hash, or `null` when it has not been hashed.
   ///
   /// The one fact that explains every state this panel can be in: a set that
@@ -69,6 +72,7 @@ class GameDetailsAchievementsTab extends StatefulWidget {
     this.rightOffset = 12.0,
     this.headerAction,
     this.onFixMatch,
+    this.onOpenPage,
     this.raHash,
   });
 
@@ -93,7 +97,7 @@ class GameDetailsAchievementsTabState
   /// Which header action holds focus, or -1 while the badge grid does.
   ///
   /// Up from the grid's top row lands here, down goes back to the badges, and
-  /// left/right walk the actions — so REFRESH and FIX MATCH are reachable
+  /// left/right walk the actions — so all header buttons are reachable
   /// without a touchscreen.
   int _headerFocusIndex = -1;
 
@@ -177,6 +181,8 @@ class GameDetailsAchievementsTabState
         _HeaderAction(label: AppLocale.refresh, onTap: widget.onRefresh),
       if (widget.onFixMatch != null)
         _HeaderAction(label: AppLocale.raFixMatch, onTap: widget.onFixMatch!),
+      if (widget.gameInfo != null && widget.onOpenPage != null)
+        _HeaderAction(label: AppLocale.raOpenPage, onTap: widget.onOpenPage!),
     ];
   }
 

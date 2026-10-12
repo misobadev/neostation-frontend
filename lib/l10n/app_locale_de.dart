@@ -385,6 +385,7 @@ const Map<String, dynamic> appLocaleDe = {
       'Pausiert: bisher {matched} Spiel(e) zugeordnet. Erneut starten, um fortzufahren.',
   AppLocale.rematchAchievementsFailed:
       'RetroAchievements-Spiele konnten nicht zugeordnet werden: {error}',
+  AppLocale.raOpenPage: 'Seite öffnen',
   AppLocale.raFixMatch: 'Zuordnung korrigieren',
   AppLocale.raFixMatchTitle: 'Das richtige Spiel auswählen',
   AppLocale.raFixMatchSearchHint: 'RetroAchievements-Titel suchen',

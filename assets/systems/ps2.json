@@ -337,12 +337,10 @@
   "neosync": {
     "sync": true,
     "android_sync_folder": [
-      "{SYNC_DIR}",
-      "{NETHERSX2_MEMCARDS}"
+      "{SYNC_DIR}"
     ],
     "windows_sync_folder": [
-      "{SYNC_DIR}",
-      "{PCSX2_MEMCARDS}"
+      "{SYNC_DIR}"
     ],
     "linux_sync_folder": [
       "{SYNC_DIR}"

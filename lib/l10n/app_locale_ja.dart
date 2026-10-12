@@ -323,6 +323,7 @@ const Map<String, dynamic> appLocaleJa = {
       '一時停止: これまでに {matched} 件一致しました。再実行すると続きから再開します。',
   AppLocale.rematchAchievementsFailed:
       'RetroAchievements のゲームを照合できませんでした: {error}',
+  AppLocale.raOpenPage: 'ページを開く',
   AppLocale.raFixMatch: '照合を修正',
   AppLocale.raFixMatchTitle: '正しいゲームを選択',
   AppLocale.raFixMatchSearchHint: 'RetroAchievements のタイトルを検索',

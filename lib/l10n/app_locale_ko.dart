@@ -322,6 +322,7 @@ const Map<String, dynamic> appLocaleKo = {
       '일시정지: 지금까지 {matched}개 일치. 다시 실행하면 이어서 진행합니다.',
   AppLocale.rematchAchievementsFailed:
       'RetroAchievements 게임을 매칭하지 못했습니다: {error}',
+  AppLocale.raOpenPage: '페이지 열기',
   AppLocale.raFixMatch: '매칭 수정',
   AppLocale.raFixMatchTitle: '올바른 게임 선택',
   AppLocale.raFixMatchSearchHint: 'RetroAchievements 제목 검색',

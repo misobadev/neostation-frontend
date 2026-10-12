@@ -311,6 +311,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.rematchAchievementsNothingToDo: '所有支援的遊戲都已檢查過。',
   AppLocale.rematchAchievementsPaused: '已暫停：目前已比對 {matched} 個遊戲。再次執行即可繼續。',
   AppLocale.rematchAchievementsFailed: '比對 RetroAchievements 遊戲失敗：{error}',
+  AppLocale.raOpenPage: '開啟頁面',
   AppLocale.raFixMatch: '修正比對',
   AppLocale.raFixMatchTitle: '選擇正確的遊戲',
   AppLocale.raFixMatchSearchHint: '搜尋 RetroAchievements 標題',
