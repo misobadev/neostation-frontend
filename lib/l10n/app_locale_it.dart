@@ -10,6 +10,8 @@ const Map<String, dynamic> appLocaleIt = {
       'Alcuni caricamenti non sono riusciti. Controlla la connessione e i permessi RomM, poi riprova.',
   AppLocale.rommUploadsFailedFor:
       'I salvataggi di {games} non sono stati caricati. Controlla la connessione e i permessi RomM, poi riprova.',
+  AppLocale.rommGameListSeparator: ', ',
+  AppLocale.rommGameListMore: '{games} e altri {count}',
   AppLocale.rommSavesHelp:
       'Sfoglia salvataggi e stati RomM. Riprova caricamenti controlla i giochi locali collegati a RomM con sincronizzazione attiva. I salvataggi remoti più recenti vengono scaricati all’avvio del gioco.',
   AppLocale.rommDeleteTitle: 'Elimina da RomM',

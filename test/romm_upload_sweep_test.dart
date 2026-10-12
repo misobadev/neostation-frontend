@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -52,6 +53,9 @@ class _FakeRommService extends RommService {
   final List<int> listCalls = [];
   final Set<int> failingListings = {};
 
+  /// rom ids whose listing waits for its future, to hold a sweep mid-game.
+  final Map<int, Future<void>> listingGates = {};
+
   /// rom ids whose uploads the server refuses, as an HTTP 500.
   final Set<int> failingUploads = {};
 
@@ -89,6 +93,7 @@ class _FakeRommService extends RommService {
   @override
   Future<List<RommAsset>> listSaves({required int romId}) async {
     listCalls.add(romId);
+    await listingGates[romId];
     if (failingListings.contains(romId)) {
       throw RommException('Listing unavailable', statusCode: 500);
     }
@@ -504,7 +509,7 @@ void main() {
         final result = await provider.fullSync();
 
         expect(result.success, isFalse);
-        expect(result.data, ['Unavailable'], reason: 'says which games failed');
+        expect(failed(), ['Unavailable'], reason: 'says which games failed');
         expect(svc.creates, contains('61/Available.srm'));
       },
     );
@@ -551,7 +556,7 @@ void main() {
         isFalse,
         reason: 'the pending save never reached the server',
       );
-      expect(result.data, ['Refused']);
+      expect(failed(), ['Refused']);
       expect(
         provider.getGameSyncState(game.romname)?.status,
         GameSyncStatus.error,
@@ -602,6 +607,33 @@ void main() {
         expect(svc.creates, ['71/Closed.srm']);
         expect(failed(), isEmpty);
       });
+
+      test(
+        "a failure behind the sweep is still reported when it's done",
+        () async {
+          // No save yet, so the sweep passes over it.
+          final closed = await linked('Closed', romId: 71);
+          await File(paths.pathFor(closed)).delete();
+          await linked('Pending', romId: 72);
+          final gate = Completer<void>();
+          svc.listingGates[72] = gate.future;
+
+          final sweep = provider.retryPendingUploads();
+          while (!svc.listCalls.contains(72)) {
+            await pumpEventQueue();
+          }
+          // Played and closed while the sweep is busy with a later game.
+          await touch(closed, 'PLAYED');
+          svc.failingUploads.add(71);
+          await provider.syncGameSavesAfterClose(closed);
+          expect(failed(), ['Closed']);
+
+          gate.complete();
+          expect((await sweep).success, isTrue);
+          expect(svc.creates, contains('72/Pending.srm'));
+          expect(failed(), ['Closed'], reason: 'its save is still pending');
+        },
+      );
 
       test('a sweep names it alongside the games it failed itself', () async {
         final closed = await linked('Closed', romId: 71);

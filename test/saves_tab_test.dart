@@ -101,11 +101,15 @@ void main() {
     connection.dispose();
   });
 
+  /// Builds [tab] and, with [settle], lets it finish loading. Without, it only
+  /// pumps a few frames: the busy bar animates for as long as loading lasts,
+  /// and settling would run fake time on past any timeout loading has.
   Future<void> pumpTab(
     WidgetTester tester, {
     Size size = const Size(1280, 720),
     double textScale = 1,
     Widget tab = const SavesTab(),
+    bool settle = true,
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -161,7 +165,13 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      for (var i = 0; i < 3; i++) {
+        await tester.pump();
+      }
+    }
   }
 
   /// Waits out the navigator's activation grace, which drops early input.
@@ -263,6 +273,27 @@ void main() {
       isNotNull,
       reason: 'B leaves for Systems, as it does from the connected saves',
     );
+  });
+
+  testWidgets('a reconnect no frame saw still opens a new list', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    final before = tester.state(find.byType(RommSavesContent));
+    connection.inventory.load = () async => [
+      inventoryAsset('Other.srm', romId: 2, id: 5),
+    ];
+
+    // Another server: its IDs say nothing about the files listed before.
+    connection.disconnectForTest();
+    connection.reconnectForTest();
+    await tester.pumpAndSettle();
+
+    expect(tester.state(find.byType(RommSavesContent)), isNot(same(before)));
+    expect(find.text('Other.srm'), findsOneWidget);
+    expect(find.text('Game.srm'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('B on the connection form takes its back action', (tester) async {
@@ -390,13 +421,16 @@ void main() {
         'name': id == 1 ? 'Alpha Quest' : 'Beta Saga',
       });
     };
-    await pumpTab(tester);
+    await pumpTab(tester, settle: false);
     // Held back: neither the panes nor the file-derived names appear.
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.text('Alpha.srm'), findsNothing);
     expect(find.text('Alpha'), findsNothing);
     expect(find.text('Beta'), findsNothing);
     // Nor can the controller wander into the hidden panes.
-    await press(tester, LogicalKeyboardKey.arrowDown);
+    await pastGrace(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
 
     names.complete();
     await tester.pumpAndSettle();

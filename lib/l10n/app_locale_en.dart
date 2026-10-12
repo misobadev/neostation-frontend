@@ -10,6 +10,8 @@ const Map<String, dynamic> appLocaleEn = {
       'Some uploads failed. Check your connection and RomM permissions, then retry.',
   AppLocale.rommUploadsFailedFor:
       "Saves for {games} didn't upload. Check your connection and RomM permissions, then retry.",
+  AppLocale.rommGameListSeparator: ', ',
+  AppLocale.rommGameListMore: '{games} and {count} more',
   AppLocale.rommSavesHelp:
       'Browse your RomM saves and states. Retry uploads checks local games linked to RomM with save sync enabled. Newer remote saves download when you launch a game.',
   AppLocale.rommDeleteTitle: 'Delete from RomM',

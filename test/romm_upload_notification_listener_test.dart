@@ -72,13 +72,27 @@ void main() {
 
   List<String> shown() => [for (final n in notifications.notifier.value) n.id];
 
-  testWidgets('names up to three games, then counts the rest', (tester) async {
+  testWidgets('names up to four games, else three and the rest', (
+    tester,
+  ) async {
     await pump(tester);
 
     romm.uploadFailures.value = const RommUploadFailures(['Alpha', 'Beta']);
     expect(
       notifications.notifier.value.single.message,
       failedFor('Alpha, Beta'),
+    );
+
+    // Never "and 1 more" for a name that fits in its place.
+    romm.uploadFailures.value = const RommUploadFailures([
+      'Alpha',
+      'Beta',
+      'Gamma',
+      'Delta',
+    ]);
+    expect(
+      notifications.notifier.value.single.message,
+      failedFor('Alpha, Beta, Gamma, Delta'),
     );
 
     romm.uploadFailures.value = const RommUploadFailures([
@@ -89,7 +103,7 @@ void main() {
       'Epsilon',
     ]);
     final notification = notifications.notifier.value.single;
-    expect(notification.message, failedFor('Alpha, Beta, Gamma +2'));
+    expect(notification.message, failedFor('Alpha, Beta, Gamma and 2 more'));
     expect(notification.type, GlobalNotificationType.error);
   });
 

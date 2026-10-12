@@ -10,6 +10,8 @@ const Map<String, dynamic> appLocaleRu = {
       'Некоторые файлы не отправлены. Проверьте подключение и разрешения RomM, затем повторите попытку.',
   AppLocale.rommUploadsFailedFor:
       'Сохранения для {games} не отправлены. Проверьте подключение и разрешения RomM, затем повторите попытку.',
+  AppLocale.rommGameListSeparator: ', ',
+  AppLocale.rommGameListMore: '{games} и ещё {count}',
   AppLocale.rommSavesHelp:
       'Просматривайте сохранения и состояния RomM. Повторная отправка проверяет локальные игры, связанные с RomM, с включённой синхронизацией. Новые удалённые сохранения скачиваются при запуске игры.',
   AppLocale.rommDeleteTitle: 'Удалить из RomM',

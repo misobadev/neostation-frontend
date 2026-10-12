@@ -10,6 +10,8 @@ const Map<String, dynamic> appLocaleId = {
       'Beberapa unggahan gagal. Periksa koneksi dan izin RomM, lalu coba lagi.',
   AppLocale.rommUploadsFailedFor:
       'Simpanan untuk {games} gagal diunggah. Periksa koneksi dan izin RomM, lalu coba lagi.',
+  AppLocale.rommGameListSeparator: ', ',
+  AppLocale.rommGameListMore: '{games} dan {count} lainnya',
   AppLocale.rommSavesHelp:
       'Lihat simpanan dan status RomM. Coba unggah lagi memeriksa game lokal yang tertaut ke RomM dengan sinkronisasi aktif. Simpanan jarak jauh yang lebih baru diunduh saat game dimulai.',
   AppLocale.rommDeleteTitle: 'Hapus dari RomM',

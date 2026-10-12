@@ -51,10 +51,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
   int _gameIndex = 0;
   int _fileIndex = 0;
   String? _gameKey;
-  // The panes stay hidden until the first screenful of games has its RomM
-  // metadata, so file-derived names never flash up before the real ones.
-  Future<void>? _firstPage;
-  bool _ready = false;
 
   // Input reads the games several times per press, so they are regrouped only
   // when the inventory or the filter changes.
@@ -167,10 +163,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
       _reconcileSelection(games);
       switch (_focus) {
         case _FocusArea.filters:
-          // Not into the panes while they are still hidden behind loading.
-          if (delta > 0 && games.isNotEmpty && _ready) {
-            _focus = _FocusArea.games;
-          }
+          if (delta > 0 && games.isNotEmpty) _focus = _FocusArea.games;
         case _FocusArea.games:
           if (_gameIndex == 0 && delta < 0) {
             _focus = _FocusArea.filters;
@@ -297,12 +290,13 @@ class _RommSavesContentState extends State<RommSavesContent> {
     action();
   };
 
-  /// [via] stands in for this tab's context once it may have closed.
-  void _notify(String message, {bool error = true, BuildContext? via}) {
+  /// Shows the [AppLocale] entry [key]. [via] stands in for this tab's context
+  /// once it may have closed.
+  void _notify(String key, {bool error = true, BuildContext? via}) {
     final at = via ?? context;
     AppNotification.showNotification(
       at,
-      message.getString(at),
+      key.getString(at),
       type: error ? NotificationType.error : NotificationType.success,
     );
   }
@@ -441,6 +435,10 @@ class _RommSavesContentState extends State<RommSavesContent> {
 
   /// Input can arrive after a filter or inventory change but before build.
   /// Resolve the selected game by key and clamp its file cursor in both paths.
+  ///
+  /// The build commits it too, so the cursor a press acts on is the one last
+  /// drawn: a press that lands before the frame showing an emptied list only
+  /// moves the cursor, rather than acting on a choice the user has not seen.
   void _reconcileSelection(List<RommSaveGame> games) {
     if (games.isEmpty) {
       _focus = _FocusArea.filters;
@@ -466,9 +464,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
     builder: (context, _) {
       final games = _games;
       _reconcileSelection(games);
-      if (games.isNotEmpty) {
-        _firstPage ??= _loadFirstPage(games);
-      }
       // The navigator owns the cursor. Otherwise an arrow key hands Flutter's
       // focus to the first button it finds, which then shows a highlight of
       // its own and is activated by Enter alongside the navigator's choice.
@@ -488,8 +483,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
                     child: _filters(),
                   ),
                   Expanded(
-                    child: games.isEmpty || !_ready
-                        ? _empty(loading: _saves.loading || games.isNotEmpty)
+                    child: games.isEmpty
+                        ? _empty(loading: _saves.loading)
                         : Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -1128,17 +1123,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
   /// has nothing better.
   String _title(RommSaveGame game, RommSaveGameInfo? info) =>
       info == null ? '' : info.rom?.name ?? game.fallbackTitle;
-
-  Future<void> _loadFirstPage(List<RommSaveGame> games) async {
-    // No more tiles than this can be on screen at once.
-    final visible = (MediaQuery.sizeOf(context).height / _gameExtent).ceil();
-    // Capped so slow metadata can't hold the inventory back for long; anything
-    // still pending fills in when it arrives.
-    await Future.wait([
-      for (final game in games.take(visible)) _saves.gameInfo(game.romId),
-    ]).timeout(const Duration(seconds: 5), onTimeout: () => const []);
-    if (mounted) setState(() => _ready = true);
-  }
 
   /// The RomM browser's centred message.
   Widget _empty({required bool loading}) {

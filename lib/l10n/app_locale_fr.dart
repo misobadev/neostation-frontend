@@ -10,6 +10,8 @@ const Map<String, dynamic> appLocaleFr = {
       'Certains envois ont échoué. Vérifiez la connexion et les autorisations RomM, puis réessayez.',
   AppLocale.rommUploadsFailedFor:
       "Les sauvegardes de {games} n'ont pas été envoyées. Vérifiez la connexion et les autorisations RomM, puis réessayez.",
+  AppLocale.rommGameListSeparator: ', ',
+  AppLocale.rommGameListMore: '{games} et {count} autres',
   AppLocale.rommSavesHelp:
       'Consultez vos sauvegardes et états RomM. Réessayer les envois vérifie les jeux locaux liés à RomM dont la synchronisation est activée. Les sauvegardes distantes plus récentes sont téléchargées au lancement du jeu.',
   AppLocale.rommDeleteTitle: 'Supprimer de RomM',

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:neostation/models/romm_asset.dart';
+import 'package:neostation/models/romm_rom.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/providers/romm_saves_provider.dart';
 import 'package:neostation/services/romm_service.dart';
@@ -317,19 +318,56 @@ void main() {
       expect(inventory.assets.single.fileName, 'new');
     });
 
-    test(
-      'disconnect clears inventory and discards an in-flight response',
-      () async {
-        final request = Completer<List<RommAsset>>();
-        connection.inventory.load = () => request.future;
-        final pending = inventory.refresh();
-        connection.disconnectForTest();
-        request.complete([inventoryAsset('old account')]);
-        await pending;
-        expect(inventory.assets, isEmpty);
-        expect(inventory.loading, isFalse);
-      },
-    );
+    test('a disconnect discards an in-flight response', () async {
+      final request = Completer<List<RommAsset>>();
+      connection.inventory.load = () => request.future;
+      final pending = inventory.refresh();
+      connection.disconnectForTest();
+      request.complete([inventoryAsset('old account')]);
+      await pending;
+      expect(inventory.assets, isEmpty);
+      expect(inventory.loading, isFalse);
+    });
+
+    test('a provider outlived by its connection stays stopped', () async {
+      connection.inventory.load = () async => [inventoryAsset('old.srm')];
+      await inventory.refresh();
+      connection.disconnectForTest();
+      connection.reconnectForTest();
+      connection.inventory.load = () async => [inventoryAsset('new.srm')];
+
+      // The Saves tab builds a new one for the new connection.
+      await inventory.refresh();
+      await inventory.retryUploads();
+      expect(connection.inventory.calls, 1);
+      expect(sync.calls, 0);
+      expect(
+        await inventory.delete(inventory.assets),
+        RommDeleteOutcome.notSent,
+      );
+      expect((await inventory.gameInfo(2)).rom, isNull);
+      expect(connection.inventory.detailCalls, [
+        1,
+      ], reason: 'ROM 2 there is an unrelated game');
+    });
+
+    test('a refresh shows the list once its first games have names', () async {
+      final names = Completer<void>();
+      connection.inventory.loadRom = (id) async {
+        await names.future;
+        return RommRom.fromJson({'id': id, 'name': 'Alpha Quest'});
+      };
+      connection.inventory.load = () async => [inventoryAsset('Alpha.srm')];
+      final pending = inventory.refresh();
+      await pumpEventQueue();
+      expect(inventory.loading, isTrue);
+      expect(inventory.assets, isEmpty, reason: 'no file-derived title first');
+
+      names.complete();
+      await pending;
+      expect(inventory.assets.single.fileName, 'Alpha.srm');
+      expect(inventory.loadedGameInfo(1)?.rom?.name, 'Alpha Quest');
+    });
 
     test(
       'retry runs only the selected provider and refreshes afterwards',
@@ -461,11 +499,12 @@ void main() {
       expect(
         connection.inventory.calls,
         1,
-        reason: 'a refresh now would cut the remaining batches short',
+        reason: 'a listing now could still show the files being deleted',
       );
       request.complete();
       expect(await pending, RommDeleteOutcome.deleted);
       expect(connection.inventory.deleted, ['save:1', 'state:1']);
+      await pumpEventQueue();
       expect(
         connection.inventory.calls,
         2,
@@ -577,15 +616,13 @@ void main() {
         final pending = inventory.delete([asset]);
         connection.disconnectForTest();
         connection.reconnectForTest();
-        connection.inventory.load = () async => [inventoryAsset('new.srm')];
-        await inventory.refresh();
+        // Cancelled at once, not left waiting on the old server's listing.
         expect(await pending, RommDeleteOutcome.notSent);
         expect(connection.inventory.deleteRequests, isEmpty);
-        expect(inventory.assets.single.fileName, 'new.srm');
         expect(inventory.deleting, isFalse);
         listing.complete([asset]);
         await refresh;
-        expect(inventory.assets.single.fileName, 'new.srm');
+        expect(inventory.assets, isEmpty, reason: 'the old listing is dropped');
       },
     );
 
@@ -762,19 +799,10 @@ void main() {
           // deletes nor single-file retries belong to the new connection.
           connection.disconnectForTest();
           connection.reconnectForTest();
-          connection.inventory.load = () async => [
-            inventoryAsset('new.srm', id: 1),
-            inventoryAsset('new.state', state: true, id: 1),
-          ];
-          await inventory.refresh();
           request.complete();
 
           expect(await pending, RommDeleteOutcome.failed);
           expect(connection.inventory.deleteRequests, ['save:1,2']);
-          expect(inventory.assets.map((a) => a.fileName), [
-            'new.srm',
-            'new.state',
-          ]);
           expect(inventory.deleting, isFalse);
         },
       );

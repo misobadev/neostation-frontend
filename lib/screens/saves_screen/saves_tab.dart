@@ -22,10 +22,14 @@ class SavesTab extends StatelessWidget {
     if (providerId != RomMSyncProvider.kProviderId) {
       return const NeoSyncContent();
     }
-    final connected = context.select<RommProvider, bool>((p) => p.isConnected);
-    if (connected) return const RommSavesContent();
+    final session = context.select<RommProvider, int?>(
+      (p) => p.isConnected ? p.service.session : null,
+    );
     // B leaves for Systems, as it does from the connected saves.
-    return const RommConnectContent(onBack: _toSystems);
+    if (session == null) return const RommConnectContent(onBack: _toSystems);
+    // One per connection, even across a reconnect no frame saw: what it lists
+    // and deletes is identified only on the connection it came from.
+    return RommSavesContent(key: ValueKey(session));
   }
 
   static void _toSystems() => AppNavigation.goToTab(AppTabs.systems);

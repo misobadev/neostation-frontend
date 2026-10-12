@@ -1473,6 +1473,10 @@ mixin AppLocale {
   static const String rommRetryUploads = 'romm_retry_uploads';
   static const String rommUploadsFailed = 'romm_uploads_failed';
   static const String rommUploadsFailedFor = 'romm_uploads_failed_for';
+  // The {games} of rommUploadsFailedFor: names joined by the separator, and
+  // past four, "{games} and {count} more" ({count} is always 2 or more).
+  static const String rommGameListSeparator = 'romm_game_list_separator';
+  static const String rommGameListMore = 'romm_game_list_more';
   static const String rommSavesHelp = 'romm_saves_help';
   static const String rommDeleteTitle = 'romm_delete_title';
   static const String rommDeleteConfirm = 'romm_delete_confirm';

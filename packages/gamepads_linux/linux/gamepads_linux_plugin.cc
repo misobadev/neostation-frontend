@@ -31,8 +31,13 @@ namespace {
 // disconnect can drop it from the registry while the thread is still inside a
 // read or a callback.
 struct Connection {
-  explicit Connection(gamepad::GamepadInfo info) : info(std::move(info)) {}
+  Connection(std::string id, gamepad::GamepadInfo info)
+      : id(std::move(id)), info(std::move(info)) {}
 
+  // What Dart knows the gamepad by. The next gamepad plugged in can take over
+  // the device path, but never this id, so nothing the app cached for an
+  // earlier gamepad (its axis layout, its button mapping) is applied to it.
+  const std::string id;
   const gamepad::GamepadInfo info;
   // Cleared by a disconnect. The reader thread stops at its next event.
   std::atomic<bool> alive{true};
@@ -40,6 +45,8 @@ struct Connection {
 }  // namespace
 
 bool keep_reading_events = false;
+// Numbers each connection's id. Only the connection listener's thread uses it.
+static unsigned long connection_count = 0;
 // Changed by the connection listener's thread and the reader threads, and
 // read by `listGamepads` on the main thread.
 static std::mutex gamepads_mutex;
@@ -72,7 +79,7 @@ static gboolean send_gamepad_event(gpointer event) {
 
 // Runs on the gamepad's reader thread. The embedder's API is not thread-safe,
 // so the event is sent from the main loop, in the order it was read.
-static void emit_gamepad_event(const gamepad::GamepadInfo& gamepad,
+static void emit_gamepad_event(const Connection& connection,
                                const js_event& event) {
   const char* type = parse_event_type(event);
   if (type == nullptr) {
@@ -83,7 +90,7 @@ static void emit_gamepad_event(const gamepad::GamepadInfo& gamepad,
   }
   FlValue* map = fl_value_new_map();
   fl_value_set_string_take(map, "gamepadId",
-                           fl_value_new_string(gamepad.device_id.c_str()));
+                           fl_value_new_string(connection.id.c_str()));
   fl_value_set_string_take(map, "time", fl_value_new_int(event.time));
   fl_value_set_string_take(map, "type", fl_value_new_string(type));
   fl_value_set_string_take(
@@ -117,7 +124,7 @@ static void gamepads_linux_plugin_handle_method_call(
       const gamepad::GamepadInfo& gamepad = connection->info;
       g_autoptr(FlValue) map = fl_value_new_map();
       fl_value_set(map, fl_value_new_string("id"),
-                   fl_value_new_string(device_id.c_str()));
+                   fl_value_new_string(connection->id.c_str()));
       fl_value_set(map, fl_value_new_string("name"),
                    fl_value_new_string(gamepad.name.c_str()));
       
@@ -179,7 +186,7 @@ void gamepads_linux_plugin_register_with_registrar(
 static void process_connection_event(std::shared_ptr<Connection> connection) {
   gamepad::listen(connection->info, connection->alive,
                   [&connection](const js_event& value) {
-                    emit_gamepad_event(connection->info, value);
+                    emit_gamepad_event(*connection, value);
                   });
   // A failed read can end the thread before the disconnect is seen. The
   // gamepad is gone either way, unless it has already been reconnected.
@@ -216,7 +223,9 @@ void event_loop_start() {
 
             std::cout << "Gamepad connected " << key << " - " << info->name
                       << std::endl;
-            auto connection = std::make_shared<Connection>(std::move(*info));
+            auto connection = std::make_shared<Connection>(
+                key + "#" + std::to_string(++connection_count),
+                std::move(*info));
             {
               std::lock_guard<std::mutex> lock(gamepads_mutex);
               gamepads[key] = connection;

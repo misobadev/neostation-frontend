@@ -10,6 +10,8 @@ const Map<String, dynamic> appLocalePt = {
       'Alguns envios falharam. Verifique a conexão e as permissões do RomM e tente novamente.',
   AppLocale.rommUploadsFailedFor:
       'Os saves de {games} não foram enviados. Verifique a conexão e as permissões do RomM e tente novamente.',
+  AppLocale.rommGameListSeparator: ', ',
+  AppLocale.rommGameListMore: '{games} e mais {count}',
   AppLocale.rommSavesHelp:
       'Veja seus salvamentos e estados do RomM. Tentar envios novamente verifica jogos locais vinculados ao RomM com sincronização ativa. Salvamentos remotos mais recentes são baixados ao iniciar um jogo.',
   AppLocale.rommDeleteTitle: 'Excluir do RomM',

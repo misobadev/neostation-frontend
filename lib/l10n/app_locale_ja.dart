@@ -8,6 +8,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.rommUploadsFailed: '一部のアップロードに失敗しました。接続とRomMの権限を確認して再試行してください。',
   AppLocale.rommUploadsFailedFor:
       '{games}のセーブをアップロードできませんでした。接続とRomMの権限を確認して再試行してください。',
+  AppLocale.rommGameListSeparator: '、',
+  AppLocale.rommGameListMore: '{games}ほか{count}件',
   AppLocale.rommSavesHelp:
       'RomMのセーブとステートを表示します。アップロードの再試行では、RomMにリンクされ同期が有効なローカルゲームを確認します。新しいリモートセーブはゲーム起動時にダウンロードされます。',
   AppLocale.rommDeleteTitle: 'RomMから削除',

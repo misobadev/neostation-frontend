@@ -10,6 +10,8 @@ const Map<String, dynamic> appLocaleDe = {
       'Einige Uploads sind fehlgeschlagen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
   AppLocale.rommUploadsFailedFor:
       'Spielstände für {games} wurden nicht hochgeladen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
+  AppLocale.rommGameListSeparator: ', ',
+  AppLocale.rommGameListMore: '{games} und {count} weitere',
   AppLocale.rommSavesHelp:
       'RomM-Spielstände ansehen. Uploads wiederholen prüft lokale, mit RomM verknüpfte Spiele mit aktivierter Synchronisierung. Neuere Spielstände werden beim Spielstart heruntergeladen.',
   AppLocale.rommDeleteTitle: 'Aus RomM löschen',

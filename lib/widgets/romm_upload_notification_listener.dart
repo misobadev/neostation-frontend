@@ -57,19 +57,27 @@ class _RommUploadNotificationListenerState
       notifications.dismiss(RommUploadNotificationListener.notificationId);
       return;
     }
-    final names = failures.games;
-    final games = names.length > 3
-        ? '${names.take(3).join(', ')} +${names.length - 3}'
-        : names.join(', ');
     notifications.show(
       id: RommUploadNotificationListener.notificationId,
       message: failures.unidentified
           ? AppLocale.rommUploadsFailed.getString(context)
           : AppLocale.rommUploadsFailedFor
                 .getString(context)
-                .replaceFirst('{games}', games),
+                .replaceFirst('{games}', _gameList(failures.games)),
       type: GlobalNotificationType.error,
     );
+  }
+
+  /// Up to four names, or three and how many more: never "and 1 more" for a
+  /// name that would fit in its place.
+  String _gameList(List<String> names) {
+    final separator = AppLocale.rommGameListSeparator.getString(context);
+    if (names.length <= 4) return names.join(separator);
+    // The names go in last, so braces in them are never taken for {count}.
+    return AppLocale.rommGameListMore
+        .getString(context)
+        .replaceFirst('{count}', '${names.length - 3}')
+        .replaceFirst('{games}', names.take(3).join(separator));
   }
 
   @override

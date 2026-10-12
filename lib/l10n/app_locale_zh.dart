@@ -7,6 +7,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.rommRetryUploads: '重试上传',
   AppLocale.rommUploadsFailed: '部分上传失败。请检查连接和 RomM 权限，然后重试。',
   AppLocale.rommUploadsFailedFor: '{games} 的存档上传失败。请检查连接和 RomM 权限，然后重试。',
+  AppLocale.rommGameListSeparator: '、',
+  AppLocale.rommGameListMore: '{games} 及另外 {count} 个游戏',
   AppLocale.rommSavesHelp:
       '浏览 RomM 存档和即时存档。重试上传会检查已关联 RomM 且启用同步的本地游戏。启动游戏时会下载较新的远程存档。',
   AppLocale.rommDeleteTitle: '从 RomM 删除',
