@@ -74,6 +74,11 @@ class RommSavesProvider extends ChangeNotifier {
   final Map<int, RommSaveGameInfo> _loadedInfo = {};
   // Lookups that got no metadata, which the next refresh retries.
   final Set<int> _failedInfo = {};
+  // [gameInfo]'s answer when there is nothing to look up. Always the same
+  // future, so a FutureBuilder given it doesn't resubscribe on every rebuild.
+  // One per provider rather than one for the app: a completed future runs its
+  // listeners in the zone that made it.
+  final _noGameInfo = Future.value(const RommSaveGameInfo());
   // Completes once this provider is disposed or its connection ends, which
   // wakes a delete still waiting so it can give up.
   final _ended = Completer<void>();
@@ -114,9 +119,7 @@ class RommSavesProvider extends ChangeNotifier {
   /// Memoized and requested only for visible games. Missing art/metadata never
   /// prevents the inventory from loading, and a refresh retries failed lookups.
   Future<RommSaveGameInfo> gameInfo(int? romId) {
-    if (romId == null || !_live) {
-      return Future.value(const RommSaveGameInfo());
-    }
+    if (romId == null || !_live) return _noGameInfo;
     return _gameInfo.putIfAbsent(
       romId,
       () => _readGameInfo(romId).then((info) {

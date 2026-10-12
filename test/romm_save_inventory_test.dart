@@ -351,6 +351,14 @@ void main() {
       ], reason: 'ROM 2 there is an unrelated game');
     });
 
+    test('a game with no ROM to look up always gets the same answer', () async {
+      // A new future each time would resubscribe its FutureBuilder on every
+      // rebuild of the game's card.
+      expect(inventory.gameInfo(null), same(inventory.gameInfo(null)));
+      expect((await inventory.gameInfo(null)).rom, isNull);
+      expect(connection.inventory.detailCalls, isEmpty);
+    });
+
     test('a refresh shows the list once its first games have names', () async {
       final names = Completer<void>();
       connection.inventory.loadRom = (id) async {

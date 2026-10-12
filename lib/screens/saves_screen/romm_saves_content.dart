@@ -68,6 +68,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
   int _gameIndex = 0;
   int _fileIndex = 0;
   String? _gameKey;
+  // The focused file, which a refresh can move by listing newer files.
+  ({bool isState, int id})? _fileKey;
 
   // Input reads the games several times per press, so they are regrouped only
   // when the inventory or the filter changes.
@@ -190,10 +192,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
           if (_fileIndex == 0 && delta < 0) {
             _focus = _FocusArea.filters;
           } else if (games.isNotEmpty) {
-            _fileIndex = (_fileIndex + delta).clamp(
-              0,
-              games[_gameIndex].assets.length - 1,
-            );
+            final files = games[_gameIndex].assets;
+            _selectFile((_fileIndex + delta).clamp(0, files.length - 1), files);
           }
       }
     });
@@ -226,27 +226,57 @@ class _RommSavesContentState extends State<RommSavesContent> {
     return _cursor != before;
   }
 
+  /// Keeps the cursor on screen: the selected game in the game list, whichever
+  /// pane has focus, and the focused file in its list while the files do.
   void _revealSelection() {
     final games = _games;
-    final files = _focus == _FocusArea.files;
-    final controller = files ? _filesScroll : _gamesScroll;
-    if (_gameIndex >= games.length || !controller.hasClients) return;
+    if (_gameIndex >= games.length) return;
+    _reveal(
+      _gamesScroll,
+      index: _gameIndex,
+      count: games.length,
+      extent: _gameExtent,
+    );
+    if (_focus != _FocusArea.files) return;
+    _reveal(
+      _filesScroll,
+      index: _fileIndex,
+      count: games[_gameIndex].assets.length,
+      extent: _fileExtent,
+      header: _headerExtent,
+    );
+  }
+
+  /// Scrolls [controller] as little as it takes to show row [index] of
+  /// [count], each [extent] tall below a [header].
+  ///
+  /// The row and the list padding either side of it stay on screen, so it is
+  /// never under the edge fade and its glow has room. That also scrolls the
+  /// first and last rows fully to the ends, the first bringing the header back
+  /// with it. It never scrolls past where [count] rows end, so it can run
+  /// before a list that is about to shrink is laid out again.
+  void _reveal(
+    ScrollController controller, {
+    required int index,
+    required int count,
+    required double extent,
+    double header = 0,
+  }) {
+    if (!controller.hasClients) return;
     final position = controller.position;
-    final index = files ? _fileIndex : _gameIndex;
-    final extent = files ? _fileExtent : _gameExtent;
-    final header = files ? _headerExtent : 0.0;
-    // The row and the list padding either side of it stay on screen, so it is
-    // never under the edge fade and its glow has room. That also scrolls the
-    // first and last rows fully to the ends, the first bringing the header
-    // back with it.
+    final viewport = position.viewportDimension;
     final top = index == 0 ? 0.0 : header + index * extent;
     final bottom = header + (index + 1) * extent + 2 * _listInset;
     final offset = top < position.pixels
         ? top
-        : bottom > position.pixels + position.viewportDimension
-        ? bottom - position.viewportDimension
+        : bottom > position.pixels + viewport
+        ? bottom - viewport
         : position.pixels;
-    controller.jumpTo(offset.clamp(0, position.maxScrollExtent));
+    final end = math.min(
+      position.maxScrollExtent,
+      math.max(0.0, header + count * extent + 2 * _listInset - viewport),
+    );
+    controller.jumpTo(offset.clamp(0, end));
   }
 
   void _activate() {
@@ -433,14 +463,20 @@ class _RommSavesContentState extends State<RommSavesContent> {
     moveFocus: false,
   );
 
+  /// The game list stays where it is around a game the new filter still
+  /// shows, which stays selected, and starts at the top otherwise. The files
+  /// start at the top, as the file list is keyed by filter.
   void _setFilter(_SaveFilter filter, {bool moveFocus = true}) {
     setState(() {
       _filter = _filterFocus = filter;
       if (moveFocus) _focus = _FocusArea.filters;
       _fileIndex = 0;
+      _fileKey = null;
       _reconcileSelection(_games);
     });
-    if (_gamesScroll.hasClients) _gamesScroll.jumpTo(0);
+    // Now, so the first frame of the new list already shows the selection,
+    // and again once that list has been laid out.
+    _revealSelection();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _revealSelection();
     });
@@ -448,13 +484,20 @@ class _RommSavesContentState extends State<RommSavesContent> {
 
   /// The new game's files start at the top: the file list is keyed by game.
   void _selectGame(int index, List<RommSaveGame> games) {
-    if (_gameKey != games[index].key) _fileIndex = 0;
+    if (_gameKey != games[index].key) _selectFile(0, games[index].assets);
     _gameIndex = index;
     _gameKey = games[index].key;
   }
 
+  void _selectFile(int index, List<RommAsset> files) {
+    _fileIndex = index;
+    _fileKey = files[index].key;
+  }
+
   /// Input can arrive after a filter or inventory change but before build.
-  /// Resolve the selected game by key and clamp its file cursor in both paths.
+  /// Resolve the selected game and its focused file by key in both paths, as
+  /// a refresh can list others ahead of either. A file that has gone leaves
+  /// the cursor where it was, on a neighbour.
   ///
   /// The build commits it too, so the cursor a press acts on is the one last
   /// drawn: a press that lands before the frame showing an emptied list only
@@ -466,12 +509,20 @@ class _RommSavesContentState extends State<RommSavesContent> {
     }
     final previousKey = _gameKey;
     final previousIndex = _gameIndex;
+    final previousFile = _fileIndex;
     final preserved = games.indexWhere((game) => game.key == _gameKey);
     _gameIndex = preserved >= 0 ? preserved : 0;
     _gameKey = games[_gameIndex].key;
-    if (previousKey != _gameKey) _fileIndex = 0;
-    _fileIndex = _fileIndex.clamp(0, games[_gameIndex].assets.length - 1);
-    if (previousIndex != _gameIndex || previousKey != _gameKey) {
+    final sameGame = previousKey == _gameKey;
+    final files = games[_gameIndex].assets;
+    final kept = sameGame ? files.indexWhere((f) => f.key == _fileKey) : -1;
+    _selectFile(
+      kept >= 0 ? kept : (sameGame ? _fileIndex : 0).clamp(0, files.length - 1),
+      files,
+    );
+    if (!sameGame ||
+        previousIndex != _gameIndex ||
+        previousFile != _fileIndex) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _revealSelection();
       });
@@ -956,7 +1007,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
                 sliver: SliverFixedExtentList(
                   itemExtent: _fileExtent,
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => _fileRow(game.assets[index], index),
+                    (context, index) => _fileRow(game, index),
                     childCount: game.assets.length,
                   ),
                 ),
@@ -1027,7 +1078,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
     );
   }
 
-  Widget _fileRow(RommAsset file, int index) {
+  Widget _fileRow(RommSaveGame game, int index) {
+    final file = game.assets[index];
     final scheme = Theme.of(context).colorScheme;
     final radius = CornerRadii.of(context).radiusInternal;
     final focused = _focus == _FocusArea.files && _fileIndex == index;
@@ -1057,7 +1109,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
         onTap: _tap(
           () => setState(() {
             _focus = _FocusArea.files;
-            _fileIndex = index;
+            _selectFile(index, game.assets);
           }),
         ),
         child: Row(

@@ -1068,6 +1068,108 @@ void main() {
     },
   );
 
+  testWidgets('a filter change keeps the selected game in view', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    // Sixty games with a save each, newest first. Every third has a state
+    // too, so States keeps game 30 but moves it up from 31st to 11th of 20,
+    // well clear of both ends of either list.
+    connection.inventory.load = () async => [
+      for (var i = 0; i < 60; i++) ...[
+        inventoryAsset('Game-$i.srm', id: i, romId: 100 + i, time: 99 - i),
+        if (i % 3 == 0)
+          inventoryAsset(
+            'Game-$i.state',
+            state: true,
+            id: i,
+            romId: 100 + i,
+            time: 99 - i,
+          ),
+      ],
+    ];
+    await pumpTab(tester);
+    final card = find.byKey(const ValueKey('save-game-rom:130'));
+    bool inView() {
+      if (card.evaluate().isEmpty) return false;
+      final list = tester.getRect(
+        find.ancestor(of: card, matching: find.byType(Scrollable)).first,
+      );
+      final rect = tester.getRect(card);
+      return rect.top >= list.top && rect.bottom <= list.bottom;
+    }
+
+    await press(tester, LogicalKeyboardKey.arrowDown); // games
+    for (var i = 0; i < 30; i++) {
+      await press(tester, LogicalKeyboardKey.arrowDown);
+    }
+    expect(inView(), isTrue);
+
+    // From the files, which keep focus.
+    await press(tester, LogicalKeyboardKey.arrowRight);
+    await pull(tester, 'axis_ltrigger'); // wraps back to States
+    expect(find.text('Game-30.srm'), findsNothing);
+    expect(glows(tester, 'save-file-true-30'), isTrue);
+    expect(inView(), isTrue, reason: 'its files are the ones on screen');
+
+    // From the game list, back to All, which moves it down again.
+    await press(tester, LogicalKeyboardKey.arrowLeft);
+    await pull(tester, 'axis_rtrigger');
+    expect(find.text('Game-30.srm'), findsOneWidget);
+    expect(inView(), isTrue);
+
+    // Already in view in the first frame of the shorter list, not only once
+    // a later frame has scrolled to it.
+    await pastGrace(tester);
+    await send(tester, 'axis_ltrigger', 1);
+    var frames = 0;
+    while (find.text('Game-30.srm').evaluate().isNotEmpty) {
+      expect(++frames, lessThan(5), reason: 'States never applied');
+      await tester.pump();
+    }
+    expect(inView(), isTrue);
+    await send(tester, 'axis_ltrigger', 0);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a refresh listing a newer file keeps the cursor on its file', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    connection.inventory.load = () async => [
+      inventoryAsset('Game-1.srm', time: 100),
+      inventoryAsset('Game-2.srm', id: 2, time: 50),
+    ];
+    await pumpTab(tester);
+    await press(tester, LogicalKeyboardKey.arrowDown); // games
+    await press(tester, LogicalKeyboardKey.arrowRight); // files, Game-1 first
+    expect(glows(tester, 'save-file-false-1'), isTrue);
+
+    // A sweep uploads a newer save, which its refresh lists first.
+    final run = Completer<SyncResult>();
+    romm.runningSweep.value = run.future;
+    connection.inventory.load = () async => [
+      inventoryAsset('Game-3.srm', id: 3, time: 200),
+      inventoryAsset('Game-1.srm', time: 100),
+      inventoryAsset('Game-2.srm', id: 2, time: 50),
+    ];
+    run.complete(SyncResult.ok());
+    romm.runningSweep.value = null;
+    await tester.pumpAndSettle();
+    expect(find.text('Game-3.srm'), findsOneWidget);
+    expect(glows(tester, 'save-file-false-1'), isTrue);
+    expect(glows(tester, 'save-file-false-3'), isFalse);
+
+    // So the delete is the file the user was on.
+    await tester.tap(find.byKey(const ValueKey('save-delete')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(connection.inventory.deleted, ['save:1']);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('failed refresh keeps the selected game and files visible', (
     tester,
   ) async {
