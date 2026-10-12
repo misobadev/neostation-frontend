@@ -131,7 +131,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
         onActivate: _navigation.activate,
         onDeactivate: _navigation.deactivate,
       );
-      _saves.refresh();
+      // No artwork has been tried yet, so there is none to retry.
+      _saves.refresh(retryArtwork: false);
     });
   }
 
@@ -846,10 +847,12 @@ class _RommSavesContentState extends State<RommSavesContent> {
     builder: (context, snapshot) => builder(snapshot.data),
   );
 
-  String? _platform(RommSaveGameInfo? info) {
-    final slug = info?.rom?.platformSlug;
-    return slug == null || slug.isEmpty ? null : slug.toUpperCase();
-  }
+  /// The RomM browser's platform name for the game, never a raw slug when
+  /// RomM sent a name.
+  String? _platform(RommSaveGameInfo? info) => switch (info?.rom) {
+    final rom? => context.read<RommProvider>().platformLabel(rom),
+    null => null,
+  };
 
   /// Saves in the primary colour, states in the tertiary, as their file rows
   /// mark them.
@@ -859,13 +862,13 @@ class _RommSavesContentState extends State<RommSavesContent> {
       if (game.saves > 0)
         _meta(
           Symbols.save_rounded,
-          '${AppLocale.statSaves.getString(context)} ${game.saves}',
+          saveFilesCountLabel(context, game.saves),
           iconColor: scheme.primary,
         ),
       if (game.states > 0)
         _meta(
           _stateIcon,
-          '${AppLocale.statStates.getString(context)} ${game.states}',
+          saveStatesCountLabel(context, game.states),
           iconColor: scheme.tertiary,
         ),
     ];

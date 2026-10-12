@@ -174,6 +174,19 @@ void main() {
       ]);
     });
 
+    test('a button sharing its number with a hat leaves the hat alone', () {
+      // On an Xbox pad, button 6 is Select and axis 6 the d-pad's X axis.
+      useOs('linux');
+      TranslatedGamepadEvent? select(double value) =>
+          send('6', value, type: KeyType.button);
+      expect(edges([send('6', rest), select(1), select(0), send('6', 0)]), [
+        'press dpadLeft',
+        'press buttonSelect',
+        'release buttonSelect',
+        'release dpadLeft',
+      ]);
+    });
+
     test('a DualShock L2, an axis and a button, presses once per pull', () {
       useOs('linux', {
         'vendorId': '054c',

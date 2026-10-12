@@ -414,6 +414,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('cards name the platform and count each kind of file', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    connection.inventory.load = () async => [
+      inventoryAsset('Alpha.srm', time: 300),
+      inventoryAsset('Alpha.state', state: true, time: 200),
+      inventoryAsset('Alpha.state1', state: true, id: 2, time: 150),
+      inventoryAsset('Beta.srm', romId: 2, id: 3, time: 100),
+    ];
+    connection.inventory.loadRom = (id) async => RommRom.fromJson({
+      'id': id,
+      'name': id == 1 ? 'Alpha Quest' : 'Beta Saga',
+      'platform_slug': id == 1 ? 'gba' : 'genesis-slash-megadrive',
+      if (id == 1) 'platform_name': 'Game Boy Advance',
+    });
+    await pumpTab(tester);
+    // RomM's name for the platform, not its slug.
+    expect(find.text('Game Boy Advance'), findsWidgets);
+    expect(find.text('GBA'), findsNothing);
+    // Without one, the slug is all there is to show.
+    expect(find.text('GENESIS-SLASH-MEGADRIVE'), findsOneWidget);
+    // Counts come from the translated templates, in both forms.
+    expect(find.text('1 save file'), findsWidgets);
+    expect(find.text('2 save states'), findsWidgets);
+    expect(find.text('Saves 1'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('L2/R2 cycle the filters without moving focus', (tester) async {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
@@ -917,6 +946,9 @@ void main() {
         'id': id,
         'name': id == 1 ? 'Super Mario Advance' : 'Crash Bandicoot',
         'platform_slug': id == 1 ? 'gba' : 'psx',
+        'platform_name': id == 1
+            ? 'Game Boy Advance'
+            : 'PlayStation (Sony Computer Entertainment)',
       });
       connection.inventory.load = () async => [
         inventoryAsset(

@@ -574,12 +574,86 @@ void main() {
       final game = await linked('Closed', romId: 71);
       svc.failingUploads.add(71);
 
-      await provider.syncGameSavesAfterClose(game);
+      final result = await provider.syncGameSavesAfterClose(game);
 
+      expect(result.success, isFalse);
       expect(
         provider.getGameSyncState(game.romname)?.status,
         GameSyncStatus.error,
         reason: 'not "local only", which reads as a save that needs nothing',
+      );
+    });
+
+    group('after a game closes', () {
+      List<String> notified() => [
+        for (final n in GlobalNotificationService().notifier.value) n.message,
+      ];
+      String failedFor(String games) => AppLocale
+          .en[AppLocale.rommUploadsFailedFor]!
+          .replaceFirst('{games}', games);
+
+      test('a refused upload is reported until the save goes up', () async {
+        final game = await linked('Closed', romId: 71);
+        svc.failingUploads.add(71);
+
+        await provider.syncGameSavesAfterClose(game);
+        expect(notified(), [failedFor('Closed')]);
+
+        svc.failingUploads.clear();
+        await touch(game, 'PLAYED-AGAIN');
+        expect((await provider.syncGameSavesAfterClose(game)).success, isTrue);
+        expect(notified(), isEmpty);
+      });
+
+      test('a sweep that uploads the save clears the report', () async {
+        final game = await linked('Closed', romId: 71);
+        svc.failingUploads.add(71);
+        await provider.syncGameSavesAfterClose(game);
+
+        svc.failingUploads.clear();
+        expect((await provider.retryPendingUploads()).success, isTrue);
+
+        expect(svc.creates, ['71/Closed.srm']);
+        expect(notified(), isEmpty);
+      });
+
+      test('a sweep names it alongside the games it failed itself', () async {
+        final closed = await linked('Closed', romId: 71);
+        svc.failingUploads.add(71);
+        await provider.syncGameSavesAfterClose(closed);
+        await linked('Swept', romId: 72);
+        svc.failingListings.add(72);
+
+        await provider.retryPendingUploads();
+
+        expect(notified(), [failedFor('Closed, Swept')]);
+      });
+
+      test(
+        'a failure while disconnected is left for the next connect',
+        () async {
+          final game = await linked('Offline', romId: 73);
+          browse.connected = false;
+
+          final result = await provider.syncGameSavesAfterClose(game);
+
+          expect(result.success, isFalse);
+          expect(notified(), isEmpty);
+        },
+      );
+
+      test(
+        'a failed listing with nothing new to send is not reported',
+        () async {
+          final game = await linked('Unchanged', romId: 74);
+          await provider.syncGameSavesAfterClose(game);
+          svc.failingListings.add(74);
+
+          final result = await provider.syncGameSavesAfterClose(game);
+
+          expect(result.success, isFalse, reason: 'the sync itself did fail');
+          expect(notified(), isEmpty, reason: 'but no save was left behind');
+        },
       );
     });
 

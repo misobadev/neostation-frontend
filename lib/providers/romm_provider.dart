@@ -244,6 +244,19 @@ class RommProvider extends ChangeNotifier {
   String get username => _username;
 
   List<RommPlatform> get platforms => List.unmodifiable(_platforms);
+
+  /// Human-readable platform name for [rom]: the loaded platform list's name
+  /// for its slug, else the name RomM sent with the ROM, else the upper-cased
+  /// slug. Null when the ROM names no platform at all.
+  String? platformLabel(RommRom rom) {
+    final slug = rom.platformSlug;
+    if (slug.isEmpty) return rom.platformName;
+    for (final platform in _platforms) {
+      if (platform.slug == slug) return platform.name;
+    }
+    return rom.platformName ?? slug.toUpperCase();
+  }
+
   bool get loadingPlatforms => _loadingPlatforms;
 
   /// [loadingPlatforms] under the name the sync layer's guards read it by.

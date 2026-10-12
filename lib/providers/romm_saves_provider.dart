@@ -74,6 +74,7 @@ class RommSavesProvider extends ChangeNotifier {
   bool _disposed = false;
   int _generation = 0;
   int _connectionGeneration = 0;
+  int _artworkRevision = 0;
   // Disposing completes it too, as a disposed notifier never notifies again.
   Completer<void>? _changed;
   Object? _loadError;
@@ -83,8 +84,9 @@ class RommSavesProvider extends ChangeNotifier {
   List<RommAsset> get assets => _assets;
   bool get loading => _loading;
 
-  /// Refresh retries artwork independently of the cached game metadata.
-  int get artworkRevision => _generation;
+  /// Advanced by a [refresh] that retries artwork, independently of the cached
+  /// game metadata.
+  int get artworkRevision => _artworkRevision;
 
   /// True during a retry, and during a sweep this provider did not start, such
   /// as the automatic one after connect, since a retry would only overlap it.
@@ -219,20 +221,27 @@ class RommSavesProvider extends ChangeNotifier {
     if (_deleteState == _DeleteState.sending) {
       _refreshAfterDelete = true;
     } else {
-      await refresh();
+      await refresh(retryArtwork: false);
     }
   }
 
-  Future<void> refresh() async {
+  /// Reloads the inventory and retries metadata lookups that failed.
+  ///
+  /// [retryArtwork] also retries the artwork that failed, including covers the
+  /// server had no image for, which it may have since. Only the user's refresh
+  /// does: the automatic ones, after every sweep, would otherwise ask the
+  /// server for each missing cover again on every connect.
+  Future<void> refresh({bool retryArtwork = true}) async {
     if (_disposed || !_browse.isConnected) return;
     final generation = ++_generation;
     _failedInfo.forEach(_gameInfo.remove);
     _failedInfo.clear();
-    // Artwork retries with the new revision, including covers the server had
-    // no image for, which it may have since.
-    _browse.service.forgetDeadCovers([
-      for (final info in _loadedInfo.values) ...info.serverCovers,
-    ]);
+    if (retryArtwork) {
+      _artworkRevision++;
+      _browse.service.forgetDeadCovers([
+        for (final info in _loadedInfo.values) ...info.serverCovers,
+      ]);
+    }
     _loading = true;
     _loadError = null;
     notifyListeners();
@@ -284,7 +293,7 @@ class RommSavesProvider extends ChangeNotifier {
     if (!_disposed &&
         generation == _generation &&
         result?.error != SyncError.busy) {
-      await refresh();
+      await refresh(retryArtwork: false);
     }
   }
 
@@ -354,7 +363,7 @@ class RommSavesProvider extends ChangeNotifier {
         notifyListeners();
         if (_refreshAfterDelete) {
           _refreshAfterDelete = false;
-          unawaited(refresh());
+          unawaited(refresh(retryArtwork: false));
         }
       }
     }

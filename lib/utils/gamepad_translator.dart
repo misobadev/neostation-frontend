@@ -311,7 +311,7 @@ class GamepadEventTranslator {
 
         // Clear directional tracking upon a successful release event.
         if (effectiveIsReleased) {
-          _lastDirectionByKey.remove(key);
+          _lastDirectionByKey.remove(_directionKey(key, eventType));
         }
 
         return translatedEvent;
@@ -510,10 +510,18 @@ class GamepadEventTranslator {
     GamepadInputType negative,
     GamepadInputType positive,
   ) {
-    if (value < -0.5) return _lastDirectionByKey[key] = negative;
-    if (value > 0.5) return _lastDirectionByKey[key] = positive;
-    return _lastDirectionByKey[key] ?? GamepadInputType.unknown;
+    final entry = _directionKey(key, KeyType.analog);
+    if (value < -0.5) return _lastDirectionByKey[entry] = negative;
+    if (value > 0.5) return _lastDirectionByKey[entry] = positive;
+    return _lastDirectionByKey[entry] ?? GamepadInputType.unknown;
   }
+
+  /// [key]'s entry in [_lastDirectionByKey]. Linux numbers buttons and axes
+  /// separately, so on an Xbox pad button 6 (Select) and axis 6 (the D-pad's
+  /// X axis) share a key: releasing Select mid-hold would forget the D-pad's
+  /// direction, and its release would never be reported.
+  String _directionKey(String key, KeyType eventType) =>
+      _isLinux && eventType == KeyType.analog ? 'axis:$key' : key;
 
   /// Determines if a key identifier corresponds to a D-pad (directional) input.
   bool _isDpadEvent(String key) {

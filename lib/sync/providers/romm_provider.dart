@@ -1366,13 +1366,48 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
   }
 
+  /// Deliberately not [detectGameSaveFiles]: this is the one hook that must
+  /// actually push. Detection went status-only so that merely highlighting a
+  /// game stops moving saves, and routing the post-close hook through it would
+  /// silently strand every save the user just made.
+  ///
+  /// Most uploads happen here, so a failure is reported the way a failed sweep
+  /// is: the game joins the upload-failure notification until its saves go up.
   @override
-  Future<SyncResult> syncGameSavesAfterClose(GameModel game) =>
-      // Deliberately not [detectGameSaveFiles]: this is the one hook that must
-      // actually push. Detection went status-only so that merely highlighting a
-      // game stops moving saves, and routing the post-close hook through it
-      // would silently strand every save the user just made.
-      _runGameSync(game, downloadOnly: false);
+  Future<SyncResult> syncGameSavesAfterClose(GameModel game) async {
+    final GameSyncStatus status;
+    try {
+      status = await _syncGame(game, downloadOnly: false);
+    } catch (e) {
+      await _recordUploadOutcome(game, failed: true);
+      return _failGame(game, e);
+    }
+    final failed = status == GameSyncStatus.error;
+    await _recordUploadOutcome(game, failed: failed);
+    if (failed) {
+      return _failGame(game, _browse.lastError ?? 'RomM save sync failed');
+    }
+    _gameSyncStates[game.romname] = _buildState(game, status);
+    notifyListeners();
+    return SyncResult.ok();
+  }
+
+  /// Adds [game] to the upload-failure notification when [failed] left a save
+  /// waiting to go up, and removes it otherwise. A failure while disconnected
+  /// is not reported, as a sweep's is not: the next connect retries it.
+  Future<void> _recordUploadOutcome(
+    GameModel game, {
+    required bool failed,
+  }) async {
+    if (!_browse.isConnected) return;
+    // A failed listing with nothing new to send left no save behind.
+    if (failed && await _hasPendingUpload(game)) {
+      _failedUploads[game.romname] = game.name;
+    } else if (_failedUploads.remove(game.romname) == null) {
+      return;
+    }
+    _reportUploadFailures();
+  }
 
   @override
   Future<void> updateGameCloudSyncEnabled(String gameId, bool enabled) async {
@@ -1546,25 +1581,36 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
   /// Uploads and their notifications outlive the Saves tab, so a sweep reports
   /// its own outcome, whoever started it and whether or not the tab is open.
-  /// One notification names the games that failed, replacing the last one, and
-  /// a sweep that succeeds clears it.
+  /// A sweep that succeeds clears the failures, including any a post-close
+  /// sync recorded.
   void _reportSweep(SyncResult result) {
+    // A disconnect ended the sweep, which says nothing about the uploads.
+    if (result.error == SyncError.authRequired) return;
+    if (result.success) _failedUploads.clear();
+    // A sweep that stopped early, or never started, names no games.
+    _reportUploadFailures(unidentified: !result.success && result.data == null);
+  }
+
+  /// Games whose saves did not upload, romname to display name, in the order
+  /// they first failed. Set by a completed sweep, and by each post-close sync.
+  final Map<String, String> _failedUploads = {};
+
+  /// One notification names the games in [_failedUploads], replacing the last
+  /// one, and is dismissed once none are left. [unidentified] reports a
+  /// failure that names no game instead.
+  void _reportUploadFailures({bool unidentified = false}) {
     final notifications = GlobalNotificationService();
-    if (result.success) {
+    final names = _failedUploads.values.toList();
+    if (!unidentified && names.isEmpty) {
       notifications.dismiss(uploadsFailedNotificationId);
       return;
     }
-    // A disconnect ended the sweep, which says nothing about the uploads.
-    if (result.error == SyncError.authRequired) return;
-    final games = switch (result.data) {
-      final List<String> names when names.length > 3 =>
-        '${names.take(3).join(', ')} +${names.length - 3}',
-      final List<String> names when names.isNotEmpty => names.join(', '),
-      _ => null,
-    };
+    final games = names.length > 3
+        ? '${names.take(3).join(', ')} +${names.length - 3}'
+        : names.join(', ');
     notifications.show(
       id: uploadsFailedNotificationId,
-      message: games == null
+      message: unidentified
           ? AppLocale.rommUploadsFailed.getStringForCurrentLocale()
           : AppLocale.rommUploadsFailedFor
                 .getStringForCurrentLocale()
@@ -1582,7 +1628,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
 
     var linked = 0, candidates = 0, synced = 0;
-    final failed = <String>[];
+    // Romname to display name, as [_failedUploads] keeps them.
+    final failed = <String, String>{};
     final touched = <String>[];
     for (final game in await _listGames()) {
       // A disconnect (or a sign-out) mid-sweep ends it; every remaining game
@@ -1604,7 +1651,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           uploadOnly: true,
         );
         if (status == GameSyncStatus.error) {
-          failed.add(game.name);
+          failed[game.romname] = game.name;
         } else {
           synced++;
         }
@@ -1624,7 +1671,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           return SyncResult.fail(SyncError.unknown, message: e.toString());
         }
         _log.e('RomM upload sweep: ${game.romname} failed: $e');
-        failed.add(game.name);
+        failed[game.romname] = game.name;
       }
     }
 
@@ -1634,6 +1681,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     if (!_browse.isConnected) {
       return SyncResult.fail(SyncError.authRequired);
     }
+    // Every pending game was just tried, so these are all that still fail.
+    _failedUploads
+      ..clear()
+      ..addAll(failed);
     if (candidates == 0) {
       // Logged even when it does nothing: this is the only outward sign the
       // automatic sweep ran at all, and phase one costs no network.
@@ -1649,7 +1700,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       return SyncResult.fail(
         SyncError.unknown,
         message: '${failed.length} of $candidates pending games failed to sync',
-        data: failed,
+        data: failed.values.toList(),
       );
     }
     return SyncResult.ok(
