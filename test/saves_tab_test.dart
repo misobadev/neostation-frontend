@@ -25,6 +25,7 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/utils/gamepad_translator.dart';
 import 'package:neostation/widgets/core_footer.dart' show GamepadControl;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -77,6 +78,9 @@ void main() {
   });
 
   setUp(() {
+    // The gamepad events below use Android's key names, so they translate
+    // the same whatever the host is.
+    GamepadEventTranslator.debugOperatingSystem = 'android';
     GlobalNotificationService().notifier.value = [];
     connection = InventoryConnection();
     connection.inventory.load = () async => [
@@ -88,6 +92,7 @@ void main() {
     manager.register(InventorySync('neosync'));
   });
   tearDown(() {
+    GamepadEventTranslator.debugOperatingSystem = null;
     manager.unregister('romm');
     manager.unregister('neosync');
     romm.runningSweep.dispose();
@@ -170,7 +175,26 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// Through the real plugin channel, including trigger translation/dispatch.
+  /// Through the real plugin channel, including translation and dispatch.
+  Future<void> send(
+    WidgetTester tester,
+    String key,
+    double value, {
+    String type = 'analog',
+  }) => tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+    'xyz.luan/gamepads',
+    const StandardMethodCodec().encodeMethodCall(
+      MethodCall('onGamepadEvent', {
+        'gamepadId': 'pad',
+        'time': 0,
+        'type': type,
+        'key': key,
+        'value': value,
+      }),
+    ),
+    (_) {},
+  );
+
   Future<void> pull(
     WidgetTester tester,
     String axis, {
@@ -178,19 +202,7 @@ void main() {
   }) async {
     for (final value in [1.0, 0.0]) {
       await pastGrace(tester);
-      await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
-        'xyz.luan/gamepads',
-        const StandardMethodCodec().encodeMethodCall(
-          MethodCall('onGamepadEvent', {
-            'gamepadId': 'pad',
-            'time': 0,
-            'type': 'analog',
-            'key': axis,
-            'value': value,
-          }),
-        ),
-        (_) {},
-      );
+      await send(tester, axis, value);
       if (settle) await tester.pumpAndSettle();
     }
   }
@@ -396,6 +408,27 @@ void main() {
     expectShowing(saves: true, states: true);
     await pull(tester, 'axis_ltrigger'); // and back round to States
     expectShowing(saves: false, states: true);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a trigger pull and a button press close together both act', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    await press(tester, LogicalKeyboardKey.arrowDown); // games
+    // Makes the pad the active one, so the events below arrive in order.
+    await send(tester, 'axis_rtrigger', 0);
+    await tester.pumpAndSettle();
+    await pastGrace(tester);
+    // All inside the face buttons' debounce of each other. A acts on its
+    // release here, as on desktop, after the pull.
+    await send(tester, 'KEYCODE_BUTTON_A', 0, type: 'button'); // ACTION_DOWN
+    await send(tester, 'axis_rtrigger', 1); // Saves
+    await send(tester, 'KEYCODE_BUTTON_A', 1, type: 'button'); // files
+    await tester.pumpAndSettle();
+    expect(find.text('Game.state'), findsNothing);
+    expect(glows(tester, 'save-file-false-1'), isTrue);
     expect(tester.takeException(), isNull);
   });
 
@@ -607,6 +640,39 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  for (final disconnect in [false, true]) {
+    testWidgets('closing the RomM saves reports a delete still queued '
+        '(disconnect: $disconnect)', (tester) async {
+      await manager.setActive('romm', persist: (_) async {});
+      await pumpTab(tester);
+      await tester.tap(find.byKey(const ValueKey('save-file-true-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('save-delete')));
+      await tester.pumpAndSettle();
+      final run = Completer<SyncResult>();
+      romm.runningSweep.value = run.future;
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Delete'));
+      await tester.pump();
+      expect(notified(), isEmpty);
+
+      // Either replaces the RomM saves, as leaving the tab does.
+      if (disconnect) {
+        connection.disconnectForTest();
+      } else {
+        await manager.setActive('neosync', persist: (_) async {});
+      }
+      await tester.pump();
+      expect(find.byType(RommSavesContent), findsNothing);
+      expect(notified(), [AppLocale.en[AppLocale.rommDeleteFailed]]);
+
+      run.complete(SyncResult.ok());
+      romm.runningSweep.value = null;
+      await tester.pumpAndSettle();
+      expect(connection.inventory.deleteRequests, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final (filter, deleted, body) in [

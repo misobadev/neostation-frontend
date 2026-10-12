@@ -856,7 +856,11 @@ class GamepadNavigation {
           }
           _lastShoulderDispatchTime = now;
           _shoulderReleasedSinceDispatch = false;
-        } else {
+        } else if (!GamepadEventTranslator.isTrigger(
+          translatedEvent.inputType,
+        )) {
+          // Triggers skip this: the translator already makes each pull one
+          // press, and a pull must not swallow the button pressed after it.
           // Select and any face button that lands during a Select chord bypass
           // the action debounce so a quick chord isn't swallowed.
           final isChordRelated =
@@ -1080,8 +1084,6 @@ class GamepadNavigation {
         if (_dispatchShoulder(event.inputType)) _startShoulderHold(event);
         break;
 
-      // A trigger may report both as an analog axis and as a keycode; the
-      // action debounce above lets only the first of the pair through.
       case GamepadInputType.buttonLT:
       case GamepadInputType.buttonRT:
         final action = event.inputType == GamepadInputType.buttonLT

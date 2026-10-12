@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <sys/stat.h>
 
+#include <algorithm>
 #include <cstring>
 #include <functional>
 #include <iostream>
@@ -68,6 +69,7 @@ std::optional<GamepadInfo> get_gamepad_info(const std::string& device_id) {
     hardware_id,
     button_axis_count.first,
     button_axis_count.second,
+    get_axis_map(file_descriptor, button_axis_count.second),
     true
   }};
 }
@@ -222,6 +224,14 @@ std::pair<int, int> get_button_axis_count(int fd) {
   }
   
   return {static_cast<int>(num_buttons), static_cast<int>(num_axes)};
+}
+
+std::vector<int> get_axis_map(int fd, int axis_count) {
+  __u8 codes[ABS_CNT];
+  if (ioctl(fd, JSIOCGAXMAP, codes) < 0) {
+    return {};
+  }
+  return std::vector<int>(codes, codes + std::min(axis_count, ABS_CNT));
 }
 
 }  // namespace gamepad

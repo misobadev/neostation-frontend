@@ -288,11 +288,15 @@ class RommSavesProvider extends ChangeNotifier {
       _deleteState = _DeleteState.sending;
       final generation = _generation;
       final gone = <RommAsset>[];
+      final notFound = <RommAsset>[];
       for (final isState in [false, true]) {
         final batch = assets.where((a) => a.isState == isState).toList();
         if (batch.isNotEmpty) {
-          gone.addAll(await _deleteBatch(batch, generation));
+          gone.addAll(await _deleteBatch(batch, generation, notFound));
         }
+      }
+      if (notFound.isNotEmpty) {
+        gone.addAll(await _unlisted(notFound, generation));
       }
       if (_disposed || generation != _generation) return false;
       // Drop them locally rather than refreshing, which would reload every
@@ -323,16 +327,16 @@ class RommSavesProvider extends ChangeNotifier {
   }
 
   /// Deletes [batch], all saves or all states as each has its own endpoint, in
-  /// one request. Returns the files no longer on the server.
+  /// one request. Returns the files it deleted, and adds any the server
+  /// answered 404 for to [notFound].
   Future<List<RommAsset>> _deleteBatch(
     List<RommAsset> batch,
     int generation,
+    List<RommAsset> notFound,
   ) async {
     // A connection change can reuse these IDs for unrelated files. Do not
     // send queued batches or 404 retries after the original session ends.
-    if (_disposed || generation != _generation || !_browse.isConnected) {
-      return const [];
-    }
+    if (!_isCurrent(generation)) return const [];
     final ids = [for (final asset in batch) asset.id];
     try {
       await (batch.first.isState
@@ -341,13 +345,15 @@ class RommSavesProvider extends ChangeNotifier {
       return batch;
     } on RommException catch (error) {
       if (error.statusCode != 404) return const [];
-      // Already gone, e.g. deleted from another device: what the user asked
-      // for. RomM stops a batch with a 404 at the first file it no longer has,
+      // RomM stops a batch with a 404 at the first file it no longer has,
       // keeping the rest, so a batch goes again a file at a time to finish.
-      if (batch.length == 1) return batch;
+      if (batch.length == 1) {
+        notFound.addAll(batch);
+        return const [];
+      }
       final gone = <RommAsset>[];
       for (final asset in batch) {
-        gone.addAll(await _deleteBatch([asset], generation));
+        gone.addAll(await _deleteBatch([asset], generation, notFound));
       }
       return gone;
     } catch (_) {
@@ -355,6 +361,31 @@ class RommSavesProvider extends ChangeNotifier {
       return const [];
     }
   }
+
+  /// Which of [assets] the server no longer lists. A file deleted from another
+  /// device is what the user asked for, but a 404 alone does not prove that:
+  /// a server or proxy without the delete route answers 404 too.
+  Future<List<RommAsset>> _unlisted(
+    List<RommAsset> assets,
+    int generation,
+  ) async {
+    if (!_isCurrent(generation)) return const [];
+    try {
+      final listed = await _browse.service.listSaveAssets();
+      return assets
+          .where(
+            (a) => !listed.any((l) => l.isState == a.isState && l.id == a.id),
+          )
+          .toList();
+    } catch (_) {
+      // Unconfirmed, so reported as a failed delete.
+      return const [];
+    }
+  }
+
+  /// Whether the session [generation] belongs to is still the current one.
+  bool _isCurrent(int generation) =>
+      !_disposed && generation == _generation && _browse.isConnected;
 
   @override
   void dispose() {

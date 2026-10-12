@@ -23,6 +23,12 @@ class InventoryService extends RommService {
   final Set<String> gone = {};
   Future<void> Function() beforeDelete = () async {};
 
+  /// [files] as RomM would list them: without those no longer on the server.
+  List<RommAsset> onServer(List<RommAsset> files) => [
+    for (final file in files)
+      if (!gone.contains('${file.isState ? 'state' : 'save'}:${file.id}')) file,
+  ];
+
   @override
   Future<RommRom> getRom(int id) {
     detailCalls.add(id);

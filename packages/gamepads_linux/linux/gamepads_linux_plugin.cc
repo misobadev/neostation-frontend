@@ -100,7 +100,12 @@ static void gamepads_linux_plugin_handle_method_call(
                    fl_value_new_int(gamepad.button_count));
       fl_value_set(system_info, fl_value_new_string("axisCount"),
                    fl_value_new_int(gamepad.axis_count));
-      
+      FlValue* axis_map = fl_value_new_list();
+      for (int code : gamepad.axis_map) {
+        fl_value_append_take(axis_map, fl_value_new_int(code));
+      }
+      fl_value_set_string_take(system_info, "axisMap", axis_map);
+
       fl_value_set(map, fl_value_new_string("systemInfo"), system_info);
       fl_value_append(list, map);
     }

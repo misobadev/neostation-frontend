@@ -443,18 +443,30 @@ void main() {
     test(
       'a file already gone counts as deleted; other failures keep it',
       () async {
-        connection.inventory.load = () async => [
+        final files = [
           inventoryAsset('a.srm', id: 1),
           inventoryAsset('b.srm', id: 2),
         ];
+        connection.inventory.load = () async =>
+            connection.inventory.onServer(files);
         await inventory.refresh();
         final a = inventory.assets.firstWhere((x) => x.fileName == 'a.srm');
         final b = inventory.assets.firstWhere((x) => x.fileName == 'b.srm');
+        // Deleted from another device.
+        connection.inventory.gone.add('save:1');
+        expect(await inventory.delete([a]), isTrue);
+        // A server or proxy without the delete route answers 404 too, but
+        // still lists the file.
         connection.inventory.beforeDelete = () async =>
             throw RommException('Delete failed (404)', statusCode: 404);
-        expect(await inventory.delete([a]), isTrue);
+        expect(await inventory.delete([b]), isFalse);
         connection.inventory.beforeDelete = () async =>
             throw RommException('Delete failed (403)', statusCode: 403);
+        expect(await inventory.delete([b]), isFalse);
+        // Gone, but the listing that would confirm it fails.
+        connection.inventory.beforeDelete = () async {};
+        connection.inventory.gone.add('save:2');
+        connection.inventory.load = () async => throw StateError('offline');
         expect(await inventory.delete([b]), isFalse);
         expect(inventory.assets.map((x) => x.fileName), ['b.srm']);
         expect(inventory.deleting, isFalse);
@@ -480,11 +492,13 @@ void main() {
     );
 
     test('a batch RomM stops short is finished a file at a time', () async {
-      connection.inventory.load = () async => [
+      final files = [
         inventoryAsset('a.srm', id: 1),
         inventoryAsset('b.srm', id: 2),
         inventoryAsset('c.srm', id: 3),
       ];
+      connection.inventory.load = () async =>
+          connection.inventory.onServer(files);
       await inventory.refresh();
       // Deleted from another device: RomM removes a.srm, then stops at b.srm.
       connection.inventory.gone.add('save:2');

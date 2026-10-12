@@ -298,12 +298,15 @@ class _RommSavesContentState extends State<RommSavesContent> {
     action();
   };
 
-  void _notify(String message, {bool error = true}) =>
-      AppNotification.showNotification(
-        context,
-        message.getString(context),
-        type: error ? NotificationType.error : NotificationType.success,
-      );
+  /// [via] stands in for this tab's context once it may have closed.
+  void _notify(String message, {bool error = true, BuildContext? via}) {
+    final at = via ?? context;
+    AppNotification.showNotification(
+      at,
+      message.getString(at),
+      type: error ? NotificationType.error : NotificationType.success,
+    );
+  }
 
   /// Select deletes the focused file, as it does in the NeoSync save list, or
   /// from the game list, the game's files. On the filters it keeps its
@@ -347,13 +350,18 @@ class _RommSavesContentState extends State<RommSavesContent> {
       maxWidth: 320.r,
     );
     if (!mounted || !confirmed) return;
+    // Leaving the tab cancels a delete still queued behind a sync. The app's
+    // navigator outlives the tab, so the outcome is reported either way.
+    final app = Navigator.of(context, rootNavigator: true).context;
     final deleted = await _saves.delete(files);
-    if (!mounted) return;
-    _notify(
-      deleted ? AppLocale.rommDeleted : AppLocale.rommDeleteFailed,
-      error: !deleted,
-    );
-    if (!deleted) return;
+    if (app.mounted) {
+      _notify(
+        deleted ? AppLocale.rommDeleted : AppLocale.rommDeleteFailed,
+        error: !deleted,
+        via: app,
+      );
+    }
+    if (!mounted || !deleted) return;
     // The build keeps the cursor on a neighbouring file. When the game's last
     // file went, stay at the same spot in the game list rather than letting the
     // build fall back to the first game.
