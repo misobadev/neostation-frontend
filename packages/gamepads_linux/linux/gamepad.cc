@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstring>
 #include <functional>
 #include <iostream>
@@ -25,7 +26,9 @@ using namespace gamepad;
 static int read_event(int fd, struct js_event* event) {
   ssize_t bytes;
 
-  bytes = read(fd, event, sizeof(*event));
+  do {
+    bytes = read(fd, event, sizeof(*event));
+  } while (bytes < 0 && errno == EINTR);
 
   if (bytes == sizeof(*event)) {
     return 0;
@@ -70,23 +73,28 @@ std::optional<GamepadInfo> get_gamepad_info(const std::string& device_id) {
     button_axis_count.first,
     button_axis_count.second,
     get_axis_map(file_descriptor, button_axis_count.second),
-    true
   }};
 }
 
-void listen(GamepadInfo* gamepad,
+void listen(const GamepadInfo& gamepad,
+            const std::atomic<bool>& alive,
             const std::function<void(const js_event&)>& event_consumer) {
-  std::cout << "Listening to gamepad " << gamepad->device_id << std::endl;
+  std::cout << "Listening to gamepad " << gamepad.device_id << std::endl;
 
-  while (gamepad->alive) {
+  while (alive) {
     struct js_event event;
-    read_event(gamepad->file_descriptor, &event);
+    // Unplugging fails the read (ENODEV) rather than blocking it, so this ends
+    // whether or not the disconnect has been seen yet. A failed read leaves
+    // [event] unset, so it must never reach the consumer.
+    if (read_event(gamepad.file_descriptor, &event) != 0) {
+      break;
+    }
     event_consumer(event);
   }
 
-  std::cout << "Stopped listening for events: " << gamepad->device_id
+  std::cout << "Stopped listening for events: " << gamepad.device_id
             << std::endl;
-  close(gamepad->file_descriptor);
+  close(gamepad.file_descriptor);
 }
 
 // Detectar tipo de conexión analizando el hardware ID y subsystem
