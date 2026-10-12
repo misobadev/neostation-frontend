@@ -21,6 +21,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
+import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/romm_asset.dart';
@@ -70,6 +71,17 @@ enum _RemoteGuard {
   /// The remote copy could not be read, so it could not be protected. The
   /// upload is abandoned for this pass rather than performed blind.
   unreadable,
+}
+
+/// What became of one [RomMSyncProvider._upload].
+enum _UploadOutcome {
+  uploaded,
+
+  /// The file was gone by the time it would have been sent.
+  noFile,
+
+  /// The transfer failed, so the save is still pending.
+  failed,
 }
 
 class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
@@ -348,7 +360,12 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     final matchedRemote = <String>{};
     String remoteKey(RommAsset a) => '${a.isState ? 's' : 'f'}:${a.id}';
     int uploaded = 0, downloaded = 0, coreMismatched = 0;
-    int conflictsPreserved = 0;
+    int conflictsPreserved = 0, uploadsFailed = 0;
+    void countUpload(_UploadOutcome outcome) {
+      if (outcome == _UploadOutcome.uploaded) uploaded++;
+      if (outcome == _UploadOutcome.failed) uploadsFailed++;
+    }
+
     bool anyLocal = localFiles.isNotEmpty;
     bool anyRemote = remote.isNotEmpty;
 
@@ -381,7 +398,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       if (match == null) {
         // Local only → upload (unless pre-launch download-only pass).
         if (!downloadOnly && !statusOnly) {
-          if (await _upload(romId, local, isState)) uploaded++;
+          countUpload(await _upload(romId, local, isState));
         }
         continue;
       }
@@ -506,15 +523,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           }
           if (guard == _RemoteGuard.preserved) conflictsPreserved++;
         }
-        if (await _upload(
-          romId,
-          local,
-          isState,
-          existing: match,
-          digest: pushDigest,
-        )) {
-          uploaded++;
-        }
+        countUpload(
+          await _upload(
+            romId,
+            local,
+            isState,
+            existing: match,
+            digest: pushDigest,
+          ),
+        );
       }
     }
 
@@ -535,6 +552,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     _log.i(
       'RomM sync ${game.romname}: $uploaded up, $downloaded down '
       '(${localFiles.length} local, ${remote.length} remote)'
+      '${uploadsFailed > 0 ? ', $uploadsFailed upload(s) failed' : ''}'
       '${coreMismatched > 0 ? ', $coreMismatched kept (different core)' : ''}'
       '${conflictsPreserved > 0 ? ', $conflictsPreserved conflict backup(s)' : ''}',
     );
@@ -546,6 +564,9 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       await _syncPlaytime(game, romId);
     }
 
+    // A save that didn't reach the server is still pending, which no status
+    // below can say: "local only" or "up to date" would read as success.
+    if (uploadsFailed > 0) return GameSyncStatus.error;
     if (!anyLocal && !anyRemote) return GameSyncStatus.noSaveFound;
     if (!anyRemote) return GameSyncStatus.localOnly;
     if (!anyLocal && downloaded == 0) return GameSyncStatus.cloudOnly;
@@ -1064,7 +1085,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// Only the create path carries [_saveSlot]. `PUT` has no slot parameter, so
   /// an asset created before this device started slotting keeps its NULL slot
   /// for life: slotting reaches new saves, never the existing library.
-  Future<bool> _upload(
+  Future<_UploadOutcome> _upload(
     int romId,
     LocalSaveFile local,
     bool isState, {
@@ -1073,7 +1094,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   }) async {
     try {
       final file = File(local.filePath);
-      if (!await file.exists()) return false;
+      if (!await file.exists()) return _UploadOutcome.noFile;
       final RommAsset asset;
       if (existing != null) {
         asset = isState
@@ -1105,11 +1126,11 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         local.fileSize,
         fileHash: digest ?? await _md5OfFile(local.filePath),
       );
-      return true;
+      return _UploadOutcome.uploaded;
     } catch (e) {
       if (isPermissionDenied(e)) rethrow;
       _log.e('RomM upload failed (${local.filePath}): $e');
-      return false;
+      return _UploadOutcome.failed;
     }
   }
 
@@ -1507,18 +1528,49 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     if (_sweeping.value != null) {
       return SyncResult.fail(SyncError.busy, message: 'Sweep already running');
     }
-    final sweep = _sweepPendingUploads();
+    // An error (the library or link index unreadable) becomes a failed result,
+    // so it is reported like any other failure and followers never see it.
+    final sweep = _sweepPendingUploads().catchError((Object e) {
+      _log.e('RomM upload sweep failed: $e');
+      return SyncResult.fail(SyncError.unknown, message: e.toString());
+    });
     _sweeping.value = sweep;
     try {
       final result = await sweep;
-      // Uploads and their notifications outlive the Saves tab.
-      if (result.success) {
-        GlobalNotificationService().dismiss(uploadsFailedNotificationId);
-      }
+      _reportSweep(result);
       return result;
     } finally {
       if (!_disposed) _sweeping.value = null;
     }
+  }
+
+  /// Uploads and their notifications outlive the Saves tab, so a sweep reports
+  /// its own outcome, whoever started it and whether or not the tab is open.
+  /// One notification names the games that failed, replacing the last one, and
+  /// a sweep that succeeds clears it.
+  void _reportSweep(SyncResult result) {
+    final notifications = GlobalNotificationService();
+    if (result.success) {
+      notifications.dismiss(uploadsFailedNotificationId);
+      return;
+    }
+    // A disconnect ended the sweep, which says nothing about the uploads.
+    if (result.error == SyncError.authRequired) return;
+    final games = switch (result.data) {
+      final List<String> names when names.length > 3 =>
+        '${names.take(3).join(', ')} +${names.length - 3}',
+      final List<String> names when names.isNotEmpty => names.join(', '),
+      _ => null,
+    };
+    notifications.show(
+      id: uploadsFailedNotificationId,
+      message: games == null
+          ? AppLocale.rommUploadsFailed.getStringForCurrentLocale()
+          : AppLocale.rommUploadsFailedFor
+                .getStringForCurrentLocale()
+                .replaceFirst('{games}', games),
+      type: GlobalNotificationType.error,
+    );
   }
 
   /// [retryPendingUploads] itself, run under its guard against overlap.

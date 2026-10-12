@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:neostation/data/datasources/sqlite_migrations.dart';
+import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/data/datasources/sqlite_service.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
@@ -52,6 +53,9 @@ class _FakeRommService extends RommService {
   /// rom ids whose asset listing was fetched — the sweep's network footprint.
   final List<int> listCalls = [];
   final Set<int> failingListings = {};
+
+  /// rom ids whose uploads the server refuses, as an HTTP 500.
+  final Set<int> failingUploads = {};
 
   int _nextAssetId = 1;
   int _stampSeq = 0;
@@ -105,6 +109,9 @@ class _FakeRommService extends RommService {
     String? deviceId,
     bool overwrite = true,
   }) async {
+    if (failingUploads.contains(romId)) {
+      throw RommException('Upload failed (500)', statusCode: 500);
+    }
     final name = p.basename(file.path);
     uploads.add('$romId/$name');
     creates.add('$romId/$name');
@@ -261,6 +268,8 @@ void main() {
   }
 
   setUp(() async {
+    // A failed sweep posts to the app-wide notifications.
+    GlobalNotificationService().notifier.value = [];
     db = await helper.setUp();
     await db.execute(SqliteMigrations.createAppRommRomMapTableSql);
     tempDir = await Directory.systemTemp.createTemp('romm_sweep_test');
@@ -464,18 +473,19 @@ void main() {
         final notifications = GlobalNotificationService();
         addTearDown(() => notifications.notifier.value = []);
 
-        // This is the notification shown by the tab after a failed upload.
         svc.failingListings.add(1);
         await saves.retryUploads();
-        expect(saves.syncResult?.success, isFalse);
-        notifications.show(
-          id: RomMSyncProvider.uploadsFailedNotificationId,
-          message: 'Zelda failed',
-        );
+        expect(notifications.notifier.value.map((n) => n.id), [
+          RomMSyncProvider.uploadsFailedNotificationId,
+        ]);
         notifications.show(id: 'unrelated', message: 'Another notification');
 
         await saves.retryUploads();
-        expect(notifications.notifier.value, hasLength(2));
+        expect(
+          notifications.notifier.value,
+          hasLength(2),
+          reason: 'a repeat failure replaces its notification',
+        );
 
         svc.failingListings.clear();
         if (!manual) saves.dispose();
@@ -528,8 +538,123 @@ void main() {
         await sweep;
 
         expect(svc.listCalls.length, lessThanOrEqualTo(1));
+        expect(
+          GlobalNotificationService().notifier.value,
+          isEmpty,
+          reason: 'a disconnect says nothing about the uploads',
+        );
       },
     );
+
+    test('an upload the server refuses fails the sweep', () async {
+      final game = await linked('Refused', romId: 70);
+      svc.failingUploads.add(70);
+
+      final result = await provider.fullSync();
+
+      expect(svc.uploads, isEmpty);
+      expect(
+        result.success,
+        isFalse,
+        reason: 'the pending save never reached the server',
+      );
+      expect(result.data, ['Refused']);
+      expect(
+        provider.getGameSyncState(game.romname)?.status,
+        GameSyncStatus.error,
+      );
+
+      // Still pending, so the next sweep sends it.
+      svc.failingUploads.clear();
+      expect((await provider.fullSync()).success, isTrue);
+      expect(svc.creates, ['70/Refused.srm']);
+    });
+
+    test('an upload refused after a game closes shows as an error', () async {
+      final game = await linked('Closed', romId: 71);
+      svc.failingUploads.add(71);
+
+      await provider.syncGameSavesAfterClose(game);
+
+      expect(
+        provider.getGameSyncState(game.romname)?.status,
+        GameSyncStatus.error,
+        reason: 'not "local only", which reads as a save that needs nothing',
+      );
+    });
+
+    test(
+      'a failed sweep names its games in one notification, replacing the last',
+      () async {
+        final names = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'];
+        svc.failingListings.addAll([
+          for (var i = 0; i < names.length; i++) 80 + i,
+        ]);
+        for (final (i, name) in names.take(2).indexed) {
+          await linked(name, romId: 80 + i);
+        }
+        await provider.fullSync();
+        for (final (i, name) in names.skip(2).indexed) {
+          await linked(name, romId: 82 + i);
+        }
+        await provider.fullSync();
+
+        final notifications = GlobalNotificationService().notifier.value;
+        expect(notifications.map((n) => n.id), [
+          RomMSyncProvider.uploadsFailedNotificationId,
+        ]);
+        expect(
+          notifications.single.message,
+          AppLocale.en[AppLocale.rommUploadsFailedFor]!.replaceFirst(
+            '{games}',
+            'Alpha, Beta, Gamma +2',
+          ),
+        );
+        expect(notifications.single.type, GlobalNotificationType.error);
+      },
+    );
+
+    test('a retry that fails after Saves closes is still reported', () async {
+      await linked('Zelda', romId: 1);
+      final manager = SyncManager.instance;
+      manager.register(provider);
+      addTearDown(() => manager.unregister('romm'));
+      await manager.setActive('romm', persist: (_) async {});
+      final saves = RommSavesProvider(browse, manager);
+      svc.failingListings.add(1);
+
+      final retry = saves.retryUploads();
+      expect(provider.runningSweep.value, isNotNull);
+      saves.dispose();
+      await retry;
+
+      expect(GlobalNotificationService().notifier.value.map((n) => n.id), [
+        RomMSyncProvider.uploadsFailedNotificationId,
+      ]);
+    });
+
+    test('a sweep that throws is reported, not left unhandled', () async {
+      // Linked, so the sweep gets past the empty-index early return.
+      await linked('Zelda', romId: 1);
+      final broken = RomMSyncProvider(
+        browse,
+        NeoSyncProvider(NeoSyncService()),
+        locateSaves: paths.locate,
+        resolveTargets: paths.resolveTargets,
+        listGames: () async => throw StateError('library unavailable'),
+        autoSweep: false,
+      );
+      addTearDown(broken.dispose);
+
+      final result = await broken.retryPendingUploads();
+
+      expect(result.success, isFalse);
+      expect(result.error, SyncError.unknown);
+      expect(broken.runningSweep.value, isNull, reason: 'the guard is freed');
+      expect(GlobalNotificationService().notifier.value.map((n) => n.id), [
+        RomMSyncProvider.uploadsFailedNotificationId,
+      ]);
+    });
 
     test('one failing game does not abandon the rest', () async {
       await linked('Broken', romId: 30);

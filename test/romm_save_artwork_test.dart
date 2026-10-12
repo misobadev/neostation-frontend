@@ -86,6 +86,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test('refresh asks again for covers the server had no image for', () async {
+    final connection = InventoryConnection();
+    addTearDown(connection.dispose);
+    final service = connection.inventory
+      ..configure(serverUrl: 'https://romm.test', apiKey: 'test')
+      ..loadRom = (id) async => RommRom.fromJson({
+        'id': id,
+        'name': 'Game',
+        'path_cover_small': '/missing.png',
+      });
+    final saves = RommSavesProvider(connection, SyncManager.instance);
+    addTearDown(saves.dispose);
+    final cover = (await saves.gameInfo(1)).serverCovers.single;
+    const elsewhere = 'https://romm.test/library-only.png';
+    service
+      ..markDeadCover(cover)
+      ..markDeadCover(elsewhere);
+
+    // The server may have gained the image since.
+    await saves.refresh();
+
+    expect(service.isDeadCover(cover), isFalse);
+    expect(
+      service.isDeadCover(elsewhere),
+      isTrue,
+      reason: 'only the covers the saves show are asked for again',
+    );
+  });
+
   testWidgets('refresh retries failed artwork while retaining metadata', (
     tester,
   ) async {

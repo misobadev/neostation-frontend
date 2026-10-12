@@ -9,13 +9,11 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_locale.dart';
 import '../../models/romm_asset.dart';
 import '../../models/romm_save_game.dart';
-import '../../models/sync_models.dart' show SyncError, SyncResult;
 import '../../providers/file_provider.dart';
 import '../../providers/romm_provider.dart';
 import '../../providers/romm_saves_provider.dart';
 import '../../services/game_service.dart' show GamepadNavigationManager;
 import '../../services/sfx_service.dart';
-import '../../sync/providers/romm_provider.dart';
 import '../../sync/sync_manager.dart';
 import '../../themes/corner_radii.dart';
 import '../../utils/count_label.dart';
@@ -56,9 +54,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
   // metadata, so file-derived names never flash up before the real ones.
   Future<void>? _firstPage;
   bool _ready = false;
-  // The sync result last reported, so each is reported once however often the
-  // inventory notifies.
-  SyncResult? _reportedSync;
 
   // Input reads the games several times per press, so they are regrouped only
   // when the inventory or the filter changes.
@@ -112,7 +107,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
       context.read<RommProvider>(),
       context.read<SyncManager>(),
       fileProvider: context.read<FileProvider?>(),
-    )..addListener(_reportSync);
+    );
     _navigation = GamepadNavigation(
       onNavigateUp: () => _vertical(-1),
       onNavigateDown: () => _vertical(1),
@@ -267,41 +262,10 @@ class _RommSavesContentState extends State<RommSavesContent> {
     }
   }
 
+  /// A failure is reported by the sync provider, which outlives this tab.
   Future<void> _retryUploads() async {
     if (_busy) return;
     await _saves.retryUploads();
-  }
-
-  /// Reports a failed sync, whether a retry or a sweep this tab did not start
-  /// (the automatic one after connect), the same way: as one notification
-  /// naming the games that failed. The sync provider clears it on success,
-  /// even after this tab closes.
-  void _reportSync() {
-    final result = _saves.syncResult;
-    if (identical(result, _reportedSync)) return;
-    _reportedSync = result;
-    if (!mounted ||
-        result == null ||
-        result.success ||
-        result.error == SyncError.busy) {
-      return;
-    }
-    final games = switch (result.data) {
-      final List<String> names when names.length > 3 =>
-        '${names.take(3).join(', ')} +${names.length - 3}',
-      final List<String> names when names.isNotEmpty => names.join(', '),
-      _ => null,
-    };
-    AppNotification.showNotification(
-      context,
-      games == null
-          ? AppLocale.rommUploadsFailed.getString(context)
-          : AppLocale.rommUploadsFailedFor
-                .getString(context)
-                .replaceFirst('{games}', games),
-      type: NotificationType.error,
-      notificationId: RomMSyncProvider.uploadsFailedNotificationId,
-    );
   }
 
   /// Greyed out while a sync runs, whoever started it.
@@ -610,7 +574,10 @@ class _RommSavesContentState extends State<RommSavesContent> {
                     key: const ValueKey('save-delete'),
                     label: AppLocale.delete.getString(context),
                     iconPath: 'assets/images/gamepad/Xbox_View_button.png',
-                    onTap: _busy ? null : _deleteFocused,
+                    // Hidden, it keeps its space but must not take clicks.
+                    onTap: _busy || _focus == _FocusArea.filters
+                        ? null
+                        : _deleteFocused,
                     textColor: scheme.onError,
                     backgroundColor: scheme.error,
                   ),
@@ -805,72 +772,79 @@ class _RommSavesContentState extends State<RommSavesContent> {
     final scheme = Theme.of(context).colorScheme;
     final selected = index == _gameIndex;
     final focused = selected && _focus == _FocusArea.games;
-    return FutureBuilder<RommSaveGameInfo>(
-      key: ValueKey(game.key),
-      future: _saves.gameInfo(game.romId),
-      initialData: _saves.loadedGameInfo(game.romId),
-      builder: (context, snapshot) {
-        final info = snapshot.data;
-        return Padding(
-          padding: EdgeInsets.only(bottom: 6.r),
-          child: _highlight(
-            key: ValueKey('save-game-${game.key}'),
-            focused: focused,
-            selected: selected,
-            radius: CornerRadii.of(context).radiusExternal,
-            fill: scheme.surface,
-            resting: BorderSide(color: scheme.outline, width: 1.r),
-            raised: true,
-            padding: EdgeInsets.all(8.r),
-            onTap: _tap(
-              () => setState(() {
-                _focus = _FocusArea.games;
-                _selectGame(index, games);
-              }),
-            ),
-            child: Row(
-              children: [
-                _art(game, info, 40.r, 54.r),
-                SizedBox(width: 10.r),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _title(game, info),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.r,
-                          height: 1.25,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.onSurface,
-                        ),
-                      ),
-                      SizedBox(height: 4.r),
-                      if (_platform(info) case final platform?) ...[
-                        _meta(Symbols.videogame_asset_rounded, platform),
-                        SizedBox(height: 3.r),
-                      ],
-                      Row(
-                        children: [
-                          for (final (i, count) in _counts(game).indexed) ...[
-                            if (i > 0) SizedBox(width: 10.r),
-                            Flexible(child: count),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+    return _withInfo(
+      game,
+      (info) => Padding(
+        padding: EdgeInsets.only(bottom: 6.r),
+        child: _highlight(
+          key: ValueKey('save-game-${game.key}'),
+          focused: focused,
+          selected: selected,
+          radius: CornerRadii.of(context).radiusExternal,
+          fill: scheme.surface,
+          resting: BorderSide(color: scheme.outline, width: 1.r),
+          raised: true,
+          padding: EdgeInsets.all(8.r),
+          onTap: _tap(
+            () => setState(() {
+              _focus = _FocusArea.games;
+              _selectGame(index, games);
+            }),
           ),
-        );
-      },
+          child: Row(
+            children: [
+              _art(game, info, 40.r, 54.r),
+              SizedBox(width: 10.r),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _title(game, info),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.r,
+                        height: 1.25,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    SizedBox(height: 4.r),
+                    if (_platform(info) case final platform?) ...[
+                      _meta(Symbols.videogame_asset_rounded, platform),
+                      SizedBox(height: 3.r),
+                    ],
+                    Row(
+                      children: [
+                        for (final (i, count) in _counts(game).indexed) ...[
+                          if (i > 0) SizedBox(width: 10.r),
+                          Flexible(child: count),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
+
+  /// Builds with whatever RomM has on [game] so far, starting from what has
+  /// already resolved so a newly built widget never flashes blank first.
+  Widget _withInfo(
+    RommSaveGame game,
+    Widget Function(RommSaveGameInfo? info) builder,
+  ) => FutureBuilder<RommSaveGameInfo>(
+    key: ValueKey(game.key),
+    future: _saves.gameInfo(game.romId),
+    initialData: _saves.loadedGameInfo(game.romId),
+    builder: (context, snapshot) => builder(snapshot.data),
+  );
 
   String? _platform(RommSaveGameInfo? info) {
     final slug = info?.rom?.platformSlug;
@@ -962,12 +936,9 @@ class _RommSavesContentState extends State<RommSavesContent> {
                 SliverToBoxAdapter(
                   child: KeyedSubtree(
                     key: _headerKey,
-                    child: FutureBuilder<RommSaveGameInfo>(
-                      key: ValueKey(game.key),
-                      future: _saves.gameInfo(game.romId),
-                      initialData: _saves.loadedGameInfo(game.romId),
-                      builder: (context, snapshot) =>
-                          _detailsHeader(game, snapshot.data),
+                    child: _withInfo(
+                      game,
+                      (info) => _detailsHeader(game, info),
                     ),
                   ),
                 ),

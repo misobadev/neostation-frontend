@@ -68,13 +68,15 @@ class RommSavesProvider extends ChangeNotifier {
   bool _loading = false;
   bool _syncing = false;
   _DeleteState _deleteState = _DeleteState.idle;
+  // A sweep ended while a delete was sending, so its refresh waits for the
+  // delete to finish.
+  bool _refreshAfterDelete = false;
   bool _disposed = false;
   int _generation = 0;
   int _connectionGeneration = 0;
   // Disposing completes it too, as a disposed notifier never notifies again.
   Completer<void>? _changed;
   Object? _loadError;
-  SyncResult? _syncResult;
 
   /// The same list until the inventory changes, so what is derived from it can
   /// be cached by identity.
@@ -89,7 +91,6 @@ class RommSavesProvider extends ChangeNotifier {
   bool get syncing => _syncing || _sweep?.value != null;
   bool get deleting => _deleteState != _DeleteState.idle;
   Object? get loadError => _loadError;
-  SyncResult? get syncResult => _syncResult;
 
   /// Memoized and requested only for visible games. Missing art/metadata never
   /// prevents the inventory from loading, and a refresh retries failed lookups.
@@ -189,13 +190,14 @@ class RommSavesProvider extends ChangeNotifier {
     _assets = const [];
     _loading = false;
     _loadError = null;
-    _syncResult = null;
+    _refreshAfterDelete = false;
     notifyListeners();
   }
 
   /// A sweep started elsewhere shows here as a retry would: busy while it
-  /// runs, then its result and a refresh so its uploads appear. A retry's own
-  /// sweep is left to [retryUploads], which already does both.
+  /// runs, then a refresh so its uploads appear. A retry's own sweep is left
+  /// to [retryUploads], which already refreshes. The sync provider reports
+  /// either one's failures.
   void _sweepChanged() {
     if (_disposed || _syncing) return;
     notifyListeners();
@@ -204,19 +206,21 @@ class RommSavesProvider extends ChangeNotifier {
   }
 
   Future<void> _followSweep(Future<SyncResult> sweep) async {
-    SyncResult result;
     try {
-      result = await sweep;
+      await sweep;
     } catch (_) {
-      result = SyncResult.fail(SyncError.unknown);
+      // Its uploads may still have partly landed, so refresh regardless.
     }
     // A disconnect has already cleared this session's state.
     if (_disposed || !_browse.isConnected) return;
-    _syncResult = result;
-    notifyListeners();
     // A queued delete waits for this refresh too. Once requests are being
-    // sent, a refresh would invalidate the remaining delete batches.
-    if (_deleteState != _DeleteState.sending) await refresh();
+    // sent, a refresh would invalidate the remaining delete batches, so it
+    // runs after them instead.
+    if (_deleteState == _DeleteState.sending) {
+      _refreshAfterDelete = true;
+    } else {
+      await refresh();
+    }
   }
 
   Future<void> refresh() async {
@@ -224,6 +228,11 @@ class RommSavesProvider extends ChangeNotifier {
     final generation = ++_generation;
     _failedInfo.forEach(_gameInfo.remove);
     _failedInfo.clear();
+    // Artwork retries with the new revision, including covers the server had
+    // no image for, which it may have since.
+    _browse.service.forgetDeadCovers([
+      for (final info in _loadedInfo.values) ...info.serverCovers,
+    ]);
     _loading = true;
     _loadError = null;
     notifyListeners();
@@ -259,26 +268,22 @@ class RommSavesProvider extends ChangeNotifier {
     }
     final generation = _generation;
     _syncing = true;
-    _syncResult = null;
     notifyListeners();
+    SyncResult? result;
     try {
-      final result = await sync!.fullSync();
-      if (_disposed || generation != _generation) return;
-      _syncResult = result;
+      result = await sync!.fullSync();
     } catch (_) {
-      if (_disposed || generation != _generation) return;
-      _syncResult = SyncResult.fail(SyncError.unknown);
+      // The sync provider reports its own failures; the refresh still runs.
     } finally {
       _syncing = false;
       if (!_disposed) notifyListeners();
     }
     // A busy result means another sweep (the automatic one after connect) is
     // still uploading, so a refresh now would miss its files and reload every
-    // game's artwork for nothing. [_followSweep] takes its result and
-    // refreshes when it ends.
+    // game's artwork for nothing. [_followSweep] refreshes when it ends.
     if (!_disposed &&
         generation == _generation &&
-        _syncResult?.error != SyncError.busy) {
+        result?.error != SyncError.busy) {
       await refresh();
     }
   }
@@ -288,26 +293,34 @@ class RommSavesProvider extends ChangeNotifier {
   ///
   /// Deleted only when all of them are gone. Any that are leave the list even
   /// when others could not be deleted. One made during a refresh or sync waits
-  /// for it to finish rather than failing unsent.
+  /// for it to finish rather than failing unsent. Disposing cancels one still
+  /// waiting, but one already sending finishes and reports its outcome.
   Future<RommDeleteOutcome> delete(List<RommAsset> assets) async {
     if (_disposed || assets.isEmpty || deleting || !_browse.isConnected) {
       return RommDeleteOutcome.notSent;
     }
-    // Waiting must never carry asset IDs into a different server/account.
-    final connectionGeneration = _connectionGeneration;
+    // Asset IDs must never reach a different server/account. Watched here, not
+    // through [_connectionChanged], so it holds after this provider is gone.
+    final session = _browse.service.session;
+    var disconnected = false;
+    void watchConnection() {
+      if (!_browse.isConnected) disconnected = true;
+    }
+
     bool sameConnection() =>
-        !_disposed &&
-        connectionGeneration == _connectionGeneration &&
-        _browse.isConnected;
+        !disconnected &&
+        _browse.isConnected &&
+        _browse.service.session == session;
+    _browse.addListener(watchConnection);
     _deleteState = _DeleteState.queued;
     notifyListeners();
     try {
       // A sweep finishing can start a refresh in the same turn that wakes us.
       // Recheck here so no async gap separates the idle check and the request.
-      while (sameConnection() && (_loading || syncing)) {
+      while (!_disposed && sameConnection() && (_loading || syncing)) {
         await _nextChange();
       }
-      if (!sameConnection()) return RommDeleteOutcome.notSent;
+      if (_disposed || !sameConnection()) return RommDeleteOutcome.notSent;
       _deleteState = _DeleteState.sending;
       final generation = _generation;
       final gone = <RommAsset>[];
@@ -315,28 +328,35 @@ class RommSavesProvider extends ChangeNotifier {
       for (final isState in [false, true]) {
         final batch = assets.where((a) => a.isState == isState).toList();
         if (batch.isNotEmpty) {
-          gone.addAll(await _deleteBatch(batch, generation, notFound));
+          gone.addAll(await _deleteBatch(batch, sameConnection, notFound));
         }
       }
       if (notFound.isNotEmpty) {
-        gone.addAll(await _unlisted(notFound, generation));
+        gone.addAll(await _unlisted(notFound, sameConnection));
       }
-      if (_disposed || generation != _generation) {
-        return RommDeleteOutcome.failed;
+      // Drop them locally rather than listing the whole inventory again, unless
+      // the list was since closed or replaced. Saves and states are numbered
+      // independently, so match both.
+      if (!_disposed && generation == _generation) {
+        _assets = List.unmodifiable(
+          _assets.where(
+            (a) => !gone.any((g) => g.isState == a.isState && g.id == a.id),
+          ),
+        );
       }
-      // Drop them locally rather than listing the whole inventory again.
-      // Saves and states are numbered independently, so match both.
-      _assets = List.unmodifiable(
-        _assets.where(
-          (a) => !gone.any((g) => g.isState == a.isState && g.id == a.id),
-        ),
-      );
       return gone.length == assets.length
           ? RommDeleteOutcome.deleted
           : RommDeleteOutcome.failed;
     } finally {
+      _browse.removeListener(watchConnection);
       _deleteState = _DeleteState.idle;
-      if (!_disposed) notifyListeners();
+      if (!_disposed) {
+        notifyListeners();
+        if (_refreshAfterDelete) {
+          _refreshAfterDelete = false;
+          unawaited(refresh());
+        }
+      }
     }
   }
 
@@ -357,12 +377,13 @@ class RommSavesProvider extends ChangeNotifier {
   /// answered 404 for to [notFound].
   Future<List<RommAsset>> _deleteBatch(
     List<RommAsset> batch,
-    int generation,
+    bool Function() sameConnection,
     List<RommAsset> notFound,
   ) async {
     // A connection change can reuse these IDs for unrelated files. Do not
-    // send queued batches or 404 retries after the original session ends.
-    if (!_isCurrent(generation)) return const [];
+    // send queued batches or 404 retries after the original session ends. The
+    // service makes the same check again before every request it sends.
+    if (!sameConnection()) return const [];
     final ids = [for (final asset in batch) asset.id];
     try {
       await (batch.first.isState
@@ -379,7 +400,7 @@ class RommSavesProvider extends ChangeNotifier {
       }
       final gone = <RommAsset>[];
       for (final asset in batch) {
-        gone.addAll(await _deleteBatch([asset], generation, notFound));
+        gone.addAll(await _deleteBatch([asset], sameConnection, notFound));
       }
       return gone;
     } catch (_) {
@@ -393,9 +414,9 @@ class RommSavesProvider extends ChangeNotifier {
   /// a server or proxy without the delete route answers 404 too.
   Future<List<RommAsset>> _unlisted(
     List<RommAsset> assets,
-    int generation,
+    bool Function() sameConnection,
   ) async {
-    if (!_isCurrent(generation)) return const [];
+    if (!sameConnection()) return const [];
     try {
       final listed = await _browse.service.listSaveAssets();
       return assets
@@ -408,10 +429,6 @@ class RommSavesProvider extends ChangeNotifier {
       return const [];
     }
   }
-
-  /// Whether the session [generation] belongs to is still the current one.
-  bool _isCurrent(int generation) =>
-      !_disposed && generation == _generation && _browse.isConnected;
 
   @override
   void dispose() {

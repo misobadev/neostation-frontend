@@ -105,6 +105,7 @@ void main() {
     WidgetTester tester, {
     Size size = const Size(1280, 720),
     double textScale = 1,
+    Widget tab = const SavesTab(),
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -152,7 +153,7 @@ void main() {
               child: Scaffold(
                 body: FocusTraversalGroup(
                   policy: NoFocusTraversalPolicy(),
-                  child: const SavesTab(),
+                  child: tab,
                 ),
               ),
             ),
@@ -257,6 +258,24 @@ void main() {
     expect(find.byType(RommConnectContent), findsOneWidget);
     expect(find.byType(NeoSyncContent), findsNothing);
     expect(connection.inventory.calls, 0);
+    expect(
+      tester.widget<RommConnectContent>(find.byType(RommConnectContent)).onBack,
+      isNotNull,
+      reason: 'B leaves for Systems, as it does from the connected saves',
+    );
+  });
+
+  testWidgets('B on the connection form takes its back action', (tester) async {
+    connection.connected = false;
+    var backs = 0;
+    var browses = 0;
+    await pumpTab(
+      tester,
+      tab: RommConnectContent(onBack: () => backs++, onBrowse: () => browses++),
+    );
+    await press(tester, LogicalKeyboardKey.backspace);
+    expect(backs, 1);
+    expect(browses, 0, reason: 'browsing is not the way back here');
   });
 
   testWidgets('filter, refresh, and upload retry are usable', (tester) async {
@@ -286,39 +305,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(romm.calls, 1);
     expect(connection.inventory.calls, 3);
-    // Only a failed retry has anything to say, and it says it in a
-    // notification rather than as text in the layout.
-    final failed = find.textContaining('Some uploads failed');
-    expect(notified(), isEmpty);
+    // A failed retry is never text in the layout. The sync provider reports
+    // it in a notification, which outlives this tab, so the tab adds none.
     romm.run = () async => SyncResult.fail(SyncError.networkError);
     await tester.tap(find.byKey(const ValueKey('save-retry-uploads')));
     await tester.pumpAndSettle();
-    expect(failed, findsNothing);
-    expect(notified().single, startsWith('Some uploads failed'));
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('failed uploads name their games and replace the prior error', (
-    tester,
-  ) async {
-    await manager.setActive('romm', persist: (_) async {});
-    await pumpTab(tester);
-    for (final games in [
-      ['Alpha', 'Beta'],
-      ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'],
-    ]) {
-      romm.run = () async => SyncResult.fail(SyncError.unknown, data: games);
-      await tester.tap(find.byKey(const ValueKey('save-retry-uploads')));
-      await tester.pumpAndSettle();
-    }
-    // The second failure replaced the first rather than stacking under it.
-    expect(notified(), [
-      AppLocale.en[AppLocale.rommUploadsFailedFor]!.replaceFirst(
-        '{games}',
-        'Alpha, Beta, Gamma +2',
-      ),
-    ]);
-
+    expect(romm.calls, 2);
+    expect(find.textContaining('Some uploads failed'), findsNothing);
+    expect(notified(), isEmpty);
     expect(tester.takeException(), isNull);
   });
 

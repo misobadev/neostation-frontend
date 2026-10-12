@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/romm_provider.dart';
 import '../../sync/providers/romm_provider.dart';
 import '../../sync/sync_manager.dart';
+import '../app_screen.dart';
 import '../neo_sync_screen/login_screen/neo_sync_content.dart';
 import '../romm_screen/romm_connect_content.dart';
 import 'romm_saves_content.dart';
@@ -22,6 +23,10 @@ class SavesTab extends StatelessWidget {
       return const NeoSyncContent();
     }
     final connected = context.select<RommProvider, bool>((p) => p.isConnected);
-    return connected ? const RommSavesContent() : const RommConnectContent();
+    if (connected) return const RommSavesContent();
+    // B leaves for Systems, as it does from the connected saves.
+    return const RommConnectContent(onBack: _toSystems);
   }
+
+  static void _toSystems() => AppNavigation.goToTab(AppTabs.systems);
 }

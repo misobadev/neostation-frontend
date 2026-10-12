@@ -1,17 +1,38 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:neostation/models/romm_asset.dart';
+import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/providers/romm_saves_provider.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/i_sync_provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
 
 import 'romm_save_inventory_fakes.dart';
+
+/// A connection backed by a real [RommService], for requests that must stay
+/// on the server they began with.
+class _ServiceConnection extends RommProvider {
+  _ServiceConnection(this._service);
+  final RommService _service;
+  bool _connected = true;
+
+  @override
+  bool get isConnected => _connected;
+
+  @override
+  RommService get service => _service;
+
+  void setConnected(bool connected) {
+    _connected = connected;
+    notifyListeners();
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -101,6 +122,135 @@ void main() {
     );
   });
 
+  group('a request outlived by its connection', () {
+    test(
+      'a delete waiting on authentication never reaches a new server',
+      () async {
+        final tokenRequested = Completer<void>();
+        final tokenResponse = Completer<http.Response>();
+        final deletes = <String>[];
+        RommService.debugUseHttpClient(
+          MockClient((request) async {
+            if (request.url.path == '/api/token') {
+              tokenRequested.complete();
+              return tokenResponse.future;
+            }
+            deletes.add('${request.url} ${request.headers['Authorization']}');
+            return http.Response('[]', 200);
+          }),
+        );
+        final service = RommService()
+          ..configure(
+            serverUrl: 'https://old.test',
+            username: 'u',
+            password: 'p',
+          );
+        final connection = _ServiceConnection(service);
+        addTearDown(connection.dispose);
+        final inventory = RommSavesProvider(connection, SyncManager.instance);
+        final deletion = inventory.delete([inventoryAsset('old.srm', id: 7)]);
+        await tokenRequested.future;
+
+        // Signed out, which closes the tab, then into another server, all while
+        // the old server's token request hangs.
+        connection.setConnected(false);
+        inventory.dispose();
+        service.configure(serverUrl: 'https://new.test', apiKey: 'new-key');
+        connection.setConnected(true);
+        tokenResponse.complete(
+          http.Response(jsonEncode({'access_token': 'old-token'}), 200),
+        );
+
+        expect(await deletion, RommDeleteOutcome.failed);
+        expect(deletes, isEmpty, reason: 'asset 7 there is an unrelated file');
+        expect(
+          service.accessToken,
+          isNull,
+          reason: 'the old token was dropped',
+        );
+      },
+    );
+
+    test('an auth retry is not sent after a reconnect', () async {
+      final requests = <String>[];
+      late RommService service;
+      var reconnected = false;
+      RommService.debugUseHttpClient(
+        MockClient((request) async {
+          requests.add('${request.method} ${request.url}');
+          if (!reconnected) {
+            // The reconnect lands while the first attempt is out.
+            reconnected = true;
+            service.configure(
+              serverUrl: 'https://new.test',
+              username: 'u2',
+              password: 'p2',
+              accessToken: 'new-token',
+              refreshToken: 'new-refresh',
+            );
+            return http.Response('', 401);
+          }
+          if (request.url.path == '/api/token') {
+            return http.Response(jsonEncode({'access_token': 'renewed'}), 200);
+          }
+          return http.Response('[]', 200);
+        }),
+      );
+      service = RommService()
+        ..configure(
+          serverUrl: 'https://old.test',
+          username: 'u',
+          password: 'p',
+          accessToken: 'old-token',
+          refreshToken: 'old-refresh',
+        );
+
+      await expectLater(
+        service.deleteSaves([7]),
+        throwsA(isA<RommException>()),
+      );
+      expect(requests, ['POST https://old.test/api/saves/delete']);
+    });
+
+    test(
+      "an upload waiting on authentication doesn't carry new credentials",
+      () async {
+        final tokenRequested = Completer<void>();
+        final tokenResponse = Completer<http.Response>();
+        final uploads = <String>[];
+        RommService.debugUseHttpClient(
+          MockClient((request) async {
+            if (request.url.path == '/api/token') {
+              tokenRequested.complete();
+              return tokenResponse.future;
+            }
+            uploads.add('${request.url} ${request.headers['Authorization']}');
+            return http.Response('{}', 201);
+          }),
+        );
+        final dir = await Directory.systemTemp.createTemp('romm_session');
+        addTearDown(() => dir.delete(recursive: true));
+        final file = await File('${dir.path}/Game.srm').writeAsString('save');
+        final service = RommService()
+          ..configure(
+            serverUrl: 'https://old.test',
+            username: 'u',
+            password: 'p',
+          );
+
+        final upload = service.uploadSave(1, file);
+        await tokenRequested.future;
+        service.configure(serverUrl: 'https://new.test', apiKey: 'new-key');
+        tokenResponse.complete(
+          http.Response(jsonEncode({'access_token': 'old-token'}), 200),
+        );
+
+        await expectLater(upload, throwsA(isA<RommException>()));
+        expect(uploads, isEmpty);
+      },
+    );
+  });
+
   group('inventory state', () {
     late InventoryConnection connection;
     late InventorySync sync;
@@ -186,7 +336,6 @@ void main() {
       () async {
         await inventory.retryUploads();
         expect(sync.calls, 1);
-        expect(inventory.syncResult?.success, isTrue);
         expect(connection.inventory.calls, 1);
         await manager.setActive('neosync', persist: (_) async {});
         await inventory.retryUploads();
@@ -194,21 +343,30 @@ void main() {
       },
     );
 
-    test(
-      'failed retry is visible and repeated presses do not duplicate uploads',
-      () async {
-        final request = Completer<SyncResult>();
-        sync.run = () => request.future;
-        final pending = inventory.retryUploads();
-        await inventory.retryUploads();
-        expect(sync.calls, 1);
-        expect(inventory.syncing, isTrue);
-        request.complete(SyncResult.fail(SyncError.networkError));
-        await pending;
-        expect(inventory.syncResult?.success, isFalse);
-        expect(inventory.syncing, isFalse);
-      },
-    );
+    test('a failed retry still refreshes and repeated presses do not duplicate '
+        'uploads', () async {
+      final request = Completer<SyncResult>();
+      sync.run = () => request.future;
+      final pending = inventory.retryUploads();
+      await inventory.retryUploads();
+      expect(sync.calls, 1);
+      expect(inventory.syncing, isTrue);
+      request.complete(SyncResult.fail(SyncError.networkError));
+      await pending;
+      expect(inventory.syncing, isFalse);
+      expect(
+        connection.inventory.calls,
+        1,
+        reason: 'the uploads that did land should appear',
+      );
+    });
+
+    test('a retry that throws still ends and refreshes', () async {
+      sync.run = () async => throw StateError('library unavailable');
+      await inventory.retryUploads();
+      expect(inventory.syncing, isFalse);
+      expect(connection.inventory.calls, 1);
+    });
 
     test(
       'a sweep started elsewhere shows as syncing, then refreshes',
@@ -222,7 +380,6 @@ void main() {
         sweep.value = null;
         await pumpEventQueue();
         expect(inventory.syncing, isFalse);
-        expect(inventory.syncResult?.success, isTrue);
         expect(
           connection.inventory.calls,
           1,
@@ -231,17 +388,24 @@ void main() {
       },
     );
 
-    test('a failed sweep started elsewhere fails as a retry would', () async {
-      final run = Completer<SyncResult>();
-      sweep.value = run.future;
-      run.complete(SyncResult.fail(SyncError.unknown));
-      sweep.value = null;
-      await pumpEventQueue();
-      expect(inventory.syncResult?.success, isFalse);
-      expect(inventory.syncResult?.error, SyncError.unknown);
-    });
+    for (final outcome in ['fails', 'throws']) {
+      test('a sweep started elsewhere that $outcome still refreshes', () async {
+        final run = Completer<SyncResult>();
+        sweep.value = run.future;
+        if (outcome == 'fails') {
+          run.complete(SyncResult.fail(SyncError.unknown));
+        } else {
+          run.completeError(StateError('library unavailable'));
+        }
+        sweep.value = null;
+        await pumpEventQueue();
+        expect(inventory.syncing, isFalse);
+        expect(connection.inventory.calls, 1);
+      });
+    }
 
     test('a sweep already running when the tab opens is followed', () async {
+      connection.inventory.load = () async => [inventoryAsset('Game.srm')];
       final run = Completer<SyncResult>();
       sweep.value = run.future;
       final opened = RommSavesProvider(
@@ -255,17 +419,16 @@ void main() {
       sweep.value = null;
       await pumpEventQueue();
       expect(opened.syncing, isFalse);
-      expect(opened.syncResult?.success, isFalse);
+      expect(opened.assets, hasLength(1), reason: 'it refreshed when it ended');
     });
 
-    test('a sweep that ends after a disconnect reports nothing', () async {
+    test('a sweep that ends after a disconnect does not refresh', () async {
       final run = Completer<SyncResult>();
       sweep.value = run.future;
       connection.disconnectForTest();
       run.complete(SyncResult.fail(SyncError.authRequired));
       sweep.value = null;
       await pumpEventQueue();
-      expect(inventory.syncResult, isNull);
       expect(connection.inventory.calls, 0);
     });
 
@@ -295,28 +458,32 @@ void main() {
       sweep.value = null;
       // Its end is handled while the delete still waits on the server.
       await pumpEventQueue();
+      expect(
+        connection.inventory.calls,
+        1,
+        reason: 'a refresh now would cut the remaining batches short',
+      );
       request.complete();
       expect(await pending, RommDeleteOutcome.deleted);
       expect(connection.inventory.deleted, ['save:1', 'state:1']);
-      expect(connection.inventory.calls, 1);
+      expect(
+        connection.inventory.calls,
+        2,
+        reason: "the sweep's uploads still appear once the delete is done",
+      );
     });
 
-    test(
-      'retry during a running sweep reports busy and does not refresh',
-      () async {
-        sync.run = () async =>
-            SyncResult.fail(SyncError.busy, message: 'Sweep already running');
-        await inventory.retryUploads();
-        expect(inventory.syncResult?.success, isFalse);
-        expect(inventory.syncResult?.error, SyncError.busy);
-        expect(inventory.syncing, isFalse);
-        expect(
-          connection.inventory.calls,
-          0,
-          reason: 'the running sweep has not finished uploading yet',
-        );
-      },
-    );
+    test('a retry during a running sweep does not refresh', () async {
+      sync.run = () async =>
+          SyncResult.fail(SyncError.busy, message: 'Sweep already running');
+      await inventory.retryUploads();
+      expect(inventory.syncing, isFalse);
+      expect(
+        connection.inventory.calls,
+        0,
+        reason: 'the running sweep has not finished uploading yet',
+      );
+    });
 
     test('delete removes only that file, without refetching', () async {
       connection.inventory.load = () async => [
@@ -453,6 +620,43 @@ void main() {
         await pumpEventQueue();
       },
     );
+
+    test('a delete already sent finishes and reports after disposal', () async {
+      final opened = RommSavesProvider(
+        connection,
+        manager,
+        runningSweep: sweep,
+      );
+      final request = Completer<void>();
+      connection.inventory.beforeDelete = () => request.future;
+      final pending = opened.delete([
+        inventoryAsset('Game.srm'),
+        inventoryAsset('Game.state', state: true),
+      ]);
+      opened.dispose();
+      request.complete();
+      expect(await pending, RommDeleteOutcome.deleted);
+      expect(connection.inventory.deleteRequests, ['save:1', 'state:1']);
+    });
+
+    test('a disconnect still stops a delete after disposal', () async {
+      final opened = RommSavesProvider(
+        connection,
+        manager,
+        runningSweep: sweep,
+      );
+      final request = Completer<void>();
+      connection.inventory.beforeDelete = () => request.future;
+      final pending = opened.delete([
+        inventoryAsset('Game.srm'),
+        inventoryAsset('Game.state', state: true),
+      ]);
+      opened.dispose();
+      connection.disconnectForTest();
+      request.complete();
+      expect(await pending, RommDeleteOutcome.failed);
+      expect(connection.inventory.deleteRequests, ['save:1']);
+    });
 
     test(
       'a file already gone counts as deleted; other failures keep it',
