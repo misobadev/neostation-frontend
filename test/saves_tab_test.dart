@@ -22,6 +22,7 @@ import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/notification_service.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/core_footer.dart' show GamepadControl;
@@ -45,11 +46,20 @@ class _Notifications extends NotificationService {
   void disconnect() {}
 }
 
+class _SweepingSync extends InventorySync
+    with ChangeNotifier
+    implements RomMSyncProvider {
+  _SweepingSync() : super('romm');
+
+  @override
+  final ValueNotifier<Future<SyncResult>?> runningSweep = ValueNotifier(null);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final manager = SyncManager.instance;
   late InventoryConnection connection;
-  late InventorySync romm;
+  late _SweepingSync romm;
 
   setUpAll(() async {
     SharedPreferences.setMockInitialValues({});
@@ -73,13 +83,15 @@ void main() {
       inventoryAsset('Game.srm'),
       inventoryAsset('Game.state', state: true),
     ];
-    romm = InventorySync('romm');
+    romm = _SweepingSync();
     manager.register(romm);
     manager.register(InventorySync('neosync'));
   });
   tearDown(() {
     manager.unregister('romm');
     manager.unregister('neosync');
+    romm.runningSweep.dispose();
+    romm.dispose();
     connection.dispose();
   });
 
@@ -156,6 +168,31 @@ void main() {
     await pastGrace(tester);
     await tester.sendKeyEvent(key);
     await tester.pumpAndSettle();
+  }
+
+  /// Through the real plugin channel, including trigger translation/dispatch.
+  Future<void> pull(
+    WidgetTester tester,
+    String axis, {
+    bool settle = true,
+  }) async {
+    for (final value in [1.0, 0.0]) {
+      await pastGrace(tester);
+      await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+        'xyz.luan/gamepads',
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('onGamepadEvent', {
+            'gamepadId': 'pad',
+            'time': 0,
+            'type': 'analog',
+            'key': axis,
+            'value': value,
+          }),
+        ),
+        (_) {},
+      );
+      if (settle) await tester.pumpAndSettle();
+    }
   }
 
   /// Messages posted to the app's notification popups, oldest first.
@@ -341,48 +378,133 @@ void main() {
   testWidgets('L2/R2 cycle the filters without moving focus', (tester) async {
     await manager.setActive('romm', persist: (_) async {});
     await pumpTab(tester);
-    // Through the real plugin channel, so translation and dispatch are covered.
-    // The axis keys map to the triggers on every desktop test host.
-    Future<void> pull(String axis) async {
-      for (final value in [1.0, 0.0]) {
-        await pastGrace(tester);
-        await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
-          'xyz.luan/gamepads',
-          const StandardMethodCodec().encodeMethodCall(
-            MethodCall('onGamepadEvent', {
-              'gamepadId': 'pad',
-              'time': 0,
-              'type': 'analog',
-              'key': axis,
-              'value': value,
-            }),
-          ),
-          (_) {},
-        );
-        await tester.pumpAndSettle();
-      }
-    }
-
     void expectShowing({required bool saves, required bool states}) {
       expect(find.text('Game.srm'), saves ? findsOneWidget : findsNothing);
       expect(find.text('Game.state'), states ? findsOneWidget : findsNothing);
     }
 
     await press(tester, LogicalKeyboardKey.arrowDown); // games
-    await pull('axis_rtrigger');
+    await pull(tester, 'axis_rtrigger');
     expectShowing(saves: true, states: false);
     // Still in the games list: no filter took focus.
     for (final i in [0, 1, 2]) {
       expect(filterFocused(tester, i), isFalse);
     }
-    await pull('axis_rtrigger');
+    await pull(tester, 'axis_rtrigger');
     expectShowing(saves: false, states: true);
-    await pull('axis_rtrigger'); // wraps to All
+    await pull(tester, 'axis_rtrigger'); // wraps to All
     expectShowing(saves: true, states: true);
-    await pull('axis_ltrigger'); // and back round to States
+    await pull(tester, 'axis_ltrigger'); // and back round to States
     expectShowing(saves: false, states: true);
     expect(tester.takeException(), isNull);
   });
+
+  for (final keepSelected in [false, true]) {
+    testWidgets(
+      'files navigate before a filtered frame (kept: $keepSelected)',
+      (tester) async {
+        await manager.setActive('romm', persist: (_) async {});
+        connection.inventory.load = () async => [
+          inventoryAsset('Alpha-1', state: keepSelected, time: 400),
+          inventoryAsset('Alpha-2', state: keepSelected, id: 2, time: 300),
+          inventoryAsset(
+            'Beta-1',
+            state: !keepSelected,
+            romId: 2,
+            id: 3,
+            time: 200,
+          ),
+          inventoryAsset(
+            'Beta-2',
+            state: !keepSelected,
+            romId: 2,
+            id: 4,
+            time: 100,
+          ),
+        ];
+        await pumpTab(tester);
+        await press(tester, LogicalKeyboardKey.arrowDown); // games
+        await press(tester, LogicalKeyboardKey.arrowDown); // Beta, index 1
+        await press(tester, LogicalKeyboardKey.arrowRight); // files
+
+        await pull(tester, 'axis_rtrigger', settle: false); // only saves remain
+        // No frame reconciles the cursor between R2 and the next D-pad event.
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        expect(tester.takeException(), isNull);
+        await tester.pumpAndSettle();
+        expect(
+          glows(tester, 'save-file-false-${keepSelected ? 4 : 2}'),
+          isTrue,
+        );
+      },
+    );
+  }
+
+  for (final remainingGame in [0, 1, 2]) {
+    testWidgets(
+      'files navigate before a sweep refresh frame (game: $remainingGame)',
+      (tester) async {
+        await manager.setActive('romm', persist: (_) async {});
+        final assets = [
+          inventoryAsset('Alpha-1.srm', time: 400),
+          inventoryAsset('Alpha-2.srm', id: 2, time: 300),
+          inventoryAsset('Beta-1.srm', romId: 2, id: 3, time: 200),
+          inventoryAsset('Beta-2.srm', romId: 2, id: 4, time: 100),
+        ];
+        connection.inventory.load = () async => assets.toList();
+        await pumpTab(tester);
+        await press(tester, LogicalKeyboardKey.arrowDown);
+        await press(tester, LogicalKeyboardKey.arrowDown);
+        await press(tester, LogicalKeyboardKey.arrowRight);
+        final run = Completer<SyncResult>();
+        romm.runningSweep.value = run.future;
+        connection.inventory.load = () async =>
+            assets.where((a) => a.romId == remainingGame).toList();
+        run.complete(SyncResult.ok());
+        romm.runningSweep.value = null;
+        await tester.idle(); // apply the inventory response, without a frame
+        expect(connection.inventory.calls, 2);
+        await pastGrace(tester);
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        expect(tester.takeException(), isNull);
+        await tester.pumpAndSettle();
+        if (remainingGame == 0) {
+          expect(filterFocused(tester, 0), isTrue);
+        } else {
+          expect(glows(tester, 'save-file-false-${remainingGame * 2}'), isTrue);
+        }
+      },
+    );
+  }
+
+  for (final key in [LogicalKeyboardKey.enter, LogicalKeyboardKey.arrowLeft]) {
+    testWidgets('a press that finds the panes emptied only reaches the filters '
+        '(${key.keyLabel})', (tester) async {
+      await manager.setActive('romm', persist: (_) async {});
+      await pumpTab(tester);
+      await press(tester, LogicalKeyboardKey.arrowRight); // Saves, unapplied
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      await press(tester, LogicalKeyboardKey.arrowRight); // files
+      final listing = connection.inventory.load;
+      final run = Completer<SyncResult>();
+      romm.runningSweep.value = run.future;
+      connection.inventory.load = () async => [];
+      run.complete(SyncResult.ok());
+      romm.runningSweep.value = null;
+      await tester.idle(); // apply the empty inventory, without a frame
+      await pastGrace(tester);
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      // Neither applied the focused filter nor moved along the filters.
+      expect(filterFocused(tester, 1), isTrue);
+      connection.inventory.load = listing;
+      await tester.tap(find.byKey(const ValueKey('save-refresh')));
+      await tester.pumpAndSettle();
+      expect(find.text('Game.srm'), findsOneWidget);
+      expect(find.text('Game.state'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('Y retries uploads, but the cursor never lands on the buttons', (
     tester,
@@ -438,6 +560,54 @@ void main() {
     expect(romm.calls, 0);
     expect(tester.takeException(), isNull);
   });
+
+  for (final duringSweep in [false, true]) {
+    testWidgets(
+      'confirmation waits for background work (sweep: $duringSweep)',
+      (tester) async {
+        await manager.setActive('romm', persist: (_) async {});
+        await pumpTab(tester);
+        await tester.tap(find.byKey(const ValueKey('save-file-true-1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('save-delete')));
+        await tester.pumpAndSettle();
+
+        final run = Completer<SyncResult>();
+        final listing = Completer<List<RommAsset>>();
+        connection.inventory.load = () => listing.future;
+        romm.runningSweep.value = run.future;
+        if (!duringSweep) {
+          run.complete(SyncResult.ok());
+          romm.runningSweep.value = null;
+          await tester.idle();
+          expect(connection.inventory.calls, 2);
+        }
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Delete'));
+        await tester.pump();
+        expect(connection.inventory.deleteRequests, isEmpty);
+        expect(notified(), isEmpty);
+
+        if (duringSweep) {
+          run.complete(SyncResult.ok());
+          romm.runningSweep.value = null;
+          await tester.idle();
+        }
+        expect(connection.inventory.calls, 2);
+        expect(connection.inventory.deleteRequests, isEmpty);
+        listing.complete([
+          inventoryAsset('Game.srm'),
+          inventoryAsset('Game.state', state: true),
+          inventoryAsset('Uploaded.srm', id: 2),
+        ]);
+        await tester.pumpAndSettle();
+        expect(connection.inventory.deleteRequests, ['state:1']);
+        expect(find.text('Game.state'), findsNothing);
+        expect(find.text('Uploaded.srm'), findsOneWidget);
+        expect(notified(), ['Deleted from RomM.']);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final (filter, deleted, body) in [
     (

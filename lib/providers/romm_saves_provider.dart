@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/game_model.dart';
@@ -12,6 +14,10 @@ import '../sync/sync_manager.dart';
 import '../utils/lifo_semaphore.dart';
 import 'file_provider.dart';
 import 'romm_provider.dart';
+
+/// A delete is queued while a refresh or sync finishes, then sends its
+/// requests.
+enum _DeleteState { idle, queued, sending }
 
 /// Remote inventory state for the Saves tab. Merely browsing never syncs files.
 class RommSavesProvider extends ChangeNotifier {
@@ -50,9 +56,12 @@ class RommSavesProvider extends ChangeNotifier {
   List<RommAsset> _assets = [];
   bool _loading = false;
   bool _syncing = false;
-  bool _deleting = false;
+  _DeleteState _deleteState = _DeleteState.idle;
   bool _disposed = false;
   int _generation = 0;
+  int _connectionGeneration = 0;
+  // Disposing completes it too, as a disposed notifier never notifies again.
+  Completer<void>? _changed;
   Object? _loadError;
   SyncResult? _syncResult;
 
@@ -62,7 +71,7 @@ class RommSavesProvider extends ChangeNotifier {
   /// True during a retry, and during a sweep this provider did not start, such
   /// as the automatic one after connect, since a retry would only overlap it.
   bool get syncing => _syncing || _sweep?.value != null;
-  bool get deleting => _deleting;
+  bool get deleting => _deleteState != _DeleteState.idle;
   Object? get loadError => _loadError;
   SyncResult? get syncResult => _syncResult;
 
@@ -151,6 +160,7 @@ class RommSavesProvider extends ChangeNotifier {
 
   void _connectionChanged() {
     if (_browse.isConnected) return;
+    _connectionGeneration++;
     _generation++;
     _gameInfo.clear();
     _loadedInfo.clear();
@@ -182,9 +192,9 @@ class RommSavesProvider extends ChangeNotifier {
     if (_disposed || !_browse.isConnected) return;
     _syncResult = result;
     notifyListeners();
-    // A refresh would make an in-flight delete abandon its remaining batches
-    // and report failure; the next refresh shows the uploads instead.
-    if (!_deleting) await refresh();
+    // A queued delete waits for this refresh too. Once requests are being
+    // sent, a refresh would invalidate the remaining delete batches.
+    if (_deleteState != _DeleteState.sending) await refresh();
   }
 
   Future<void> refresh() async {
@@ -219,6 +229,7 @@ class RommSavesProvider extends ChangeNotifier {
     final sync = _manager.active;
     if (_disposed ||
         syncing ||
+        deleting ||
         !_browse.isConnected ||
         sync?.providerId != RomMSyncProvider.kProviderId) {
       return;
@@ -253,40 +264,62 @@ class RommSavesProvider extends ChangeNotifier {
   /// so a device that still syncs the game uploads its copies again.
   ///
   /// Returns whether all of them are gone. Any that are leave the list even
-  /// when others could not be deleted.
+  /// when others could not be deleted. One made during a refresh or sync waits
+  /// for it to finish rather than failing unsent.
   Future<bool> delete(List<RommAsset> assets) async {
-    if (_disposed ||
-        assets.isEmpty ||
-        _loading ||
-        syncing ||
-        _deleting ||
-        !_browse.isConnected) {
+    if (_disposed || assets.isEmpty || deleting || !_browse.isConnected) {
       return false;
     }
-    final generation = _generation;
-    _deleting = true;
+    // Waiting must never carry asset IDs into a different server/account.
+    final connectionGeneration = _connectionGeneration;
+    bool sameConnection() =>
+        !_disposed &&
+        connectionGeneration == _connectionGeneration &&
+        _browse.isConnected;
+    _deleteState = _DeleteState.queued;
     notifyListeners();
-    final gone = <RommAsset>[];
-    for (final isState in [false, true]) {
-      final batch = assets.where((a) => a.isState == isState).toList();
-      if (batch.isNotEmpty) {
-        gone.addAll(await _deleteBatch(batch, generation));
+    try {
+      // A sweep finishing can start a refresh in the same turn that wakes us.
+      // Recheck here so no async gap separates the idle check and the request.
+      while (sameConnection() && (_loading || syncing)) {
+        await _nextChange();
       }
+      if (!sameConnection()) return false;
+      _deleteState = _DeleteState.sending;
+      final generation = _generation;
+      final gone = <RommAsset>[];
+      for (final isState in [false, true]) {
+        final batch = assets.where((a) => a.isState == isState).toList();
+        if (batch.isNotEmpty) {
+          gone.addAll(await _deleteBatch(batch, generation));
+        }
+      }
+      if (_disposed || generation != _generation) return false;
+      // Drop them locally rather than refreshing, which would reload every
+      // game's artwork. Saves and states are numbered independently, so match
+      // both.
+      _assets = _assets
+          .where(
+            (a) => !gone.any((g) => g.isState == a.isState && g.id == a.id),
+          )
+          .toList();
+      return gone.length == assets.length;
+    } finally {
+      _deleteState = _DeleteState.idle;
+      if (!_disposed) notifyListeners();
     }
-    if (_disposed) return false;
-    _deleting = false;
-    if (generation != _generation) {
-      notifyListeners();
-      return false;
+  }
+
+  /// Completes at this provider's next notification, or once it is disposed.
+  Future<void> _nextChange() {
+    final changed = _changed = Completer<void>();
+    void done() {
+      removeListener(done);
+      if (!changed.isCompleted) changed.complete();
     }
-    // Drop them locally rather than refreshing, which would reload every
-    // game's artwork. Saves and states are numbered independently, so match
-    // both.
-    _assets = _assets
-        .where((a) => !gone.any((g) => g.isState == a.isState && g.id == a.id))
-        .toList();
-    notifyListeners();
-    return gone.length == assets.length;
+
+    addListener(done);
+    return changed.future;
   }
 
   /// Deletes [batch], all saves or all states as each has its own endpoint, in
@@ -326,6 +359,8 @@ class RommSavesProvider extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    final changed = _changed;
+    if (changed != null && !changed.isCompleted) changed.complete();
     _generation++;
     _browse.removeListener(_connectionChanged);
     _sweep?.removeListener(_sweepChanged);

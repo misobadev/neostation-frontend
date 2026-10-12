@@ -328,6 +328,118 @@ void main() {
       expect(sync.calls, 0);
     });
 
+    for (final failRefresh in [false, true]) {
+      test(
+        'confirmed delete waits for a refresh (fails: $failRefresh)',
+        () async {
+          final asset = inventoryAsset('Game.srm');
+          connection.inventory.load = () async => [asset];
+          await inventory.refresh();
+          final listing = Completer<List<RommAsset>>();
+          connection.inventory.load = () => listing.future;
+          final refresh = inventory.refresh();
+          final pending = inventory.delete([asset]);
+          expect(inventory.deleting, isTrue);
+          expect(connection.inventory.deleteRequests, isEmpty);
+          expect(await inventory.delete([asset]), isFalse);
+          await inventory.retryUploads();
+          expect(sync.calls, 0);
+
+          if (failRefresh) {
+            listing.completeError(StateError('offline'));
+          } else {
+            listing.complete([asset, inventoryAsset('New.srm', id: 2)]);
+          }
+          await refresh;
+          expect(await pending, isTrue);
+          expect(connection.inventory.deleteRequests, ['save:1']);
+          expect(
+            inventory.assets.map((a) => a.fileName),
+            failRefresh ? isEmpty : ['New.srm'],
+          );
+          expect(inventory.deleting, isFalse);
+        },
+      );
+    }
+
+    for (final retry in [false, true]) {
+      test(
+        'confirmed delete waits for sync and its refresh (retry: $retry)',
+        () async {
+          final asset = inventoryAsset('Game.srm');
+          connection.inventory.load = () async => [asset];
+          await inventory.refresh();
+          final run = Completer<SyncResult>();
+          final listing = Completer<List<RommAsset>>();
+          connection.inventory.load = () => listing.future;
+          Future<void>? retrying;
+          if (retry) {
+            sync.run = () => run.future;
+            retrying = inventory.retryUploads();
+          } else {
+            sweep.value = run.future;
+          }
+          final pending = inventory.delete([asset]);
+          expect(inventory.deleting, isTrue);
+          expect(connection.inventory.deleteRequests, isEmpty);
+
+          run.complete(SyncResult.ok());
+          sweep.value = null;
+          await pumpEventQueue();
+          expect(inventory.loading, isTrue);
+          expect(connection.inventory.deleteRequests, isEmpty);
+          listing.complete([asset, inventoryAsset('Uploaded.srm', id: 2)]);
+          await retrying;
+          expect(await pending, isTrue);
+          expect(connection.inventory.deleteRequests, ['save:1']);
+          expect(inventory.assets.single.fileName, 'Uploaded.srm');
+          expect(inventory.deleting, isFalse);
+        },
+      );
+    }
+
+    test(
+      'a connection change cancels a queued delete before any request',
+      () async {
+        final asset = inventoryAsset('old.srm');
+        final listing = Completer<List<RommAsset>>();
+        connection.inventory.load = () => listing.future;
+        final refresh = inventory.refresh();
+        final pending = inventory.delete([asset]);
+        connection.disconnectForTest();
+        connection.connected = true;
+        connection.inventory.load = () async => [inventoryAsset('new.srm')];
+        await inventory.refresh();
+        expect(await pending, isFalse);
+        expect(connection.inventory.deleteRequests, isEmpty);
+        expect(inventory.assets.single.fileName, 'new.srm');
+        expect(inventory.deleting, isFalse);
+        listing.complete([asset]);
+        await refresh;
+        expect(inventory.assets.single.fileName, 'new.srm');
+      },
+    );
+
+    test(
+      'disposing cancels a queued delete without waiting for the server',
+      () async {
+        final opened = RommSavesProvider(
+          connection,
+          manager,
+          runningSweep: sweep,
+        );
+        final run = Completer<SyncResult>();
+        sweep.value = run.future;
+        final pending = opened.delete([inventoryAsset('Game.srm')]);
+        opened.dispose();
+        expect(await pending, isFalse);
+        expect(connection.inventory.deleteRequests, isEmpty);
+        run.complete(SyncResult.ok());
+        sweep.value = null;
+        await pumpEventQueue();
+      },
+    );
+
     test(
       'a file already gone counts as deleted; other failures keep it',
       () async {

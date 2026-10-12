@@ -150,6 +150,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
     final games = _games;
     final before = _cursor;
     setState(() {
+      _reconcileSelection(games);
       switch (_focus) {
         case _FocusArea.filters:
           // Not into the panes while they are still hidden behind loading.
@@ -179,13 +180,19 @@ class _RommSavesContentState extends State<RommSavesContent> {
 
   /// Refresh and Retry uploads are left out: X and Y reach them directly.
   bool _horizontal(int delta) {
+    final games = _games;
     final before = _cursor;
     setState(() {
+      final focus = _focus;
+      _reconcileSelection(games);
+      // Panes that emptied before this frame send the cursor to the filters,
+      // and that is all this press does.
+      if (_focus != focus) return;
       switch (_focus) {
         case _FocusArea.filters:
           _filterFocus = (_filterFocus + delta).clamp(0, 2);
         case _FocusArea.games:
-          if (delta > 0 && _games.isNotEmpty) _focus = _FocusArea.files;
+          if (delta > 0 && games.isNotEmpty) _focus = _FocusArea.files;
         case _FocusArea.files:
           if (delta < 0) _focus = _FocusArea.games;
       }
@@ -218,14 +225,19 @@ class _RommSavesContentState extends State<RommSavesContent> {
   }
 
   void _activate() {
-    switch (_focus) {
-      case _FocusArea.filters:
-        _setFilter(_filterFocus);
-      case _FocusArea.games:
-        if (_games.isNotEmpty) setState(() => _focus = _FocusArea.files);
-      case _FocusArea.files:
-        break;
+    // Checked before reconciling: panes that emptied before this frame send
+    // the cursor to the filters, and the press must not then apply one.
+    if (_focus == _FocusArea.filters) {
+      _setFilter(_filterFocus);
+      return;
     }
+    final games = _games;
+    setState(() {
+      _reconcileSelection(games);
+      if (_focus == _FocusArea.games && games.isNotEmpty) {
+        _focus = _FocusArea.files;
+      }
+    });
   }
 
   // Failures are reported as notifications, never as text in the layout. With
@@ -307,8 +319,10 @@ class _RommSavesContentState extends State<RommSavesContent> {
   /// A game's delete takes every file the filter shows for it: saves and
   /// states under All, and only the one kind under Saves or States.
   Future<void> _deleteFocused() async {
+    if (_busy) return;
     final games = _games;
-    if (_busy || _gameIndex >= games.length) return;
+    setState(() => _reconcileSelection(games));
+    if (games.isEmpty) return;
     final game = games[_gameIndex];
     final files = switch (_focus) {
       _FocusArea.games => game.assets,
@@ -396,6 +410,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
       _filter = _filterFocus = index;
       if (moveFocus) _focus = _FocusArea.filters;
       _fileIndex = 0;
+      _reconcileSelection(_games);
     });
     if (_gamesScroll.hasClients) _gamesScroll.jumpTo(0);
     if (_filesScroll.hasClients) _filesScroll.jumpTo(0);
@@ -413,27 +428,35 @@ class _RommSavesContentState extends State<RommSavesContent> {
     _gameKey = games[index].key;
   }
 
+  /// Input can arrive after a filter or inventory change but before build.
+  /// Resolve the selected game by key and clamp its file cursor in both paths.
+  void _reconcileSelection(List<RommSaveGame> games) {
+    if (games.isEmpty) {
+      _focus = _FocusArea.filters;
+      return;
+    }
+    final previousKey = _gameKey;
+    final previousIndex = _gameIndex;
+    final preserved = games.indexWhere((game) => game.key == _gameKey);
+    _gameIndex = preserved >= 0 ? preserved : 0;
+    _gameKey = games[_gameIndex].key;
+    if (previousKey != _gameKey) _fileIndex = 0;
+    _fileIndex = _fileIndex.clamp(0, games[_gameIndex].assets.length - 1);
+    if (previousIndex != _gameIndex || previousKey != _gameKey) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _revealSelection();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: _saves,
     builder: (context, _) {
       final games = _games;
+      _reconcileSelection(games);
       if (games.isNotEmpty) {
         _firstPage ??= _loadFirstPage(games);
-        final previousKey = _gameKey;
-        final previousIndex = _gameIndex;
-        final preserved = games.indexWhere((game) => game.key == _gameKey);
-        _gameIndex = preserved >= 0 ? preserved : 0;
-        _gameKey = games[_gameIndex].key;
-        if (previousKey != _gameKey) _fileIndex = 0;
-        _fileIndex = _fileIndex.clamp(0, games[_gameIndex].assets.length - 1);
-        if (previousIndex != _gameIndex || previousKey != _gameKey) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _revealSelection();
-          });
-        }
-      } else if (_focus == _FocusArea.games || _focus == _FocusArea.files) {
-        _focus = _FocusArea.filters;
       }
       // The navigator owns the cursor. Otherwise an arrow key hands Flutter's
       // focus to the first button it finds, which then shows a highlight of
