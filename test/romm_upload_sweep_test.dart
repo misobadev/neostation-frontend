@@ -187,9 +187,17 @@ class _GamePaths {
 
   final String dir;
 
-  String pathFor(GameModel game) => p.join(dir, '${game.romname}.srm');
+  /// Games whose save folder cannot be read.
+  final Set<GameModel> unreadable = {};
+
+  /// Per system, as two systems can each hold a game of the same name.
+  String pathFor(GameModel game) =>
+      p.join(dir, game.systemFolderName, '${game.romname}.srm');
 
   Future<List<LocalSaveFile>> locate(GameModel game) async {
+    if (unreadable.contains(game)) {
+      throw FileSystemException('Permission denied', pathFor(game));
+    }
     final file = File(pathFor(game));
     if (!file.existsSync()) return [];
     final stat = file.statSync();
@@ -209,10 +217,14 @@ class _GamePaths {
   Future<List<String>> resolveTargets(
     GameModel game,
     String relativeName,
-  ) async => [p.join(dir, p.basename(relativeName))];
+  ) async => [p.join(dir, game.systemFolderName, p.basename(relativeName))];
 }
 
-GameModel _game(String romname, {bool? cloudSync = true}) => GameModel(
+GameModel _game(
+  String romname, {
+  bool? cloudSync = true,
+  String system = 'snes',
+}) => GameModel(
   romname: romname,
   realname: romname,
   name: romname,
@@ -222,8 +234,8 @@ GameModel _game(String romname, {bool? cloudSync = true}) => GameModel(
   genre: '',
   players: '',
   rating: 0,
-  romPath: '/roms/snes/$romname',
-  systemFolderName: 'snes',
+  romPath: '/roms/$system/$romname',
+  systemFolderName: system,
   cloudSyncEnabled: cloudSync,
 );
 
@@ -245,17 +257,20 @@ void main() {
     int? romId,
     String contents = 'LOCAL',
     bool? cloudSync = true,
+    String system = 'snes',
   }) async {
-    final game = _game(romname, cloudSync: cloudSync);
+    final game = _game(romname, cloudSync: cloudSync, system: system);
     if (romId != null) {
       await RommSaveMapRepository.putMapping(
         source: RommLinkSource.download,
         romname: romname,
-        systemFolder: 'snes',
+        systemFolder: system,
         rommRomId: romId,
       );
     }
-    await File(paths.pathFor(game)).writeAsString(contents);
+    final save = File(paths.pathFor(game));
+    await save.parent.create(recursive: true);
+    await save.writeAsString(contents);
     library.add(game);
     return game;
   }
@@ -287,7 +302,9 @@ void main() {
       NeoSyncProvider(NeoSyncService()),
       locateSaves: paths.locate,
       resolveTargets: paths.resolveTargets,
-      listGames: () async => library,
+      // A fresh list, as the database gives, so a test can change the library
+      // while a sweep walks it.
+      listGames: () async => List.of(library),
       // The connect-triggered sweep is a 30s timer; these tests drive the sweep
       // directly instead of waiting one out.
       autoSweep: false,
@@ -673,6 +690,101 @@ void main() {
           expect(failed(), isEmpty, reason: 'but no save was left behind');
         },
       );
+
+      test('a same-named game on another system leaves it alone', () async {
+        final snes = await linked('Same', romId: 90);
+        svc.failingUploads.add(90);
+        await provider.syncGameSavesAfterClose(snes);
+        final gba = await linked(
+          'Same',
+          romId: 91,
+          system: 'gba',
+          cloudSync: false,
+        );
+
+        await provider.retryPendingUploads();
+        expect(failed(), ['Same'], reason: 'the SNES save still fails');
+
+        await provider.syncGameSavesAfterClose(gba);
+        expect(failed(), ['Same']);
+      });
+
+      test('a sweep that leaves a both-changed save keeps it', () async {
+        final game = await linked('Contra', romId: 4);
+        await provider.syncGameSavesAfterClose(game);
+        await touch(game, 'LOCAL-PROGRESS');
+        svc.failingListings.add(4);
+        await provider.syncGameSavesAfterClose(game);
+        expect(failed(), ['Contra']);
+
+        svc.failingListings.clear();
+        svc.seedSave(
+          4,
+          'Contra.srm',
+          'REMOTE-FROM-OTHER-DEVICE'.codeUnits,
+          updatedAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+        );
+        svc.uploads.clear();
+        await provider.retryPendingUploads();
+
+        expect(
+          svc.uploads,
+          isEmpty,
+          reason: 'the tie is not the sweep to settle',
+        );
+        expect(failed(), ['Contra'], reason: 'its save is still waiting');
+
+        // Settled by the hook that has the authority.
+        await provider.syncGameSavesAfterClose(game);
+        expect(svc.uploads, ['4/Contra.srm']);
+        expect(failed(), isEmpty);
+      });
+
+      test('an unreadable save folder keeps it', () async {
+        final game = await linked('Locked', romId: 75);
+        svc.failingUploads.add(75);
+        await provider.syncGameSavesAfterClose(game);
+
+        svc.failingUploads.clear();
+        paths.unreadable.add(game);
+        await provider.retryPendingUploads();
+        expect(svc.uploads, isEmpty);
+        expect(failed(), ['Locked'], reason: 'nothing checked or sent it');
+
+        await provider.syncGameSavesAfterClose(game);
+        expect(failed(), ['Locked']);
+      });
+
+      test('a sweep that began before the game was added keeps it', () async {
+        await linked('Pending', romId: 72);
+        final gate = Completer<void>();
+        svc.listingGates[72] = gate.future;
+
+        final sweep = provider.retryPendingUploads();
+        while (!svc.listCalls.contains(72)) {
+          await pumpEventQueue();
+        }
+        // Added, played and closed while the sweep is busy.
+        final added = await linked('Added', romId: 76);
+        svc.failingUploads.add(76);
+        await provider.syncGameSavesAfterClose(added);
+        expect(failed(), ['Added']);
+
+        gate.complete();
+        expect((await sweep).success, isTrue);
+        expect(failed(), ['Added'], reason: 'its save is still pending');
+      });
+
+      test('a game removed from the library is no longer reported', () async {
+        final game = await linked('Removed', romId: 77);
+        svc.failingUploads.add(77);
+        await provider.syncGameSavesAfterClose(game);
+        library.remove(game);
+
+        await provider.retryPendingUploads();
+
+        expect(failed(), isEmpty);
+      });
     });
 
     test(

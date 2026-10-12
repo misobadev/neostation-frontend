@@ -82,6 +82,36 @@ enum _UploadOutcome {
   failed,
 }
 
+/// Whether a game still has a save waiting to go up, which decides whether
+/// [RomMSyncProvider.uploadFailures] names the game.
+enum _Pending {
+  /// Every local save is on the server, or none of them is ours to send.
+  none,
+
+  /// A save is waiting. After an upload attempt, that attempt failed.
+  waiting,
+
+  /// A save was left on purpose: a file both sides changed, which a sweep
+  /// leaves for the post-close hook to settle. It is still waiting, but no
+  /// failure kept it there, so an earlier report of the game stands and no new
+  /// one starts.
+  deferred,
+
+  /// Nothing could tell, such as a save folder that could not be read. An
+  /// earlier report of the game stands.
+  unknown,
+}
+
+/// What [RomMSyncProvider._syncGame] made of a game: the cloud state to show,
+/// and what an upload-capable pass left waiting to go up.
+typedef _GameSync = ({GameSyncStatus status, _Pending uploads});
+
+/// Identifies a game in the library. Two systems can each hold a `Same.zip`.
+typedef _GameKey = ({String? system, String romname});
+
+_GameKey _keyOf(GameModel game) =>
+    (system: game.systemFolderName, romname: game.romname);
+
 /// The saves [RomMSyncProvider] could not upload, for the app to report.
 class RommUploadFailures {
   /// The games whose saves are still waiting to go up, in the order they first
@@ -317,25 +347,30 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// indicator. Moving the highlight onto a game in the list must not push or
   /// pull a save: the transfers belong to the launch lifecycle, where the user
   /// has actually asked for the game.
-  Future<GameSyncStatus> _syncGame(
+  ///
+  /// What it reports left to upload is [_Pending.unknown] when the pass never
+  /// got as far as comparing the saves (no connection, or a listing that
+  /// failed), for the caller to answer from the disk.
+  Future<_GameSync> _syncGame(
     GameModel game, {
     required bool downloadOnly,
     bool statusOnly = false,
     bool uploadOnly = false,
     SyncDeadline? deadline,
   }) async {
-    if (!_browse.isConnected) return GameSyncStatus.error;
+    if (!_browse.isConnected) {
+      return (status: GameSyncStatus.error, uploads: _Pending.unknown);
+    }
+    const disabled = (status: GameSyncStatus.disabled, uploads: _Pending.none);
     // Honour the sync opt-outs exactly the way NeoSync does: a null per-game
     // flag counts as disabled, and a system whose config sets `sync: false`
     // (e.g. shared-memcard systems the user deliberately excluded) is skipped
     // regardless of the per-game flag.
-    if (game.cloudSyncEnabled != true) return GameSyncStatus.disabled;
+    if (game.cloudSyncEnabled != true) return disabled;
     final systemFolder = game.systemFolderName;
     if (systemFolder != null && systemFolder.isNotEmpty) {
       final system = await SystemRepository.getSystemByFolderName(systemFolder);
-      if (system != null && !system.neosync.sync) {
-        return GameSyncStatus.disabled;
-      }
+      if (system != null && !system.neosync.sync) return disabled;
     }
 
     final romId = await _resolveRomId(game);
@@ -343,7 +378,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       // Not a RomM-linked game (wasn't downloaded through the app). Report
       // "disabled" — sync simply doesn't apply — rather than "no save found",
       // which would be a lie whenever the game has perfectly good local saves.
-      return GameSyncStatus.disabled;
+      return disabled;
     }
 
     final localFiles = syncableSaves(game, await _locateSaves(game));
@@ -366,16 +401,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       );
     } catch (e) {
       _log.e('RomM listSaves/listStates failed for ${game.romname}: $e');
-      return GameSyncStatus.error;
+      return (status: GameSyncStatus.error, uploads: _Pending.unknown);
     }
 
     // Assets already paired with a local file. Keyed by kind *and* id: the two
     // endpoints number their rows independently, so a bare id would let a save
     // mask a state that happens to share it.
-    final matchedRemote = <String>{};
-    String remoteKey(RommAsset a) => '${a.isState ? 's' : 'f'}:${a.id}';
+    final matchedRemote = <({bool isState, int id})>{};
     int uploaded = 0, downloaded = 0, coreMismatched = 0;
-    int conflictsPreserved = 0, uploadsFailed = 0;
+    int conflictsPreserved = 0, uploadsFailed = 0, uploadsDeferred = 0;
     void countUpload(_UploadOutcome outcome) {
       if (outcome == _UploadOutcome.uploaded) uploaded++;
       if (outcome == _UploadOutcome.failed) uploadsFailed++;
@@ -397,7 +431,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           break;
         }
       }
-      if (match != null) matchedRemote.add(remoteKey(match));
+      if (match != null) matchedRemote.add(match.key);
 
       final localMs = local.lastModified.millisecondsSinceEpoch;
       final recorded = await SyncRepository.getSyncState(
@@ -475,7 +509,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         // hazard comes back — the other device's newer save overwritten by an
         // older local one — so a sweep leaves ties to the hook that can settle
         // them.
-        if (uploadOnly && remoteChanged) continue;
+        if (uploadOnly && remoteChanged) {
+          uploadsDeferred++;
+          continue;
+        }
         // `localChanged` is an mtime answer, and mtime lies in the direction
         // that costs the most: RetroArch rewrites `<game>.state.auto` on every
         // exit whether or not the bytes moved, so a device with auto-save-state
@@ -529,11 +566,13 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           );
           if (guard == _RemoteGuard.unreadable) {
             // Nothing recorded: the file stays pending and the next pass asks
-            // again, which is the non-destructive way to fail.
+            // again, which is the non-destructive way to fail. Still a failed
+            // upload: the save the session just made is not on the server.
             _log.w(
               'RomM: leaving ${path.basename(local.filePath)} pending — the '
               'remote copy it would replace could not be read',
             );
+            uploadsFailed++;
             continue;
           }
           if (guard == _RemoteGuard.preserved) conflictsPreserved++;
@@ -553,7 +592,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     // 2) Remote-only files → download.
     for (final a in remote) {
       if (statusOnly || uploadOnly) break;
-      if (matchedRemote.contains(remoteKey(a))) continue;
+      if (matchedRemote.contains(a.key)) continue;
       final r = await _download(
         game,
         a,
@@ -568,6 +607,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       'RomM sync ${game.romname}: $uploaded up, $downloaded down '
       '(${localFiles.length} local, ${remote.length} remote)'
       '${uploadsFailed > 0 ? ', $uploadsFailed upload(s) failed' : ''}'
+      '${uploadsDeferred > 0 ? ', $uploadsDeferred deferred' : ''}'
       '${coreMismatched > 0 ? ', $coreMismatched kept (different core)' : ''}'
       '${conflictsPreserved > 0 ? ', $conflictsPreserved conflict backup(s)' : ''}',
     );
@@ -581,11 +621,18 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
     // A save that didn't reach the server is still pending, which no status
     // below can say: "local only" or "up to date" would read as success.
-    if (uploadsFailed > 0) return GameSyncStatus.error;
-    if (!anyLocal && !anyRemote) return GameSyncStatus.noSaveFound;
-    if (!anyRemote) return GameSyncStatus.localOnly;
-    if (!anyLocal && downloaded == 0) return GameSyncStatus.cloudOnly;
-    return GameSyncStatus.upToDate;
+    if (uploadsFailed > 0) {
+      return (status: GameSyncStatus.error, uploads: _Pending.waiting);
+    }
+    final uploads = uploadsDeferred > 0 ? _Pending.deferred : _Pending.none;
+    if (!anyLocal && !anyRemote) {
+      return (status: GameSyncStatus.noSaveFound, uploads: uploads);
+    }
+    if (!anyRemote) return (status: GameSyncStatus.localOnly, uploads: uploads);
+    if (!anyLocal && downloaded == 0) {
+      return (status: GameSyncStatus.cloudOnly, uploads: uploads);
+    }
+    return (status: GameSyncStatus.upToDate, uploads: uploads);
   }
 
   /// Pushes queued play sessions and pulls back playtime recorded elsewhere.
@@ -1292,8 +1339,11 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   }
 
   @override
-  Future<SyncResult> detectGameSaveFiles(GameModel game) =>
-      _runGameSync(game, downloadOnly: true, statusOnly: true);
+  Future<SyncResult> detectGameSaveFiles(GameModel game) => _runGameSync(
+    game,
+    downloadOnly: true,
+    statusOnly: true,
+  ).then((sync) => sync.result);
 
   /// Runs one per-game hook's sync and publishes the resulting cloud state.
   ///
@@ -1302,27 +1352,33 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// or "up to date" would read as success. [_syncGame] has logged its cause.
   /// Every caller treats a failure as best-effort, so it never blocks a game
   /// from starting; it only keeps the UI honest.
-  Future<SyncResult> _runGameSync(
+  ///
+  /// Also returns what the sync left waiting to go up, which is
+  /// [_Pending.unknown] when it threw.
+  Future<({SyncResult result, _Pending uploads})> _runGameSync(
     GameModel game, {
     required bool downloadOnly,
     bool statusOnly = false,
     SyncDeadline? deadline,
   }) async {
     try {
-      final status = await _syncGame(
+      final sync = await _syncGame(
         game,
         downloadOnly: downloadOnly,
         statusOnly: statusOnly,
         deadline: deadline,
       );
-      if (status == GameSyncStatus.error) {
-        return _failGame(game, 'RomM save sync failed');
+      if (sync.status == GameSyncStatus.error) {
+        return (
+          result: _failGame(game, 'RomM save sync failed'),
+          uploads: sync.uploads,
+        );
       }
-      _gameSyncStates[game.romname] = _buildState(game, status);
+      _gameSyncStates[game.romname] = _buildState(game, sync.status);
       notifyListeners();
-      return SyncResult.ok();
+      return (result: SyncResult.ok(), uploads: sync.uploads);
     } catch (e) {
-      return _failGame(game, e);
+      return (result: _failGame(game, e), uploads: _Pending.unknown);
     }
   }
 
@@ -1369,7 +1425,11 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   Future<SyncResult> syncGameSavesBeforeLaunch(
     GameModel game, {
     SyncDeadline? deadline,
-  }) => _runGameSync(game, downloadOnly: true, deadline: deadline);
+  }) => _runGameSync(
+    game,
+    downloadOnly: true,
+    deadline: deadline,
+  ).then((sync) => sync.result);
 
   /// Deliberately not [detectGameSaveFiles]: this is the one hook that must
   /// actually push. Detection went status-only so that merely highlighting a
@@ -1380,25 +1440,22 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// is: the game joins [uploadFailures] until its saves go up.
   @override
   Future<SyncResult> syncGameSavesAfterClose(GameModel game) async {
-    final result = await _runGameSync(game, downloadOnly: false);
-    await _recordUploadOutcome(game, failed: !result.success);
-    return result;
+    final sync = await _runGameSync(game, downloadOnly: false);
+    await _recordUploadOutcome(game, sync.uploads);
+    return sync.result;
   }
 
-  /// Reports [game] in [uploadFailures] when [failed] left a save waiting to
-  /// go up, and stops reporting it otherwise. A failure while disconnected is
-  /// not reported, as a sweep's is not: the next connect retries it.
-  Future<void> _recordUploadOutcome(
-    GameModel game, {
-    required bool failed,
-  }) async {
+  /// Reports [game] in [uploadFailures] while [uploads] left a save waiting
+  /// to go up, and stops reporting it once nothing is. When the sync could not
+  /// tell, the disk is asked: a failed listing with nothing new to send left no
+  /// save behind. A failure while disconnected is not reported, as a sweep's
+  /// is not: the next connect retries it.
+  Future<void> _recordUploadOutcome(GameModel game, _Pending uploads) async {
     if (!_browse.isConnected) return;
-    // A failed listing with nothing new to send left no save behind.
-    final left = failed && await _hasPendingUpload(game);
-    // Neither failing now nor reported before: nothing to say.
-    if (!left && !_failedUploads.containsKey(game.romname)) return;
-    _noteUpload(game, failed: left);
-    _reportUploadFailures();
+    final left = uploads == _Pending.unknown
+        ? await _pendingUpload(game)
+        : uploads;
+    if (_noteUpload(game, left)) _reportUploadFailures();
   }
 
   @override
@@ -1571,16 +1628,25 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
   }
 
-  /// Games whose saves did not upload, romname to display name, in the order
+  /// Games whose saves did not upload, to their display names, in the order
   /// they first failed. Kept by the sweep and by each post-close sync, each
   /// recording a game's outcome as it learns it, so the latest one stands.
-  final Map<String, String> _failedUploads = {};
+  final Map<_GameKey, String> _failedUploads = {};
 
-  void _noteUpload(GameModel game, {required bool failed}) {
-    if (failed) {
-      _failedUploads[game.romname] = game.name;
-    } else {
-      _failedUploads.remove(game.romname);
+  /// Records what an upload attempt [left] of [game]'s saves. Returns whether
+  /// that is news: a failure, which is reported again each time it recurs, or
+  /// a game that no longer fails.
+  bool _noteUpload(GameModel game, _Pending left) {
+    switch (left) {
+      case _Pending.waiting:
+        _failedUploads[_keyOf(game)] = game.name;
+        return true;
+      case _Pending.none:
+        return _failedUploads.remove(_keyOf(game)) != null;
+      case _Pending.deferred:
+      case _Pending.unknown:
+        // Nothing settled either way.
+        return false;
     }
   }
 
@@ -1616,14 +1682,14 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       return SyncResult.ok(message: 'No RomM-linked games to sweep');
     }
 
-    var linked = 0, candidates = 0, synced = 0, failed = 0;
-    final listed = <String>{};
-    final touched = <String>[];
+    var linked = 0, candidates = 0, synced = 0, failed = 0, deferred = 0;
+    final listed = <_GameKey>{};
+    var touched = false;
     for (final game in await _listGames()) {
       // A disconnect (or a sign-out) mid-sweep ends it; every remaining game
       // would fail against a server we no longer have credentials for.
       if (!_browse.isConnected) break;
-      listed.add(game.romname);
+      listed.add(_keyOf(game));
 
       final folder = game.systemFolderName;
       final sweepable =
@@ -1632,28 +1698,33 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           index.lookup(game.romname, folder) != null &&
           game.cloudSyncEnabled == true;
       if (sweepable) linked++;
-      if (!sweepable || !await _hasPendingUpload(game)) {
-        // Nothing of this game's is waiting to go up.
-        _noteUpload(game, failed: false);
+      final pending = sweepable ? await _pendingUpload(game) : _Pending.none;
+      if (pending != _Pending.waiting) {
+        // Nothing of this game's is waiting to go up, or its saves could not
+        // be checked.
+        _noteUpload(game, pending);
         continue;
       }
 
       candidates++;
       try {
-        final status = await _syncGame(
+        final sync = await _syncGame(
           game,
           downloadOnly: false,
           uploadOnly: true,
         );
-        final uploaded = status != GameSyncStatus.error;
-        if (uploaded) {
-          synced++;
-        } else {
+        // A sync that could not tell leaves the pre-check's answer standing.
+        final left = sync.uploads == _Pending.unknown ? pending : sync.uploads;
+        if (left == _Pending.waiting) {
           failed++;
+        } else if (left == _Pending.deferred) {
+          deferred++;
+        } else {
+          synced++;
         }
-        _noteUpload(game, failed: !uploaded);
-        _gameSyncStates[game.romname] = _buildState(game, status);
-        touched.add(game.romname);
+        _noteUpload(game, left);
+        _gameSyncStates[game.romname] = _buildState(game, sync.status);
+        touched = true;
       } catch (e) {
         if (isPermissionDenied(e)) {
           _log.e('RomM upload sweep: permission denied, stopping: $e');
@@ -1662,7 +1733,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
             GameSyncStatus.error,
             errorMessage: e.toString(),
           );
-          if (touched.isNotEmpty) notifyListeners();
+          if (touched) notifyListeners();
           // It stopped short, so it cannot say which games are left.
           _reportUploadFailures(unidentified: true);
           // Same error shape [_failGame] uses for a bubbled-up 403, so a
@@ -1671,19 +1742,25 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         }
         _log.e('RomM upload sweep: ${game.romname} failed: $e');
         failed++;
-        _noteUpload(game, failed: true);
+        _noteUpload(game, pending);
       }
     }
 
     // One notification for the whole sweep: it can touch hundreds of games,
     // and notifying per game would rebuild the library UI hundreds of times.
-    if (touched.isNotEmpty) notifyListeners();
+    if (touched) notifyListeners();
     // A disconnect ended the sweep, which says nothing about the uploads.
     if (!_browse.isConnected) {
       return SyncResult.fail(SyncError.authRequired);
     }
-    // A game that left the library has nothing left to upload.
-    _failedUploads.removeWhere((romname, _) => !listed.contains(romname));
+    // A game that left the library has nothing left to upload. The listing
+    // predates the sweep, so a game missing from it may instead be one added
+    // since, whose upload failed after it closed: the library as it is now
+    // decides.
+    if (_failedUploads.keys.any((key) => !listed.contains(key))) {
+      final current = {for (final game in await _listGames()) _keyOf(game)};
+      _failedUploads.removeWhere((key, _) => !current.contains(key));
+    }
     _reportUploadFailures();
     if (candidates == 0) {
       // Logged even when it does nothing: this is the only outward sign the
@@ -1692,7 +1769,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       return SyncResult.ok(message: 'Nothing pending');
     }
     _log.i(
-      'RomM upload sweep: $candidates pending, $synced synced, $failed failed',
+      'RomM upload sweep: $candidates pending, $synced synced, $failed failed, '
+      '$deferred deferred',
     );
     if (failed > 0) {
       return SyncResult.fail(
@@ -1705,20 +1783,21 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     );
   }
 
-  /// True when [game] has a local save the server has not been told about —
-  /// either never recorded, or changed since it was recorded.
+  /// [_Pending.waiting] when [game] has a local save the server has not been
+  /// told about — either never recorded, or changed since it was recorded —
+  /// and [_Pending.unknown] when its save folder could not be read.
   ///
   /// The point of this check is that it touches only the disk and the local
   /// sync-state table, so the sweep can rule a game out without a round trip.
-  Future<bool> _hasPendingUpload(GameModel game) async {
+  Future<_Pending> _pendingUpload(GameModel game) async {
     final List<LocalSaveFile> localFiles;
     try {
       localFiles = syncableSaves(game, await _locateSaves(game));
     } catch (e) {
-      // Unreadable save folder: not a pending upload, and not worth a round
-      // trip to find out. The post-close hook will report it properly.
-      _log.w('RomM upload sweep: cannot locate saves for ${game.romname}: $e');
-      return false;
+      // Not worth a round trip to find out, and no reason to stop reporting a
+      // save that failed before.
+      _log.w('RomM: cannot locate saves for ${game.romname}: $e');
+      return _Pending.unknown;
     }
     for (final local in localFiles) {
       final recorded = await SyncRepository.getSyncState(
@@ -1727,14 +1806,14 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       );
       // No record at all: either a first upload that failed, or a save made
       // before RomM sync was on. Both want pushing.
-      if (recorded == null) return true;
+      if (recorded == null) return _Pending.waiting;
       final recordedLocalMs = (recorded['local_modified_at'] as int?) ?? 0;
       if (local.lastModified.millisecondsSinceEpoch >
           recordedLocalMs + _mtimeToleranceMs) {
-        return true;
+        return _Pending.waiting;
       }
     }
-    return false;
+    return _Pending.none;
   }
 
   /// Fires the connect-time work once, on a disconnected → connected

@@ -85,6 +85,10 @@ class RommAsset {
   /// Milliseconds-since-epoch of [updatedAt], or 0 when unknown.
   int get updatedAtMs => updatedAt?.millisecondsSinceEpoch ?? 0;
 
+  /// Identifies this asset on its server. Saves and states are numbered
+  /// independently, so an [id] alone could match a save to a state.
+  ({bool isState, int id}) get key => (isState: isState, id: id);
+
   /// A trimmed string, or null when the field is absent or blank.
   ///
   /// `""` and `null` mean the same thing for a slot — no slot — and collapsing

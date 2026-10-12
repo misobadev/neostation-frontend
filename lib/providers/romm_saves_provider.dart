@@ -334,13 +334,11 @@ class RommSavesProvider extends ChangeNotifier {
       _sending = sending;
       final gone = await sending;
       // Drop them locally rather than listing the whole inventory again, unless
-      // the list was since replaced. Saves and states are numbered
-      // independently, so match both.
+      // the list was since replaced.
       if (!_disposed && generation == _generation) {
+        final goneKeys = {for (final asset in gone) asset.key};
         _assets = List.unmodifiable(
-          _assets.where(
-            (a) => !gone.any((g) => g.isState == a.isState && g.id == a.id),
-          ),
+          _assets.where((a) => !goneKeys.contains(a.key)),
         );
       }
       return gone.length == assets.length
@@ -408,12 +406,10 @@ class RommSavesProvider extends ChangeNotifier {
   Future<List<RommAsset>> _unlisted(List<RommAsset> assets) async {
     if (!_connected) return const [];
     try {
-      final listed = await _browse.service.listSaveAssets();
-      return assets
-          .where(
-            (a) => !listed.any((l) => l.isState == a.isState && l.id == a.id),
-          )
-          .toList();
+      final listed = {
+        for (final asset in await _browse.service.listSaveAssets()) asset.key,
+      };
+      return assets.where((a) => !listed.contains(a.key)).toList();
     } catch (_) {
       // Unconfirmed, so reported as a failed delete.
       return const [];
