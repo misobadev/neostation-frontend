@@ -154,6 +154,19 @@ void main() {
       },
     );
 
+    test('refresh keeps metadata that loaded, even mid-request', () async {
+      final pending = Completer<RommRom>();
+      connection.inventory.loadRom = (_) => pending.future;
+      final first = saves.gameInfo(1);
+      await Future<void>.delayed(Duration.zero);
+      await saves.refresh();
+      pending.complete(RommRom.fromJson({'id': 1, 'name': 'Mario'}));
+      expect((await first).rom?.name, 'Mario');
+      await saves.refresh();
+      expect(saves.gameInfo(1), same(first));
+      expect(connection.inventory.detailCalls, [1]);
+    });
+
     test('discards metadata arriving after disconnect', () async {
       final pending = Completer<RommRom>();
       connection.inventory.loadRom = (_) => pending.future;

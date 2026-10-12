@@ -8,6 +8,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.rommRetryUploads: 'Reintentar subidas',
   AppLocale.rommUploadsFailed:
       'Algunas subidas fallaron. Revisa la conexión y los permisos de RomM e inténtalo de nuevo.',
+  AppLocale.rommUploadsFailedFor:
+      'No se subieron las partidas de {games}. Revisa la conexión y los permisos de RomM e inténtalo de nuevo.',
   AppLocale.rommSavesHelp:
       'Consulta tus partidas y estados de RomM. Reintentar subidas comprueba los juegos locales vinculados a RomM con sincronización activada. Las partidas remotas más recientes se descargan al iniciar un juego.',
   AppLocale.rommDeleteTitle: 'Eliminar de RomM',
@@ -16,6 +18,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.rommDeleted: 'Eliminado de RomM.',
   AppLocale.rommDeleteFailed:
       'No se pudo eliminar de RomM. Revisa la conexión y los permisos de RomM e inténtalo de nuevo.',
+  AppLocale.rommDeleteNotSent:
+      'Eliminación cancelada antes de llegar a RomM. No se eliminó nada.',
   AppLocale.rommSaveFileCount: '{count} partida guardada',
   AppLocale.rommSaveFilesCount: '{count} partidas guardadas',
   AppLocale.rommSaveStateCount: '{count} estado guardado',

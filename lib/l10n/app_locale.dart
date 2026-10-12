@@ -1472,11 +1472,13 @@ mixin AppLocale {
   static const String rommSaveState = 'romm_save_state';
   static const String rommRetryUploads = 'romm_retry_uploads';
   static const String rommUploadsFailed = 'romm_uploads_failed';
+  static const String rommUploadsFailedFor = 'romm_uploads_failed_for';
   static const String rommSavesHelp = 'romm_saves_help';
   static const String rommDeleteTitle = 'romm_delete_title';
   static const String rommDeleteConfirm = 'romm_delete_confirm';
   static const String rommDeleted = 'romm_deleted';
   static const String rommDeleteFailed = 'romm_delete_failed';
+  static const String rommDeleteNotSent = 'romm_delete_not_sent';
   // Deleting a whole game from the game list. Counts follow the singular/plural
   // pattern described at gamesCount; use lib/utils/count_label.dart.
   static const String rommSaveFileCount = 'romm_save_file_count';

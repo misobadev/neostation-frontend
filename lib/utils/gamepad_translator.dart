@@ -494,6 +494,10 @@ class GamepadEventTranslator {
           GamepadInputType.dpadUp,
           GamepadInputType.dpadDown,
         );
+      case 20: // ABS_HAT2X: the Steam Deck's R2 under hid-steam
+        return GamepadInputType.buttonRT;
+      case 21: // ABS_HAT2Y: and its L2
+        return GamepadInputType.buttonLT;
     }
     return GamepadInputType.unknown;
   }

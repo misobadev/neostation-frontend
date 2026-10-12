@@ -8,6 +8,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.rommRetryUploads: 'Повторить отправку',
   AppLocale.rommUploadsFailed:
       'Некоторые файлы не отправлены. Проверьте подключение и разрешения RomM, затем повторите попытку.',
+  AppLocale.rommUploadsFailedFor:
+      'Сохранения для {games} не отправлены. Проверьте подключение и разрешения RomM, затем повторите попытку.',
   AppLocale.rommSavesHelp:
       'Просматривайте сохранения и состояния RomM. Повторная отправка проверяет локальные игры, связанные с RomM, с включённой синхронизацией. Новые удалённые сохранения скачиваются при запуске игры.',
   AppLocale.rommDeleteTitle: 'Удалить из RomM',
@@ -16,6 +18,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.rommDeleted: 'Удалено из RomM.',
   AppLocale.rommDeleteFailed:
       'Не удалось удалить из RomM. Проверьте подключение и разрешения RomM, затем повторите попытку.',
+  AppLocale.rommDeleteNotSent:
+      'Удаление отменено до отправки в RomM. Ничего не удалено.',
   AppLocale.rommSaveFileCount: '{count} файл сохранения',
   AppLocale.rommSaveFilesCount: '{count} файлов сохранения',
   AppLocale.rommSaveStateCount: '{count} состояние игры',

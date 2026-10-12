@@ -6,6 +6,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.rommSaveState: '세이브 상태',
   AppLocale.rommRetryUploads: '업로드 재시도',
   AppLocale.rommUploadsFailed: '일부 업로드에 실패했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',
+  AppLocale.rommUploadsFailedFor:
+      '{games}의 저장 파일을 업로드하지 못했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',
   AppLocale.rommSavesHelp:
       'RomM 저장 파일과 상태를 확인합니다. 업로드 재시도는 동기화가 활성화된 RomM 연결 로컬 게임을 확인합니다. 최신 원격 저장 파일은 게임 시작 시 다운로드됩니다.',
   AppLocale.rommDeleteTitle: 'RomM에서 삭제',
@@ -14,6 +16,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.rommDeleted: 'RomM에서 삭제했습니다.',
   AppLocale.rommDeleteFailed:
       'RomM에서 삭제하지 못했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',
+  AppLocale.rommDeleteNotSent: '삭제가 RomM에 도달하기 전에 취소되었습니다. 아무것도 삭제되지 않았습니다.',
   AppLocale.rommSaveFileCount: '세이브 파일 {count}개',
   AppLocale.rommSaveFilesCount: '세이브 파일 {count}개',
   AppLocale.rommSaveStateCount: '세이브 상태 {count}개',

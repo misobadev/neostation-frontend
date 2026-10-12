@@ -15,6 +15,7 @@ import '../../providers/romm_provider.dart';
 import '../../providers/romm_saves_provider.dart';
 import '../../services/game_service.dart' show GamepadNavigationManager;
 import '../../services/sfx_service.dart';
+import '../../sync/providers/romm_provider.dart';
 import '../../sync/sync_manager.dart';
 import '../../themes/corner_radii.dart';
 import '../../utils/count_label.dart';
@@ -59,11 +60,27 @@ class _RommSavesContentState extends State<RommSavesContent> {
   // inventory notifies.
   SyncResult? _reportedSync;
 
-  List<RommSaveGame> get _games => RommSaveGame.group(
-    _saves.assets
-        .where((asset) => _filter == 0 || asset.isState == (_filter == 2))
-        .toList(),
-  );
+  // Input reads the games several times per press, so they are regrouped only
+  // when the inventory or the filter changes.
+  (List<RommAsset>, int, List<RommSaveGame>)? _grouped;
+
+  List<RommSaveGame> get _games {
+    final assets = _saves.assets;
+    if (_grouped case (
+      final from,
+      final filter,
+      final games,
+    ) when identical(from, assets) && filter == _filter) {
+      return games;
+    }
+    final games = RommSaveGame.group([
+      for (final asset in assets)
+        if (_filter == 0 || asset.isState == (_filter == 2)) asset,
+    ]);
+    _grouped = (assets, _filter, games);
+    return games;
+  }
+
   bool get _busy => _saves.loading || _saves.syncing || _saves.deleting;
 
   // Accommodate both ScreenUtil and accessibility text scaling. Each extent is
@@ -256,19 +273,35 @@ class _RommSavesContentState extends State<RommSavesContent> {
   }
 
   /// Reports a failed sync, whether a retry or a sweep this tab did not start
-  /// (the automatic one after connect), the same way. A success needs no
-  /// message, and nor does a retry that found a sweep already running: the
-  /// button shows that one as it runs.
+  /// (the automatic one after connect), the same way: as one notification
+  /// naming the games that failed. The sync provider clears it on success,
+  /// even after this tab closes.
   void _reportSync() {
     final result = _saves.syncResult;
     if (identical(result, _reportedSync)) return;
     _reportedSync = result;
-    if (mounted &&
-        result != null &&
-        !result.success &&
-        result.error != SyncError.busy) {
-      _notify(AppLocale.rommUploadsFailed);
+    if (!mounted ||
+        result == null ||
+        result.success ||
+        result.error == SyncError.busy) {
+      return;
     }
+    final games = switch (result.data) {
+      final List<String> names when names.length > 3 =>
+        '${names.take(3).join(', ')} +${names.length - 3}',
+      final List<String> names when names.isNotEmpty => names.join(', '),
+      _ => null,
+    };
+    AppNotification.showNotification(
+      context,
+      games == null
+          ? AppLocale.rommUploadsFailed.getString(context)
+          : AppLocale.rommUploadsFailedFor
+                .getString(context)
+                .replaceFirst('{games}', games),
+      type: NotificationType.error,
+      notificationId: RomMSyncProvider.uploadsFailedNotificationId,
+    );
   }
 
   /// Greyed out while a sync runs, whoever started it.
@@ -350,13 +383,18 @@ class _RommSavesContentState extends State<RommSavesContent> {
       maxWidth: 320.r,
     );
     if (!mounted || !confirmed) return;
-    // Leaving the tab cancels a delete still queued behind a sync. The app's
-    // navigator outlives the tab, so the outcome is reported either way.
+    // Leaving the tab cancels a delete still queued behind a sync, unsent. The
+    // app's navigator outlives the tab, so the outcome is reported either way.
     final app = Navigator.of(context, rootNavigator: true).context;
-    final deleted = await _saves.delete(files);
+    final outcome = await _saves.delete(files);
+    final deleted = outcome == RommDeleteOutcome.deleted;
     if (app.mounted) {
       _notify(
-        deleted ? AppLocale.rommDeleted : AppLocale.rommDeleteFailed,
+        switch (outcome) {
+          RommDeleteOutcome.deleted => AppLocale.rommDeleted,
+          RommDeleteOutcome.failed => AppLocale.rommDeleteFailed,
+          RommDeleteOutcome.notSent => AppLocale.rommDeleteNotSent,
+        },
         error: !deleted,
         via: app,
       );
@@ -897,6 +935,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
     key: ValueKey('art-${game.key}'),
     info: info,
     service: context.read<RommProvider>().service,
+    retryRevision: _saves.artworkRevision,
     width: width,
     height: height,
   );

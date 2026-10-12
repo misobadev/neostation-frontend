@@ -14,6 +14,9 @@ import '../../utils/cover_decode.dart';
 class RommSaveArtwork extends StatefulWidget {
   final RommSaveGameInfo? info;
   final RommService service;
+
+  /// Advance to retry artwork without replacing the cached [info].
+  final int retryRevision;
   final double width;
   final double height;
 
@@ -21,6 +24,7 @@ class RommSaveArtwork extends StatefulWidget {
     super.key,
     required this.info,
     required this.service,
+    this.retryRevision = 0,
     required this.width,
     required this.height,
   });
@@ -35,7 +39,10 @@ class _RommSaveArtworkState extends State<RommSaveArtwork> {
   @override
   void didUpdateWidget(covariant RommSaveArtwork oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.info != widget.info) _attempt = 0;
+    if (oldWidget.info != widget.info ||
+        oldWidget.retryRevision != widget.retryRevision) {
+      _attempt = 0;
+    }
   }
 
   @override
@@ -82,7 +89,7 @@ class _RommSaveArtworkState extends State<RommSaveArtwork> {
           child: attempt >= sources.length
               ? placeholder
               : Image(
-                  key: ValueKey(sources[attempt]),
+                  key: ValueKey((sources[attempt], widget.retryRevision)),
                   image: ResizeImage(
                     sources[attempt],
                     width: hint.cacheWidth,
@@ -94,10 +101,12 @@ class _RommSaveArtworkState extends State<RommSaveArtwork> {
                   errorBuilder: (context, error, stackTrace) {
                     final failed = _attempt;
                     final failedInfo = widget.info;
+                    final failedRevision = widget.retryRevision;
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted &&
                           failed == _attempt &&
-                          widget.info == failedInfo) {
+                          widget.info == failedInfo &&
+                          widget.retryRevision == failedRevision) {
                         setState(() => _attempt = attempt + 1);
                       }
                     });

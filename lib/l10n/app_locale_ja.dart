@@ -6,6 +6,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.rommSaveState: 'セーブステート',
   AppLocale.rommRetryUploads: 'アップロードを再試行',
   AppLocale.rommUploadsFailed: '一部のアップロードに失敗しました。接続とRomMの権限を確認して再試行してください。',
+  AppLocale.rommUploadsFailedFor:
+      '{games}のセーブをアップロードできませんでした。接続とRomMの権限を確認して再試行してください。',
   AppLocale.rommSavesHelp:
       'RomMのセーブとステートを表示します。アップロードの再試行では、RomMにリンクされ同期が有効なローカルゲームを確認します。新しいリモートセーブはゲーム起動時にダウンロードされます。',
   AppLocale.rommDeleteTitle: 'RomMから削除',
@@ -13,6 +15,7 @@ const Map<String, dynamic> appLocaleJa = {
       '{file} をRomMサーバーから完全に削除します。デバイス上のコピーは残り、このゲームの同期を続けているデバイスからは再びアップロードされます。',
   AppLocale.rommDeleted: 'RomMから削除しました。',
   AppLocale.rommDeleteFailed: 'RomMから削除できませんでした。接続とRomMの権限を確認して再試行してください。',
+  AppLocale.rommDeleteNotSent: '削除はRomMに届く前にキャンセルされました。何も削除されていません。',
   AppLocale.rommSaveFileCount: 'セーブデータ{count}件',
   AppLocale.rommSaveFilesCount: 'セーブデータ{count}件',
   AppLocale.rommSaveStateCount: 'セーブステート{count}件',

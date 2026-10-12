@@ -143,8 +143,8 @@ class SyncResult {
   factory SyncResult.ok({String? message, dynamic data}) =>
       SyncResult(success: true, message: message, data: data);
 
-  factory SyncResult.fail(SyncError error, {String? message}) =>
-      SyncResult(success: false, error: error, message: message);
+  factory SyncResult.fail(SyncError error, {String? message, dynamic data}) =>
+      SyncResult(success: false, error: error, message: message, data: data);
 }
 
 /// Operational state of a sync provider instance.

@@ -8,6 +8,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.rommRetryUploads: 'Retry uploads',
   AppLocale.rommUploadsFailed:
       'Some uploads failed. Check your connection and RomM permissions, then retry.',
+  AppLocale.rommUploadsFailedFor:
+      "Saves for {games} didn't upload. Check your connection and RomM permissions, then retry.",
   AppLocale.rommSavesHelp:
       'Browse your RomM saves and states. Retry uploads checks local games linked to RomM with save sync enabled. Newer remote saves download when you launch a game.',
   AppLocale.rommDeleteTitle: 'Delete from RomM',
@@ -16,6 +18,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.rommDeleted: 'Deleted from RomM.',
   AppLocale.rommDeleteFailed:
       "Couldn't delete from RomM. Check your connection and RomM permissions, then try again.",
+  AppLocale.rommDeleteNotSent:
+      'Delete cancelled before it reached RomM. Nothing was deleted.',
   AppLocale.rommSaveFileCount: '{count} save file',
   AppLocale.rommSaveFilesCount: '{count} save files',
   AppLocale.rommSaveStateCount: '{count} save state',

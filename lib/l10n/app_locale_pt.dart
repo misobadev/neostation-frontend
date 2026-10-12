@@ -8,6 +8,8 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.rommRetryUploads: 'Tentar envios novamente',
   AppLocale.rommUploadsFailed:
       'Alguns envios falharam. Verifique a conexão e as permissões do RomM e tente novamente.',
+  AppLocale.rommUploadsFailedFor:
+      'Os saves de {games} não foram enviados. Verifique a conexão e as permissões do RomM e tente novamente.',
   AppLocale.rommSavesHelp:
       'Veja seus salvamentos e estados do RomM. Tentar envios novamente verifica jogos locais vinculados ao RomM com sincronização ativa. Salvamentos remotos mais recentes são baixados ao iniciar um jogo.',
   AppLocale.rommDeleteTitle: 'Excluir do RomM',
@@ -16,6 +18,8 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.rommDeleted: 'Excluído do RomM.',
   AppLocale.rommDeleteFailed:
       'Não foi possível excluir do RomM. Verifique a conexão e as permissões do RomM e tente novamente.',
+  AppLocale.rommDeleteNotSent:
+      'Exclusão cancelada antes de chegar ao RomM. Nada foi excluído.',
   AppLocale.rommSaveFileCount: '{count} arquivo de save',
   AppLocale.rommSaveFilesCount: '{count} arquivos de save',
   AppLocale.rommSaveStateCount: '{count} estado salvo',

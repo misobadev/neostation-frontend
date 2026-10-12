@@ -6,6 +6,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.rommSaveState: '即時存檔',
   AppLocale.rommRetryUploads: '重試上傳',
   AppLocale.rommUploadsFailed: '部分上傳失敗。請檢查連線和 RomM 權限，然後重試。',
+  AppLocale.rommUploadsFailedFor: '{games} 的存檔上傳失敗。請檢查連線和 RomM 權限，然後重試。',
   AppLocale.rommSavesHelp:
       '瀏覽 RomM 存檔和即時存檔。重試上傳會檢查已關聯 RomM 且啟用同步的本機遊戲。啟動遊戲時會下載較新的遠端存檔。',
   AppLocale.rommDeleteTitle: '從 RomM 刪除',
@@ -13,6 +14,7 @@ const Map<String, dynamic> appLocaleZhHant = {
       '{file} 將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
   AppLocale.rommDeleted: '已從 RomM 刪除。',
   AppLocale.rommDeleteFailed: '無法從 RomM 刪除。請檢查連線和 RomM 權限，然後重試。',
+  AppLocale.rommDeleteNotSent: '刪除在傳送到 RomM 之前已取消。未刪除任何內容。',
   AppLocale.rommSaveFileCount: '{count} 個存檔檔案',
   AppLocale.rommSaveFilesCount: '{count} 個存檔檔案',
   AppLocale.rommSaveStateCount: '{count} 個即時存檔',

@@ -14,6 +14,7 @@ import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/screens/neo_sync_screen/login_screen/neo_sync_content.dart';
 import 'package:neostation/screens/romm_screen/romm_connect_content.dart';
+import 'package:neostation/screens/saves_screen/romm_save_artwork.dart';
 import 'package:neostation/screens/saves_screen/romm_saves_content.dart';
 import 'package:neostation/screens/saves_screen/saves_tab.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
@@ -269,9 +270,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Game.srm'), findsNothing);
     expect(find.text('Game.state'), findsOneWidget);
+    final artwork = tester.widget<RommSaveArtwork>(
+      find.byType(RommSaveArtwork).first,
+    );
     await tester.tap(find.byKey(const ValueKey('save-refresh')));
     await tester.pumpAndSettle();
     expect(connection.inventory.calls, 2);
+    final refreshed = tester.widget<RommSaveArtwork>(
+      find.byType(RommSaveArtwork).first,
+    );
+    expect(refreshed.info, same(artwork.info));
+    expect(refreshed.retryRevision, greaterThan(artwork.retryRevision));
     expect(romm.calls, 0);
     await tester.tap(find.byKey(const ValueKey('save-retry-uploads')));
     await tester.pumpAndSettle();
@@ -286,6 +295,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(failed, findsNothing);
     expect(notified().single, startsWith('Some uploads failed'));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed uploads name their games and replace the prior error', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    for (final games in [
+      ['Alpha', 'Beta'],
+      ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'],
+    ]) {
+      romm.run = () async => SyncResult.fail(SyncError.unknown, data: games);
+      await tester.tap(find.byKey(const ValueKey('save-retry-uploads')));
+      await tester.pumpAndSettle();
+    }
+    // The second failure replaced the first rather than stacking under it.
+    expect(notified(), [
+      AppLocale.en[AppLocale.rommUploadsFailedFor]!.replaceFirst(
+        '{games}',
+        'Alpha, Beta, Gamma +2',
+      ),
+    ]);
+
     expect(tester.takeException(), isNull);
   });
 
@@ -665,7 +698,7 @@ void main() {
       }
       await tester.pump();
       expect(find.byType(RommSavesContent), findsNothing);
-      expect(notified(), [AppLocale.en[AppLocale.rommDeleteFailed]]);
+      expect(notified(), [AppLocale.en[AppLocale.rommDeleteNotSent]]);
 
       run.complete(SyncResult.ok());
       romm.runningSweep.value = null;

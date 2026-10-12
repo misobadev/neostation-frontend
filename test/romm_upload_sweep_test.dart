@@ -11,10 +11,13 @@ import 'package:neostation/models/romm_asset.dart';
 import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
+import 'package:neostation/providers/romm_saves_provider.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
+import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
+import 'package:neostation/sync/sync_manager.dart';
 
 import 'database_test_helper.dart';
 
@@ -215,6 +218,8 @@ GameModel _game(String romname, {bool? cloudSync = true}) => GameModel(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   final helper = DatabaseTestHelper();
   late DatabaseAdapter db;
   late Directory tempDir;
@@ -447,6 +452,45 @@ void main() {
   });
 
   group('sweep lifecycle', () {
+    for (final manual in [true, false]) {
+      test('successful uploads clear errors after Saves closes '
+          '(manual: $manual)', () async {
+        await linked('Zelda', romId: 1);
+        final manager = SyncManager.instance;
+        manager.register(provider);
+        addTearDown(() => manager.unregister('romm'));
+        await manager.setActive('romm', persist: (_) async {});
+        final saves = RommSavesProvider(browse, manager);
+        final notifications = GlobalNotificationService();
+        addTearDown(() => notifications.notifier.value = []);
+
+        // This is the notification shown by the tab after a failed upload.
+        svc.failingListings.add(1);
+        await saves.retryUploads();
+        expect(saves.syncResult?.success, isFalse);
+        notifications.show(
+          id: RomMSyncProvider.uploadsFailedNotificationId,
+          message: 'Zelda failed',
+        );
+        notifications.show(id: 'unrelated', message: 'Another notification');
+
+        await saves.retryUploads();
+        expect(notifications.notifier.value, hasLength(2));
+
+        svc.failingListings.clear();
+        if (!manual) saves.dispose();
+        final retry = manual
+            ? saves.retryUploads()
+            : provider.retryPendingUploads();
+        expect(provider.runningSweep.value, isNotNull);
+        if (manual) saves.dispose();
+        await retry;
+
+        expect(svc.uploads, ['1/Zelda.srm']);
+        expect(notifications.notifier.value.map((n) => n.id), ['unrelated']);
+      });
+    }
+
     test(
       'partial failures reach the caller while other games still upload',
       () async {
@@ -457,6 +501,7 @@ void main() {
         final result = await provider.fullSync();
 
         expect(result.success, isFalse);
+        expect(result.data, ['Unavailable'], reason: 'says which games failed');
         expect(svc.creates, contains('61/Available.srm'));
       },
     );

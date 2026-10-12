@@ -8,6 +8,8 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.rommRetryUploads: 'Réessayer les envois',
   AppLocale.rommUploadsFailed:
       'Certains envois ont échoué. Vérifiez la connexion et les autorisations RomM, puis réessayez.',
+  AppLocale.rommUploadsFailedFor:
+      "Les sauvegardes de {games} n'ont pas été envoyées. Vérifiez la connexion et les autorisations RomM, puis réessayez.",
   AppLocale.rommSavesHelp:
       'Consultez vos sauvegardes et états RomM. Réessayer les envois vérifie les jeux locaux liés à RomM dont la synchronisation est activée. Les sauvegardes distantes plus récentes sont téléchargées au lancement du jeu.',
   AppLocale.rommDeleteTitle: 'Supprimer de RomM',
@@ -16,6 +18,8 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.rommDeleted: 'Supprimé de RomM.',
   AppLocale.rommDeleteFailed:
       'Impossible de supprimer de RomM. Vérifiez la connexion et les autorisations RomM, puis réessayez.',
+  AppLocale.rommDeleteNotSent:
+      "Suppression annulée avant d'atteindre RomM. Rien n'a été supprimé.",
   AppLocale.rommSaveFileCount: '{count} fichier de sauvegarde',
   AppLocale.rommSaveFilesCount: '{count} fichiers de sauvegarde',
   AppLocale.rommSaveStateCount: '{count} état sauvegardé',

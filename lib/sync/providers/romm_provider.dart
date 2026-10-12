@@ -34,6 +34,7 @@ import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
+import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/romm/romm_library_linker.dart';
 import 'package:neostation/services/romm_playtime_service.dart';
@@ -73,6 +74,7 @@ enum _RemoteGuard {
 
 class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   static const String kProviderId = 'romm';
+  static const uploadsFailedNotificationId = 'romm_uploads_failed';
 
   /// Tolerance (ms) for local-vs-recorded mtime comparisons, matching NeoSync.
   static const int _mtimeToleranceMs = 2000;
@@ -1508,7 +1510,12 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     final sweep = _sweepPendingUploads();
     _sweeping.value = sweep;
     try {
-      return await sweep;
+      final result = await sweep;
+      // Uploads and their notifications outlive the Saves tab.
+      if (result.success) {
+        GlobalNotificationService().dismiss(uploadsFailedNotificationId);
+      }
+      return result;
     } finally {
       if (!_disposed) _sweeping.value = null;
     }
@@ -1522,7 +1529,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       return SyncResult.ok(message: 'No RomM-linked games to sweep');
     }
 
-    var linked = 0, candidates = 0, synced = 0, failed = 0;
+    var linked = 0, candidates = 0, synced = 0;
+    final failed = <String>[];
     final touched = <String>[];
     for (final game in await _listGames()) {
       // A disconnect (or a sign-out) mid-sweep ends it; every remaining game
@@ -1544,7 +1552,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           uploadOnly: true,
         );
         if (status == GameSyncStatus.error) {
-          failed++;
+          failed.add(game.name);
         } else {
           synced++;
         }
@@ -1564,7 +1572,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           return SyncResult.fail(SyncError.unknown, message: e.toString());
         }
         _log.e('RomM upload sweep: ${game.romname} failed: $e');
-        failed++;
+        failed.add(game.name);
       }
     }
 
@@ -1581,12 +1589,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       return SyncResult.ok(message: 'Nothing pending');
     }
     _log.i(
-      'RomM upload sweep: $candidates pending, $synced synced, $failed failed',
+      'RomM upload sweep: $candidates pending, $synced synced, '
+      '${failed.length} failed',
     );
-    if (failed > 0) {
+    if (failed.isNotEmpty) {
+      // The names let the failure say which games, not just that some failed.
       return SyncResult.fail(
         SyncError.unknown,
-        message: '$failed of $candidates pending games failed to sync',
+        message: '${failed.length} of $candidates pending games failed to sync',
+        data: failed,
       );
     }
     return SyncResult.ok(

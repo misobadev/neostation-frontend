@@ -19,6 +19,15 @@ import 'romm_provider.dart';
 /// requests.
 enum _DeleteState { idle, queued, sending }
 
+/// What became of a [RommSavesProvider.delete].
+enum RommDeleteOutcome {
+  deleted,
+  failed,
+
+  /// Cancelled before any request, so nothing on the server changed.
+  notSent,
+}
+
 /// Remote inventory state for the Saves tab. Merely browsing never syncs files.
 class RommSavesProvider extends ChangeNotifier {
   RommSavesProvider(
@@ -53,7 +62,9 @@ class RommSavesProvider extends ChangeNotifier {
   // Kept across refreshes (which only retry lookups) so the last good answer
   // stays on screen until a new one replaces it.
   final Map<int, RommSaveGameInfo> _loadedInfo = {};
-  List<RommAsset> _assets = [];
+  // Lookups that got no metadata, which the next refresh retries.
+  final Set<int> _failedInfo = {};
+  List<RommAsset> _assets = const [];
   bool _loading = false;
   bool _syncing = false;
   _DeleteState _deleteState = _DeleteState.idle;
@@ -65,8 +76,13 @@ class RommSavesProvider extends ChangeNotifier {
   Object? _loadError;
   SyncResult? _syncResult;
 
-  List<RommAsset> get assets => List.unmodifiable(_assets);
+  /// The same list until the inventory changes, so what is derived from it can
+  /// be cached by identity.
+  List<RommAsset> get assets => _assets;
   bool get loading => _loading;
+
+  /// Refresh retries artwork independently of the cached game metadata.
+  int get artworkRevision => _generation;
 
   /// True during a retry, and during a sweep this provider did not start, such
   /// as the automatic one after connect, since a retry would only overlap it.
@@ -81,11 +97,16 @@ class RommSavesProvider extends ChangeNotifier {
     if (romId == null || _disposed || !_browse.isConnected) {
       return Future.value(const RommSaveGameInfo());
     }
-    final generation = _generation;
+    // A ROM's metadata only changes with the server, so lookups outlive
+    // refreshes but not the connection.
+    final connection = _connectionGeneration;
     return _gameInfo.putIfAbsent(
       romId,
-      () => _readGameInfo(romId, generation).then((info) {
-        if (generation == _generation) _loadedInfo[romId] = info;
+      () => _readGameInfo(romId, connection).then((info) {
+        if (connection == _connectionGeneration) {
+          _loadedInfo[romId] = info;
+          if (info.rom == null) _failedInfo.add(romId);
+        }
         return info;
       }),
     );
@@ -96,10 +117,10 @@ class RommSavesProvider extends ChangeNotifier {
   RommSaveGameInfo? loadedGameInfo(int? romId) =>
       romId == null ? const RommSaveGameInfo() : _loadedInfo[romId];
 
-  Future<RommSaveGameInfo> _readGameInfo(int romId, int generation) async {
+  Future<RommSaveGameInfo> _readGameInfo(int romId, int connection) async {
     await _metadataGate.acquire();
     try {
-      if (_disposed || generation != _generation) {
+      if (_disposed || connection != _connectionGeneration) {
         return const RommSaveGameInfo();
       }
       // Resolve independently: device artwork remains useful when RomM's
@@ -112,7 +133,7 @@ class RommSavesProvider extends ChangeNotifier {
         // Save inventory is still usable without game metadata.
       }
       final cover = await local;
-      if (_disposed || generation != _generation) {
+      if (_disposed || connection != _connectionGeneration) {
         return const RommSaveGameInfo();
       }
       final server = Uri.tryParse(_browse.service.baseUrl);
@@ -164,7 +185,8 @@ class RommSavesProvider extends ChangeNotifier {
     _generation++;
     _gameInfo.clear();
     _loadedInfo.clear();
-    _assets = [];
+    _failedInfo.clear();
+    _assets = const [];
     _loading = false;
     _loadError = null;
     _syncResult = null;
@@ -200,7 +222,8 @@ class RommSavesProvider extends ChangeNotifier {
   Future<void> refresh() async {
     if (_disposed || !_browse.isConnected) return;
     final generation = ++_generation;
-    _gameInfo.clear();
+    _failedInfo.forEach(_gameInfo.remove);
+    _failedInfo.clear();
     _loading = true;
     _loadError = null;
     notifyListeners();
@@ -213,7 +236,7 @@ class RommSavesProvider extends ChangeNotifier {
         );
         return order != 0 ? order : a.fileName.compareTo(b.fileName);
       });
-      _assets = assets;
+      _assets = List.unmodifiable(assets);
     } catch (error) {
       if (_disposed || generation != _generation) return;
       _loadError = error;
@@ -263,12 +286,12 @@ class RommSavesProvider extends ChangeNotifier {
   /// Permanently removes [assets] from the server. Local copies are untouched,
   /// so a device that still syncs the game uploads its copies again.
   ///
-  /// Returns whether all of them are gone. Any that are leave the list even
+  /// Deleted only when all of them are gone. Any that are leave the list even
   /// when others could not be deleted. One made during a refresh or sync waits
   /// for it to finish rather than failing unsent.
-  Future<bool> delete(List<RommAsset> assets) async {
+  Future<RommDeleteOutcome> delete(List<RommAsset> assets) async {
     if (_disposed || assets.isEmpty || deleting || !_browse.isConnected) {
-      return false;
+      return RommDeleteOutcome.notSent;
     }
     // Waiting must never carry asset IDs into a different server/account.
     final connectionGeneration = _connectionGeneration;
@@ -284,7 +307,7 @@ class RommSavesProvider extends ChangeNotifier {
       while (sameConnection() && (_loading || syncing)) {
         await _nextChange();
       }
-      if (!sameConnection()) return false;
+      if (!sameConnection()) return RommDeleteOutcome.notSent;
       _deleteState = _DeleteState.sending;
       final generation = _generation;
       final gone = <RommAsset>[];
@@ -298,16 +321,19 @@ class RommSavesProvider extends ChangeNotifier {
       if (notFound.isNotEmpty) {
         gone.addAll(await _unlisted(notFound, generation));
       }
-      if (_disposed || generation != _generation) return false;
-      // Drop them locally rather than refreshing, which would reload every
-      // game's artwork. Saves and states are numbered independently, so match
-      // both.
-      _assets = _assets
-          .where(
-            (a) => !gone.any((g) => g.isState == a.isState && g.id == a.id),
-          )
-          .toList();
-      return gone.length == assets.length;
+      if (_disposed || generation != _generation) {
+        return RommDeleteOutcome.failed;
+      }
+      // Drop them locally rather than listing the whole inventory again.
+      // Saves and states are numbered independently, so match both.
+      _assets = List.unmodifiable(
+        _assets.where(
+          (a) => !gone.any((g) => g.isState == a.isState && g.id == a.id),
+        ),
+      );
+      return gone.length == assets.length
+          ? RommDeleteOutcome.deleted
+          : RommDeleteOutcome.failed;
     } finally {
       _deleteState = _DeleteState.idle;
       if (!_disposed) notifyListeners();

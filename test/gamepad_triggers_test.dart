@@ -156,6 +156,16 @@ void main() {
       });
     });
 
+    test("the Steam Deck's own driver puts its triggers on HAT2", () {
+      useOs('linux', {
+        // Sticks, then the left and right trackpads, then R2/L2.
+        'axisMap': <Object?>[0, 1, 3, 4, 16, 17, 18, 19, 20, 21],
+      });
+      expect(moves('8'), 'buttonRT');
+      expect(moves('9'), 'buttonLT');
+      expect(moves('6'), isNull, reason: 'the right trackpad is no d-pad');
+    });
+
     test('a hat reports the direction it lets go of', () {
       useOs('linux');
       expect(edges([send('6', rest), send('6', 0)]), [

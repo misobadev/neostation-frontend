@@ -8,6 +8,8 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.rommRetryUploads: 'Uploads wiederholen',
   AppLocale.rommUploadsFailed:
       'Einige Uploads sind fehlgeschlagen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
+  AppLocale.rommUploadsFailedFor:
+      'Spielstände für {games} wurden nicht hochgeladen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
   AppLocale.rommSavesHelp:
       'RomM-Spielstände ansehen. Uploads wiederholen prüft lokale, mit RomM verknüpfte Spiele mit aktivierter Synchronisierung. Neuere Spielstände werden beim Spielstart heruntergeladen.',
   AppLocale.rommDeleteTitle: 'Aus RomM löschen',
@@ -16,6 +18,8 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.rommDeleted: 'Aus RomM gelöscht.',
   AppLocale.rommDeleteFailed:
       'Löschen aus RomM fehlgeschlagen. Verbindung und RomM-Berechtigungen prüfen und erneut versuchen.',
+  AppLocale.rommDeleteNotSent:
+      'Löschen abgebrochen, bevor es RomM erreicht hat. Es wurde nichts gelöscht.',
   AppLocale.rommSaveFileCount: '{count} Spielstand',
   AppLocale.rommSaveFilesCount: '{count} Spielstände',
   AppLocale.rommSaveStateCount: '{count} Speicherstand',

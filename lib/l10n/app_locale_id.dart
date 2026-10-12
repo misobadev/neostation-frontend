@@ -8,6 +8,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.rommRetryUploads: 'Coba unggah lagi',
   AppLocale.rommUploadsFailed:
       'Beberapa unggahan gagal. Periksa koneksi dan izin RomM, lalu coba lagi.',
+  AppLocale.rommUploadsFailedFor:
+      'Simpanan untuk {games} gagal diunggah. Periksa koneksi dan izin RomM, lalu coba lagi.',
   AppLocale.rommSavesHelp:
       'Lihat simpanan dan status RomM. Coba unggah lagi memeriksa game lokal yang tertaut ke RomM dengan sinkronisasi aktif. Simpanan jarak jauh yang lebih baru diunduh saat game dimulai.',
   AppLocale.rommDeleteTitle: 'Hapus dari RomM',
@@ -16,6 +18,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.rommDeleted: 'Dihapus dari RomM.',
   AppLocale.rommDeleteFailed:
       'Gagal menghapus dari RomM. Periksa koneksi dan izin RomM, lalu coba lagi.',
+  AppLocale.rommDeleteNotSent:
+      'Penghapusan dibatalkan sebelum mencapai RomM. Tidak ada yang dihapus.',
   AppLocale.rommSaveFileCount: '{count} berkas simpanan',
   AppLocale.rommSaveFilesCount: '{count} berkas simpanan',
   AppLocale.rommSaveStateCount: '{count} status simpanan',

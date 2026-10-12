@@ -135,6 +135,17 @@ void main() {
       expect(sync.calls, 0);
     });
 
+    test('the inventory stays one list until it changes', () async {
+      connection.inventory.load = () async => [inventoryAsset('a.srm')];
+      await inventory.refresh();
+      final listed = inventory.assets;
+      expect(inventory.assets, same(listed));
+      expect(() => listed.add(inventoryAsset('b.srm')), throwsUnsupportedError);
+      await inventory.delete(listed);
+      expect(inventory.assets, isEmpty);
+      expect(listed, hasLength(1));
+    });
+
     test('failed refresh preserves files but exposes an error', () async {
       connection.inventory.load = () async => [inventoryAsset('save')];
       await inventory.refresh();
@@ -285,7 +296,7 @@ void main() {
       // Its end is handled while the delete still waits on the server.
       await pumpEventQueue();
       request.complete();
-      expect(await pending, isTrue);
+      expect(await pending, RommDeleteOutcome.deleted);
       expect(connection.inventory.deleted, ['save:1', 'state:1']);
       expect(connection.inventory.calls, 1);
     });
@@ -317,9 +328,12 @@ void main() {
       connection.inventory.beforeDelete = () => request.future;
       final pending = inventory.delete([inventory.assets.last]);
       expect(inventory.deleting, isTrue);
-      expect(await inventory.delete([inventory.assets.first]), isFalse);
+      expect(
+        await inventory.delete([inventory.assets.first]),
+        RommDeleteOutcome.notSent,
+      );
       request.complete();
-      expect(await pending, isTrue);
+      expect(await pending, RommDeleteOutcome.deleted);
       // Saves and states share id 1 here; only the state may go.
       expect(connection.inventory.deleted, ['state:1']);
       expect(inventory.assets.map((a) => a.fileName), ['Game.srm']);
@@ -341,7 +355,7 @@ void main() {
           final pending = inventory.delete([asset]);
           expect(inventory.deleting, isTrue);
           expect(connection.inventory.deleteRequests, isEmpty);
-          expect(await inventory.delete([asset]), isFalse);
+          expect(await inventory.delete([asset]), RommDeleteOutcome.notSent);
           await inventory.retryUploads();
           expect(sync.calls, 0);
 
@@ -351,7 +365,7 @@ void main() {
             listing.complete([asset, inventoryAsset('New.srm', id: 2)]);
           }
           await refresh;
-          expect(await pending, isTrue);
+          expect(await pending, RommDeleteOutcome.deleted);
           expect(connection.inventory.deleteRequests, ['save:1']);
           expect(
             inventory.assets.map((a) => a.fileName),
@@ -390,7 +404,7 @@ void main() {
           expect(connection.inventory.deleteRequests, isEmpty);
           listing.complete([asset, inventoryAsset('Uploaded.srm', id: 2)]);
           await retrying;
-          expect(await pending, isTrue);
+          expect(await pending, RommDeleteOutcome.deleted);
           expect(connection.inventory.deleteRequests, ['save:1']);
           expect(inventory.assets.single.fileName, 'Uploaded.srm');
           expect(inventory.deleting, isFalse);
@@ -410,7 +424,7 @@ void main() {
         connection.connected = true;
         connection.inventory.load = () async => [inventoryAsset('new.srm')];
         await inventory.refresh();
-        expect(await pending, isFalse);
+        expect(await pending, RommDeleteOutcome.notSent);
         expect(connection.inventory.deleteRequests, isEmpty);
         expect(inventory.assets.single.fileName, 'new.srm');
         expect(inventory.deleting, isFalse);
@@ -432,7 +446,7 @@ void main() {
         sweep.value = run.future;
         final pending = opened.delete([inventoryAsset('Game.srm')]);
         opened.dispose();
-        expect(await pending, isFalse);
+        expect(await pending, RommDeleteOutcome.notSent);
         expect(connection.inventory.deleteRequests, isEmpty);
         run.complete(SyncResult.ok());
         sweep.value = null;
@@ -454,20 +468,20 @@ void main() {
         final b = inventory.assets.firstWhere((x) => x.fileName == 'b.srm');
         // Deleted from another device.
         connection.inventory.gone.add('save:1');
-        expect(await inventory.delete([a]), isTrue);
+        expect(await inventory.delete([a]), RommDeleteOutcome.deleted);
         // A server or proxy without the delete route answers 404 too, but
         // still lists the file.
         connection.inventory.beforeDelete = () async =>
             throw RommException('Delete failed (404)', statusCode: 404);
-        expect(await inventory.delete([b]), isFalse);
+        expect(await inventory.delete([b]), RommDeleteOutcome.failed);
         connection.inventory.beforeDelete = () async =>
             throw RommException('Delete failed (403)', statusCode: 403);
-        expect(await inventory.delete([b]), isFalse);
+        expect(await inventory.delete([b]), RommDeleteOutcome.failed);
         // Gone, but the listing that would confirm it fails.
         connection.inventory.beforeDelete = () async {};
         connection.inventory.gone.add('save:2');
         connection.inventory.load = () async => throw StateError('offline');
-        expect(await inventory.delete([b]), isFalse);
+        expect(await inventory.delete([b]), RommDeleteOutcome.failed);
         expect(inventory.assets.map((x) => x.fileName), ['b.srm']);
         expect(inventory.deleting, isFalse);
       },
@@ -484,7 +498,7 @@ void main() {
         ];
         await inventory.refresh();
         final game = inventory.assets.where((a) => a.romId == 1).toList();
-        expect(await inventory.delete(game), isTrue);
+        expect(await inventory.delete(game), RommDeleteOutcome.deleted);
         expect(connection.inventory.deleteRequests, ['save:1,2', 'state:1']);
         expect(inventory.assets.map((a) => a.fileName), ['other.srm']);
         expect(connection.inventory.calls, 1);
@@ -502,7 +516,10 @@ void main() {
       await inventory.refresh();
       // Deleted from another device: RomM removes a.srm, then stops at b.srm.
       connection.inventory.gone.add('save:2');
-      expect(await inventory.delete(inventory.assets), isTrue);
+      expect(
+        await inventory.delete(inventory.assets),
+        RommDeleteOutcome.deleted,
+      );
       expect(connection.inventory.deleteRequests, [
         'save:1,2,3',
         'save:1',
@@ -526,7 +543,10 @@ void main() {
           throw RommException('Delete failed (403)', statusCode: 403);
         }
       };
-      expect(await inventory.delete(inventory.assets), isFalse);
+      expect(
+        await inventory.delete(inventory.assets),
+        RommDeleteOutcome.failed,
+      );
       expect(inventory.assets.map((a) => a.fileName), ['Game.state']);
       expect(inventory.deleting, isFalse);
     });
@@ -557,7 +577,7 @@ void main() {
           await inventory.refresh();
           request.complete();
 
-          expect(await pending, isFalse);
+          expect(await pending, RommDeleteOutcome.failed);
           expect(connection.inventory.deleteRequests, ['save:1,2']);
           expect(inventory.assets.map((a) => a.fileName), [
             'new.srm',
