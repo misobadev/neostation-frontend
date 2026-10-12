@@ -71,6 +71,14 @@ class InventoryConnection extends RommProvider {
     connected = false;
     notifyListeners();
   }
+
+  /// Reconnects as the app does: configuring the service starts a new
+  /// session, which is how a delete tells this connection from the last.
+  void reconnectForTest() {
+    inventory.configure(serverUrl: 'https://romm.test', apiKey: 'test');
+    connected = true;
+    notifyListeners();
+  }
 }
 
 class InventorySync implements ISyncProvider {

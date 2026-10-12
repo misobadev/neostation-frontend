@@ -84,8 +84,8 @@ void main() {
       ]);
       expect(groups.length, 4);
       expect(groups.map((g) => g.romId), [2, 1, null, null]);
-      expect(groups.first.saves, 1);
-      expect(groups.first.states, 1);
+      expect(groups.first.saveCount, 1);
+      expect(groups.first.stateCount, 1);
       expect(groups.first.fallbackTitle, 'Same');
       expect(groups[2].key, isNot(groups[3].key));
     },

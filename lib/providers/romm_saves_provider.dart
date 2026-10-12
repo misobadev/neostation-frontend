@@ -266,6 +266,10 @@ class RommSavesProvider extends ChangeNotifier {
     }
   }
 
+  /// Runs the upload sweep, then lists what it uploaded. Does nothing while a
+  /// sweep is running: [syncing] covers one started elsewhere, which
+  /// [_followSweep] refreshes after, so this can never be the overlapping
+  /// call the sweep turns away as busy.
   Future<void> retryUploads() async {
     final sync = _manager.active;
     if (_disposed ||
@@ -278,21 +282,15 @@ class RommSavesProvider extends ChangeNotifier {
     final generation = _generation;
     _syncing = true;
     notifyListeners();
-    SyncResult? result;
     try {
-      result = await sync!.fullSync();
+      await sync!.fullSync();
     } catch (_) {
       // The sync provider reports its own failures; the refresh still runs.
     } finally {
       _syncing = false;
       if (!_disposed) notifyListeners();
     }
-    // A busy result means another sweep (the automatic one after connect) is
-    // still uploading, so a refresh now would miss its files and reload every
-    // game's artwork for nothing. [_followSweep] refreshes when it ends.
-    if (!_disposed &&
-        generation == _generation &&
-        result?.error != SyncError.busy) {
+    if (!_disposed && generation == _generation) {
       await refresh(retryArtwork: false);
     }
   }
@@ -308,19 +306,13 @@ class RommSavesProvider extends ChangeNotifier {
     if (_disposed || assets.isEmpty || deleting || !_browse.isConnected) {
       return RommDeleteOutcome.notSent;
     }
-    // Asset IDs must never reach a different server/account. Watched here, not
-    // through [_connectionChanged], so it holds after this provider is gone.
+    // Asset IDs must never reach a different server/account. Every connect
+    // configures the service, which starts a new session, so a disconnect
+    // fails this check even once reconnected. Checked rather than watched, so
+    // it holds after this provider is gone.
     final session = _browse.service.session;
-    var disconnected = false;
-    void watchConnection() {
-      if (!_browse.isConnected) disconnected = true;
-    }
-
     bool sameConnection() =>
-        !disconnected &&
-        _browse.isConnected &&
-        _browse.service.session == session;
-    _browse.addListener(watchConnection);
+        _browse.isConnected && _browse.service.session == session;
     _deleteState = _DeleteState.queued;
     notifyListeners();
     try {
@@ -357,7 +349,6 @@ class RommSavesProvider extends ChangeNotifier {
           ? RommDeleteOutcome.deleted
           : RommDeleteOutcome.failed;
     } finally {
-      _browse.removeListener(watchConnection);
       _deleteState = _DeleteState.idle;
       if (!_disposed) {
         notifyListeners();

@@ -3,6 +3,7 @@ import 'package:neostation/screens/app_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/widgets/music_notification_listener.dart';
+import 'package:neostation/widgets/romm_upload_notification_listener.dart';
 import 'package:neostation/widgets/scraping_notification_listener.dart';
 
 class MainScreen extends StatelessWidget {
@@ -13,7 +14,9 @@ class MainScreen extends StatelessWidget {
     return Scaffold(
       key: context.read<MenuAppProvider>().scaffoldKey,
       body: ScrapingNotificationListener(
-        child: MusicNotificationListener(child: AppScreen()),
+        child: RommUploadNotificationListener(
+          child: MusicNotificationListener(child: AppScreen()),
+        ),
       ),
     );
   }

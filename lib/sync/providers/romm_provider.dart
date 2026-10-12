@@ -21,7 +21,6 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
-import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/romm_asset.dart';
@@ -35,7 +34,6 @@ import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
-import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/romm/romm_library_linker.dart';
 import 'package:neostation/services/romm_playtime_service.dart';
@@ -84,9 +82,25 @@ enum _UploadOutcome {
   failed,
 }
 
+/// The saves [RomMSyncProvider] could not upload, for the app to report.
+class RommUploadFailures {
+  /// The games whose saves are still waiting to go up, in the order they first
+  /// failed.
+  final List<String> games;
+
+  /// A failure that could not say which games, such as a sweep the server
+  /// stopped or one that never got going.
+  final bool unidentified;
+
+  const RommUploadFailures(this.games, {this.unidentified = false});
+
+  static const none = RommUploadFailures([]);
+
+  bool get isEmpty => games.isEmpty && !unidentified;
+}
+
 class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   static const String kProviderId = 'romm';
-  static const uploadsFailedNotificationId = 'romm_uploads_failed';
 
   /// Tolerance (ms) for local-vs-recorded mtime comparisons, matching NeoSync.
   static const int _mtimeToleranceMs = 2000;
@@ -184,6 +198,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     _disposed = true;
     if (_autoSweep) _browse.removeListener(_onBrowseChanged);
     _sweeping.dispose();
+    _uploadFailures.dispose();
     super.dispose();
   }
 
@@ -1372,7 +1387,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// silently strand every save the user just made.
   ///
   /// Most uploads happen here, so a failure is reported the way a failed sweep
-  /// is: the game joins the upload-failure notification until its saves go up.
+  /// is: the game joins [uploadFailures] until its saves go up.
   @override
   Future<SyncResult> syncGameSavesAfterClose(GameModel game) async {
     final GameSyncStatus status;
@@ -1392,9 +1407,9 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     return SyncResult.ok();
   }
 
-  /// Adds [game] to the upload-failure notification when [failed] left a save
-  /// waiting to go up, and removes it otherwise. A failure while disconnected
-  /// is not reported, as a sweep's is not: the next connect retries it.
+  /// Adds [game] to [uploadFailures] when [failed] left a save waiting to go
+  /// up, and removes it otherwise. A failure while disconnected is not
+  /// reported, as a sweep's is not: the next connect retries it.
   Future<void> _recordUploadOutcome(
     GameModel game, {
     required bool failed,
@@ -1579,10 +1594,9 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
   }
 
-  /// Uploads and their notifications outlive the Saves tab, so a sweep reports
-  /// its own outcome, whoever started it and whether or not the tab is open.
-  /// A sweep that succeeds clears the failures, including any a post-close
-  /// sync recorded.
+  /// Uploads outlive the Saves tab, so a sweep reports its own outcome,
+  /// whoever started it and whether or not the tab is open. A sweep that
+  /// succeeds clears the failures, including any a post-close sync recorded.
   void _reportSweep(SyncResult result) {
     // A disconnect ended the sweep, which says nothing about the uploads.
     if (result.error == SyncError.authRequired) return;
@@ -1595,27 +1609,18 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// they first failed. Set by a completed sweep, and by each post-close sync.
   final Map<String, String> _failedUploads = {};
 
-  /// One notification names the games in [_failedUploads], replacing the last
-  /// one, and is dismissed once none are left. [unidentified] reports a
-  /// failure that names no game instead.
+  /// The current upload failures, which the app shows as a notification.
+  /// Every report is a new value, so a failure that repeats is shown again.
+  ValueListenable<RommUploadFailures> get uploadFailures => _uploadFailures;
+  final _uploadFailures = ValueNotifier(RommUploadFailures.none);
+
+  /// Publishes [_failedUploads], or with [unidentified], a failure that names
+  /// no game.
   void _reportUploadFailures({bool unidentified = false}) {
-    final notifications = GlobalNotificationService();
-    final names = _failedUploads.values.toList();
-    if (!unidentified && names.isEmpty) {
-      notifications.dismiss(uploadsFailedNotificationId);
-      return;
-    }
-    final games = names.length > 3
-        ? '${names.take(3).join(', ')} +${names.length - 3}'
-        : names.join(', ');
-    notifications.show(
-      id: uploadsFailedNotificationId,
-      message: unidentified
-          ? AppLocale.rommUploadsFailed.getStringForCurrentLocale()
-          : AppLocale.rommUploadsFailedFor
-                .getStringForCurrentLocale()
-                .replaceFirst('{games}', games),
-      type: GlobalNotificationType.error,
+    if (_disposed) return;
+    _uploadFailures.value = RommUploadFailures(
+      List.unmodifiable(_failedUploads.values),
+      unidentified: unidentified,
     );
   }
 

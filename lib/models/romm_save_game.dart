@@ -9,8 +9,8 @@ class RommSaveGame {
 
   const RommSaveGame(this.key, this.romId, this.assets);
 
-  int get saves => assets.where((asset) => !asset.isState).length;
-  int get states => assets.length - saves;
+  int get saveCount => assets.where((asset) => !asset.isState).length;
+  int get stateCount => assets.length - saveCount;
 
   /// A display-only fallback while metadata loads; never used to match art.
   String get fallbackTitle {
@@ -26,15 +26,17 @@ class RommSaveGame {
     return title.isEmpty ? file.fileName : title;
   }
 
+  /// The [key] of the game [asset] belongs to. Unidentified assets stay
+  /// separate rather than borrowing another game's title or artwork on a
+  /// filename guess. Save/state IDs can overlap.
+  static String keyOf(RommAsset asset) => asset.romId != null
+      ? 'rom:${asset.romId}'
+      : '${asset.isState ? 'state' : 'save'}:${asset.id}';
+
   static List<RommSaveGame> group(List<RommAsset> assets) {
     final groups = <String, List<RommAsset>>{};
     for (final asset in assets) {
-      // Unidentified assets stay separate rather than borrowing another game's
-      // title or artwork on a filename guess. Save/state IDs can overlap.
-      final key = asset.romId != null
-          ? 'rom:${asset.romId}'
-          : '${asset.isState ? 'state' : 'save'}:${asset.id}';
-      (groups[key] ??= []).add(asset);
+      (groups[keyOf(asset)] ??= []).add(asset);
     }
     return [
       for (final entry in groups.entries)

@@ -343,13 +343,12 @@ class GamepadEventTranslator {
       }
     }
 
-    // LINUX: Utilize native event type from the plugin.
+    // LINUX: The plugin says whether a numeric key is a button or an axis, so
+    // nothing below, which tells them apart by name, sees a Linux event.
     if (_isLinux) {
-      if (eventType == KeyType.button) {
-        return _translateButtonEvent(key, mapping, gamepadId);
-      } else if (eventType == KeyType.analog) {
-        return _translateLinuxAxis(key, value, gamepadId);
-      }
+      return eventType == KeyType.button
+          ? _translateButtonEvent(key, mapping, gamepadId)
+          : _translateLinuxAxis(key, value, gamepadId);
     }
 
     // D-pad translation for other platforms.
@@ -540,16 +539,6 @@ class GamepadEventTranslator {
     // Inputs starting with "axis" are generally analog, not digital buttons.
     if (key.startsWith('axis')) return false;
 
-    // On Linux, indices 0-5 are typically reserved for analog axes.
-    if (_isLinux) {
-      final numValue = int.tryParse(key);
-      if (numValue != null) {
-        // 0-5: Analog Sticks (LS, RS, Triggers).
-        // 6+: Physical buttons.
-        return numValue >= 6;
-      }
-    }
-
     return key.startsWith('button-') || // Windows/Linux hyphenated format.
         key.startsWith('button_') || // Linux underscore format.
         (key.isNotEmpty &&
@@ -560,13 +549,6 @@ class GamepadEventTranslator {
 
   /// Determines if a key identifier corresponds to an analog axis input.
   bool _isAnalogEvent(String key) {
-    if (_isLinux) {
-      final numValue = int.tryParse(key);
-      if (numValue != null && numValue >= 0 && numValue <= 5) {
-        return true;
-      }
-    }
-
     return (key.startsWith('axis_') &&
             !key.contains('hat') && // Exclude Android D-pad axes.
             !key.contains('brake') &&

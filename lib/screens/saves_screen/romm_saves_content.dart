@@ -21,6 +21,7 @@ import '../../utils/gamepad_nav.dart';
 import '../../widgets/confirm_action_dialog.dart';
 import '../../widgets/core_footer.dart' show GamepadControl;
 import '../../widgets/custom_notification.dart';
+import '../../widgets/edge_fade.dart';
 import '../../widgets/romm_sync_banner.dart' show rommFormatBytes;
 import '../app_screen.dart';
 import 'romm_save_artwork.dart';
@@ -387,26 +388,28 @@ class _RommSavesContentState extends State<RommSavesContent> {
   String _gameDeleteBody(RommSaveGame game) {
     final title =
         _saves.loadedGameInfo(game.romId)?.rom?.name ?? game.fallbackTitle;
-    final saves = saveFilesCountLabel(context, game.saves);
-    final states = saveStatesCountLabel(context, game.states);
-    final body = game.saves > 0 && game.states > 0
+    final saves = saveFilesCountLabel(context, game.saveCount);
+    final states = saveStatesCountLabel(context, game.stateCount);
+    final body = game.saveCount > 0 && game.stateCount > 0
         ? AppLocale.rommDeleteGameBothConfirm
               .getString(context)
               .replaceFirst('{saves}', saves)
               .replaceFirst('{states}', states)
         : AppLocale.rommDeleteGameConfirm
               .getString(context)
-              .replaceFirst('{files}', game.saves > 0 ? saves : states);
-    final whole = RommSaveGame.group(
-      _saves.assets,
-    ).firstWhere((other) => other.key == game.key, orElse: () => game);
+              .replaceFirst('{files}', game.saveCount > 0 ? saves : states);
+    // The game unfiltered, to tell what the filter keeps out of the delete.
+    final whole = RommSaveGame(game.key, game.romId, [
+      for (final asset in _saves.assets)
+        if (RommSaveGame.keyOf(asset) == game.key) asset,
+    ]);
     return [
       // The title goes in last, so braces in it are never taken for one of
       // the other placeholders.
       body.replaceFirst('{game}', title),
-      if (whole.saves > game.saves)
+      if (whole.saveCount > game.saveCount)
         AppLocale.rommDeleteKeepsSaves.getString(context),
-      if (whole.states > game.states)
+      if (whole.stateCount > game.stateCount)
         AppLocale.rommDeleteKeepsStates.getString(context),
     ].join('\n\n');
   }
@@ -424,17 +427,14 @@ class _RommSavesContentState extends State<RommSavesContent> {
       _reconcileSelection(_games);
     });
     if (_gamesScroll.hasClients) _gamesScroll.jumpTo(0);
-    if (_filesScroll.hasClients) _filesScroll.jumpTo(0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _revealSelection();
     });
   }
 
+  /// The new game's files start at the top: the file list is keyed by game.
   void _selectGame(int index, List<RommSaveGame> games) {
-    if (_gameKey != games[index].key) {
-      _fileIndex = 0;
-      if (_filesScroll.hasClients) _filesScroll.jumpTo(0);
-    }
+    if (_gameKey != games[index].key) _fileIndex = 0;
     _gameIndex = index;
     _gameKey = games[index].key;
   }
@@ -757,7 +757,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
 
   // No heading above the list, so its first card lines up with the top of the
   // details card beside it.
-  Widget _gameList(List<RommSaveGame> games) => _EdgeFade(
+  Widget _gameList(List<RommSaveGame> games) => EdgeFade(
     extent: _listInset,
     child: ListView.builder(
       controller: _gamesScroll,
@@ -859,16 +859,16 @@ class _RommSavesContentState extends State<RommSavesContent> {
   List<Widget> _counts(RommSaveGame game) {
     final scheme = Theme.of(context).colorScheme;
     return [
-      if (game.saves > 0)
+      if (game.saveCount > 0)
         _meta(
           Symbols.save_rounded,
-          saveFilesCountLabel(context, game.saves),
+          saveFilesCountLabel(context, game.saveCount),
           iconColor: scheme.primary,
         ),
-      if (game.states > 0)
+      if (game.stateCount > 0)
         _meta(
           _stateIcon,
-          saveStatesCountLabel(context, game.states),
+          saveStatesCountLabel(context, game.stateCount),
           iconColor: scheme.tertiary,
         ),
     ];
@@ -927,10 +927,11 @@ class _RommSavesContentState extends State<RommSavesContent> {
         // Keeps scrolled file rows inside the rounded corners.
         clipBehavior: Clip.antiAlias,
         decoration: _cardDecoration(),
-        child: _EdgeFade(
+        child: EdgeFade(
           extent: _listInset,
           // The header scrolls away with the files, so a long list gets the
-          // whole card.
+          // whole card. Keyed so another game or filter starts a new list at
+          // the top, however the selection changed, including in a build.
           child: CustomScrollView(
             key: ValueKey('files-${game.key}-$_filter'),
             controller: _filesScroll,
@@ -1174,70 +1175,4 @@ class _RommSavesContentState extends State<RommSavesContent> {
       ),
     );
   }
-}
-
-/// Fades whichever edge of a list has content beyond it, as the header's sort
-/// menu does, so rows dissolve into the list's padding instead of being sliced
-/// off. An edge with nothing beyond it keeps a hard stop, so the first and last
-/// rows, and their glow, are never dimmed.
-class _EdgeFade extends StatefulWidget {
-  /// How far in from each edge the fade runs.
-  final double extent;
-  final Widget child;
-
-  const _EdgeFade({required this.extent, required this.child});
-
-  @override
-  State<_EdgeFade> createState() => _EdgeFadeState();
-}
-
-class _EdgeFadeState extends State<_EdgeFade> {
-  bool _before = false;
-  bool _after = false;
-
-  /// Never stops the notification, so it reaches anything else listening.
-  bool _update(ScrollMetrics metrics) {
-    final before = metrics.extentBefore > 0;
-    final after = metrics.extentAfter > 0;
-    if (before != _before || after != _after) {
-      setState(() {
-        _before = before;
-        _after = after;
-      });
-    }
-    return false;
-  }
-
-  @override
-  Widget build(BuildContext context) =>
-      // Metrics cover the first layout and changes of length; updates cover
-      // scrolling.
-      NotificationListener<ScrollMetricsNotification>(
-        onNotification: (n) => n.depth == 0 && _update(n.metrics),
-        child: NotificationListener<ScrollUpdateNotification>(
-          onNotification: (n) => n.depth == 0 && _update(n.metrics),
-          // Always in the tree, even with nothing to fade: adding and removing
-          // it would remount the list each time it reached an end.
-          child: ShaderMask(
-            blendMode: BlendMode.dstIn,
-            shaderCallback: (bounds) {
-              final stop = bounds.height > 0
-                  ? (widget.extent / bounds.height).clamp(0.0, 0.5)
-                  : 0.0;
-              return LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: [0, _before ? stop : 0, _after ? 1 - stop : 1, 1],
-                colors: const [
-                  Colors.transparent,
-                  Colors.white,
-                  Colors.white,
-                  Colors.transparent,
-                ],
-              ).createShader(bounds);
-            },
-            child: widget.child,
-          ),
-        ),
-      );
 }

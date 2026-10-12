@@ -473,18 +473,6 @@ void main() {
       );
     });
 
-    test('a retry during a running sweep does not refresh', () async {
-      sync.run = () async =>
-          SyncResult.fail(SyncError.busy, message: 'Sweep already running');
-      await inventory.retryUploads();
-      expect(inventory.syncing, isFalse);
-      expect(
-        connection.inventory.calls,
-        0,
-        reason: 'the running sweep has not finished uploading yet',
-      );
-    });
-
     test('delete removes only that file, without refetching', () async {
       connection.inventory.load = () async => [
         inventoryAsset('Game.srm'),
@@ -588,7 +576,7 @@ void main() {
         final refresh = inventory.refresh();
         final pending = inventory.delete([asset]);
         connection.disconnectForTest();
-        connection.connected = true;
+        connection.reconnectForTest();
         connection.inventory.load = () async => [inventoryAsset('new.srm')];
         await inventory.refresh();
         expect(await pending, RommDeleteOutcome.notSent);
@@ -773,7 +761,7 @@ void main() {
           // IDs may be reused by another server/account. Neither queued state
           // deletes nor single-file retries belong to the new connection.
           connection.disconnectForTest();
-          connection.connected = true;
+          connection.reconnectForTest();
           connection.inventory.load = () async => [
             inventoryAsset('new.srm', id: 1),
             inventoryAsset('new.state', state: true, id: 1),
