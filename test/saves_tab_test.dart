@@ -448,6 +448,23 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('opens loading, never as an empty inventory', (tester) async {
+    await pumpTab(tester);
+    final listing = Completer<List<RommAsset>>();
+    connection.inventory.load = () => listing.future;
+    await manager.setActive('romm', persist: (_) async {});
+    // The saves' first frame.
+    await tester.pump();
+    expect(find.byType(RommSavesContent), findsOneWidget);
+    expect(find.text('Loading...'), findsOneWidget);
+    expect(find.text('No online saves found'), findsNothing);
+
+    listing.complete([inventoryAsset('Game.srm')]);
+    await tester.pumpAndSettle();
+    expect(find.text('Game.srm'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('cards name the platform and count each kind of file', (
     tester,
   ) async {

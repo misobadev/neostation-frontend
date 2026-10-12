@@ -289,9 +289,8 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.bartopShutdownSubtitle:
       'Desliga o computador ao fechar o aplicativo',
 
-  AppLocale.showSyncTab: 'Mostrar aba de salvamentos',
-  AppLocale.showSyncTabSubtitle:
-      'Exibir a aba de salvamentos na barra de navegação',
+  AppLocale.showSyncTab: 'Mostrar aba Saves',
+  AppLocale.showSyncTabSubtitle: 'Exibe a aba Saves na barra de navegação',
   AppLocale.showAchievementsTab: 'Mostrar aba Conquistas',
   AppLocale.showAchievementsTabSubtitle:
       'Exibe a aba do RetroAchievements na barra de navegação',

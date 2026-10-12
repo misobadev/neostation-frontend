@@ -28,6 +28,23 @@ import 'romm_save_artwork.dart';
 
 enum _FocusArea { filters, games, files }
 
+/// The filter chips, in the order they are shown.
+enum _SaveFilter {
+  all(AppLocale.filterAll),
+  saves(AppLocale.statSaves),
+  states(AppLocale.statStates);
+
+  const _SaveFilter(this.labelKey);
+
+  final String labelKey;
+
+  bool includes(RommAsset asset) => switch (this) {
+    all => true,
+    saves => !asset.isState,
+    states => asset.isState,
+  };
+}
+
 /// A game-first view of RomM's inventory. Browsing is always read-only; the
 /// only change it can make is a confirmed delete of the focused file, or of
 /// every file the filter shows for the focused game.
@@ -46,15 +63,15 @@ class _RommSavesContentState extends State<RommSavesContent> {
   // The selected game's header, which scrolls with its files.
   final _headerKey = GlobalKey();
   _FocusArea _focus = _FocusArea.filters;
-  int _filter = 0;
-  int _filterFocus = 0;
+  _SaveFilter _filter = _SaveFilter.all;
+  _SaveFilter _filterFocus = _SaveFilter.all;
   int _gameIndex = 0;
   int _fileIndex = 0;
   String? _gameKey;
 
   // Input reads the games several times per press, so they are regrouped only
   // when the inventory or the filter changes.
-  (List<RommAsset>, int, List<RommSaveGame>)? _grouped;
+  (List<RommAsset>, _SaveFilter, List<RommSaveGame>)? _grouped;
 
   List<RommSaveGame> get _games {
     final assets = _saves.assets;
@@ -65,10 +82,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
     ) when identical(from, assets) && filter == _filter) {
       return games;
     }
-    final games = RommSaveGame.group([
-      for (final asset in assets)
-        if (_filter == 0 || asset.isState == (_filter == 2)) asset,
-    ]);
+    final games = RommSaveGame.group(assets.where(_filter.includes).toList());
     _grouped = (assets, _filter, games);
     return games;
   }
@@ -105,6 +119,10 @@ class _RommSavesContentState extends State<RommSavesContent> {
       context.read<SyncManager>(),
       fileProvider: context.read<FileProvider?>(),
     );
+    // Started before the first frame, which then shows it loading rather than
+    // an empty inventory. No artwork has been tried yet, so there is none to
+    // retry.
+    _saves.refresh(retryArtwork: false);
     _navigation = GamepadNavigation(
       onNavigateUp: () => _vertical(-1),
       onNavigateDown: () => _vertical(1),
@@ -128,8 +146,6 @@ class _RommSavesContentState extends State<RommSavesContent> {
         onActivate: _navigation.activate,
         onDeactivate: _navigation.deactivate,
       );
-      // No artwork has been tried yet, so there is none to retry.
-      _saves.refresh(retryArtwork: false);
     });
   }
 
@@ -151,7 +167,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
     }
   }
 
-  (_FocusArea, int, int, int) get _cursor =>
+  (_FocusArea, _SaveFilter, int, int) get _cursor =>
       (_focus, _filterFocus, _gameIndex, _fileIndex);
 
   /// Returns whether the cursor moved. The navigator plays the move sound, and
@@ -197,7 +213,9 @@ class _RommSavesContentState extends State<RommSavesContent> {
       if (_focus != focus) return;
       switch (_focus) {
         case _FocusArea.filters:
-          _filterFocus = (_filterFocus + delta).clamp(0, 2);
+          final next = _filterFocus.index + delta;
+          _filterFocus =
+              _SaveFilter.values[next.clamp(0, _SaveFilter.values.length - 1)];
         case _FocusArea.games:
           if (delta > 0 && games.isNotEmpty) _focus = _FocusArea.files;
         case _FocusArea.files:
@@ -410,12 +428,14 @@ class _RommSavesContentState extends State<RommSavesContent> {
 
   /// L2/R2 cycle the filters, wrapping like L1/R1 do the tabs. Focus stays
   /// where it is, so the list can be re-filtered without leaving it.
-  void _stepFilter(int delta) =>
-      _setFilter((_filter + delta) % 3, moveFocus: false);
+  void _stepFilter(int delta) => _setFilter(
+    _SaveFilter.values[(_filter.index + delta) % _SaveFilter.values.length],
+    moveFocus: false,
+  );
 
-  void _setFilter(int index, {bool moveFocus = true}) {
+  void _setFilter(_SaveFilter filter, {bool moveFocus = true}) {
     setState(() {
-      _filter = _filterFocus = index;
+      _filter = _filterFocus = filter;
       if (moveFocus) _focus = _FocusArea.filters;
       _fileIndex = 0;
       _reconcileSelection(_games);
@@ -692,44 +712,34 @@ class _RommSavesContentState extends State<RommSavesContent> {
   /// the controller is on them.
   Widget _filters() {
     final assets = _saves.assets;
-    final counts = [
-      assets.length,
-      assets.where((a) => !a.isState).length,
-      assets.where((a) => a.isState).length,
-    ];
-    final labels = [
-      AppLocale.filterAll,
-      AppLocale.statSaves,
-      AppLocale.statStates,
-    ];
     return Wrap(
       spacing: 8.r,
       runSpacing: 8.r,
       children: [
-        for (var i = 0; i < 3; i++)
-          _filterChip(i, labels[i].getString(context), counts[i]),
+        for (final filter in _SaveFilter.values)
+          _filterChip(filter, assets.where(filter.includes).length),
       ],
     );
   }
 
-  Widget _filterChip(int index, String label, int count) {
+  Widget _filterChip(_SaveFilter filter, int count) {
     final scheme = Theme.of(context).colorScheme;
-    final focused = _focus == _FocusArea.filters && _filterFocus == index;
-    final selected = _filter == index;
+    final focused = _focus == _FocusArea.filters && _filterFocus == filter;
+    final selected = _filter == filter;
     final color = focused || selected ? scheme.primary : scheme.onSurface;
     return _highlight(
-      key: ValueKey('save-filter-$index'),
+      key: ValueKey('save-filter-${filter.index}'),
       focused: focused,
       selected: selected,
       radius: CornerRadii.of(context).radiusInternal,
       fill: scheme.surface.withValues(alpha: 0.5),
       padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
-      onTap: _tap(() => _setFilter(index)),
+      onTap: _tap(() => _setFilter(filter)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            label,
+            filter.labelKey.getString(context),
             style: TextStyle(
               fontSize: 11.r,
               fontWeight: FontWeight.w600,
@@ -928,7 +938,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
           // whole card. Keyed so another game or filter starts a new list at
           // the top, however the selection changed, including in a build.
           child: CustomScrollView(
-            key: ValueKey('files-${game.key}-$_filter'),
+            key: ValueKey('files-${game.key}-${_filter.name}'),
             controller: _filesScroll,
             slivers: [
               if (showHeader)

@@ -180,11 +180,14 @@ class RommSavesProvider extends ChangeNotifier {
       final files = _files;
       if (files == null || !files.isInitialized) return null;
       for (final link in await RommSaveMapRepository.localNamesForRom(romId)) {
-        // The media lookup reads nothing of a game but its file name.
-        final game = GameModel.fromJson({'romname': link.romname});
         for (final type in ['box2d', 'screenshots']) {
-          final path = game.getImagePath(link.systemFolder, type, files);
-          if (await files.fileExists(path)) return path;
+          final path = await GameModel.findExistingImagePath(
+            romname: link.romname,
+            systemFolderName: link.systemFolder,
+            imageType: type,
+            fileProvider: files,
+          );
+          if (path != null) return path;
         }
       }
     } catch (_) {

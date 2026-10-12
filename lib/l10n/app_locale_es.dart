@@ -291,9 +291,9 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.bartopShutdownSubtitle:
       'Apagar el equipo al salir de la aplicación',
 
-  AppLocale.showSyncTab: 'Mostrar pestaña de partidas',
+  AppLocale.showSyncTab: 'Mostrar pestaña Guardados',
   AppLocale.showSyncTabSubtitle:
-      'Mostrar la pestaña de partidas en la barra de navegación',
+      'Muestra la pestaña Guardados en la barra de navegación',
   AppLocale.showAchievementsTab: 'Mostrar pestaña Logros',
   AppLocale.showAchievementsTabSubtitle:
       'Muestra la pestaña de RetroAchievements en la barra de navegación',

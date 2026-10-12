@@ -112,6 +112,32 @@ void main() {
       }
     });
 
+    test('finds the same art from a file name alone', () async {
+      Future<String?> lookUp() => GameModel.findExistingImagePath(
+        romname: game.romname,
+        systemFolderName: 'snes',
+        imageType: 'box2d',
+        fileProvider: provider,
+      );
+
+      expect(await lookUp(), isNull, reason: 'there is no art yet');
+
+      final esdeFile = await writeEsdeAsset('covers');
+      expect(await lookUp(), esdeFile.path);
+
+      final own = File(
+        path.join(tempDir.path, 'media', 'snes', 'box2d', 'sonic.jpg'),
+      );
+      await own.parent.create(recursive: true);
+      await own.writeAsString('own art');
+      expect(
+        await lookUp(),
+        own.path,
+        reason: "NeoStation's own art shadows ES-DE's",
+      );
+      expect(await lookUp(), game.getImagePath('snes', 'box2d', provider));
+    });
+
     test('never writes into ES-DE, for any media type', () async {
       final mediaRoot = path.join(tempDir.path, 'media');
 
@@ -174,7 +200,7 @@ void main() {
 
   group('ES-DE paths cannot leak to new call sites', () {
     /// Only these files may mention the ES-DE path helpers: [FileProvider]
-    /// defines them, and [GameModel]'s two *read* resolvers are the sole
+    /// defines them, and [GameModel]'s *read* resolvers are the sole
     /// consumers. A new consumer anywhere else is how ES-DE art becomes
     /// writable again — the artwork-replacement bug was exactly that shape,
     /// a write target taken from a resolver that could return an ES-DE path.

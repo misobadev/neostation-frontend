@@ -247,8 +247,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.bartopShutdown: '종료할 때 BarTOP 전원 끄기',
   AppLocale.bartopShutdownSubtitle: '앱을 종료할 때 컴퓨터도 함께 종료합니다',
 
-  AppLocale.showSyncTab: '저장 탭 표시',
-  AppLocale.showSyncTabSubtitle: '탐색 모음에 저장 탭 표시',
+  AppLocale.showSyncTab: '세이브 탭 표시',
+  AppLocale.showSyncTabSubtitle: '내비게이션 바에 세이브 탭을 표시합니다',
   AppLocale.showAchievementsTab: '업적 탭 표시',
   AppLocale.showAchievementsTabSubtitle: '내비게이션 바에 RetroAchievements 탭을 표시합니다',
   AppLocale.showRommTab: 'RomM 탭 표시',
