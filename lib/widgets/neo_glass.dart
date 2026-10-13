@@ -150,9 +150,9 @@ class _GlassRimPainter extends CustomPainter {
     required this.intensity,
     required this.strokeWidth,
   }) : _colors = [
-         Colors.white.withValues(alpha: 0.96 * intensity),
-         Colors.white.withValues(alpha: 0.64 * intensity),
-         Colors.white.withValues(alpha: 0.16 * intensity),
+         Colors.white.withValues(alpha: 0.15 * intensity),
+         Colors.white.withValues(alpha: 0.10 * intensity),
+         Colors.white.withValues(alpha: 0.025 * intensity),
        ];
 
   final double cornerRadius;
@@ -179,15 +179,21 @@ class _GlassRimPainter extends CustomPainter {
 
     // Light from the top-left. The rim stays light all around — it only fades
     // in strength towards the far edge, it never turns dark. Blended with
-    // BlendMode.overlay so the edge reads as the backdrop colour lifted
-    // brighter (overlay preserves the hue instead of washing it to white).
+    // BlendMode.plus so the edge reads as the backdrop lifted brighter.
+    //
+    // Not BlendMode.overlay (or screen, or any other advanced blend): Impeller
+    // emulates those on GPUs without framebuffer fetch (Windows' OpenGL ES via
+    // ANGLE), and with a gradient shader that emulation smears the rim's
+    // bottom and right edges to the bottom and right of the window — vertical
+    // bands under every pill that shift with the window size. plus is a
+    // fixed-function blend, so it never takes that path.
     canvas.drawPath(
       path,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..isAntiAlias = true
-        ..blendMode = BlendMode.overlay
+        ..blendMode = BlendMode.plus
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
