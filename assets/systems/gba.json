@@ -43,6 +43,18 @@
   },
   "emulators": [
     {
+      "name": "Standalone PokeDaisy",
+      "unique_id": "gba.com.pokedaisy.app",
+      "description": "GBA emulator with a dual-screen companion for supported Pokemon games and ROM hacks. Supported extensions: gba, zip, 7z.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.pokedaisy.app/.LaunchActivity -a android.intent.action.VIEW -d \"{file.localuri}\"",
+          "keep_saf_uri": true
+        }
+      }
+    },
+    {
       "name": "Standalone Pizza Boy GBA Basic",
       "unique_id": "gba.it.dbtecno.pizzaboygba",
       "description": "Supported extensions: gba, zip, 7z.",
