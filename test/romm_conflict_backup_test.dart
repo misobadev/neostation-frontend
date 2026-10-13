@@ -633,7 +633,7 @@ void main() {
       await touch(localSave());
       svc.failDownloads = true;
 
-      await provider.syncGameSavesAfterClose(game);
+      final result = await provider.syncGameSavesAfterClose(game);
 
       expect(
         svc.updates,
@@ -642,6 +642,12 @@ void main() {
             'a blind overwrite is the one thing '
             'this must not do',
       );
+      expect(
+        result.success,
+        isFalse,
+        reason: 'the save the session just made is not on the server',
+      );
+      expect(provider.uploadFailures.value.games, ['Game']);
       expect(
         String.fromCharCodes(svc.contentByPath[asset.downloadPath!]!),
         'REMOTE-PROGRESS',
@@ -663,6 +669,7 @@ void main() {
 
       expect(svc.updates, [asset.id]);
       expect(backupsIn('saves'), hasLength(1));
+      expect(provider.uploadFailures.value.isEmpty, isTrue);
     });
   });
 

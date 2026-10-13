@@ -150,6 +150,21 @@ class RommService {
   bool get playtimeSyncAvailable =>
       _playtimeScopeGranted && _playSessionsSupported;
 
+  /// Advanced by every [configure]. A request reads the server and credentials
+  /// only when it is sent, so one begun under an earlier connection must not
+  /// be sent, retried, or store a token under this one.
+  int _session = 0;
+
+  /// Identifies the current connection. Asset and ROM IDs are only meaningful
+  /// on the connection they came from: another server or account can reuse
+  /// them for unrelated files.
+  int get session => _session;
+
+  /// Throws when [configure] has run since [session] was read.
+  void _checkSession(int session) {
+    if (session != _session) throw RommException('Connection changed');
+  }
+
   String get baseUrl => _baseUrl;
 
   /// The account this connection belongs to. With the password grant it is
@@ -188,6 +203,7 @@ class RommService {
     String? refreshToken,
     int? tokenExpiresMs,
   }) {
+    _session++;
     // A different server (or a reconnect) knows nothing about the last one's
     // missing covers.
     _deadCovers.clear();
@@ -263,6 +279,7 @@ class RommService {
   /// Nothing is cached: the key *is* the credential, so this is a validity
   /// check rather than a token exchange, and only ever runs on connect.
   Future<void> _verifyApiKey() async {
+    final session = _session;
     http.Response resp;
     try {
       resp = await _httpClient
@@ -279,6 +296,7 @@ class RommService {
     } catch (e) {
       throw RommException('Connection failed: $e');
     }
+    _checkSession(session);
 
     if (resp.statusCode == 401 || resp.statusCode == 403) {
       throw RommException('Invalid API key', statusCode: resp.statusCode);
@@ -312,22 +330,21 @@ class RommService {
       'scope': scope,
     };
 
+    final session = _session;
     http.Response resp;
+    bool? playtimeGranted;
     try {
       resp = await _postTokenRequest(bodyFor('$_readScopes $_playtimeScopes'));
-      if (resp.statusCode == 403) {
+      if (resp.statusCode == 403 && session == _session) {
         // Either the account lacks the playtime scopes or the server predates
         // them — indistinguishable here, and both mean the same thing: keep the
         // connection, drop playtime sync. Bad credentials fail the retry too,
         // so the error path below is unchanged for them.
         final base = await _postTokenRequest(bodyFor(_readScopes));
-        if (base.statusCode == 200) {
-          _playtimeScopeGranted = false;
-          _log.w('RomM denied $_playtimeScopes — playtime sync disabled');
-        }
+        if (base.statusCode == 200) playtimeGranted = false;
         resp = base.statusCode == 200 ? base : resp;
       } else if (resp.statusCode == 200) {
-        _playtimeScopeGranted = true;
+        playtimeGranted = true;
       }
     } on TimeoutException {
       throw RommException('Connection timed out');
@@ -340,6 +357,7 @@ class RommService {
     } catch (e) {
       throw RommException('Connection failed: $e');
     }
+    _checkSession(session);
 
     if (resp.statusCode == 401 || resp.statusCode == 403) {
       throw RommException(
@@ -354,6 +372,10 @@ class RommService {
       );
     }
 
+    if (playtimeGranted != null) _playtimeScopeGranted = playtimeGranted;
+    if (playtimeGranted == false) {
+      _log.w('RomM denied $_playtimeScopes — playtime sync disabled');
+    }
     _applyTokenResponse(resp.body);
   }
 
@@ -367,18 +389,20 @@ class RommService {
       await authenticate();
       return;
     }
+    final session = _session;
     try {
       final resp = await _postTokenRequest({
         'grant_type': 'refresh_token',
         'refresh_token': refresh,
       });
-      if (resp.statusCode == 200) {
+      if (resp.statusCode == 200 && session == _session) {
         _applyTokenResponse(resp.body);
         return;
       }
     } catch (e) {
       _log.w('RomM token refresh failed, re-authenticating: $e');
     }
+    _checkSession(session);
     // Refresh failed for any reason: re-authenticate from credentials.
     await authenticate();
   }
@@ -452,11 +476,17 @@ class RommService {
   /// Works for both [http.Response] and [http.StreamedResponse] via [statusOf];
   /// this is the single retry policy shared by every authenticated call site
   /// (plain GETs, asset GETs, uploads and ROM downloads).
+  ///
+  /// Nothing is sent once [configure] has run since the call began, so a
+  /// request waiting on authentication can't reach a different server, or
+  /// carry its credentials to the original one.
   Future<T> _sendWithAuthRetry<T>(
     Future<T> Function() send, {
     required int Function(T resp) statusOf,
   }) async {
+    final session = _session;
     await _ensureToken();
+    _checkSession(session);
     T resp;
     try {
       resp = await send();
@@ -465,15 +495,13 @@ class RommService {
     } on SocketException catch (e) {
       throw RommException('Cannot reach server: ${e.message}');
     }
+    final status = statusOf(resp);
+    if (status != 401 && status != 403) return resp;
+    _checkSession(session);
     if (usesApiKey) return resp;
-    if (statusOf(resp) == 401) {
-      await _refreshAccessToken();
-      resp = await send();
-    } else if (statusOf(resp) == 403) {
-      await authenticate();
-      resp = await send();
-    }
-    return resp;
+    await (status == 401 ? _refreshAccessToken() : authenticate());
+    _checkSession(session);
+    return send();
   }
 
   /// Issues an authenticated GET for a server-relative path+query, applying the
@@ -868,6 +896,10 @@ class RommService {
     _deadCovers.add(url);
   }
 
+  /// Lets [urls] be asked for again: an explicit refresh retries artwork, and
+  /// the server may have gained an image since it answered with nothing.
+  void forgetDeadCovers(Iterable<String> urls) => _deadCovers.removeAll(urls);
+
   /// Whether [bytes] start with the magic numbers of an image format the app
   /// can decode. Deliberately content-based: RomM names every stored cover
   /// `big.png` whatever the source served, so the extension proves nothing.
@@ -1175,12 +1207,24 @@ class RommService {
   Future<List<RommAsset>> listStates({required int romId}) =>
       _listAssets('/api/states', romId: romId, isState: true);
 
+  /// Inventory for the Saves tab, including archival versions and backups.
+  /// Unlike per-game sync discovery, this lists all of the current user's files.
+  Future<List<RommAsset>> listSaveAssets() async {
+    final results = await Future.wait([
+      _listAssets('/api/saves', isState: false),
+      _listAssets('/api/states', isState: true),
+    ]);
+    return [...results[0], ...results[1]];
+  }
+
   Future<List<RommAsset>> _listAssets(
     String basePath, {
-    required int romId,
+    int? romId,
     required bool isState,
   }) async {
-    final resp = await _authedGet('$basePath?rom_id=$romId');
+    final resp = await _authedGet(
+      romId == null ? basePath : '$basePath?rom_id=$romId',
+    );
     return _itemsOf(jsonDecode(resp.body))
         .whereType<Map<String, dynamic>>()
         .map((j) => RommAsset.fromJson(j, isState: isState))
@@ -1429,6 +1473,42 @@ class RommService {
       decoded as Map<String, dynamic>,
       isState: isState,
     );
+  }
+
+  /// Permanently deletes save files from the server (`POST /api/saves/delete`,
+  /// body `{"saves": [...]}`). Requires the `assets.write` scope.
+  Future<void> deleteSaves(List<int> assetIds) =>
+      _deleteAssets('/api/saves', field: 'saves', assetIds: assetIds);
+
+  /// Permanently deletes save states from the server
+  /// (`POST /api/states/delete`, body `{"states": [...]}`).
+  Future<void> deleteStates(List<int> assetIds) =>
+      _deleteAssets('/api/states', field: 'states', assetIds: assetIds);
+
+  /// RomM answers 404 when any id is not one of the current user's assets.
+  Future<void> _deleteAssets(
+    String basePath, {
+    required String field,
+    required List<int> assetIds,
+  }) async {
+    if (assetIds.isEmpty) return;
+    final body = jsonEncode({field: assetIds});
+    final resp = await _sendWithAuthRetry<http.Response>(
+      () => _httpClient
+          .post(
+            _uri('$basePath/delete'),
+            headers: {..._authHeaders, 'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 30)),
+      statusOf: (r) => r.statusCode,
+    );
+    if (resp.statusCode != 200) {
+      throw RommException(
+        'Delete failed (${resp.statusCode})',
+        statusCode: resp.statusCode,
+      );
+    }
   }
 
   // ── Play sessions (playtime sync) ─────────────────────────────────────────

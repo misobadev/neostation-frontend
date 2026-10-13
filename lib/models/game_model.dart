@@ -401,27 +401,72 @@ class GameModel {
     String systemFolderName,
     String imageType,
   ) {
+    for (final candidate in _neoStationImageCandidates(
+      fileProvider,
+      romname,
+      systemFolderName,
+      imageType,
+    )) {
+      if (File(candidate).existsSync()) return candidate;
+    }
+    return null;
+  }
+
+  /// Where NeoStation's own [imageType] art for the ROM file [romname] may
+  /// be, in probe order.
+  static Iterable<String> _neoStationImageCandidates(
+    FileProvider fileProvider,
+    String romname,
+    String systemFolderName,
+    String imageType,
+  ) sync* {
     for (final extension in _mediaExtensions) {
-      final candidate = fileProvider.getMediaPath(
+      yield fileProvider.getMediaPath(
         systemFolderName,
         imageType,
         romname,
         extension,
       );
-      if (File(candidate).existsSync()) return candidate;
     }
 
     // Fallback for files with complex extensions (e.g., 'v1.11.zip').
     for (final extension in _mediaExtensions) {
-      final candidate = path.join(
+      yield path.join(
         fileProvider.getMediaDirectoryPath(),
         systemFolderName,
         imageType,
         '$romname.$extension',
       );
-      if (File(candidate).existsSync()) return candidate;
     }
+  }
 
+  /// The existing [imageType] art for the ROM file [romname], or null when it
+  /// has none: the file [getImagePath] would find, for a caller that knows the
+  /// game only by its file name. Checks the disk without blocking, so it suits
+  /// lookups made many at a time.
+  static Future<String?> findExistingImagePath({
+    required String romname,
+    required String systemFolderName,
+    required String imageType,
+    required FileProvider fileProvider,
+  }) async {
+    if (!fileProvider.isInitialized) return null;
+    for (final candidate in [
+      ..._neoStationImageCandidates(
+        fileProvider,
+        romname,
+        systemFolderName,
+        imageType,
+      ),
+      // Read-only, as in [getImagePath]: ES-DE's art is never written to.
+      ...fileProvider.getEsdeMediaCandidates(
+        systemFolderName,
+        imageType,
+        romname,
+      ),
+    ]) {
+      if (await fileProvider.fileExists(candidate)) return candidate;
+    }
     return null;
   }
 

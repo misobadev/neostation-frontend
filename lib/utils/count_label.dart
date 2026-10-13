@@ -47,6 +47,22 @@ String collectionsCountLabel(BuildContext context, int count) => _label(
   AppLocale.collectionsCount,
 );
 
+/// "3 save files" / "1 save file", for RomM's saves.
+String saveFilesCountLabel(BuildContext context, int count) => _label(
+  context,
+  count,
+  AppLocale.rommSaveFileCount,
+  AppLocale.rommSaveFilesCount,
+);
+
+/// "3 save states" / "1 save state", for RomM's states.
+String saveStatesCountLabel(BuildContext context, int count) => _label(
+  context,
+  count,
+  AppLocale.rommSaveStateCount,
+  AppLocale.rommSaveStatesCount,
+);
+
 /// The count line for one system card, footer or pill: "12 Games", "1 App",
 /// "48 Tracks".
 ///

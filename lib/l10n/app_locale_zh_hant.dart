@@ -17,6 +17,32 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.customSoundsInvalidError: "檔案為空、格式不支援或無法播放。",
   AppLocale.customSoundsSaveError: "無法匯入或儲存音效。原音效保持不變。",
 
+  AppLocale.rommSavesAutoDownload: '啟動已連結的遊戲時，會下載較新的雲端存檔。',
+  AppLocale.rommSaveFile: '存檔檔案',
+  AppLocale.rommSaveState: '即時存檔',
+  AppLocale.rommRetryUploads: '重試上傳',
+  AppLocale.rommUploadsFailed: '部分上傳失敗。請檢查連線和 RomM 權限，然後重試。',
+  AppLocale.rommUploadsFailedFor: '{games} 的存檔上傳失敗。請檢查連線和 RomM 權限，然後重試。',
+  AppLocale.rommGameListSeparator: '、',
+  AppLocale.rommGameListMore: '{games} 及另外 {count} 個遊戲',
+  AppLocale.rommSavesHelp:
+      '瀏覽 RomM 存檔和即時存檔。重試上傳會檢查已關聯 RomM 且啟用同步的本機遊戲。啟動遊戲時會下載較新的遠端存檔。',
+  AppLocale.rommDeleteTitle: '從 RomM 刪除',
+  AppLocale.rommDeleteConfirm:
+      '{file} 將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
+  AppLocale.rommDeleted: '已從 RomM 刪除。',
+  AppLocale.rommDeleteFailed: '無法從 RomM 刪除。請檢查連線和 RomM 權限，然後重試。',
+  AppLocale.rommDeleteNotSent: '刪除在傳送到 RomM 之前已取消。未刪除任何內容。',
+  AppLocale.rommSaveFileCount: '{count} 個存檔檔案',
+  AppLocale.rommSaveFilesCount: '{count} 個存檔檔案',
+  AppLocale.rommSaveStateCount: '{count} 個即時存檔',
+  AppLocale.rommSaveStatesCount: '{count} 個即時存檔',
+  AppLocale.rommDeleteGameBothConfirm:
+      '{game} 的 {saves}和{states}將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
+  AppLocale.rommDeleteGameConfirm:
+      '{game} 的 {files}將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
+  AppLocale.rommDeleteKeepsSaves: '此遊戲的存檔檔案會保留在 RomM 上。',
+  AppLocale.rommDeleteKeepsStates: '此遊戲的即時存檔會保留在 RomM 上。',
   AppLocale.ignoreArticlesInGameSort: "排序遊戲時忽略冠詞",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "忽略標題開頭的 The、A 或 An。例如，The Legend of Zelda 排在 L 下。",
@@ -231,8 +257,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.bartopShutdown: '離開時關閉 BarTOP',
   AppLocale.bartopShutdownSubtitle: '離開應用程式時關閉電腦',
 
-  AppLocale.showSyncTab: '顯示 NeoSync 分頁',
-  AppLocale.showSyncTabSubtitle: '在導覽列中顯示 NeoSync 分頁',
+  AppLocale.showSyncTab: '顯示存檔分頁',
+  AppLocale.showSyncTabSubtitle: '在導覽列中顯示存檔分頁',
   AppLocale.showAchievementsTab: '顯示成就分頁',
   AppLocale.showAchievementsTabSubtitle: '在導覽列中顯示 RetroAchievements 分頁',
   AppLocale.showRommTab: '顯示 RomM 分頁',
@@ -351,7 +377,6 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.scrapingUnavailableAndroid: 'Android 應用程式無法抓取。',
   AppLocale.achievements: '成就',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'NeoSync 登入',
   AppLocale.neoSyncSynchronizing: 'NeoSync: 正在同步...',
   AppLocale.neoSyncNotConnected: 'NeoSync: 未連線',
@@ -644,7 +669,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.sortByGroup: '排序方式',
   AppLocale.orderGroup: '順序',
   AppLocale.synced: '已同步',
-  AppLocale.syncing: '同步中',
+  AppLocale.syncing: '同步中...',
   AppLocale.conflict: '衝突',
   AppLocale.ready: '就緒',
   AppLocale.quota: '配額',

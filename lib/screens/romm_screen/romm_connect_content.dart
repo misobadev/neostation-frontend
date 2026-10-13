@@ -35,7 +35,11 @@ class RommConnectContent extends StatefulWidget {
   /// panel is shown as the disconnected landing view (nothing to go back to).
   final VoidCallback? onBrowse;
 
-  const RommConnectContent({super.key, this.onBrowse});
+  /// Where B goes once no field is focused, when that isn't [onBrowse]: the
+  /// Saves tab has no library to return to, so it leaves for Systems instead.
+  final VoidCallback? onBack;
+
+  const RommConnectContent({super.key, this.onBrowse, this.onBack});
 
   @override
   State<RommConnectContent> createState() => _RommConnectContentState();
@@ -204,13 +208,13 @@ class _RommConnectContentState extends State<RommConnectContent>
   }
 
   /// B leaves a focused field first — that is what it does everywhere else in
-  /// the app — and only steps back to the library once nothing is focused.
+  /// the app — and only steps back once nothing is focused.
   void _handleBack() {
     if (isAnyFieldFocused()) {
       exitTextEntry();
       return;
     }
-    widget.onBrowse?.call();
+    (widget.onBack ?? widget.onBrowse)?.call();
   }
 
   void _scrollToIndex(int index) {

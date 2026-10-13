@@ -17,6 +17,33 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.customSoundsInvalidError: "ファイルが空か、未対応、または再生できません。",
   AppLocale.customSoundsSaveError: "効果音を読み込みまたは保存できませんでした。以前の効果音は保持されます。",
 
+  AppLocale.rommSavesAutoDownload: '連携したゲームの起動時に、新しいクラウドセーブをダウンロードします。',
+  AppLocale.rommSaveFile: 'セーブデータ',
+  AppLocale.rommSaveState: 'セーブステート',
+  AppLocale.rommRetryUploads: 'アップロードを再試行',
+  AppLocale.rommUploadsFailed: '一部のアップロードに失敗しました。接続とRomMの権限を確認して再試行してください。',
+  AppLocale.rommUploadsFailedFor:
+      '{games}のセーブをアップロードできませんでした。接続とRomMの権限を確認して再試行してください。',
+  AppLocale.rommGameListSeparator: '、',
+  AppLocale.rommGameListMore: '{games}ほか{count}件',
+  AppLocale.rommSavesHelp:
+      'RomMのセーブとステートを表示します。アップロードの再試行では、RomMにリンクされ同期が有効なローカルゲームを確認します。新しいリモートセーブはゲーム起動時にダウンロードされます。',
+  AppLocale.rommDeleteTitle: 'RomMから削除',
+  AppLocale.rommDeleteConfirm:
+      '{file} をRomMサーバーから完全に削除します。デバイス上のコピーは残り、このゲームの同期を続けているデバイスからは再びアップロードされます。',
+  AppLocale.rommDeleted: 'RomMから削除しました。',
+  AppLocale.rommDeleteFailed: 'RomMから削除できませんでした。接続とRomMの権限を確認して再試行してください。',
+  AppLocale.rommDeleteNotSent: '削除はRomMに届く前にキャンセルされました。何も削除されていません。',
+  AppLocale.rommSaveFileCount: 'セーブデータ{count}件',
+  AppLocale.rommSaveFilesCount: 'セーブデータ{count}件',
+  AppLocale.rommSaveStateCount: 'セーブステート{count}件',
+  AppLocale.rommSaveStatesCount: 'セーブステート{count}件',
+  AppLocale.rommDeleteGameBothConfirm:
+      '{game} の{saves}と{states}をRomMサーバーから完全に削除します。デバイス上のコピーは残り、このゲームの同期を続けているデバイスからは再びアップロードされます。',
+  AppLocale.rommDeleteGameConfirm:
+      '{game} の{files}をRomMサーバーから完全に削除します。デバイス上のコピーは残り、このゲームの同期を続けているデバイスからは再びアップロードされます。',
+  AppLocale.rommDeleteKeepsSaves: 'このゲームのセーブデータはRomMに残ります。',
+  AppLocale.rommDeleteKeepsStates: 'このゲームのセーブステートはRomMに残ります。',
   AppLocale.ignoreArticlesInGameSort: "ゲームの並び替えで冠詞を無視",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "タイトル先頭の The、A、An を無視します。例：The Legend of Zelda は L に分類されます。",
@@ -236,8 +263,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.bartopShutdown: '終了時にBarTOPをシャットダウン',
   AppLocale.bartopShutdownSubtitle: 'アプリ終了時にコンピュータをシャットダウン',
 
-  AppLocale.showSyncTab: 'NeoSyncタブを表示',
-  AppLocale.showSyncTabSubtitle: 'ナビゲーションバーにNeoSyncタブを表示します',
+  AppLocale.showSyncTab: 'セーブタブを表示',
+  AppLocale.showSyncTabSubtitle: 'ナビゲーションバーにセーブタブを表示します',
   AppLocale.showAchievementsTab: '実績タブを表示',
   AppLocale.showAchievementsTabSubtitle: 'ナビゲーションバーにRetroAchievementsタブを表示します',
   AppLocale.showRommTab: 'RomM タブを表示',
@@ -362,7 +389,6 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.scrapingUnavailableAndroid: 'Androidではスクレイピングを利用できません。',
   AppLocale.achievements: '実績',
 
-  AppLocale.neoSync: 'NeoSync',
   AppLocale.neoSyncLogin: 'NeoSync ログイン',
   AppLocale.neoSyncSynchronizing: 'NeoSync: 同期中...',
   AppLocale.neoSyncNotConnected: 'NeoSync: 未接続',
@@ -656,7 +682,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.sortByGroup: '並べ替え',
   AppLocale.orderGroup: '順序',
   AppLocale.synced: '同期済み',
-  AppLocale.syncing: '同期中',
+  AppLocale.syncing: '同期中...',
   AppLocale.conflict: '競合',
   AppLocale.ready: '準備完了',
   AppLocale.quota: '容量',

@@ -27,6 +27,10 @@ class ConfirmActionDialog extends StatefulWidget {
   /// theme error colour for destructive intent.
   final Color? accentColor;
 
+  /// Caps the body width so a long message wraps instead of stretching the
+  /// dialog across the screen. Null keeps the default sizing.
+  final double? maxWidth;
+
   const ConfirmActionDialog({
     super.key,
     required this.title,
@@ -35,6 +39,7 @@ class ConfirmActionDialog extends StatefulWidget {
     required this.icon,
     this.cancelLabel,
     this.accentColor,
+    this.maxWidth,
   });
 
   static Future<bool> show(
@@ -45,6 +50,7 @@ class ConfirmActionDialog extends StatefulWidget {
     required IconData icon,
     String? cancelLabel,
     Color? accentColor,
+    double? maxWidth,
   }) async {
     final result = await showDialog<bool>(
       context: context,
@@ -56,6 +62,7 @@ class ConfirmActionDialog extends StatefulWidget {
         icon: icon,
         cancelLabel: cancelLabel,
         accentColor: accentColor,
+        maxWidth: maxWidth,
       ),
     );
     return result ?? false;
@@ -128,11 +135,16 @@ class _ConfirmActionDialogState extends State<ConfirmActionDialog> {
           ),
         ],
       ),
-      content: Text(
-        widget.body,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          fontSize: 11.r,
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: widget.maxWidth ?? double.infinity,
+        ),
+        child: Text(
+          widget.body,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontSize: 11.r,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
         ),
       ),
       actions: [
