@@ -145,7 +145,7 @@ class _StatusReadoutState extends State<StatusReadout> {
   /// Battery glyph for the current charge, matching the primary header's ramp.
   IconData get _batteryIcon {
     if (_isCharging) return Symbols.battery_android_frame_bolt;
-    if (_batteryLevel >= 90) return Symbols.battery_full;
+    if (_batteryLevel >= 90) return Symbols.battery_android_frame_full;
     if (_batteryLevel >= 75) return Symbols.battery_android_frame_6;
     if (_batteryLevel >= 60) return Symbols.battery_android_frame_5;
     if (_batteryLevel >= 45) return Symbols.battery_android_frame_4;
@@ -166,14 +166,11 @@ class _StatusReadoutState extends State<StatusReadout> {
 
   @override
   Widget build(BuildContext context) {
-    final muted = widget.scheme.onSurface.withValues(alpha: 0.55);
     final batteryColor = _batteryColor;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Symbols.schedule_rounded, color: muted, size: 19.r),
-        SizedBox(width: 7.r),
         Text(
           formatClockTime(_now, use12Hour: widget.use12HourClock),
           style: TextStyle(

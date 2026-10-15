@@ -162,7 +162,7 @@ class HeaderState extends State<Header> {
       return Symbols.battery_android_frame_bolt;
     }
 
-    if (_batteryLevel >= 90) return Symbols.battery_full;
+    if (_batteryLevel >= 90) return Symbols.battery_android_frame_full;
     if (_batteryLevel >= 75) return Symbols.battery_android_frame_6;
     if (_batteryLevel >= 60) return Symbols.battery_android_frame_5;
     if (_batteryLevel >= 45) return Symbols.battery_android_frame_4;
@@ -277,33 +277,9 @@ class HeaderState extends State<Header> {
                 gutter: 4.r,
               );
 
-              // The clock glyph is the first thing given up when the tab strip
-              // leaves too little room, and it comes back on its own when a tab
-              // is hidden in settings. It is the right thing to drop first: it
-              // sits immediately before a label that already reads as a time,
-              // so it carries no information the user loses.
-              final showClockGlyph =
-                  statusPillWidth(
-                    clockTextWidth: _measureText(
-                      context,
-                      clockText,
-                      labelStyle,
-                    ),
-                    batteryTextWidth: showBattery
-                        ? _measureText(context, '$_batteryLevel%', labelStyle)
-                        : 0,
-                    withClockGlyph: true,
-                    horizontalPadding: 10.r,
-                    bell: 14.r,
-                    bellGap: 10.r,
-                    glyph: 14.r,
-                    glyphGap: 4.r,
-                    batteryGap: 12.r,
-                    batteryIcon: 16.r,
-                    batteryIconGap: 4.r,
-                  ) <=
-                  pillAllowance;
-
+              // The clock glyph was dropped entirely: it sat immediately before
+              // a label that already reads as a time, so it carried no
+              // information and only cost room the tab strip needed.
               return Stack(
                 alignment: Alignment.center,
                 children: [
@@ -478,16 +454,6 @@ class HeaderState extends State<Header> {
                               children: [
                                 const NotificationBell(),
                                 SizedBox(width: 10.r),
-                                if (showClockGlyph) ...[
-                                  Icon(
-                                    Symbols.schedule,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
-                                    size: 14.r,
-                                  ),
-                                  SizedBox(width: 4.r),
-                                ],
                                 Text(
                                   clockText,
                                   style: TextStyle(
