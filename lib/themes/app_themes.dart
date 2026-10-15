@@ -18,6 +18,7 @@ import 'cyberpunk_theme.dart' as cyberpunk;
 import 'aqua_theme.dart' as aqua;
 import 'palenight_theme.dart' as palenight;
 import 'horizon_theme.dart' as horizon;
+import 'dmg_theme.dart' as dmg;
 
 class AppThemes {
   /// Registry of user-imported themes, keyed by id. Populated at startup by
@@ -45,6 +46,7 @@ class AppThemes {
   static ThemeData get aquaTheme => aqua.aquaTheme;
   static ThemeData get palenightTheme => palenight.palenightTheme;
   static ThemeData get horizonTheme => horizon.horizonTheme;
+  static ThemeData get dmgTheme => dmg.dmgTheme;
 
   // References to custom colors for each theme
   static dynamic get darkCustomColors => dark.DarkCustomColors();
@@ -62,6 +64,7 @@ class AppThemes {
   static dynamic get aquaCustomColors => aqua.AquaCustomColors();
   static dynamic get palenightCustomColors => palenight.PalenightCustomColors();
   static dynamic get horizonCustomColors => horizon.HorizonCustomColors();
+  static dynamic get dmgCustomColors => dmg.DmgCustomColors();
 
   /// Retrieves a theme's custom colors from its name.
   ///
@@ -110,6 +113,8 @@ class AppThemes {
         return palenight.PalenightCustomColors();
       case 'horizon':
         return horizon.HorizonCustomColors();
+      case 'dmg':
+        return dmg.DmgCustomColors();
       default:
         return dark.DarkCustomColors();
     }
@@ -169,6 +174,9 @@ class AppThemes {
     } else if (surface == horizonTheme.colorScheme.surface ||
         secondary == horizonTheme.colorScheme.secondary) {
       return horizon.HorizonCustomColors();
+    } else if (surface == dmgTheme.colorScheme.surface ||
+        secondary == dmgTheme.colorScheme.secondary) {
+      return dmg.DmgCustomColors();
     } else {
       return dark.DarkCustomColors();
     }
@@ -209,6 +217,8 @@ class AppThemes {
         return palenightTheme;
       case 'horizon':
         return horizonTheme;
+      case 'dmg':
+        return dmgTheme;
       default:
         return darkTheme;
     }

@@ -62,6 +62,7 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
     'aqua': AppThemes.aquaTheme,
     'palenight': AppThemes.palenightTheme,
     'horizon': AppThemes.horizonTheme,
+    'dmg': AppThemes.dmgTheme,
   };
 
   /// Human-readable mapping for theme identifiers.
@@ -81,6 +82,7 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
     'aqua': 'Aqua',
     'palenight': 'Palenight',
     'horizon': 'Horizon',
+    'dmg': 'Dmg',
   };
 
   ThemeProvider._() {
