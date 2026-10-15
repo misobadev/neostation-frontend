@@ -156,6 +156,21 @@ void main() {
       expect(radii.radiusInternalRaw, 0.0);
     });
 
+    test('attaches the theme glass block when present', () {
+      final json = Map<String, dynamic>.from(_daisyJson)
+        ..['glass'] = {'blur': 1, 'transparency': 20, 'borderWidth': 3};
+      final theme = CustomTheme.fromDaisyJson(json);
+      expect(theme.glass, isNotNull);
+      expect(theme.glass!.blur, 1);
+      expect(theme.glass!.transparency, 20);
+      expect(theme.glass!.borderWidth, 3.0);
+    });
+
+    test('glass is null when the json has no glass block', () {
+      final theme = CustomTheme.fromDaisyJson(_daisyJson);
+      expect(theme.glass, isNull);
+    });
+
     test('identical palettes share a signature; different ones do not', () {
       final a = CustomTheme.fromDaisyJson(_daisyJson);
       final renamed = Map<String, dynamic>.from(_daisyJson)

@@ -14,6 +14,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../../../themes/corner_radii.dart';
+import '../../../widgets/neo_glass.dart';
 import '../../../widgets/shaders/shader_gif_widget.dart';
 import '../../../widgets/shaders/music_card_shader_background.dart';
 import '../../../utils/image_utils.dart';
@@ -259,108 +260,109 @@ class _SystemCardState extends State<SystemCard> {
           : neoAssets.getBackgroundForSystemSync(folderName);
     }
 
+    final radii = Theme.of(context).extension<CornerRadii>();
+    final outerRadius = radii?.radiusExternal ?? BorderRadius.circular(14.r);
+    final outerRadiusPx = radii?.radiusExternalRadius ?? 14.r;
+
     return Padding(
       padding: EdgeInsets.all(2.r),
       child: MouseRegion(
         cursor: SystemMouseCursors.basic,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius:
-                Theme.of(context).extension<CornerRadii>()?.radiusExternal ??
-                BorderRadius.circular(14.r),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outline,
-              width: 1.r,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.1),
-                blurRadius: 4.r,
-                offset: Offset(2.0.r, 2.0.r),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius:
-                Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
-                BorderRadius.circular(9.r),
-            child: InkWell(
-              focusNode: _focusNode,
-              onTap: () {
-                // A tap on the already-selected card confirms it rather than
-                // moving the selection (touch users have no A button), so it
-                // earns the enter sound instead of the nav sound.
-                if (widget.isSelected) {
-                  SfxService().playEnterSound();
-                } else {
-                  SfxService().playNavSound();
-                }
-                widget.onTap?.call();
-              },
-              // No sound here: every host opens a menu from this callback and
-              // plays its own, so playing one too would double it.
-              onLongPress: widget.onLongPress,
-              canRequestFocus: false,
-              focusColor: Colors.transparent,
-              hoverColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  top: 4.r,
-                  bottom: hideSystemLogos && !widget.info.isGame ? 4.r : 0.r,
-                  left: 4.r,
-                  right: 4.r,
+        child: NeoGlassRim(
+          cornerRadius: outerRadiusPx,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: outerRadius,
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.shadow.withValues(alpha: 0.1),
+                  blurRadius: 4.r,
+                  offset: Offset(2.0.r, 2.0.r),
                 ),
-                child: widget.info.isGame
-                    ? Column(
-                        children: [
-                          Expanded(
-                            child: Stack(
-                              key: _contentStackKey,
-                              children: [
-                                _buildSystemBackground(),
-                                _buildGameMainContent(context),
-                              ],
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius:
+                  Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
+                  BorderRadius.circular(9.r),
+              child: InkWell(
+                focusNode: _focusNode,
+                onTap: () {
+                  // A tap on the already-selected card confirms it rather than
+                  // moving the selection (touch users have no A button), so it
+                  // earns the enter sound instead of the nav sound.
+                  if (widget.isSelected) {
+                    SfxService().playEnterSound();
+                  } else {
+                    SfxService().playNavSound();
+                  }
+                  widget.onTap?.call();
+                },
+                // No sound here: every host opens a menu from this callback and
+                // plays its own, so playing one too would double it.
+                onLongPress: widget.onLongPress,
+                canRequestFocus: false,
+                focusColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 4.r,
+                    bottom: hideSystemLogos && !widget.info.isGame ? 4.r : 0.r,
+                    left: 4.r,
+                    right: 4.r,
+                  ),
+                  child: widget.info.isGame
+                      ? Column(
+                          children: [
+                            Expanded(
+                              child: Stack(
+                                key: _contentStackKey,
+                                children: [
+                                  _buildSystemBackground(),
+                                  _buildGameMainContent(context),
+                                ],
+                              ),
                             ),
-                          ),
-                          _buildGameFooter(context),
-                        ],
-                      )
-                    : (hideSystemLogos
-                          ? Column(
-                              children: [
-                                Expanded(
-                                  child: Stack(
-                                    key: _contentStackKey,
-                                    children: [
-                                      _buildSystemBackground(),
-                                      if (widget.showCount)
-                                        _buildCountPill(context),
-                                    ],
+                            _buildGameFooter(context),
+                          ],
+                        )
+                      : (hideSystemLogos
+                            ? Column(
+                                children: [
+                                  Expanded(
+                                    child: Stack(
+                                      key: _contentStackKey,
+                                      children: [
+                                        _buildSystemBackground(),
+                                        if (widget.showCount)
+                                          _buildCountPill(context),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              children: [
-                                AspectRatio(
-                                  aspectRatio: 1,
-                                  child: Stack(
-                                    key: _contentStackKey,
-                                    children: [
-                                      _buildSystemBackground(),
-                                      if (widget.showCount)
-                                        _buildCountPill(context),
-                                    ],
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  AspectRatio(
+                                    aspectRatio: 1,
+                                    child: Stack(
+                                      key: _contentStackKey,
+                                      children: [
+                                        _buildSystemBackground(),
+                                        if (widget.showCount)
+                                          _buildCountPill(context),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                _buildSystemFooter(context),
-                              ],
-                            )),
+                                  _buildSystemFooter(context),
+                                ],
+                              )),
+                ),
               ),
             ),
           ),

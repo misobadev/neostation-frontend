@@ -89,6 +89,11 @@ class NeoGlass extends StatelessWidget {
     }
   }
 
+  /// The rim stroke width NeoGlass will draw: the explicit [override] when
+  /// given, otherwise the user's configured value. `0` means no rim/border.
+  static double borderWidthOf(BuildContext context, {double? override}) =>
+      override ?? _prefs(context).borderWidth;
+
   @override
   Widget build(BuildContext context) {
     final prefs = _prefs(context);
@@ -137,6 +142,47 @@ class NeoGlass extends StatelessWidget {
         borderRadius: BorderRadius.circular(cornerRadius),
         child: surface,
       ),
+    );
+  }
+}
+
+/// Paints only the NeoGlass specular rim over [child], using the same
+/// user-configured border width as the full [NeoGlass] surface (or an explicit
+/// [borderWidth] override). When the effective width is `0` no rim is drawn, so
+/// bordered surfaces can be made borderless with the global Glass Border
+/// setting — e.g. the systems grid tiles.
+class NeoGlassRim extends StatelessWidget {
+  const NeoGlassRim({
+    super.key,
+    required this.child,
+    required this.cornerRadius,
+    this.borderWidth,
+    this.intensity = 1,
+  });
+
+  final Widget child;
+
+  /// Corner radius of the surface whose edge the rim traces.
+  final double cornerRadius;
+
+  /// Rim stroke width. When null, the user's configured border width is used.
+  final double? borderWidth;
+
+  /// Strength of the specular highlight (0.0–1.0).
+  final double intensity;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = borderWidth ?? NeoGlass._prefs(context).borderWidth;
+    return CustomPaint(
+      foregroundPainter: (intensity > 0 && width > 0)
+          ? _GlassRimPainter(
+              cornerRadius: cornerRadius,
+              intensity: intensity,
+              strokeWidth: width,
+            )
+          : null,
+      child: child,
     );
   }
 }

@@ -10,6 +10,8 @@ import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
+import 'package:neostation/themes/app_themes.dart';
+import 'package:neostation/themes/theme_glass.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/widgets/theme_card.dart';
@@ -231,8 +233,11 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
       // Index 0: Native System/Dynamic theme resolution.
       await themeProvider.setTheme('system');
     } else if (gridIndex - 1 < themes.length) {
-      // Indices >0: Specific registered theme variants.
-      await themeProvider.setTheme(themes[gridIndex - 1]['name']!);
+      // Indices >0: Specific registered theme variants. Imported themes may
+      // ship NeoGlass defaults; seed them so the theme's frosted look applies.
+      final name = themes[gridIndex - 1]['name']!;
+      await themeProvider.setTheme(name);
+      await _applyThemeGlass(AppThemes.customThemes[name]?.glass);
     } else {
       // Last item: the "Import theme" tile.
       await _importTheme();
@@ -240,6 +245,16 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
     }
     if (mounted) setState(() {});
     widget.onSelectionChanged?.call(index);
+  }
+
+  /// Seeds the user's NeoGlass settings from the applied theme's `glass` block,
+  /// when it ships one. Each value stays user-overridable afterwards.
+  Future<void> _applyThemeGlass(ThemeGlass? glass) async {
+    if (glass == null || !mounted) return;
+    final config = Provider.of<SqliteConfigProvider>(context, listen: false);
+    await config.updateNeoglassBlur(glass.blur);
+    await config.updateNeoglassTransparency(glass.transparency);
+    await config.updateNeoglassBorderWidth(glass.borderWidth);
   }
 
   /// Cycles the NeoGlass appearance option at [row] (0 = blur, 1 = transparency,
@@ -297,6 +312,7 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
       if (filePath == null) return;
 
       final result = await themeProvider.importTheme(File(filePath));
+      await _applyThemeGlass(result.theme.glass);
       if (mounted) setState(() {});
       if (mounted) {
         final name = result.theme.name;
