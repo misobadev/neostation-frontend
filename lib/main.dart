@@ -52,6 +52,7 @@ import 'package:fullscreen_window/fullscreen_window.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:neostation/screens/secondary_screen/secondary_screen.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:file_picker/file_picker.dart';
 
 // Politica personalizada para deshabilitar navegacion por teclado
 class NoFocusTraversalPolicy extends FocusTraversalPolicy {
@@ -215,6 +216,14 @@ void main() async {
   // wait happens once (behind the loading screen) rather than once per caller.
   if (Platform.isAndroid) {
     await _awaitUserDataStorage();
+  }
+
+  // The App Sandbox is disabled on macOS (see Release.entitlements), so the
+  // `files.user-selected.*` entitlements are gone. file_picker_darwin still
+  // checks for them before every dialog and fails with ENTITLEMENT_NOT_FOUND
+  // instead of opening one, which left every folder/file picker dead (#614).
+  if (Platform.isMacOS) {
+    await FilePicker.skipEntitlementsChecks();
   }
 
   // Inicializar window_manager para desktop con tamano minimo 640x480
