@@ -41,13 +41,24 @@
       }
     },
     {
-      "name": "Standalone ARMSX3",
+      "name": "Standalone ARMSX3 ISO",
       "unique_id": "ps3.com.armsx3",
       "description": "Supported extensions: iso.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
           "launch_arguments": "-n com.armsx3/com.armsx2.Main -a android.intent.action.VIEW -e path \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone ARMSX3 PKG",
+      "unique_id": "ps3.com.armsx3",
+      "description": "Supported extensions: ps3.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.armsx3/com.armsx2.Main -a android.intent.action.VIEW --es title_id \"{file.content}\""
         }
       }
     },
