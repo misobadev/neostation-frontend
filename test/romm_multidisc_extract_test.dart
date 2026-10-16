@@ -1,8 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:neostation/providers/romm_provider.dart';
+import 'package:neostation/services/romm_archive_service.dart';
 import 'package:path/path.dart' as p;
 
 /// Writes [files] (name → bytes) into a zip at [zipPath].
@@ -15,8 +16,16 @@ void _writeZip(String zipPath, Map<String, List<int>> files) {
   File(zipPath).writeAsBytesSync(encoded);
 }
 
+/// PS1's own extension list, as production passes it for a download.
+Set<String> _ps1Extensions() =>
+    ((jsonDecode(File('assets/systems/ps1.json').readAsStringSync())
+                as Map<String, dynamic>)['system']['extensions']
+            as List)
+        .cast<String>()
+        .toSet();
+
 void main() {
-  group('RommProvider.extractMultiDiscZip', () {
+  group('RommArchiveService multi-disc ZIP', () {
     late Directory dir;
 
     setUp(() async {
@@ -39,10 +48,12 @@ void main() {
                   .codeUnits,
         });
 
-        final m3uName = await RommProvider.extractMultiDiscZip(
+        final m3uName = await RommArchiveService.prepareDownload(
           zipPath,
           dir.path,
-          'Alone in the Dark',
+          _ps1Extensions(),
+          forceExtract: true,
+          playlistBaseName: 'Alone in the Dark',
         );
 
         expect(m3uName, 'Alone in the Dark.m3u');
@@ -80,7 +91,13 @@ void main() {
         'g.m3u': 'g (Disc 2).chd\ng (Disc 1).chd\n'.codeUnits,
       });
 
-      await RommProvider.extractMultiDiscZip(zipPath, dir.path, 'g');
+      await RommArchiveService.prepareDownload(
+        zipPath,
+        dir.path,
+        _ps1Extensions(),
+        forceExtract: true,
+        playlistBaseName: 'g',
+      );
 
       final playlist = File(p.join(dir.path, 'g.m3u')).readAsLinesSync();
       expect(playlist, ['g (Disc 2).chd', 'g (Disc 1).chd']);
@@ -95,10 +112,12 @@ void main() {
           'Game (Disc 1).chd': [1],
         });
 
-        final m3uName = await RommProvider.extractMultiDiscZip(
+        final m3uName = await RommArchiveService.prepareDownload(
           zipPath,
           dir.path,
-          'Game',
+          _ps1Extensions(),
+          forceExtract: true,
+          playlistBaseName: 'Game',
         );
 
         expect(m3uName, 'Game.m3u');
@@ -111,10 +130,12 @@ void main() {
       final zipPath = p.join(dir.path, 'empty.zip');
       _writeZip(zipPath, {'only.m3u': 'nothing.chd\n'.codeUnits});
 
-      final m3uName = await RommProvider.extractMultiDiscZip(
+      final m3uName = await RommArchiveService.prepareDownload(
         zipPath,
         dir.path,
-        'only',
+        _ps1Extensions(),
+        forceExtract: true,
+        playlistBaseName: 'only',
       );
 
       expect(m3uName, isNull);
@@ -122,7 +143,7 @@ void main() {
     });
   });
 
-  group('RommProvider.extractScummVmDownload', () {
+  group('RommArchiveService.prepareScummVmDownload', () {
     late Directory dir;
 
     setUp(() async {
@@ -141,7 +162,7 @@ void main() {
         'Loom/VIDEO/INTRO.DXA': [4, 5, 6],
       });
 
-      final descriptorName = await RommProvider.extractScummVmDownload(
+      final descriptorName = await RommArchiveService.prepareScummVmDownload(
         zipPath,
         dir.path,
       );
@@ -164,7 +185,7 @@ void main() {
       final descriptor = File(p.join(dir.path, 'Day of the Tentacle.scummvm'));
       await descriptor.writeAsString('tentacle');
 
-      final descriptorName = await RommProvider.extractScummVmDownload(
+      final descriptorName = await RommArchiveService.prepareScummVmDownload(
         descriptor.path,
         dir.path,
       );

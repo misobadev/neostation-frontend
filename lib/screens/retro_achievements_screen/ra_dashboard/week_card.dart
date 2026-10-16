@@ -124,6 +124,7 @@ extension _WeekCard on RADashboardHubState {
         return AppLocale.rommNoSystemMatch.getString(context);
       case RommDownloadError.noWritableFolder:
         return AppLocale.rommNoWritableFolder.getString(context);
+      case RommDownloadError.extraction:
       case RommDownloadError.network:
       case RommDownloadError.none:
         return AppLocale.rommDownloadFailed.getString(context);
