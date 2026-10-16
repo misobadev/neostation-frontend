@@ -600,6 +600,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.hintSelect: '選擇',
   AppLocale.hintSettings: '設定',
   AppLocale.hintBack: '返回',
+  AppLocale.androidGameMarkApp: '標記為應用程式',
+  AppLocale.androidGameHint: '遊戲',
   AppLocale.hintPlay: '開始遊戲',
   AppLocale.hintFavorite: '收藏',
   AppLocale.hintRandom: '隨機',

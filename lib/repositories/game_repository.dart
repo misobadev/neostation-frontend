@@ -208,6 +208,11 @@ class GameRepository {
     String filename,
   ) => SqliteService.getSingleGame(systemId, filename);
 
+  static Future<void> setAndroidGameOverride(
+    String packageName,
+    bool? isGame,
+  ) => SqliteService.setAndroidGameOverride(packageName, isGame);
+
   static Future<List<DatabaseGameModel>> getAllGames() =>
       SqliteService.getAllGames();
 

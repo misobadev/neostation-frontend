@@ -770,7 +770,8 @@ class _GamesCarouselState extends State<GamesCarousel> {
       // collection has no bundled logo at all ('collection:<uuid>.webp' does
       // not exist), so keying the asset off the list would resolve to nothing.
       // Mirrors the secondary display's fallback.
-      final path = 'assets/images/logos/${_folderForGame(game)}.webp';
+      final path =
+          'assets/images/logos/${SystemFolderNames.artFolderName(_folderForGame(game))}.webp';
       imageProvider = AssetImage(path);
       imagePath = path;
     }

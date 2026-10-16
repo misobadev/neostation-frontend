@@ -688,6 +688,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.hintSelect: 'Pilih',
   AppLocale.hintSettings: 'Pengaturan',
   AppLocale.hintBack: 'Kembali',
+  AppLocale.androidGameMarkApp: 'Tandai sebagai aplikasi',
+  AppLocale.androidGameHint: 'Game',
   AppLocale.hintPlay: 'Main',
   AppLocale.hintFavorite: 'Favorit',
   AppLocale.hintRandom: 'Acak',

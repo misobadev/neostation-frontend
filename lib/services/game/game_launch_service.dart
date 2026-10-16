@@ -1,3 +1,4 @@
+import '../../constants/system_folder_names.dart';
 import 'dart:io';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -67,7 +68,8 @@ class GameLaunchService {
     GameModel game,
   ) async {
     try {
-      if (Platform.isAndroid && (system.folderName == 'android')) {
+      if (Platform.isAndroid &&
+          SystemFolderNames.isAndroidApps(system.folderName)) {
         if (game.romPath == null) {
           return GameLaunchResult.failure(
             AppLocale.packageNameMissing.getString(context),

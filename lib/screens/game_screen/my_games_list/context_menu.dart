@@ -125,6 +125,12 @@ extension _ContextMenu on _SystemGamesListState {
       onIdentify: canScrape && (game.romPath?.isNotEmpty ?? false)
           ? _identifySelectedGame
           : null,
+      // Android Games only: sends the app back to Android Apps.
+      onMarkAsApp:
+          widget.system.folderName == SystemFolderNames.androidGames &&
+              (game.romPath?.isNotEmpty ?? false)
+          ? () => _markSelectedAsApp(game)
+          : null,
       onViewMode: () =>
           GameViewModeDropdown.globalKey.currentState?.showDropdown(),
       onRandom: _showRandomGameDialog,
@@ -170,6 +176,23 @@ extension _ContextMenu on _SystemGamesListState {
       }
     }
     return false;
+  }
+
+  /// Sends [game] back to Android Apps, where it leaves this list. The systems
+  /// list follows, since the Games system disappears with its last game.
+  Future<void> _markSelectedAsApp(GameModel game) async {
+    final packageName = game.romPath;
+    if (packageName == null) return;
+    final config = context.read<SqliteConfigProvider>();
+    try {
+      await AndroidGamesService.setIsGame(packageName, false);
+      await config.refreshAndroidGamesSystem();
+    } catch (e) {
+      _SystemGamesListState._log.e('Mark as app failed: $e');
+      return;
+    }
+    if (!mounted) return;
+    await _loadGames();
   }
 
   /// Applies a favourite change chosen in the checklist, reporting whether it

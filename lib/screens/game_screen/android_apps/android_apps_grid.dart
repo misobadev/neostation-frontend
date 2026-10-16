@@ -5,11 +5,13 @@ import 'package:neostation/services/android_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/services/android_games_service.dart';
 import 'package:provider/provider.dart';
 import '../../../models/system_model.dart';
 import '../../../models/game_model.dart';
 import '../../../services/game_service.dart';
 import '../../../utils/gamepad_nav.dart';
+import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../widgets/android_apps_footer.dart';
 import 'android_app_card.dart';
@@ -56,6 +58,10 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
   late final String _navLayerId = 'android_apps_grid#${++_navLayerSeq}';
 
   List<GameModel> _apps = [];
+
+  /// Packages marked as games during this visit. They stay listed (badged)
+  /// until the grid is left so a mistake can be undone.
+  final Set<String> _markedGames = {};
   bool _isLoading = true;
   int _selectedIndex = 0;
   late GamepadNavigation _gamepadNav;
@@ -97,6 +103,7 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
       onNavigateLeft: _navigateLeft,
       onNavigateRight: _navigateRight,
       onSelectItem: _launchSelectedApp,
+      onFavorite: _toggleGame,
       onBack: widget.embedded ? null : _goBack,
       onPreviousTab: widget.embedded ? widget.onPreviousTab : null,
       onNextTab: widget.embedded ? widget.onNextTab : null,
@@ -261,6 +268,35 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
     }
   }
 
+  /// Y: files the focused app under "Android Games", or takes it back out.
+  ///
+  /// The app stays in this grid, badged, until the grid is left: a game lives
+  /// in the Games system and not here, but pulling the card away the instant it
+  /// is marked would leave a slip with no way to undo it. Reopening the grid
+  /// loads the list without the games.
+  Future<void> _toggleGame() async {
+    if (_apps.isEmpty || _isLaunching) return;
+    final packageName = _apps[_selectedIndex].romPath;
+    if (packageName == null) return;
+
+    final makeGame = !_markedGames.contains(packageName);
+    SfxService().playNavSound();
+    try {
+      await AndroidGamesService.setIsGame(packageName, makeGame);
+    } catch (e) {
+      _log.e('Could not update game flag for $packageName: $e');
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      makeGame
+          ? _markedGames.add(packageName)
+          : _markedGames.remove(packageName);
+    });
+    // The Games system appears with its first game and its count follows.
+    await context.read<SqliteConfigProvider>().refreshAndroidGamesSystem();
+  }
+
   /// Standard exit handler with gamepad input management.
   void _goBack() {
     if (_isNavigatingBack) return;
@@ -333,6 +369,7 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
                 AndroidAppsFooter(
                   appName: _apps.isNotEmpty ? _apps[_selectedIndex].name : '',
                   onLaunch: _launchSelectedApp,
+                  onToggleGame: _apps.isEmpty ? null : _toggleGame,
                   onBack: widget.embedded ? null : _goBack,
                   showBack: !widget.embedded,
                 ),
@@ -439,6 +476,7 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
                     height: itemHeight,
                     child: AndroidAppCard(
                       app: _apps[index],
+                      isGame: _markedGames.contains(_apps[index].romPath),
                       isSelected: _selectedIndex == index,
                       onTap: () {
                         // Touch users have no A button: tapping the app that is

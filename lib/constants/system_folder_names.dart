@@ -4,6 +4,21 @@ class SystemFolderNames {
   static const String music = 'music';
   static const String android = 'android';
 
+  /// Virtual system listing the installed apps flagged as games. Owns no rows:
+  /// its games are the `android` system's `user_roms` rows whose effective
+  /// game flag is set, so it is browsed and launched like any other system.
+  static const String androidGames = 'android_games';
+
+  /// The folder name theme and system artwork is filed under. "Android Games"
+  /// has no art of its own and shows the active theme's Android art.
+  static String artFolderName(String folderName) =>
+      folderName == androidGames ? android : folderName;
+
+  /// Whether [folderName] lists installed Android apps (launched by package
+  /// name rather than through an emulator).
+  static bool isAndroidApps(String? folderName) =>
+      folderName == android || folderName == androidGames;
+
   /// Systems the "Recursive Scan" setting cannot apply to: they own no ROM
   /// folder to walk. [all] and [favorites] aggregate games that belong to other
   /// systems, [android] lists installed apps, and [collections] lists the
@@ -22,6 +37,7 @@ class SystemFolderNames {
     all,
     favorites,
     android,
+    androidGames,
     collections,
   };
 

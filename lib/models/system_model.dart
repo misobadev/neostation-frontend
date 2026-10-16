@@ -229,13 +229,17 @@ class SystemModel {
         final filename = iconParts.last;
         if (filename.contains('-')) {
           final parts = filename.split('-');
-          return parts.sublist(0, parts.length - 1).join('-');
+          return SystemFolderNames.artFolderName(
+            parts.sublist(0, parts.length - 1).join('-'),
+          );
         }
       }
     } catch (e) {
       // ignore
     }
-    return folderName;
+    // Systems loaded from the database carry no icon path, so this is the
+    // common case. "Android Games" resolves to Android's theme art here.
+    return SystemFolderNames.artFolderName(folderName);
   }
 
   /// Creates a [SystemModel] from a JSON-compatible map.

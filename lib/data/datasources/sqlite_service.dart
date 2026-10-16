@@ -460,7 +460,14 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 168;
+  static const int _databaseVersion = 171;
+
+  /// SQL predicate (over `user_roms` aliased `ur`) for an installed app that
+  /// counts as a game: the user's override wins, else the scan's category
+  /// detection. See migration v169.
+  static const String androidGameFlagSql =
+      'COALESCE(ur.android_game_override, ur.android_is_game_category, 0) = 1';
+
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -2018,6 +2025,12 @@ class SqliteService {
         -- ScreenScraper game the user picked by hand (Identify…); NULL means
         -- match automatically. See migration v165.
         ss_manual_game_id INTEGER,
+        -- Android apps only. Override: NULL follows the scan's category
+        -- detection, 1 = user marked it a game, 0 = user marked it not a game.
+        -- See migration v169.
+        android_game_override INTEGER,
+        android_is_game_category INTEGER,
+        icon_path TEXT,
         id_ra INTEGER,
         ra_match_source TEXT,
         ra_hash_skipped TEXT,
@@ -3404,6 +3417,31 @@ class SqliteService {
   ) async {
     if (results.isEmpty) return [];
 
+    // "Android Games" owns no rows and "Android" lists only the apps that are
+    // not games, so the per-system `rom_count` subquery is wrong for both. Count
+    // the flagged apps instead. Kept out of the shared SELECTs so they never
+    // reference the v169 columns for other systems.
+    if (results.any(
+      (r) => SystemFolderNames.isAndroidApps(r['folder_name']?.toString()),
+    )) {
+      final counts = await db.rawQuery(
+        "SELECT SUM(CASE WHEN $androidGameFlagSql THEN 1 ELSE 0 END) AS games, "
+        "SUM(CASE WHEN NOT ($androidGameFlagSql) THEN 1 ELSE 0 END) AS apps "
+        "FROM user_roms ur WHERE ur.app_system_id = 'android' "
+        "AND ur.is_hidden = 0",
+      );
+      final games = int.tryParse(counts.first['games'].toString()) ?? 0;
+      final apps = int.tryParse(counts.first['apps'].toString()) ?? 0;
+      results = [
+        for (final r in results)
+          switch (r['folder_name']) {
+            SystemFolderNames.androidGames => {...r, 'rom_count': games},
+            SystemFolderNames.android => {...r, 'rom_count': apps},
+            _ => r,
+          },
+      ];
+    }
+
     // 1. Fetch all folder mappings in a single query to minimize IO overhead.
     final folderResults = await db.query('app_system_folders');
     final Map<String, List<String>> folderMap = {};
@@ -3601,8 +3639,15 @@ class SqliteService {
   static Future<int> getRomCountForSystem(String systemId) async {
     final db = await instance.database;
     final results = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM user_roms WHERE app_system_id = ?',
-      [systemId],
+      systemId == SystemFolderNames.androidGames
+          ? "SELECT COUNT(*) as count FROM user_roms ur WHERE ur.app_system_id = 'android' AND $androidGameFlagSql"
+          : systemId == SystemFolderNames.android
+          ? "SELECT COUNT(*) as count FROM user_roms ur WHERE ur.app_system_id = 'android' AND NOT ($androidGameFlagSql)"
+          : 'SELECT COUNT(*) as count FROM user_roms WHERE app_system_id = ?',
+      systemId == SystemFolderNames.androidGames ||
+              systemId == SystemFolderNames.android
+          ? []
+          : [systemId],
     );
     if (results.isEmpty) return 0;
     return int.tryParse(results.first['count']?.toString() ?? '0') ?? 0;
@@ -3617,9 +3662,16 @@ class SqliteService {
   static Future<int> getVisibleRomCountForSystem(String systemId) async {
     final db = await instance.database;
     final results = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM user_roms '
-      'WHERE app_system_id = ? AND is_hidden = 0',
-      [systemId],
+      systemId == SystemFolderNames.androidGames
+          ? "SELECT COUNT(*) as count FROM user_roms ur WHERE ur.app_system_id = 'android' AND ur.is_hidden = 0 AND $androidGameFlagSql"
+          : systemId == SystemFolderNames.android
+          ? "SELECT COUNT(*) as count FROM user_roms ur WHERE ur.app_system_id = 'android' AND ur.is_hidden = 0 AND NOT ($androidGameFlagSql)"
+          : 'SELECT COUNT(*) as count FROM user_roms '
+                'WHERE app_system_id = ? AND is_hidden = 0',
+      systemId == SystemFolderNames.androidGames ||
+              systemId == SystemFolderNames.android
+          ? []
+          : [systemId],
     );
     if (results.isEmpty) return 0;
     return int.tryParse(results.first['count']?.toString() ?? '0') ?? 0;
@@ -4510,14 +4562,22 @@ class SqliteService {
     String systemId,
   ) async {
     final db = await instance.database;
+    // "Android Games" owns no rows: it is the `android` system's apps that are
+    // flagged as games, reported under the games system so every view, launch
+    // and setting resolves against it. `s` stays the android row, which the
+    // title/description fallbacks below key on.
+    final isAndroidGames = systemId == SystemFolderNames.androidGames;
+    final isAndroidApps =
+        isAndroidGames || systemId == SystemFolderNames.android;
     final results = await db.rawQuery(
       '''
       SELECT
+        ${isAndroidApps ? "(CASE WHEN ur.app_system_id = 'android' AND $androidGameFlagSql THEN 1 ELSE 0 END) as is_android_game," : ''}
         ur.filename, ur.rom_path, ur.is_favorite, ur.is_hidden, ur.play_time, ur.last_played,
         ur.cloud_sync_enabled, ur.title_id, ur.title_name,
         ur.app_emulator_unique_id as emulator_name,
-        s.id as system_id, s.real_name as system_real_name, s.folder_name as system_folder_name,
-        s.short_name as system_short_name,
+        ${isAndroidGames ? 'g' : 's'}.id as system_id, ${isAndroidGames ? 'g' : 's'}.real_name as system_real_name, ${isAndroidGames ? 'g' : 's'}.folder_name as system_folder_name,
+        ${isAndroidGames ? 'g' : 's'}.short_name as system_short_name,
         COALESCE(usm.real_name, CASE WHEN s.folder_name IN ('android') THEN ur.title_name END, ur.filename) as game_display_name,
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
@@ -4537,8 +4597,13 @@ class SqliteService {
         usm.is_fully_scraped
       FROM user_roms ur
       JOIN app_systems s ON ur.app_system_id = s.id
+      ${isAndroidGames ? 'JOIN app_systems g ON g.id = ?' : ''}
       LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-      WHERE ur.app_system_id = ?
+      WHERE ur.app_system_id = ${isAndroidGames
+          ? "'android' AND $androidGameFlagSql"
+          : isAndroidApps
+          ? "? AND NOT ($androidGameFlagSql)"
+          : '?'}
       ORDER BY ur.is_favorite DESC, LOWER(game_display_name) ASC
 ''',
       [systemId],
@@ -5207,6 +5272,22 @@ class SqliteService {
         row['app_system_id'].toString():
             int.tryParse(row['count']?.toString() ?? '0') ?? 0,
     };
+  }
+
+  /// Sets the user's game override for an installed app: true files it under
+  /// "Android Games", false keeps it out even if the app declares itself a
+  /// game, and null returns it to following the app's own category.
+  static Future<void> setAndroidGameOverride(
+    String packageName,
+    bool? isGame,
+  ) async {
+    final db = await instance.database;
+    await db.update(
+      'user_roms',
+      {'android_game_override': isGame == null ? null : (isGame ? 1 : 0)},
+      where: "rom_path = ? AND app_system_id = 'android'",
+      whereArgs: [packageName],
+    );
   }
 
   /// Resets a game's play statistics (time and last played) to zero.

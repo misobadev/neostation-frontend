@@ -46,6 +46,10 @@ class GameModel {
   /// filtered out of every list; the row and the ROM file are left untouched.
   final bool isHidden;
 
+  /// Installed Android app that currently counts as a game. See
+  /// [DatabaseGameModel.isAndroidGame].
+  final bool isAndroidGame;
+
   /// Timestamp of the last time the game was launched.
   final DateTime? lastPlayed;
 
@@ -119,6 +123,7 @@ class GameModel {
     required this.rating,
     this.isFavorite,
     this.isHidden = false,
+    this.isAndroidGame = false,
     this.lastPlayed,
     this.playTime,
     this.romPath,
@@ -185,6 +190,7 @@ class GameModel {
       rating: db.rating ?? 0.0,
       isFavorite: db.isFavorite,
       isHidden: db.isHidden,
+      isAndroidGame: db.isAndroidGame,
       lastPlayed: db.lastPlayed,
       playTime: db.playTime,
       romPath: db.romPath,
@@ -249,6 +255,7 @@ class GameModel {
     double? rating,
     bool? isFavorite,
     bool? isHidden,
+    bool? isAndroidGame,
     DateTime? lastPlayed,
     int? playTime,
     String? romPath,
@@ -282,6 +289,7 @@ class GameModel {
       rating: rating ?? this.rating,
       isFavorite: isFavorite ?? this.isFavorite,
       isHidden: isHidden ?? this.isHidden,
+      isAndroidGame: isAndroidGame ?? this.isAndroidGame,
       lastPlayed: lastPlayed ?? this.lastPlayed,
       playTime: playTime ?? this.playTime,
       romPath: romPath ?? this.romPath,

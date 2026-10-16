@@ -20,6 +20,10 @@ class DatabaseGameModel {
   /// the database and are restored from the system settings dialog.
   final bool isHidden;
 
+  /// Installed Android app that currently counts as a game (the user's
+  /// override, else the app's own category). Only set for the `android` system.
+  final bool isAndroidGame;
+
   /// Unique identifier on RetroAchievements.org.
   final int? idRa;
 
@@ -116,6 +120,7 @@ class DatabaseGameModel {
     required this.romPath,
     this.isFavorite = false,
     this.isHidden = false,
+    this.isAndroidGame = false,
     this.idRa,
     this.systemRaId,
     this.raNumAchievements,
@@ -205,6 +210,10 @@ class DatabaseGameModel {
                   .toLowerCase() ==
               'true' ||
           (json['is_hidden'] ?? json['isHidden'] ?? 0).toString() == '1',
+      isAndroidGame:
+          (json['is_android_game'] ?? json['isAndroidGame'] ?? 0).toString() ==
+              '1' ||
+          json['isAndroidGame'] == true,
       idRa: int.tryParse((json['id_ra'] ?? json['idRa'] ?? '').toString()),
       systemRaId: (json['system_ra_id'] ?? json['systemRaId'])?.toString(),
       raNumAchievements: int.tryParse(
@@ -277,6 +286,7 @@ class DatabaseGameModel {
       'romPath': romPath,
       'isFavorite': isFavorite,
       'isHidden': isHidden,
+      'isAndroidGame': isAndroidGame,
       'idRa': idRa,
       'systemRaId': systemRaId,
       'raNumAchievements': raNumAchievements,
@@ -316,6 +326,7 @@ class DatabaseGameModel {
     String? romPath,
     bool? isFavorite,
     bool? isHidden,
+    bool? isAndroidGame,
     int? idRa,
     String? systemRaId,
     int? raNumAchievements,
@@ -351,6 +362,7 @@ class DatabaseGameModel {
       romPath: romPath ?? this.romPath,
       isFavorite: isFavorite ?? this.isFavorite,
       isHidden: isHidden ?? this.isHidden,
+      isAndroidGame: isAndroidGame ?? this.isAndroidGame,
       idRa: idRa ?? this.idRa,
       systemRaId: systemRaId ?? this.systemRaId,
       raNumAchievements: raNumAchievements ?? this.raNumAchievements,

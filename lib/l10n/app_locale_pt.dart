@@ -701,6 +701,8 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.hintSelect: 'Selecionar',
   AppLocale.hintSettings: 'Configurações',
   AppLocale.hintBack: 'Voltar',
+  AppLocale.androidGameMarkApp: 'Marcar como app',
+  AppLocale.androidGameHint: 'Jogo',
   AppLocale.hintPlay: 'Jogar',
   AppLocale.hintFavorite: 'Favorito',
   AppLocale.hintRandom: 'Aleatório',

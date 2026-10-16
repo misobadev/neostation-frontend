@@ -154,6 +154,24 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Re-evaluates the "Android Games" system after the user (un)marks an app.
+  ///
+  /// The system appears once at least one app counts as a game and disappears
+  /// with the last one, so its detected row is added or removed to match, and
+  /// the systems list is reloaded for the new count.
+  Future<void> refreshAndroidGamesSystem() async {
+    if (!Platform.isAndroid) return;
+    const id = SystemFolderNames.androidGames;
+    final games = await SystemRepository.getRomCountForSystem(id);
+    if (games > 0) {
+      await SystemRepository.addDetectedSystem(id, id);
+    } else {
+      await SystemRepository.removeDetectedSystem(id);
+    }
+    await _loadDetectedSystems();
+    _notify();
+  }
+
   /// Chooses whether Android apps are opened from Systems or their own tab.
   Future<void> updateAndroidAppsAsTab(bool value) async {
     _config = _config.copyWith(androidAppsAsTab: value);

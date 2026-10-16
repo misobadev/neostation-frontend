@@ -686,6 +686,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.hintSelect: 'Select',
   AppLocale.hintSettings: 'Settings',
   AppLocale.hintBack: 'Back',
+  AppLocale.androidGameMarkApp: 'Mark as App',
+  AppLocale.androidGameHint: 'Game',
   AppLocale.hintPlay: 'Play',
   AppLocale.hintFavorite: 'Favorite',
   AppLocale.hintRandom: 'Random',

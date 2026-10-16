@@ -374,7 +374,7 @@ extension _SecondaryDisplay on _SystemGamesListState {
           ? game.systemFolderName!
           : widget.system.id;
       final path =
-          'assets/images/logos/$sysId.webp'; // Correcting to logo fallback for grid consistency.
+          'assets/images/logos/${SystemFolderNames.artFolderName(sysId.toString())}.webp'; // Correcting to logo fallback for grid consistency.
       imageProvider = AssetImage(path);
       imagePath = path;
     }

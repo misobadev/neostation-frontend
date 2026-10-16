@@ -6,6 +6,9 @@ import 'sqlite_service.dart';
 import 'sqlite_config_service.dart';
 import '../../utils/vita_title_extractor.dart';
 import 'package:neostation/services/android_service.dart';
+import 'package:neostation/services/android_game_icon_service.dart';
+import '../../constants/system_folder_names.dart';
+import '../../utils/android_game_filter.dart';
 import 'package:neostation/services/saf_directory_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'dart:io';
@@ -161,8 +164,9 @@ class SqliteDatabaseService {
   }) async {
     final initialCount = await SqliteService.getRomCountForSystem(system.id!);
 
-    if (Platform.isAndroid && (system.folderName == 'android')) {
-      await _performAndroidSystemScan(system, system.folderName);
+    if (Platform.isAndroid &&
+        SystemFolderNames.isAndroidApps(system.folderName)) {
+      await _scanAndroidApps(system);
       final finalCount = await SqliteService.getRomCountForSystem(system.id!);
       return ScanSummary(
         added: (finalCount - initialCount).clamp(0, 999999),
@@ -1009,8 +1013,45 @@ class SqliteDatabaseService {
     return renames;
   }
 
+  /// When the installed apps were last read, and the read in flight if any.
+  /// "Android" and "Android Games" are scanned as two systems over the same
+  /// rows, so whichever runs second reuses the first one's read.
+  static DateTime? _androidScannedAt;
+  static Future<void>? _androidScanInFlight;
+  static const Duration _androidScanReuse = Duration(seconds: 30);
+
+  /// Refreshes the installed-app rows behind the "Android" system, and so
+  /// behind "Android Games", which only filters them.
+  static Future<void> _scanAndroidApps(SystemModel system) async {
+    final inFlight = _androidScanInFlight;
+    if (inFlight != null) return inFlight;
+
+    final scannedAt = _androidScannedAt;
+    if (scannedAt != null &&
+        DateTime.now().difference(scannedAt) < _androidScanReuse) {
+      return;
+    }
+
+    final androidSystem = system.folderName == SystemFolderNames.android
+        ? system
+        : await SqliteService.getSystemByFolderName(SystemFolderNames.android);
+    if (androidSystem.id == null) return;
+
+    final scan = _performAndroidSystemScan(
+      androidSystem,
+      androidSystem.folderName,
+    );
+    _androidScanInFlight = scan;
+    try {
+      await scan;
+      _androidScannedAt = DateTime.now();
+    } finally {
+      _androidScanInFlight = null;
+    }
+  }
+
   /// Performs a specialized scan of installed Android applications.
-  static Future<List<DatabaseGameModel>> _performAndroidSystemScan(
+  static Future<void> _performAndroidSystemScan(
     SystemModel system,
     String folderName,
   ) async {
@@ -1018,63 +1059,77 @@ class SqliteDatabaseService {
       final installedApps = await AndroidService.getInstalledApps(
         includeSystemApps: true,
       );
-      final List<DatabaseGameModel> scannedGames = [];
-
-      for (var app in installedApps) {
-        final String packageName = app['package'];
-        scannedGames.add(
-          DatabaseGameModel(
-            filename: packageName,
-            romPath: packageName,
-            realName: app['name'],
-            emulatorName: 'Android',
-            systemFolderName: folderName,
-            descriptions: {'en': 'Android Application'},
-          ),
-        );
-      }
+      final apps = installedApps
+          .where((app) => app['package'] is String)
+          .toList();
 
       await _cleanupOrphanedRomsOptimized(
         system.id!,
-        scannedGames.map((g) => g.romPath).toSet(),
+        apps.map((app) => app['package'] as String).toSet(),
       );
-      await _batchInsertAndroidApps(
-        system.folderName,
-        scannedGames,
-        system.id!,
-      );
-      return scannedGames;
+      await _batchInsertAndroidApps(system.folderName, apps, system.id!);
     } catch (e) {
       _log.e('Error scanning Android apps: $e');
-      return [];
     }
   }
 
   /// High-performance batch operation for registering Android applications
   /// in the ROM database.
+  ///
+  /// [apps] are the native app maps. Besides the name it records the app's own
+  /// game category, which seeds "Android Games" until the user overrides it,
+  /// and caches icons for the apps that currently count as games.
   static Future<void> _batchInsertAndroidApps(
     String folderName,
-    List<DatabaseGameModel> games,
+    List<Map<String, dynamic>> apps,
     String systemId,
   ) async {
     final db = await SqliteService.getDatabase();
-    final batch = db.batch();
 
-    for (final game in games) {
-      final List<Map<String, dynamic>> existing = await db.query(
+    // One read for every existing row instead of one per app.
+    final existing = <String, int?>{
+      for (final row in await db.query(
         'user_roms',
-        columns: ['rom_path'],
-        where: 'rom_path = ? AND app_system_id = ?',
-        whereArgs: [game.romPath, systemId],
-      );
-      if (existing.isEmpty) {
+        columns: ['rom_path', 'android_game_override'],
+        where: 'app_system_id = ?',
+        whereArgs: [systemId],
+      ))
+        row['rom_path'].toString(): row['android_game_override'] as int?,
+    };
+
+    // Emulators and frontends declare the game category too; they are not
+    // games, so they only join "Android Games" when the user says so.
+    final emulatorPackages = {
+      for (final row in await db.rawQuery(
+        'SELECT DISTINCT android_package_name FROM app_emulators '
+        "WHERE android_package_name IS NOT NULL AND android_package_name != ''",
+      ))
+        row['android_package_name'].toString(),
+    };
+
+    final batch = db.batch();
+    final gamePackages = <String>[];
+    for (final app in apps) {
+      final packageName = app['package'] as String;
+      final label = app['name']?.toString();
+      final category =
+          app['isGame'] == true &&
+              !AndroidGameFilter.isEmulatorOrFrontend(
+                packageName: packageName,
+                label: label,
+                emulatorPackages: emulatorPackages,
+              )
+          ? 1
+          : 0;
+      if (!existing.containsKey(packageName)) {
         batch.insert('user_roms', {
-          'rom_path': game.romPath,
-          'filename': game.filename,
+          'rom_path': packageName,
+          'filename': packageName,
           'virtual_folder_name': folderName,
           'app_system_id': systemId,
-          'title_name': game.realName,
-          'description': game.descriptions?['en'],
+          'title_name': label,
+          'description': 'Android Application',
+          'android_is_game_category': category,
           'is_favorite': 0,
           'play_time': 0,
         });
@@ -1082,15 +1137,37 @@ class SqliteDatabaseService {
         batch.update(
           'user_roms',
           {
-            'title_name': game.realName,
-            'description': game.descriptions?['en'],
+            'title_name': label,
+            'description': 'Android Application',
+            'android_is_game_category': category,
           },
           where: 'rom_path = ? AND app_system_id = ?',
-          whereArgs: [game.romPath, systemId],
+          whereArgs: [packageName, systemId],
         );
+      }
+      final override = existing[packageName];
+      if (override == 1 || (override == null && category == 1)) {
+        gamePackages.add(packageName);
       }
     }
     await batch.commit(noResult: true);
+
+    // Icons only for games: a library has hundreds of apps and nothing shows
+    // the rest as artwork. Marking an app as a game caches its icon then.
+    final iconBatch = db.batch();
+    var hasIcons = false;
+    for (final packageName in gamePackages) {
+      final iconPath = await AndroidGameIconService.ensureIcon(packageName);
+      if (iconPath == null) continue;
+      hasIcons = true;
+      iconBatch.update(
+        'user_roms',
+        {'icon_path': iconPath},
+        where: 'rom_path = ? AND app_system_id = ?',
+        whereArgs: [packageName, systemId],
+      );
+    }
+    if (hasIcons) await iconBatch.commit(noResult: true);
   }
 
   /// The ROM roots in [rootFoldersMap] that list no subdirectories.

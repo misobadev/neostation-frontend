@@ -1,3 +1,4 @@
+import '../constants/system_folder_names.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
@@ -850,7 +851,9 @@ class ScreenScraperService {
           romName,
           appSystemId: appSystemId,
           maxDailyRequests: 0,
-          gameName: (systemFolder == 'android') ? gameName : null,
+          gameName: SystemFolderNames.isAndroidApps(systemFolder)
+              ? gameName
+              : null,
           manualGameId: manualGameId,
         );
         if (gameInfoResult != null && gameInfoResult['gameInfo'] != null) break;
@@ -1335,7 +1338,9 @@ class ScreenScraperService {
       final manualGameId = await ScraperRepository.getManualScreenScraperGameId(
         romPath,
       );
-      var fingerprint = (systemFolder == 'android' || manualGameId != null)
+      var fingerprint =
+          (SystemFolderNames.isAndroidApps(systemFolder) ||
+              manualGameId != null)
           ? null
           : await _resolveFingerprint(
               romPath,
@@ -1351,7 +1356,9 @@ class ScreenScraperService {
         crc: fingerprint?.crc32,
         romSize: fingerprint?.sizeBytes,
         maxDailyRequests: maxDailyRequests,
-        gameName: (systemFolder == 'android') ? titleName : null,
+        gameName: SystemFolderNames.isAndroidApps(systemFolder)
+            ? titleName
+            : null,
         manualGameId: manualGameId,
       );
       var gameInfo = gameResult?['gameInfo'];
@@ -1363,7 +1370,7 @@ class ScreenScraperService {
       // still matches). A name-only retry could never succeed where that
       // request failed, so none is sent.
       if (gameInfo == null &&
-          systemFolder != 'android' &&
+          !SystemFolderNames.isAndroidApps(systemFolder) &&
           manualGameId == null &&
           fingerprint == null) {
         // The name missed and no cheap hash was available, so this is the ROM

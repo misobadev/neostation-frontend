@@ -12,12 +12,16 @@ import '../../../services/android_service.dart';
 class AndroidAppCard extends StatefulWidget {
   final GameModel app;
   final bool isSelected;
+
+  /// Marked as a game in this visit; shown with a badge.
+  final bool isGame;
   final VoidCallback onTap;
 
   const AndroidAppCard({
     super.key,
     required this.app,
     required this.isSelected,
+    this.isGame = false,
     required this.onTap,
   });
 
@@ -131,6 +135,25 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
               Symbols.android_rounded,
               size: iconSize,
               color: Colors.white,
+            ),
+          ),
+
+        // Marks an app filed under "Android Games" during this visit.
+        if (widget.isGame)
+          Positioned(
+            right: -4.r,
+            bottom: -4.r,
+            child: Container(
+              padding: EdgeInsets.all(2.r),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondary,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Symbols.sports_esports_rounded,
+                size: 10.r,
+                color: Theme.of(context).colorScheme.onSecondary,
+              ),
             ),
           ),
       ],

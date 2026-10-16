@@ -1,3 +1,4 @@
+import 'package:neostation/constants/system_folder_names.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -84,7 +85,7 @@ class ScreenScraperMatchPickerDialog extends StatefulWidget {
   /// own name is the better guess.
   @visibleForTesting
   static String initialQuery(GameModel game) {
-    final isApp = game.systemFolderName == 'android';
+    final isApp = SystemFolderNames.isAndroidApps(game.systemFolderName);
     final raw = (isApp || game.romname.isEmpty)
         ? game.name
         : _withoutExtension(game.romname, game.romPath);

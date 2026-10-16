@@ -619,6 +619,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.hintSelect: '선택',
   AppLocale.hintSettings: '설정',
   AppLocale.hintBack: '뒤로',
+  AppLocale.androidGameMarkApp: '앱으로 표시',
+  AppLocale.androidGameHint: '게임',
   AppLocale.hintPlay: '플레이',
   AppLocale.hintFavorite: '즐겨찾기',
   AppLocale.hintRandom: '무작위',

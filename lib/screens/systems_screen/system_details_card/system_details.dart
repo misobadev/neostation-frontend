@@ -1,3 +1,4 @@
+import 'package:neostation/constants/system_folder_names.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../models/system_model.dart';
@@ -207,7 +208,7 @@ class SystemDetailsState extends State<SystemDetails> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12.r),
                   child: Image.asset(
-                    'assets/images/systems/grid/${isEmptyState ? 'all' : widget.selectedSystem!.folderName}-detail-background.webp',
+                    'assets/images/systems/grid/${isEmptyState ? 'all' : SystemFolderNames.artFolderName(widget.selectedSystem!.folderName)}-detail-background.webp',
                     fit: BoxFit.fill,
                     errorBuilder: (context, error, stackTrace) =>
                         Container(color: headerColor.withValues(alpha: 0.12)),

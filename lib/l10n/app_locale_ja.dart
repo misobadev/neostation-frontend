@@ -613,6 +613,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.hintSelect: '選択',
   AppLocale.hintSettings: '設定',
   AppLocale.hintBack: '戻る',
+  AppLocale.androidGameMarkApp: 'アプリとして登録',
+  AppLocale.androidGameHint: 'ゲーム',
   AppLocale.hintPlay: 'プレイ',
   AppLocale.hintFavorite: 'お気に入り',
   AppLocale.hintRandom: 'ランダム',

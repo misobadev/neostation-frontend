@@ -379,7 +379,8 @@ class _SystemEmulatorSettingsDialogState
   /// to reach — a Hidden tab there could only ever be empty. Everything else
   /// (music included) goes through the games list, where START opens the game
   /// settings dialog.
-  bool get _systemSupportsHiding => _system.folderName != 'android';
+  bool get _systemSupportsHiding =>
+      !SystemFolderNames.isAndroidApps(_system.folderName);
 
   /// Whether the Hidden tab is offered. Kept visible whenever games *are*
   /// hidden even if the system can't hide them, so a row can never end up with
@@ -394,7 +395,7 @@ class _SystemEmulatorSettingsDialogState
     // Emulators belong to a hardware system. An aggregate library has none of
     // its own, so the tab could only ever render empty.
     if (!SystemFolderNames.isAggregate(_system.folderName) &&
-        _system.folderName != 'android')
+        !SystemFolderNames.isAndroidApps(_system.folderName))
       1,
     2,
     if (_showHiddenTab) 3,

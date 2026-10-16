@@ -1093,8 +1093,15 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                     val appInfo = activityInfo.applicationInfo 
                     val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                     
-                    // All Android apps are now treated the same
-                    val isGame = false
+                    // Declared by the app itself: the Play-assigned category on
+                    // API 26+, or the legacy flag older manifests carry. This
+                    // only seeds the "Android Games" system; the user's own
+                    // override always wins on the Dart side.
+                    @Suppress("DEPRECATION")
+                    val isGame =
+                        (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+                            appInfo.category == ApplicationInfo.CATEGORY_GAME) ||
+                            (appInfo.flags and ApplicationInfo.FLAG_IS_GAME) != 0
 
                     val label = resolveInfo.loadLabel(pm).toString()
 
