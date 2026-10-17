@@ -1476,6 +1476,16 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.wizardSaveFailedTitle: 'Настройка не завершена',
   AppLocale.wizardSaveFailedBody:
       'NeoStation не удалось сохранить настройки. Убедитесь, что хранилище доступно, и попробуйте ещё раз.\n\n{error}',
+  AppLocale.wizardRomFolderNotAdded:
+      'NeoStation не удалось добавить эту папку.\n\n{error}',
+  AppLocale.wizardRomFolderTemporary:
+      'NeoStation не сможет сохранить доступ к этой папке после перезапуска. Выберите папку в домашней папке или на съёмном носителе.',
+  AppLocale.wizardFolderNotUsable:
+      'NeoStation не может использовать эту папку. Выберите папку во внутренней памяти устройства или на SD-карте.',
+  AppLocale.wizardArtPackFailed:
+      'Не удалось загрузить System Art Pack. Попробуйте ещё раз или пока пропустите его.',
+  AppLocale.wizardScanFailed:
+      'Сканирование не завершилось. Попробуйте ещё раз или пропустите этот шаг.\n\n{error}',
 
   // Hide / unhide games
   AppLocale.hideGame: 'Скрыть игру',

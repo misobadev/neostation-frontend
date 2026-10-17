@@ -1170,6 +1170,11 @@ mixin AppLocale {
   static const String wizardArtPackUnavailable = 'wizard_art_pack_unavailable';
   static const String wizardSaveFailedTitle = 'wizard_save_failed_title';
   static const String wizardSaveFailedBody = 'wizard_save_failed_body';
+  static const String wizardRomFolderNotAdded = 'wizard_rom_folder_not_added';
+  static const String wizardRomFolderTemporary = 'wizard_rom_folder_temporary';
+  static const String wizardFolderNotUsable = 'wizard_folder_not_usable';
+  static const String wizardArtPackFailed = 'wizard_art_pack_failed';
+  static const String wizardScanFailed = 'wizard_scan_failed';
   static const String userDataLocationDefault = 'user_data_location_default';
   static const String selectUserDataFolder = 'select_user_data_folder';
   static const String folderNotEmptyTitle = 'folder_not_empty_title';

@@ -1516,6 +1516,16 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.wizardSaveFailedTitle: 'La configurazione non è terminata',
   AppLocale.wizardSaveFailedBody:
       'NeoStation non è riuscito a salvare le tue impostazioni. Verifica che la memoria sia disponibile, poi riprova.\n\n{error}',
+  AppLocale.wizardRomFolderNotAdded:
+      'NeoStation non è riuscito ad aggiungere questa cartella.\n\n{error}',
+  AppLocale.wizardRomFolderTemporary:
+      "NeoStation non può mantenere l'accesso a quella cartella dopo un riavvio. Scegli una cartella nella tua cartella home o su un supporto rimovibile.",
+  AppLocale.wizardFolderNotUsable:
+      'NeoStation non può usare questa cartella. Scegli una cartella nella memoria del dispositivo o sulla scheda SD.',
+  AppLocale.wizardArtPackFailed:
+      'Impossibile scaricare il System Art Pack. Riprova o saltalo per ora.',
+  AppLocale.wizardScanFailed:
+      'La scansione non è stata completata. Riprova o salta questo passaggio.\n\n{error}',
 
   // Hide / unhide games
   AppLocale.hideGame: 'Nascondi gioco',

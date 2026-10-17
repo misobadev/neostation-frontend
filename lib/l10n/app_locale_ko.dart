@@ -1326,6 +1326,14 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.wizardSaveFailedTitle: '설정을 완료하지 못했습니다',
   AppLocale.wizardSaveFailedBody:
       'NeoStation이 설정을 저장하지 못했습니다. 저장소를 사용할 수 있는지 확인한 후 다시 시도하세요.\n\n{error}',
+  AppLocale.wizardRomFolderNotAdded: 'NeoStation이 이 폴더를 추가하지 못했습니다.\n\n{error}',
+  AppLocale.wizardRomFolderTemporary:
+      'NeoStation은 다시 시작한 후에는 이 폴더에 계속 접근할 수 없습니다. 홈 폴더 안이나 이동식 미디어의 폴더를 선택하세요.',
+  AppLocale.wizardFolderNotUsable:
+      'NeoStation이 이 폴더를 사용할 수 없습니다. 기기 저장소나 SD 카드의 폴더를 선택하세요.',
+  AppLocale.wizardArtPackFailed:
+      'System Art Pack을 다운로드하지 못했습니다. 다시 시도하거나 나중에 하세요.',
+  AppLocale.wizardScanFailed: '스캔을 마치지 못했습니다. 다시 시도하거나 이 단계를 건너뛰세요.\n\n{error}',
 
   // Library search & filtering.
   AppLocale.searchTitle: '검색',

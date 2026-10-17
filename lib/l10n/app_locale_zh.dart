@@ -1296,6 +1296,12 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.wizardSaveFailedTitle: '设置尚未完成',
   AppLocale.wizardSaveFailedBody:
       'NeoStation 无法保存你的设置。请确认存储可用，然后重试。\n\n{error}',
+  AppLocale.wizardRomFolderNotAdded: 'NeoStation 无法添加此文件夹。\n\n{error}',
+  AppLocale.wizardRomFolderTemporary:
+      'NeoStation 重启后无法继续访问该文件夹。请选择主文件夹内或可移动介质上的文件夹。',
+  AppLocale.wizardFolderNotUsable: 'NeoStation 无法使用此文件夹。请选择设备存储或 SD 卡上的文件夹。',
+  AppLocale.wizardArtPackFailed: '无法下载 System Art Pack。请重试，或暂时跳过。',
+  AppLocale.wizardScanFailed: '扫描未完成。请重试，或跳过此步骤。\n\n{error}',
 
   // Hide / unhide games
   AppLocale.hideGame: '隐藏游戏',

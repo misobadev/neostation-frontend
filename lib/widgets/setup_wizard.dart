@@ -22,6 +22,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import '../widgets/tv_directory_picker.dart';
 import '../widgets/folder_not_empty_dialog.dart';
 import '../widgets/info_dialog.dart';
+import '../utils/rom_folder_path.dart';
 import 'core_footer.dart';
 import '../models/secondary_display_state.dart';
 
@@ -196,7 +197,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             context,
             listen: false,
           );
-          if (provider.scanCompleted) _handleMainAction();
+          if (provider.scanCompleted || _scanFailed(provider)) {
+            _handleMainAction();
+          }
         } else {
           // Every step — including the final art-pack one — goes through the
           // same primary action as the on-screen button. Shortcutting the last
@@ -280,6 +283,18 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   }
 
   void _handleSkip() {
+    // A running ES-DE import reports its outcome on this step, and a running
+    // art pack download finishes setup itself.
+    if (_isImportingEsde || _isDownloadingArt) return;
+
+    // A scan that stopped with an error can be skipped (the library is scanned
+    // again on the next start, or from Settings).
+    if (_currentStep == _stepScanning) {
+      if (_scanFailed(context.read<SqliteConfigProvider>())) {
+        setState(() => _currentStep = _stepEsde);
+      }
+      return;
+    }
     // Permissions step: neither grant is a hard requirement. ROM access goes
     // through SAF, and UserDataLocationService already falls back to the
     // app-specific external dir without All-Files access. The skip is
@@ -292,14 +307,17 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     }
 
     if (_currentStep == _stepFolder) {
-      // Skip folder selection → Advance to Scanning step.
-      setState(() => _currentStep = _stepScanning);
-
       // Start initial scan to detect available systems (e.g., Android apps).
       final provider = Provider.of<SqliteConfigProvider>(
         context,
         listen: false,
       );
+      // A leftover error (say, from a folder that couldn't be added) would
+      // read as a failed scan until the scan starts.
+      provider.clearError();
+      // Skip folder selection → Advance to Scanning step.
+      setState(() => _currentStep = _stepScanning);
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         provider.scanSystems();
       });
@@ -808,21 +826,59 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     );
   }
 
-  void _showUserDataNotWritable() {
+  /// Shows [body] under [title] on screen.
+  ///
+  /// The app's header, and with it the notification bell, isn't shown during
+  /// setup, so a message the user needs has to appear here. The wizard's
+  /// navigation isn't a manager layer, so it is paused while the dialogue is
+  /// open (or a press on it would also press the wizard's buttons), and only
+  /// resumed if it was running: a flow that paused it resumes it itself.
+  Future<void> _showWizardMessage(
+    String title,
+    String body, {
+    IconData icon = Symbols.error_rounded,
+  }) async {
+    if (!mounted) return;
+    final wasActive = _gamepadNav?.isActive ?? false;
+    _gamepadNav?.deactivate();
+    try {
+      await InfoDialog.show(
+        context,
+        title: title,
+        body: body,
+        okLabel: AppLocale.ok.getString(context),
+        icon: icon,
+      );
+    } finally {
+      if (mounted && wasActive) _gamepadNav?.activate();
+    }
+  }
+
+  String _userDataNotWritableMessage() {
     var message = AppLocale.userDataFolderNotWritable.getString(context);
     if (Platform.isAndroid) {
       message +=
           '\n${AppLocale.userDataFolderGrantAllFiles.getString(context)}';
     }
-    GlobalNotificationService().show(
-      id: 'wizard_user_data_not_writable',
-      message: message,
-      type: GlobalNotificationType.error,
-    );
+    return message;
   }
 
-  /// Opens a folder picker, saves the new user-data path, and reinitializes the DB.
+  /// Opens a folder picker, saves the new user-data path, and reinitialises
+  /// the DB, then shows on screen why a picked folder can't be used.
   Future<void> _selectUserDataLocationWizard() async {
+    final problem = await _changeUserDataLocation();
+    if (problem != null && mounted) {
+      await _showWizardMessage(
+        AppLocale.userDataLocation.getString(context),
+        problem,
+      );
+    }
+  }
+
+  /// [_selectUserDataLocationWizard]'s work: answers why the picked folder
+  /// can't be used, or null.
+  Future<String?> _changeUserDataLocation() async {
+    String? problem;
     setState(() => _isSelectingUserDataFolder = true);
     _gamepadNav?.deactivate();
 
@@ -842,6 +898,10 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               selected = UserDataLocationService.safUriToRealPath(
                 uri.toString(),
               );
+              // A folder from another provider has no path SQLite can open.
+              if (selected == null && mounted) {
+                problem = AppLocale.wizardFolderNotUsable.getString(context);
+              }
             }
           } on PlatformException catch (e) {
             if (e.code == 'PICKER_FAILED' && mounted) {
@@ -857,14 +917,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
         );
       }
 
-      if (selected == null || !mounted) return;
+      if (selected == null || !mounted) return problem;
 
       // Normalize trailing separator.
       if (selected.endsWith(Platform.pathSeparator)) {
         selected = selected.substring(0, selected.length - 1);
       }
 
-      if (selected == _selectedUserDataPath) return;
+      if (selected == _selectedUserDataPath) return problem;
 
       // Refuse a folder the database can't be created in. On Android this
       // step runs before the permissions step, so without All-Files access a
@@ -872,8 +932,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       // written. Saving it anyway left SQLite failing with code 14 on every
       // launch, stuck on an empty library.
       if (!await UserDataLocationService.canWriteDirectory(selected)) {
-        if (mounted) _showUserDataNotWritable();
-        return;
+        if (mounted) problem = _userDataNotWritableMessage();
+        return problem;
       }
 
       // Warn if the chosen folder already contains files, so the user doesn't
@@ -881,21 +941,21 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       final entryCount = await UserDataLocationService.countDirectoryEntries(
         selected,
       );
-      if (!mounted) return;
+      if (!mounted) return problem;
       if (entryCount > 0) {
         final proceed = await FolderNotEmptyDialog.show(
           context,
           path: selected,
           itemCount: entryCount,
         );
-        if (!proceed || !mounted) return;
+        if (!proceed || !mounted) return problem;
       }
 
       final previousCustomPath = await UserDataLocationService.getCustomPath();
       await UserDataLocationService.setCustomPath(selected);
 
       // Reinitialize the DB at the new path (no data yet on first launch).
-      if (!mounted) return;
+      if (!mounted) return problem;
       final configProvider = Provider.of<SqliteConfigProvider>(
         context,
         listen: false,
@@ -918,7 +978,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           await UserDataLocationService.clearCustomPath();
         }
         await configProvider.reinitialize();
-        if (mounted) _showUserDataNotWritable();
+        if (mounted) problem = _userDataNotWritableMessage();
         selected = await ConfigService.getUserDataPath();
       }
 
@@ -927,7 +987,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       // Without this the art pack downloaded on the final step lands in the
       // folder the app started in, and is gone on the next launch even though
       // System Art still shows the pack as applied.
-      if (!mounted) return;
+      if (!mounted) return problem;
       await context.read<NeoAssetsProvider>().reinitialize();
 
       if (mounted) setState(() => _selectedUserDataPath = selected);
@@ -937,6 +997,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       if (mounted) setState(() => _isSelectingUserDataFolder = false);
       _gamepadNav?.activate();
     }
+    return problem;
   }
 
   /// Combined permissions step: All-Files (storage) access plus the optional
@@ -1111,6 +1172,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     );
   }
 
+  /// Whether the scan this step started stopped with an error. Without this
+  /// the step waited for a completion that never came: Next stayed disabled
+  /// and B did nothing.
+  bool _scanFailed(SqliteConfigProvider provider) =>
+      !provider.isScanning && !provider.scanCompleted && provider.error != null;
+
   Widget _buildScanningStep(ThemeData theme) {
     final orientation = MediaQuery.of(context).orientation;
     final isLandscape = orientation == Orientation.landscape;
@@ -1121,6 +1188,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
     return Consumer<SqliteConfigProvider>(
       builder: (context, provider, child) {
+        final failed = _scanFailed(provider);
         return SingleChildScrollView(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1138,6 +1206,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                       ? Icon(
                           Symbols.check_circle_rounded,
                           color: Colors.green,
+                          size: iconSize,
+                        )
+                      : failed
+                      ? Icon(
+                          Symbols.error_rounded,
+                          color: theme.colorScheme.error,
                           size: iconSize,
                         )
                       : SizedBox(
@@ -1165,12 +1239,21 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               SizedBox(height: isLandscape ? 4.r : 16.r),
 
               Text(
-                provider.scanStatus.isNotEmpty
+                failed
+                    ? AppLocale.wizardScanFailed
+                          .getString(context)
+                          .replaceFirst(
+                            '{error}',
+                            provider.error!.split('\n').first,
+                          )
+                    : provider.scanStatus.isNotEmpty
                     ? provider.scanStatus
                     : AppLocale.scanningSystemsRoms.getString(context),
                 style: TextStyle(
                   fontSize: textSize,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: failed
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.7),
                   height: 1.3,
                 ),
                 textAlign: TextAlign.center,
@@ -1178,7 +1261,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
               // Progress bar
               if (provider.totalSystemsToScan > 0 &&
-                  !provider.scanCompleted) ...[
+                  !provider.scanCompleted &&
+                  !failed) ...[
                 SizedBox(height: isLandscape ? 4.r : 32.r),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8.r),
@@ -1523,6 +1607,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     // Pick the ES-DE root folder (platform-branched, mirrors the Directories
     // settings picker).
     String? selected;
+    // A folder from another provider has no path the import can read.
+    var unusable = false;
     _gamepadNav?.deactivate();
     try {
       if (Platform.isAndroid) {
@@ -1542,6 +1628,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     hasAllFilesAccess: hasFiles,
                   ) ??
                   UserDataLocationService.safUriToRealPath(uriStr);
+              unusable = selected == null;
             }
           } on PlatformException catch (e) {
             if (e.code == 'PICKER_FAILED' && mounted) {
@@ -1559,7 +1646,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       _gamepadNav?.activate();
     }
 
-    if (selected == null || !mounted) return;
+    if (selected == null || !mounted) {
+      if (unusable && mounted) {
+        await _showWizardMessage(
+          AppLocale.wizardEsdeStepTitle.getString(context),
+          AppLocale.wizardFolderNotUsable.getString(context),
+        );
+      }
+      return;
+    }
     if (selected.endsWith(Platform.pathSeparator)) {
       selected = selected.substring(0, selected.length - 1);
     }
@@ -1586,6 +1681,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     final localeErrorConfiguringPath = AppLocale.errorConfiguringPath.getString(
       context,
     );
+    final localeEsdeTitle = AppLocale.wizardEsdeStepTitle.getString(context);
 
     try {
       await context.read<SqliteConfigProvider>().updateEsdeFolderPath(selected);
@@ -1595,6 +1691,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
         id: 'wizard_esde_folder_error',
         message: localeErrorConfiguringPath.replaceFirst('{error}', '$e'),
         type: GlobalNotificationType.error,
+      );
+      // The bell isn't on screen during setup.
+      await _showWizardMessage(
+        localeEsdeTitle,
+        localeErrorConfiguringPath.replaceFirst(
+          '{error}',
+          '$e'.split('\n').first,
+        ),
       );
       return;
     }
@@ -1666,6 +1770,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
         type: GlobalNotificationType.error,
         progress: null,
       );
+      // The bell above is the record; it isn't on screen during setup.
+      await _showWizardMessage(localeEsdeTitle, error);
     } else if (result != null && !result.gamelistsDirFound) {
       GlobalNotificationService().update(
         id: notificationId,
@@ -1673,12 +1779,18 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
         type: GlobalNotificationType.error,
         progress: null,
       );
+      await _showWizardMessage(localeEsdeTitle, localeEsdeImportNotEsdeFolder);
     } else if (!matched) {
       GlobalNotificationService().update(
         id: notificationId,
         message: localeEsdeImportNothingFound,
         type: GlobalNotificationType.info,
         progress: null,
+      );
+      await _showWizardMessage(
+        localeEsdeTitle,
+        localeEsdeImportNothingFound,
+        icon: Symbols.info_rounded,
       );
     } else {
       final importResult = result;
@@ -1736,6 +1848,10 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     // with nothing said about it.
     if (!applied) {
       _log.w('Art pack was not applied; staying on the wizard art-pack step');
+      await _showWizardMessage(
+        AppLocale.wizardArtPackTitle.getString(context),
+        AppLocale.wizardArtPackFailed.getString(context),
+      );
       return;
     }
 
@@ -1751,14 +1867,26 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     if (isInScanningStep) {
       return Consumer<SqliteConfigProvider>(
         builder: (context, provider, child) {
+          final failed = _scanFailed(provider);
           return Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisAlignment: failed
+                ? MainAxisAlignment.spaceBetween
+                : MainAxisAlignment.end,
             children: [
-              // Next button only when scan completes
+              if (failed)
+                GamepadControl(
+                  iconPath: 'assets/images/gamepad/Xbox_B_button.png',
+                  label: AppLocale.skipForNow.getString(context),
+                  onTap: () => _handleSkip(),
+                  textColor: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              // Next once the scan completes; Retry if it stopped with an error
               GamepadControl(
                 iconPath: 'assets/images/gamepad/Xbox_A_button.png',
-                label: AppLocale.next.getString(context),
-                onTap: provider.scanCompleted
+                label: failed
+                    ? AppLocale.retry.getString(context)
+                    : AppLocale.next.getString(context),
+                onTap: provider.scanCompleted || failed
                     ? () => _handleMainAction()
                     : null,
                 backgroundColor: theme.colorScheme.primary,
@@ -1802,7 +1930,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               GamepadControl(
                 iconPath: 'assets/images/gamepad/Xbox_B_button.png',
                 label: AppLocale.skipForNow.getString(context),
-                onTap: () => _handleSkip(),
+                onTap: _isImportingEsde || _isDownloadingArt
+                    ? null
+                    : () => _handleSkip(),
                 textColor: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               )
             else
@@ -1899,6 +2029,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     }
 
     if (_currentStep == _stepScanning) {
+      final provider = context.read<SqliteConfigProvider>();
+      if (_scanFailed(provider)) {
+        // The scan stopped with an error: try it again.
+        provider.scanSystems();
+        return;
+      }
       // Scan finished → advance to the optional ES-DE import step.
       setState(() => _currentStep = _stepEsde);
       return;
@@ -1986,6 +2122,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     });
     _gamepadNav?.deactivate();
 
+    // Why a picked folder wasn't added, shown once the picker has closed.
+    String? problem;
     try {
       final configProvider = Provider.of<SqliteConfigProvider>(
         context,
@@ -2009,19 +2147,49 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             }
           }
         }
-
-        if (result != null && mounted) {
-          await configProvider.addRomFolder(result, scan: false);
-        }
-      } else {
-        await configProvider.selectRomFolder(scan: false, context: context);
-        // Provider already called addRomFolder internally; read back the path
-        result = configProvider.config.romFolder;
+      } else if (mounted) {
+        // Desktop: the platform picker, falling back to the in-app browser
+        // where no XDG portal backend exists (SteamOS Game Mode). Picked here
+        // rather than through the provider so the wizard knows which folder
+        // was picked, and can tell a cancelled pick from one that failed.
+        result = await TvDirectoryPicker.pickDirectory(
+          context,
+          dialogTitle: AppLocale.selectRomFolder.getString(context),
+        );
       }
 
-      if (result != null && mounted) {
+      final folders = configProvider.config.romFolders;
+      // A library the user-data step opened can already have folders: a
+      // cancelled pick (desktop has no Skip on this step) or a full list
+      // moves on with them, as before.
+      var keepFolders =
+          result == null && folders.isNotEmpty && !Platform.isAndroid;
+      if (result != null && mounted && !folders.contains(result)) {
+        // addRomFolder refuses these, and reports a failed save, only through
+        // the provider's error and the notification bell.
+        if (folders.length >= 5) {
+          problem = AppLocale.maxRomFoldersReached.getString(context);
+          keepFolders = true;
+        } else if (isTransientPortalPath(result)) {
+          problem = AppLocale.wizardRomFolderTemporary.getString(context);
+        } else {
+          final notAdded = AppLocale.wizardRomFolderNotAdded.getString(context);
+          configProvider.clearError();
+          await configProvider.addRomFolder(result, scan: false);
+          if (!configProvider.config.romFolders.contains(result)) {
+            final reason = (configProvider.error ?? '').split('\n').first;
+            problem = notAdded.replaceFirst('{error}', reason).trim();
+          }
+        }
+      }
+
+      final added =
+          result != null && configProvider.config.romFolders.contains(result);
+      if (mounted && (added || keepFolders)) {
+        // A leftover error would read as a failed scan until the scan starts.
+        configProvider.clearError();
         setState(() {
-          _selectedFolder = result;
+          _selectedFolder = added ? result : folders.first;
           _isSelectingFolder = false;
           _currentStep++;
         });
@@ -2042,6 +2210,13 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       }
     } finally {
       _gamepadNav?.activate();
+    }
+
+    if (problem != null && mounted) {
+      await _showWizardMessage(
+        AppLocale.selectRomFolder.getString(context),
+        problem,
+      );
     }
   }
 

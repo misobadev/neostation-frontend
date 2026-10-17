@@ -1298,6 +1298,12 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.wizardSaveFailedTitle: '設定尚未完成',
   AppLocale.wizardSaveFailedBody:
       'NeoStation 無法儲存你的設定。請確認儲存空間可用，然後重試。\n\n{error}',
+  AppLocale.wizardRomFolderNotAdded: 'NeoStation 無法新增此資料夾。\n\n{error}',
+  AppLocale.wizardRomFolderTemporary:
+      'NeoStation 重新啟動後無法繼續存取該資料夾。請選擇主資料夾內或卸除式媒體上的資料夾。',
+  AppLocale.wizardFolderNotUsable: 'NeoStation 無法使用此資料夾。請選擇裝置儲存空間或 SD 卡上的資料夾。',
+  AppLocale.wizardArtPackFailed: '無法下載 System Art Pack。請重試，或暫時跳過。',
+  AppLocale.wizardScanFailed: '掃描未完成。請重試，或跳過此步驟。\n\n{error}',
 
   // Hide / unhide games
   AppLocale.hideGame: '隱藏遊戲',

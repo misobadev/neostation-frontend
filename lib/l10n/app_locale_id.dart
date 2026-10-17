@@ -1482,6 +1482,16 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.wizardSaveFailedTitle: 'Penyiapan belum selesai',
   AppLocale.wizardSaveFailedBody:
       'NeoStation tidak dapat menyimpan pengaturan Anda. Pastikan penyimpanan Anda tersedia, lalu coba lagi.\n\n{error}',
+  AppLocale.wizardRomFolderNotAdded:
+      'NeoStation tidak dapat menambahkan folder ini.\n\n{error}',
+  AppLocale.wizardRomFolderTemporary:
+      'NeoStation tidak dapat mempertahankan akses ke folder itu setelah dimulai ulang. Pilih folder di dalam folder home Anda atau di media yang dapat dilepas.',
+  AppLocale.wizardFolderNotUsable:
+      'NeoStation tidak dapat menggunakan folder ini. Pilih folder di penyimpanan perangkat atau kartu SD.',
+  AppLocale.wizardArtPackFailed:
+      'System Art Pack tidak dapat diunduh. Coba lagi, atau lewati untuk sekarang.',
+  AppLocale.wizardScanFailed:
+      'Pemindaian tidak selesai. Coba lagi, atau lewati langkah ini.\n\n{error}',
 
   // Hide / unhide games
   AppLocale.hideGame: 'Sembunyikan Game',
