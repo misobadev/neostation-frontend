@@ -156,22 +156,33 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
     _log.i('CustomSaveFolder: picker start for $system / $emulatorSlug');
     try {
       String? selected;
-      final isTV = await PermissionService.isTelevision();
-      if (!mounted) return;
+      if (Platform.isAndroid) {
+        final isTV = await PermissionService.isTelevision();
+        if (!mounted) return;
 
-      if (isTV) {
-        selected = await TvDirectoryPicker.show(context);
-      } else {
-        final uri = await PermissionService.requestFolderAccess();
-        if (uri != null) {
-          final hasFiles = await PermissionService.hasAllFilesAccess();
-          selected =
-              await UserDataLocationService.resolveAndroidUserDataPath(
-                uri.toString(),
-                hasAllFilesAccess: hasFiles,
-              ) ??
-              UserDataLocationService.safUriToRealPath(uri.toString());
+        if (isTV) {
+          selected = await TvDirectoryPicker.show(context);
+        } else {
+          final uri = await PermissionService.requestFolderAccess();
+          if (uri != null) {
+            final hasFiles = await PermissionService.hasAllFilesAccess();
+            selected =
+                await UserDataLocationService.resolveAndroidUserDataPath(
+                  uri.toString(),
+                  hasAllFilesAccess: hasFiles,
+                ) ??
+                UserDataLocationService.safUriToRealPath(uri.toString());
+          }
         }
+      } else {
+        // Desktop: the SAF picker above is Android-only and returns null
+        // elsewhere, which closed the dialog without opening anything (#609).
+        // pickDirectory falls back to the in-app browser where no XDG portal
+        // exists (SteamOS Game Mode).
+        selected = await TvDirectoryPicker.pickDirectory(
+          context,
+          dialogTitle: AppLocale.selectFolder.getString(context),
+        );
       }
 
       if (selected == null || !mounted) return;
