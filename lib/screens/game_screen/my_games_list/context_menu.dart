@@ -81,7 +81,9 @@ extension _ContextMenu on _SystemGamesListState {
           return applied;
         },
       ),
-      for (final collection in collectionsProvider.collections)
+      for (final collection in collectionsProvider.collections.where(
+        (c) => !c.isSmart,
+      ))
         GameContextMenuTarget(
           id: '${SystemFolderNames.collectionPrefix}${collection.id}',
           label: collection.name,
@@ -137,7 +139,8 @@ extension _ContextMenu on _SystemGamesListState {
     // A reload rebuilds the list from the database in load order, which seats
     // everything correctly on its own — so the held moves are only owed when
     // there is no reload coming.
-    if (reloadWhenClosed) {
+    if (reloadWhenClosed || _pendingCollectionRefresh) {
+      _pendingCollectionRefresh = false;
       _pendingFavoriteReseats.clear();
       await _loadGames();
       return;

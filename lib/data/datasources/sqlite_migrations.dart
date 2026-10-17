@@ -144,6 +144,8 @@ class SqliteMigrations {
     CREATE TABLE IF NOT EXISTS user_collections (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      collection_type TEXT NOT NULL DEFAULT 'manual',
+      rules_json TEXT,
       image_path TEXT,
       color1 TEXT,
       color2 TEXT,
@@ -638,6 +640,9 @@ class SqliteMigrations {
         break;
       case 168:
         await _migrateToVersion168(db);
+        break;
+      case 170:
+        await _migrateToVersion170(db);
         break;
       default:
         _log.w('No migration defined for version $version');
@@ -7195,6 +7200,30 @@ class SqliteMigrations {
       _log.e('Error in migration v163: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
+    }
+  }
+
+  /// Migration v170: adds smart definitions without changing manual memberships.
+  /// Above main’s v168 and the Android Games PR’s v169; devices already on
+  /// main must still run this migration to install smart definitions.
+  static Future<void> _migrateToVersion170(Database db) async {
+    // Test devices on the smart collections branch already ran its former
+    // v163 and therefore skipped upstream's RomM migration at that version.
+    await _migrateToVersion163(db);
+    // All three collection objects, not just the table: a database that
+    // skipped v139 would otherwise lack the items table and its index.
+    await _migrateToVersion139(db);
+    final columns = db
+        .select('PRAGMA table_info(user_collections)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('collection_type')) {
+      db.execute(
+        "ALTER TABLE user_collections ADD COLUMN collection_type TEXT NOT NULL DEFAULT 'manual'",
+      );
+    }
+    if (!columns.contains('rules_json')) {
+      db.execute('ALTER TABLE user_collections ADD COLUMN rules_json TEXT');
     }
   }
 

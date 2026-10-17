@@ -391,6 +391,39 @@ class _SystemGamesListState extends State<SystemGamesList> {
   late SqliteDatabaseProvider _databaseProvider;
   late ScrapingProvider _scrapingProvider;
   int _lastArtworkRevision = 0;
+  late CollectionsProvider _collectionsProvider;
+  int _lastCollectionRevision = 0;
+  bool _pendingCollectionRefresh = false;
+
+  bool _collectionLoadFailed = false;
+
+  int get _currentCollectionRevision => _collectionsProvider.collectionRevision(
+    SystemFolderNames.collectionIdOf(widget.system.folderName) ?? '',
+  );
+
+  /// The provider's evaluated matches when this list is a smart collection,
+  /// so opening or reloading it skips re-evaluating the whole library.
+  Set<String>? get _smartCollectionPaths {
+    final id = SystemFolderNames.collectionIdOf(widget.system.folderName);
+    return id == null ? null : _collectionsProvider.smartPathsFor(id);
+  }
+
+  void _onCollectionsUpdated() {
+    if (_lastCollectionRevision == _currentCollectionRevision) return;
+    _lastCollectionRevision = _currentCollectionRevision;
+    // The list is emptied to free RAM during gameplay and reloaded on return;
+    // refilling it now would undo that.
+    if (SystemFolderNames.isCollection(widget.system.folderName) &&
+        mounted &&
+        !_isNavigatingBack &&
+        !_isGameLaunching) {
+      if (_deferFavoriteReseat) {
+        _pendingCollectionRefresh = true;
+      } else {
+        _loadGames();
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -407,6 +440,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
     );
 
     // Attach persistent listeners to global providers.
+    _collectionsProvider = context.read<CollectionsProvider>();
+    _lastCollectionRevision = _currentCollectionRevision;
+    _collectionsProvider.addListener(_onCollectionsUpdated);
+    if (SystemFolderNames.isCollection(widget.system.folderName)) {
+      _collectionsProvider.load();
+    }
     _databaseProvider = context.read<SqliteDatabaseProvider>();
     _databaseProvider.addListener(_onDatabaseUpdated);
 
@@ -506,6 +545,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
   @override
   void dispose() {
     // Detach listeners before disposal.
+    _collectionsProvider.removeListener(_onCollectionsUpdated);
     _configProvider.removeListener(_onConfigChanged);
     _databaseProvider.removeListener(_onDatabaseUpdated);
     _scrapingProvider.removeListener(_onScrapingUpdated);
@@ -1031,6 +1071,12 @@ class _SystemGamesListState extends State<SystemGamesList> {
     final isAggregateView = SystemFolderNames.isAggregate(
       widget.system.folderName,
     );
+    final collectionId = SystemFolderNames.collectionIdOf(
+      widget.system.folderName,
+    );
+    final collection = collectionId == null
+        ? null
+        : _collectionsProvider.byId(collectionId);
 
     return Center(
       child: Container(
@@ -1090,7 +1136,13 @@ class _SystemGamesListState extends State<SystemGamesList> {
             ),
             SizedBox(height: 4.r),
             Text(
-              (SystemFolderNames.isCollection(widget.system.folderName)
+              (_collectionLoadFailed
+                      ? AppLocale.collectionLoadError
+                      : collection?.rulesInvalid == true
+                      ? AppLocale.smartInvalidRules
+                      : collection?.isSmart == true
+                      ? AppLocale.smartNoMatches
+                      : SystemFolderNames.isCollection(widget.system.folderName)
                       ? AppLocale.emptyCollection
                       : AppLocale.checkRomFiles)
                   .getString(context),
@@ -1961,6 +2013,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// The DB toggle already happened in the card; mirror it into _games. The
   /// game keeps its position until the list is reloaded.
   void _handleFavoriteToggledFromCard() {
+    _collectionsProvider.load();
     _applyFavoriteToLoadedList();
   }
 
@@ -1972,6 +2025,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// Called after a game is permanently deleted. Removes it from the list and
   /// selects the previous game (or the next one if at the start).
   void _handleGameDeleted(String romname) {
+    _collectionsProvider.load();
     if (_games.isEmpty) return;
 
     _resetVideoState();
@@ -2007,6 +2061,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
   /// Synchronizes the selected game's metadata and refreshes the list sorting.
   Future<void> _handleGameUpdated() async {
+    _collectionsProvider.load();
     if (_selectedGame == null) return;
 
     try {

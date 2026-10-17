@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
+import '../models/smart_collection_rules.dart';
+import '../models/database_game_model.dart';
+import '../services/collections/smart_collections_service.dart';
 
 import '../models/collection_model.dart';
 import '../models/game_model.dart';
@@ -9,19 +14,157 @@ import '../services/collections/collections_service.dart';
 /// Two consumers depend on being notified: the systems carousel/grid (the
 /// Collections card's game count) and the collections browser screen.
 ///
-/// Every mutation writes through [CollectionsService] and then re-reads the
-/// list, so the game counts stay honest without a second query per collection —
-/// the listing query already computes them in one `GROUP BY`.
+/// Every mutation writes through [CollectionsService] and then re-reads a
+/// [CollectionsSnapshot]: manual counts come from the stored memberships and
+/// smart counts from evaluating each collection's rules off the UI isolate.
+/// The evaluated paths are kept so an open smart collection loads only its
+/// matched rows instead of re-evaluating the library.
 ///
 /// Nothing here is static. `subDisplay()` runs a second Flutter engine that
 /// shares the SQLite file and nothing in memory, so a process-wide cache would
 /// go stale the moment either engine wrote (CLAUDE.md, dual-display devices).
-class CollectionsProvider extends ChangeNotifier {
+class CollectionsProvider extends ChangeNotifier with WidgetsBindingObserver {
+  /// [isBusy] reports a long-running writer (a scrape) whose notifications
+  /// would otherwise each trigger a library re-evaluation; while it is true
+  /// refreshes are throttled to [_busyRefreshInterval] instead of 300 ms.
+  CollectionsProvider({
+    List<ChangeNotifier> sources = const [],
+    bool Function()? isBusy,
+    Future<CollectionsSnapshot> Function()? readSnapshot,
+  }) : _sources = sources,
+       _isBusy = isBusy,
+       _snapshotReader = readSnapshot {
+    WidgetsBinding.instance.addObserver(this);
+    for (final source in _sources) {
+      source.addListener(_scheduleRefresh);
+    }
+  }
+
+  static const _busyRefreshInterval = Duration(seconds: 10);
+
+  final _snapshotCache = SmartCollectionSnapshotCache();
+  final Future<CollectionsSnapshot> Function()? _snapshotReader;
+  final Map<String, int> _collectionRevisions = {};
+  Map<String, Set<String>> _collectionPaths = const {};
+  Map<String, int> _gameHashes = const {};
+  int collectionRevision(String id) => _collectionRevisions[id] ?? 0;
+
+  /// The evaluated matches of smart collection [id], or null when they are
+  /// not known yet (or [id] is manual), in which case the caller evaluates.
+  Set<String>? smartPathsFor(String id) {
+    final collection = byId(id);
+    if (!_hasLoaded || collection == null || !collection.isSmart) return null;
+    return _collectionPaths[id] ?? const {};
+  }
+
+  final List<ChangeNotifier> _sources;
+  final bool Function()? _isBusy;
+  bool _wasBusy = false;
+  Timer? _debounce;
+  Timer? _boundaryTimer;
+  Timer? _retryTimer;
+  bool _disposed = false;
+  bool _pending = false;
+  Future<void>? _loadFuture;
+  int _revision = 0;
+  int get revision => _revision;
+
+  void _scheduleRefresh() {
+    final busy = _isBusy?.call() ?? false;
+    // Leave a pending throttled refresh alone so a steady stream of
+    // notifications cannot keep pushing it back; the busy->idle edge below
+    // still refreshes promptly once the work finishes.
+    if (busy && _wasBusy && (_debounce?.isActive ?? false)) return;
+    _wasBusy = busy;
+    _debounce?.cancel();
+    _debounce = Timer(
+      busy ? _busyRefreshInterval : const Duration(milliseconds: 300),
+      () => load(),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) load();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _debounce?.cancel();
+    _boundaryTimer?.cancel();
+    _retryTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    for (final source in _sources) {
+      source.removeListener(_scheduleRefresh);
+    }
+    super.dispose();
+  }
+
+  Future<bool> _readSnapshot() async {
+    final snapshot = await (_snapshotReader ?? _snapshotCache.snapshot)();
+    if (_disposed) return false;
+    var changed = false;
+    for (final collection in snapshot.collections) {
+      final old = byId(collection.id);
+      final paths = snapshot.collectionPaths[collection.id] ?? const <String>{};
+      final contentChanged =
+          collection.isSmart &&
+          paths.any((path) => snapshot.gameHashes[path] != _gameHashes[path]);
+      if (old != collection ||
+          contentChanged ||
+          !setEquals(
+            _collectionPaths[collection.id],
+            snapshot.collectionPaths[collection.id],
+          )) {
+        changed = true;
+        _collectionRevisions.update(
+          collection.id,
+          (value) => value + 1,
+          ifAbsent: () => 1,
+        );
+      }
+    }
+    for (final old in _collections) {
+      if (!snapshot.collections.any((c) => c.id == old.id)) {
+        changed = true;
+        _collectionRevisions.update(
+          old.id,
+          (value) => value + 1,
+          ifAbsent: () => 1,
+        );
+      }
+    }
+    if (!listEquals(_collections, snapshot.collections) ||
+        !setEquals(_memberRomPaths, snapshot.memberPaths) ||
+        _collectionPaths.length != snapshot.collectionPaths.length ||
+        _collectionPaths.entries.any(
+          (entry) =>
+              !setEquals(entry.value, snapshot.collectionPaths[entry.key]),
+        )) {
+      changed = true;
+    }
+    if (changed) _revision++;
+    _collections = snapshot.collections;
+    _memberRomPaths = snapshot.memberPaths;
+    _collectionPaths = snapshot.collectionPaths;
+    _gameHashes = snapshot.gameHashes;
+    _boundaryTimer?.cancel();
+    if (snapshot.nextBoundary != null) {
+      final delay = snapshot.nextBoundary!.difference(DateTime.now());
+      _boundaryTimer = Timer(
+        delay.isNegative ? Duration.zero : delay,
+        () => load(),
+      );
+    }
+    return changed;
+  }
+
   List<CollectionModel> _collections = const [];
   bool _isLoading = false;
   bool _hasLoaded = false;
 
-  /// Every `rom_path` that belongs to at least one collection.
+  /// Every `rom_path` that was filed in at least one manual collection.
   ///
   /// Held here so the games views can badge a row without a query per card.
   /// Refreshed with the list itself, which is exactly when membership can have
@@ -34,6 +177,7 @@ class CollectionsProvider extends ChangeNotifier {
   /// value that does change to force a repaint — the same reason
   /// `SystemInfo.imageVersion` exists.
   int _imageVersion = 0;
+  int _publishedImageVersion = 0;
 
   /// The collections, ordered by `sort_order` then name.
   List<CollectionModel> get collections => List.unmodifiable(_collections);
@@ -44,29 +188,11 @@ class CollectionsProvider extends ChangeNotifier {
   /// True once the first [load] has completed, successfully or not.
   bool get hasLoaded => _hasLoaded;
 
-  /// Total games across all collections, **counting a game once per
-  /// collection it is filed in**. This is what the Collections card shows.
-  ///
-  /// Deliberately not a distinct count, at the maintainer's call, and it was
-  /// distinct for a day before being changed — so the reasoning is worth
-  /// keeping. The browser lists every collection with its own count directly
-  /// under the card, and a reader adds those up. A card reading 6 over
-  /// collections of 1, 4 and 4 looks broken, and nothing on screen explains
-  /// the overlap that accounts for it; the arithmetic working is worth more
-  /// here than the stricter number, because the per-collection counts are the
-  /// visible source of truth.
-  ///
-  /// Known consequence, accepted: with enough overlap this can exceed the
-  /// number of games in the library. If that ever needs fixing, do it by
-  /// showing the overlap rather than by silently switching the number back —
-  /// the distinct count is `_memberRomPaths.length`, already loaded for the
-  /// games views' badge.
-  ///
-  /// Note the question only exists *across* collections. Within one,
-  /// [CollectionModel.gameCount] is already distinct and needs no `DISTINCT`:
-  /// `user_collection_items` is keyed on `(collection_id, rom_path)`, so the
-  /// same game cannot be filed in one collection twice.
-  int get totalGameCount => _collections.fold(0, (sum, c) => sum + c.gameCount);
+  /// Games filed manually, counting a game once per manual collection.
+  /// Smart matches retain per-card counts but do not inflate the home total.
+  int get totalGameCount => _collections
+      .where((c) => !c.isSmart)
+      .fold(0, (sum, c) => sum + c.gameCount);
 
   /// Seeds [collections] without a database, so a test can pin what the counts
   /// derived from them mean. Not a general setter: nothing in the app may
@@ -98,31 +224,96 @@ class CollectionsProvider extends ChangeNotifier {
 
   /// Re-reads every collection (and its game count) from the database.
   ///
-  /// Safe to call repeatedly; concurrent calls collapse into the first.
-  Future<void> load() async {
-    if (_isLoading) return;
-    _isLoading = true;
-    notifyListeners();
+  /// Concurrent callers await the current read and a queued follow-up snapshot.
+  Future<void> load() {
+    if (_disposed) return Future.value();
+    if (_loadFuture != null) {
+      _pending = true;
+      return _loadFuture!;
+    }
+    // Defer the first read so the future is installed before notifications.
+    final completer = Completer<void>();
+    _loadFuture = completer.future;
+    scheduleMicrotask(() async {
+      await _load();
+      completer.complete();
+    });
+    return completer.future;
+  }
 
+  Future<void> _load() async {
+    if (_disposed) return;
+    final initialLoad = !_hasLoaded;
+    var changed = false;
+    _isLoading = true;
+    if (initialLoad) notifyListeners();
     try {
-      _collections = await CollectionsService.getCollections();
-      _memberRomPaths = await CollectionsService.memberRomPaths();
+      do {
+        _pending = false;
+        changed = await _readSnapshot() || changed;
+      } while (_pending && !_disposed);
+    } catch (error) {
+      // Preserve the last successful snapshot on transient database failure
+      // (e.g. the busy timeout during a long write). A refresh queued behind
+      // this one, or a rolling-window boundary whose timer just fired, would
+      // otherwise be lost until some unrelated trigger, so try again later.
+      debugPrint('Collection refresh failed: $error');
+      if (!_disposed && (_pending || _boundaryTimer != null)) {
+        _retryTimer?.cancel();
+        _retryTimer = Timer(_busyRefreshInterval, () => load());
+      }
     } finally {
+      _loadFuture = null;
       _isLoading = false;
       _hasLoaded = true;
-      notifyListeners();
+      if (!_disposed &&
+          (initialLoad || changed || _publishedImageVersion != _imageVersion)) {
+        _publishedImageVersion = _imageVersion;
+        notifyListeners();
+      }
     }
   }
 
   /// Creates a collection and returns it, refreshing the list.
-  Future<CollectionModel> create(String name, {String? imageSourcePath}) async {
+  Future<CollectionModel> create(
+    String name, {
+    String? imageSourcePath,
+    SmartCollectionRules? rules,
+  }) async {
     final created = await CollectionsService.createCollection(
       name,
       imageSourcePath: imageSourcePath,
+      rules: rules,
     );
     await _refresh();
-    return created;
+    return byId(created.id) ?? created;
   }
+
+  Future<void> updateRules(String id, SmartCollectionRules rules) async {
+    await CollectionsService.updateRules(id, rules);
+    await _refresh();
+  }
+
+  /// The slim library the editor previews rules against.
+  Future<SmartRuleLibrary> ruleLibrary() => SmartCollectionsService.library();
+
+  List<DatabaseGameModel> previewRules(
+    SmartRuleLibrary library,
+    SmartCollectionRules? rules,
+  ) {
+    if (rules == null) return [];
+    final evaluator = library.evaluator(DateTime.now());
+    return library.games
+        .where((game) => evaluator.matches(game, rules))
+        .toList();
+  }
+
+  DateTime? previewBoundary(
+    SmartRuleLibrary library,
+    SmartCollectionRules? rules,
+  ) => rules == null
+      ? null
+      : library.evaluator(DateTime.now()).nextBoundary(library.games, [rules]);
 
   /// Renames a collection and refreshes the list.
   Future<void> rename(String id, String name) async {
@@ -183,11 +374,8 @@ class CollectionsProvider extends ChangeNotifier {
   Future<Set<String>> collectionIdsFor(GameModel game) =>
       CollectionsService.collectionIdsFor(game);
 
-  /// Re-reads after a mutation, bypassing [load]'s in-flight guard.
+  /// Re-reads after a mutation, queuing a fresh snapshot if a read is in flight.
   Future<void> _refresh() async {
-    _collections = await CollectionsService.getCollections();
-    _memberRomPaths = await CollectionsService.memberRomPaths();
-    _hasLoaded = true;
-    notifyListeners();
+    await load();
   }
 }

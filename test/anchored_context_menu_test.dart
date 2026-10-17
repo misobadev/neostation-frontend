@@ -88,6 +88,63 @@ void main() {
     return ctx;
   }
 
+  testWidgets('picker heading labels the choices without becoming selectable', (
+    tester,
+  ) async {
+    useViewport(tester, const Size(800, 450));
+    final ctx = await pumpHost(tester);
+    final result = showAnchoredContextMenu(
+      context: ctx,
+      title: 'Favourite',
+      items: const [
+        ContextMenuItem(id: 'yes', label: 'Yes'),
+        ContextMenuItem(id: 'no', label: 'No'),
+      ],
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Favourite'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Yes'));
+    await tester.pumpAndSettle();
+    expect(await result, 'yes');
+  });
+
+  testWidgets(
+    'standalone collection chooser is centred with a visible border',
+    (tester) async {
+      useViewport(tester, const Size(1280, 720));
+      final ctx = await pumpHost(tester);
+      final result = showAnchoredContextMenu(
+        context: ctx,
+        items: const [
+          ContextMenuItem(id: 'manual', label: 'Manual Collection'),
+          ContextMenuItem(id: 'smart', label: 'Smart Collection'),
+        ],
+        alignment: ContextMenuAlignment.centerScreen,
+      );
+      await tester.pumpAndSettle();
+      final panel = find
+          .descendant(
+            of: find.byType(AnchoredContextMenu),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Container && widget.decoration is BoxDecoration,
+            ),
+          )
+          .first;
+      expect(tester.getRect(panel).center.dx, closeTo(640, 1));
+      expect(tester.getRect(panel).center.dy, closeTo(360, 1));
+      final decoration =
+          tester.widget<Container>(panel).decoration! as BoxDecoration;
+      final border = decoration.border! as Border;
+      expect(border.top.color.a, closeTo(0.65, 0.01));
+      await tester.tap(find.text('Smart Collection'));
+      await tester.pumpAndSettle();
+      expect(await result, 'smart');
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('renders one row per item', (tester) async {
     useViewport(tester, const Size(1920, 1080));
     final ctx = await pumpHost(tester);
@@ -99,6 +156,39 @@ void main() {
     expect(find.text('Add to'), findsOneWidget);
     // The submenu is closed, so its children are not in the tree yet.
     expect(find.text('Shooters'), findsNothing);
+  });
+
+  testWidgets('a second B while the menu fades out leaves the route below', (
+    tester,
+  ) async {
+    useViewport(tester, const Size(1920, 1080));
+    final ctx = await pumpHost(tester);
+    late BuildContext screen;
+    Navigator.of(ctx).push(
+      MaterialPageRoute<void>(
+        builder: (context) {
+          screen = context;
+          return const Scaffold(body: Text('Screen'));
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    // ignore: unawaited_futures
+    showAnchoredContextMenu(context: screen, items: items);
+    await tester.pumpAndSettle();
+    await settleNavGrace(tester);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    await tester.pump(const Duration(milliseconds: 10));
+    // Past the action debounce, but the fade-out has not finished.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 150)),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Settings'), findsNothing);
+    expect(find.text('Screen'), findsOneWidget);
   });
 
   testWidgets('activating a leaf resolves with its id', (tester) async {

@@ -96,12 +96,24 @@ extension _LaunchFlow on _SystemGamesListState {
 
     // Reload games list (was cleared to free RAM during gameplay).
     try {
-      final updatedGames = await GameService.loadGamesForSystem(widget.system);
+      final List<GameModel> updatedGames;
+      try {
+        updatedGames = await GameService.loadGamesForSystem(
+          widget.system,
+          smartPaths: _smartCollectionPaths,
+        );
+      } catch (_) {
+        // Only collections throw. The list was cleared for gameplay, so show
+        // the load error rather than an empty-collection message.
+        if (mounted) rebuild(() => _collectionLoadFailed = true);
+        rethrow;
+      }
+      _collectionLoadFailed = false;
       if (!mounted) return;
 
-      final previousRomname = _selectedGame?.romname;
-      final gameIndex = previousRomname != null
-          ? updatedGames.indexWhere((g) => g.romname == previousRomname)
+      final previousRomPath = _selectedGame?.romPath;
+      final gameIndex = previousRomPath != null
+          ? updatedGames.indexWhere((g) => g.romPath == previousRomPath)
           : -1;
 
       rebuild(() {
@@ -112,8 +124,16 @@ extension _LaunchFlow on _SystemGamesListState {
         if (gameIndex != -1) {
           _selectedGame = updatedGames[gameIndex];
           _selectedGameIndex = gameIndex;
+        } else {
+          _selectedGameIndex = updatedGames.isEmpty
+              ? 0
+              : _selectedGameIndex.clamp(0, updatedGames.length - 1);
+          _selectedGame = updatedGames.isEmpty
+              ? null
+              : updatedGames[_selectedGameIndex];
         }
       });
+      _collectionsProvider.load();
       _databaseProvider.refresh();
     } catch (e) {
       _SystemGamesListState._log.e(
@@ -544,8 +564,12 @@ extension _LaunchFlow on _SystemGamesListState {
           systemRealName: widget.system.realName,
           fileProvider: _fileProvider,
           onPlayGame: (selectedGame) {
+            // romPath, not romname: an aggregate view (a cross-system smart
+            // collection) can hold two "Tetris (USA)" from different systems.
             final gameIndex = _games.indexWhere(
-              (game) => game.romname == selectedGame.romname,
+              (game) => selectedGame.romPath != null
+                  ? game.romPath == selectedGame.romPath
+                  : game.romname == selectedGame.romname,
             );
             if (gameIndex != -1) {
               rebuild(() {

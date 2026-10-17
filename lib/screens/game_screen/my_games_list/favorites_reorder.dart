@@ -34,6 +34,7 @@ extension _FavoritesReorder on _SystemGamesListState {
       try {
         final configProvider = context.read<SqliteConfigProvider>();
         await GameService.toggleFavorite(_selectedGame!);
+        _collectionsProvider.load();
         if (!mounted) return;
         await configProvider.refreshDetectedSystems();
 
@@ -47,6 +48,7 @@ extension _FavoritesReorder on _SystemGamesListState {
     try {
       final configProvider = context.read<SqliteConfigProvider>();
       await GameService.toggleFavorite(_selectedGame!);
+      _collectionsProvider.load();
 
       if (!mounted) return;
       await configProvider.refreshDetectedSystems();

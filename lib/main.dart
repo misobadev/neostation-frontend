@@ -1028,7 +1028,17 @@ class _MyAppState extends State<MyApp> {
           // first screen. A lazy create would leave the count at zero until
           // something else read the provider.
           lazy: false,
-          create: (context) => CollectionsProvider()..load(),
+          create: (context) {
+            final scraping = context.read<ScrapingProvider>();
+            return CollectionsProvider(
+              sources: [
+                context.read<SqliteDatabaseProvider>(),
+                context.read<SqliteConfigProvider>(),
+                scraping,
+              ],
+              isBusy: () => scraping.isScraping,
+            )..load();
+          },
         ),
         ChangeNotifierProvider(
           // Eager: the theme manifest is a network fetch, and during first-run

@@ -43,7 +43,7 @@ class SystemsGridFooter extends CoreFooter {
       // Games are one-offs, so only real systems carry a count.
       countText: system.isGame
           ? null
-          : "${system.numOfRoms} ${system.folderName == 'android'
+          : "${system.numOfRoms ?? 0} ${system.folderName == 'android'
                 ? AppLocale.apps.getString(context)
                 : system.folderName == 'music'
                 ? AppLocale.tracks.getString(context)

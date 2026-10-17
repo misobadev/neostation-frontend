@@ -1,3 +1,5 @@
+import '../../models/smart_collection_rules.dart';
+import 'smart_collections_service.dart';
 import 'dart:io';
 import 'dart:math';
 
@@ -40,23 +42,15 @@ class CollectionsService {
 
   // ── Collections ────────────────────────────────────────────────────────────
 
-  /// Returns every collection, ordered by `sort_order` then name, each with its
-  /// game count already filled in by the listing query.
-  static Future<List<CollectionModel>> getCollections() async {
-    try {
-      final rows = await CollectionRepository.getCollections();
-      return rows.map(CollectionModel.fromJson).toList();
-    } catch (e) {
-      _log.e('Error loading collections: $e');
-      return [];
-    }
-  }
-
   /// Returns a single collection, or null when it no longer exists.
+  ///
+  /// A smart collection's count here is always 0: its matches are evaluated
+  /// by [SmartCollectionsService.snapshot], not stored.
   static Future<CollectionModel?> getCollection(String id) async {
     try {
       final row = await CollectionRepository.getCollectionById(id);
-      return row == null ? null : CollectionModel.fromJson(row);
+      if (row == null) return null;
+      return CollectionModel.fromJson(row);
     } catch (e) {
       _log.e('Error loading collection $id: $e');
       return null;
@@ -71,11 +65,17 @@ class CollectionsService {
   static Future<CollectionModel> createCollection(
     String name, {
     String? imageSourcePath,
+    SmartCollectionRules? rules,
   }) async {
     final id = _generateUuidV4();
     final trimmed = name.trim();
 
-    await CollectionRepository.insertCollection(id: id, name: trimmed);
+    if (trimmed.isEmpty) throw ArgumentError('Collection name is empty');
+    await CollectionRepository.insertCollection(
+      id: id,
+      name: trimmed,
+      rulesJson: rules?.encode(),
+    );
 
     String? imagePath;
     if (imageSourcePath != null && imageSourcePath.isNotEmpty) {
@@ -84,7 +84,13 @@ class CollectionsService {
 
     final created = await getCollection(id);
     return created ??
-        CollectionModel(id: id, name: trimmed, imagePath: imagePath);
+        CollectionModel(
+          id: id,
+          name: trimmed,
+          imagePath: imagePath,
+          isSmart: rules != null,
+          rules: rules,
+        );
   }
 
   /// Renames a collection. Duplicate names are allowed by design.
@@ -180,6 +186,7 @@ class CollectionsService {
   /// `content://` URI and must be stored exactly as `user_roms` holds it, or
   /// membership and favourites disagree about the same game.
   static Future<void> addGame(String collectionId, GameModel game) async {
+    await _requireManual(collectionId);
     final romPath = game.romPath;
     if (romPath == null || romPath.isEmpty) return;
     await CollectionRepository.addRomToCollection(collectionId, romPath);
@@ -187,6 +194,7 @@ class CollectionsService {
 
   /// Removes [game] from a collection. Removing a non-member is a no-op.
   static Future<void> removeGame(String collectionId, GameModel game) async {
+    await _requireManual(collectionId);
     final romPath = game.romPath;
     if (romPath == null || romPath.isEmpty) return;
     await CollectionRepository.removeRomFromCollection(collectionId, romPath);
@@ -194,6 +202,7 @@ class CollectionsService {
 
   /// Adds or removes [game] and returns whether it is now a member.
   static Future<bool> toggleGame(String collectionId, GameModel game) async {
+    await _requireManual(collectionId);
     final romPath = game.romPath;
     if (romPath == null || romPath.isEmpty) return false;
 
@@ -213,23 +222,9 @@ class CollectionsService {
     final romPath = game.romPath;
     if (romPath == null || romPath.isEmpty) return <String>{};
     try {
-      final ids = await CollectionRepository.getCollectionIdsForRom(romPath);
-      return ids.toSet();
+      return await SmartCollectionsService.collectionIdsFor(romPath);
     } catch (e) {
       _log.e('Error reading collections for ${game.romname}: $e');
-      return <String>{};
-    }
-  }
-
-  /// Every `rom_path` filed in at least one collection.
-  ///
-  /// Read whole rather than per game: the games views badge every visible row,
-  /// and one query beats one per card.
-  static Future<Set<String>> memberRomPaths() async {
-    try {
-      return await CollectionRepository.getCollectionMemberRomPaths();
-    } catch (e) {
-      _log.e('Error reading collection membership: $e');
       return <String>{};
     }
   }
@@ -239,8 +234,28 @@ class CollectionsService {
   /// Delegates to the games loader so per-system naming preferences
   /// (extension/tag stripping, scraped-title coalescing) and hidden-ROM
   /// filtering are applied exactly as they are for favourites.
-  static Future<List<GameModel>> loadGamesForCollection(String collectionId) =>
-      GameListService.loadGamesForCollection(collectionId);
+  static Future<List<GameModel>> loadGamesForCollection(
+    String collectionId, {
+    Set<String>? smartPaths,
+  }) => GameListService.loadGamesForCollection(
+    collectionId,
+    smartPaths: smartPaths,
+  );
+
+  static Future<void> updateRules(String id, SmartCollectionRules rules) async {
+    final collection = await getCollection(id);
+    if (collection == null || !collection.isSmart) {
+      throw StateError('Only smart collections have rules');
+    }
+    await CollectionRepository.updateCollection(id, rulesJson: rules.encode());
+  }
+
+  static Future<void> _requireManual(String id) async {
+    final collection = await getCollection(id);
+    if (collection == null || collection.isSmart) {
+      throw StateError('Membership is editable only for manual collections');
+    }
+  }
 
   // ── Internals ──────────────────────────────────────────────────────────────
 

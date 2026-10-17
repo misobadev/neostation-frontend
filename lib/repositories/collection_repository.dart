@@ -26,6 +26,7 @@ class CollectionRepository {
     String? color1,
     String? color2,
     int? sortOrder,
+    String? rulesJson,
   }) => SqliteService.insertCollection(
     id: id,
     name: name,
@@ -33,6 +34,7 @@ class CollectionRepository {
     color1: color1,
     color2: color2,
     sortOrder: sortOrder,
+    rulesJson: rulesJson,
   );
 
   /// Updates a collection's mutable fields.
@@ -46,6 +48,7 @@ class CollectionRepository {
     String? color2,
     bool clearColor2 = false,
     int? sortOrder,
+    String? rulesJson,
   }) => SqliteService.updateCollection(
     id,
     name: name,
@@ -56,6 +59,7 @@ class CollectionRepository {
     color2: color2,
     clearColor2: clearColor2,
     sortOrder: sortOrder,
+    rulesJson: rulesJson,
   );
 
   /// Deletes a collection and its membership rows.
@@ -76,9 +80,19 @@ class CollectionRepository {
   static Future<List<String>> getCollectionIdsForRom(String romPath) =>
       SqliteService.getCollectionIdsForRom(romPath);
 
-  /// Returns every `rom_path` that belongs to at least one collection.
-  static Future<Set<String>> getCollectionMemberRomPaths() =>
-      SqliteService.getCollectionMemberRomPaths();
+  static Future<Map<String, Set<String>>> getMemberPathsByCollection() async {
+    final db = await SqliteService.getDatabase();
+    final rows = await db.rawQuery(
+      'SELECT collection_id, rom_path FROM user_collection_items',
+    );
+    final paths = <String, Set<String>>{};
+    for (final row in rows) {
+      paths
+          .putIfAbsent(row['collection_id'].toString(), () => {})
+          .add(row['rom_path'].toString());
+    }
+    return paths;
+  }
 
   /// Returns the games in a collection, in the same shape as the favourites
   /// query (systems joined, so `systemFolderName` is populated).
