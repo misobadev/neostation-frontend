@@ -1411,10 +1411,11 @@ class _GamesCarouselState extends State<GamesCarousel> {
             // #188 layout: drop the top spacer so the carousel gets the full
             // height (bigger cards sit closer together). Pad symmetrically so
             // the centered card stays centered on-screen while still clearing
-            // the vertical legend on the left.
+            // the vertical legend on the left. The vertical margin keeps the
+            // artwork off the screen edges; this view has no header to clear.
             Expanded(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 60.r),
+                padding: EdgeInsets.symmetric(horizontal: 60.r, vertical: 24.r),
                 child: NativeCarousel(
                   key: _carouselKey,
                   itemCount: widget.games.length,

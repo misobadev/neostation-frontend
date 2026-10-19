@@ -479,8 +479,8 @@ class _GamesGridState extends State<GamesGrid> {
   /// Cheap positioning pass: turns cached aspect ratios + a target width into
   /// card rects and row bounds. No image reads, one allocation per card.
   void _positionCards(double availableWidth) {
-    final spX = 6.0.r;
-    final spY = 6.0.r;
+    final spX = 12.0.r;
+    final spY = 12.0.r;
     _spX = spX;
     _spY = spY;
 
