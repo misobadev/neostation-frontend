@@ -453,10 +453,10 @@ void main() {
       reason: 'omitted outright rather than drawn as a dark sliver',
     );
     // The rest of the row is unaffected: the controls are what the row is for.
-    // On a card this narrow, Play gives up its label and keeps the A action.
-    final playGlyph = find.byType(Image);
-    expect(playGlyph, findsOneWidget);
-    expect(tester.getSize(playGlyph).width, greaterThan(0));
+    // On a card this narrow the PLAY label ellipsizes instead of disappearing.
+    final playLabel = find.text('PLAY');
+    expect(playLabel, findsOneWidget);
+    expect(tester.getSize(playLabel).width, greaterThan(0));
     expect(find.byIcon(Symbols.settings_rounded), findsOneWidget);
   });
 
