@@ -20,6 +20,12 @@ void main() {
   const double panelWidth = 640;
   const double panelHeight = 480;
 
+  /// The breathing room the media tab keeps above the footer and at its sides.
+  /// These are in the same unscaled units as the widget's insets (`.r` is 1.0
+  /// at this viewport).
+  const double mediaBottomMargin = 20;
+  const double mediaSideInset = 48;
+
   /// The laid-out media box — the `AspectRatio` the screenshot or video fills.
   Rect mediaRect(WidgetTester tester) =>
       tester.getRect(find.byType(AspectRatio).first);
@@ -63,7 +69,7 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('the media stops where the card says the footer starts', (
+  testWidgets('the media stops above the footer by its breathing-room margin', (
     tester,
   ) async {
     await pumpPanel(tester, offset: gameDetailsPanelBottomOffset());
@@ -71,12 +77,12 @@ void main() {
     expect(
       mediaRect(tester).bottom,
       moreOrLessEquals(
-        panelHeight - gameDetailsPanelBottomOffset(),
+        panelHeight - gameDetailsPanelBottomOffset() - mediaBottomMargin,
         epsilon: 0.5,
       ),
       reason:
-          'the panel reserves the footer it actually has, not a constant '
-          'of its own that the footer has since shrunk away from',
+          'the panel reserves the footer it actually has plus the margin that '
+          'keeps the artwork off it',
     );
   });
 
@@ -103,9 +109,9 @@ void main() {
 
     final r = mediaRect(tester);
     expect(
-      r.left - 12,
-      moreOrLessEquals(panelWidth - 12 - r.right, epsilon: 0.5),
-      reason: 'equal slack either side of the box, inside the 12 insets',
+      r.left - mediaSideInset,
+      moreOrLessEquals(panelWidth - mediaSideInset - r.right, epsilon: 0.5),
+      reason: 'equal slack either side of the box, inside the side insets',
     );
   });
 }
