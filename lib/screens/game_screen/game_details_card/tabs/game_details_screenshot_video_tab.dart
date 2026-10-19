@@ -126,7 +126,12 @@ class _GameDetailsScreenshotVideoTabState
     }
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(12.r, 55.r, 12.r, widget.bottomOffset.r),
+      padding: EdgeInsets.fromLTRB(
+        48.r,
+        72.r,
+        48.r,
+        widget.bottomOffset.r + 20.r,
+      ),
       child: Center(
         child: Container(
           decoration: BoxDecoration(
