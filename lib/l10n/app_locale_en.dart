@@ -745,6 +745,18 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.hintScrape: 'Scrape',
   AppLocale.hintMoreActions: 'More',
   AppLocale.hintOptions: 'Options',
+  AppLocale.systemOptionsSelectedSystem: 'Selected System',
+  AppLocale.systemOptionsSystemView: 'System View',
+  AppLocale.systemOptionsSystemLayout: 'System Layout',
+  AppLocale.systemOptionsGameSearch: 'Game Search',
+  AppLocale.systemOptionsSystemViewSubtitle: 'How systems are displayed.',
+  AppLocale.systemOptionsSystemSorting: 'System Sorting',
+  AppLocale.systemOptionsSystemSortingSubtitle: 'How systems are ordered.',
+  AppLocale.systemOptionsGameSettingsDescription:
+      'Emulator, cores, controls and display',
+  AppLocale.systemOptionsSearchDescription: 'Find games across your library',
+  AppLocale.systemOptionsNoSystem:
+      'Select a system to configure Game Settings.',
   AppLocale.addTo: 'Add to…',
   AppLocale.addedToCollection: 'Added to {name}',
   AppLocale.newCollection: 'New collection…',

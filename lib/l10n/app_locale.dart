@@ -1000,6 +1000,23 @@ mixin AppLocale {
   static const String hintScrape = 'hint_scrape';
   static const String hintMoreActions = 'hint_more_actions';
   static const String hintOptions = 'hint_options';
+  static const String systemOptionsSelectedSystem =
+      'system_options_selected_system';
+  static const String systemOptionsSystemView = 'system_options_system_view';
+  static const String systemOptionsSystemLayout =
+      'system_options_system_layout';
+  static const String systemOptionsGameSearch = 'system_options_game_search';
+  static const String systemOptionsSystemViewSubtitle =
+      'system_options_system_view_subtitle';
+  static const String systemOptionsSystemSorting =
+      'system_options_system_sorting';
+  static const String systemOptionsSystemSortingSubtitle =
+      'system_options_system_sorting_subtitle';
+  static const String systemOptionsGameSettingsDescription =
+      'system_options_game_settings_description';
+  static const String systemOptionsSearchDescription =
+      'system_options_search_description';
+  static const String systemOptionsNoSystem = 'system_options_no_system';
 
   // ---------------------------------------------------------------------------
   // Game context menu (Y)

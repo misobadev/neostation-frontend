@@ -757,6 +757,18 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.hintScrape: 'Скрейп',
   AppLocale.hintMoreActions: 'Ещё',
   AppLocale.hintOptions: 'Опции',
+  AppLocale.systemOptionsSelectedSystem: 'Выбранная система',
+  AppLocale.systemOptionsSystemView: 'Вид системы',
+  AppLocale.systemOptionsSystemLayout: 'Макет системы',
+  AppLocale.systemOptionsGameSearch: 'Поиск игр',
+  AppLocale.systemOptionsSystemViewSubtitle: 'Как отображаются системы.',
+  AppLocale.systemOptionsSystemSorting: 'Сортировка системы',
+  AppLocale.systemOptionsSystemSortingSubtitle: 'Как сортируются системы.',
+  AppLocale.systemOptionsGameSettingsDescription:
+      'Эмулятор, ядра, управление и отображение',
+  AppLocale.systemOptionsSearchDescription: 'Искать игры во всей библиотеке',
+  AppLocale.systemOptionsNoSystem:
+      'Выберите систему, чтобы настроить параметры игры.',
   AppLocale.addTo: 'Добавить в…',
   AppLocale.addedToCollection: 'Добавлено в {name}',
   AppLocale.newCollection: 'Новая коллекция…',

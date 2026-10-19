@@ -46,15 +46,11 @@ extension _GamepadGridNav on _SystemCardGridViewState {
       // (the long-press route never had the bug: the card reads `widget` when
       // it is built). A null `onYPressed` still does nothing, and Y counts as
       // handled either way, so nothing else changes.
-      onFavorite: () => widget.onYPressed?.call(),
+      onFavorite: widget.bindYButton ? () => widget.onYPressed?.call() : null,
       // Likewise B: the systems screen is a root tab with nothing to pop, and a
       // null onBack also leaves the keyboard's Backspace unhandled, as it was.
       onBack: widget.onBackPressed,
-      onXButton:
-          widget.onXPressed ??
-          () {
-            HeaderSortDropdown.globalKey.currentState?.showDropdown();
-          },
+      onXButton: widget.onXPressed,
       // A pushed host is not part of the tab strip, so its shoulder buttons
       // must not cycle tabs out from under it.
       onPreviousTab: widget.enableTabBumpers ? AppNavigation.previousTab : null,

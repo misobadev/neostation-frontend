@@ -782,6 +782,21 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.hintScrape: 'Scraper',
   AppLocale.hintMoreActions: 'Plus',
   AppLocale.hintOptions: 'Options',
+  AppLocale.systemOptionsSelectedSystem: 'Système sélectionné',
+  AppLocale.systemOptionsSystemView: 'Vue du système',
+  AppLocale.systemOptionsSystemLayout: 'Disposition du système',
+  AppLocale.systemOptionsGameSearch: 'Recherche de jeux',
+  AppLocale.systemOptionsSystemViewSubtitle:
+      'Comment les systèmes sont affichés.',
+  AppLocale.systemOptionsSystemSorting: 'Tri du système',
+  AppLocale.systemOptionsSystemSortingSubtitle:
+      'Comment les systèmes sont triés.',
+  AppLocale.systemOptionsGameSettingsDescription:
+      'Émulateur, cœurs, contrôles et affichage',
+  AppLocale.systemOptionsSearchDescription:
+      'Rechercher des jeux dans toute la bibliothèque',
+  AppLocale.systemOptionsNoSystem:
+      'Sélectionnez un système pour configurer les paramètres du jeu.',
   AppLocale.addTo: 'Ajouter à…',
   AppLocale.addedToCollection: 'Ajouté à {name}',
   AppLocale.newCollection: 'Nouvelle collection…',

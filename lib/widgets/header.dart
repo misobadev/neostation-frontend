@@ -12,11 +12,9 @@ import 'package:neostation/themes/app_themes.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
-import 'package:neostation/widgets/header_sort_dropdown.dart';
 import 'package:neostation/widgets/bumper_glyph.dart';
 import 'package:neostation/widgets/notification_bell.dart';
 import 'package:neostation/widgets/neo_glass.dart';
-import 'package:neostation/screens/app_screen.dart';
 import 'package:neostation/utils/header_layout.dart';
 import 'package:neostation/utils/nav_tabs.dart';
 import 'package:neostation/utils/time_format.dart';
@@ -285,15 +283,6 @@ class HeaderState extends State<Header> {
               return Stack(
                 alignment: Alignment.center,
                 children: [
-                  if (widget.selectedTabIndex == AppTabs.systems)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [HeaderSortDropdown()],
-                      ),
-                    ),
-
                   // Grouped Tab Navigation with Background (Glass Style)
                   Align(
                     key: const ValueKey('tabs-container'),

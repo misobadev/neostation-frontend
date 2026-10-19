@@ -748,6 +748,18 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.hintScrape: 'Ambil',
   AppLocale.hintMoreActions: 'Lainnya',
   AppLocale.hintOptions: 'Opsi',
+  AppLocale.systemOptionsSelectedSystem: 'Sistem Terpilih',
+  AppLocale.systemOptionsSystemView: 'Tampilan Sistem',
+  AppLocale.systemOptionsSystemLayout: 'Tata Letak Sistem',
+  AppLocale.systemOptionsGameSearch: 'Pencarian Game',
+  AppLocale.systemOptionsSystemViewSubtitle: 'Cara sistem ditampilkan.',
+  AppLocale.systemOptionsSystemSorting: 'Pengurutan Sistem',
+  AppLocale.systemOptionsSystemSortingSubtitle: 'Cara sistem diurutkan.',
+  AppLocale.systemOptionsGameSettingsDescription:
+      'Emulator, core, kontrol, dan tampilan',
+  AppLocale.systemOptionsSearchDescription: 'Cari game di seluruh pustaka',
+  AppLocale.systemOptionsNoSystem:
+      'Pilih sistem untuk mengonfigurasi pengaturan game.',
   AppLocale.addTo: 'Tambahkan ke…',
   AppLocale.addedToCollection: 'Ditambahkan ke {name}',
   AppLocale.newCollection: 'Koleksi baru…',

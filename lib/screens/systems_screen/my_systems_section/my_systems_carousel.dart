@@ -29,7 +29,6 @@ import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/services/secondary_achievements_controller.dart';
 import '../../game_screen/my_games_list.dart';
 import 'package:neostation/models/secondary_display_state.dart';
-import 'package:neostation/widgets/header_sort_dropdown.dart';
 import 'package:neostation/widgets/native_carousel.dart';
 import 'system_list_builder.dart';
 import 'system_card.dart';
@@ -59,6 +58,7 @@ class MySystemsCarousel extends StatefulWidget {
     this.onYPressed,
     this.onBackPressed,
     this.onXPressed,
+    this.bindYButton = true,
     this.navLayerId = kSystemsCarouselNavLayerId,
     this.cardOverrideBuilder,
     this.blockSystemBack = true,
@@ -90,14 +90,23 @@ class MySystemsCarousel extends StatefulWidget {
   /// Start. Null keeps the built-in emulator-settings dialog.
   final void Function(int index)? onOptions;
 
-  /// Y. Unbound on the systems screen.
+  /// Options entry point for pad Y (when [bindYButton]) and the touch
+  /// long-press. The systems screen binds only the long-press now that Options
+  /// moved to Start; the collections browser still uses Y for its menu.
   final VoidCallback? onYPressed;
 
   /// B. Unbound on the systems screen, which is a root tab.
   final VoidCallback? onBackPressed;
 
-  /// X. Defaults to the header's view/sort picker.
+  /// X. Unbound on the systems screen; a pushed host supplies its own picker.
   final VoidCallback? onXPressed;
+
+  /// Whether the gamepad's Y button fires [onYPressed].
+  ///
+  /// The systems screen turns this off now that Options moved to Start. The
+  /// callback itself stays bound to the touch long-press route, which is why
+  /// the two are separate.
+  final bool bindYButton;
 
   /// Anchor for a menu opened on the centred card.
   ///
@@ -299,13 +308,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
       // Resolved on every press: the host rebuilds this callback around the
       // currently selected card, so holding the closure captured here would
       // pin Y to the card selected when this state was created.
-      onFavorite: () => widget.onYPressed?.call(),
+      onFavorite: widget.bindYButton ? () => widget.onYPressed?.call() : null,
       onBack: widget.onBackPressed,
-      onXButton:
-          widget.onXPressed ??
-          () {
-            HeaderSortDropdown.globalKey.currentState?.showDropdown();
-          },
+      onXButton: widget.onXPressed,
       onPreviousTab: widget.enableTabBumpers ? AppNavigation.previousTab : null,
       onNextTab: widget.enableTabBumpers ? AppNavigation.nextTab : null,
       onLeftBumper: widget.enableTabBumpers ? AppNavigation.previousTab : null,
@@ -582,14 +587,14 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
     }
   }
 
-  /// Opens configuration dialogs for the focused carousel item.
+  /// Opens the Options dialog, or the built-in settings fallback, for the
+  /// focused carousel item.
   ///
   /// A recent-activity card used to be turned away here on the grounds that it
-  /// carries a game rather than a system. The grid's START and both layouts' Y
-  /// menu resolve one through [SystemInfo.settingsFolderName] instead, so this
-  /// did the same job three different ways and refused what its siblings
-  /// allowed. It now shares their resolution, and reports an unresolvable card
-  /// the way the grid does rather than doing nothing.
+  /// carries a game rather than a system. The dialog resolves one through
+  /// [SystemInfo.settingsFolderName], so this shares that resolution and
+  /// reports an unresolvable card the way the grid does rather than doing
+  /// nothing.
   void _openSystemSettingsFromCarousel() async {
     final allSystems = _getSystemsList();
 
