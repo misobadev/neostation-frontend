@@ -676,6 +676,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.hintScrape: '정보 가져오기',
   AppLocale.hintMoreActions: '더보기',
   AppLocale.hintOptions: '옵션',
+  AppLocale.gameOptionsThisGame: '이 게임',
+  AppLocale.gameOptionsView: '보기',
   AppLocale.systemOptionsSelectedSystem: '선택한 시스템',
   AppLocale.systemOptionsSystemView: '시스템 보기',
   AppLocale.systemOptionsSystemLayout: '시스템 레이아웃',

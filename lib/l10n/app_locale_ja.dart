@@ -670,6 +670,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.hintScrape: 'スクレイプ',
   AppLocale.hintMoreActions: 'その他',
   AppLocale.hintOptions: 'オプション',
+  AppLocale.gameOptionsThisGame: 'このゲーム',
+  AppLocale.gameOptionsView: '表示',
   AppLocale.systemOptionsSelectedSystem: '選択中のシステム',
   AppLocale.systemOptionsSystemView: 'システム表示',
   AppLocale.systemOptionsSystemLayout: 'システムレイアウト',

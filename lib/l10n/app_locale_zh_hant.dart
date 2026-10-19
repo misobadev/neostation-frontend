@@ -655,6 +655,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.hintScrape: '刮削',
   AppLocale.hintMoreActions: '更多',
   AppLocale.hintOptions: '選項',
+  AppLocale.gameOptionsThisGame: '此遊戲',
+  AppLocale.gameOptionsView: '檢視',
   AppLocale.systemOptionsSelectedSystem: '已選系統',
   AppLocale.systemOptionsSystemView: '系統檢視',
   AppLocale.systemOptionsSystemLayout: '系統版面',

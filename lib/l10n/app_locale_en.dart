@@ -745,6 +745,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.hintScrape: 'Scrape',
   AppLocale.hintMoreActions: 'More',
   AppLocale.hintOptions: 'Options',
+  AppLocale.gameOptionsThisGame: 'This Game',
+  AppLocale.gameOptionsView: 'View',
   AppLocale.systemOptionsSelectedSystem: 'Selected System',
   AppLocale.systemOptionsSystemView: 'System View',
   AppLocale.systemOptionsSystemLayout: 'System Layout',

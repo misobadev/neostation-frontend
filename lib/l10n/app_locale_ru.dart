@@ -757,6 +757,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.hintScrape: 'Скрейп',
   AppLocale.hintMoreActions: 'Ещё',
   AppLocale.hintOptions: 'Опции',
+  AppLocale.gameOptionsThisGame: 'Эта игра',
+  AppLocale.gameOptionsView: 'Вид',
   AppLocale.systemOptionsSelectedSystem: 'Выбранная система',
   AppLocale.systemOptionsSystemView: 'Вид системы',
   AppLocale.systemOptionsSystemLayout: 'Макет системы',

@@ -1000,6 +1000,8 @@ mixin AppLocale {
   static const String hintScrape = 'hint_scrape';
   static const String hintMoreActions = 'hint_more_actions';
   static const String hintOptions = 'hint_options';
+  static const String gameOptionsThisGame = 'game_options_this_game';
+  static const String gameOptionsView = 'game_options_view';
   static const String systemOptionsSelectedSystem =
       'system_options_selected_system';
   static const String systemOptionsSystemView = 'system_options_system_view';

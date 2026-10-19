@@ -43,6 +43,7 @@ import 'game_details_card/detail_tab.dart';
 import 'game_details_card/dialogs/screenscraper_match_picker_dialog.dart';
 import 'game_details_card/random_game_dialog.dart';
 import 'game_settings_dialog/game_settings_dialog.dart';
+import 'game_options_dialog.dart';
 import 'my_games_grid.dart';
 import 'my_games_carousel.dart';
 import 'game_list_view.dart';
@@ -52,7 +53,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../providers/system_background_provider.dart';
 import '../../models/secondary_display_state.dart';
 import '../../widgets/context_menu/game_context_menu.dart';
-import '../../widgets/game_view_mode_dropdown.dart';
 import '../../widgets/letter_indicator.dart';
 import '../../constants/system_folder_names.dart';
 import '../search_screen/search_screen.dart';
@@ -359,6 +359,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
   // up here instead and are flushed when the menu closes.
   bool _deferFavoriteReseat = false;
   final Set<String> _pendingFavoriteReseats = {};
+
+  /// Guards the Options panel against a second Start press landing before the
+  /// dialog's own navigation layer is registered.
+  bool _gameOptionsOpen = false;
 
   // Scraping state.
   final Set<String> _scrapingGameRomnames = {};
@@ -1010,7 +1014,6 @@ class _SystemGamesListState extends State<SystemGamesList> {
             // Navigation Layer: Visual alphabetical feedback for rapid scrolling.
             if (_currentLetter != null && !_isGameLaunching)
               _buildLetterIndicator(),
-            GameViewModeDropdown(),
           ],
         ),
       ),
@@ -1457,10 +1460,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
       onBack: _goBack,
       onPlay: _selectCurrentGame,
       onFavorite: _toggleFavorite,
-      onYButton: _openGameContextMenu,
+      onYButton: _openGameOptions,
       selectedItemKey: _selectedItemKey,
       onRandom: _showRandomGameDialog,
-      onSettings: _openGameSettingsDialog,
+      onOptions: _openGameOptions,
       onScrape: _scrapeSelectedGame,
       scrapingGameRomnames: _scrapingGameRomnames,
       scrapeProgress: _scrapeProgress,
@@ -1496,10 +1499,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
       onBack: _goBack,
       onPlay: _selectCurrentGame,
       onFavorite: _toggleFavorite,
-      onYButton: _openGameContextMenu,
+      onYButton: _openGameOptions,
       selectedItemKey: _selectedItemKey,
       onRandom: _showRandomGameDialog,
-      onSettings: _openGameSettingsDialog,
+      onOptions: _openGameOptions,
       onScrape: _scrapeSelectedGame,
       scrapingGameRomnames: _scrapingGameRomnames,
       scrapeProgress: _scrapeProgress,
@@ -1674,7 +1677,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
                   systemColor: widget.system.colorAsColor,
                   onGameSelected: _selectGame,
                   onGameConfirmed: _selectCurrentGame,
-                  onGameOptions: _openGameContextMenuFor,
+                  onGameOptions: _openGameOptionsFor,
                   isAllMode: SystemFolderNames.isAggregate(
                     widget.system.folderName,
                   ),
@@ -1999,7 +2002,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
           onShowRandomGame: _showRandomGameDialog,
           onPlayGame: _selectCurrentGame,
           onToggleFavorite: _toggleFavorite,
-          onOpenGameSettings: _openGameSettingsDialog,
+          onOpenGameSettings: _openGameOptions,
           onBack: _goBack,
           onGameUpdated: _handleGameUpdated, // Sync UI after metadata edits.
           onFavoriteToggled: _handleFavoriteToggledFromCard,

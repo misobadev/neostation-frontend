@@ -748,6 +748,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.hintScrape: 'Ambil',
   AppLocale.hintMoreActions: 'Lainnya',
   AppLocale.hintOptions: 'Opsi',
+  AppLocale.gameOptionsThisGame: 'Game Ini',
+  AppLocale.gameOptionsView: 'Tampilan',
   AppLocale.systemOptionsSelectedSystem: 'Sistem Terpilih',
   AppLocale.systemOptionsSystemView: 'Tampilan Sistem',
   AppLocale.systemOptionsSystemLayout: 'Tata Letak Sistem',
