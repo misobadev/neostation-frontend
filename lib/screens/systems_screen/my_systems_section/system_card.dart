@@ -53,6 +53,7 @@ class SystemCard extends StatefulWidget {
     this.isSelected = false,
     this.backgroundCacheWidth = 512,
     this.showCount = false,
+    this.isCompact = false,
   });
 
   /// The system or game metadata resolved for this card.
@@ -87,6 +88,12 @@ class SystemCard extends StatefulWidget {
   /// Decode width for the card's background image. Defaults to 512 (grid
   /// cards); the carousel passes 1024 since its cards are much larger.
   final int backgroundCacheWidth;
+
+  /// Whether this card occupies the compact 2x1 recent-game slot.
+  ///
+  /// The compact slot has less artwork to spare, so the game wheel is scaled
+  /// down to keep it from crowding the card.
+  final bool isCompact;
 
   @override
   State<SystemCard> createState() => _SystemCardState();
@@ -644,35 +651,10 @@ class _SystemCardState extends State<SystemCard> {
     );
   }
 
-  /// Builds the foreground content for game cards, including the RECENT badge
-  /// and the game wheel/logo.
+  /// Builds the foreground content for game cards: the game wheel/logo.
   Widget _buildGameMainContent(BuildContext context) {
     return Stack(
       children: [
-        // RECENT badge.
-        Positioned(
-          top: 6.r,
-          right: 6.r,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondary,
-              borderRadius:
-                  Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
-                  BorderRadius.circular(9.r),
-            ),
-            child: Text(
-              AppLocale.recentBadge.getString(context),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSecondary,
-                fontSize: 8.r,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-        ),
-
         // Central game wheel/logo. The inset that lets the wheel breathe on the
         // 3x2 card would eat most of a 2x1 one, so it scales with the box and
         // only reaches its full value on cards tall enough to spare it.
@@ -682,9 +664,11 @@ class _SystemCardState extends State<SystemCard> {
               : LayoutBuilder(
                   builder: (context, constraints) {
                     final shortestSide = constraints.biggest.shortestSide;
+                    final maxInset = widget.isCompact ? 36.r : 48.r;
+                    final insetFactor = widget.isCompact ? 0.22 : 0.15;
                     final inset = shortestSide.isFinite
-                        ? math.min(48.r, shortestSide * 0.15)
-                        : 48.r;
+                        ? math.min(maxInset, shortestSide * insetFactor)
+                        : maxInset;
 
                     return Padding(
                       padding: EdgeInsets.all(inset),

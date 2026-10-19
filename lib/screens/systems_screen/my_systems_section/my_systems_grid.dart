@@ -120,7 +120,7 @@ class MySystems extends StatelessWidget {
               children: [
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.only(top: 42.r),
+                    padding: EdgeInsets.only(top: 56.r),
                     child: MySystemsCarousel(
                       selectedIndex: selectedIndex,
                       onCardTapped: onCardTapped,
@@ -1296,6 +1296,9 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
                   key: ValueKey('system_card_${card.title}_$cardIdx'),
                   info: card,
                   isSelected: cardIsSelected,
+                  isCompact:
+                      card.isGame &&
+                      widget.recentCardSize == RecentCardSizes.twoByOne,
                   onTap: handleTap,
                   onLongPress: widget.onYPressed == null
                       ? null

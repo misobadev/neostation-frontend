@@ -1109,6 +1109,8 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           ),
         ),
 
+        SizedBox(height: 8.r),
+
         // Secondary Systems Indicator List (Bottom).
         SizedBox(
           height: 40.r,
