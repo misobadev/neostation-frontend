@@ -99,6 +99,7 @@ class _SystemOptionsDialogState extends State<SystemOptionsDialog> {
       _gamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
         'system_options_dialog',
+        modal: true,
         onActivate: () => _gamepadNav.activate(),
         onDeactivate: () => _gamepadNav.deactivate(),
       );

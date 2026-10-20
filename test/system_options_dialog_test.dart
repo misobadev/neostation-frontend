@@ -11,6 +11,7 @@ import 'package:neostation/models/my_systems.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/screens/systems_screen/my_systems_section/widgets/system_options_dialog.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -197,6 +198,27 @@ void main() {
       find.text(AppLocale.systemOptionsGameSearch.getString(context)),
       findsNothing,
     );
+  });
+
+  testWidgets('remounting the system view keeps input in Options', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await openDialog(tester);
+    var systemsActive = false;
+    GamepadNavigationManager.pushLayer(
+      'replacement_systems_view',
+      onActivate: () => systemsActive = true,
+      onDeactivate: () => systemsActive = false,
+    );
+    try {
+      expect(systemsActive, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(systemsActive, isTrue);
+    } finally {
+      GamepadNavigationManager.popLayer('replacement_systems_view');
+    }
   });
 
   testWidgets('System Settings reports the action back to the host', (

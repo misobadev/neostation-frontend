@@ -9,9 +9,13 @@ import 'package:neostation/models/config_model.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/screens/game_screen/game_options_dialog.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/widgets/context_menu/game_context_menu.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'database_test_helper.dart';
 
 /// The games Options panel is the Start-button replacement for the old Y
 /// menu: game actions first, view actions below, with Add to and View Mode
@@ -179,6 +183,113 @@ void main() {
     for (final size in const ['S', 'M', 'L', 'XL']) {
       expect(find.text(size), findsOneWidget);
     }
+  });
+
+  testWidgets('remounting the game view keeps input in Options', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await openDialog(tester);
+    final context = tester.element(find.byType(GameOptionsDialog));
+    await tester.tap(find.text(AppLocale.viewMode.getString(context)));
+    await tester.pumpAndSettle();
+
+    // Switching view styles registers the replacement games navigator while
+    // this dialog remains open. It must wait until the dialog is dismissed.
+    var gamesActive = false;
+    GamepadNavigationManager.pushLayer(
+      'replacement_games_view',
+      onActivate: () => gamesActive = true,
+      onDeactivate: () => gamesActive = false,
+    );
+    try {
+      expect(gamesActive, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(gamesActive, isTrue);
+    } finally {
+      GamepadNavigationManager.popLayer('replacement_games_view');
+    }
+  });
+
+  for (final from in ['list', 'grid', 'carousel']) {
+    for (final to in ['list', 'grid', 'carousel']) {
+      if (from == to) continue;
+      testWidgets('$from to $to keeps Back on Options', (tester) async {
+        final viewNav = GamepadNavigation(onBack: () {});
+        final db = DatabaseTestHelper();
+        await db.setUp();
+        final config = SqliteConfigProvider();
+        await config.updateGameViewMode(from);
+        config.addListener(() {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            GamepadNavigationManager.pushLayer(
+              'switched_games_view',
+              onActivate: viewNav.activate,
+              onDeactivate: viewNav.deactivate,
+            );
+          });
+        });
+        try {
+          await tester.pumpWidget(host(config: config));
+          await openDialog(tester);
+          final context = tester.element(find.byType(GameOptionsDialog));
+          await tester.tap(find.text(AppLocale.viewMode.getString(context)));
+          await tester.pumpAndSettle();
+          final label = switch (to) {
+            'list' => AppLocale.listView,
+            'grid' => AppLocale.gridView,
+            _ => AppLocale.carouselView,
+          };
+          await tester.tap(find.text(label.getString(context)));
+          await tester.pumpAndSettle();
+          expect(config.config.gameViewMode, to);
+          expect(viewNav.isActive, isFalse);
+
+          // Dispatch the active navigator's B action: first leave the submenu,
+          // then dismiss Options. A hidden game view must not consume either.
+          expect(GamepadNavigation.triggerBack(), isTrue);
+          await tester.pumpAndSettle();
+          expect(find.byType(GameOptionsDialog), findsOneWidget);
+          expect(
+            find.text(AppLocale.viewMode.getString(context)),
+            findsOneWidget,
+          );
+          expect(GamepadNavigation.triggerBack(), isTrue);
+          await tester.pumpAndSettle();
+          expect(find.byType(GameOptionsDialog), findsNothing);
+          expect(viewNav.isActive, isTrue);
+        } finally {
+          GamepadNavigationManager.popLayer('switched_games_view');
+          viewNav.dispose();
+          await tester.pumpWidget(const SizedBox.shrink());
+          await db.tearDown();
+        }
+      });
+    }
+  }
+
+  testWidgets('concurrent callers open only one Options menu', (tester) async {
+    await tester.pumpWidget(host());
+    await tester.pump();
+    final open = tester
+        .widget<ElevatedButton>(find.byType(ElevatedButton))
+        .onPressed!;
+    // Distinct input listeners can request the route before its first frame
+    // registers modal focus. The shared entry point must reject the duplicate.
+    open();
+    open();
+    await tester.pumpAndSettle();
+    expect(find.byType(GameOptionsDialog, skipOffstage: false), findsOneWidget);
+    expect(GamepadNavigation.triggerBack(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.byType(GameOptionsDialog, skipOffstage: false), findsNothing);
+
+    open();
+    await tester.pumpAndSettle();
+    expect(find.byType(GameOptionsDialog), findsOneWidget);
+    expect(GamepadNavigation.triggerBack(), isTrue);
+    await tester.pumpAndSettle();
   });
 
   testWidgets('Game Settings reports the action back to the host', (

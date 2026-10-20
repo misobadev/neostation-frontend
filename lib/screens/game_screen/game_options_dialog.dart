@@ -24,6 +24,10 @@ enum GameOptionsAction {
 
 enum _GameMenu { main, view, addTo }
 
+// This guard belongs to the shared entry point: separate mounted games screens
+// can receive the same input before the dialog registers its navigation layer.
+final _gameOptionsDialogs = Expando<bool>('game options dialog open');
+
 /// Opens the games screen's Options menu from the left edge.
 Future<GameOptionsAction?> showGameOptionsDialog({
   required BuildContext context,
@@ -32,38 +36,46 @@ Future<GameOptionsAction?> showGameOptionsDialog({
   required bool canScrape,
   required bool canIdentify,
   required String? createTargetLabel,
-}) {
-  return showGeneralDialog<GameOptionsAction>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: AppLocale.hintOptions.getString(context),
-    barrierColor: Colors.black.withValues(alpha: 0.35),
-    transitionDuration: const Duration(milliseconds: 220),
-    pageBuilder: (context, animation, secondaryAnimation) => GameOptionsDialog(
-      gameTitle: gameTitle,
-      targets: targets,
-      canScrape: canScrape,
-      canIdentify: canIdentify,
-      createTargetLabel: createTargetLabel,
-    ),
-    transitionBuilder: (context, animation, secondaryAnimation, child) {
-      final curved = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
-      );
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(-1, 0),
-            end: Offset.zero,
-          ).animate(curved),
-          child: child,
-        ),
-      );
-    },
-  );
+}) async {
+  final navigator = Navigator.of(context, rootNavigator: true);
+  if (_gameOptionsDialogs[navigator] == true) return null;
+  _gameOptionsDialogs[navigator] = true;
+  try {
+    return await showGeneralDialog<GameOptionsAction>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: AppLocale.hintOptions.getString(context),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          GameOptionsDialog(
+            gameTitle: gameTitle,
+            targets: targets,
+            canScrape: canScrape,
+            canIdentify: canIdentify,
+            createTargetLabel: createTargetLabel,
+          ),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(-1, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
+  } finally {
+    _gameOptionsDialogs[navigator] = false;
+  }
 }
 
 /// A left-side, gamepad-navigable list of everything the selected game can do.
@@ -98,6 +110,8 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
 
   late GamepadNavigation _gamepadNav;
   bool _isClosing = false;
+  late final String _navLayerId =
+      'game_options_dialog#${identityHashCode(this)}';
 
   @override
   void initState() {
@@ -119,7 +133,8 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
       if (!mounted) return;
       _gamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
-        'game_options_dialog',
+        _navLayerId,
+        modal: true,
         onActivate: () => _gamepadNav.activate(),
         onDeactivate: () => _gamepadNav.deactivate(),
       );
@@ -128,7 +143,7 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
 
   @override
   void dispose() {
-    GamepadNavigationManager.popLayer('game_options_dialog');
+    GamepadNavigationManager.popLayer(_navLayerId);
     _gamepadNav.dispose();
     super.dispose();
   }

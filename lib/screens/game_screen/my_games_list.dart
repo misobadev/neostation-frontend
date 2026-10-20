@@ -616,7 +616,9 @@ class _SystemGamesListState extends State<SystemGamesList> {
         if (gameViewMode == 'grid' || gameViewMode == 'carousel') {
           _gamepadNav.deactivate();
         } else {
-          _gamepadNav.activate();
+          // Options can still be open when its view-mode write completes.
+          // Let the stack retain the modal rather than waking this list too.
+          GamepadNavigationManager.reactivate();
         }
       } catch (_) {}
     }
