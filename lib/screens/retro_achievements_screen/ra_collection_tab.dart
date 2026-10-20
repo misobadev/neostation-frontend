@@ -498,9 +498,10 @@ class RaCollectionTabState extends State<RaCollectionTab> {
                                             textAlign: TextAlign.center,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.labelSmall,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .labelSmall
+                                                ?.copyWith(fontSize: 10.r),
                                           ),
                                         ),
                                       ],
