@@ -32,6 +32,34 @@ Configuring the emulator's executable is separate from cloud saves. Standalone e
 
 Android launches supported standalone emulators using their configured application integration. There is no desktop executable-picker step on Android.
 
+## PS3 disc and PSN folders
+
+NeoStation recognises both extracted layouts alongside `.iso` files:
+
+```text
+roms/ps3/
+  Disc Game.ps3/
+    PS3_GAME/
+      PARAM.SFO
+      USRDIR/EBOOT.BIN
+  NPEB00913.ps3/
+    PARAM.SFO
+    USRDIR/EBOOT.BIN
+    TROPDIR/
+```
+
+The `.ps3` suffix is optional for directories. Each game folder is one library
+entry; its artwork, trophy files and internal assets are not separate games.
+After adding a folder, rescan the PS3 system. Enable recursive scanning if games
+are inside additional category folders.
+
+NeoStation passes the game directory to the selected emulator. aPS3e's
+directory-specific `game_dir` intent is used instead of its ISO intent; ARMSX3,
+EmuCoreC and desktop RPCS3 retain their configured path-based launch commands.
+The emulator must have access to the game folder and its contents. Firmware,
+PSN installation requirements and any required licenses remain the emulator's
+responsibility; scanning a folder does not install a PKG or provide a license.
+
 ## Related Pages
 
 - [Getting Started](/getting-started/getting-started/)

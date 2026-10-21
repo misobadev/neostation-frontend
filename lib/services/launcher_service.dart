@@ -226,6 +226,10 @@ class LauncherService {
       // `"m3u_first_disc": true` and are launched on the playlist's first disc
       // instead (see [resolveAndroidLaunchFiles]).
       result['m3u_first_disc'] = platformConfig['m3u_first_disc'] == true;
+      if (platformConfig['directory_launch_arguments'] is String) {
+        result['directory_launch_arguments'] =
+            platformConfig['directory_launch_arguments'];
+      }
 
       if (platformConfig.containsKey('launch_arguments')) {
         final args = platformConfig['launch_arguments'].toString();
@@ -447,8 +451,47 @@ class LauncherService {
     Map<String, dynamic> command,
     GameModel game,
   ) async {
+    await _resolveDirectoryLaunch(command, game);
     await _resolveM3uFirstDisc(command, game);
     await _resolveScummVmTarget(command, game);
+  }
+
+  /// Keep emulator-specific ISO/folder differences in the systems JSON, not Kotlin.
+  Future<void> _resolveDirectoryLaunch(
+    Map<String, dynamic> command,
+    GameModel game,
+  ) async {
+    final template = command['directory_launch_arguments'];
+    final location = game.romPath;
+    if (template is! String || template.isEmpty || location == null) return;
+    if (!await GameRepository.isLaunchDirectory(location)) return;
+    final directoryCommand = _parseLaunchArguments(template);
+    if (directoryCommand['data'] is String) {
+      directoryCommand['data'] = resolvePlaceholdersAndroid(
+        directoryCommand['data'] as String,
+        game,
+      );
+    }
+    for (final extra in directoryCommand['extras'] as List) {
+      extra['value'] = resolvePlaceholdersAndroid(
+        extra['value'].toString(),
+        game,
+      );
+    }
+    // In particular, do not leave the old iso_uri extra in a directory intent.
+    for (final key in [
+      'package',
+      'activity',
+      'action',
+      'category',
+      'data',
+      'type',
+      'extras',
+      'activity_flags',
+    ]) {
+      command.remove(key);
+    }
+    command.addAll(directoryCommand);
   }
 
   /// Swaps a multi-disc `.m3u` launch for the playlist's first disc.

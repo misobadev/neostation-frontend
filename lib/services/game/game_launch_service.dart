@@ -10,6 +10,7 @@ import '../../models/system_model.dart';
 import '../../models/emulator_model.dart';
 import '../../models/core_emulator_model.dart';
 import '../../repositories/emulator_repository.dart';
+import '../../repositories/game_repository.dart';
 import '../../utils/emulator_loader.dart';
 import '../config_service.dart';
 import '../android_service.dart';
@@ -89,14 +90,10 @@ class GameLaunchService {
         }
       }
 
-      bool romExists = false;
-      if (game.romPath != null) {
-        if (Platform.isAndroid && game.romPath!.startsWith('content://')) {
-          romExists = true;
-        } else {
-          romExists = await File(game.romPath!).exists();
-        }
-      }
+      final romExists = await GameRepository.launchPathExists(
+        game.romPath,
+        allowDirectory: system.id == 'ps3' || system.folderName == 'ps3',
+      );
       if (!context.mounted) return GameLaunchResult.failure('', '');
 
       if (!romExists) {

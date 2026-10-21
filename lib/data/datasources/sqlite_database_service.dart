@@ -1373,7 +1373,7 @@ class SqliteDatabaseService {
   ///
   /// Android's SAF walk stays where it is: it reaches the DocumentsProvider
   /// over a platform channel, which is only bound on the root isolate.
-  /// Recognises extracted disc games as a single entry at their outer folder.
+  /// Recognises extracted disc and PSN games as one entry at their outer folder.
   /// Does not descend into recognised games (including PS3_UPDATE).
   @visibleForTesting
   static Future<List<RomEntry>> scanPs3Path(

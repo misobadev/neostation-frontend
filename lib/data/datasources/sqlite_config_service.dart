@@ -75,9 +75,10 @@ class SqliteConfigService {
     }
   }
 
-  /// Lists PS3 disc folders as single games while retaining ordinary ROM files.
+  /// Lists PS3 disc/PSN folders as single games, retaining ordinary ISO files.
   ///
-  /// A folder is a game when it contains `PS3_GAME/PARAM.SFO`. Recognised game
+  /// A disc folder contains `PS3_GAME/PARAM.SFO`; an extracted PSN folder has
+  /// `PARAM.SFO` and `USRDIR/EBOOT.BIN` directly inside it. Recognised game
   /// folders are not traversed, so files below `PS3_GAME` and `PS3_UPDATE` are
   /// never reported as separate games.
   static Future<List<({String path, String filename, int size})>> scanPs3Path(
@@ -105,6 +106,26 @@ class SqliteConfigService {
     }
 
     Future<bool> isGame(List<Map<String, dynamic>> items) async {
+      final hasDirectSfo = items.any(
+        (item) =>
+            item['isDirectory'] != true &&
+            item['name'].toString().toUpperCase() == 'PARAM.SFO',
+      );
+      if (hasDirectSfo) {
+        for (final item in items) {
+          if (item['isDirectory'] == true &&
+              item['name'].toString().toUpperCase() == 'USRDIR') {
+            final executableItems = await children(item['uri'].toString());
+            if (executableItems.any(
+              (child) =>
+                  child['isDirectory'] != true &&
+                  child['name'].toString().toUpperCase() == 'EBOOT.BIN',
+            )) {
+              return true;
+            }
+          }
+        }
+      }
       for (final item in items) {
         if (item['isDirectory'] != true ||
             item['name'].toString().toUpperCase() != 'PS3_GAME') {
@@ -163,7 +184,10 @@ class SqliteConfigService {
     }
 
     try {
-      await visit(root, path.basename(root), true);
+      final rootName = useSaf
+          ? path.posix.basename(Uri.parse(root).pathSegments.last)
+          : path.basename(root);
+      await visit(root, rootName, true);
     } catch (error) {
       _log.e('Error scanning PS3 folders: $error');
       rethrow;

@@ -11,6 +11,32 @@ import '../services/saf_directory_service.dart';
 
 /// Repository for game data access operations.
 class GameRepository {
+  /// Folder-backed systems may launch directories; ordinary ROM systems may not.
+  static Future<bool> launchPathExists(
+    String? location, {
+    bool allowDirectory = false,
+  }) async {
+    if (location == null || location.isEmpty) return false;
+    // SAF permission/reading errors are surfaced by the Android launch bridge.
+    if (location.startsWith('content://')) return true;
+    final localPath = location.startsWith('file://')
+        ? Uri.parse(location).toFilePath()
+        : location;
+    return await File(localPath).exists() ||
+        (allowDirectory && await Directory(localPath).exists());
+  }
+
+  /// Used only by emulators declaring an alternate directory launch command.
+  static Future<bool> isLaunchDirectory(String location) async {
+    if (location.startsWith('content://')) {
+      return (await SafDirectoryService.listFiles(location)).isNotEmpty;
+    }
+    final directory = location.startsWith('file://')
+        ? Directory.fromUri(Uri.parse(location))
+        : Directory(location);
+    return directory.exists();
+  }
+
   /// Reads a small text launch descriptor through SAF or the local filesystem.
   static Future<String> readLaunchDescriptor(String location) async {
     const limit = 4096;

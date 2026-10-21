@@ -32,18 +32,19 @@
       "name": "Standalone aPS3e",
       "default_standalone": true,
       "unique_id": "ps3.aenu.aps3e",
-      "description": "Supported extensions: iso.",
+      "description": "Supported formats: ISO and extracted PS3 disc/PSN game folders.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n aenu.aps3e/aenu.aps3e.EmulatorActivity -a aenu.intent.action.APS3E -e iso_uri \"{file.uri}\""
+          "launch_arguments": "-n aenu.aps3e/aenu.aps3e.EmulatorActivity -a aenu.intent.action.APS3E -e iso_uri \"{file.uri}\"",
+          "directory_launch_arguments": "-n aenu.aps3e/aenu.aps3e.EmulatorActivity -a aenu.intent.action.APS3E -e game_dir \"{file.path}\""
         }
       }
     },
     {
       "name": "Standalone ARMSX3",
       "unique_id": "ps3.com.armsx3",
-      "description": "Supported extensions: iso.",
+      "description": "Supported formats: ISO and extracted PS3 disc/PSN game folders.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -54,7 +55,7 @@
     {
       "name": "Standalone EMUCOREC",
       "unique_id": "ps3.com.sbro.emucorec",
-      "description": "Supported extensions: iso.",
+      "description": "Supported formats: ISO and extracted PS3 disc/PSN game folders.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -65,7 +66,7 @@
     {
       "name": "Standalone RPCS3",
       "unique_id": "ps3.rpcs3",
-      "description": "Supported extensions: iso.",
+      "description": "Supported formats: ISO and extracted PS3 disc/PSN game folders.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "windows": {
