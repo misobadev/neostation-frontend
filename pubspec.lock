@@ -37,10 +37,10 @@ packages:
     dependency: "direct main"
     description:
       name: archive
-      sha256: "6c5bcd986e06b94e3c40244af471750840a3d2341d1f9763a1100a14add517b4"
+      sha256: "0d58d1fa1fddf6588251ccf2819f3fb3b6d0452c1b2813ac7413a05592bfbefe"
       url: "https://pub.dev"
     source: hosted
-    version: "4.3.0"
+    version: "4.5.2"
   args:
     dependency: transitive
     description:
@@ -61,10 +61,10 @@ packages:
     dependency: "direct main"
     description:
       name: audio_metadata_reader
-      sha256: "5c769c77f19a38c0cf2a4a7e3728ed1cdefb2ce4a016111527b6b986c17663f9"
+      sha256: "66e8e216deab90008fa161c345e93c7c3cab28667042264976eb03865122a7b9"
       url: "https://pub.dev"
     source: hosted
-    version: "1.8.0"
+    version: "1.8.1"
   battery_plus:
     dependency: "direct main"
     description:
@@ -433,10 +433,10 @@ packages:
     dependency: "direct main"
     description:
       name: fvp
-      sha256: "2addef2e6faf46a589c529de8a81b74cef927c3343eb75aeab5e6a4715c97e8d"
+      sha256: "2f4607e07748856dbe268a3b968efe973c27f85ea4e7621c4209783a6dad26a0"
       url: "https://pub.dev"
     source: hosted
-    version: "0.39.0"
+    version: "0.39.1"
   glob:
     dependency: transitive
     description:
@@ -998,10 +998,10 @@ packages:
     dependency: "direct main"
     description:
       name: sqlite3
-      sha256: fa3fd961e83b2dca8890a7b1014ab1226831d2b5908067c0ab7f385ffb655caf
+      sha256: "144132790ec1947fad9f3ddceffd0af2ab80a1f0d1e81a4d094ee6707ec3df0b"
       url: "https://pub.dev"
     source: hosted
-    version: "3.6.0"
+    version: "3.7.1"
   stack_trace:
     dependency: transitive
     description:
