@@ -365,6 +365,14 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                         result.error("INVALID_ARGUMENTS", "URI is required", null)
                     }
                 }
+                "releasePermission" -> {
+                    val uriString = call.argument<String>("uri")
+                    if (uriString != null) {
+                        releaseSafPermission(uriString, result)
+                    } else {
+                        result.error("INVALID_ARGUMENTS", "URI is required", null)
+                    }
+                }
                 "openAllFilesAccessSettings" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                         // Narrowest to broadest. The general All-Files list used
@@ -1580,6 +1588,46 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             }
             result.success(hasPermission)
         } catch (e: Exception) {
+            result.success(false)
+        }
+    }
+
+    /**
+     * Releases the persisted grant of the folder tree [uriString] names, and only that
+     * folder's: a folder inside it or around it, picked on its own, holds a grant of its own.
+     * The held grant is matched by provider and decoded folder id, so `primary%3AROMs` and
+     * `primary:ROMs` are the same folder. Answers whether a grant was released; never fails.
+     */
+    private fun releaseSafPermission(uriString: String, result: MethodChannel.Result) {
+        try {
+            val uri = Uri.parse(uriString)
+            if (!android.provider.DocumentsContract.isTreeUri(uri)) {
+                result.success(false)
+                return
+            }
+            val treeId = android.provider.DocumentsContract.getTreeDocumentId(uri)
+            var released = false
+            for (permission in contentResolver.persistedUriPermissions) {
+                val held = permission.uri
+                if (held.authority != uri.authority ||
+                    !android.provider.DocumentsContract.isTreeUri(held) ||
+                    android.provider.DocumentsContract.getTreeDocumentId(held) != treeId
+                ) {
+                    continue
+                }
+                var flags = 0
+                if (permission.isReadPermission) flags = flags or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                if (permission.isWritePermission) flags = flags or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                try {
+                    contentResolver.releasePersistableUriPermission(held, flags)
+                    released = true
+                } catch (e: Exception) {
+                    android.util.Log.w("MainActivity", "Could not release a SAF permission: ${e.message}")
+                }
+            }
+            result.success(released)
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Could not release a SAF permission: ${e.message}")
             result.success(false)
         }
     }

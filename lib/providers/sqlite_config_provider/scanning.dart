@@ -141,7 +141,11 @@ extension SqliteConfigScanning on SqliteConfigProvider {
         rethrow;
       }
 
-      // 3. Refresh the library: scan what remains, or clear the systems.
+      // 3. Give back Android's storage grant for the folder, unless something
+      // still stored uses that same folder. Never throws.
+      await SafGrantService.releaseRemovedRomFolder(folderPath);
+
+      // 4. Refresh the library: scan what remains, or clear the systems.
       try {
         if (newList.isNotEmpty) {
           await scanSystems();
