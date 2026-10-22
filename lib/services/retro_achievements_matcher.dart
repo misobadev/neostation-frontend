@@ -21,7 +21,7 @@ import 'retroachievements_hash_service.dart';
 /// The strategies, in order:
 ///
 /// 0. a match the user chose by hand, which outranks every automatic answer;
-/// 1. an exact hash match against the bundled RA hash database;
+/// 1. an exact hash match against the local RA hash catalogue;
 /// 2. a sanitized-filename lookup, for systems with no hash-only policy;
 /// 3. a loose title match against the user's recently-played history.
 ///

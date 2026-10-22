@@ -118,6 +118,13 @@ Create a `.env` file from `.env.example` for local development.
 
 > RetroAchievements no longer uses a build-time key. Each user signs in with their own RetroAchievements username and web API key (from [retroachievements.org/controlpanel.php](https://retroachievements.org/controlpanel.php)) inside the app.
 
+Signed-in users automatically refresh the RetroAchievements game/hash catalogue
+for consoles in their library once per day. This runs in the background even
+with startup matching disabled; only existing ROM hashes are looked up in that
+case. **Settings → Tools → Match RetroAchievements Games** forces a catalogue
+refresh before matching and hashing. Downloads use the user's own API key;
+failed downloads retain the saved catalogue, and manual matches are preserved.
+
 ### Android release signing (optional)
 
 If you want your release APKs signed with a release certificate (required for app store distribution and seamless user upgrades), create `android/key.properties` from `android/key.properties.example`.

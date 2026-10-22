@@ -1,3 +1,4 @@
+import 'package:neostation/providers/sqlite_database_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -15,7 +16,7 @@ import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/ra_library_match_runner.dart';
 import 'package:neostation/services/metadata_cleanup_service.dart';
-import 'package:neostation/services/retroachievements_hash_service.dart';
+import 'package:neostation/services/retro_achievements_helper.dart';
 import 'package:neostation/services/rom_folder_organizer_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/count_label.dart';
@@ -540,8 +541,8 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
     // The service owns "is it running", not this widget: leaving Tools disposes
     // the screen while the pass carries on, so a local flag reads idle on the
     // way back and would start a second run over the same ROMs.
-    if (RetroAchievementsHashService.isRematchRunning) {
-      RetroAchievementsHashService.requestRematchPause();
+    if (RaLibraryMatchRunner.isRunning) {
+      RaLibraryMatchRunner.requestPause();
       setState(() {});
       return;
     }
@@ -566,6 +567,9 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
       nothingToDo: AppLocale.rematchAchievementsNothingToDo.getString(context),
       paused: AppLocale.rematchAchievementsPaused.getString(context),
       failed: AppLocale.rematchAchievementsFailed.getString(context),
+      catalogueRefreshFailed: AppLocale.raCatalogueRefreshFailed.getString(
+        context,
+      ),
     );
     final localeConfirm = AppLocale.confirm.getString(context);
 
@@ -582,8 +586,16 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
     // Redraw so the row renders as "stop" for the duration of the run.
     setState(() {});
 
+    final raProvider = context.read<RetroAchievementsProvider>();
+    final databaseProvider = context.read<SqliteDatabaseProvider>();
     await RaLibraryMatchRunner.run(
       strings: strings,
+      apiKey: raProvider.apiKey,
+      onCatalogueChanged: () async {
+        RetroAchievementsHelper.forgetResolvedIds();
+        raProvider.invalidateCachedReads();
+        await databaseProvider.refresh();
+      },
       onProgressStateChanged: () {
         if (mounted) setState(() {});
       },
@@ -639,7 +651,7 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
                     selected: isSelected,
                     onTap: () => _rematchAchievements(),
                     trailing: SettingsActionButton(
-                      icon: RetroAchievementsHashService.isRematchRunning
+                      icon: RaLibraryMatchRunner.isRunning
                           ? Symbols.pause_rounded
                           : Symbols.emoji_events_rounded,
                       selected: isSelected,

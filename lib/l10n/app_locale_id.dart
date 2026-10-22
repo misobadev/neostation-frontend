@@ -1,6 +1,8 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleId = {
+  AppLocale.raCatalogueRefreshFailed:
+      'Katalog RetroAchievements tidak dapat diperbarui. Pencocokan menggunakan data tersimpan.',
   AppLocale.smartMatchesOne: '1 game cocok',
   AppLocale.smartCollection: 'Koleksi pintar',
   AppLocale.manualCollection: 'Koleksi manual',

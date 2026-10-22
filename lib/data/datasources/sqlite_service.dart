@@ -469,7 +469,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 170;
+  static const int _databaseVersion = 172;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -2164,6 +2164,7 @@ class SqliteService {
   /// Creates tables dedicated to RetroAchievements game metadata.
   Future<void> _createRetroArchTables(DatabaseExecutorAdapter db) async {
     const raTables = [
+      SqliteMigrations.createRaCatalogueSyncTableSql,
       '''
       CREATE TABLE IF NOT EXISTS app_ra_game_list (
           id INTEGER,
@@ -5979,11 +5980,34 @@ class SqliteService {
       await db.transaction((txn) async {
         _log.i('Refreshing local RetroAchievements game database...');
 
+        // A bundled snapshot must never replace downloaded catalogues. Keep
+        // those consoles intact even when an app upgrade changes the seed.
+        final syncTable = await txn.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_ra_catalogue_sync'",
+        );
+        if (syncTable.isNotEmpty) {
+          await txn.execute('''
+            CREATE TEMP TABLE ra_live_seed_backup AS
+            SELECT * FROM app_ra_game_list WHERE console_id IN
+              (SELECT console_id FROM app_ra_catalogue_sync)
+          ''');
+        }
+
         // Purge existing data to ensure a clean sync.
         await txn.execute('DELETE FROM app_ra_game_list');
 
         // Batch insert data from the SQL seed file.
         await _executeSqlFileOptimized(txn, _raSeedAsset, 'ra_insert');
+        if (syncTable.isNotEmpty) {
+          await txn.execute('''
+            DELETE FROM app_ra_game_list WHERE console_id IN
+              (SELECT console_id FROM app_ra_catalogue_sync)
+          ''');
+          await txn.execute(
+            'INSERT INTO app_ra_game_list SELECT * FROM ra_live_seed_backup',
+          );
+          await txn.execute('DROP TABLE ra_live_seed_backup');
+        }
       });
 
       if (assetStamp.isNotEmpty) {

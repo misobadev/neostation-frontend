@@ -1,6 +1,8 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleKo = {
+  AppLocale.raCatalogueRefreshFailed:
+      'RetroAchievements 카탈로그를 새로 고칠 수 없습니다. 저장된 데이터로 일치하는 게임을 찾았습니다.',
   AppLocale.smartMatchesOne: '일치하는 게임 1개',
   AppLocale.smartCollection: '스마트 컬렉션',
   AppLocale.manualCollection: '수동 컬렉션',

@@ -14,6 +14,14 @@ import 'package:neostation/utils/cloud_path_builder.dart';
 class SqliteMigrations {
   static final _log = LoggerService.instance;
 
+  static const createRaCatalogueSyncTableSql = '''
+    CREATE TABLE IF NOT EXISTS app_ra_catalogue_sync (
+      console_id INTEGER PRIMARY KEY,
+      refreshed_at TEXT NOT NULL,
+      match_pending INTEGER NOT NULL DEFAULT 1
+    )
+  ''';
+
   // ── RomM schema — single source of truth ──────────────────────────────────
   // Referenced by migration v111 and by the fresh-install table list, so a
   // future column change is made in exactly one place.
@@ -643,6 +651,10 @@ class SqliteMigrations {
         break;
       case 170:
         await _migrateToVersion170(db);
+        break;
+      // 171 is reserved by Android Games (upstream PR #604).
+      case 172:
+        db.execute(createRaCatalogueSyncTableSql);
         break;
       default:
         _log.w('No migration defined for version $version');

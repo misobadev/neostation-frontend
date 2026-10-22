@@ -1,3 +1,5 @@
+import 'package:neostation/providers/sqlite_database_provider.dart';
+import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
@@ -11,7 +13,7 @@ import 'package:neostation/widgets/systems_update_dialog.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/game/game_session_manager.dart';
 import 'package:neostation/services/ra_library_match_runner.dart';
-import 'package:neostation/services/retroachievements_hash_service.dart';
+import 'package:neostation/services/retro_achievements_helper.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import '../widgets/fixed_header.dart';
@@ -240,9 +242,9 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
     await _runStartupRaMatch(configProvider, holdsSplash: true);
   }
 
-  /// Runs the RetroAchievements match pass over ROMs the startup scan added.
+  /// Refreshes the RA catalogue and matches hashes already in the library.
   ///
-  /// Opt-in, and silent when there is nothing to do. Hashing is otherwise only
+  /// Hashing new ROMs is opt-in. Hashing is otherwise only
   /// ever triggered by the user opening a game or walking to Tools, so a ROM
   /// added last week carries no match and no badge until somebody remembers to
   /// press a button.
@@ -256,7 +258,6 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
     bool holdsSplash = false,
   }) async {
     if (!mounted) return;
-    if (!configProvider.config.raMatchOnStartup) return;
 
     // Nothing to walk, and nothing the user would see if we did.
     if (configProvider.config.romFolders.isEmpty) return;
@@ -264,21 +265,30 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
     // The Tools button may already be running one; it is single-flight anyway,
     // but starting a pass that immediately refuses itself would log a warning
     // on every launch.
-    if (RetroAchievementsHashService.isRematchRunning) return;
+    if (RaLibraryMatchRunner.isRunning) return;
 
-    // Deliberately not gated on being signed in to RetroAchievements. The pass
-    // hashes locally and resolves against the bundled RA database, so it needs
-    // no account, and what it produces — the match, and the achievement count
-    // behind the library badge — is visible without one. Tools takes the same
-    // view: signed out it warns and still runs, rather than refusing.
+    final raProvider = context.read<RetroAchievementsProvider>();
+    final databaseProvider = context.read<SqliteDatabaseProvider>();
+    final apiKey = await raProvider.catalogueApiKey();
+    final hashMissing = configProvider.config.raMatchOnStartup;
+    if (!mounted || GameSessionManager.isGameLaunchInProgress) return;
+    if (!hashMissing && apiKey.isEmpty) return;
 
     final strings = _raMatchStrings();
     if (strings == null) return;
 
     _raMatchInterrupted = await RaLibraryMatchRunner.run(
       strings: strings,
+      apiKey: apiKey,
+      hashMissing: hashMissing,
+      onCatalogueChanged: () async {
+        RetroAchievementsHelper.forgetResolvedIds();
+        raProvider.invalidateCachedReads();
+        await databaseProvider.refresh();
+      },
       trigger: RaMatchTrigger.automatic,
-      holdsSplash: holdsSplash,
+      // A catalogue-only network refresh must not hold up the library.
+      holdsSplash: holdsSplash && hashMissing,
     );
   }
 
