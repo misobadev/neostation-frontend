@@ -58,6 +58,7 @@ import '../../constants/system_folder_names.dart';
 import '../search_screen/search_screen.dart';
 import '../../utils/artwork_cache.dart';
 import '../../utils/game_list_update.dart';
+import '../../utils/effective_system.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 import '../../themes/corner_radii.dart';
@@ -2068,16 +2069,23 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// Synchronizes the selected game's metadata and refreshes the list sorting.
   Future<void> _handleGameUpdated() async {
     _collectionsProvider.load();
-    if (_selectedGame == null) return;
+    final selectedGame = _selectedGame;
+    if (selectedGame == null) return;
 
     try {
       _resetVideoState();
 
       // Fetch latest metadata from local storage.
-      final updatedGame = await GameService.getGameDetails(
-        widget.system,
-        _selectedGame!.romname,
+      final effectiveSystem = resolveEffectiveSystem(
+        listSystem: widget.system,
+        game: selectedGame,
+        detectedSystems: _configProvider.detectedSystems,
       );
+      final updatedGame = await GameService.getGameDetails(
+        effectiveSystem,
+        selectedGame.romname,
+      );
+      if (!mounted) return;
 
       if (updatedGame != null) {
         final artworkFolder =
@@ -2093,10 +2101,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
           _selectedGame = updatedGame;
           _artworkVersion++;
 
-          // Grid and carousel views use the games-list identity to know when
-          // their cached artwork cards must be rebuilt. Publish a new list
-          // instead of mutating this one in place.
-          _games = replaceGameInList(_games, updatedGame);
+          // Folder views are rebuilt from the master list. Updating only the
+          // visible copy would restore the old emulator on the next rebuild.
+          _allGames = replaceGameInList(_allGames, updatedGame);
+          _games = _buildDisplayList();
         });
 
         _loadLocalizedDescription();
