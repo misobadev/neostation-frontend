@@ -178,6 +178,22 @@ class RommService {
   /// [_sharedHttpClient]. Process-wide, like the client it replaces.
   static http.Client? _httpClientOverride;
 
+  /// Opens the part file a ROM download writes to.
+  static Future<RandomAccessFile> Function(File file) _openPartFile =
+      _openForWrite;
+
+  static Future<RandomAccessFile> _openForWrite(File file) =>
+      file.open(mode: FileMode.write);
+
+  /// Replaces how a ROM download opens its part file, or restores it with
+  /// null, so a test can hold or fail its writes.
+  @visibleForTesting
+  static void debugUsePartFileOpener(
+    Future<RandomAccessFile> Function(File file)? open,
+  ) {
+    _openPartFile = open ?? _openForWrite;
+  }
+
   /// Routes all RomM HTTP through [client] (a `MockClient`, typically); pass
   /// null to restore the shared client.
   @visibleForTesting
@@ -1264,7 +1280,7 @@ class RommService {
   /// success, so partial/cancelled downloads never leave a usable-looking file.
   /// Streaming (not buffering) keeps memory flat for multi-GB ROMs.
   ///
-  /// [onProgress] receives `(receivedBytes, totalBytes?)`. [shouldCancel] is
+  /// [onProgress] receives `(writtenBytes, totalBytes?)`. [shouldCancel] is
   /// polled between chunks, and every [_cancelPollInterval] while waiting on
   /// the server; returning true aborts with [RommCancelledException] and
   /// cleans up the temp file.
@@ -1318,11 +1334,20 @@ class RommService {
             }
           });
 
-    IOSink? sink;
+    RandomAccessFile? part;
     // Only a failure while the body streams to disk is reported as a
     // "Download error"; anything else reaches the caller as it was thrown.
     var reading = false;
     try {
+      // Opened before the request, so a folder that can't be written to fails
+      // without asking for a body nobody would read: a body never listened to
+      // keeps its connection open, aborted or not.
+      try {
+        part = await _openPartFile(tmpFile);
+      } catch (e) {
+        throw RommException('Download error: $e');
+      }
+
       // Build a fresh request each attempt so the shared retry policy (401 →
       // refresh, 403 → re-auth) picks up the new token on its second try.
       final resp = await _sendWithAuthRetry<http.StreamedResponse>(() async {
@@ -1354,7 +1379,7 @@ class RommService {
       final total = resp.contentLength;
       var received = 0;
       chunks = StreamIterator(resp.stream.timeout(stallTimeout));
-      final out = sink = tmpFile.openWrite();
+      final out = part;
       reading = true;
       while (true) {
         final bool more;
@@ -1369,13 +1394,18 @@ class RommService {
         if (!more) break;
         if (shouldCancel?.call() ?? false) throw RommCancelledException();
         final chunk = chunks.current;
-        out.add(chunk);
+        // Each chunk is on disk before the next is read. Handed to a sink
+        // without waiting, a network faster than the disk (a microSD card, a
+        // USB stick) piled the difference up in memory, gigabytes over a disc
+        // image, and a failed write (a full disk) was lost, leaving the
+        // download waiting for good. The body is paused meanwhile, which also
+        // stops the stall timer: a slow disk is not a stalled server.
+        await out.writeFrom(chunk);
         received += chunk.length;
         onProgress?.call(received, total);
       }
-      await out.flush();
       await out.close();
-      sink = null;
+      part = null;
       reading = false;
 
       // Replace any existing destination, then move temp into place.
@@ -1388,7 +1418,7 @@ class RommService {
     } catch (e) {
       fireAbort();
       try {
-        await sink?.close();
+        await part?.close();
       } catch (_) {}
       try {
         if (await tmpFile.exists()) await tmpFile.delete();
