@@ -1378,6 +1378,11 @@ mixin AppLocale {
       'romm_error_unexpected_status';
   static const String rommErrorNotRomm = 'romm_error_not_romm';
   static const String rommErrorServerStatus = 'romm_error_server_status';
+  // Why loading from a connected RomM server failed, where the connect wording
+  // (check the URL, the password) no longer fits.
+  static const String rommErrorUnreadable = 'romm_error_unreadable';
+  static const String rommErrorLoadFailed = 'romm_error_load_failed';
+  static const String rommErrorSignInRejected = 'romm_error_sign_in_rejected';
   static const String rommConnectedAs = 'romm_connected_as';
   static const String rommCredentialsRequired = 'romm_credentials_required';
   static const String rommAuthPassword = 'romm_auth_password';

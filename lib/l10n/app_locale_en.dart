@@ -1297,6 +1297,11 @@ const Map<String, dynamic> appLocaleEn = {
       'That URL didn\'t answer like a RomM server. Check the server URL.',
   AppLocale.rommErrorServerStatus:
       'The RomM server answered with an error ({error}).',
+  AppLocale.rommErrorUnreadable:
+      'The RomM server sent an answer the app couldn\'t read.',
+  AppLocale.rommErrorLoadFailed: 'Couldn\'t load from RomM. Try again.',
+  AppLocale.rommErrorSignInRejected:
+      'Your RomM sign-in was rejected. Sign in again.',
   AppLocale.rommConnectedAs: 'Connected as {user}',
   AppLocale.rommCredentialsRequired:
       'Enter the server URL, username and password',

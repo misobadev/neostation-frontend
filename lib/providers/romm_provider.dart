@@ -116,7 +116,23 @@ class RommProvider extends ChangeNotifier {
   /// screen, so a global error would put a failing `/api/collections` under
   /// the search field of a search that worked. Scoped here, the search caption
   /// only ever reports the search.
-  String? _romsError;
+  ///
+  /// Its [RommException.kind] is what the UI says, in the app language; the
+  /// message is English, for the log.
+  RommException? _romsFailure;
+
+  /// The failure of the last [loadPlatforms], or null when it succeeded (or
+  /// has not run), so an empty platform list can say why it is empty.
+  RommException? _platformsFailure;
+
+  /// The failure of the last [loadCollections], as [_platformsFailure].
+  RommException? _collectionsFailure;
+
+  /// Why the saved account was rejected when it was checked at start-up, or
+  /// null. Set only for a definite rejection (see
+  /// [_verifyRestoredConnection]), so the connect screen can say why it is
+  /// showing instead of the library.
+  RommException? _restoreFailure;
 
   String _serverUrl = '';
   String _username = '';
@@ -240,7 +256,10 @@ class RommProvider extends ChangeNotifier {
   RommConnectionStatus get status => _status;
   bool get isConnected => _status == RommConnectionStatus.connected;
   String? get lastError => _lastError;
-  String? get romsError => _romsError;
+  RommException? get romsFailure => _romsFailure;
+  RommException? get platformsFailure => _platformsFailure;
+  RommException? get collectionsFailure => _collectionsFailure;
+  RommException? get restoreFailure => _restoreFailure;
   String get serverUrl => _serverUrl;
   String get username => _username;
 
@@ -450,6 +469,7 @@ class RommProvider extends ChangeNotifier {
   /// background (see [_verifyRestoredConnection]).
   Future<void> initialize() async {
     final epoch = ++_connectionEpoch;
+    _restoreFailure = null;
     try {
       final config = await RommRepository.getConfig();
       if (config == null) {
@@ -506,6 +526,7 @@ class RommProvider extends ChangeNotifier {
         _log.w('RomM: saved account was rejected: ${e.message}');
         _status = RommConnectionStatus.error;
         _lastError = e.message;
+        _restoreFailure = e;
         notifyListeners();
       } else {
         _log.w('RomM: could not verify the saved account: ${e.message}');
@@ -532,6 +553,9 @@ class RommProvider extends ChangeNotifier {
     _connectionEpoch++;
     _status = RommConnectionStatus.connecting;
     _lastError = null;
+    // Signing in again is the answer to a rejected saved account; whatever
+    // this attempt says replaces it.
+    _restoreFailure = null;
     notifyListeners();
 
     _service.configure(
@@ -614,11 +638,14 @@ class RommProvider extends ChangeNotifier {
     await RommRepository.clearConfig();
     _status = RommConnectionStatus.disconnected;
     _lastError = null;
+    _restoreFailure = null;
     _serverUrl = '';
     _username = '';
     _platforms = [];
+    _platformsFailure = null;
     _platformIdsBySystemName = null;
     _collections = [];
+    _collectionsFailure = null;
     _currentPlatform = null;
     _currentCollection = null;
     _librarySearch = false;
@@ -645,6 +672,7 @@ class RommProvider extends ChangeNotifier {
     _loadingPlatforms = true;
     final load = _platformsLoad = Completer<void>();
     _lastError = null;
+    _platformsFailure = null;
     notifyListeners();
     try {
       // Via the [service] getter, not [_service], so a test can substitute the
@@ -658,8 +686,10 @@ class RommProvider extends ChangeNotifier {
       unawaited(_loadRaProgression().then((_) => notifyListeners()));
     } on RommException catch (e) {
       _lastError = e.message;
+      _platformsFailure = e;
     } catch (e) {
       _lastError = 'Failed to load platforms: $e';
+      _platformsFailure = RommException(_lastError!);
     } finally {
       _loadingPlatforms = false;
       _platformsLoad = null;
@@ -676,6 +706,7 @@ class RommProvider extends ChangeNotifier {
     if (_collections.isNotEmpty && !force) return;
     _loadingCollections = true;
     _lastError = null;
+    _collectionsFailure = null;
     notifyListeners();
     try {
       final user = await _service.getCollections();
@@ -691,8 +722,10 @@ class RommProvider extends ChangeNotifier {
       await _persistRefreshedTokens();
     } on RommException catch (e) {
       _lastError = e.message;
+      _collectionsFailure = e;
     } catch (e) {
       _lastError = 'Failed to load collections: $e';
+      _collectionsFailure = RommException(_lastError!);
     } finally {
       _loadingCollections = false;
       notifyListeners();
@@ -821,7 +854,7 @@ class RommProvider extends ChangeNotifier {
   /// blocked by a request whose answer is about to be discarded.
   void _resetRoms() {
     _roms = [];
-    _romsError = null;
+    _romsFailure = null;
     _romsOffset = 0;
     _romsHasMore = false;
     _loadingRoms = false;
@@ -848,7 +881,7 @@ class RommProvider extends ChangeNotifier {
     final offset = _romsOffset;
     _loadingRoms = true;
     _lastError = null;
-    _romsError = null;
+    _romsFailure = null;
     notifyListeners();
     try {
       final page = await _service.getRoms(
@@ -886,7 +919,7 @@ class RommProvider extends ChangeNotifier {
         return;
       }
       _lastError = e.message;
-      _romsError = e.message;
+      _romsFailure = e;
     } catch (e) {
       if (generation != _romsGeneration) {
         _log.d(
@@ -896,7 +929,7 @@ class RommProvider extends ChangeNotifier {
         return;
       }
       _lastError = 'Failed to load ROMs: $e';
-      _romsError = _lastError;
+      _romsFailure = RommException(_lastError!);
     } finally {
       // A stale request's loading flag was already released by [_resetRoms];
       // clearing it here would cancel the flag of the load that replaced it.

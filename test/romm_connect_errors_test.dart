@@ -101,6 +101,28 @@ void main() {
       expect(e.kind, RommFailure.serverError);
       expect(e.statusCode, 500);
     });
+
+    test('the check after signing in says why it failed', () async {
+      final failures = <Object, RommFailure>{
+        TimeoutException('test'): RommFailure.timeout,
+        const SocketException('Connection reset'): RommFailure.unreachable,
+        http.ClientException('Connection closed'): RommFailure.unreachable,
+        http.Response('{}', 403): RommFailure.serverError,
+      };
+      for (final MapEntry(key: failure, value: kind) in failures.entries) {
+        serve((r) {
+          if (r.url.path == '/api/token') {
+            return http.Response('{"access_token": "a", "expires": 900}', 200);
+          }
+          if (failure is http.Response) return failure;
+          throw failure;
+        });
+        final e = await failureOf(password());
+        // The password was just accepted, so a 403 here is the server
+        // refusing the account, not a wrong password.
+        expect(e.kind, kind, reason: '$failure');
+      }
+    });
   });
 
   group('the message', () {

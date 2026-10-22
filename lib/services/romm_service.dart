@@ -561,18 +561,9 @@ class RommService {
     // list — same auth guarantee, a fraction of the payload. authenticate()
     // surfaces bad credentials as 401/403. The token has just proven this is
     // RomM, so an error status from this call is the server's
-    // ([RommFailure.serverError]), not a wrong address.
-    try {
-      await _authedGet('/api/users/me');
-    } on RommException catch (e) {
-      if (e.kind != RommFailure.other || e.statusCode == null) rethrow;
-      throw RommException(
-        e.message,
-        statusCode: e.statusCode,
-        serverResponse: e.serverResponse,
-        kind: RommFailure.serverError,
-      );
-    }
+    // ([RommFailure.serverError], as [_authedGetUri] tags it), not a wrong
+    // address.
+    await _authedGet('/api/users/me');
   }
 
   /// Validates a restored session, allowing cached tokens to refresh normally.
@@ -609,9 +600,22 @@ class RommService {
       try {
         return await send();
       } on TimeoutException {
-        throw RommException('Request timed out');
+        throw RommException('Request timed out', kind: RommFailure.timeout);
+      } on HandshakeException {
+        throw RommException('TLS handshake failed', kind: RommFailure.tls);
       } on SocketException catch (e) {
-        throw RommException('Cannot reach server: ${e.message}');
+        // Also package:http's socket failures, which implement SocketException.
+        throw RommException(
+          'Cannot reach server: ${e.message}',
+          kind: RommFailure.unreachable,
+          detail: e.message,
+        );
+      } on http.ClientException catch (e) {
+        throw RommException(
+          'Cannot reach server: ${e.message}',
+          kind: RommFailure.unreachable,
+          detail: e.message,
+        );
       }
     }
 
@@ -644,12 +648,37 @@ class RommService {
       statusOf: (r) => r.statusCode,
     );
     if (resp.statusCode != 200) {
+      // With an API key there is no retry, and a 401/403 is the key's. With a
+      // password, [_sendWithAuthRetry] has just signed in again — a password
+      // the server rejects fails there — so a 401/403 still standing is the
+      // server refusing this account the request, not a wrong password.
+      final rejectedKey =
+          usesApiKey && (resp.statusCode == 401 || resp.statusCode == 403);
       throw RommException(
         'Request failed (${resp.statusCode})',
         statusCode: resp.statusCode,
+        kind: rejectedKey ? RommFailure.invalidApiKey : RommFailure.serverError,
       );
     }
     return resp;
+  }
+
+  /// Reads a browse list from [resp] with [parse]. An answer that isn't the
+  /// JSON RomM sends (a web page, or records of the wrong shape) is
+  /// [RommFailure.notRomm] rather than a raw parse error.
+  static T _parseBrowse<T>(http.Response resp, T Function(Object? json) parse) {
+    try {
+      return parse(jsonDecode(resp.body));
+    } catch (e) {
+      if (e is! FormatException && e is! TypeError) rethrow;
+      // A FormatException's own text quotes the body; the excerpt holds it.
+      final reason = e is FormatException ? e.message : '$e';
+      throw RommException(
+        'Server did not answer like RomM: $reason',
+        serverResponse: _bodyExcerpt(resp.body),
+        kind: RommFailure.notRomm,
+      );
+    }
   }
 
   /// Extracts the item list from a RomM list response, tolerating both a bare
@@ -666,15 +695,16 @@ class RommService {
   /// Returns all platforms (consoles/systems) on the server.
   Future<List<RommPlatform>> getPlatforms() async {
     final resp = await _authedGet('/api/platforms');
-    final decoded = jsonDecode(resp.body);
-    if (decoded is! List) return [];
-    return decoded
-        .whereType<Map<String, dynamic>>()
-        .map(RommPlatform.fromJson)
-        // RomM's /api/platforms returns every platform its DB knows about,
-        // including ones with no scanned ROMs. Hide the empties.
-        .where((p) => p.romCount > 0)
-        .toList();
+    return _parseBrowse(resp, (decoded) {
+      if (decoded is! List) return <RommPlatform>[];
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(RommPlatform.fromJson)
+          // RomM's /api/platforms returns every platform its DB knows about,
+          // including ones with no scanned ROMs. Hide the empties.
+          .where((p) => p.romCount > 0)
+          .toList();
+    });
   }
 
   /// Returns the current user's RetroAchievements progression as a map of
@@ -713,7 +743,10 @@ class RommService {
   /// bare list and a `{items: [...]}` envelope; an empty/`{}` body yields [].
   Future<List<RommCollection>> getCollections() async {
     final resp = await _authedGet('/api/collections');
-    return _parseCollections(resp.body, isVirtual: false);
+    return _parseBrowse(
+      resp,
+      (decoded) => _parseCollections(decoded, isVirtual: false),
+    );
   }
 
   /// Returns RomM virtual collections of [type] (default `collection`, i.e. the
@@ -725,14 +758,17 @@ class RommService {
     final resp = await _authedGet(
       '/api/collections/virtual?type=${Uri.encodeQueryComponent(type)}',
     );
-    return _parseCollections(resp.body, isVirtual: true);
+    return _parseBrowse(
+      resp,
+      (decoded) => _parseCollections(decoded, isVirtual: true),
+    );
   }
 
   static List<RommCollection> _parseCollections(
-    String body, {
+    Object? decoded, {
     required bool isVirtual,
   }) {
-    return _itemsOf(jsonDecode(body))
+    return _itemsOf(decoded)
         .whereType<Map<String, dynamic>>()
         .map((j) => RommCollection.fromJson(j, isVirtual: isVirtual))
         .toList();
@@ -785,9 +821,12 @@ class RommService {
         },
       ),
     );
-    return _itemsOf(
-      jsonDecode(resp.body),
-    ).whereType<Map<String, dynamic>>().map(RommRom.fromJson).toList();
+    return _parseBrowse(
+      resp,
+      (decoded) => _itemsOf(
+        decoded,
+      ).whereType<Map<String, dynamic>>().map(RommRom.fromJson).toList(),
+    );
   }
 
   /// Returns one page of ROMs along with RomM's result [RommRomPage.total] and
@@ -843,20 +882,22 @@ class RommService {
     final resp = await _authedGetUri(
       Uri.parse('$_baseUrl/api/roms').replace(queryParameters: params),
     );
-    final decoded = jsonDecode(resp.body);
-    // RomM may return either a bare list or a paginated `{items: [...]}` object.
-    final items = _itemsOf(
-      decoded,
-    ).whereType<Map<String, dynamic>>().map(RommRom.fromJson).toList();
+    return _parseBrowse(resp, (decoded) {
+      // RomM may return either a bare list or a paginated `{items: [...]}`
+      // object.
+      final items = _itemsOf(
+        decoded,
+      ).whereType<Map<String, dynamic>>().map(RommRom.fromJson).toList();
 
-    if (decoded is! Map<String, dynamic>) {
-      return RommRomPage(items: items, total: items.length);
-    }
-    return RommRomPage(
-      items: items,
-      total: (decoded['total'] as num?)?.toInt() ?? items.length,
-      filterValues: _filterValuesOf(decoded['filter_values']),
-    );
+      if (decoded is! Map<String, dynamic>) {
+        return RommRomPage(items: items, total: items.length);
+      }
+      return RommRomPage(
+        items: items,
+        total: (decoded['total'] as num?)?.toInt() ?? items.length,
+        filterValues: _filterValuesOf(decoded['filter_values']),
+      );
+    });
   }
 
   /// Normalizes RomM's `filter_values` object into string lists.

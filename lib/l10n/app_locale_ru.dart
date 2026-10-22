@@ -1303,6 +1303,11 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.rommErrorNotRomm:
       'По этому URL отвечает не сервер RomM. Проверьте URL сервера.',
   AppLocale.rommErrorServerStatus: 'Сервер RomM ответил ошибкой ({error}).',
+  AppLocale.rommErrorUnreadable:
+      'Сервер RomM прислал ответ, который приложение не смогло прочитать.',
+  AppLocale.rommErrorLoadFailed:
+      'Не удалось загрузить данные из RomM. Попробуйте ещё раз.',
+  AppLocale.rommErrorSignInRejected: 'Вход в RomM отклонён. Войдите снова.',
   AppLocale.rommConnectedAs: 'Подключено как {user}',
   AppLocale.rommCredentialsRequired:
       'Введите URL сервера, имя пользователя и пароль',

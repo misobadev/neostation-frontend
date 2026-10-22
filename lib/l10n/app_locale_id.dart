@@ -1306,6 +1306,11 @@ const Map<String, dynamic> appLocaleId = {
       'URL itu tidak merespons seperti server RomM. Periksa URL server.',
   AppLocale.rommErrorServerStatus:
       'Server RomM merespons dengan kesalahan ({error}).',
+  AppLocale.rommErrorUnreadable:
+      'Server RomM mengirim respons yang tidak dapat dibaca aplikasi.',
+  AppLocale.rommErrorLoadFailed: 'Tidak dapat memuat dari RomM. Coba lagi.',
+  AppLocale.rommErrorSignInRejected:
+      'Proses masuk RomM Anda ditolak. Silakan masuk lagi.',
   AppLocale.rommConnectedAs: 'Terhubung sebagai {user}',
   AppLocale.rommCredentialsRequired:
       'Masukkan URL server, nama pengguna, dan kata sandi',

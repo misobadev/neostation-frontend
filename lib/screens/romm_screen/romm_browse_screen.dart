@@ -23,6 +23,7 @@ import '../../sync/providers/romm_provider.dart';
 import '../../sync/sync_manager.dart';
 import '../../utils/debounced_search.dart';
 import '../../utils/gamepad_nav.dart';
+import '../../utils/romm_failure_message.dart';
 import '../../utils/romm_search_message.dart';
 import '../../widgets/confirm_action_dialog.dart';
 import '../../widgets/core_footer.dart' show kCoreFooterHeight;
@@ -212,7 +213,7 @@ class _RommBrowseScreenState extends State<RommBrowseScreen> {
       delay: _searchDebounce,
       run: _rommProvider.searchRoms,
       // searchRoms records its own failures on the provider (see
-      // RommProvider.romsError, drawn under the field); this only catches a
+      // RommProvider.romsFailure, drawn under the field); this only catches a
       // throw that escaped it, so nothing goes unlogged.
       onError: (term, error, _) =>
           _log.w('RomM search failed: term="$term" error=$error'),
@@ -1566,10 +1567,14 @@ class _RommBrowseScreenState extends State<RommBrowseScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (provider.collections.isEmpty) {
+      // A failed load says why, rather than passing for an empty library.
+      final failure = provider.collectionsFailure;
       return _centeredMessage(
         theme,
         Symbols.collections_bookmark_rounded,
-        AppLocale.rommNoCollections.getString(context),
+        failure != null
+            ? _browseFailureMessage(failure)
+            : AppLocale.rommNoCollections.getString(context),
       );
     }
     _collectionIndex = _collectionIndex.clamp(
@@ -1631,6 +1636,13 @@ class _RommBrowseScreenState extends State<RommBrowseScreen> {
     );
   }
 
+  /// [failure] said in the app language, as a load from a connected server.
+  String _browseFailureMessage(RommException failure) => rommFailureMessage(
+    failure,
+    (key) => key.getString(context),
+    browsing: true,
+  );
+
   Widget _centeredMessage(ThemeData theme, IconData icon, String message) {
     return Center(
       child: Column(
@@ -1665,10 +1677,14 @@ class _RommBrowseScreenState extends State<RommBrowseScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (provider.platforms.isEmpty) {
+      // A failed load says why, rather than passing for an empty library.
+      final failure = provider.platformsFailure;
       return _centeredMessage(
         theme,
         Symbols.videogame_asset_off_rounded,
-        AppLocale.rommNoPlatforms.getString(context),
+        failure != null
+            ? _browseFailureMessage(failure)
+            : AppLocale.rommNoPlatforms.getString(context),
       );
     }
     _platformIndex = _platformIndex.clamp(0, provider.platforms.length - 1);
@@ -1988,7 +2004,8 @@ class _RommBrowseScreenState extends State<RommBrowseScreen> {
     // Scoped to the ROM query, not the provider's global lastError: the
     // screen re-runs loadPlatforms/loadCollections on every entry, and one of
     // those failing must not replace the caption of a search that worked.
-    final error = provider.romsError;
+    final failure = provider.romsFailure;
+    final error = failure == null ? null : _browseFailureMessage(failure);
     final hint =
         (provider.currentCollection != null
                 ? AppLocale.rommSearchCollectionHint

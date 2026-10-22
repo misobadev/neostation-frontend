@@ -1348,6 +1348,12 @@ const Map<String, dynamic> appLocaleDe = {
       'Unter dieser URL antwortet kein RomM-Server. Prüfe die Server-URL.',
   AppLocale.rommErrorServerStatus:
       'Der RomM-Server hat mit einem Fehler geantwortet ({error}).',
+  AppLocale.rommErrorUnreadable:
+      'Der RomM-Server hat eine Antwort gesendet, die die App nicht lesen konnte.',
+  AppLocale.rommErrorLoadFailed:
+      'Laden von RomM fehlgeschlagen. Versuche es erneut.',
+  AppLocale.rommErrorSignInRejected:
+      'Deine RomM-Anmeldung wurde abgelehnt. Melde dich erneut an.',
   AppLocale.rommConnectedAs: 'Verbunden als {user}',
   AppLocale.rommCredentialsRequired:
       'Gib Server-URL, Benutzername und Passwort ein',

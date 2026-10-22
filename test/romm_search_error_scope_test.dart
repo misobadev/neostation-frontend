@@ -74,7 +74,7 @@ void main() {
 
       await p.selectPlatform(snes, search: 'mario');
       expect(p.roms, hasLength(1));
-      expect(p.romsError, isNull);
+      expect(p.romsFailure, isNull);
 
       // What the browse screen's initState does on every entry to the tab.
       await p.loadCollections();
@@ -85,7 +85,7 @@ void main() {
         reason: 'the collections failure is still recorded somewhere',
       );
       expect(
-        p.romsError,
+        p.romsFailure,
         isNull,
         reason: 'but not against the ROM list, whose results are correct',
       );
@@ -114,7 +114,7 @@ void main() {
     await p.loadPlatforms();
 
     expect(p.lastError, isNotNull);
-    expect(p.romsError, isNull);
+    expect(p.romsFailure, isNull);
   });
 
   test('a search that actually fails is reported', () async {
@@ -131,7 +131,7 @@ void main() {
     await p.selectPlatform(snes, search: 'mario');
 
     expect(p.roms, isEmpty);
-    expect(p.romsError, isNotNull);
+    expect(p.romsFailure, isNotNull);
   });
 
   test('the next query clears the previous one\'s failure', () async {
@@ -152,11 +152,11 @@ void main() {
     final p = provider();
 
     await p.selectPlatform(snes, search: 'zzz');
-    expect(p.romsError, isNotNull);
+    expect(p.romsFailure, isNotNull);
 
     failRoms = false;
     await p.searchRoms('mario');
-    expect(p.romsError, isNull);
+    expect(p.romsFailure, isNull);
     expect(p.roms, hasLength(1));
   });
 
@@ -172,9 +172,9 @@ void main() {
     final p = provider();
 
     await p.selectPlatform(snes, search: 'zzz');
-    expect(p.romsError, isNotNull);
+    expect(p.romsFailure, isNotNull);
 
     p.backToPlatforms();
-    expect(p.romsError, isNull);
+    expect(p.romsFailure, isNull);
   });
 }
