@@ -444,14 +444,14 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
               ),
             ),
           ],
-          SizedBox(height: 8.r),
+          SizedBox(height: 12.r),
           _buildNeoglassRow(
             keyIndex: 1,
             title: AppLocale.neoglassTransparency.getString(context),
             subtitle: AppLocale.neoglassTransparencySubtitle.getString(context),
             value: '${config.neoglassTransparency}',
           ),
-          SizedBox(height: 8.r),
+          SizedBox(height: 12.r),
           _buildNeoglassRow(
             keyIndex: 2,
             title: AppLocale.neoglassBorderWidth.getString(context),

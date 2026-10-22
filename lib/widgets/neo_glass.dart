@@ -196,9 +196,9 @@ class _GlassRimPainter extends CustomPainter {
     required this.intensity,
     required this.strokeWidth,
   }) : _colors = [
-         Colors.white.withValues(alpha: 0.15 * intensity),
-         Colors.white.withValues(alpha: 0.10 * intensity),
-         Colors.white.withValues(alpha: 0.025 * intensity),
+         Colors.white.withValues(alpha: 0.08 * intensity),
+         Colors.white.withValues(alpha: 0.05 * intensity),
+         Colors.white.withValues(alpha: 0.012 * intensity),
        ];
 
   final double cornerRadius;

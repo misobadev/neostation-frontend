@@ -29,6 +29,18 @@ class SystemArtPackTile extends StatelessWidget {
   /// Row tap (touch) handler.
   final VoidCallback? onTap;
 
+  /// Optional fill override. The settings panel passes the same surface tone as
+  /// its other rows; the setup wizard keeps the default card colour.
+  final Color? backgroundColor;
+
+  /// Optional outer margin override. The settings panel wraps the tile in its
+  /// own NeoGlass rim and spacing, so it passes zero here.
+  final EdgeInsetsGeometry? margin;
+
+  /// Whether to draw the tile's own outline. The settings panel disables it so
+  /// the NeoGlass rim is the only border; the setup wizard keeps it.
+  final bool showBorder;
+
   const SystemArtPackTile({
     super.key,
     required this.pack,
@@ -37,6 +49,9 @@ class SystemArtPackTile extends StatelessWidget {
     this.isSelected = false,
     this.mosaicSize = 56,
     this.onTap,
+    this.backgroundColor,
+    this.margin,
+    this.showBorder = true,
   });
 
   @override
@@ -48,19 +63,23 @@ class SystemArtPackTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: EdgeInsets.symmetric(vertical: 2.r),
+        margin: margin ?? EdgeInsets.symmetric(vertical: 2.r),
         padding: EdgeInsets.all(6.r),
         decoration: BoxDecoration(
-          color: theme.cardColor,
+          color: backgroundColor ?? theme.cardColor,
           borderRadius: BorderRadius.circular(10.r),
-          border: Border.all(
-            color: highlighted
-                ? primary
-                : (isActive
-                      ? Colors.greenAccent.withValues(alpha: 0.7)
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.12)),
-            width: highlighted ? 2.r : 1.r,
-          ),
+          border: showBorder
+              ? Border.all(
+                  color: highlighted
+                      ? primary
+                      : (isActive
+                            ? Colors.greenAccent.withValues(alpha: 0.7)
+                            : theme.colorScheme.onSurface.withValues(
+                                alpha: 0.12,
+                              )),
+                  width: highlighted ? 2.r : 1.r,
+                )
+              : null,
           boxShadow: highlighted
               ? [
                   BoxShadow(

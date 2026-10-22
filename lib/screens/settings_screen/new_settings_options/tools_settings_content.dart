@@ -627,6 +627,7 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
               return ListView(
                 controller: _scrollController,
                 physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.only(top: 6.r),
                 children: [
                   SettingsCardRow(
                     key: _itemKeys[0],

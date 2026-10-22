@@ -11,6 +11,7 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/widgets/custom_toggle_switch.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/system_art_pack_dialog.dart';
 import 'package:neostation/widgets/system_art_pack_tile.dart';
 import 'package:provider/provider.dart';
@@ -167,6 +168,36 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
       _initKeys(itemCount);
     }
 
+    final rimWidth = NeoGlass.borderWidthOf(context);
+    final inset = rimWidth > 0 ? (rimWidth / 2 + 0.5).r : 0.0;
+
+    Widget buildPackTile(int i) {
+      final tile = SystemArtPackTile(
+        pack: themes[i],
+        isActive: neoAssets.isThemeActive(themes[i].folder),
+        isFocused:
+            widget.isContentFocused && widget.selectedContentIndex == i + 2,
+        onTap: () {
+          SfxService().playNavSound();
+          _onItemTapped(i + 2);
+        },
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.5),
+        margin: EdgeInsets.zero,
+        showBorder: false,
+      );
+      return Padding(
+        key: _itemKeys[i + 2],
+        padding: EdgeInsets.fromLTRB(inset, 0, inset, 12.r),
+        child: rimWidth > 0
+            ? NeoGlassRim(
+                cornerRadius: 10.r,
+                borderWidth: rimWidth,
+                child: tile,
+              )
+            : tile,
+      );
+    }
+
     return SingleChildScrollView(
       controller: _scrollController,
       physics: const ClampingScrollPhysics(),
@@ -187,21 +218,7 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
           else ...[
             _buildHideLogosRow(context, theme, config),
             _buildNoneTile(theme),
-            for (int i = 0; i < themes.length; i++)
-              Container(
-                key: _itemKeys[i + 2],
-                child: SystemArtPackTile(
-                  pack: themes[i],
-                  isActive: neoAssets.isThemeActive(themes[i].folder),
-                  isFocused:
-                      widget.isContentFocused &&
-                      widget.selectedContentIndex == i + 2,
-                  onTap: () {
-                    SfxService().playNavSound();
-                    _onItemTapped(i + 2);
-                  },
-                ),
-              ),
+            for (int i = 0; i < themes.length; i++) buildPackTile(i),
           ],
         ],
       ),
@@ -215,7 +232,7 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
     SqliteConfigProvider config,
   ) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 8.r),
+      padding: EdgeInsets.only(bottom: 12.r),
       child: SettingRow(
         key: _itemKeys.isNotEmpty ? _itemKeys[0] : null,
         onTap: () {
@@ -245,21 +262,21 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
         .activeThemeFolder
         .isEmpty;
 
-    return Container(
+    final tile = Container(
       key: _itemKeys.length > 1 ? _itemKeys[1] : null,
-      margin: EdgeInsets.symmetric(vertical: 4.r),
       padding: EdgeInsets.all(8.r),
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: theme.colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: isFocused
-              ? primary
-              : (isActive
-                    ? Colors.greenAccent.withValues(alpha: 0.7)
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.12)),
-          width: isFocused ? 2.r : 1.r,
-        ),
+        boxShadow: isFocused
+            ? [
+                BoxShadow(
+                  color: primary.withValues(alpha: 0.25),
+                  blurRadius: 8.r,
+                  spreadRadius: 1.r,
+                ),
+              ]
+            : null,
       ),
       child: InkWell(
         onTap: () {
@@ -318,6 +335,15 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
           ],
         ),
       ),
+    );
+
+    final rimWidth = NeoGlass.borderWidthOf(context);
+    final inset = rimWidth > 0 ? (rimWidth / 2 + 0.5).r : 0.0;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(inset, 0, inset, 12.r),
+      child: rimWidth > 0
+          ? NeoGlassRim(cornerRadius: 12.r, borderWidth: rimWidth, child: tile)
+          : tile,
     );
   }
 

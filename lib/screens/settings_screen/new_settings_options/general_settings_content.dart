@@ -555,7 +555,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
           child: SingleChildScrollView(
             controller: _scrollController,
             physics: const ClampingScrollPhysics(),
-            padding: EdgeInsets.only(bottom: 24.r),
+            padding: EdgeInsets.only(top: 6.r, bottom: 24.r),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

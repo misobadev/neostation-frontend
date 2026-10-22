@@ -13,6 +13,7 @@ import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/custom_toggle_switch.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import '../settings_title.dart';
 import '../widgets/setting_row.dart';
 import '../widgets/setting_value_chip.dart';
@@ -541,6 +542,7 @@ class ScreenScraperSettingsContentState
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
                   controller: _scrollController,
+                  padding: EdgeInsets.only(top: 6.r),
                   child: _signedIn
                       ? _buildSignedIn(context)
                       : _buildSignedOut(context),
@@ -580,7 +582,7 @@ class ScreenScraperSettingsContentState
   }
 
   Widget _buildSignedIn(BuildContext context) {
-    final gap = SizedBox(height: 6.r);
+    final gap = SizedBox(height: 12.r);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -768,6 +770,9 @@ class ScreenScraperSettingsContentState
   }
 
   Widget _buildRegionList(BuildContext context) {
+    final rimWidth = NeoGlass.borderWidthOf(context);
+    final inset = rimWidth > 0 ? (rimWidth / 2 + 0.5).r : 0.0;
+
     return ReorderableListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -782,18 +787,25 @@ class ScreenScraperSettingsContentState
       ),
       itemBuilder: (context, index) {
         final slot = _regionStart + index;
+        final card = KeyedSubtree(
+          key: _keyFor(slot),
+          child: _buildRegionCard(
+            context,
+            index: index,
+            focused: _focused(slot),
+            moving: _movingRegion && _cursor == slot,
+          ),
+        );
         return Padding(
           key: ValueKey('region_${_regions[index]}'),
-          padding: EdgeInsets.only(bottom: 4.r),
-          child: KeyedSubtree(
-            key: _keyFor(slot),
-            child: _buildRegionCard(
-              context,
-              index: index,
-              focused: _focused(slot),
-              moving: _movingRegion && _cursor == slot,
-            ),
-          ),
+          padding: EdgeInsets.fromLTRB(inset, 0, inset, 12.r),
+          child: rimWidth > 0
+              ? NeoGlassRim(
+                  cornerRadius: 8.r,
+                  borderWidth: rimWidth,
+                  child: card,
+                )
+              : card,
         );
       },
     );

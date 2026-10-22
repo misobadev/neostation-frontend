@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 
 /// A single focus-bordered settings row: a title/subtitle block paired with a
 /// trailing control (toggle, dropdown, etc.).
@@ -77,7 +78,7 @@ class SettingRow extends StatelessWidget {
       ],
     );
 
-    return Container(
+    final row = Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8.r),
@@ -114,6 +115,13 @@ class SettingRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    final rimWidth = NeoGlass.borderWidthOf(context);
+    if (rimWidth <= 0) return row;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: (rimWidth / 2 + 0.5).r),
+      child: NeoGlassRim(cornerRadius: 8.r, borderWidth: rimWidth, child: row),
     );
   }
 }
