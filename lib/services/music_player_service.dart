@@ -8,6 +8,7 @@ import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:neostation/services/saf_directory_service.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:neostation/utils/chunked_file_writer.dart';
 import '../repositories/game_repository.dart';
 import '../models/game_model.dart';
 
@@ -826,11 +827,10 @@ class MusicPlayerService extends ChangeNotifier {
           : 'temp_music_track$ext';
       final tempFile = File('${tempDir.path}/$fileName');
 
-      final IOSink sink = tempFile.openWrite();
-      int offset = 0;
       const int chunkSize = 1 * 1024 * 1024;
 
-      try {
+      Stream<Uint8List> chunks() async* {
+        int offset = 0;
         while (offset < size) {
           final int length = (size - offset) < chunkSize
               ? (size - offset)
@@ -843,14 +843,13 @@ class MusicPlayerService extends ChangeNotifier {
           if (chunk == null) {
             throw Exception("Failed to read chunk at offset $offset");
           }
-          sink.add(chunk);
+          yield chunk;
           offset += length;
-          await Future.delayed(Duration.zero);
         }
-        await sink.flush();
-      } finally {
-        await sink.close();
       }
+
+      // Removes the partial file and rethrows if a write or a read fails.
+      await writeChunksToFile(tempFile, chunks());
 
       if (!forScan) {
         _tempPath = tempFile.path;

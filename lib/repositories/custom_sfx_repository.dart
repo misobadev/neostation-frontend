@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/custom_sfx.dart';
 import '../services/saf_directory_service.dart';
+import '../utils/chunked_file_writer.dart';
 
 /// Owns durable copies of imported clips, independent of picker permissions.
 class CustomSfxRepository {
@@ -33,9 +34,8 @@ class CustomSfxRepository {
     final sound = CustomSfx(path: 'custom_sfx/$name', filename: filename);
     final file = File(await resolve(sound));
     try {
-      final sink = file.openWrite();
-      var copied = 0;
-      try {
+      Stream<List<int>> chunks() async* {
+        var copied = 0;
         if (saf) {
           while (copied < size) {
             final bytes = await SafDirectoryService.readRange(
@@ -48,20 +48,19 @@ class CustomSfxRepository {
             }
             copied += bytes.length;
             if (copied > maxBytes) throw const FormatException('size');
-            sink.add(bytes);
+            yield bytes;
           }
         } else {
           await for (final bytes in File(source).openRead()) {
             copied += bytes.length;
             if (copied > maxBytes) throw const FormatException('size');
-            sink.add(bytes);
+            yield bytes;
           }
         }
         if (copied == 0) throw const FormatException('invalid');
-        await sink.flush();
-      } finally {
-        await sink.close();
       }
+
+      await writeChunksToFile(file, chunks());
       return sound;
     } catch (_) {
       await remove(sound);
