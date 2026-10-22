@@ -147,6 +147,14 @@ class RommImageFetch {
 /// Modeled on the IOClient + bad-certificate setup used by [ScreenScraperService]
 /// so self-signed homelab certificates work.
 class RommService {
+  /// The limits default to the production ones; tests pass short ones.
+  RommService({
+    this.uploadStallLimit = uploadStallTimeout,
+    this.uploadResponseLimit = uploadResponseTimeout,
+    this.assetRequestLimit = downloadRequestTimeout,
+    this.assetStallLimit = downloadStallTimeout,
+  });
+
   static final _log = LoggerService.instance;
 
   /// Scopes requested in the password grant. RomM grants the intersection of
@@ -166,13 +174,25 @@ class RommService {
   /// Maximum sessions RomM accepts in one `/api/play-sessions` POST.
   static const int maxPlaySessionBatch = 100;
 
+  /// How long connecting to the server may take, so an address that swallows
+  /// the handshake fails in good time rather than at the system's own limit.
+  /// Longer than the 30 s limits on the sign-in requests, so signing in to an
+  /// address that never answers still fails as a timeout first, as it did
+  /// before; it is the uploads, which have no overall limit, it bounds.
+  @visibleForTesting
+  static const connectTimeout = Duration(seconds: 45);
+
+  /// Builds the [HttpClient] behind [_sharedHttpClient]: tolerates self-signed
+  /// certificates (homelab servers) and gives up connecting after
+  /// [connectTimeout].
+  @visibleForTesting
+  static HttpClient newHttpClient() => HttpClient()
+    ..connectionTimeout = connectTimeout
+    ..badCertificateCallback = ((X509Certificate cert, String host, int port) =>
+        true);
+
   /// Shared client that tolerates self-signed certificates (homelab servers).
-  static final http.Client _sharedHttpClient = () {
-    final inner = HttpClient()
-      ..badCertificateCallback =
-          ((X509Certificate cert, String host, int port) => true);
-    return IOClient(inner);
-  }();
+  static final http.Client _sharedHttpClient = IOClient(newHttpClient());
 
   /// Test seam: when set, every request goes through this client instead of
   /// [_sharedHttpClient]. Process-wide, like the client it replaces.
@@ -1244,15 +1264,22 @@ class RommService {
 
   // ── Download ─────────────────────────────────────────────────────────────
 
-  /// How long [downloadRom] waits for the response headers.
+  /// How long [downloadRom] and [downloadAssetByPath] wait for the response
+  /// headers.
   @visibleForTesting
   static const downloadRequestTimeout = Duration(seconds: 60);
 
-  /// How long [downloadRom] waits for the next chunk of the body. There is no
-  /// limit on the whole transfer: a multi-GB ROM over slow wifi is fine, as
-  /// long as it keeps arriving.
+  /// How long [downloadRom] and [downloadAssetByPath] wait for the next chunk
+  /// of the body. There is no limit on the whole transfer: a multi-GB ROM over
+  /// slow wifi is fine, as long as it keeps arriving.
   @visibleForTesting
   static const downloadStallTimeout = Duration(seconds: 60);
+
+  /// [downloadRequestTimeout] for [downloadAssetByPath].
+  final Duration assetRequestLimit;
+
+  /// [downloadStallTimeout] for [downloadAssetByPath].
+  final Duration assetStallLimit;
 
   /// How often [downloadRom] asks its `shouldCancel` while it waits on the
   /// server, so a cancel reaches a download that has stopped arriving.
@@ -1491,6 +1518,11 @@ class RommService {
   /// (`/api/raw/assets/{file_path}/{file_name}?timestamp=...`). This is the
   /// canonical route for BOTH saves and states — states have no `/content`
   /// endpoint.
+  ///
+  /// A state can be large, so there is no limit on the whole transfer: the
+  /// headers must arrive within [assetRequestLimit] and each chunk of the
+  /// body within [assetStallLimit] of the last, or the download fails as
+  /// timed out and its request is aborted.
   Future<Uint8List> downloadAssetByPath(String downloadPath) async {
     final uri = _assetUri(downloadPath);
     // The request carries our credentials, so it may only go to the
@@ -1498,9 +1530,44 @@ class RommService {
     if (!_isConfiguredOrigin(uri)) {
       throw RommException('Asset is not on the configured RomM server');
     }
-    // Asset content can be large, so allow a longer per-attempt timeout than a
-    // plain metadata GET.
-    final resp = await _authedGetUri(uri, timeout: const Duration(seconds: 60));
+
+    // Reads the body inside the attempt, so a stall there is mapped like a
+    // timeout waiting for the headers.
+    Future<http.Response> send() async {
+      final abort = Completer<void>();
+      try {
+        final resp = await _httpClient
+            .send(
+              http.AbortableRequest('GET', uri, abortTrigger: abort.future)
+                ..headers.addAll(_authHeaders),
+            )
+            .timeout(assetRequestLimit);
+        final body = await http.ByteStream(
+          resp.stream.timeout(assetStallLimit),
+        ).toBytes();
+        return http.Response.bytes(
+          body,
+          resp.statusCode,
+          headers: resp.headers,
+          request: resp.request,
+        );
+      } finally {
+        // Closes the connection of an attempt that failed; a body read in
+        // full is unaffected.
+        abort.complete();
+      }
+    }
+
+    final resp = await _sendWithAuthRetry<http.Response>(
+      send,
+      statusOf: (r) => r.statusCode,
+    );
+    if (resp.statusCode != 200) {
+      throw RommException(
+        'Request failed (${resp.statusCode})',
+        statusCode: resp.statusCode,
+      );
+    }
     return resp.bodyBytes;
   }
 
@@ -1634,35 +1701,13 @@ class RommService {
     required bool isState,
   }) async {
     final uri = Uri.parse('$_baseUrl$basePath/$assetId');
-
-    Future<http.StreamedResponse> send() async {
-      final req = http.MultipartRequest('PUT', uri)
-        ..headers.addAll(_authHeaders)
-        ..files.add(
-          await http.MultipartFile.fromPath(
-            fileField,
-            file.path,
-            filename: path.basename(file.path),
-          ),
-        );
-      return _httpClient.send(req);
-    }
-
-    final resp = await _sendWithAuthRetry<http.StreamedResponse>(
-      send,
-      statusOf: (r) => r.statusCode,
-    );
-
-    final body = await resp.stream.bytesToString();
-    if (resp.statusCode != 200 && resp.statusCode != 201) {
-      throw RommException(
-        'Update failed (${resp.statusCode})',
-        statusCode: resp.statusCode,
-      );
-    }
-    return RommAsset.fromJson(
-      jsonDecode(body) as Map<String, dynamic>,
+    return _sendAssetFile(
+      'PUT',
+      uri,
+      fileField: fileField,
+      file: file,
       isState: isState,
+      failure: 'Update failed',
     );
   }
 
@@ -1688,36 +1733,176 @@ class RommService {
       '$_baseUrl$basePath',
     ).replace(queryParameters: params);
 
-    Future<http.StreamedResponse> send() async {
-      final req = http.MultipartRequest('POST', uri)
-        ..headers.addAll(_authHeaders)
-        ..files.add(
-          await http.MultipartFile.fromPath(
-            fileField,
-            file.path,
-            filename: path.basename(file.path),
+    return _sendAssetFile(
+      'POST',
+      uri,
+      fileField: fileField,
+      file: file,
+      isState: isState,
+      failure: 'Upload failed',
+    );
+  }
+
+  /// How long an upload waits for the connection to take the next chunk of
+  /// the file. There is no limit on the whole transfer: a large state over a
+  /// slow link is fine, as long as it keeps moving.
+  ///
+  /// The connection takes chunks in bursts, as the system's send buffer
+  /// drains, not one by one: at 64 KiB/s about every 15 s. So this sets a
+  /// floor, roughly 8 KiB/s, below which an upload that is still moving
+  /// fails as timed out — well under any link a save would sync over.
+  @visibleForTesting
+  static const uploadStallTimeout = Duration(seconds: 120);
+
+  /// How long an upload waits for the response headers once the whole file
+  /// has been taken. Longer than [uploadStallTimeout]: the last chunk counts
+  /// as taken once it reaches the send buffer, which can hold a few MB — a
+  /// few minutes of a slow link — still to be sent.
+  @visibleForTesting
+  static const uploadResponseTimeout = Duration(seconds: 300);
+
+  /// [uploadStallTimeout] for this service's uploads; also the limit between
+  /// chunks of the response body.
+  final Duration uploadStallLimit;
+
+  /// [uploadResponseTimeout] for this service's uploads.
+  final Duration uploadResponseLimit;
+
+  /// Sends [file] as the multipart field [fileField] of a [method] request to
+  /// [uri] and reads back the asset RomM answers with; a status other than
+  /// 200/201 throws a [RommException] headed [failure].
+  ///
+  /// The transfer fails as timed out when it stops moving, not when it takes
+  /// long: when the connection takes no chunk of the file for
+  /// [uploadStallLimit] (a server that stops reading leaves the socket full,
+  /// which pauses the file), when the headers take longer than
+  /// [uploadResponseLimit] after the last chunk, or when the response body
+  /// goes [uploadStallLimit] without a chunk. A timer measures that rather
+  /// than `Stream.timeout`, which stops counting while its stream is paused —
+  /// the very stall to catch.
+  Future<RommAsset> _sendAssetFile(
+    String method,
+    Uri uri, {
+    required String fileField,
+    required File file,
+    required bool isState,
+    required String failure,
+  }) async {
+    // A fresh request, watchdog and abort for each attempt of the auth retry.
+    // The answer is read inside the attempt too, so its timeout is mapped by
+    // the retry like any other.
+    Future<http.Response> send() async {
+      final abort = Completer<void>();
+      final timedOut = Completer<Never>();
+      Timer? watchdog;
+      var answered = false;
+      var finished = false;
+      StreamSubscription<List<int>>? reading;
+      StreamSubscription<List<int>>? receiving;
+
+      void arm(Duration limit) {
+        // A chunk can still land after the attempt has ended.
+        if (finished || timedOut.isCompleted) return;
+        watchdog?.cancel();
+        watchdog = Timer(limit, () {
+          // The timeout goes in before the abort, so the race below ends with
+          // it rather than with the client's report of the abort.
+          timedOut.completeError(
+            TimeoutException('RomM upload stalled', limit),
+          );
+          if (!abort.isCompleted) abort.complete();
+        });
+      }
+
+      Future<http.Response> exchange() async {
+        final length = await file.length();
+        // Every chunk the connection takes from the file restarts the
+        // watchdog. The read follows the request body's pauses, so it stops
+        // when the socket does, and the watchdog, which nothing pauses, fires.
+        late final StreamController<List<int>> content;
+        content = StreamController<List<int>>(
+          onListen: () => reading = file.openRead().listen(
+            (chunk) {
+              if (!answered) arm(uploadStallLimit);
+              content.add(chunk);
+            },
+            onError: content.addError,
+            onDone: () {
+              if (!answered) arm(uploadResponseLimit);
+              content.close();
+            },
           ),
+          onPause: () => reading?.pause(),
+          onResume: () => reading?.resume(),
+          onCancel: () => reading?.cancel(),
         );
-      return _httpClient.send(req);
+        final req =
+            http.AbortableMultipartRequest(
+                method,
+                uri,
+                abortTrigger: abort.future,
+              )
+              ..headers.addAll(_authHeaders)
+              ..files.add(
+                http.MultipartFile(
+                  fileField,
+                  content.stream,
+                  length,
+                  filename: path.basename(file.path),
+                ),
+              );
+        final resp = await _httpClient.send(req);
+        answered = true;
+        arm(uploadStallLimit);
+
+        final body = BytesBuilder(copy: false);
+        final received = Completer<void>();
+        receiving = resp.stream.listen(
+          (chunk) {
+            arm(uploadStallLimit);
+            body.add(chunk);
+          },
+          onError: received.completeError,
+          onDone: received.complete,
+          cancelOnError: true,
+        );
+        await received.future;
+        return http.Response.bytes(
+          body.takeBytes(),
+          resp.statusCode,
+          headers: resp.headers,
+          request: resp.request,
+        );
+      }
+
+      arm(uploadStallLimit);
+      try {
+        return await Future.any([exchange(), timedOut.future]);
+      } finally {
+        finished = true;
+        watchdog?.cancel();
+        // Closes the connection of an attempt that failed (a finished one is
+        // unaffected) and the file, which the client may have left mid-read.
+        if (!abort.isCompleted) abort.complete();
+        unawaited(receiving?.cancel());
+        await reading?.cancel();
+      }
     }
 
     // Shared retry policy: 401 → refresh, 403 → re-auth (cached token may
     // predate the assets.write scope).
-    final resp = await _sendWithAuthRetry<http.StreamedResponse>(
+    final resp = await _sendWithAuthRetry<http.Response>(
       send,
       statusOf: (r) => r.statusCode,
     );
-
-    final body = await resp.stream.bytesToString();
     if (resp.statusCode != 200 && resp.statusCode != 201) {
       throw RommException(
-        'Upload failed (${resp.statusCode})',
+        '$failure (${resp.statusCode})',
         statusCode: resp.statusCode,
       );
     }
-    final decoded = jsonDecode(body);
     return RommAsset.fromJson(
-      decoded as Map<String, dynamic>,
+      jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>,
       isState: isState,
     );
   }
