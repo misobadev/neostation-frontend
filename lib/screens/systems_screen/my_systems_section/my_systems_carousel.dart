@@ -946,7 +946,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
       fontWeight: FontWeight.normal,
     );
     final selectedTextStyle = textStyle.copyWith(
-      color: theme.colorScheme.onPrimary,
+      color: Colors.black,
       fontWeight: FontWeight.bold,
     );
 
@@ -1059,6 +1059,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                             info: system,
                             isSelected: isSelected,
                             backgroundCacheWidth: 1024,
+                            artworkInset: 10,
                             onTap: handleTap,
                             // The centred card only. An off-centre card is
                             // painted outside the page slot the viewport
@@ -1165,7 +1166,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                             width: width,
                             child: Container(
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary,
+                                color: Colors.white,
                                 borderRadius:
                                     Theme.of(context)
                                         .extension<CornerRadii>()

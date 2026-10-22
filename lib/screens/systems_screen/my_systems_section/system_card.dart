@@ -54,6 +54,7 @@ class SystemCard extends StatefulWidget {
     this.backgroundCacheWidth = 512,
     this.showCount = false,
     this.isCompact = false,
+    this.artworkInset = 4,
   });
 
   /// The system or game metadata resolved for this card.
@@ -94,6 +95,11 @@ class SystemCard extends StatefulWidget {
   /// The compact slot has less artwork to spare, so the game wheel is scaled
   /// down to keep it from crowding the card.
   final bool isCompact;
+
+  /// Inset of the artwork and footer from the card edge, in logical pixels
+  /// before responsive scaling. The grid passes a larger value than the
+  /// carousel so its smaller cards get visible breathing room.
+  final double artworkInset;
 
   @override
   State<SystemCard> createState() => _SystemCardState();
@@ -299,7 +305,11 @@ class _SystemCardState extends State<SystemCard> {
           cornerRadius: outerRadiusPx,
           child: Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
+              // Only the surface-coloured chrome (the frame around the artwork
+              // and the footer) inverts on selection; the artwork itself stays.
+              color: widget.isSelected
+                  ? Theme.of(context).colorScheme.onSurface
+                  : Theme.of(context).colorScheme.surface,
               borderRadius: outerRadius,
               boxShadow: [
                 BoxShadow(
@@ -338,10 +348,12 @@ class _SystemCardState extends State<SystemCard> {
                 splashColor: Colors.transparent,
                 child: Padding(
                   padding: EdgeInsets.only(
-                    top: 4.r,
-                    bottom: hideSystemLogos && !widget.info.isGame ? 4.r : 0.r,
-                    left: 4.r,
-                    right: 4.r,
+                    top: widget.artworkInset.r,
+                    bottom: hideSystemLogos && !widget.info.isGame
+                        ? widget.artworkInset.r
+                        : 0.r,
+                    left: widget.artworkInset.r,
+                    right: widget.artworkInset.r,
                   ),
                   child: widget.info.isGame
                       ? Column(
@@ -711,7 +723,9 @@ class _SystemCardState extends State<SystemCard> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
+              color: widget.isSelected
+                  ? Theme.of(context).colorScheme.surface
+                  : Theme.of(context).colorScheme.onSurface,
               fontSize: 10.r,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.0,
@@ -730,9 +744,13 @@ class _SystemCardState extends State<SystemCard> {
   /// the artwork instead (see [_buildCountPill]).
   Widget _buildSystemFooter(BuildContext context) {
     final assetLogoPath = _resolveSystemLogoPath();
+    final selected = widget.isSelected;
 
     return Expanded(
       child: Container(
+        color: selected
+            ? Theme.of(context).colorScheme.onSurface
+            : Colors.transparent,
         padding: EdgeInsets.only(top: 1.r, bottom: 1.r, left: 2.r, right: 2.r),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -743,7 +761,9 @@ class _SystemCardState extends State<SystemCard> {
                 child: _buildSystemLogo(
                   assetLogoPath,
                   height: 128.r,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: selected
+                      ? Theme.of(context).colorScheme.surface
+                      : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),

@@ -299,6 +299,7 @@ class HeaderState extends State<Header> {
                                   .extension<CornerRadii>()
                                   ?.radiusExternalRadius ??
                               8.r,
+                          tint: Theme.of(context).colorScheme.surface,
                           child: SizedBox(
                             height: 32.r,
                             child: Padding(
@@ -436,6 +437,7 @@ class HeaderState extends State<Header> {
                                     .extension<CornerRadii>()
                                     ?.radiusExternalRadius ??
                                 14.r,
+                            tint: Theme.of(context).colorScheme.surface,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
                               vertical: 4,
