@@ -1336,6 +1336,7 @@ mixin AppLocale {
   static const String romDirectories = 'rom_directories';
   static const String tools = 'tools';
   static const String toolsSubtitle = 'tools_subtitle';
+  static const String toolsStillRunning = 'tools_still_running';
   static const String addRomFolder = 'add_rom_folder';
   static const String removeRomFolder = 'remove_rom_folder';
 

@@ -84,17 +84,6 @@ String esdeEntriesKeptSuffix(BuildContext context, int count) => _label(
   AppLocale.cleanOrphanedMetadataEsdeSkippedSuffix,
 );
 
-/// " 2 entries couldn't be removed. …", the orphan cleanup's note on rows it
-/// failed to delete. Like [esdeEntriesKeptSuffix] it starts with the
-/// language's own separator; trim it to use it on its own.
-String orphanedMetadataNotRemovedSuffix(BuildContext context, int count) =>
-    _label(
-      context,
-      count,
-      AppLocale.cleanOrphanedMetadataNotRemovedOne,
-      AppLocale.cleanOrphanedMetadataNotRemoved,
-    );
-
 /// The count line for one system card, footer or pill: "12 Games", "1 App",
 /// "48 Tracks".
 ///

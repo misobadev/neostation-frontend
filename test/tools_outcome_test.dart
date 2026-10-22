@@ -7,8 +7,9 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/screens/settings_screen/new_settings_options/tools_settings_content.dart';
 import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/metadata_cleanup_service.dart';
+import 'package:neostation/services/multi_disc_organizer_runner.dart';
+import 'package:neostation/services/orphan_cleanup_runner.dart';
 import 'package:neostation/services/rom_folder_organizer_service.dart';
-import 'package:neostation/widgets/custom_notification.dart';
 
 /// The Tools screen's outcomes. A finished tool kept its progress bar in the
 /// bell and under the tool (a finished run looked like a running one); an
@@ -51,23 +52,22 @@ void main() {
   });
 
   group('orphan cleanup outcome', () {
-    const done = 'Cleaned {entries} entries and {files} files.';
-    String outcome(MetadataCleanupResult result) => orphanCleanupOutcome(
-      result,
-      done: done,
+    const strings = OrphanCleanupStrings(
+      scanning: 'Scanning',
+      cleaningItemTemplate: 'Cleaning {filename}',
+      failedTemplate: 'Failed: {error}',
+      done: 'Cleaned {entries} entries and {files} files.',
       nothingFound: 'Nothing found.',
       nothingToDelete: 'Nothing to delete.',
-      esdeKept: (n) => ' $n kept.',
-      notRemoved: (n) => ' $n not removed.',
-    ).$1;
-    NotificationType type(MetadataCleanupResult result) => orphanCleanupOutcome(
-      result,
-      done: done,
-      nothingFound: 'Nothing found.',
-      nothingToDelete: 'Nothing to delete.',
-      esdeKept: (n) => ' $n kept.',
-      notRemoved: (n) => ' $n not removed.',
-    ).$2;
+      esdeKeptOne: ' {count} kept.',
+      esdeKeptMany: ' {count} kept.',
+      notRemovedOne: ' {count} not removed.',
+      notRemovedMany: ' {count} not removed.',
+    );
+    String outcome(MetadataCleanupResult result) =>
+        orphanCleanupOutcome(result, strings).$1;
+    GlobalNotificationType type(MetadataCleanupResult result) =>
+        orphanCleanupOutcome(result, strings).$2;
 
     const a = OrphanedMetadataItem(
       appSystemId: 'psx',
@@ -92,7 +92,7 @@ void main() {
         errors: const ['Failed to clean metadata for psx/b.chd: locked'],
       );
       expect(outcome(result), 'Cleaned 2 entries and 1 files. 1 not removed.');
-      expect(type(result), NotificationType.error);
+      expect(type(result), GlobalNotificationType.error);
     });
 
     test('a total failure says so without the service\'s English', () {
@@ -102,7 +102,7 @@ void main() {
       );
       expect(outcome(result), '2 not removed.');
       expect(outcome(result), isNot(contains('Failed to clean metadata')));
-      expect(type(result), NotificationType.error);
+      expect(type(result), GlobalNotificationType.error);
     });
 
     test('a partial failure lists the ES-DE note before the failures', () {
@@ -124,7 +124,7 @@ void main() {
         deletedMediaFiles: 2,
       );
       expect(outcome(result), 'Cleaned 0 entries and 2 files.');
-      expect(type(result), NotificationType.success);
+      expect(type(result), GlobalNotificationType.success);
     });
 
     test('a clean run is a success, with the ES-DE note', () {
@@ -134,7 +134,7 @@ void main() {
         skippedEsdeItems: const [e],
       );
       expect(outcome(result), 'Cleaned 1 entries and 0 files. 1 kept.');
-      expect(type(result), NotificationType.success);
+      expect(type(result), GlobalNotificationType.success);
     });
 
     test('nothing to clean is information', () {
@@ -148,7 +148,7 @@ void main() {
         ),
         'Nothing to delete. 1 kept.',
       );
-      expect(type(const MetadataCleanupResult()), NotificationType.info);
+      expect(type(const MetadataCleanupResult()), GlobalNotificationType.info);
     });
   });
 
@@ -168,28 +168,32 @@ void main() {
       rootsSkipped: rootsSkipped,
       groupsFailed: groupsFailed,
     );
-    (String, NotificationType) outcome(RomFolderOrganizerResult result) =>
+    (String, GlobalNotificationType) outcome(RomFolderOrganizerResult result) =>
         multiDiscOutcome(
           result,
-          done:
-              'Organized {groups} sets, {files} files, {playlists} '
-              'playlists{skipped}.',
-          noSetsFound: 'No sets found{skipped}.',
-          partialFailure: '{failed} sets failed. {result}',
-          skippedSuffix: ' ({count} skipped)',
+          const MultiDiscOrganizerStrings(
+            scanning: 'Scanning',
+            done:
+                'Organized {groups} sets, {files} files, {playlists} '
+                'playlists{skipped}.',
+            noSetsFound: 'No sets found{skipped}.',
+            partialFailure: '{failed} sets failed. {result}',
+            skippedSuffix: ' ({count} skipped)',
+            failedTemplate: 'Failed: {error}',
+          ),
         );
 
     test('every set failing does not also say none were found', () {
       final (message, type) = outcome(org(groupsFailed: 2));
       expect(message, '2 sets failed.');
-      expect(type, NotificationType.error);
+      expect(type, GlobalNotificationType.error);
     });
 
     test('every set failing after its folder was made says only that', () {
       // On SAF the folder is created before a move fails.
       final (message, type) = outcome(org(groupsFailed: 2, foldersCreated: 2));
       expect(message, '2 sets failed.');
-      expect(type, NotificationType.error);
+      expect(type, GlobalNotificationType.error);
     });
 
     test('every set failing keeps the skipped folders note', () {
@@ -207,13 +211,13 @@ void main() {
         ),
       );
       expect(message, '1 sets failed. Organized 1 sets, 2 files, 1 playlists.');
-      expect(type, NotificationType.error);
+      expect(type, GlobalNotificationType.error);
     });
 
     test('nothing found is information, with the skipped folders', () {
       final (message, type) = outcome(org(rootsSkipped: 2));
       expect(message, 'No sets found (2 skipped).');
-      expect(type, NotificationType.info);
+      expect(type, GlobalNotificationType.info);
     });
   });
 
@@ -223,15 +227,13 @@ void main() {
       'tools_settings_content.dart',
     ).readAsStringSync();
 
-    test('the screen uses the outcome functions', () {
-      expect(
-        tools,
-        contains('(completionMessage, completionType) = orphanCleanupOutcome('),
-      );
-      expect(
-        tools,
-        contains('(completionMessage, completionType) = multiDiscOutcome('),
-      );
+    test('the screen hands both tools to their runners', () {
+      // The outcomes are the runners' now (tools_runners_test checks that a
+      // run's terminal row is the outcome function's, word for word), so the
+      // screen must not build one of its own.
+      expect(tools, contains('OrphanCleanupRunner.run('));
+      expect(tools, contains('MultiDiscOrganizerRunner.run('));
+      expect(tools, isNot(contains('Outcome(')));
       expect(tools, isNot(contains('result.errors.first')));
     });
   });

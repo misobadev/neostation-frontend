@@ -1110,6 +1110,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.romDirectories: 'ROM 目錄',
   AppLocale.tools: '工具',
   AppLocale.toolsSubtitle: '協助整理 ROM 的工具',
+  AppLocale.toolsStillRunning: '有工具仍在執行中。請等待其完成。',
   AppLocale.addRomFolder: '新增 ROM 資料夾',
   AppLocale.removeRomFolder: '移除',
   // RomM (remote library browse + download)

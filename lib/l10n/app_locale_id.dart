@@ -1261,6 +1261,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.romDirectories: 'Direktori ROM',
   AppLocale.tools: 'Alat',
   AppLocale.toolsSubtitle: 'Alat untuk membantu mengatur ROM Anda',
+  AppLocale.toolsStillRunning:
+      'Masih ada alat yang berjalan. Tunggu hingga selesai.',
   AppLocale.addRomFolder: 'Tambah Folder ROM',
   AppLocale.removeRomFolder: 'Hapus',
   // RomM (remote library browse + download)

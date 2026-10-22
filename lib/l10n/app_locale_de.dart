@@ -1302,6 +1302,8 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.romDirectories: 'ROM-Verzeichnisse',
   AppLocale.tools: 'Werkzeuge',
   AppLocale.toolsSubtitle: 'Werkzeuge zur Organisation deiner ROMs',
+  AppLocale.toolsStillRunning:
+      'Ein Werkzeug läuft noch. Warte, bis es fertig ist.',
   AppLocale.addRomFolder: 'ROM-Ordner hinzufügen',
   AppLocale.removeRomFolder: 'Entfernen',
   // RomM (remote library browse + download)

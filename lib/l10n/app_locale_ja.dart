@@ -1145,6 +1145,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.romDirectories: 'ROMディレクトリ',
   AppLocale.tools: 'ツール',
   AppLocale.toolsSubtitle: 'ROMの整理に役立つツール',
+  AppLocale.toolsStillRunning: 'ツールがまだ実行中です。完了するまでお待ちください。',
   AppLocale.addRomFolder: 'ROMフォルダを追加',
   AppLocale.removeRomFolder: '削除',
   // RomM (remote library browse + download)

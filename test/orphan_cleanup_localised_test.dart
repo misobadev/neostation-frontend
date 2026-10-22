@@ -4,10 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/l10n/app_locale.dart';
-import 'package:neostation/screens/settings_screen/new_settings_options/tools_settings_content.dart';
+import 'package:neostation/models/system_model.dart';
 import 'package:neostation/services/global_notification_service.dart';
+import 'package:neostation/services/library_file_tool_lock.dart';
+import 'package:neostation/services/metadata_cleanup_service.dart';
+import 'package:neostation/services/multi_disc_organizer_runner.dart';
+import 'package:neostation/services/orphan_cleanup_runner.dart';
+import 'package:neostation/services/rom_folder_organizer_service.dart';
 import 'package:neostation/utils/count_label.dart';
-import 'package:neostation/widgets/custom_notification.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Settings > Tools > Clean Orphaned Metadata built its confirmation in
@@ -63,17 +67,24 @@ void main() {
           ),
         ),
       );
-      // The completion note uses the same helper; orphanCleanupOutcome gives
-      // it the count of entries actually skipped (tools_outcome_test).
-      expect(
-        clean,
-        matches(
-          RegExp(
-            r'esdeKept:\s*\(count\)\s*=>\s*'
-            r'esdeEntriesKeptSuffix\(\s*context,\s*count,?\s*\)',
-          ),
-        ),
-      );
+      // The completion note is built by the runner, which has no context, so
+      // the screen resolves both forms up front; orphanCleanupOutcome gives
+      // it the count of entries actually skipped (tools_outcome_test), and
+      // OrphanCleanupStrings picks the form the way the helpers do
+      // (tools_runners_test).
+      final strings = method('OrphanCleanupStrings _orphanCleanupStrings()');
+      for (final (field, key) in [
+        ('esdeKeptOne', 'cleanOrphanedMetadataEsdeSkippedSuffixOne'),
+        ('esdeKeptMany', 'cleanOrphanedMetadataEsdeSkippedSuffix'),
+        ('notRemovedOne', 'cleanOrphanedMetadataNotRemovedOne'),
+        ('notRemovedMany', 'cleanOrphanedMetadataNotRemoved'),
+      ]) {
+        expect(
+          strings,
+          matches(RegExp('$field:\\s*AppLocale\\.$key\\s*\\.getString')),
+          reason: field,
+        );
+      }
       expect(
         clean,
         isNot(contains('AppLocale.cleanOrphanedMetadataEsdeSkippedSuffix')),
@@ -116,51 +127,103 @@ void main() {
   });
 
   group('the outcome notification', () {
-    test('says the cleanup failed when nothing could be deleted', () {
-      // A failed delete lands in result.errors, not result.deletedItems, so
-      // a run where every delete failed has no deletions. The outcome is
-      // chosen by orphanCleanupOutcome, whose cases tools_outcome_test checks.
-      expect(
-        clean,
-        contains('(completionMessage, completionType) = orphanCleanupOutcome('),
-      );
+    final notifications = GlobalNotificationService();
+
+    setUp(() {
+      LibraryFileToolLock.debugReset();
+      notifications.notifier.value = [];
+    });
+    tearDown(() {
+      MultiDiscOrganizerRunner.debugReset();
+      OrphanCleanupRunner.debugReset();
+      LibraryFileToolLock.debugReset();
+      notifications.notifier.value = [];
     });
 
-    test('keeps its type: info stays info', () {
-      expect(
-        toolOutcomeNotificationType(NotificationType.info),
-        GlobalNotificationType.info,
-      );
-      expect(
-        toolOutcomeNotificationType(NotificationType.success),
-        GlobalNotificationType.success,
-      );
-      expect(
-        toolOutcomeNotificationType(NotificationType.error),
-        GlobalNotificationType.error,
-      );
-    });
+    const cleanupStrings = OrphanCleanupStrings(
+      scanning: 'Scanning',
+      cleaningItemTemplate: 'Cleaning {filename}',
+      failedTemplate: 'Failed: {error}',
+      done: 'Cleaned {entries} entries and {files} files.',
+      nothingFound: 'Nothing found.',
+      nothingToDelete: 'Nothing to delete.',
+      esdeKeptOne: ' {count} kept.',
+      esdeKeptMany: ' {count} kept.',
+      notRemovedOne: ' {count} not removed.',
+      notRemovedMany: ' {count} not removed.',
+    );
 
-    for (final (tool, signature) in [
-      ('orphan cleanup', 'Future<void> _cleanOrphanedMetadata()'),
-      ('multi-disc organiser', 'Future<void> _organizeMultiDiscGames()'),
-    ]) {
-      test('$tool maps its outcome with that function', () {
-        final body = method(signature);
-        expect(body, contains('toolOutcomeNotificationType(completionType)'));
-        expect(
-          body,
-          isNot(
-            matches(
-              RegExp(
-                r'\? GlobalNotificationType\.success\s*'
-                r': GlobalNotificationType\.error',
-              ),
-            ),
-          ),
-        );
-      });
+    Future<GlobalNotificationData> cleanRow(
+      MetadataCleanupResult result,
+    ) async {
+      OrphanCleanupRunner.clean = ({mediaDirectoryPath, onProgress}) async =>
+          result;
+      await OrphanCleanupRunner.run(
+        mediaDirectoryPath: '/media',
+        strings: cleanupStrings,
+      );
+      return notifications.notifier.value.singleWhere(
+        (n) => n.id == OrphanCleanupRunner.notificationId,
+      );
     }
+
+    test('says the cleanup failed when nothing could be deleted', () async {
+      // A failed delete lands in result.errors, not result.deletedItems, so
+      // a run where every delete failed has no deletions.
+      const item = OrphanedMetadataItem(
+        appSystemId: 'psx',
+        filename: 'a.chd',
+        systemFolderName: 'psx',
+        isFullyScraped: true,
+        esdeImported: false,
+      );
+      final row = await cleanRow(
+        const MetadataCleanupResult(orphanedItems: [item], errors: ['x']),
+      );
+      expect(row.message, '1 not removed.');
+      expect(row.type, GlobalNotificationType.error);
+    });
+
+    test('orphan cleanup keeps its type: info stays info', () async {
+      final row = await cleanRow(const MetadataCleanupResult());
+      expect(row.message, 'Nothing found.');
+      expect(row.type, GlobalNotificationType.info);
+    });
+
+    test('multi-disc organiser keeps its type: info stays info', () async {
+      MultiDiscOrganizerRunner.loadSystems = () async => const <SystemModel>[];
+      MultiDiscOrganizerRunner.organize =
+          (
+            roots, {
+            required supportedRomExtensions,
+            supportedSystemFolders,
+            onProgress,
+          }) async => const RomFolderOrganizerResult(
+            groupsOrganized: 0,
+            foldersCreated: 0,
+            filesMoved: 0,
+            playlistsCreated: 0,
+            rootsSkipped: 0,
+            groupsFailed: 0,
+          );
+      await MultiDiscOrganizerRunner.run(
+        romFolders: const ['/roms'],
+        strings: const MultiDiscOrganizerStrings(
+          scanning: 'Scanning',
+          done: 'Done',
+          noSetsFound: 'No sets found{skipped}.',
+          partialFailure: '{failed} failed. {result}',
+          skippedSuffix: ' ({count} skipped)',
+          failedTemplate: 'Failed: {error}',
+        ),
+        rescanSystem: (_) async {},
+      );
+      final row = notifications.notifier.value.singleWhere(
+        (n) => n.id == MultiDiscOrganizerRunner.notificationId,
+      );
+      expect(row.message, 'No sets found.');
+      expect(row.type, GlobalNotificationType.info);
+    });
   });
 
   group('the count strings', () {
@@ -220,23 +283,30 @@ void main() {
       );
     });
 
-    testWidgets('the not-removed note changes form at exactly one', (
-      tester,
-    ) async {
+    test('the not-removed note changes form at exactly one', () {
+      // Only the runner reports it, from the two forms Tools resolves up
+      // front, so it is checked on the runner's strings with the real text.
+      final strings = OrphanCleanupStrings(
+        scanning: '',
+        cleaningItemTemplate: '',
+        failedTemplate: '',
+        done: '',
+        nothingFound: '',
+        nothingToDelete: '',
+        esdeKeptOne: '',
+        esdeKeptMany: '',
+        notRemovedOne:
+            AppLocale.en[AppLocale.cleanOrphanedMetadataNotRemovedOne]
+                as String,
+        notRemovedMany:
+            AppLocale.en[AppLocale.cleanOrphanedMetadataNotRemoved] as String,
+      );
       expect(
-        await label(
-          tester,
-          'en',
-          (c) => orphanedMetadataNotRemovedSuffix(c, 1),
-        ),
+        strings.notRemoved(1),
         " 1 entry couldn't be removed. Run the tool again to retry.",
       );
       expect(
-        await label(
-          tester,
-          'en',
-          (c) => orphanedMetadataNotRemovedSuffix(c, 3),
-        ),
+        strings.notRemoved(3),
         " 3 entries couldn't be removed. Run the tool again to retry.",
       );
     });

@@ -1155,6 +1155,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.romDirectories: 'ROM 폴더',
   AppLocale.tools: '도구',
   AppLocale.toolsSubtitle: 'ROM 정리에 도움이 되는 도구',
+  AppLocale.toolsStillRunning: '도구가 아직 실행 중입니다. 완료될 때까지 기다려 주세요.',
   AppLocale.addRomFolder: 'ROM 폴더 추가',
   AppLocale.removeRomFolder: '제거',
   // RomM (원격 라이브러리 탐색 + 다운로드)

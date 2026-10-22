@@ -10,13 +10,14 @@ import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/repositories/config_repository.dart';
-import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/global_notification_service.dart';
+import 'package:neostation/services/library_file_tool_lock.dart';
+import 'package:neostation/services/multi_disc_organizer_runner.dart';
+import 'package:neostation/services/orphan_cleanup_runner.dart';
 import 'package:neostation/services/ra_library_match_runner.dart';
 import 'package:neostation/services/metadata_cleanup_service.dart';
 import 'package:neostation/services/retroachievements_hash_service.dart';
-import 'package:neostation/services/rom_folder_organizer_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/count_label.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
@@ -25,103 +26,6 @@ import 'package:neostation/widgets/info_dialog.dart';
 import 'settings_title.dart';
 import 'widgets/settings_card_row.dart';
 import 'widgets/settings_action_button.dart';
-
-/// The bell notification type for a tool's outcome: an informational outcome
-/// (nothing to do) stays informational instead of showing as an error.
-@visibleForTesting
-GlobalNotificationType toolOutcomeNotificationType(NotificationType type) =>
-    switch (type) {
-      NotificationType.success => GlobalNotificationType.success,
-      NotificationType.error => GlobalNotificationType.error,
-      NotificationType.info => GlobalNotificationType.info,
-    };
-
-/// The orphan cleanup's outcome message and type. [done] holds `{entries}` and
-/// `{files}`; [esdeKept] and [notRemoved] give the appended notes (each starting
-/// with the language's separator) for a count.
-///
-/// Rows that failed to delete are reported as such, never as cleaned; the
-/// per-row error text stays in the log (it is the service's English).
-@visibleForTesting
-(String, NotificationType) orphanCleanupOutcome(
-  MetadataCleanupResult result, {
-  required String done,
-  required String nothingFound,
-  required String nothingToDelete,
-  required String Function(int count) esdeKept,
-  required String Function(int count) notRemoved,
-}) {
-  final esdeNote = result.skippedEsdeItems.isNotEmpty
-      ? esdeKept(result.skippedEsdeItems.length)
-      : '';
-  final failed = result.errors.length;
-  if (result.hasDeletions) {
-    final message =
-        done
-            .replaceFirst('{entries}', '${result.deletedItems.length}')
-            .replaceFirst('{files}', '${result.deletedMediaFiles}') +
-        esdeNote;
-    return failed > 0
-        ? (message + notRemoved(failed), NotificationType.error)
-        : (message, NotificationType.success);
-  }
-  if (failed > 0) {
-    // Nothing could be deleted: say it failed, not that there was nothing
-    // to clean.
-    return (notRemoved(failed).trim(), NotificationType.error);
-  }
-  return (
-    (result.skippedEsdeItems.isNotEmpty ? nothingToDelete : nothingFound) +
-        esdeNote,
-    NotificationType.info,
-  );
-}
-
-/// The multi-disc organiser's outcome message and type. [done] holds
-/// `{groups}`, `{files}`, `{playlists}` and `{skipped}`; [noSetsFound] holds
-/// `{skipped}`; [partialFailure] holds `{failed}` and `{result}`.
-///
-/// When every set failed there is nothing else to report, so the failure
-/// stands alone rather than also saying that no sets were found.
-@visibleForTesting
-(String, NotificationType) multiDiscOutcome(
-  RomFolderOrganizerResult result, {
-  required String done,
-  required String noSetsFound,
-  required String partialFailure,
-  required String skippedSuffix,
-}) {
-  final skippedNote = result.rootsSkipped > 0
-      ? skippedSuffix.replaceFirst('{count}', '${result.rootsSkipped}')
-      : '';
-  final summary = result.hasChanges
-      ? done
-            .replaceFirst('{groups}', '${result.groupsOrganized}')
-            .replaceFirst('{files}', '${result.filesMoved}')
-            .replaceFirst('{playlists}', '${result.playlistsCreated}')
-            .replaceFirst('{skipped}', skippedNote)
-      : noSetsFound.replaceFirst('{skipped}', skippedNote);
-  if (result.hasFailures) {
-    return (
-      partialFailure
-          .replaceFirst('{failed}', '${result.groupsFailed}')
-          .replaceFirst(
-            '{result}',
-            // On SAF a set's folder is often created before its move fails,
-            // so a run where every set failed can still count a folder.
-            result.groupsOrganized > 0 || result.filesMoved > 0
-                ? summary
-                : skippedNote.trim(),
-          )
-          .trim(),
-      NotificationType.error,
-    );
-  }
-  return (
-    summary,
-    result.hasChanges ? NotificationType.success : NotificationType.info,
-  );
-}
 
 class ToolsSettingsContent extends StatefulWidget {
   final bool isContentFocused;
@@ -140,6 +44,11 @@ class ToolsSettingsContent extends StatefulWidget {
 class ToolsSettingsContentState extends State<ToolsSettingsContent> {
   static final _log = LoggerService.instance;
 
+  /// The bell row that says a press was refused because a library tool is
+  /// still running. One id for every refusal, so they share a row.
+  @visibleForTesting
+  static const String toolsStillRunningNotificationId = 'tools_still_running';
+
   final ScrollController _scrollController = ScrollController();
 
   /// Snaps during rapid D-pad navigation, animates on a single move.
@@ -149,8 +58,6 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
   /// tool row.
   final List<GlobalKey> _itemKeys = List.generate(4, (_) => GlobalKey());
 
-  bool _isOrganizingMultiDisc = false;
-  bool _isCleaningMetadata = false;
   List<String> _currentRomFolders = [];
 
   @override
@@ -243,26 +150,49 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
     );
   }
 
+  /// Refuses a press while the multi-disc organiser or the orphan cleanup
+  /// runs, saying why. Those two rewrite the library on disk and must not
+  /// overlap (see [LibraryFileToolLock]); the runners refuse as well, but
+  /// silently, and the cleanup has to be stopped here before it analyses.
+  ///
+  /// The message keeps one id, so pressing again replaces its row in the bell
+  /// rather than stacking another copy (and a replaced row does not pulse it).
+  bool _refuseWhileLibraryToolRuns() {
+    if (!LibraryFileToolLock.isHeld) return false;
+    AppNotification.showNotification(
+      context,
+      AppLocale.toolsStillRunning.getString(context),
+      type: NotificationType.info,
+      notificationId: toolsStillRunningNotificationId,
+    );
+    return true;
+  }
+
+  MultiDiscOrganizerStrings _multiDiscStrings() => MultiDiscOrganizerStrings(
+    scanning: AppLocale.organizeMultiDiscScanning.getString(context),
+    done: AppLocale.organizeMultiDiscDone.getString(context),
+    noSetsFound: AppLocale.organizeMultiDiscNoSetsFound.getString(context),
+    partialFailure: AppLocale.organizeMultiDiscPartialFailure.getString(
+      context,
+    ),
+    skippedSuffix: AppLocale.organizeMultiDiscSkippedSuffix.getString(context),
+    failedTemplate: AppLocale.organizeMultiDiscFailed.getString(context),
+  );
+
   Future<void> _organizeMultiDiscGames() async {
-    if (_isOrganizingMultiDisc) return;
+    // The runner owns "is it running", not this widget: leaving Tools disposes
+    // the screen while the moves carry on, so a local flag would read idle on
+    // the way back and start a second run. A press while this or the orphan
+    // cleanup runs is refused with a message; the running tool's row shows
+    // its progress.
+    if (_refuseWhileLibraryToolRuns()) return;
 
     final localeTitle = AppLocale.organizeMultiDiscGames.getString(context);
     final localeWarning = AppLocale.organizeMultiDiscWarning.getString(context);
     final localeNoFolders = AppLocale.organizeMultiDiscNoRomFoldersConfigured
         .getString(context);
-    final localeScanning = AppLocale.organizeMultiDiscScanning.getString(
-      context,
-    );
-    final localeDone = AppLocale.organizeMultiDiscDone.getString(context);
-    final localeNoSetsFound = AppLocale.organizeMultiDiscNoSetsFound.getString(
-      context,
-    );
-    final localeSkippedSuffix = AppLocale.organizeMultiDiscSkippedSuffix
-        .getString(context);
-    final localeFailed = AppLocale.organizeMultiDiscFailed.getString(context);
-    final localePartialFailure = AppLocale.organizeMultiDiscPartialFailure
-        .getString(context);
     final localeConfirm = AppLocale.confirm.getString(context);
+    final strings = _multiDiscStrings();
 
     if (_currentRomFolders.isEmpty) {
       if (mounted) {
@@ -284,95 +214,59 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
       accentColor: Theme.of(context).colorScheme.primary,
     );
     if (confirmed != true || !mounted) return;
+    if (_refuseWhileLibraryToolRuns()) return;
 
-    final multiDiscSystems = (await SystemRepository.getAllSystems())
-        .where((system) => system.multiDisc)
-        .toList();
-    final supportedFolders = multiDiscSystems
-        .expand((system) => [system.folderName, ...system.folders])
-        .where((folder) => folder.isNotEmpty)
-        .toSet();
-    final supportedRomExtensions = multiDiscSystems
-        .expand((system) => system.extensions)
-        .where((extension) => extension.isNotEmpty)
-        .toSet();
+    // The provider is app-scoped, so the rescan the runner ends with still
+    // works after this screen has gone.
+    final rescanSystem = context
+        .read<SqliteConfigProvider>()
+        .rescanSystemSilent;
 
-    String? completionMessage;
-    NotificationType? completionType;
-    const notificationId = 'organize_multidisc';
-
-    try {
-      if (mounted) setState(() => _isOrganizingMultiDisc = true);
-
-      GlobalNotificationService().show(
-        id: notificationId,
-        message: localeScanning,
-        type: GlobalNotificationType.info,
-        progress: 0,
-        ongoing: true,
-      );
-
-      final result = await RomFolderOrganizerService.organizeRomFolders(
-        _currentRomFolders,
-        supportedRomExtensions: supportedRomExtensions,
-        supportedSystemFolders: supportedFolders,
-        onProgress: (completed, total) {
-          if (total == 0) return;
-          GlobalNotificationService().update(
-            id: notificationId,
-            message: localeScanning,
-            type: GlobalNotificationType.info,
-            progress: completed / total,
-            ongoing: true,
-          );
-        },
-      );
-
-      if (result.hasChanges && mounted) {
-        final configProvider = Provider.of<SqliteConfigProvider>(
-          context,
-          listen: false,
-        );
-        for (final system in multiDiscSystems) {
-          await configProvider.rescanSystemSilent(system);
-        }
-      }
-
-      if (mounted) {
-        (completionMessage, completionType) = multiDiscOutcome(
-          result,
-          done: localeDone,
-          noSetsFound: localeNoSetsFound,
-          partialFailure: localePartialFailure,
-          skippedSuffix: localeSkippedSuffix,
-        );
-      }
-    } catch (e, stackTrace) {
-      _log.e('Failed to organize multi-disc games: $e', stackTrace: stackTrace);
-      if (mounted) {
-        completionMessage = localeFailed.replaceFirst('{error}', e.toString());
-        completionType = NotificationType.error;
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isOrganizingMultiDisc = false);
-        await _loadRomFolders();
-        if (completionMessage != null && completionType != null) {
-          GlobalNotificationService().update(
-            id: notificationId,
-            message: completionMessage,
-            type: toolOutcomeNotificationType(completionType),
-            progress: null,
-          );
-        }
-      } else {
-        GlobalNotificationService().dismiss(notificationId);
-      }
-    }
+    await MultiDiscOrganizerRunner.run(
+      romFolders: _currentRomFolders,
+      strings: strings,
+      rescanSystem: rescanSystem,
+      onProgressStateChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
+    if (mounted) await _loadRomFolders();
   }
 
+  OrphanCleanupStrings _orphanCleanupStrings() => OrphanCleanupStrings(
+    scanning: AppLocale.cleanOrphanedMetadataScanning.getString(context),
+    cleaningItemTemplate: AppLocale.cleanOrphanedMetadataCleaningItem.getString(
+      context,
+    ),
+    failedTemplate: AppLocale.cleanOrphanedMetadataFailed.getString(context),
+    done: AppLocale.cleanOrphanedMetadataDone.getString(context),
+    nothingFound: AppLocale.cleanOrphanedMetadataNothingFound.getString(
+      context,
+    ),
+    nothingToDelete: AppLocale.cleanOrphanedMetadataNothingToDelete.getString(
+      context,
+    ),
+    // Both forms, because the runner picks one once it has the count and
+    // has no context to resolve it with by then.
+    esdeKeptOne: AppLocale.cleanOrphanedMetadataEsdeSkippedSuffixOne.getString(
+      context,
+    ),
+    esdeKeptMany: AppLocale.cleanOrphanedMetadataEsdeSkippedSuffix.getString(
+      context,
+    ),
+    notRemovedOne: AppLocale.cleanOrphanedMetadataNotRemovedOne.getString(
+      context,
+    ),
+    notRemovedMany: AppLocale.cleanOrphanedMetadataNotRemoved.getString(
+      context,
+    ),
+  );
+
   Future<void> _cleanOrphanedMetadata() async {
-    if (_isCleaningMetadata) return;
+    // As for the organiser: the runner owns "is it running". The check comes
+    // before the analysis, which would otherwise read a set the organiser has
+    // moved but not yet rescanned as orphaned.
+    if (_refuseWhileLibraryToolRuns()) return;
 
     final locale = AppLocale.cleanOrphanedMetadata.getString(context);
     final localeWarning = AppLocale.cleanOrphanedMetadataWarning.getString(
@@ -380,16 +274,8 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
     );
     final localeNothingFound = AppLocale.cleanOrphanedMetadataNothingFound
         .getString(context);
-    final localeScanning = AppLocale.cleanOrphanedMetadataScanning.getString(
-      context,
-    );
-    final localeCleaningItem = AppLocale.cleanOrphanedMetadataCleaningItem
-        .getString(context);
     final localeDelete = AppLocale.delete.getString(context);
-    final localeFailed = AppLocale.cleanOrphanedMetadataFailed.getString(
-      context,
-    );
-    final localeDone = AppLocale.cleanOrphanedMetadataDone.getString(context);
+    final strings = _orphanCleanupStrings();
 
     final fileProvider = Provider.of<FileProvider>(context, listen: false);
     if (!fileProvider.isInitialized) {
@@ -402,6 +288,7 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
       }
       return;
     }
+    final mediaDirectoryPath = fileProvider.getMediaDirectoryPath();
 
     // Analyze without deleting so the user can review what will be affected.
     final analysis = await MetadataCleanupService.analyze();
@@ -458,75 +345,17 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
       accentColor: accentColor,
     );
     if (confirmed != true || !mounted) return;
+    // The organiser can have started while the analysis ran, before the
+    // dialogue was up to block the press.
+    if (_refuseWhileLibraryToolRuns()) return;
 
-    String? completionMessage;
-    NotificationType? completionType;
-    const notificationId = 'clean_orphaned_metadata';
-
-    try {
-      if (mounted) setState(() => _isCleaningMetadata = true);
-
-      // Use the global notification service so the progress bar survives tab
-      // and menu navigation while the cleanup runs.
-      GlobalNotificationService().show(
-        id: notificationId,
-        message: localeScanning,
-        type: GlobalNotificationType.info,
-        progress: 0,
-        ongoing: true,
-      );
-
-      final result = await MetadataCleanupService.clean(
-        fileProvider: fileProvider,
-        onProgress: (progress, currentItem) {
-          GlobalNotificationService().update(
-            id: notificationId,
-            message: localeCleaningItem.replaceFirst(
-              '{filename}',
-              currentItem.filename,
-            ),
-            type: GlobalNotificationType.info,
-            progress: progress,
-            ongoing: true,
-          );
-        },
-      );
-
-      if (mounted) {
-        (completionMessage, completionType) = orphanCleanupOutcome(
-          result,
-          done: localeDone,
-          nothingFound: localeNothingFound,
-          nothingToDelete: AppLocale.cleanOrphanedMetadataNothingToDelete
-              .getString(context),
-          esdeKept: (count) => esdeEntriesKeptSuffix(context, count),
-          notRemoved: (count) =>
-              orphanedMetadataNotRemovedSuffix(context, count),
-        );
-      }
-    } catch (e, stackTrace) {
-      _log.e('Failed to clean orphaned metadata: $e', stackTrace: stackTrace);
-      if (mounted) {
-        completionMessage = localeFailed.replaceFirst('{error}', e.toString());
-        completionType = NotificationType.error;
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isCleaningMetadata = false);
-        if (completionMessage != null && completionType != null) {
-          GlobalNotificationService().update(
-            id: notificationId,
-            message: completionMessage,
-            type: toolOutcomeNotificationType(completionType),
-            progress: null,
-          );
-        }
-      } else {
-        // Make sure the persistent notification is removed if the widget that
-        // started the operation is no longer in the tree.
-        GlobalNotificationService().dismiss(notificationId);
-      }
-    }
+    await OrphanCleanupRunner.run(
+      mediaDirectoryPath: mediaDirectoryPath,
+      strings: strings,
+      onProgressStateChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   /// Walks the whole library looking for RetroAchievements matches, instead of
@@ -609,11 +438,11 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
             builder: (context, notifications, _) {
               final multiDiscProgress = _progressFor(
                 notifications,
-                'organize_multidisc',
+                MultiDiscOrganizerRunner.notificationId,
               );
               final metadataProgress = _progressFor(
                 notifications,
-                'clean_orphaned_metadata',
+                OrphanCleanupRunner.notificationId,
               );
               final rematchProgress = _progressFor(
                 notifications,

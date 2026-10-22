@@ -1257,6 +1257,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.romDirectories: 'Директории ROM',
   AppLocale.tools: 'Инструменты',
   AppLocale.toolsSubtitle: 'Инструменты для организации ваших ROM',
+  AppLocale.toolsStillRunning:
+      'Инструмент ещё работает. Дождитесь его завершения.',
   AppLocale.addRomFolder: 'Добавить папку ROM',
   AppLocale.removeRomFolder: 'Удалить',
   // RomM (remote library browse + download)
