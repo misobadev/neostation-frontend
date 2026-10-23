@@ -54,6 +54,17 @@
       }
     },
     {
+      "name": "Standalone ARMSX3 (Play Store)",
+      "unique_id": "ps3.com.armsx3.play",
+      "description": "Supported extensions: iso.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.armsx3.play/com.armsx2.Main -a android.intent.action.VIEW -e path \"{file.path}\""
+        }
+      }
+    },
+    {
       "name": "Standalone EMUCOREC",
       "unique_id": "ps3.com.sbro.emucorec",
       "description": "Supported extensions: iso.",
