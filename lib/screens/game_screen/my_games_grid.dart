@@ -81,6 +81,11 @@ class GamesGrid extends StatefulWidget {
   /// calling [onFavorite] directly — it is a mouse/touch affordance.
   final VoidCallback? onYButton;
 
+  /// The West face button (X on an Xbox pad, Y on a Nintendo-style one), and
+  /// the footer hint for it. Opens
+  /// the library search; null leaves both unbound.
+  final VoidCallback? onSearch;
+
   /// Attached to the selected card so the host can anchor the context menu to
   /// it. Null when no anchor is needed.
   final GlobalKey? selectedItemKey;
@@ -121,6 +126,7 @@ class GamesGrid extends StatefulWidget {
     this.folderCoverResolver,
     this.artworkVersion = 0,
     this.onYButton,
+    this.onSearch,
     this.selectedItemKey,
     this.isSecondaryScreenActive = false,
     this.navLayerId = 'games_grid',
@@ -748,6 +754,7 @@ class _GamesGridState extends State<GamesGrid> {
       onBack: widget.onBack,
       onFavorite: null, // Options moved to Start.
       onXButton: null, // Options moved to Start.
+      onWestButton: widget.onSearch, // West face button - Search.
       onLeftStickClick: widget.onRandom,
       onSelectButton: _toggleVideoMute, // Select tap - Mute preview video.
       onSelectModifierA: widget.onScrape, // Select + A - Scrape.
@@ -1353,6 +1360,7 @@ class _GamesGridState extends State<GamesGrid> {
       currentGameInfo: settled ? _currentGameInfo : null,
       onShowAchievements: _showAchievementsDialog,
       onToggleMute: widget.isSecondaryScreenActive ? null : _toggleVideoMute,
+      onSearch: widget.onSearch,
       hasVideo: !isFolder && _hasVideoFor(settledGame),
       isFolder: isFolder,
       // The game's own system, so the cloud mark reflects the game rather than

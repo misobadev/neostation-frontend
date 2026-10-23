@@ -114,6 +114,9 @@ class GameDetailsCardList extends StatefulWidget {
   final VoidCallback onToggleFavorite;
   final VoidCallback onOpenGameSettings;
 
+  /// Opens the library search, as the West face button does. Null hides the footer's hint.
+  final VoidCallback? onSearch;
+
   /// Callback to register the primary trigger action (standard Gamepad A).
   final Function(VoidCallback)? onRegisterTriggerAction;
 
@@ -176,6 +179,7 @@ class GameDetailsCardList extends StatefulWidget {
     required this.onPlayGame,
     required this.onToggleFavorite,
     required this.onOpenGameSettings,
+    this.onSearch,
     this.onRegisterTriggerAction,
     this.onRegisterSecondaryAction,
     this.onRegisterIsPlayingGameBlocked,
@@ -916,6 +920,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
             onShowRandomGame: widget.onShowRandomGame,
             onToggleFavorite: widget.onToggleFavorite,
             onOpenGameSettings: widget.onOpenGameSettings,
+            onSearch: widget.onSearch,
           ),
 
           // Panel layer: the tabs share one strip so a D-pad step or a

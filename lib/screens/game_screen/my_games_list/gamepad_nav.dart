@@ -48,20 +48,20 @@ extension _GamepadNav on _SystemGamesListState {
 
   /// Handles the X button for the music library.
   ///
-  /// Games moved their view picker into Options on Start; music keeps its
-  /// shuffle toggle because it is not a view setting.
+  /// Games moved their view picker into Options on Start and open search with
+  /// the West face button ([_searchAction]); music keeps its shuffle toggle
+  /// because it is not a view setting.
   void _handleXButton() {
-    if (widget.system.folderName == 'music') {
-      final service = MusicPlayerService();
-      service.toggleShuffle();
-      AppNotification.showNotification(
-        context,
-        service.isShuffle
-            ? AppLocale.shuffleEnabled.getString(context)
-            : AppLocale.shuffleDisabled.getString(context),
-        type: NotificationType.info,
-      );
-    }
+    if (widget.system.folderName != 'music') return;
+    final service = MusicPlayerService();
+    service.toggleShuffle();
+    AppNotification.showNotification(
+      context,
+      service.isShuffle
+          ? AppLocale.shuffleEnabled.getString(context)
+          : AppLocale.shuffleDisabled.getString(context),
+      type: NotificationType.info,
+    );
   }
 
   /// Registers gamepad and keyboard input mappings for the screen.
@@ -79,6 +79,7 @@ extension _GamepadNav on _SystemGamesListState {
           ? _toggleFavorite
           : null, // Games use Start -> Options; music keeps Y = favourite.
       onXButton: _handleXButton, // Music only: shuffle.
+      onWestButton: _searchAction, // West face button - Search (not music).
       onSettings: widget.system.folderName == 'music'
           ? _openGameSettingsDialog
           : _openGameOptions, // Button Start - Options.

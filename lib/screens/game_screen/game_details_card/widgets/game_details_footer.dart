@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/west_button_glyph.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
@@ -51,6 +52,11 @@ class GameDetailsFooter extends StatelessWidget {
 
   /// Opens the per-game settings dialog — the same one Start opens.
   final VoidCallback onOpenGameSettings;
+
+  /// Opens the library search — the same one the West face button opens. Null
+  /// hides the button, which is the only control on the row that wears its pad
+  /// glyph: that button has no other place on screen that says what it does.
+  final VoidCallback? onSearch;
   final TextScaler? textScaler;
   final TextScaler? playTextScaler;
 
@@ -74,6 +80,7 @@ class GameDetailsFooter extends StatelessWidget {
     this.onShowRandomGame,
     required this.onToggleFavorite,
     required this.onOpenGameSettings,
+    this.onSearch,
     required this.onShowGameInfo,
     this.textScaler,
     this.playTextScaler,
@@ -173,8 +180,8 @@ class GameDetailsFooter extends StatelessWidget {
                   SizedBox(
                     height: _bottomRowHeight,
                     // The whole row is touch-only. Every action on it has a
-                    // hardware binding already (A launches, Y opens the context
-                    // menu, Start opens settings), and a focusable widget inside
+                    // hardware binding already (A launches, West searches, Y
+                    // opens the context menu, Start opens settings), and a focusable widget inside
                     // the card would put a second cursor in a view that owns its
                     // own selection.
                     child: ExcludeFocus(
@@ -187,13 +194,16 @@ class GameDetailsFooter extends StatelessWidget {
                           final minimumAchievementsWidth = showsAchievements
                               ? _minimumAchievementsWidth(context)
                               : 0.0;
+                          final hasSearch = onSearch != null;
                           final fullControlsWidth =
                               (hasRating ? _scoreWidth.r : 0) +
                               (onShowRandomGame != null ? _controlSize.r : 0) +
+                              (hasSearch ? _searchControlWidth.r : 0) +
                               2 * _controlSize.r +
                               (3 +
                                       (hasRating ? 1 : 0) +
-                                      (onShowRandomGame != null ? 1 : 0)) *
+                                      (onShowRandomGame != null ? 1 : 0) +
+                                      (hasSearch ? 1 : 0)) *
                                   _rowGap;
                           // Narrower list panels leave less room in the details
                           // card. Contract the score and icon controls after
@@ -206,14 +216,18 @@ class GameDetailsFooter extends StatelessWidget {
                           final controlWidth =
                               (compact ? 34.0 : _controlSize).r;
                           final scoreWidth = (compact ? 56.0 : _scoreWidth).r;
+                          final searchWidth =
+                              (compact ? 52.0 : _searchControlWidth).r;
                           final gap = compact ? 4.r : _rowGap;
                           final fixedControlsWidth =
                               (hasRating ? scoreWidth : 0) +
                               (onShowRandomGame != null ? controlWidth : 0) +
+                              (hasSearch ? searchWidth : 0) +
                               2 * controlWidth +
                               (3 +
                                       (hasRating ? 1 : 0) +
-                                      (onShowRandomGame != null ? 1 : 0)) *
+                                      (onShowRandomGame != null ? 1 : 0) +
+                                      (hasSearch ? 1 : 0)) *
                                   gap;
                           // PLAY always retains enough space for its A glyph.
                           // If the achievement pill cannot fit beside that
@@ -269,6 +283,14 @@ class GameDetailsFooter extends StatelessWidget {
                               ),
                               SizedBox(width: gap),
                               // Controls, in the order the removed rail had them.
+                              if (hasSearch) ...[
+                                _FooterSearchButton(
+                                  onTap: onSearch!,
+                                  width: searchWidth,
+                                  height: controlWidth,
+                                ),
+                                SizedBox(width: gap),
+                              ],
                               if (onShowRandomGame != null) ...[
                                 _FooterActionButton(
                                   // The same dice the Y context menu gives Random, so the
@@ -764,6 +786,9 @@ const double _pillMaxWidth = 132;
 /// `.r` themselves.
 const double _controlSize = _bottomRow;
 
+/// Width of the search control: an icon button plus the glyph beside it.
+const double _searchControlWidth = 60;
+
 /// Height of the play-time line above the row.
 ///
 /// Reserved whether or not the selected game has a reading to put on it: the
@@ -869,6 +894,70 @@ class _FooterActionButton extends StatelessWidget {
               color: isOn
                   ? AppThemes.getCustomColors(context).errorColor
                   : theme.colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The search control: the West button's glyph and a magnifier, so the
+/// button doubles as the hint for what that button does in this view.
+///
+/// Drawn like [_FooterActionButton], only wider to fit the glyph.
+class _FooterSearchButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final double width;
+  final double height;
+
+  const _FooterSearchButton({
+    required this.onTap,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final glyphSize = math.min(16.r, height * 0.4);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          SfxService().playNavSound();
+          onTap();
+        },
+        canRequestFocus: false,
+        focusColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        splashColor: theme.colorScheme.onSurface.withValues(alpha: 0.1),
+        borderRadius: _controlRadius,
+        child: NeoGlass(
+          cornerRadius: _bottomRow.r,
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                WestButtonGlyph(
+                  builder: (context, iconPath) => Image.asset(
+                    iconPath,
+                    width: glyphSize,
+                    height: glyphSize,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                SizedBox(width: 3.r),
+                Icon(
+                  Symbols.search_rounded,
+                  size: math.min(21.r, height * 0.55),
+                  color: theme.colorScheme.onSurface,
+                ),
+              ],
             ),
           ),
         ),

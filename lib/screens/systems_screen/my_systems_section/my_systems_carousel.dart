@@ -58,6 +58,7 @@ class MySystemsCarousel extends StatefulWidget {
     this.onYPressed,
     this.onBackPressed,
     this.onXPressed,
+    this.onWestPressed,
     this.bindYButton = true,
     this.navLayerId = kSystemsCarouselNavLayerId,
     this.cardOverrideBuilder,
@@ -100,6 +101,10 @@ class MySystemsCarousel extends StatefulWidget {
 
   /// X. Unbound on the systems screen; a pushed host supplies its own picker.
   final VoidCallback? onXPressed;
+
+  /// The West face button (X on an Xbox pad, Y on a Nintendo-style one). The
+  /// systems screen opens the library search with it.
+  final VoidCallback? onWestPressed;
 
   /// Whether the gamepad's Y button fires [onYPressed].
   ///
@@ -311,6 +316,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
       onFavorite: widget.bindYButton ? () => widget.onYPressed?.call() : null,
       onBack: widget.onBackPressed,
       onXButton: widget.onXPressed,
+      onWestButton: widget.onWestPressed,
       onPreviousTab: widget.enableTabBumpers ? AppNavigation.previousTab : null,
       onNextTab: widget.enableTabBumpers ? AppNavigation.nextTab : null,
       onLeftBumper: widget.enableTabBumpers ? AppNavigation.previousTab : null,

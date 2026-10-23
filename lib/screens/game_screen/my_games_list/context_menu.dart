@@ -166,6 +166,15 @@ extension _ContextMenu on _SystemGamesListState {
     );
   }
 
+  /// Opens the library search from the West face button and its footer hint.
+  ///
+  /// Unlike [_openSearchFromMenu] this is a shortcut to search itself, not to
+  /// "search this system", so it always opens library-wide with no filters
+  /// set.
+  Future<void> _openSearchFromButton() async {
+    await openSearch(context, showInPlace: _selectSearchPickInPlace);
+  }
+
   /// Selects [picked] in the loaded folder level, if it is there.
   bool _selectSearchPickInPlace(DatabaseGameModel picked) {
     final romPath = GameModel.fromDatabaseModel(picked).romPath;

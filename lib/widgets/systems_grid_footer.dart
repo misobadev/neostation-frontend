@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/west_button_glyph.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -19,11 +20,15 @@ class SystemsGridFooter extends CoreFooter {
   /// the pad has one predictable route for everything the screen can change.
   final VoidCallback onOptions;
 
+  /// The West face button: opens the library-wide search. Null hides the control.
+  final VoidCallback? onSearch;
+
   const SystemsGridFooter({
     super.key,
     required this.system,
     required this.onEnter,
     required this.onOptions,
+    this.onSearch,
   });
 
   @override
@@ -54,6 +59,18 @@ class SystemsGridFooter extends CoreFooter {
     final theme = Theme.of(context);
 
     return [
+      if (onSearch != null) ...[
+        WestButtonGlyph(
+          builder: (context, iconPath) => GamepadControl(
+            label: AppLocale.searchTitle.getString(context),
+            iconPath: iconPath,
+            onTap: onSearch!,
+            textColor: theme.colorScheme.onTertiaryFixed,
+            backgroundColor: theme.colorScheme.tertiaryFixed,
+          ),
+        ),
+        SizedBox(width: 8.r),
+      ],
       // Options, on every card: the dialog behind it has rows for a
       // recent-game card too.
       GamepadControl(

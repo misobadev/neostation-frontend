@@ -69,6 +69,12 @@ class GamepadNavigation {
   final VoidCallback? onFavorite;
   final VoidCallback? onSettings;
   final VoidCallback? onXButton;
+
+  /// The West face button — X on an Xbox pad, Square on a PlayStation one, Y
+  /// on a Nintendo-style one — whichever input the active controller reports
+  /// it as (see [GamepadEventTranslator.westButtonFor]). When set it takes
+  /// that press ahead of [onXButton] / [onFavorite].
+  final VoidCallback? onWestButton;
   final VoidCallback? onLeftStickClick;
   final VoidCallback? onRightStickClick;
   final VoidCallback? onSelectButton;
@@ -337,6 +343,12 @@ class GamepadNavigation {
   String? _currentGamepadId;
   String? _currentGamepadName;
 
+  /// Which input the most recently used controller reports its West face
+  /// button as, so button hints can show the glyph of the button to press.
+  static final ValueNotifier<GamepadInputType> activeWestButton = ValueNotifier(
+    GamepadInputType.buttonX,
+  );
+
   final GamepadEventTranslator _translator = GamepadEventTranslator();
 
   bool _keyboardInitialized = false;
@@ -363,6 +375,7 @@ class GamepadNavigation {
     this.onFavorite,
     this.onSettings,
     this.onXButton,
+    this.onWestButton,
     this.onLeftStickClick,
     this.onRightStickClick,
     this.onSelectButton,
@@ -454,6 +467,7 @@ class GamepadNavigation {
           firstGamepad.systemInfo,
         );
         _translator.updateGamepadName(firstGamepad.id, firstGamepad.name);
+        activeWestButton.value = _translator.westButtonFor(firstGamepad.id);
 
         if (Platform.isLinux) {
           final connectionType = firstGamepad.deviceInfo.connectionType;
@@ -479,6 +493,7 @@ class GamepadNavigation {
 
       _translator.updateGamepadSystemInfo(gamepadId, gamepad.systemInfo);
       _translator.updateGamepadName(gamepadId, gamepad.name);
+      activeWestButton.value = _translator.westButtonFor(gamepadId);
       final connectionType = gamepad.deviceInfo.connectionType;
       _translator.updateGamepadConnectionType(gamepadId, connectionType);
       _currentGamepadName = gamepad.name;
@@ -576,6 +591,18 @@ class GamepadNavigation {
       default:
         return null;
     }
+  }
+
+  /// Fires [onWestButton] when [event] is the active controller's West face
+  /// button, reporting whether it did.
+  bool _dispatchWest(TranslatedGamepadEvent event) {
+    final onWest = onWestButton;
+    if (onWest == null) return false;
+    if (event.inputType != _translator.westButtonFor(event.gamepadId)) {
+      return false;
+    }
+    onWest();
+    return true;
   }
 
   /// Cancels all active auto-repeat timers.
@@ -1067,12 +1094,12 @@ class GamepadNavigation {
 
       case GamepadInputType.buttonY:
         SfxService().playNavSound();
-        onFavorite?.call();
+        if (!_dispatchWest(event)) onFavorite?.call();
         break;
 
       case GamepadInputType.buttonX:
         SfxService().playNavSound();
-        onXButton?.call();
+        if (!_dispatchWest(event)) onXButton?.call();
         break;
 
       case GamepadInputType.buttonStart:

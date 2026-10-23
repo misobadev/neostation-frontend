@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/west_button_glyph.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -38,6 +39,11 @@ class GameViewFooter extends StatelessWidget {
   /// Omit it to hide the pill.
   final VoidCallback? onToggleMute;
 
+  /// Opens the library search, as the West face button does. Drawn as a hint
+  /// pill for that button,
+  /// tappable for touchscreen users; omit it to hide the pill.
+  final VoidCallback? onSearch;
+
   /// Whether the selected game actually has a preview video. There is nothing
   /// to mute without one, so the pill stays hidden rather than offering a
   /// control that does nothing for this game.
@@ -67,6 +73,7 @@ class GameViewFooter extends StatelessWidget {
     this.currentGameInfo,
     this.onShowAchievements,
     this.onToggleMute,
+    this.onSearch,
     this.hasVideo = false,
     this.isFolder = false,
     this.system,
@@ -161,6 +168,10 @@ class GameViewFooter extends StatelessWidget {
                     showGlyphShadow: false,
                   ),
                   SizedBox(width: 8.r),
+                ],
+                if (onSearch != null) ...[
+                  _SearchHintPill(onSearch: onSearch!),
+                  SizedBox(width: 6.r),
                 ],
                 if (onToggleMute != null && hasVideo) ...[
                   _MuteHintPill(onToggleMute: onToggleMute!),
@@ -629,6 +640,53 @@ class _MuteHintPill extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// West-button hint for the library search, tappable for touchscreen users. Drawn like
+/// [_MuteHintPill] so the two hint pills read as a pair.
+class _SearchHintPill extends StatelessWidget {
+  final VoidCallback onSearch;
+
+  const _SearchHintPill({required this.onSearch});
+
+  @override
+  Widget build(BuildContext context) {
+    final radii = Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m();
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          SfxService().playNavSound();
+          onSearch();
+        },
+        canRequestFocus: false,
+        borderRadius: radii.radiusExternal,
+        child: Container(
+          height: 32.r,
+          padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
+          decoration: _pillDecoration(context),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              WestButtonGlyph(
+                builder: (context, iconPath) => Image.asset(
+                  iconPath,
+                  width: 15.r,
+                  height: 15.r,
+                  color: scheme.onSurface,
+                ),
+              ),
+              SizedBox(width: 4.r),
+              Icon(Symbols.search_rounded, size: 15.r, color: scheme.onSurface),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -962,6 +962,26 @@ class GamepadEventTranslator {
     return value;
   }
 
+  /// The face button in the West position (left of the diamond) on
+  /// [gamepadId]. See [isWestReportedAsY].
+  GamepadInputType westButtonFor(String gamepadId) =>
+      isWestReportedAsY(_systemInfoCache[gamepadId])
+      ? GamepadInputType.buttonY
+      : GamepadInputType.buttonX;
+
+  /// Whether a controller's West face button arrives as [GamepadInputType.buttonY].
+  ///
+  /// The face buttons are otherwise translated on the Xbox layout, where X is
+  /// West and Y is North. The AYN built-in controller (Thor, Odin; VID 2020)
+  /// names its keycodes after its Nintendo-style labels instead: West, labelled
+  /// Y, sends KEYCODE_BUTTON_Y and North, labelled X, sends KEYCODE_BUTTON_X
+  /// (confirmed on the Thor).
+  static bool isWestReportedAsY(Map<String, dynamic>? systemInfo) {
+    if (!_isAndroid) return false;
+    final vendorId = (systemInfo?['vendorId'] as String?)?.toLowerCase();
+    return vendorId == '2020';
+  }
+
   /// Checks if a gamepad is a Sony (PlayStation) device based on Vendor ID.
   bool _isSonyController(String gamepadId) {
     final vendorId = (_systemInfoCache[gamepadId]?['vendorId'] as String?)
