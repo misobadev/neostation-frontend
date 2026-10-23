@@ -272,9 +272,14 @@ class SystemsUpdateService {
         );
       }
 
-      // 3. Get the full list of system files from the GitHub repo directory.
-      final systemIds = await _fetchSystemListFromApi();
-      if (systemIds.isEmpty) return null;
+      // 3. Get the full list of system files from the GitHub repo directory,
+      // falling back to the manifest's list when the API refuses us.
+      var systemIds = await _fetchSystemListFromApi();
+      if (systemIds.isEmpty) systemIds = await _fetchSystemListFromManifest();
+      if (systemIds.isEmpty) {
+        _log.w('SystemsUpdateService: no system list available, aborting');
+        return null;
+      }
 
       // 4. Download each file to the local cache.
       final cacheDir = await _getSystemsCachePath();
@@ -377,7 +382,14 @@ class SystemsUpdateService {
       final response = await http
           .get(Uri.parse(_githubApiUrl))
           .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) {
+        // Unauthenticated GitHub API calls are capped at 60/hour per IP, so a
+        // 403 here is usually a rate limit, not a missing repo.
+        _log.w(
+          'SystemsUpdateService: GitHub API returned ${response.statusCode}',
+        );
+        return [];
+      }
       final entries = json.decode(response.body) as List<dynamic>;
       return entries
           .where((e) => e['name']?.toString().endsWith('.json') == true)
@@ -387,6 +399,16 @@ class SystemsUpdateService {
       _log.w('SystemsUpdateService: GitHub API error: $e');
       return [];
     }
+  }
+
+  /// Reads the system IDs listed in the remote manifest. raw.githubusercontent
+  /// isn't subject to the API rate limit, so this still works when
+  /// [_fetchSystemListFromApi] is refused.
+  static Future<List<String>> _fetchSystemListFromManifest() async {
+    final manifest = await _fetchManifest();
+    final systems = manifest?['systems'];
+    if (systems is! List) return [];
+    return systems.map((e) => e.toString()).toList();
   }
 
   /// Returns false (and logs) if the manifest declares a minimum app version
