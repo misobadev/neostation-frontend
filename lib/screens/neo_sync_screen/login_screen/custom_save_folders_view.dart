@@ -115,7 +115,9 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
       cancelLabel: AppLocale.cancel.getString(context),
       icon: Symbols.delete_forever_rounded,
     );
-    _gamepadNav.activate();
+    // No activate() here: the prompt's layer hands the controller back when the
+    // prompt is disposed. Activating on its return, during the prompt's exit
+    // animation, left this view live alongside it.
 
     if (confirmed != true) return;
     await _removeFolder(system, slug);
@@ -272,6 +274,9 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
   }
 
   Future<void> _openConfigDialog() async {
+    // The dialogue's own layer takes the controller from this view and hands
+    // it back when it closes. It is pushed after the dialogue's first frame, so
+    // let go of the controller now rather than share that frame's presses.
     _gamepadNav.deactivate();
     await showDialog<void>(
       context: context,
@@ -281,7 +286,6 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
         onSelectFolder: (system, slug) => _selectFolderFor(system, slug),
       ),
     );
-    _gamepadNav.activate();
   }
 
   @override

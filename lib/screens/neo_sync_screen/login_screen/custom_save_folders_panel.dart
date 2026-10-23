@@ -6,6 +6,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/system_model.dart';
 import 'package:neostation/data/datasources/sqlite_service.dart';
 import 'package:neostation/models/core_emulator_model.dart';
+import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/utils/cloud_path_builder.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/widgets/core_footer.dart';
@@ -36,6 +37,15 @@ class CustomSaveFoldersDialog extends StatefulWidget {
 
 class _CustomSaveFoldersDialogState extends State<CustomSaveFoldersDialog> {
   late GamepadNavigation _gamepadNav;
+
+  /// The dialogue's own navigation layer. Without one, a resume (or a modal
+  /// closing just before this opened) woke the screen underneath, and one A or
+  /// B press drove both. Modal, so a screen that mounts behind it can't take
+  /// the controller back; per instance, as [GamepadNavigationManager.popLayer]
+  /// removes the first layer with a matching id.
+  late final String _layerId =
+      'neo_sync_custom_folders_dialog#${identityHashCode(this)}';
+
   String? _selectedSystem;
   List<CoreEmulatorModel> _emulators = [];
   String? _selectedEmulatorUniqueId;
@@ -49,12 +59,21 @@ class _CustomSaveFoldersDialogState extends State<CustomSaveFoldersDialog> {
         if (mounted) Navigator.of(context).pop();
       },
     );
-    _gamepadNav.initialize();
-    _gamepadNav.activate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _gamepadNav.initialize();
+      GamepadNavigationManager.pushLayer(
+        _layerId,
+        onActivate: _gamepadNav.activate,
+        onDeactivate: _gamepadNav.deactivate,
+        modal: true,
+      );
+    });
   }
 
   @override
   void dispose() {
+    GamepadNavigationManager.popLayer(_layerId);
     _gamepadNav.dispose();
     super.dispose();
   }

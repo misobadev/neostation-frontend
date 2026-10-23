@@ -52,6 +52,14 @@ class _SaveListViewState extends State<SaveListView> {
 
   DateTime? _lastSelectTime;
   static const int _selectThrottleMs = 500;
+
+  /// Set while the delete prompt is open. Closing it pops its layer, which
+  /// re-activates this list's layer; that activation must keep the highlighted
+  /// save (and the clamp a delete applied) rather than jump back to the first.
+  /// The reset would also land mid-teardown of the prompt, where its setState
+  /// can't rebuild the list.
+  bool _keepSelectionOnActivate = false;
+
   DateTime? _lastRefreshTime;
 
   // ── Region-based focus (mirrors the search tab) ─────────────────────────
@@ -125,7 +133,11 @@ class _SaveListViewState extends State<SaveListView> {
         'neo_sync_save_list',
         onActivate: () {
           _savesGamepadNav.activate();
-          _resetSelection();
+          if (_keepSelectionOnActivate) {
+            _keepSelectionOnActivate = false;
+          } else {
+            _resetSelection();
+          }
         },
         onDeactivate: () => _savesGamepadNav.deactivate(),
       );
@@ -657,8 +669,13 @@ class _SaveListViewState extends State<SaveListView> {
     NeoSyncFile file,
     Function(bool) onDisableNeoSyncChanged,
   ) async {
+    // The prompt's own layer takes the controller from this list and hands it
+    // back when it closes; the list keeps the save the user chose. The layer is
+    // pushed after the prompt's first frame, so let go of the controller now
+    // rather than share that frame's presses with it.
+    _keepSelectionOnActivate = true;
     _savesGamepadNav.deactivate();
-    final result = await showDialog<bool>(
+    return showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
@@ -668,8 +685,6 @@ class _SaveListViewState extends State<SaveListView> {
         );
       },
     );
-    _savesGamepadNav.activate();
-    return result;
   }
 
   Future<void> _refreshOnlineFiles() async {
