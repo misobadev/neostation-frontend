@@ -258,6 +258,15 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Updates whether favourite games are pinned to the top of game lists.
+  Future<void> updateFavoritesFirstInGameSort(bool value) async {
+    if (_config.favoritesFirstInGameSort == value) return;
+    final previous = _config;
+    _config = _config.copyWith(favoritesFirstInGameSort: value);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
   /// Updates whether hidden files/folders are ignored during ROM scans.
   Future<void> updateIgnoreHiddenFiles(bool ignoreHiddenFiles) async {
     final previous = _config;

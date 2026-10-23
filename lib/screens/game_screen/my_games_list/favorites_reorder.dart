@@ -129,8 +129,10 @@ extension _FavoritesReorder on _SystemGamesListState {
     });
 
     // Marking: done, the game stays put. Un-marking: it has just left the block
-    // at the front and has to go back to its own place.
-    if (updated.isFavorite != true) {
+    // at the front and has to go back to its own place. With favourites-on-top
+    // off there is no block — every game already sits at its alphabetical
+    // place — so un-marking leaves it put as well.
+    if (updated.isFavorite != true && _favoritesFirst) {
       if (_deferFavoriteReseat) {
         _pendingFavoriteReseats.add(updated.romname);
       } else {
@@ -234,9 +236,9 @@ extension _FavoritesReorder on _SystemGamesListState {
   }
 }
 
-/// The order the list loads in: favourites first, then display name folded to
-/// lower case, exactly as `ORDER BY ur.is_favorite DESC,
-/// LOWER(game_display_name) ASC` does it.
+/// The order the list loads in: favourites first (unless [favoritesFirst] is
+/// off), then display name folded to lower case, exactly as
+/// `ORDER BY ur.is_favorite DESC, LOWER(game_display_name) ASC` does it.
 ///
 /// Any in-memory re-sort is anticipating that query, so it has to agree with
 /// it. The favourites-first comparator this replaces compared names
@@ -249,9 +251,12 @@ int _byFavouriteThenName(
   GameModel a,
   GameModel b, {
   bool ignoreArticles = false,
+  bool favoritesFirst = true,
 }) {
-  final bool aFavourite = a.isFavorite == true;
-  final bool bFavourite = b.isFavorite == true;
-  if (aFavourite != bFavourite) return aFavourite ? -1 : 1;
+  if (favoritesFirst) {
+    final bool aFavourite = a.isFavorite == true;
+    final bool bFavourite = b.isFavorite == true;
+    if (aFavourite != bFavourite) return aFavourite ? -1 : 1;
+  }
   return compareGameNames(a, b, ignoreArticles: ignoreArticles);
 }

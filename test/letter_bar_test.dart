@@ -119,6 +119,27 @@ void main() {
     );
   });
 
+  test('with favourites-first off, a leading favourite is just its letter', () {
+    // Alphabetical order where the first game happens to be a favourite: there
+    // is no favourites block, so no star and Alpha files under A.
+    final games = [
+      game('Alpha', favorite: true),
+      game('Bravo'),
+      game('Charlie', favorite: true),
+    ];
+
+    expect(favoritesRunLength(games, folderCount: 0, favoritesFirst: false), 0);
+    expect(
+      letterBarGroups(
+        games,
+        folderCount: 0,
+        favoritesLabel: star,
+        favoritesFirst: false,
+      ),
+      <String>['A', 'B', 'C'],
+    );
+  });
+
   test('an empty list has no chips', () {
     expect(
       letterBarGroups(<GameModel>[], folderCount: 0, favoritesLabel: star),

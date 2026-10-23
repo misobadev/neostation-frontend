@@ -84,6 +84,9 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.ignoreArticlesInGameSort: "ゲームの並び替えで冠詞を無視",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "タイトル先頭の The、A、An を無視します。例：The Legend of Zelda は L に分類されます。",
+  AppLocale.favoritesFirstInGameSort: "お気に入りを上に表示",
+  AppLocale.favoritesFirstInGameSortSubtitle:
+      "お気に入りのゲームを各ゲームリストの先頭に固定します。オフの場合、お気に入りはリスト内の元の位置のままです。",
   AppLocale.raEvents: 'イベント',
   AppLocale.raAotwYearTitle: '今週のアチーブメント（{year}）',
   AppLocale.raAotw: 'AOTW',

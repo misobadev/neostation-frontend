@@ -170,6 +170,23 @@ void main() {
       ]);
     });
 
+    test(
+      'favorites keep their alphabetical place with favorites-first off',
+      () {
+        final fav = game('Zelda', '$root/Zelda.zip', favorite: true);
+        final entries = buildRomLevel(
+          games: [fav, tenYard, battle],
+          rootFolders: const [root],
+          favoritesFirst: false,
+        );
+        expect(entries.map((e) => e.label).toList(), [
+          '10-Yard Fight',
+          '1943',
+          'Zelda',
+        ]);
+      },
+    );
+
     test('games outside every root folder fall back to the root level', () {
       final orphan = game('Stray', '/somewhere/else/Stray.zip');
       final entries = buildRomLevel(

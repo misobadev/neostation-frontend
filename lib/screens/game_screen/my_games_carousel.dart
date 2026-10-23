@@ -260,8 +260,14 @@ class _GamesCarouselState extends State<GamesCarousel> {
   /// How many games at the head of the list loaded as favourites. See
   /// [favoritesRunLength] for why the ★ group is a range of the list rather
   /// than a property of a game.
-  int get _favoritesRunLength =>
-      favoritesRunLength(widget.games, folderCount: widget.folderCount);
+  int get _favoritesRunLength => favoritesRunLength(
+    widget.games,
+    folderCount: widget.folderCount,
+    favoritesFirst: _favoritesFirst,
+  );
+
+  bool get _favoritesFirst =>
+      context.read<SqliteConfigProvider>().config.favoritesFirstInGameSort;
 
   /// Whether the entry at [index] is a folder placeholder rather than a game.
   bool _isFolderIndex(int index) => index < widget.folderCount;
@@ -277,6 +283,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
         .read<SqliteConfigProvider>()
         .config
         .ignoreArticlesInGameSort,
+    favoritesFirst: _favoritesFirst,
   );
 
   /// The bar's group for the entry at [index].

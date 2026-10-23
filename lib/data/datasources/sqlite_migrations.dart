@@ -644,6 +644,9 @@ class SqliteMigrations {
       case 170:
         await _migrateToVersion170(db);
         break;
+      case 173:
+        await _migrateToVersion173(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7147,6 +7150,22 @@ class SqliteMigrations {
       db.execute(
         'ALTER TABLE user_config ADD COLUMN android_apps_as_tab '
         'INTEGER DEFAULT 0',
+      );
+    }
+  }
+
+  /// Migration v173: persists the favourites-on-top game sort toggle.
+  ///
+  /// Defaults to on, which is the order every list loaded in before the toggle
+  /// existed. Numbered above the v171 (#604) and v172 (#665) held by open PRs.
+  static Future<void> _migrateToVersion173(Database db) async {
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('favorites_first_in_game_sort')) {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN favorites_first_in_game_sort INTEGER DEFAULT 1',
       );
     }
   }

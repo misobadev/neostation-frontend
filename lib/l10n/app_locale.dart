@@ -74,6 +74,9 @@ mixin AppLocale {
   static const String ignoreArticlesInGameSort = 'ignoreArticlesInGameSort';
   static const String ignoreArticlesInGameSortSubtitle =
       'ignoreArticlesInGameSortSubtitle';
+  static const String favoritesFirstInGameSort = 'favoritesFirstInGameSort';
+  static const String favoritesFirstInGameSortSubtitle =
+      'favoritesFirstInGameSortSubtitle';
   // ---------------------------------------------------------------------------
   // Navigation / Controls
   // ---------------------------------------------------------------------------

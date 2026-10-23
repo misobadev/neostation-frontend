@@ -24,7 +24,16 @@ import 'game_name_sort.dart';
 ///
 /// [folderCount] is the number of folder placeholders at the front of [games];
 /// folders are not alphabetical content and sit outside every group.
-int favoritesRunLength(List<GameModel> games, {required int folderCount}) {
+///
+/// With [favoritesFirst] off the list is purely alphabetical, so there is no
+/// favourites block: a favourite that happens to sort first is just the first
+/// game under its letter.
+int favoritesRunLength(
+  List<GameModel> games, {
+  required int folderCount,
+  bool favoritesFirst = true,
+}) {
+  if (!favoritesFirst) return 0;
   var count = 0;
   for (var i = folderCount; i < games.length; i++) {
     if (games[i].isFavorite != true) break;
@@ -58,9 +67,14 @@ List<String> letterBarGroups(
   required int folderCount,
   required String favoritesLabel,
   bool ignoreArticles = false,
+  bool favoritesFirst = true,
 }) {
   final groups = <String>[];
-  final run = favoritesRunLength(games, folderCount: folderCount);
+  final run = favoritesRunLength(
+    games,
+    folderCount: folderCount,
+    favoritesFirst: favoritesFirst,
+  );
   if (run > 0) groups.add(favoritesLabel);
 
   for (var i = folderCount + run; i < games.length; i++) {

@@ -95,6 +95,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.ignoreArticlesInGameSort: "Abaikan artikel saat mengurutkan game",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Abaikan The, A, atau An di awal judul. Misalnya, The Legend of Zelda diurutkan di huruf L.",
+  AppLocale.favoritesFirstInGameSort: "Favorit di atas",
+  AppLocale.favoritesFirstInGameSortSubtitle:
+      "Sematkan game favorit di bagian atas setiap daftar game. Jika nonaktif, favorit tetap di posisinya dalam daftar.",
   AppLocale.raEvents: 'Acara',
   AppLocale.raAotwYearTitle: 'Pencapaian Minggu Ini ({year})',
   AppLocale.raAotw: 'AOTW',
