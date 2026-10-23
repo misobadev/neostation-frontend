@@ -24,6 +24,12 @@ const String _noRomFoldersNotificationId = 'rom-folders-missing';
 /// consecutive scans replace the warning in place.
 const String _safPermissionNotificationId = 'rom-folders-saf-permission';
 
+/// Bell entry for an Android library whose ROM folders can't be read at all:
+/// no broad storage permission and no SAF folder to fall back on. A fixed id
+/// for the same reason as [_unreachableRomFoldersNotificationId].
+const String _storageAccessRequiredNotificationId =
+    'rom-storage-access-required';
+
 /// [key] in the app language. The provider has no BuildContext, so its
 /// messages use the context-free lookup, as the scan status does.
 String _text(String key) => key.getStringForCurrentLocale();
@@ -256,11 +262,11 @@ extension SqliteConfigScanning on SqliteConfigProvider {
       );
 
       // Verify permissions in Android BEFORE scanning
-      if (Platform.isAndroid) {
+      if (SqliteConfigProvider._androidScanChecks) {
         // On Android 13+, hasBroadPermissions returns true (simulated).
         // For older versions, we check if we have broad permissions OR if we use SAF.
         final hasBroadPermissions =
-            await PermissionService.hasStoragePermissions();
+            await SqliteConfigProvider.debugHasStoragePermissions();
         final hasSafFolders = _config.romFolders.any(
           (f) => f.startsWith('content://'),
         );
@@ -273,24 +279,68 @@ extension SqliteConfigScanning on SqliteConfigProvider {
           SqliteConfigProvider._log.e(
             'Storage access required; no SAF folder and no broad permission',
           );
+          // With games in the library this used to end on a blank systems
+          // screen: it renders neither the library nor the setup prompt until
+          // `_scanCompleted` flips, and `_error` reaches only the setup prompt.
+          // Show the library that is already there and say why it can't be
+          // rescanned. A first run keeps both as they were: the setup wizard
+          // reads its failed scan from exactly `!scanCompleted` plus `_error`.
+          if (await _hasStoredRoms()) {
+            _scanCompleted = true;
+            // This bell explains the whole library now, so a folder warning
+            // left by an earlier scan would only contradict it.
+            GlobalNotificationService().dismiss(
+              _unreachableRomFoldersNotificationId,
+            );
+            GlobalNotificationService().show(
+              id: _storageAccessRequiredNotificationId,
+              title: _text(
+                _config.romFolders.length == 1
+                    ? AppLocale.romFolderUnreachableTitle
+                    : AppLocale.romFoldersUnreachableTitle,
+              ),
+              message: _error!,
+              type: GlobalNotificationType.error,
+            );
+          }
           _setScanning(false);
           _notify();
           return;
         }
+        // Access is back (or never went), so an earlier warning is stale.
+        GlobalNotificationService().dismiss(
+          _storageAccessRequiredNotificationId,
+        );
 
-        // Verify access to directories
-        for (final path in _config.romFolders) {
-          // On Android 13+ with SAF, canAccessDirectory now returns true for content://
-          final canAccess = await PermissionService.canAccessDirectory(path);
-          if (!canAccess) {
+        // Verify access to the plain-path roots. canAccessDirectory passes
+        // every content:// root on Android unconditionally (SAF access is the
+        // grant check's business, below), so only plain paths can fail here.
+        final deniedRoots = <String>[
+          for (final path in _config.romFolders)
+            if (!path.startsWith('content://') &&
+                !await SqliteConfigProvider.debugCanAccessDirectory(path))
+              path,
+        ];
+        if (deniedRoots.isNotEmpty) {
+          SqliteConfigProvider._log.e(
+            'Cannot access ROM folder(s): ${deniedRoots.join(', ')}',
+          );
+          // A first run has no library to keep, so it stops here as it always
+          // has, and the setup wizard names the folder.
+          if (!await _hasStoredRoms()) {
             _error = _text(
               AppLocale.romFolderAccessDenied,
-            ).replaceFirst('{folder}', path);
-            SqliteConfigProvider._log.e('Cannot access ROM folder: $path');
+            ).replaceFirst('{folder}', deniedRoots.first);
             _setScanning(false);
             _notify();
             return;
           }
+          // With a library, stopping here was a blank systems screen, and it
+          // came before the start-up storage wait: a root on an SD card that
+          // was still mounting never got the wait, and one missing root
+          // blocked every other. Carry on instead. The wait below looks at
+          // every root, and whatever is still unreadable after it ends the
+          // scan with the library kept, by the unreachable-roots check.
         }
 
         // Detect configured folders that lost their persistent SAF grant and
@@ -319,6 +369,12 @@ extension SqliteConfigScanning on SqliteConfigProvider {
           SqliteConfigProvider._log.w(
             'Startup scan skipped because Android ROM storage never became ready',
           );
+          // No root came up at all: the usual handheld case of ROMs kept only
+          // on an SD card that is out, broken or slow. Stopping here is right,
+          // since a scan would see every game as gone, but it used to leave
+          // the systems screen blank after the wait. Keep the library on
+          // screen and name the folders, as for an unreachable desktop root.
+          _keepLibraryForUnreachableRomFolders(_config.romFolders);
           _setScanning(false);
           _notify();
           return;
@@ -330,53 +386,30 @@ extension SqliteConfigScanning on SqliteConfigProvider {
       // expired. Off Android nothing verified that until now, so the walk found
       // nothing and the prune phase deleted every ROM row — indistinguishable
       // from data loss to the user. Keep the library and explain instead.
-      if (!Platform.isAndroid && _config.romFolders.isNotEmpty) {
+      if (_config.romFolders.isNotEmpty) {
         final unreachable = <String>[];
-        for (final folder in _config.romFolders) {
-          if (!await Directory(folder).exists()) unreachable.add(folder);
+        if (SqliteConfigProvider._androidScanChecks) {
+          // On Android, the plain roots that are still unreadable after the
+          // checks and the wait above (only a library can get this far with
+          // one). A SAF root isn't checked here: one that is offline lists no
+          // folders, and the scan's offline-root guard keeps its games.
+          for (final folder in _config.romFolders) {
+            if (folder.startsWith('content://')) continue;
+            if (!await SqliteConfigProvider.debugCanAccessDirectory(folder)) {
+              unreachable.add(folder);
+            }
+          }
+        } else {
+          for (final folder in _config.romFolders) {
+            if (!await Directory(folder).exists()) unreachable.add(folder);
+          }
         }
         if (unreachable.isNotEmpty && await _hasStoredRoms()) {
-          // A portal grant cannot be restored by plugging anything back in, so
-          // that case needs different advice from a missing drive.
-          final advice = _text(
-            unreachable.any(isTransientPortalPath)
-                ? AppLocale.romFolderAdvicePortal
-                : AppLocale.romFolderAdviceReconnect,
-          );
-          final one = unreachable.length == 1;
-          // The paths go in last, so one holding "{advice}" stays as it is.
-          _error =
-              _text(
-                    one
-                        ? AppLocale.romFolderUnreachable
-                        : AppLocale.romFoldersUnreachable,
-                  )
-                  .replaceFirst('{advice}', advice)
-                  .replaceFirst('{folders}', unreachable.join(', '));
           SqliteConfigProvider._log.e(
             'Scan aborted, ${unreachable.length} unreachable ROM folder(s); '
             'library preserved: ${unreachable.join(', ')}',
           );
-          // The preserved library is worth nothing if the screen behind this
-          // stays blank. `_scanCompleted` is only set at the far end of a
-          // successful scan, and the systems screen renders neither the library
-          // nor the setup prompt until it flips — an early return without it
-          // leaves an empty page, which is the very symptom being fixed.
-          _scanCompleted = true;
-          // `_error` reaches only the initial-setup widget, which is shown when
-          // no systems are detected — impossible here, since this branch needs
-          // stored ROMs. The bell is the one surface that both survives the scan
-          // ending and does not need a BuildContext from this layer.
-          GlobalNotificationService().show(
-            id: _unreachableRomFoldersNotificationId,
-            title: _text(
-              one
-                  ? AppLocale.romFolderUnreachableTitle
-                  : AppLocale.romFoldersUnreachableTitle,
-            ),
-            message: _error!,
-            type: GlobalNotificationType.error,
-          );
+          _keepLibraryForUnreachableRomFolders(unreachable);
           _setScanning(false);
           _notify();
           return;
@@ -641,6 +674,54 @@ extension SqliteConfigScanning on SqliteConfigProvider {
     }
   }
 
+  /// Ends a scan that found [unreachable] ROM roots while the library holds
+  /// games: says why in `_error` and the bell, and shows the library as it is.
+  /// The caller logs, clears the scanning flag and returns; nothing has been
+  /// pruned at that point, so every game is kept.
+  void _keepLibraryForUnreachableRomFolders(List<String> unreachable) {
+    // A portal grant cannot be restored by plugging anything back in, so
+    // that case needs different advice from a missing drive.
+    final advice = _text(
+      unreachable.any(isTransientPortalPath)
+          ? AppLocale.romFolderAdvicePortal
+          : AppLocale.romFolderAdviceReconnect,
+    );
+    final one = unreachable.length == 1;
+    // The paths go in last, so one holding "{advice}" stays as it is. An
+    // Android SAF root goes in as its volume and folder rather than its URI.
+    _error =
+        _text(
+              one
+                  ? AppLocale.romFolderUnreachable
+                  : AppLocale.romFoldersUnreachable,
+            )
+            .replaceFirst('{advice}', advice)
+            .replaceFirst(
+              '{folders}',
+              unreachable.map(romFolderLabel).join(', '),
+            );
+    // The preserved library is worth nothing if the screen behind this stays
+    // blank. `_scanCompleted` is only set at the far end of a successful scan,
+    // and the systems screen renders neither the library nor the setup prompt
+    // until it flips — an early return without it leaves an empty page, which
+    // is the very symptom being fixed.
+    _scanCompleted = true;
+    // `_error` reaches only the initial-setup widget, which is shown when no
+    // systems are detected — impossible here, since this needs stored ROMs.
+    // The bell is the one surface that both survives the scan ending and does
+    // not need a BuildContext from this layer.
+    GlobalNotificationService().show(
+      id: _unreachableRomFoldersNotificationId,
+      title: _text(
+        one
+            ? AppLocale.romFolderUnreachableTitle
+            : AppLocale.romFoldersUnreachableTitle,
+      ),
+      message: _error!,
+      type: GlobalNotificationType.error,
+    );
+  }
+
   /// Returns whether the local library contains ROMs that a premature scan
   /// could otherwise remove as missing.
   Future<bool> _hasStoredRoms() async {
@@ -660,13 +741,19 @@ extension SqliteConfigScanning on SqliteConfigProvider {
   /// no root came up at all; a root still missing after the wait keeps its
   /// games through the scan's own offline-root guard.
   Future<bool> _waitForAndroidRomFolders() async {
-    const retryDelay = Duration(seconds: 3);
+    final retryDelay = SqliteConfigProvider.debugAndroidStorageRetryDelay;
     const maxAttempts = 10;
 
     final rootsWithGames = <String>{
       for (final root in _config.romFolders)
         if (await GameRepository.hasRomsUnderFolder(root)) root,
     };
+    // Nothing under a ROM root to protect: a library of installed Android apps
+    // alone (stored as ROM rows, so it counts as a library), or roots that hold
+    // no games yet. The scan can't prune anything here, and waiting would only
+    // hold the systems screen back for 30 s on every cold start, then end with
+    // no root to name.
+    if (rootsWithGames.isEmpty) return true;
 
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       final folders = await SqliteDatabaseService.getExistingSubdirectories(

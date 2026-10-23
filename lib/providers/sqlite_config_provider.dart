@@ -112,6 +112,52 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
     'com.neogamelab.neostation/secondary_display',
   );
 
+  /// Forces whether [scanSystems] runs its Android pre-scan checks (storage
+  /// access, unreadable roots, the start-up storage wait, unreachable roots).
+  ///
+  /// Tests use it to exercise those checks on any CI host, with plain temp
+  /// paths as ROM roots. It covers only those checks: the scan itself, the
+  /// SAF grant check (which needs the platform channel) and the folder listing
+  /// the start-up wait uses still follow the real platform, so off a device a
+  /// `content://` root always lists as offline.
+  @visibleForTesting
+  static bool? debugAndroidOverride;
+
+  /// Whether the Android pre-scan checks apply: [debugAndroidOverride] under
+  /// test, the real platform otherwise.
+  static bool get _androidScanChecks =>
+      debugAndroidOverride ?? Platform.isAndroid;
+
+  /// The broad storage permission check behind the Android pre-scan checks.
+  /// Replaceable so a test can take the permission away.
+  @visibleForTesting
+  static Future<bool> Function() debugHasStoragePermissions =
+      PermissionService.hasStoragePermissions;
+
+  /// The readability check the Android pre-scan checks run on plain-path ROM
+  /// roots.
+  @visibleForTesting
+  static Future<bool> Function(String path) debugCanAccessDirectory =
+      PermissionService.canAccessDirectory;
+
+  /// The pause between looks while the start-up scan waits for Android ROM
+  /// storage to come up. Tests set it to zero rather than sit through 27 s
+  /// (nine pauses between ten looks).
+  @visibleForTesting
+  static Duration debugAndroidStorageRetryDelay =
+      _defaultAndroidStorageRetryDelay;
+
+  static const _defaultAndroidStorageRetryDelay = Duration(seconds: 3);
+
+  /// Puts the Android scan seams above back to their defaults.
+  @visibleForTesting
+  static void debugResetAndroidScanSeams() {
+    debugAndroidOverride = null;
+    debugHasStoragePermissions = PermissionService.hasStoragePermissions;
+    debugCanAccessDirectory = PermissionService.canAccessDirectory;
+    debugAndroidStorageRetryDelay = _defaultAndroidStorageRetryDelay;
+  }
+
   // Getters
   ConfigModel get config => _config;
   List<SystemModel> get detectedSystems => _detectedSystems;
