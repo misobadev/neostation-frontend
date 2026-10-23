@@ -284,6 +284,9 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.nowPlayingFanartDim: 'Затемнять фанарт',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Затемнять фон за логотипом, чтобы яркий фанарт не мешал',
+  AppLocale.secondaryHideSystemLogo: 'Скрыть логотип системы',
+  AppLocale.secondaryHideSystemLogoSubtitle:
+      'Показывать только фон, без логотипа и названия системы',
   AppLocale.nowPlayingDimOff: 'Выкл',
   AppLocale.secondarySectionNowPlaying: 'Панель Now Playing',
   AppLocale.secondarySectionDock: 'Док приложений',

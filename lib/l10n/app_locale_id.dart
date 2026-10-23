@@ -283,6 +283,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.nowPlayingFanartDim: 'Redupkan fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Gelapkan seni latar belakang di belakang logo agar fanart yang ramai tidak bertabrakan',
+  AppLocale.secondaryHideSystemLogo: 'Sembunyikan logo sistem',
+  AppLocale.secondaryHideSystemLogoSubtitle:
+      'Tampilkan hanya gambar latar, tanpa logo atau nama sistem',
   AppLocale.nowPlayingDimOff: 'Mati',
   AppLocale.secondarySectionNowPlaying: 'Panel Now Playing',
   AppLocale.secondarySectionDock: 'Dock aplikasi',

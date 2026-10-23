@@ -1196,11 +1196,16 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
         duration: const Duration(milliseconds: 256),
         child: Column(
           key: ValueKey(
-            'system_center_${value.systemName}_${value.systemLogo}_$isTab',
+            'system_center_${value.systemName}_${value.systemLogo}_'
+            '${value.hideSystemLogo}_$isTab',
           ),
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (!isTab) ...[
+            // User opted out of the logo: leave just the background art, with
+            // no name pill either.
+            if (!isTab && value.hideSystemLogo)
+              const SizedBox.shrink()
+            else if (!isTab) ...[
               _buildSystemLogo(value),
               if (value.systemLogo == null) ...[
                 SizedBox(height: 40.r),

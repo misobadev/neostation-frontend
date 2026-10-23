@@ -251,6 +251,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.nowPlayingFanartDim: '팬아트 어둡기',
   AppLocale.nowPlayingFanartDimSubtitle:
       '복잡한 팬아트가 로고를 방해하지 않도록 로고 뒤의 배경을 어둡게 표시합니다',
+  AppLocale.secondaryHideSystemLogo: '시스템 로고 숨기기',
+  AppLocale.secondaryHideSystemLogoSubtitle: '로고나 시스템 이름 없이 배경 아트만 표시합니다',
   AppLocale.nowPlayingDimOff: '끄기',
   AppLocale.secondarySectionNowPlaying: '플레이 중 패널',
   AppLocale.secondarySectionDock: '앱 Dock',

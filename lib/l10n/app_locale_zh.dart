@@ -246,6 +246,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.nowPlayingDockSlotsSubtitle: '应用坞显示多少个应用槽位 (0-5)',
   AppLocale.nowPlayingFanartDim: '变暗同人图',
   AppLocale.nowPlayingFanartDimSubtitle: '变暗标志后面的背景艺术，以免繁杂的同人图与之冲突',
+  AppLocale.secondaryHideSystemLogo: '隐藏系统标志',
+  AppLocale.secondaryHideSystemLogoSubtitle: '仅显示背景图，不显示标志或系统名称',
   AppLocale.nowPlayingDimOff: '关闭',
   AppLocale.secondarySectionNowPlaying: 'Now Playing 面板',
   AppLocale.secondarySectionDock: '应用坞',

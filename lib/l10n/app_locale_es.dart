@@ -289,6 +289,9 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.nowPlayingFanartDim: 'Atenuar fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Oscurece el arte de fondo tras el logo para que un fanart recargado no choque con él',
+  AppLocale.secondaryHideSystemLogo: 'Ocultar logo del sistema',
+  AppLocale.secondaryHideSystemLogoSubtitle:
+      'Muestra solo el arte de fondo, sin el logo ni el nombre del sistema',
   AppLocale.nowPlayingDimOff: 'Desactivado',
   AppLocale.secondarySectionNowPlaying: 'Panel Reproduciendo',
   AppLocale.secondarySectionDock: 'Dock de apps',

@@ -281,6 +281,9 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.nowPlayingFanartDim: 'Dim fanart',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Darken the background art behind the logo so a busy fanart does not clash with it',
+  AppLocale.secondaryHideSystemLogo: 'Hide system logo',
+  AppLocale.secondaryHideSystemLogoSubtitle:
+      'Show only the background art, without the logo or system name',
   AppLocale.nowPlayingDimOff: 'Off',
   AppLocale.secondarySectionNowPlaying: 'Now Playing panel',
   AppLocale.secondarySectionDock: 'App dock',

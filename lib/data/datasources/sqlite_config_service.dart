@@ -355,6 +355,13 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['dock_enabled']?.toString() ?? '1') ??
                 1) ==
             1,
+        // Missing column/row => 0 => logo shown (the default).
+        secondaryHideSystemLogo:
+            (int.tryParse(
+                  userConfig?['secondary_hide_system_logo']?.toString() ?? '0',
+                ) ??
+                0) ==
+            1,
         dockSlotCount:
             (int.tryParse(userConfig?['dock_slot_count']?.toString() ?? '3') ??
                     3)
@@ -497,6 +504,7 @@ class SqliteConfigService {
           gameCarouselCardStyle: config.gameCarouselCardStyle,
           dockApps: jsonEncode(config.dockApps),
           dockEnabled: config.dockEnabled ? 1 : 0,
+          secondaryHideSystemLogo: config.secondaryHideSystemLogo ? 1 : 0,
           dockSlotCount: config.dockSlotCount,
           nowPlayingDimDelay: config.nowPlayingDimDelay,
           nowPlayingDimLevel: config.nowPlayingDimLevel,

@@ -291,6 +291,9 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.nowPlayingFanartDim: 'Fanart abdunkeln',
   AppLocale.nowPlayingFanartDimSubtitle:
       'Hintergrundbild hinter dem Logo abdunkeln, damit ein unruhiges Fanart nicht stört',
+  AppLocale.secondaryHideSystemLogo: 'Systemlogo ausblenden',
+  AppLocale.secondaryHideSystemLogoSubtitle:
+      'Nur das Hintergrundbild anzeigen, ohne Logo oder Systemnamen',
   AppLocale.nowPlayingDimOff: 'Aus',
   AppLocale.secondarySectionNowPlaying: 'Now Playing-Bereich',
   AppLocale.secondarySectionDock: 'App-Dock',

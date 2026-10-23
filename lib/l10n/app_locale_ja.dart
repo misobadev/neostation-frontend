@@ -251,6 +251,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.nowPlayingDockSlotsSubtitle: 'ドックに表示するアプリスロット数 (0-5)',
   AppLocale.nowPlayingFanartDim: 'ファンアートを暗くする',
   AppLocale.nowPlayingFanartDimSubtitle: 'ロゴの背後を暗くして、派手なファンアートが視認性を妨げないようにする',
+  AppLocale.secondaryHideSystemLogo: 'システムロゴを非表示',
+  AppLocale.secondaryHideSystemLogoSubtitle: 'ロゴやシステム名を表示せず、背景アートのみを表示する',
   AppLocale.nowPlayingDimOff: 'オフ',
   AppLocale.secondarySectionNowPlaying: 'Now Playingパネル',
   AppLocale.secondarySectionDock: 'アプリドック',

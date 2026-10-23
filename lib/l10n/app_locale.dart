@@ -248,6 +248,9 @@ mixin AppLocale {
   static const String nowPlayingFanartDimSubtitle =
       'now_playing_fanart_dim_subtitle';
   static const String nowPlayingDimOff = 'now_playing_dim_off';
+  static const String secondaryHideSystemLogo = 'secondary_hide_system_logo';
+  static const String secondaryHideSystemLogoSubtitle =
+      'secondary_hide_system_logo_subtitle';
   static const String secondarySectionNowPlaying =
       'secondary_section_now_playing';
   static const String secondarySectionDock = 'secondary_section_dock';

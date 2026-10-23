@@ -456,6 +456,17 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Shows or hides the system logo on the secondary display while browsing.
+  /// Persists and pushes the value to the secondary display.
+  Future<void> updateSecondaryHideSystemLogo(bool value) async {
+    if (_config.secondaryHideSystemLogo == value) return;
+    final previous = _config;
+    _config = _config.copyWith(secondaryHideSystemLogo: value);
+    await _saveOrRevert(previous);
+    _secondaryDisplayState?.updateState(hideSystemLogo: value);
+    _notify();
+  }
+
   /// Sets how many secondary dock slots are visible, clamped to
   /// [ConfigModel.dockMinSlotCount]–[ConfigModel.dockMaxSlotCount]. Persists and
   /// pushes the value to the secondary display.

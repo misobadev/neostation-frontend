@@ -246,6 +246,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.nowPlayingDockSlotsSubtitle: '應用程式塢顯示多少個應用程式槽位 (0-5)',
   AppLocale.nowPlayingFanartDim: '變暗同人圖',
   AppLocale.nowPlayingFanartDimSubtitle: '變暗標誌後面的背景藝術，以免繁雜的同人圖與之衝突',
+  AppLocale.secondaryHideSystemLogo: '隱藏系統標誌',
+  AppLocale.secondaryHideSystemLogoSubtitle: '僅顯示背景圖，不顯示標誌或系統名稱',
   AppLocale.nowPlayingDimOff: '關閉',
   AppLocale.secondarySectionNowPlaying: 'Now Playing 面板',
   AppLocale.secondarySectionDock: '應用程式塢',

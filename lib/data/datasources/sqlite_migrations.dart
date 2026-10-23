@@ -644,6 +644,9 @@ class SqliteMigrations {
       case 170:
         await _migrateToVersion170(db);
         break;
+      case 174:
+        await _migrateToVersion174(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7224,6 +7227,34 @@ class SqliteMigrations {
     }
     if (!columns.contains('rules_json')) {
       db.execute('ALTER TABLE user_collections ADD COLUMN rules_json TEXT');
+    }
+  }
+
+  /// Migration v174: adds `user_config.secondary_hide_system_logo`.
+  ///
+  /// When enabled, the secondary display drops the system logo while browsing
+  /// and shows only the background art. v171 and v173 are claimed by other
+  /// branches (Android games system, favourite-games sorting), so this takes
+  /// the next slot above them.
+  static Future<void> _migrateToVersion174(Database db) async {
+    _log.i('Migration v174: Adding secondary_hide_system_logo to user_config');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+      if (!columns.contains('secondary_hide_system_logo')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN secondary_hide_system_logo '
+          'INTEGER DEFAULT 0',
+        );
+        _log.i('Column secondary_hide_system_logo added via v174');
+      } else {
+        _log.i('Column secondary_hide_system_logo already exists');
+      }
+      _log.i('Migration v174 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v174: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
     }
   }
 
