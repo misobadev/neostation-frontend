@@ -4,9 +4,18 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../l10n/app_locale.dart';
 
 /// Earned status is independent of the surrounding controller focus ring.
+///
+/// Mirrors retroachievements.org: badge art is near-square (many badges bake
+/// their own frame into the corners, which a large radius clips off) and the
+/// earned border sits flush against it. The badge clips [child] itself, so
+/// callers should pass the bare image rather than rounding it.
 class RaEarnedBadge extends StatelessWidget {
   static const silver = Color(0xFFC5CCD6);
   static const gold = Color(0xFFFFC857);
+
+  /// Outer corner radius of the earned border.
+  static double get radius => 3.r;
+  static double get borderWidth => 2.r;
   final bool casual;
   final bool hardcore;
   final Widget child;
@@ -27,19 +36,21 @@ class RaEarnedBadge extends StatelessWidget {
                 : AppLocale.raFilterLocked)
             .getString(context),
     child: Container(
-      padding: EdgeInsets.all(2.r),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(
           color: hardcore
               ? gold
               : casual
               ? silver
               : Colors.transparent,
-          width: 2.r,
+          width: borderWidth,
         ),
       ),
-      child: child,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius - borderWidth),
+        child: child,
+      ),
     ),
   );
 }
