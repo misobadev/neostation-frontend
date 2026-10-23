@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 
-def format_file(json_file: Path) -> bool:
+def format_file(json_file: Path) -> str:
     original = json_file.read_text(encoding="utf-8")
     try:
         data = json.loads(original)
@@ -21,8 +21,13 @@ def format_file(json_file: Path) -> bool:
 
 
 def main():
-    systems_dir = Path(__file__).parent / "assets/systems"
+    # The scripts live in scripts/, one level below the repository root.
+    systems_dir = Path(__file__).resolve().parent.parent / "assets" / "systems"
     files = sorted(systems_dir.glob("*.json"))
+    if not files:
+        # A wrong path must not pass as "nothing to reformat".
+        print(f"ERROR: no systems JSON found in {systems_dir}")
+        sys.exit(1)
 
     changed = 0
     errors = 0

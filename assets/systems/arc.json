@@ -454,17 +454,6 @@
       }
     },
     {
-      "name": "RetroArch64 MAME 2010",
-      "unique_id": "arc.ra64.mame2010",
-      "description": "Supported extensions: 7z, chd, zip.",
-      "is_retroachievements_compatible": false,
-      "platforms": {
-        "android": {
-          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mame2010\""
-        }
-      }
-    },
-    {
       "name": "RetroArch32 MAME 2010",
       "unique_id": "arc.ra32.mame2010",
       "description": "Supported extensions: 7z, chd, zip.",
