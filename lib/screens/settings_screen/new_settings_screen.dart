@@ -20,6 +20,8 @@ import 'new_settings_options/screenscraper/screenscraper_settings_content.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import '../../providers/sqlite_config_provider.dart';
 
 /// A unified Settings dashboard featuring a master-detail layout with category navigation and contextual content panels.
@@ -548,81 +550,91 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
   }
 
   Widget _buildLeftMenu(ThemeData theme) {
-    return Container(
+    final radii = theme.extension<CornerRadii>();
+    final radiusPx = radii?.radiusExternalRadius ?? 14.r;
+    final radius = radii?.radiusExternal ?? BorderRadius.circular(14.r);
+    final rimWidth = NeoGlass.borderWidthOf(context);
+
+    return SizedBox(
       width: MediaQuery.of(context).size.width * 0.25,
-      decoration: BoxDecoration(
-        color: theme.cardColor.withValues(alpha: 0.25),
-        border: Border(
-          right: BorderSide(
-            color: theme.colorScheme.primary.withValues(alpha: 0.1),
-            width: 1.r,
-          ),
-        ),
-      ),
       child: ListView.builder(
+        padding: EdgeInsets.fromLTRB(16.r, 0, 8.r, 24.r),
         itemCount: _menuItems.length,
         itemBuilder: (context, index) {
           final item = _menuItems[index];
           if (!item.isVisible) return const SizedBox.shrink();
 
           final isSelected = _selectedMenuIndex == index;
+          // While focus lives in the content panel, keep the active category
+          // visible but muted so the content's own selection reads as primary.
+          final mutedSelection = Color.alphaBlend(
+            theme.colorScheme.onSurface.withValues(alpha: 0.18),
+            theme.colorScheme.surface,
+          );
+          final background = isSelected
+              ? (_focusOnMenu ? theme.colorScheme.onSurface : mutedSelection)
+              : theme.colorScheme.surface;
+          final contentColor = isSelected
+              ? (_focusOnMenu
+                    ? theme.colorScheme.surface
+                    : theme.colorScheme.onSurface)
+              : theme.colorScheme.onSurface;
 
-          return Material(
-            key: isSelected ? _selectedMenuItemKey : null,
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                SfxService().playNavSound();
-                _onMenuItemSelected(index);
-              },
-              canRequestFocus: false,
-              focusColor: Colors.transparent,
-              hoverColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 12.r),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? theme.colorScheme.primary.withValues(alpha: 0.15)
-                      : Colors.transparent,
-                  border: Border(
-                    left: BorderSide(
-                      color: isSelected && _focusOnMenu
-                          ? theme.colorScheme.primary
-                          : Colors.transparent,
-                      width: 3.r,
-                    ),
+          final button = Container(
+            decoration: BoxDecoration(color: background, borderRadius: radius),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: radius,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () {
+                  SfxService().playNavSound();
+                  _onMenuItemSelected(index);
+                },
+                canRequestFocus: false,
+                focusColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                borderRadius: radius,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.r,
+                    vertical: 8.r,
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      item.icon,
-                      color: isSelected && _focusOnMenu
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
-                      size: 20.r,
-                    ),
-                    SizedBox(width: 12.r),
-                    Expanded(
-                      child: Text(
-                        item.localeKey.getString(context),
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: isSelected && _focusOnMenu
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurface,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          fontSize: 14.r,
+                  child: Row(
+                    children: [
+                      Icon(item.icon, color: contentColor, size: 18.r),
+                      SizedBox(width: 10.r),
+                      Expanded(
+                        child: Text(
+                          item.localeKey.getString(context),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: contentColor,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            fontSize: 12.r,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
+          );
+
+          return Padding(
+            key: isSelected ? _selectedMenuItemKey : null,
+            padding: EdgeInsets.only(bottom: 8.r),
+            child: rimWidth > 0
+                ? NeoGlassRim(
+                    cornerRadius: radiusPx,
+                    borderWidth: rimWidth,
+                    child: button,
+                  )
+                : button,
           );
         },
       ),

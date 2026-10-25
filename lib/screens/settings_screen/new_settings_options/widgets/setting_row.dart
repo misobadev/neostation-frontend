@@ -50,6 +50,12 @@ class SettingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final foreground = focused
+        ? theme.colorScheme.surface
+        : theme.colorScheme.onSurface;
+    final subtitleForeground = focused
+        ? theme.colorScheme.surface.withValues(alpha: 0.6)
+        : theme.colorScheme.onSurface.withValues(alpha: 0.6);
 
     final titleColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,9 +65,7 @@ class SettingRow extends StatelessWidget {
           style: theme.textTheme.bodyLarge?.copyWith(
             fontSize: 12.r,
             fontWeight: FontWeight.w500,
-            color: focused
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurface,
+            color: foreground,
           ),
         ),
         SizedBox(height: 4.r),
@@ -72,7 +76,7 @@ class SettingRow extends StatelessWidget {
             subtitle,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontSize: 9.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              color: subtitleForeground,
             ),
           ),
       ],
@@ -80,7 +84,9 @@ class SettingRow extends StatelessWidget {
 
     final row = Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.5),
+        color: focused
+            ? theme.colorScheme.onSurface
+            : theme.colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8.r),
         border: Border.all(
           color: focused ? theme.colorScheme.primary : Colors.transparent,

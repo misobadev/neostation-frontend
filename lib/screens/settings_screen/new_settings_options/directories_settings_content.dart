@@ -988,6 +988,18 @@ class DirectoriesSettingsContentState
                                 ? theme.colorScheme.error
                                 : theme.colorScheme.primary)
                           : theme.colorScheme.outline.withValues(alpha: 0);
+                      final foreground = isSelected
+                          ? (isRemoveItem
+                                ? theme.colorScheme.error
+                                : theme.colorScheme.surface)
+                          : theme.colorScheme.onSurface;
+                      final subtitleForeground = isSelected
+                          ? (isRemoveItem
+                                ? theme.colorScheme.error.withValues(alpha: 0.7)
+                                : theme.colorScheme.surface.withValues(
+                                    alpha: 0.6,
+                                  ))
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.6);
                       final rimWidth = NeoGlass.borderWidthOf(context);
 
                       return Padding(
@@ -1004,10 +1016,8 @@ class DirectoriesSettingsContentState
                               borderWidth: rimWidth,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: isSelected && isRemoveItem
-                                      ? theme.colorScheme.error.withValues(
-                                          alpha: 0.08,
-                                        )
+                                  color: isSelected
+                                      ? theme.colorScheme.onSurface
                                       : theme.colorScheme.surface.withValues(
                                           alpha: 0.5,
                                         ),
@@ -1045,15 +1055,7 @@ class DirectoriesSettingsContentState
                                               _iconFor(
                                                 item['action'] as String,
                                               ),
-                                              color: isSelected
-                                                  ? (isRemoveItem
-                                                        ? theme
-                                                              .colorScheme
-                                                              .error
-                                                        : theme
-                                                              .colorScheme
-                                                              .primary)
-                                                  : theme.colorScheme.onSurface,
+                                              color: foreground,
                                               size: 20.r,
                                             ),
                                             SizedBox(width: 12.r),
@@ -1080,17 +1082,7 @@ class DirectoriesSettingsContentState
                                                           fontSize: isRemoveItem
                                                               ? 10.r
                                                               : 12.r,
-                                                          color: isSelected
-                                                              ? (isRemoveItem
-                                                                    ? theme
-                                                                          .colorScheme
-                                                                          .error
-                                                                    : theme
-                                                                          .colorScheme
-                                                                          .primary)
-                                                              : theme
-                                                                    .colorScheme
-                                                                    .onSurface,
+                                                          color: foreground,
                                                           fontFamily:
                                                               isRemoveItem
                                                               ? 'monospace'
@@ -1109,22 +1101,7 @@ class DirectoriesSettingsContentState
                                                         .bodySmall
                                                         ?.copyWith(
                                                           color:
-                                                              isSelected &&
-                                                                  isRemoveItem
-                                                              ? theme
-                                                                    .colorScheme
-                                                                    .error
-                                                                    .withValues(
-                                                                      alpha:
-                                                                          0.7,
-                                                                    )
-                                                              : theme
-                                                                    .colorScheme
-                                                                    .onSurface
-                                                                    .withValues(
-                                                                      alpha:
-                                                                          0.6,
-                                                                    ),
+                                                              subtitleForeground,
                                                           fontSize: 9.r,
                                                         ),
                                                   ),

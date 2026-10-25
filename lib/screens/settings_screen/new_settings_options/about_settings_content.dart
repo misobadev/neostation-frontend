@@ -319,6 +319,10 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
     required ThemeData theme,
     bool isFocused = false,
   }) {
+    final foreground = isFocused
+        ? theme.colorScheme.surface
+        : theme.colorScheme.onSurface;
+
     final card = InkWell(
       key: cardKey,
       onTap: () {
@@ -338,7 +342,9 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
       child: Container(
         padding: EdgeInsets.all(6.r),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.5),
+          color: isFocused
+              ? theme.colorScheme.onSurface
+              : theme.colorScheme.surface.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
             color: isFocused ? theme.colorScheme.primary : Colors.transparent,
@@ -357,13 +363,16 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       fontSize: 12.r,
+                      color: foreground,
                     ),
                   ),
                   SizedBox(height: 2.r),
                   Text(
                     value,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.primary,
+                      color: isFocused
+                          ? theme.colorScheme.surface.withValues(alpha: 0.7)
+                          : theme.colorScheme.primary,
                       fontWeight: FontWeight.w500,
                       fontSize: 9.r,
                     ),
@@ -374,7 +383,9 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
             Icon(
               trailingIcon,
               size: 14.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              color: isFocused
+                  ? theme.colorScheme.surface.withValues(alpha: 0.6)
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.4),
             ),
           ],
         ),

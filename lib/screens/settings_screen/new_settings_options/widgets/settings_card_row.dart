@@ -61,12 +61,17 @@ class SettingsCardRow extends StatelessWidget {
         ? theme.colorScheme.primary
         : theme.colorScheme.outline.withValues(alpha: 0);
     final foreground = selected
-        ? theme.colorScheme.primary
+        ? theme.colorScheme.surface
         : theme.colorScheme.onSurface.withValues(alpha: disabled ? 0.4 : 1.0);
+    final subtitleForeground = selected
+        ? theme.colorScheme.surface.withValues(alpha: disabled ? 0.25 : 0.6)
+        : theme.colorScheme.onSurface.withValues(alpha: disabled ? 0.25 : 0.6);
 
     final row = Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.5),
+        color: selected
+            ? theme.colorScheme.onSurface
+            : theme.colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: borderColor, width: selected ? 2.r : 1.r),
       ),
@@ -107,9 +112,7 @@ class SettingsCardRow extends StatelessWidget {
                             subtitle,
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontSize: 9.r,
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: disabled ? 0.25 : 0.6,
-                              ),
+                              color: subtitleForeground,
                             ),
                             maxLines: subtitleMaxLines,
                             overflow: TextOverflow.ellipsis,
