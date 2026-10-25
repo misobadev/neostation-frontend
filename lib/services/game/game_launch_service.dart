@@ -221,6 +221,20 @@ class GameLaunchService {
                 system,
               );
 
+              final libretroCore = _libretroCoreFromExtras(extrasList);
+              if (libretroCore != null) {
+                if (!context.mounted) {
+                  return GameLaunchResult.failure('', '');
+                }
+                final coreFailure = await _retroArchCoreFailure(
+                  context,
+                  platform: platform,
+                  packageName: packageName,
+                  coreName: libretroCore,
+                );
+                if (coreFailure != null) return coreFailure;
+              }
+
               final result = await platform
                   .invokeMethod('launchGenericIntent', {
                     'package': packageName,
@@ -365,6 +379,97 @@ class GameLaunchService {
     }
   }
 
+  /// Aborts a RetroArch launch when its exported core receiver positively
+  /// reports the requested core as missing. Returns null when the launch may
+  /// proceed (installed, receiver unavailable, or query timed out).
+  ///
+  /// RetroArch's cores live in its private data dir, so the frontend cannot
+  /// read them; the receiver is the only non-root way to check. A null answer
+  /// means the installed RetroArch predates that receiver (1.22.x), and the
+  /// launch must fail open.
+  static Future<GameLaunchResult?> _retroArchCoreFailure(
+    BuildContext context, {
+    required MethodChannel platform,
+    required String packageName,
+    required String coreName,
+  }) async {
+    if (!packageName.startsWith('com.retroarch')) return null;
+
+    bool? installed;
+    try {
+      installed = await platform.invokeMethod<bool>('isCoreInstalled', {
+        'packageName': packageName,
+        'coreFilename': coreName,
+        'forceRefresh': true,
+      });
+    } catch (e) {
+      _log.w('Could not query RetroArch installed cores: $e');
+    }
+    _log.i(
+      '[CoreCheck] package=$packageName core=$coreName '
+      'installed=${installed ?? "unknown"}',
+    );
+    if (installed != false) return null;
+
+    _log.w(
+      '[CoreCheck] $packageName does not have the core "$coreName" '
+      'installed; aborting launch',
+    );
+    GamepadNavigationManager.reactivate();
+    try {
+      await platform.invokeMethod('setGamepadBlock', {'block': false});
+    } catch (e) {
+      _log.w('Could not release the gamepad block after a missing core: $e');
+    }
+    if (!context.mounted) return GameLaunchResult.failure('', '');
+    return GameLaunchResult.failure(
+      AppLocale.coreNotInstalled
+          .getString(context)
+          .replaceFirst('{name}', coreName),
+      AppLocale.coreNotInstalledHint.getString(context),
+    );
+  }
+
+  /// The LIBRETRO extra of an Android JSON launch, if present.
+  static String? _libretroCoreFromExtras(List<Map<String, dynamic>> extras) {
+    for (final extra in extras) {
+      if (extra['key']?.toString() == 'LIBRETRO') {
+        final value = extra['value']?.toString() ?? '';
+        if (value.isNotEmpty) return value;
+      }
+    }
+    return null;
+  }
+
+  /// The `-L` / `--libretro` core argument of a desktop RetroArch launch.
+  static String? _retroArchCoreFromArgs(List<String> args) {
+    for (var i = 0; i < args.length; i++) {
+      final arg = args[i];
+      if (arg == '-L' || arg == '--libretro') {
+        if (i + 1 < args.length && args[i + 1].isNotEmpty) return args[i + 1];
+      } else if (arg.startsWith('--libretro=')) {
+        final value = arg.substring('--libretro='.length);
+        if (value.isNotEmpty) return value;
+      }
+    }
+    return null;
+  }
+
+  /// Whether a desktop RetroArch core exists, or null when the answer cannot
+  /// be determined (unknown install layout), in which case launch anyway.
+  static Future<bool?> _desktopRetroArchCoreInstalled(
+    String coreName,
+    EmulatorModel? retroArch,
+  ) async {
+    if (coreName.isEmpty) return null;
+    if (path.isAbsolute(coreName)) return File(coreName).exists();
+    if (retroArch == null) return null;
+
+    final coresDir = await _getRetroArchCoresDirectory(retroArch);
+    if (!await Directory(coresDir).exists()) return null;
+    return await _getCoreFullPath(coreName) != null;
+  }
+
   /// Internal logic for launching RetroArch cores on Android.
   static Future<GameLaunchResult> _launchGameAndroid(
     BuildContext context,
@@ -408,14 +513,24 @@ class GameLaunchService {
         }
       }
 
-      const platform = MethodChannel('com.neogamelab.neostation/game');
-      GamepadNavigationManager.reactivate();
-      await platform.invokeMethod('setGamepadBlock', {'block': true});
-
       String packageName = 'com.retroarch.aarch64';
       if (packages.isNotEmpty) {
         packageName = packages.first;
       }
+
+      const platform = MethodChannel('com.neogamelab.neostation/game');
+      if (!context.mounted) return GameLaunchResult.failure('', '');
+
+      final coreFailure = await _retroArchCoreFailure(
+        context,
+        platform: platform,
+        packageName: packageName,
+        coreName: coreName,
+      );
+      if (coreFailure != null) return coreFailure;
+
+      GamepadNavigationManager.reactivate();
+      await platform.invokeMethod('setGamepadBlock', {'block': true});
 
       final activityName =
           'com.retroarch.browser.retroactivity.RetroActivityFuture';
@@ -665,10 +780,9 @@ class GameLaunchService {
   ) async {
     try {
       String executable = launchCmd['executable'].toString();
+      final detected = await EmulatorRepository.getUserDetectedEmulators();
 
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        final detected = await EmulatorRepository.getUserDetectedEmulators();
-
         if (executable.toLowerCase().contains('retroarch')) {
           final ra = detected['RetroArch'];
           if (ra != null &&
@@ -781,6 +895,30 @@ class GameLaunchService {
           : LauncherService.splitArgs(argsStr);
       var processExecutable = executable;
       var launchedViaOpen = false;
+
+      // Desktop RetroArch runs from the same system JSON as Android, so the
+      // missing-core guard has to exist here too; the standalone RetroArch
+      // path below only covers systems without a JSON profile.
+      if (executable.toLowerCase().contains('retroarch')) {
+        final coreArg = _retroArchCoreFromArgs(args);
+        if (coreArg != null) {
+          final installed = await _desktopRetroArchCoreInstalled(
+            coreArg,
+            detected['RetroArch'],
+          );
+          if (installed == false) {
+            if (!context.mounted) return GameLaunchResult.failure('', '');
+            _log.w('[CoreCheck] RetroArch core "$coreArg" is not installed');
+            return GameLaunchResult.failure(
+              AppLocale.coreNotInstalled
+                  .getString(context)
+                  .replaceFirst('{name}', coreArg),
+              '${AppLocale.coreNotInstalledHint.getString(context)}\n'
+              'Core: $coreArg',
+            );
+          }
+        }
+      }
 
       // The systems JSON names cores by filename alone (`-L snes9x_libretro.so`),
       // which RetroArch resolves against the working directory — ours, not its

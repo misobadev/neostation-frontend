@@ -1085,6 +1085,7 @@ mixin AppLocale {
   static const String platformNotSupported = 'platform_not_supported';
   static const String coreNotConfigured = 'core_not_configured';
   static const String coreNotInstalled = 'core_not_installed';
+  static const String coreNotInstalledHint = 'core_not_installed_hint';
   static const String retroArchNotFound = 'retroarch_not_found';
   static const String retroArchExecutableNotFound = 'retroarch_exe_not_found';
   static const String coresDirectoryNotFound = 'cores_dir_not_found';

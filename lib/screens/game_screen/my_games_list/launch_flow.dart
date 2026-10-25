@@ -259,143 +259,16 @@ extension _LaunchFlow on _SystemGamesListState {
           if (mounted && _isGameLaunching) {
             rebuild(() => _isGameLaunching = false);
           }
-          await showDialog(
-            context: ctx,
-            builder: (BuildContext context) {
-              return Focus(
-                autofocus: true,
-                onKeyEvent: (node, event) {
-                  if (event is KeyDownEvent) {
-                    if (event.logicalKey == LogicalKeyboardKey.escape ||
-                        event.logicalKey == LogicalKeyboardKey.backspace ||
-                        event.logicalKey == LogicalKeyboardKey.enter) {
-                      Navigator.of(context).pop();
-                      return KeyEventResult.handled;
-                    }
-                  }
-                  return KeyEventResult.ignored;
-                },
-                child: AlertDialog(
-                  backgroundColor: Colors.grey[900],
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                    side: BorderSide(
-                      color: Colors.red.withValues(alpha: 0.5),
-                      width: 2.r,
-                    ),
-                  ),
-                  title: Row(
-                    children: [
-                      Icon(
-                        Symbols.error_outline_rounded,
-                        color: Colors.red[400],
-                        size: 32.r,
-                      ),
-                      SizedBox(width: 12.r),
-                      Expanded(
-                        child: Text(
-                          AppLocale.launchGameFailed.getString(context),
-                          style: TextStyle(color: Colors.white, fontSize: 20.r),
-                        ),
-                      ),
-                    ],
-                  ),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          AppLocale.unableToLaunch
-                              .getString(context)
-                              .replaceFirst('{name}', selectedGame.name),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontSize: 16.r,
-                          ),
-                        ),
-                        SizedBox(height: 16.r),
-                        Container(
-                          width: double.maxFinite,
-                          padding: EdgeInsets.all(12.r),
-                          decoration: BoxDecoration(
-                            color: Colors.red[900]?.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(8.r),
-                            border: Border.all(
-                              color: Colors.red[700]!,
-                              width: 1.r,
-                            ),
-                          ),
-                          child: Text(
-                            result.errorMessage ??
-                                AppLocale.unknownError.getString(context),
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.red[300],
-                              fontSize: 14.r,
-                            ),
-                          ),
-                        ),
-                        if (result.errorDetails != null &&
-                            result.errorDetails!.isNotEmpty) ...[
-                          SizedBox(height: 16.r),
-                          Text(
-                            AppLocale.technicalDetails.getString(context),
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[400],
-                              fontSize: 13.r,
-                            ),
-                          ),
-                          SizedBox(height: 8.r),
-                          Container(
-                            width: double.maxFinite,
-                            padding: EdgeInsets.all(12.r),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[850],
-                              borderRadius: BorderRadius.circular(8.r),
-                              border: Border.all(
-                                color: Colors.grey[700]!,
-                                width: 1.r,
-                              ),
-                            ),
-                            child: Text(
-                              result.errorDetails!,
-                              style: TextStyle(
-                                fontSize: 12.r,
-                                fontFamily: 'monospace',
-                                color: Colors.grey[300],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      autofocus: true,
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.red[700],
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 24.r,
-                          vertical: 12.r,
-                        ),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(
-                        AppLocale.ok.getString(context),
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+          await LaunchFailureDialog.show(
+            ctx,
+            title: AppLocale.launchGameFailed.getString(ctx),
+            intro: AppLocale.unableToLaunch
+                .getString(ctx)
+                .replaceFirst('{name}', selectedGame.name),
+            message: result.errorMessage?.isNotEmpty == true
+                ? result.errorMessage!
+                : AppLocale.unknownError.getString(ctx),
+            details: result.errorDetails,
           );
           if (mounted) _gamepadNav.activate();
         },
@@ -412,123 +285,16 @@ extension _LaunchFlow on _SystemGamesListState {
 
       _SystemGamesListState._log.e('Error launching game: $error');
 
-      await showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return Focus(
-            autofocus: true,
-            onKeyEvent: (node, event) {
-              if (event is KeyDownEvent) {
-                if (event.logicalKey == LogicalKeyboardKey.escape ||
-                    event.logicalKey == LogicalKeyboardKey.backspace ||
-                    event.logicalKey == LogicalKeyboardKey.enter) {
-                  Navigator.of(context).pop();
-                  return KeyEventResult.handled;
-                }
-              }
-              return KeyEventResult.ignored;
-            },
-            child: AlertDialog(
-              backgroundColor: Colors.grey[900],
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.r),
-                side: BorderSide(
-                  color: Colors.orange.withValues(alpha: 0.5),
-                  width: 2.r,
-                ),
-              ),
-              title: Row(
-                children: [
-                  Icon(
-                    Symbols.warning_amber_rounded,
-                    color: Colors.orange[400],
-                    size: 32,
-                  ),
-                  SizedBox(width: 12.r),
-                  Expanded(
-                    child: Text(
-                      AppLocale.launchError.getString(context),
-                      style: TextStyle(color: Colors.white, fontSize: 20.r),
-                    ),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      AppLocale.unexpectedLaunchError
-                          .getString(context)
-                          .replaceFirst('{name}', _selectedGame!.name),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontSize: 15.r,
-                      ),
-                    ),
-                    SizedBox(height: 16.r),
-                    Text(
-                      'Technical Details:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[400],
-                        fontSize: 13.r,
-                      ),
-                    ),
-                    SizedBox(height: 8.r),
-                    Container(
-                      width: double.maxFinite,
-                      padding: EdgeInsets.all(12.r),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[850],
-                        borderRadius: BorderRadius.circular(8.r),
-                        border: Border.all(
-                          color: Colors.grey[700]!,
-                          width: 1.r,
-                        ),
-                      ),
-                      child: Text(
-                        error.toString(),
-                        style: TextStyle(
-                          fontSize: 12.r,
-                          fontFamily: 'monospace',
-                          color: Colors.orange[200],
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 16.r),
-                    Text(
-                      AppLocale.tryAgainGameConfig.getString(context),
-                      style: TextStyle(fontSize: 12.r, color: Colors.grey[400]),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  autofocus: true,
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.orange[700],
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 24.r,
-                      vertical: 12.r,
-                    ),
-                  ),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(
-                    AppLocale.ok.getString(context),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+      await LaunchFailureDialog.show(
+        context,
+        title: AppLocale.launchError.getString(context),
+        intro: AppLocale.unexpectedLaunchError
+            .getString(context)
+            .replaceFirst('{name}', _selectedGame?.name ?? ''),
+        message: AppLocale.tryAgainGameConfig.getString(context),
+        details: error.toString(),
+        icon: Symbols.warning_amber_rounded,
+        accentColor: Colors.orange,
       );
 
       if (mounted) {

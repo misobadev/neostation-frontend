@@ -1084,6 +1084,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.platformNotSupported: 'Platform tidak didukung',
   AppLocale.coreNotConfigured: 'Core tidak dikonfigurasi',
   AppLocale.coreNotInstalled: 'Core "{name}" tidak terinstal',
+  AppLocale.coreNotInstalledHint:
+      'RetroArch melaporkan core belum terpasang. Pasang dari Online Updater > Core Downloader.',
   AppLocale.retroArchNotFound: 'RetroArch tidak ditemukan',
   AppLocale.retroArchExecutableNotFound: 'Eksekusi RetroArch tidak ditemukan',
   AppLocale.coresDirectoryNotFound: 'Direktori core tidak ditemukan',

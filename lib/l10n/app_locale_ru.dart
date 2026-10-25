@@ -1087,6 +1087,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.platformNotSupported: 'Платформа не поддерживается',
   AppLocale.coreNotConfigured: 'Ядро не настроено',
   AppLocale.coreNotInstalled: 'Ядро «{name}» не установлено',
+  AppLocale.coreNotInstalledHint:
+      'RetroArch сообщает, что ядро не установлено. Установите его через Online Updater > Core Downloader.',
   AppLocale.retroArchNotFound: 'RetroArch не найден',
   AppLocale.retroArchExecutableNotFound: 'Исполняемый файл RetroArch не найден',
   AppLocale.coresDirectoryNotFound: 'Директория ядер не найдена',

@@ -28,6 +28,7 @@ import '../../../services/ra_library_match_runner.dart';
 import 'widgets/grid_empty_state.dart';
 import 'my_systems_carousel.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/widgets/systems_grid_footer.dart';
 import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
 import 'package:neostation/sync/sync_manager.dart';
@@ -455,6 +456,22 @@ class MySystems extends StatelessWidget {
           onLaunchFailed: (ctx, r) async {
             achievementsController.stop(hidePanel: true);
             MySystems.gridLaunchNotifier.value = false;
+            if (ctx.mounted) {
+              await LaunchFailureDialog.show(
+                ctx,
+                title: AppLocale.launchGameFailed.getString(ctx),
+                intro: AppLocale.unableToLaunch
+                    .getString(ctx)
+                    .replaceFirst(
+                      '{name}',
+                      systemInfo.gameModel?.name ?? systemInfo.title ?? '',
+                    ),
+                message: r.errorMessage?.isNotEmpty == true
+                    ? r.errorMessage!
+                    : AppLocale.unknownError.getString(ctx),
+                details: r.errorDetails,
+              );
+            }
             GamepadNavigationManager.restoreFocusOwner();
           },
         );

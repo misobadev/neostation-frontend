@@ -1110,6 +1110,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.platformNotSupported: 'Plataforma no soportada',
   AppLocale.coreNotConfigured: 'Núcleo no configurado',
   AppLocale.coreNotInstalled: 'El núcleo "{name}" no está instalado',
+  AppLocale.coreNotInstalledHint:
+      'RetroArch indica que el núcleo no está instalado. Instálalo desde Online Updater > Core Downloader.',
   AppLocale.retroArchNotFound: 'RetroArch no encontrado',
   AppLocale.retroArchExecutableNotFound:
       'Ejecutable de RetroArch no encontrado',

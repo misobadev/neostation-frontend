@@ -1125,6 +1125,8 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.platformNotSupported: 'Plateforme non supportée',
   AppLocale.coreNotConfigured: 'Core non configuré',
   AppLocale.coreNotInstalled: 'Core "{name}" non installé',
+  AppLocale.coreNotInstalledHint:
+      "RetroArch indique que le core n'est pas installé. Installez-le via Online Updater > Core Downloader.",
   AppLocale.retroArchNotFound: 'RetroArch non trouvé',
   AppLocale.retroArchExecutableNotFound: 'Exécutable RetroArch non trouvé',
   AppLocale.coresDirectoryNotFound: 'Répertoire des cores non trouvé',

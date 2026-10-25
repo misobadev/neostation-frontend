@@ -34,6 +34,7 @@ import 'package:neostation/utils/romm_failure_message.dart';
 import 'package:neostation/utils/romm_local_matcher.dart';
 import 'package:neostation/utils/game_launch_utils.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/screens/game_screen/game_settings_dialog/romm_match_picker_dialog.dart';
 import 'package:neostation/screens/game_screen/my_games_list.dart';
 
@@ -1447,13 +1448,17 @@ class _SearchScreenState extends State<SearchScreen> {
       },
       onLaunchFailed: (ctx, result) async {
         _achievementsController.stop(hidePanel: true);
-        if (mounted) {
-          AppNotification.showNotification(
-            context,
-            AppLocale.errorLaunchingGame
-                .getString(context)
-                .replaceFirst('{error}', ''),
-            type: NotificationType.error,
+        if (ctx.mounted) {
+          await LaunchFailureDialog.show(
+            ctx,
+            title: AppLocale.launchGameFailed.getString(ctx),
+            intro: AppLocale.unableToLaunch
+                .getString(ctx)
+                .replaceFirst('{name}', game.name),
+            message: result.errorMessage?.isNotEmpty == true
+                ? result.errorMessage!
+                : AppLocale.unknownError.getString(ctx),
+            details: result.errorDetails,
           );
         }
         GamepadNavigationManager.restoreFocusOwner();

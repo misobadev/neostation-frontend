@@ -959,6 +959,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.platformNotSupported: '平台不支援',
   AppLocale.coreNotConfigured: '核心未設定',
   AppLocale.coreNotInstalled: '核心 "{name}" 未安裝',
+  AppLocale.coreNotInstalledHint:
+      'RetroArch 回報核心未安裝。請從 Online Updater > Core Downloader 安裝。',
   AppLocale.retroArchNotFound: '未發現 RetroArch',
   AppLocale.retroArchExecutableNotFound: '未發現 RetroArch 執行檔',
   AppLocale.coresDirectoryNotFound: '未發現核心目錄',

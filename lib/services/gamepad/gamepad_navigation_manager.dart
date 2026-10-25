@@ -242,6 +242,19 @@ class GamepadNavigationManager {
 
     if (index != _stack.length - 1) {
       final displaced = _stack.last;
+
+      // Never pull focus out from under an open modal. The launch failure
+      // dialog is exactly this case: the launch dialog's dispose fires
+      // onGameClosed while the error dialog is still up, and restoring the
+      // owner would leave A/B driving the grid behind it.
+      if (displaced.modal) {
+        _log.i(
+          '[GamepadNavigationManager] Not restoring $ownerId over modal '
+          '${displaced.id}',
+        );
+        return;
+      }
+
       _log.i(
         '[GamepadNavigationManager] Restoring $ownerId over ${displaced.id}, '
         'which took the top of the stack during the launch',

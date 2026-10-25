@@ -993,6 +993,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.platformNotSupported: '지원되지 않는 플랫폼',
   AppLocale.coreNotConfigured: '코어가 구성되지 않았습니다',
   AppLocale.coreNotInstalled: '코어 "{name}"이(가) 설치되지 않았습니다',
+  AppLocale.coreNotInstalledHint:
+      'RetroArch에서 코어가 설치되지 않았다고 보고합니다. Online Updater > Core Downloader에서 설치하세요.',
   AppLocale.retroArchNotFound: 'RetroArch를 찾을 수 없습니다',
   AppLocale.retroArchExecutableNotFound: 'RetroArch 실행 파일을 찾을 수 없습니다',
   AppLocale.coresDirectoryNotFound: '코어 폴더를 찾을 수 없습니다',

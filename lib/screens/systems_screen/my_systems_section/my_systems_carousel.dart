@@ -18,6 +18,7 @@ import '../../../services/game_service.dart';
 import '../../../utils/game_launch_utils.dart';
 import '../../../providers/system_background_provider.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
 import '../../collections_screen/collections_browser_screen.dart';
 import '../../search_screen/search_screen.dart';
@@ -503,6 +504,22 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           onLaunchFailed: (ctx, r) async {
             _achievementsController.stop(hidePanel: true);
             if (mounted) setState(() => _isGameLaunching = false);
+            if (ctx.mounted) {
+              await LaunchFailureDialog.show(
+                ctx,
+                title: AppLocale.launchGameFailed.getString(ctx),
+                intro: AppLocale.unableToLaunch
+                    .getString(ctx)
+                    .replaceFirst(
+                      '{name}',
+                      systemInfo.gameModel?.name ?? systemInfo.title ?? '',
+                    ),
+                message: r.errorMessage?.isNotEmpty == true
+                    ? r.errorMessage!
+                    : AppLocale.unknownError.getString(ctx),
+                details: r.errorDetails,
+              );
+            }
             GamepadNavigationManager.restoreFocusOwner();
           },
         );
