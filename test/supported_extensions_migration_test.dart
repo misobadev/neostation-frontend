@@ -3,7 +3,7 @@ import 'package:neostation/data/datasources/sqlite_migrations.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 void main() {
-  test('v171 adds supported_extensions and is idempotent', () async {
+  test('v175 adds supported_extensions and is idempotent', () async {
     final db = sqlite3.openInMemory();
     addTearDown(db.close);
     db.execute('''
@@ -19,8 +19,8 @@ void main() {
       )
     ''');
 
-    await SqliteMigrations.migrateToVersion(db, 171);
-    await SqliteMigrations.migrateToVersion(db, 171);
+    await SqliteMigrations.migrateToVersion(db, 175);
+    await SqliteMigrations.migrateToVersion(db, 175);
 
     final columns = db
         .select('PRAGMA table_info(app_emulators)')
