@@ -1122,6 +1122,11 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.failedToLaunchAndroidApp: 'Échec du lancement de l’app Android',
   AppLocale.romFileNotFound: 'Fichier ROM non trouvé',
   AppLocale.launchFailed: 'Échec du lancement',
+  AppLocale.unsupportedGameFormat:
+      "Ce format de jeu n'est pas pris en charge par l'émulateur sélectionné",
+  AppLocale.shortcutResolveFailed:
+      'Impossible de résoudre le raccourci vers une application lançable',
+  AppLocale.invalidPs3Serial: 'Descripteur de numéro de série PS3 invalide',
   AppLocale.platformNotSupported: 'Plateforme non supportée',
   AppLocale.coreNotConfigured: 'Core non configuré',
   AppLocale.coreNotInstalled: 'Core "{name}" non installé',

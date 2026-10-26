@@ -29,6 +29,9 @@
       "exe",
       "desktop",
       "lnk",
+      "app",
+      "appimage",
+      "sh",
       "pcgame",
       "gog",
       "epic",
@@ -40,6 +43,62 @@
     ]
   },
   "emulators": [
+    {
+      "name": "Desktop shortcut",
+      "unique_id": "windows.desktop.shortcut",
+      "description": "Supported extensions: lnk, desktop, app.",
+      "extensions": [
+        "lnk",
+        "desktop",
+        "app"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        },
+        "linux": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        },
+        "macos": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        }
+      }
+    },
+    {
+      "name": "Desktop executable",
+      "unique_id": "windows.desktop.executable",
+      "description": "Supported extensions: exe, appimage, sh.",
+      "extensions": [
+        "exe",
+        "appimage",
+        "sh"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "launch_mode": "executable",
+          "executable": "{file.path}",
+          "args": "",
+          "working_directory": "{file.dir}"
+        },
+        "linux": {
+          "launch_mode": "executable",
+          "executable": "{file.path}",
+          "args": "",
+          "working_directory": "{file.dir}"
+        },
+        "macos": {
+          "launch_mode": "executable",
+          "executable": "{file.path}",
+          "args": "",
+          "working_directory": "{file.dir}"
+        }
+      }
+    },
     {
       "name": "Standalone Winlator CMod",
       "unique_id": "windows.winlator.cmod",

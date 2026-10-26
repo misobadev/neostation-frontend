@@ -10,6 +10,7 @@ import '../../models/system_model.dart';
 import '../../models/emulator_model.dart';
 import '../../models/core_emulator_model.dart';
 import '../../repositories/emulator_repository.dart';
+import '../../repositories/game_repository.dart';
 import '../../utils/emulator_loader.dart';
 import '../config_service.dart';
 import '../android_service.dart';
@@ -19,6 +20,7 @@ import '../windows_emulator_discovery.dart';
 import '../linux_host_process.dart';
 import '../macos_application_service.dart';
 import 'emulator_launch_diagnostics.dart';
+import 'shortcut_resolver.dart';
 import 'favorites_service.dart';
 import 'game_session_manager.dart';
 import '../gamepad/gamepad_navigation_manager.dart';
@@ -89,14 +91,13 @@ class GameLaunchService {
         }
       }
 
-      bool romExists = false;
-      if (game.romPath != null) {
-        if (Platform.isAndroid && game.romPath!.startsWith('content://')) {
-          romExists = true;
-        } else {
-          romExists = await File(game.romPath!).exists();
-        }
-      }
+      final romExists = await GameRepository.launchPathExists(
+        game.romPath,
+        allowDirectory:
+            system.id == 'ps3' ||
+            system.folderName == 'ps3' ||
+            (game.romPath?.toLowerCase().endsWith('.app') ?? false),
+      );
       if (!context.mounted) return GameLaunchResult.failure('', '');
 
       if (!romExists) {
@@ -135,6 +136,40 @@ class GameLaunchService {
             source = 'auto-resolved default';
           }
         }
+      }
+
+      // Formats a system can launch are not interchangeable: a PS3 shortcut is
+      // not an ISO, and a native port is not an emulator ROM. Pick the installed
+      // emulator that declares the game's extension before building the command.
+      final extensionResolution = await _resolveExtensionAwareEmulator(
+        system,
+        game,
+        preferredPlayerId,
+        isExplicitChoice,
+      );
+      final gameExtension = _gameExtension(game);
+      if (extensionResolution.unsupported) {
+        if (!context.mounted) return GameLaunchResult.failure('', '');
+        return GameLaunchResult.failure(
+          '${AppLocale.unsupportedGameFormat.getString(context)} '
+              '(${gameExtension.toUpperCase()})',
+          'No installed emulator for ${system.folderName} declares '
+              '.$gameExtension support.',
+        );
+      }
+      if (extensionResolution.explicitMismatch) {
+        if (!context.mounted) return GameLaunchResult.failure('', '');
+        return GameLaunchResult.failure(
+          '${AppLocale.unsupportedGameFormat.getString(context)} '
+              '(${gameExtension.toUpperCase()})',
+          'The selected emulator "${preferredPlayerId ?? ''}" does not launch '
+              '.$gameExtension files.',
+        );
+      }
+      if (extensionResolution.uniqueId != null &&
+          extensionResolution.uniqueId != preferredPlayerId) {
+        source = 'extension match (.$gameExtension)';
+        preferredPlayerId = extensionResolution.uniqueId;
       }
 
       // Emulator selection has been the source of repeated, hard-to-reproduce
@@ -181,6 +216,10 @@ class GameLaunchService {
 
             try {
               await LauncherService.instance.resolveAndroidLaunchFiles(
+                launchCmd,
+                game,
+              );
+              await LauncherService.instance.resolveLaunchContent(
                 launchCmd,
                 game,
               );
@@ -258,12 +297,24 @@ class GameLaunchService {
               return await failLaunch();
             } catch (e) {
               _log.e('JSON Launch Error: $e');
+              if (e is FormatException) {
+                GamepadNavigationManager.reactivate();
+                await platform.invokeMethod('setGamepadBlock', {
+                  'block': false,
+                });
+                if (!context.mounted) return GameLaunchResult.failure('', '');
+                return GameLaunchResult.failure(
+                  AppLocale.invalidPs3Serial.getString(context),
+                  e.message,
+                );
+              }
               return await failLaunch();
             }
           }
 
           if ((Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
-              launchCmd.containsKey('executable')) {
+              (launchCmd.containsKey('executable') ||
+                  launchCmd['launch_mode'] == 'shortcut')) {
             if (!context.mounted) return GameLaunchResult.failure('', '');
             return await _launchGameDesktopFromConfig(
               context,
@@ -377,6 +428,158 @@ class GameLaunchService {
         e.toString(),
       );
     }
+  }
+
+  /// The game's launch format: `folder` for directories, otherwise the
+  /// lower-case extension without the dot.
+  static String _gameExtension(GameModel game) {
+    final romPath = game.romPath;
+    if (romPath == null || romPath.isEmpty) return '';
+    try {
+      if (FileSystemEntity.isDirectorySync(romPath)) {
+        // `.app` is a directory-backed executable, not a folder game.
+        final directoryExtension = path
+            .extension(romPath)
+            .toLowerCase()
+            .replaceAll('.', '');
+        return directoryExtension == 'app' ? 'app' : 'folder';
+      }
+    } catch (_) {
+      // Fall through to the file extension.
+    }
+    final extension = path.extension(romPath).toLowerCase();
+    return extension.startsWith('.') ? extension.substring(1) : extension;
+  }
+
+  /// Resolves directories as the synthetic `folder` format.
+  ///
+  /// Android SAF folder URIs do not expose `FileSystemEntity.isDirectory`, so a
+  /// PSN folder named `NPEB00913.ps3` would otherwise be mistaken for a serial
+  /// descriptor. Ask the document provider instead.
+  static Future<String> _gameExtensionForSelection(GameModel game) async {
+    final romPath = game.romPath;
+    if (romPath == null || romPath.isEmpty) return '';
+    if (romPath.startsWith('content://')) {
+      try {
+        if (await GameRepository.isLaunchDirectory(romPath)) {
+          final decoded = Uri.parse(romPath).pathSegments.last;
+          return decoded.toLowerCase().endsWith('.app') ? 'app' : 'folder';
+        }
+      } catch (_) {
+        // Fall back to the URI extension below.
+      }
+    }
+    return _gameExtension(game);
+  }
+
+  /// Chooses the installed emulator that declares [game]'s extension.
+  ///
+  /// Emulators with no `supported_extensions` declaration stay compatible with
+  /// every system extension, preserving the behaviour of older system JSONs.
+  static Future<({String? uniqueId, bool unsupported, bool explicitMismatch})>
+  _resolveExtensionAwareEmulator(
+    SystemModel system,
+    GameModel game,
+    String? preferredId,
+    bool explicitChoice,
+  ) async {
+    final extension = await _gameExtensionForSelection(game);
+    if (system.id == null || extension.isEmpty) {
+      return (
+        uniqueId: preferredId,
+        unsupported: false,
+        explicitMismatch: false,
+      );
+    }
+
+    List<CoreEmulatorModel> emulators;
+    try {
+      emulators = await loadEmulatorsForSystem(system);
+    } catch (error) {
+      _log.w('Could not load emulators for extension selection: $error');
+      return (
+        uniqueId: preferredId,
+        unsupported: false,
+        explicitMismatch: false,
+      );
+    }
+
+    return selectEmulatorForExtension(
+      extension: extension,
+      emulators: emulators,
+      preferredId: preferredId,
+      explicitChoice: explicitChoice,
+    );
+  }
+
+  /// Pure extension-selection rule shared by the launch path and its tests.
+  ///
+  /// Emulators that declare no extensions remain wildcards. A user-selected
+  /// emulator that cannot launch the format fails instead of silently picking
+  /// another one; an automatic/default pick falls through to the best match.
+  @visibleForTesting
+  static ({String? uniqueId, bool unsupported, bool explicitMismatch})
+  selectEmulatorForExtension({
+    required String extension,
+    required List<CoreEmulatorModel> emulators,
+    String? preferredId,
+    required bool explicitChoice,
+  }) {
+    final declaresExtensions = emulators.any(
+      (emulator) => emulator.supportedExtensions.isNotEmpty,
+    );
+    if (!declaresExtensions) {
+      return (
+        uniqueId: preferredId,
+        unsupported: false,
+        explicitMismatch: false,
+      );
+    }
+
+    bool supports(CoreEmulatorModel emulator) {
+      if (emulator.supportedExtensions.isEmpty) return true;
+      return emulator.supportedExtensions.contains(extension) ||
+          emulator.supportedExtensions.contains('*');
+    }
+
+    if (preferredId != null) {
+      CoreEmulatorModel? preferred;
+      for (final emulator in emulators) {
+        if (emulator.uniqueId == preferredId) {
+          preferred = emulator;
+          break;
+        }
+      }
+      if (preferred != null && supports(preferred)) {
+        return (
+          uniqueId: preferredId,
+          unsupported: false,
+          explicitMismatch: false,
+        );
+      }
+      if (explicitChoice) {
+        return (
+          uniqueId: preferredId,
+          unsupported: false,
+          explicitMismatch: true,
+        );
+      }
+    }
+
+    final matches = emulators.where(supports).toList();
+    if (matches.isEmpty) {
+      return (uniqueId: null, unsupported: true, explicitMismatch: false);
+    }
+    matches.sort((a, b) {
+      final aInstalled = a.isInstalled ? 0 : 1;
+      final bInstalled = b.isInstalled ? 0 : 1;
+      return aInstalled - bInstalled;
+    });
+    return (
+      uniqueId: matches.first.uniqueId,
+      unsupported: false,
+      explicitMismatch: false,
+    );
   }
 
   /// Aborts a RetroArch launch when its exported core receiver positively
@@ -771,6 +974,88 @@ class GameLaunchService {
     }
   }
 
+  /// Launches a resolved `.lnk`/`.desktop`/`.app` shortcut on desktop.
+  ///
+  /// Resolution is required: a shell wrapper exits as soon as the handoff is
+  /// done, so the session monitor would think the game had closed. Launching
+  /// the real target keeps the existing process polling correct.
+  static Future<GameLaunchResult> _launchShortcutFromConfig(
+    BuildContext context,
+    Map<String, dynamic> launchCmd,
+    SystemModel system,
+    GameModel game,
+  ) async {
+    final resolved = await ShortcutResolver.resolve(game.romPath ?? '');
+    if (resolved == null) {
+      if (!context.mounted) return GameLaunchResult.failure('', '');
+      return GameLaunchResult.failure(
+        AppLocale.shortcutResolveFailed.getString(context),
+        game.romPath ?? '',
+      );
+    }
+
+    try {
+      final env = Map<String, String>.from(Platform.environment);
+      if (Platform.isMacOS) {
+        env['HOME'] = ConfigService.getRealHomePath();
+      }
+      if (resolved.environment != null) {
+        env.addAll(resolved.environment!);
+      }
+
+      final process = await LinuxHostProcess.start(
+        resolved.executable,
+        resolved.args,
+        environment: env,
+        workingDirectory: resolved.workingDirectory,
+      );
+
+      GamepadNavigationManager.deactivateAll();
+
+      final diagnostics = EmulatorLaunchDiagnostics.attach(
+        process,
+        resolved.executable,
+        resolved.args,
+      );
+
+      process.exitCode
+          .then((exitCode) async {
+            _log.i('Shortcut target exited with code: $exitCode');
+            diagnostics.reportExit(exitCode);
+            await Future.delayed(const Duration(seconds: 2));
+            var stillRunning = false;
+            if (GameSessionManager.launchedEmulatorExe != null) {
+              stillRunning = await _isProcessRunning(
+                GameSessionManager.launchedEmulatorExe!,
+              );
+            }
+            if (!stillRunning) {
+              GameSessionManager.endGameSession();
+            }
+          })
+          .catchError((error) {
+            _log.e('Error monitoring shortcut target: $error');
+            GameSessionManager.endGameSession();
+          });
+
+      final exeName = path.basename(resolved.executable);
+      final launchedExeName = exeName.toLowerCase().contains('retroarch')
+          ? null
+          : exeName;
+      GameSessionManager.registerGameLaunch(system, game, launchedExeName);
+      await FavoritesService.recordGamePlayed(game);
+      return GameLaunchResult.success();
+    } catch (error) {
+      _log.e('Error launching shortcut $resolved: $error');
+      GamepadNavigationManager.reactivate();
+      if (!context.mounted) return GameLaunchResult.failure('', '');
+      return GameLaunchResult.failure(
+        AppLocale.shortcutResolveFailed.getString(context),
+        error.toString(),
+      );
+    }
+  }
+
   /// Internal logic for launching games using a custom JSON configuration profile.
   static Future<GameLaunchResult> _launchGameDesktopFromConfig(
     BuildContext context,
@@ -779,6 +1064,28 @@ class GameLaunchService {
     GameModel game,
   ) async {
     try {
+      try {
+        await LauncherService.instance.resolveLaunchContent(launchCmd, game);
+      } on FormatException catch (error) {
+        if (!context.mounted) return GameLaunchResult.failure('', '');
+        return GameLaunchResult.failure(
+          AppLocale.invalidPs3Serial.getString(context),
+          error.message,
+        );
+      }
+      final launchMode =
+          launchCmd['launch_mode']?.toString().trim().toLowerCase() ??
+          'executable';
+      if (launchMode == 'shortcut') {
+        if (!context.mounted) return GameLaunchResult.failure('', '');
+        return await _launchShortcutFromConfig(
+          context,
+          launchCmd,
+          system,
+          game,
+        );
+      }
+
       String executable = launchCmd['executable'].toString();
       final detected = await EmulatorRepository.getUserDetectedEmulators();
 
@@ -970,6 +1277,7 @@ class GameLaunchService {
         processExecutable,
         args,
         environment: env,
+        workingDirectory: launchCmd['working_directory']?.toString(),
       );
 
       GamepadNavigationManager.deactivateAll();

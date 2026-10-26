@@ -1082,6 +1082,9 @@ mixin AppLocale {
   static const String failedToLaunchAndroidApp = 'failed_to_launch_android_app';
   static const String romFileNotFound = 'rom_file_not_found';
   static const String launchFailed = 'launch_failed';
+  static const String unsupportedGameFormat = 'unsupported_game_format';
+  static const String shortcutResolveFailed = 'shortcut_resolve_failed';
+  static const String invalidPs3Serial = 'invalid_ps3_serial';
   static const String platformNotSupported = 'platform_not_supported';
   static const String coreNotConfigured = 'core_not_configured';
   static const String coreNotInstalled = 'core_not_installed';

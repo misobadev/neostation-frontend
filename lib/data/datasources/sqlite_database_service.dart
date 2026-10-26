@@ -1433,26 +1433,44 @@ class SqliteDatabaseService {
       final entities = await Directory(
         pathStr,
       ).list(recursive: recursive, followLinks: false).toList();
+      // Directory-backed formats such as macOS `.app` bundles are one entry,
+      // and their contents must not be reported as separate games.
+      entities.sort((a, b) => a.path.length.compareTo(b.path.length));
+      final directoryEntries = <String>[];
       for (final entity in entities) {
+        if (directoryEntries.any(
+          (entry) => path.isWithin(entry, entity.path),
+        )) {
+          continue;
+        }
         if (_shouldSkipStandardEntity(
           entity,
           ignoreHiddenFiles: ignoreHiddenFiles,
         )) {
           continue;
         }
-        if (entity is File) {
-          final filename = path.basename(entity.path);
-          final ext = path.extension(filename).toLowerCase();
-          if (validExtensions.contains(ext.replaceAll('.', '')) ||
-              validExtensions.isEmpty) {
+        final filename = path.basename(entity.path);
+        final ext = path.extension(filename).toLowerCase().replaceAll('.', '');
+        final matches =
+            validExtensions.contains(ext) || validExtensions.isEmpty;
+        if (entity is Directory) {
+          // Only `.app` is a directory-backed launchable format today.
+          if (ext == 'app' && validExtensions.contains('app')) {
             entries.add(
-              RomEntry(
-                path: entity.path,
-                filename: filename,
-                size: await entity.length(),
-              ),
+              RomEntry(path: entity.path, filename: filename, size: 0),
             );
+            directoryEntries.add(entity.path);
           }
+          continue;
+        }
+        if (entity is File && matches) {
+          entries.add(
+            RomEntry(
+              path: entity.path,
+              filename: filename,
+              size: await entity.length(),
+            ),
+          );
         }
       }
     } catch (e) {

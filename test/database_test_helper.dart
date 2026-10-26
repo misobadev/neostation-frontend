@@ -205,7 +205,8 @@ class DatabaseTestHelper {
         is_default_core INTEGER,
         is_default_standalone INTEGER NOT NULL DEFAULT 0,
         is_ra_compatible INTEGER,
-        neosync_slug TEXT
+        neosync_slug TEXT,
+        supported_extensions TEXT
       )
     ''');
 

@@ -1,0 +1,105 @@
+{
+  "system": {
+    "id": "ports",
+    "multidisc": false,
+    "name": "Native Ports",
+    "short_name": "Ports",
+    "details": {
+      "manufacturer": "Community",
+      "release_date": null,
+      "description": "Native PC game ports and standalone applications.",
+      "type": "computer"
+    },
+    "ids": {
+      "screenscraper": null,
+      "retroachievements": null
+    },
+    "folders": [
+      "ports",
+      "Ports",
+      "Native Ports"
+    ],
+    "colors": [
+      "#455A64",
+      "#78909C"
+    ],
+    "extensions": [
+      "exe",
+      "appimage",
+      "app",
+      "lnk",
+      "desktop",
+      "sh",
+      "x86_64",
+      "aarch64"
+    ]
+  },
+  "emulators": [
+    {
+      "name": "Native port (executable)",
+      "default_standalone": true,
+      "unique_id": "ports.native.executable",
+      "description": "Supported extensions: exe, appimage, sh, x86_64, aarch64.",
+      "extensions": [
+        "exe",
+        "appimage",
+        "sh",
+        "x86_64",
+        "aarch64"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "launch_mode": "executable",
+          "executable": "{file.path}",
+          "args": "",
+          "working_directory": "{file.dir}"
+        },
+        "linux": {
+          "launch_mode": "executable",
+          "executable": "{file.path}",
+          "args": "",
+          "working_directory": "{file.dir}"
+        },
+        "macos": {
+          "launch_mode": "executable",
+          "executable": "{file.path}",
+          "args": "",
+          "working_directory": "{file.dir}"
+        }
+      }
+    },
+    {
+      "name": "Native port (shortcut)",
+      "unique_id": "ports.native.shortcut",
+      "description": "Supported extensions: lnk, desktop, app.",
+      "extensions": [
+        "lnk",
+        "desktop",
+        "app"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        },
+        "linux": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        },
+        "macos": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        }
+      }
+    }
+  ],
+  "neosync": {
+    "sync": false,
+    "android_sync_folder": [],
+    "windows_sync_folder": [],
+    "linux_sync_folder": [],
+    "macos_sync_folder": []
+  }
+}

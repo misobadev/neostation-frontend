@@ -1084,6 +1084,11 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.failedToLaunchAndroidApp: 'Ошибка запуска приложения Android',
   AppLocale.romFileNotFound: 'Файл ROM не найден',
   AppLocale.launchFailed: 'Ошибка запуска',
+  AppLocale.unsupportedGameFormat:
+      'Этот формат игры не поддерживается выбранным эмулятором',
+  AppLocale.shortcutResolveFailed:
+      'Не удалось разрешить ярлык в запускаемое приложение',
+  AppLocale.invalidPs3Serial: 'Недопустимый дескриптор серийного номера PS3',
   AppLocale.platformNotSupported: 'Платформа не поддерживается',
   AppLocale.coreNotConfigured: 'Ядро не настроено',
   AppLocale.coreNotInstalled: 'Ядро «{name}» не установлено',

@@ -1081,6 +1081,11 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.failedToLaunchAndroidApp: 'Gagal menjalankan aplikasi Android',
   AppLocale.romFileNotFound: 'File ROM tidak ditemukan',
   AppLocale.launchFailed: 'Peluncuran gagal',
+  AppLocale.unsupportedGameFormat:
+      'Format game ini tidak didukung oleh emulator yang dipilih',
+  AppLocale.shortcutResolveFailed:
+      'Tidak dapat menyelesaikan pintasan ke aplikasi yang dapat diluncurkan',
+  AppLocale.invalidPs3Serial: 'Deskriptor serial PS3 tidak valid',
   AppLocale.platformNotSupported: 'Platform tidak didukung',
   AppLocale.coreNotConfigured: 'Core tidak dikonfigurasi',
   AppLocale.coreNotInstalled: 'Core "{name}" tidak terinstal',

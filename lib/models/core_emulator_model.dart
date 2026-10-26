@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Represents an emulator or libretro core entry from the `app_emulators` table.
 class CoreEmulatorModel {
   /// Unique identifier for the emulator/core configuration.
@@ -38,6 +40,12 @@ class CoreEmulatorModel {
   /// the row alone cannot answer the question. If you need a trustworthy
   /// answer, go through `loadEmulatorsForSystem`, not a raw query.
   final bool isInstalled;
+
+  /// Formats this emulator launches, without dots and lower-case.
+  ///
+  /// Empty means the seed did not declare any: treat it as compatible with
+  /// every extension of the system, which is the pre-extension behaviour.
+  final Set<String> supportedExtensions;
 
   /// Whether a desktop executable path is configured for this emulator.
   ///
@@ -84,7 +92,27 @@ class CoreEmulatorModel {
     this.androidPackageName,
     this.isInstalled = false,
     this.hasConfiguredPath = false,
+    this.supportedExtensions = const {},
   });
+
+  static Set<String> _parseExtensions(Object? raw) {
+    if (raw == null) return const {};
+    final List<dynamic> values;
+    if (raw is List) {
+      values = raw;
+    } else {
+      try {
+        final decoded = jsonDecode(raw.toString());
+        values = decoded is List ? decoded : const [];
+      } catch (_) {
+        return const {};
+      }
+    }
+    return values
+        .map((e) => e.toString().trim().toLowerCase().replaceAll('.', ''))
+        .where((e) => e.isNotEmpty)
+        .toSet();
+  }
 
   /// Creates a [CoreEmulatorModel] from a database row map.
   factory CoreEmulatorModel.fromMap(Map<String, dynamic> map) {
@@ -102,6 +130,7 @@ class CoreEmulatorModel {
       isretroAchievementsCompatible:
           (int.tryParse(map['is_ra_compatible']?.toString() ?? '0') ?? 0) == 1,
       androidPackageName: map['android_package_name']?.toString(),
+      supportedExtensions: _parseExtensions(map['supported_extensions']),
       isInstalled: (map['is_installed'] == 1 || map['is_installed'] == true),
       hasConfiguredPath:
           (map['has_configured_path'] == 1 ||
@@ -122,6 +151,9 @@ class CoreEmulatorModel {
       'is_default_core': isDefaultCore ? 1 : 0,
       'is_ra_compatible': isretroAchievementsCompatible ? 1 : 0,
       'android_package_name': androidPackageName,
+      'supported_extensions': supportedExtensions.isEmpty
+          ? null
+          : jsonEncode(supportedExtensions.toList()..sort()),
     };
   }
 
@@ -139,6 +171,7 @@ class CoreEmulatorModel {
     String? androidPackageName,
     bool? isInstalled,
     bool? hasConfiguredPath,
+    Set<String>? supportedExtensions,
   }) {
     return CoreEmulatorModel(
       uniqueId: uniqueId ?? this.uniqueId,
@@ -154,6 +187,7 @@ class CoreEmulatorModel {
       androidPackageName: androidPackageName ?? this.androidPackageName,
       isInstalled: isInstalled ?? this.isInstalled,
       hasConfiguredPath: hasConfiguredPath ?? this.hasConfiguredPath,
+      supportedExtensions: supportedExtensions ?? this.supportedExtensions,
     );
   }
 
@@ -201,6 +235,8 @@ class CoreEmulatorModel {
         return isInstalled;
       case 'has_configured_path':
         return hasConfiguredPath;
+      case 'supported_extensions':
+        return supportedExtensions;
       default:
         return null;
     }

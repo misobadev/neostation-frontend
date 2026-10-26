@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'logger_service.dart';
 
 /// Service for managing directory and file operations via the Android
@@ -10,6 +11,10 @@ import 'logger_service.dart';
 /// USB storage) on Android 11+ where standard filesystem APIs are restricted
 /// by Scoped Storage.
 class SafDirectoryService {
+  /// Allows directory-channel tests to exercise encoded Android URIs on CI hosts.
+  @visibleForTesting
+  static bool? directoryPlatformIsAndroidOverride;
+
   /// Platform channel for communicating with native Android implementation.
   static const platform = MethodChannel('com.neogamelab.neostation/game');
 
@@ -131,7 +136,7 @@ class SafDirectoryService {
   /// Each entry in the resulting list is a map containing metadata like
   /// 'name', 'uri', 'is_directory', and 'size'.
   static Future<List<Map<String, dynamic>>> listFiles(String uri) async {
-    if (!Platform.isAndroid) {
+    if (!(directoryPlatformIsAndroidOverride ?? Platform.isAndroid)) {
       return [];
     }
 

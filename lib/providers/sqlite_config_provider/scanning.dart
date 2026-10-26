@@ -897,6 +897,9 @@ extension SqliteConfigScanning on SqliteConfigProvider {
       for (final system in allSystems) {
         if (system.folderName == 'all') continue;
         if (system.folderName == SystemFolderNames.collections) continue;
+        if (!SystemRepository.isSystemAvailableOnPlatform(system.folderName)) {
+          continue;
+        }
 
         final romCount = await SystemRepository.getRomCountForSystem(
           system.id!,

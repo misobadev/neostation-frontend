@@ -469,7 +469,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 170;
+  static const int _databaseVersion = 171;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -710,6 +710,9 @@ class SqliteService {
     List<EmulatorDefinition> emulators,
     Map<String, int> osMap,
   ) => _syncEmulators(txn, systemId, emulators, osMap, systemId);
+
+  static String? _encodeExtensions(List<String> extensions) =>
+      extensions.isEmpty ? null : jsonEncode(extensions);
 
   static Future<void> _syncEmulators(
     TransactionAdapter txn,
@@ -955,6 +958,7 @@ class SqliteService {
             'android_activity_name': platformData['_resolved_activity_name'],
             'is_ra_compatible': retroAchievementsCompatible ? 1 : 0,
             'neosync_slug': neosyncSlug,
+            'supported_extensions': _encodeExtensions(emuDef.extensions),
           };
 
           if (isDefaultCore) {
@@ -991,6 +995,7 @@ class SqliteService {
               'android_activity_name': platformData['_resolved_activity_name'],
               'is_ra_compatible': retroAchievementsCompatible ? 1 : 0,
               'neosync_slug': neosyncSlug,
+              'supported_extensions': _encodeExtensions(emuDef.extensions),
             };
             if (isDefaultCore) {
               updateData['is_default_core'] = 1;
@@ -1021,6 +1026,7 @@ class SqliteService {
               'is_default': 0,
               'is_ra_compatible': retroAchievementsCompatible ? 1 : 0,
               'neosync_slug': neosyncSlug,
+              'supported_extensions': _encodeExtensions(emuDef.extensions),
             };
             if (isDefaultCore) {
               insertData['is_default_core'] = 1;
@@ -1885,6 +1891,7 @@ class SqliteService {
           android_package_name TEXT,
           android_activity_name TEXT,
           neosync_slug TEXT,
+          supported_extensions TEXT,
           PRIMARY KEY (os_id, unique_identifier),
           FOREIGN KEY (os_id) REFERENCES app_os(id) ON DELETE CASCADE,
           FOREIGN KEY (system_id) REFERENCES app_systems(id) ON DELETE CASCADE

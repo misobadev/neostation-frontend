@@ -51,21 +51,30 @@ class SqliteConfigService {
         )).length;
       }
       final directory = Directory(directoryPath);
-      final files = await directory
+      final entities = await directory
           .list(recursive: recursive, followLinks: false)
-          .where((entity) => entity is File)
-          .cast<File>()
           .toList();
-
+      // Directory-backed formats such as macOS `.app` bundles count as one
+      // game each, and their contents must not be counted again.
+      entities.sort((a, b) => a.path.length.compareTo(b.path.length));
+      final directoryEntries = <String>[];
       int count = 0;
-      for (final file in files) {
-        String extension = path.extension(file.path).toLowerCase();
+      for (final entity in entities) {
+        if (directoryEntries.any(
+          (entry) => path.isWithin(entry, entity.path),
+        )) {
+          continue;
+        }
+        String extension = path.extension(entity.path).toLowerCase();
         if (extension.startsWith('.')) {
           extension = extension.substring(1);
         }
-        if (validExtensions.contains(extension)) {
-          count++;
+        if (!validExtensions.contains(extension)) continue;
+        if (entity is Directory) {
+          if (extension != 'app') continue;
+          directoryEntries.add(entity.path);
         }
+        count++;
       }
 
       return count;
@@ -75,9 +84,10 @@ class SqliteConfigService {
     }
   }
 
-  /// Lists PS3 disc folders as single games while retaining ordinary ROM files.
+  /// Lists PS3 disc/PSN folders as single games, retaining ordinary ISO files.
   ///
-  /// A folder is a game when it contains `PS3_GAME/PARAM.SFO`. Recognised game
+  /// A disc folder contains `PS3_GAME/PARAM.SFO`; an extracted PSN folder has
+  /// `PARAM.SFO` and `USRDIR/EBOOT.BIN` directly inside it. Recognised game
   /// folders are not traversed, so files below `PS3_GAME` and `PS3_UPDATE` are
   /// never reported as separate games.
   static Future<List<({String path, String filename, int size})>> scanPs3Path(
@@ -105,6 +115,26 @@ class SqliteConfigService {
     }
 
     Future<bool> isGame(List<Map<String, dynamic>> items) async {
+      final hasDirectSfo = items.any(
+        (item) =>
+            item['isDirectory'] != true &&
+            item['name'].toString().toUpperCase() == 'PARAM.SFO',
+      );
+      if (hasDirectSfo) {
+        for (final item in items) {
+          if (item['isDirectory'] == true &&
+              item['name'].toString().toUpperCase() == 'USRDIR') {
+            final executableItems = await children(item['uri'].toString());
+            if (executableItems.any(
+              (child) =>
+                  child['isDirectory'] != true &&
+                  child['name'].toString().toUpperCase() == 'EBOOT.BIN',
+            )) {
+              return true;
+            }
+          }
+        }
+      }
       for (final item in items) {
         if (item['isDirectory'] != true ||
             item['name'].toString().toUpperCase() != 'PS3_GAME') {
@@ -163,7 +193,10 @@ class SqliteConfigService {
     }
 
     try {
-      await visit(root, path.basename(root), true);
+      final rootName = useSaf
+          ? path.posix.basename(Uri.parse(root).pathSegments.last)
+          : path.basename(root);
+      await visit(root, rootName, true);
     } catch (error) {
       _log.e('Error scanning PS3 folders: $error');
       rethrow;

@@ -644,6 +644,9 @@ class SqliteMigrations {
       case 170:
         await _migrateToVersion170(db);
         break;
+      case 171:
+        await _migrateToVersion171(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7257,6 +7260,34 @@ class SqliteMigrations {
       _log.i('Migration v165 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v165: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v171: adds `app_emulators.supported_extensions`.
+  ///
+  /// Emulator entries can declare which formats they launch (ISO, shortcut,
+  /// serial file, folder...). A null value means "no declaration" and keeps the
+  /// legacy behaviour: compatible with every extension of the system.
+  static Future<void> _migrateToVersion171(Database db) async {
+    _log.i('Migration v171: Adding supported_extensions to app_emulators');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(app_emulators)')
+          .map((row) => row['name'].toString())
+          .toSet();
+      if (!columns.contains('supported_extensions')) {
+        db.execute(
+          'ALTER TABLE app_emulators ADD COLUMN supported_extensions TEXT',
+        );
+        _log.i('Column supported_extensions added via v171');
+      } else {
+        _log.i('Column supported_extensions already exists');
+      }
+      _log.i('Migration v171 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v171: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }
