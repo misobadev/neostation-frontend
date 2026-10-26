@@ -7,6 +7,7 @@ import 'package:neostation/models/secondary_display_state.dart';
 import 'package:neostation/repositories/custom_sfx_repository.dart';
 import 'package:neostation/services/custom_sfx_import_service.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:neostation/utils/chunked_file_writer.dart';
 import 'package:neostation/data/datasources/sqlite_migrations.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:neostation/data/datasources/sqlite_service.dart';
@@ -56,6 +57,28 @@ class FakeAudio implements SfxAudioBackend {
   Future<void> stop(Object handle) async {
     stopped.add(handle);
   }
+}
+
+/// A file on a full disk: the first write fails with ENOSPC.
+class _FullDiskFile implements RandomAccessFile {
+  bool closed = false;
+
+  @override
+  Future<RandomAccessFile> writeFrom(
+    List<int> buffer, [
+    int start = 0,
+    int? end,
+  ]) async => throw const FileSystemException(
+    'writeFrom failed',
+    'x',
+    OSError('No space left on device', 28),
+  );
+
+  @override
+  Future<void> close() async => closed = true;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 void main() {
@@ -225,6 +248,37 @@ void main() {
       expect(await Directory('${temp.path}/custom_sfx').exists(), false);
     },
   );
+
+  test('a full disk fails the import instead of hanging, and leaves no '
+      'copy', () async {
+    // The copy used to go through an IOSink, which never finished once a
+    // write failed: the Custom sounds dialogue stayed busy for good.
+    addTearDown(() => openFileForChunks = defaultOpenFileForChunks);
+    final handle = _FullDiskFile();
+    openFileForChunks = (file) async {
+      await file.writeAsBytes([1]);
+      return handle;
+    };
+    final source = File('${temp.path}/input.wav');
+    await source.writeAsBytes(List.filled(200 * 1024, 1));
+    final service = CustomSfxImportService(
+      repository: files,
+      validate: (_) async {},
+    );
+
+    await expectLater(
+      service.import(source.path, 'x.wav').timeout(const Duration(seconds: 5)),
+      throwsA(
+        isA<FileSystemException>().having(
+          (e) => e.osError?.errorCode,
+          'errno',
+          28,
+        ),
+      ),
+    );
+    expect(handle.closed, isTrue);
+    expect(await Directory('${temp.path}/custom_sfx').list().toList(), isEmpty);
+  });
 
   test('decoder failure removes the staged file', () async {
     final source = File('${temp.path}/input.wav');

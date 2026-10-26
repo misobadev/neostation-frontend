@@ -9,6 +9,28 @@ import 'package:neostation/utils/gamepad_nav.dart';
 
 import '../../themes/corner_radii.dart';
 
+/// Makes the prompt numeric: a number keyboard, and D-pad left/right on the
+/// unfocused field steps the value by [step] within [min]..[max], starting
+/// from [start] when the field is empty. The keyboard stays available with A.
+class NumberStepper {
+  final num step;
+  final num min;
+  final num? max;
+  final num start;
+
+  /// Whether the value may have a fractional part (number keyboard with a
+  /// decimal separator).
+  final bool decimal;
+
+  const NumberStepper({
+    required this.step,
+    required this.min,
+    this.max,
+    required this.start,
+    this.decimal = false,
+  });
+}
+
 /// Gamepad-navigable single-field text prompt, used to name a collection on
 /// creation and to rename one afterwards.
 ///
@@ -35,11 +57,20 @@ class CollectionNameDialog extends StatefulWidget {
   /// Label of the confirming button.
   final String confirmLabel;
 
+  /// Placeholder shown while the field is empty; defaults to "Collection
+  /// name".
+  final String? hintText;
+
+  /// Turns the prompt into a numeric one; see [NumberStepper].
+  final NumberStepper? stepper;
+
   const CollectionNameDialog({
     super.key,
     required this.title,
     required this.initialValue,
     required this.confirmLabel,
+    this.hintText,
+    this.stepper,
   });
 
   /// Shows the prompt and resolves to the trimmed name, or null when the user
@@ -49,6 +80,8 @@ class CollectionNameDialog extends StatefulWidget {
     required String title,
     required String initialValue,
     required String confirmLabel,
+    String? hintText,
+    NumberStepper? stepper,
   }) {
     return showDialog<String>(
       context: context,
@@ -57,6 +90,8 @@ class CollectionNameDialog extends StatefulWidget {
         title: title,
         initialValue: initialValue,
         confirmLabel: confirmLabel,
+        hintText: hintText,
+        stepper: stepper,
       ),
     );
   }
@@ -93,8 +128,8 @@ class _CollectionNameDialogState extends State<CollectionNameDialog> {
     _gamepadNav = GamepadNavigation(
       // Three fixed stops: a held direction would only spin the cursor round.
       allowRepeat: false,
-      onNavigateLeft: () => _move(-1),
-      onNavigateRight: () => _move(1),
+      onNavigateLeft: () => _horizontal(-1),
+      onNavigateRight: () => _horizontal(1),
       onNavigateUp: () => _move(-1),
       onNavigateDown: () => _move(1),
       onSelectItem: _activate,
@@ -114,8 +149,9 @@ class _CollectionNameDialogState extends State<CollectionNameDialog> {
         onDeactivate: () => _gamepadNav.deactivate(),
       );
       // Open with the caret in the field so a desktop user can simply type and
-      // an Android user gets the IME without a further press.
-      _nameFocus.requestFocus();
+      // an Android user gets the IME without a further press. A numeric
+      // prompt opens on the stepper instead: the D-pad is the quicker way in.
+      if (widget.stepper == null) _nameFocus.requestFocus();
     });
   }
 
@@ -139,6 +175,37 @@ class _CollectionNameDialogState extends State<CollectionNameDialog> {
     if (next == _stop.index) return;
     SfxService().playNavSound();
     setState(() => _stop = _NameDialogStop.values[next]);
+  }
+
+  /// Left/right step a numeric value while its field is selected but not
+  /// being typed in; otherwise they move between stops like up/down.
+  void _horizontal(int delta) {
+    if (widget.stepper != null &&
+        _stop == _NameDialogStop.field &&
+        !_nameFocus.hasFocus) {
+      _step(delta);
+      return;
+    }
+    _move(delta);
+  }
+
+  void _step(int direction) {
+    final stepper = widget.stepper!;
+    final current = num.tryParse(_controller.text.trim().replaceAll(',', '.'));
+    var next = current == null
+        ? stepper.start
+        : current + stepper.step * direction;
+    if (next < stepper.min) next = stepper.min;
+    if (stepper.max != null && next > stepper.max!) next = stepper.max!;
+    final text = next == next.roundToDouble() ? '${next.round()}' : '$next';
+    if (text == _controller.text) return;
+    SfxService().playNavSound();
+    setState(() {
+      _controller.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    });
   }
 
   void _activate() {
@@ -182,6 +249,29 @@ class _CollectionNameDialogState extends State<CollectionNameDialog> {
     }
     if (!mounted) return;
     Navigator.of(context).pop(name);
+  }
+
+  /// Flanks a numeric field with tappable chevrons, which also tell a
+  /// controller user that left/right adjust the value.
+  Widget _withStepper(ThemeData theme, Widget field) {
+    if (widget.stepper == null) return field;
+    Widget chevron(IconData icon, int direction) => InkWell(
+      onTap: () {
+        setState(() => _stop = _NameDialogStop.field);
+        _step(direction);
+      },
+      child: Padding(
+        padding: EdgeInsets.all(6.r),
+        child: Icon(icon, size: 20.r, color: theme.colorScheme.primary),
+      ),
+    );
+    return Row(
+      children: [
+        chevron(Symbols.chevron_left_rounded, -1),
+        Expanded(child: field),
+        chevron(Symbols.chevron_right_rounded, 1),
+      ],
+    );
   }
 
   @override
@@ -230,32 +320,42 @@ class _CollectionNameDialogState extends State<CollectionNameDialog> {
               width: 2.r,
             ),
           ),
-          child: TextField(
-            controller: _controller,
-            focusNode: _nameFocus,
-            textInputAction: TextInputAction.done,
-            autocorrect: false,
-            onTap: () => setState(() => _stop = _NameDialogStop.field),
-            onSubmitted: (_) => _nameFocus.unfocus(),
-            style: TextStyle(
-              fontSize: 13.r,
-              color: theme.colorScheme.onSurface,
-            ),
-            decoration: InputDecoration(
-              hintText: AppLocale.collectionName.getString(context),
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 12.r,
-                vertical: 10.r,
+          child: _withStepper(
+            theme,
+            TextField(
+              controller: _controller,
+              focusNode: _nameFocus,
+              keyboardType: widget.stepper == null
+                  ? null
+                  : TextInputType.numberWithOptions(
+                      decimal: widget.stepper!.decimal,
+                    ),
+              textInputAction: TextInputAction.done,
+              autocorrect: false,
+              onTap: () => setState(() => _stop = _NameDialogStop.field),
+              onSubmitted: (_) => _nameFocus.unfocus(),
+              style: TextStyle(
+                fontSize: 13.r,
+                color: theme.colorScheme.onSurface,
               ),
-              filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.5,
-              ),
-              border: OutlineInputBorder(
-                borderRadius:
-                    radii?.radiusInternal ?? BorderRadius.circular(12.r),
-                borderSide: BorderSide.none,
+              decoration: InputDecoration(
+                hintText:
+                    widget.hintText ??
+                    AppLocale.collectionName.getString(context),
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12.r,
+                  vertical: 10.r,
+                ),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius:
+                      radii?.radiusInternal ?? BorderRadius.circular(12.r),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
           ),

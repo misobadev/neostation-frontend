@@ -11,6 +11,7 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/data/datasources/sqlite_service.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'settings_title.dart';
 
@@ -245,7 +246,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                             widget.isContentFocused &&
                             widget.selectedContentIndex == 0,
                       ),
-                      SizedBox(height: 8.h),
+                      SizedBox(height: 12.r),
                       _buildInfoCard(
                         cardKey: _itemKeys[1],
                         icon: Symbols.favorite_rounded,
@@ -257,7 +258,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                             widget.isContentFocused &&
                             widget.selectedContentIndex == 1,
                       ),
-                      SizedBox(height: 8.h),
+                      SizedBox(height: 12.r),
                       _buildInfoCard(
                         cardKey: _itemKeys[2],
                         icon: Symbols.chat_bubble_outline_rounded,
@@ -269,7 +270,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                             widget.isContentFocused &&
                             widget.selectedContentIndex == 2,
                       ),
-                      SizedBox(height: 8.h),
+                      SizedBox(height: 12.r),
                       _buildInfoCard(
                         cardKey: _itemKeys[3],
                         icon: Symbols.language_rounded,
@@ -281,7 +282,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                             widget.isContentFocused &&
                             widget.selectedContentIndex == 3,
                       ),
-                      SizedBox(height: 8.h),
+                      SizedBox(height: 12.r),
                       _buildInfoCard(
                         cardKey: _itemKeys[4],
                         icon: Symbols.bug_report_rounded,
@@ -318,7 +319,11 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
     required ThemeData theme,
     bool isFocused = false,
   }) {
-    return InkWell(
+    final foreground = isFocused
+        ? theme.colorScheme.surface
+        : theme.colorScheme.onSurface;
+
+    final card = InkWell(
       key: cardKey,
       onTap: () {
         SfxService().playNavSound();
@@ -337,7 +342,9 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
       child: Container(
         padding: EdgeInsets.all(6.r),
         decoration: BoxDecoration(
-          color: theme.cardColor.withValues(alpha: 0.25),
+          color: isFocused
+              ? theme.colorScheme.onSurface
+              : theme.colorScheme.surface.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
             color: isFocused ? theme.colorScheme.primary : Colors.transparent,
@@ -356,13 +363,16 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       fontSize: 12.r,
+                      color: foreground,
                     ),
                   ),
                   SizedBox(height: 2.r),
                   Text(
                     value,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.primary,
+                      color: isFocused
+                          ? theme.colorScheme.surface.withValues(alpha: 0.7)
+                          : theme.colorScheme.primary,
                       fontWeight: FontWeight.w500,
                       fontSize: 9.r,
                     ),
@@ -373,10 +383,23 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
             Icon(
               trailingIcon,
               size: 14.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              color: isFocused
+                  ? theme.colorScheme.surface.withValues(alpha: 0.6)
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.4),
             ),
           ],
         ),
+      ),
+    );
+
+    final rimWidth = NeoGlass.borderWidthOf(context);
+    if (rimWidth <= 0) return card;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: (rimWidth / 2 + 0.5).r),
+      child: NeoGlassRim(
+        cornerRadius: 12.r,
+        borderWidth: rimWidth,
+        child: card,
       ),
     );
   }

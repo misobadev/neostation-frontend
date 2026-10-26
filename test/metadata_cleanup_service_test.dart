@@ -206,5 +206,29 @@ void main() {
         expect(await discTwoScreenshot.exists(), isFalse);
       },
     );
+
+    test('a row that fails to delete is counted, the others are cleaned', () async {
+      await db.execute(
+        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, is_fully_scraped) VALUES ('psx', 'good.chd', 1)",
+      );
+      await db.execute(
+        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, is_fully_scraped) VALUES ('psx', 'bad.chd', 1)",
+      );
+      await db.execute(
+        'CREATE TRIGGER fail_one BEFORE DELETE ON user_screenscraper_metadata '
+        "WHEN OLD.filename = 'bad.chd' "
+        "BEGIN SELECT RAISE(ABORT, 'disk failure'); END",
+      );
+
+      final result = await MetadataCleanupService.clean(
+        mediaDirectoryPath: '${tempMediaDir.path}/',
+      );
+
+      expect(result.deletedItems.map((i) => i.filename), ['good.chd']);
+      expect(result.errors, hasLength(1));
+      // The failed row stays, so the next run finds it again.
+      final left = await MetadataCleanupService.analyze();
+      expect(left.orphanedItems.map((i) => i.filename), ['bad.chd']);
+    });
   });
 }

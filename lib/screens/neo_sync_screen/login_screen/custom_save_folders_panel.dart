@@ -44,13 +44,20 @@ class CustomSaveFoldersDialog extends StatefulWidget {
 }
 
 class _CustomSaveFoldersDialogState extends State<CustomSaveFoldersDialog> {
-  static const _layerId = 'neo_sync_custom_folders_dialog';
   static const _rowSystem = 0;
   static const _rowEmulator = 1;
   static const _rowSelect = 2;
 
   late GamepadNavigation _gamepadNav;
   final ScrollController _listScroll = ScrollController();
+
+  /// The dialogue's own navigation layer. Without one, a resume (or a modal
+  /// closing just before this opened) woke the screen underneath, and one A or
+  /// B press drove both. Modal, so a screen that mounts behind it can't take
+  /// the controller back; per instance, as [GamepadNavigationManager.popLayer]
+  /// removes the first layer with a matching id.
+  late final String _layerId =
+      'neo_sync_custom_folders_dialog#${identityHashCode(this)}';
 
   String? _selectedSystem;
   List<CoreEmulatorModel> _emulators = [];
@@ -70,14 +77,14 @@ class _CustomSaveFoldersDialogState extends State<CustomSaveFoldersDialog> {
       onSelectItem: _activate,
       onBack: _back,
     );
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _gamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
         _layerId,
-        onActivate: () => _gamepadNav.activate(),
-        onDeactivate: () => _gamepadNav.deactivate(),
+        onActivate: _gamepadNav.activate,
+        onDeactivate: _gamepadNav.deactivate,
+        modal: true,
       );
     });
   }

@@ -10,14 +10,16 @@ import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/repositories/config_repository.dart';
-import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/global_notification_service.dart';
+import 'package:neostation/services/library_file_tool_lock.dart';
+import 'package:neostation/services/multi_disc_organizer_runner.dart';
+import 'package:neostation/services/orphan_cleanup_runner.dart';
 import 'package:neostation/services/ra_library_match_runner.dart';
 import 'package:neostation/services/metadata_cleanup_service.dart';
 import 'package:neostation/services/retroachievements_hash_service.dart';
-import 'package:neostation/services/rom_folder_organizer_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
+import 'package:neostation/utils/count_label.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/info_dialog.dart';
@@ -42,6 +44,11 @@ class ToolsSettingsContent extends StatefulWidget {
 class ToolsSettingsContentState extends State<ToolsSettingsContent> {
   static final _log = LoggerService.instance;
 
+  /// The bell row that says a press was refused because a library tool is
+  /// still running. One id for every refusal, so they share a row.
+  @visibleForTesting
+  static const String toolsStillRunningNotificationId = 'tools_still_running';
+
   final ScrollController _scrollController = ScrollController();
 
   /// Snaps during rapid D-pad navigation, animates on a single move.
@@ -51,8 +58,6 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
   /// tool row.
   final List<GlobalKey> _itemKeys = List.generate(4, (_) => GlobalKey());
 
-  bool _isOrganizingMultiDisc = false;
-  bool _isCleaningMetadata = false;
   List<String> _currentRomFolders = [];
 
   @override
@@ -145,26 +150,49 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
     );
   }
 
+  /// Refuses a press while the multi-disc organiser or the orphan cleanup
+  /// runs, saying why. Those two rewrite the library on disk and must not
+  /// overlap (see [LibraryFileToolLock]); the runners refuse as well, but
+  /// silently, and the cleanup has to be stopped here before it analyses.
+  ///
+  /// The message keeps one id, so pressing again replaces its row in the bell
+  /// rather than stacking another copy (and a replaced row does not pulse it).
+  bool _refuseWhileLibraryToolRuns() {
+    if (!LibraryFileToolLock.isHeld) return false;
+    AppNotification.showNotification(
+      context,
+      AppLocale.toolsStillRunning.getString(context),
+      type: NotificationType.info,
+      notificationId: toolsStillRunningNotificationId,
+    );
+    return true;
+  }
+
+  MultiDiscOrganizerStrings _multiDiscStrings() => MultiDiscOrganizerStrings(
+    scanning: AppLocale.organizeMultiDiscScanning.getString(context),
+    done: AppLocale.organizeMultiDiscDone.getString(context),
+    noSetsFound: AppLocale.organizeMultiDiscNoSetsFound.getString(context),
+    partialFailure: AppLocale.organizeMultiDiscPartialFailure.getString(
+      context,
+    ),
+    skippedSuffix: AppLocale.organizeMultiDiscSkippedSuffix.getString(context),
+    failedTemplate: AppLocale.organizeMultiDiscFailed.getString(context),
+  );
+
   Future<void> _organizeMultiDiscGames() async {
-    if (_isOrganizingMultiDisc) return;
+    // The runner owns "is it running", not this widget: leaving Tools disposes
+    // the screen while the moves carry on, so a local flag would read idle on
+    // the way back and start a second run. A press while this or the orphan
+    // cleanup runs is refused with a message; the running tool's row shows
+    // its progress.
+    if (_refuseWhileLibraryToolRuns()) return;
 
     final localeTitle = AppLocale.organizeMultiDiscGames.getString(context);
     final localeWarning = AppLocale.organizeMultiDiscWarning.getString(context);
     final localeNoFolders = AppLocale.organizeMultiDiscNoRomFoldersConfigured
         .getString(context);
-    final localeScanning = AppLocale.organizeMultiDiscScanning.getString(
-      context,
-    );
-    final localeDone = AppLocale.organizeMultiDiscDone.getString(context);
-    final localeNoSetsFound = AppLocale.organizeMultiDiscNoSetsFound.getString(
-      context,
-    );
-    final localeSkippedSuffix = AppLocale.organizeMultiDiscSkippedSuffix
-        .getString(context);
-    final localeFailed = AppLocale.organizeMultiDiscFailed.getString(context);
-    final localePartialFailure = AppLocale.organizeMultiDiscPartialFailure
-        .getString(context);
     final localeConfirm = AppLocale.confirm.getString(context);
+    final strings = _multiDiscStrings();
 
     if (_currentRomFolders.isEmpty) {
       if (mounted) {
@@ -186,117 +214,59 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
       accentColor: Theme.of(context).colorScheme.primary,
     );
     if (confirmed != true || !mounted) return;
+    if (_refuseWhileLibraryToolRuns()) return;
 
-    final multiDiscSystems = (await SystemRepository.getAllSystems())
-        .where((system) => system.multiDisc)
-        .toList();
-    final supportedFolders = multiDiscSystems
-        .expand((system) => [system.folderName, ...system.folders])
-        .where((folder) => folder.isNotEmpty)
-        .toSet();
-    final supportedRomExtensions = multiDiscSystems
-        .expand((system) => system.extensions)
-        .where((extension) => extension.isNotEmpty)
-        .toSet();
+    // The provider is app-scoped, so the rescan the runner ends with still
+    // works after this screen has gone.
+    final rescanSystem = context
+        .read<SqliteConfigProvider>()
+        .rescanSystemSilent;
 
-    String? completionMessage;
-    NotificationType? completionType;
-    const notificationId = 'organize_multidisc';
-
-    try {
-      if (mounted) setState(() => _isOrganizingMultiDisc = true);
-
-      GlobalNotificationService().show(
-        id: notificationId,
-        message: localeScanning,
-        type: GlobalNotificationType.info,
-        progress: 0,
-        ongoing: true,
-      );
-
-      final result = await RomFolderOrganizerService.organizeRomFolders(
-        _currentRomFolders,
-        supportedRomExtensions: supportedRomExtensions,
-        supportedSystemFolders: supportedFolders,
-        onProgress: (completed, total) {
-          if (total == 0) return;
-          GlobalNotificationService().update(
-            id: notificationId,
-            message: localeScanning,
-            type: GlobalNotificationType.info,
-            progress: completed / total,
-            ongoing: true,
-          );
-        },
-      );
-
-      if (result.hasChanges && mounted) {
-        final configProvider = Provider.of<SqliteConfigProvider>(
-          context,
-          listen: false,
-        );
-        for (final system in multiDiscSystems) {
-          await configProvider.rescanSystemSilent(system);
-        }
-      }
-
-      if (mounted) {
-        final skippedNote = result.rootsSkipped > 0
-            ? localeSkippedSuffix.replaceFirst(
-                '{count}',
-                result.rootsSkipped.toString(),
-              )
-            : '';
-        completionMessage = result.hasChanges
-            ? localeDone
-                  .replaceFirst('{groups}', result.groupsOrganized.toString())
-                  .replaceFirst('{files}', result.filesMoved.toString())
-                  .replaceFirst(
-                    '{playlists}',
-                    result.playlistsCreated.toString(),
-                  )
-                  .replaceFirst('{skipped}', skippedNote)
-            : localeNoSetsFound.replaceFirst('{skipped}', skippedNote);
-        if (result.hasFailures) {
-          completionMessage = localePartialFailure
-              .replaceFirst('{failed}', result.groupsFailed.toString())
-              .replaceFirst('{result}', completionMessage);
-          completionType = NotificationType.error;
-        } else {
-          completionType = result.hasChanges
-              ? NotificationType.success
-              : NotificationType.info;
-        }
-      }
-    } catch (e, stackTrace) {
-      _log.e('Failed to organize multi-disc games: $e', stackTrace: stackTrace);
-      if (mounted) {
-        completionMessage = localeFailed.replaceFirst('{error}', e.toString());
-        completionType = NotificationType.error;
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isOrganizingMultiDisc = false);
-        await _loadRomFolders();
-        if (completionMessage != null && completionType != null) {
-          final globalType = completionType == NotificationType.success
-              ? GlobalNotificationType.success
-              : GlobalNotificationType.error;
-          GlobalNotificationService().update(
-            id: notificationId,
-            message: completionMessage,
-            type: globalType,
-            progress: null,
-          );
-        }
-      } else {
-        GlobalNotificationService().dismiss(notificationId);
-      }
-    }
+    await MultiDiscOrganizerRunner.run(
+      romFolders: _currentRomFolders,
+      strings: strings,
+      rescanSystem: rescanSystem,
+      onProgressStateChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
+    if (mounted) await _loadRomFolders();
   }
 
+  OrphanCleanupStrings _orphanCleanupStrings() => OrphanCleanupStrings(
+    scanning: AppLocale.cleanOrphanedMetadataScanning.getString(context),
+    cleaningItemTemplate: AppLocale.cleanOrphanedMetadataCleaningItem.getString(
+      context,
+    ),
+    failedTemplate: AppLocale.cleanOrphanedMetadataFailed.getString(context),
+    done: AppLocale.cleanOrphanedMetadataDone.getString(context),
+    nothingFound: AppLocale.cleanOrphanedMetadataNothingFound.getString(
+      context,
+    ),
+    nothingToDelete: AppLocale.cleanOrphanedMetadataNothingToDelete.getString(
+      context,
+    ),
+    // Both forms, because the runner picks one once it has the count and
+    // has no context to resolve it with by then.
+    esdeKeptOne: AppLocale.cleanOrphanedMetadataEsdeSkippedSuffixOne.getString(
+      context,
+    ),
+    esdeKeptMany: AppLocale.cleanOrphanedMetadataEsdeSkippedSuffix.getString(
+      context,
+    ),
+    notRemovedOne: AppLocale.cleanOrphanedMetadataNotRemovedOne.getString(
+      context,
+    ),
+    notRemovedMany: AppLocale.cleanOrphanedMetadataNotRemoved.getString(
+      context,
+    ),
+  );
+
   Future<void> _cleanOrphanedMetadata() async {
-    if (_isCleaningMetadata) return;
+    // As for the organiser: the runner owns "is it running". The check comes
+    // before the analysis, which would otherwise read a set the organiser has
+    // moved but not yet rescanned as orphaned.
+    if (_refuseWhileLibraryToolRuns()) return;
 
     final locale = AppLocale.cleanOrphanedMetadata.getString(context);
     final localeWarning = AppLocale.cleanOrphanedMetadataWarning.getString(
@@ -304,30 +274,21 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
     );
     final localeNothingFound = AppLocale.cleanOrphanedMetadataNothingFound
         .getString(context);
-    final localeScanning = AppLocale.cleanOrphanedMetadataScanning.getString(
-      context,
-    );
-    final localeCleaningItem = AppLocale.cleanOrphanedMetadataCleaningItem
-        .getString(context);
     final localeDelete = AppLocale.delete.getString(context);
-    final localeFailed = AppLocale.cleanOrphanedMetadataFailed.getString(
-      context,
-    );
-    final localeDone = AppLocale.cleanOrphanedMetadataDone.getString(context);
-    final localeEsdeSkipped = AppLocale.cleanOrphanedMetadataEsdeSkippedSuffix
-        .getString(context);
+    final strings = _orphanCleanupStrings();
 
     final fileProvider = Provider.of<FileProvider>(context, listen: false);
     if (!fileProvider.isInitialized) {
       if (mounted) {
         AppNotification.showNotification(
           context,
-          localeFailed.replaceFirst('{error}', 'File provider not initialized'),
+          AppLocale.cleanOrphanedMetadataMediaUnavailable.getString(context),
           type: NotificationType.error,
         );
       }
       return;
     }
+    final mediaDirectoryPath = fileProvider.getMediaDirectoryPath();
 
     // Analyze without deleting so the user can review what will be affected.
     final analysis = await MetadataCleanupService.analyze();
@@ -351,17 +312,27 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
         .where((i) => i.esdeImported)
         .length;
 
+    if (neoStationCount == 0) {
+      // Only ES-DE imported rows are orphaned, and the cleanup never deletes
+      // those, so there is nothing to confirm.
+      await InfoDialog.show(
+        context,
+        title: locale,
+        body:
+            '${AppLocale.cleanOrphanedMetadataNothingToDelete.getString(context)}'
+            '\n\n${esdeEntriesKeptSuffix(context, esdeCount).trim()}',
+        okLabel: AppLocale.ok.getString(context),
+        icon: Symbols.cleaning_services_rounded,
+      );
+      return;
+    }
+
     final body = StringBuffer()
       ..writeln(localeWarning)
       ..writeln()
-      ..writeln(
-        'Found ${analysis.orphanedItems.length} orphaned metadata entr${analysis.orphanedItems.length == 1 ? 'y' : 'ies'}. '
-        '$neoStationCount will be deleted from the database and disk.',
-      );
+      ..writeln(orphanedMetadataDeleteLabel(context, neoStationCount));
     if (esdeCount > 0) {
-      body.writeln(
-        '$esdeCount ES-DE imported entr${esdeCount == 1 ? 'y' : 'ies'} will be left untouched.',
-      );
+      body.writeln(esdeEntriesKeptSuffix(context, esdeCount).trim());
     }
 
     final accentColor = Theme.of(context).colorScheme.error;
@@ -374,91 +345,17 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
       accentColor: accentColor,
     );
     if (confirmed != true || !mounted) return;
+    // The organiser can have started while the analysis ran, before the
+    // dialogue was up to block the press.
+    if (_refuseWhileLibraryToolRuns()) return;
 
-    String? completionMessage;
-    NotificationType? completionType;
-    const notificationId = 'clean_orphaned_metadata';
-
-    try {
-      if (mounted) setState(() => _isCleaningMetadata = true);
-
-      // Use the global notification service so the progress bar survives tab
-      // and menu navigation while the cleanup runs.
-      GlobalNotificationService().show(
-        id: notificationId,
-        message: localeScanning,
-        type: GlobalNotificationType.info,
-        progress: 0,
-        ongoing: true,
-      );
-
-      final result = await MetadataCleanupService.clean(
-        fileProvider: fileProvider,
-        onProgress: (progress, currentItem) {
-          GlobalNotificationService().update(
-            id: notificationId,
-            message: localeCleaningItem.replaceFirst(
-              '{filename}',
-              currentItem.filename,
-            ),
-            type: GlobalNotificationType.info,
-            progress: progress,
-            ongoing: true,
-          );
-        },
-      );
-
-      if (mounted) {
-        final esdeSkippedNote = result.skippedEsdeItems.isNotEmpty
-            ? localeEsdeSkipped.replaceFirst(
-                '{count}',
-                result.skippedEsdeItems.length.toString(),
-              )
-            : '';
-        if (result.hasDeletions) {
-          completionMessage =
-              localeDone
-                  .replaceFirst(
-                    '{entries}',
-                    result.deletedItems.length.toString(),
-                  )
-                  .replaceFirst(
-                    '{files}',
-                    result.deletedMediaFiles.toString(),
-                  ) +
-              esdeSkippedNote;
-          completionType = NotificationType.success;
-        } else {
-          completionMessage = localeNothingFound + esdeSkippedNote;
-          completionType = NotificationType.info;
-        }
-      }
-    } catch (e, stackTrace) {
-      _log.e('Failed to clean orphaned metadata: $e', stackTrace: stackTrace);
-      if (mounted) {
-        completionMessage = localeFailed.replaceFirst('{error}', e.toString());
-        completionType = NotificationType.error;
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isCleaningMetadata = false);
-        if (completionMessage != null && completionType != null) {
-          final globalType = completionType == NotificationType.success
-              ? GlobalNotificationType.success
-              : GlobalNotificationType.error;
-          GlobalNotificationService().update(
-            id: notificationId,
-            message: completionMessage,
-            type: globalType,
-            progress: null,
-          );
-        }
-      } else {
-        // Make sure the persistent notification is removed if the widget that
-        // started the operation is no longer in the tree.
-        GlobalNotificationService().dismiss(notificationId);
-      }
-    }
+    await OrphanCleanupRunner.run(
+      mediaDirectoryPath: mediaDirectoryPath,
+      strings: strings,
+      onProgressStateChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   /// Walks the whole library looking for RetroAchievements matches, instead of
@@ -541,11 +438,11 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
             builder: (context, notifications, _) {
               final multiDiscProgress = _progressFor(
                 notifications,
-                'organize_multidisc',
+                MultiDiscOrganizerRunner.notificationId,
               );
               final metadataProgress = _progressFor(
                 notifications,
-                'clean_orphaned_metadata',
+                OrphanCleanupRunner.notificationId,
               );
               final rematchProgress = _progressFor(
                 notifications,
@@ -559,6 +456,7 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
               return ListView(
                 controller: _scrollController,
                 physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.only(top: 6.r),
                 children: [
                   SettingsCardRow(
                     key: _itemKeys[0],
@@ -576,9 +474,8 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
                           : Symbols.emoji_events_rounded,
                       selected: isSelected,
                     ),
-                    belowContent: _buildInlineProgress(
-                      context,
-                      rematchProgress,
+                    belowContent: ToolInlineStatus(
+                      notification: rematchProgress,
                     ),
                   ),
                   SettingsCardRow(
@@ -599,9 +496,8 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
                           widget.isContentFocused &&
                           widget.selectedContentIndex == 1,
                     ),
-                    belowContent: _buildInlineProgress(
-                      context,
-                      metadataProgress,
+                    belowContent: ToolInlineStatus(
+                      notification: metadataProgress,
                     ),
                   ),
                   SettingsCardRow(
@@ -621,9 +517,8 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
                           widget.isContentFocused &&
                           widget.selectedContentIndex == 2,
                     ),
-                    belowContent: _buildInlineProgress(
-                      context,
-                      multiDiscProgress,
+                    belowContent: ToolInlineStatus(
+                      notification: multiDiscProgress,
                     ),
                   ),
                   SettingsCardRow(
@@ -644,9 +539,8 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
                           widget.isContentFocused &&
                           widget.selectedContentIndex == 3,
                     ),
-                    belowContent: _buildInlineProgress(
-                      context,
-                      rommLinkProgress,
+                    belowContent: ToolInlineStatus(
+                      notification: rommLinkProgress,
                     ),
                   ),
                 ],
@@ -670,52 +564,68 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
 
   /// Inline progress shown inside the card row while a long-running tool runs,
   /// mirroring the notification the header bell keeps for the same operation.
-  Widget _buildInlineProgress(
-    BuildContext context,
-    GlobalNotificationData? notification,
-  ) {
-    if (notification == null || notification.progress == null) {
+}
+
+/// A tool's status under its card: a bar with the progress while it runs, then
+/// its outcome message once it has finished.
+///
+/// A finished run carries no progress (the bar is dropped so it doesn't read as
+/// still running), but its message stays until the notification is dismissed.
+@visibleForTesting
+class ToolInlineStatus extends StatelessWidget {
+  final GlobalNotificationData? notification;
+
+  const ToolInlineStatus({super.key, required this.notification});
+
+  @override
+  Widget build(BuildContext context) {
+    final notification = this.notification;
+    if (notification == null) return const SizedBox.shrink();
+    final progress = notification.progress;
+    // Running but no progress yet: nothing to show.
+    if (progress == null && notification.ongoing) {
       return const SizedBox.shrink();
     }
 
     final theme = Theme.of(context);
-    final progress = notification.progress!;
 
     return Padding(
       padding: EdgeInsets.only(top: 8.r),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(2.r),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 4.r,
-                    backgroundColor: theme.colorScheme.surface.withValues(
-                      alpha: 0.4,
-                    ),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      theme.colorScheme.primary,
+          if (progress != null) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(2.r),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 4.r,
+                      backgroundColor: theme.colorScheme.surface.withValues(
+                        alpha: 0.4,
+                      ),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        theme.colorScheme.primary,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              SizedBox(width: 8.r),
-              Text(
-                '${(progress * 100).round()}%',
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontSize: 10.r,
-                  fontWeight: FontWeight.w600,
+                SizedBox(width: 8.r),
+                Text(
+                  '${(progress * 100).round()}%',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontSize: 10.r,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          if (notification.message.isNotEmpty) ...[
+              ],
+            ),
             SizedBox(height: 4.r),
+          ],
+          if (notification.message.isNotEmpty)
             Text(
               notification.message,
               style: TextStyle(
@@ -725,7 +635,6 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-          ],
         ],
       ),
     );

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/screens/secondary_screen/widgets/status_readout.dart';
 import 'package:neostation/services/secondary_apps_service.dart';
 import 'package:neostation/themes/app_themes.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Covers the secondary display's corner clock + battery readout.
 ///
@@ -21,6 +24,16 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
   var levelReads = 0;
+
+  // The clock reads its AM/PM words from the app language.
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await FlutterLocalization.instance.ensureInitialized();
+    FlutterLocalization.instance.init(
+      mapLocales: [const MapLocale('en', AppLocale.en)],
+      initLanguageCode: 'en',
+    );
+  });
 
   setUp(() {
     levelReads = 0;
@@ -56,6 +69,10 @@ void main() {
       ScreenUtilInit(
         designSize: const Size(640, 480),
         builder: (context, _) => MaterialApp(
+          localizationsDelegates:
+              FlutterLocalization.instance.localizationsDelegates,
+          supportedLocales: FlutterLocalization.instance.supportedLocales,
+          locale: const Locale('en'),
           home: Scaffold(
             body: StatusReadout(
               scheme: const ColorScheme.dark(),

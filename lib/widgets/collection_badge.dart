@@ -30,14 +30,16 @@ class CollectionBadge extends StatelessWidget {
   const CollectionBadge.inline({
     super.key,
     required this.color,
-    this.inlineSize = 11,
+    this.inlineSize,
   }) : compact = true,
        size = 0;
 
   final bool compact;
   final Color? color;
   final double size;
-  final double inlineSize;
+
+  /// Resolved logical pixels, matching the host row’s already scaled font.
+  final double? inlineSize;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +47,11 @@ class CollectionBadge extends StatelessWidget {
     if (compact) {
       return Semantics(
         label: label,
-        child: Icon(Symbols.bookmark_rounded, size: inlineSize.r, color: color),
+        child: Icon(
+          Symbols.bookmark_rounded,
+          size: inlineSize ?? 11.r,
+          color: color,
+        ),
       );
     }
 

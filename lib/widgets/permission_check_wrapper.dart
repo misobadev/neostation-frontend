@@ -100,11 +100,13 @@ class _PermissionCheckWrapperState extends State<PermissionCheckWrapper> {
     ).setSetupWizardActive(active);
   }
 
-  void _completeSetup() async {
+  Future<void> _completeSetup() async {
     final configProvider = Provider.of<SqliteConfigProvider>(
       context,
       listen: false,
     );
+    // A failure here reaches the wizard, which says so and lets the user try
+    // again.
     await configProvider.completeSetup();
 
     // Setup is done — let the secondary display bring in the dock/launcher.
@@ -112,9 +114,16 @@ class _PermissionCheckWrapperState extends State<PermissionCheckWrapper> {
 
     // Persist flag to SharedPreferences so the wizard is never shown again
     // even if the SQLite DB is temporarily inaccessible (e.g. SD card not ready).
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(setupCompletedKey, true);
+    // Setup is already saved as completed in the database, which restores
+    // this flag at the next start if it can't be written now.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(setupCompletedKey, true);
+    } catch (e) {
+      _log.w('Could not save the setup flag to preferences: $e');
+    }
 
+    if (!mounted) return;
     setState(() {
       _needsSetup = false;
     });

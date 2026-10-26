@@ -98,6 +98,11 @@ class GlobalNotificationService {
   /// value over: the last update of a run is the completion message, and those
   /// call sites are the ones that would forget to clear the flag. Progress
   /// updates opt back in, next to the [progress] value they already pass.
+  ///
+  /// For the same reason a finished update ([ongoing] false) without a
+  /// [progress] drops the bar: a run's completion message must not sit under
+  /// the full or frozen bar it left behind. A running update without one keeps
+  /// the bar it has.
   void update({
     required String id,
     required String message,
@@ -123,7 +128,7 @@ class GlobalNotificationService {
         imageBytes: imageBytes ?? existing.imageBytes,
         icon: icon ?? existing.icon,
         type: type ?? existing.type,
-        progress: progress ?? existing.progress,
+        progress: progress ?? (ongoing ? existing.progress : null),
         ongoing: ongoing,
       ),
       ...current.sublist(index + 1),

@@ -174,6 +174,7 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
               child: ListView.builder(
                 controller: _scrollController,
                 physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.only(top: 6.r),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final item = items[index];

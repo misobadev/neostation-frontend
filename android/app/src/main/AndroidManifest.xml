@@ -60,6 +60,11 @@
         <package android:name="com.retroarch.ra32" />
         <package android:name="com.retroarch.a" />
         <package android:name="com.retroarch.plus" />
+        <!-- Visible so the frontend can verify RetroArch's installed-core
+             receiver before sending its query. -->
+        <intent>
+            <action android:name="com.retroarch.QUERY_INSTALLED_CORES" />
+        </intent>
     </queries>
         
    <application

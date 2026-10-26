@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 
 /// Actionable settings tile: a bordered card with a leading icon, a
 /// title/subtitle block and a trailing control (toggle or action button).
@@ -60,16 +61,20 @@ class SettingsCardRow extends StatelessWidget {
         ? theme.colorScheme.primary
         : theme.colorScheme.outline.withValues(alpha: 0);
     final foreground = selected
-        ? theme.colorScheme.primary
+        ? theme.colorScheme.surface
         : theme.colorScheme.onSurface.withValues(alpha: disabled ? 0.4 : 1.0);
+    final subtitleForeground = selected
+        ? theme.colorScheme.surface.withValues(alpha: disabled ? 0.25 : 0.6)
+        : theme.colorScheme.onSurface.withValues(alpha: disabled ? 0.25 : 0.6);
 
-    return Container(
+    final row = Container(
       decoration: BoxDecoration(
-        color: theme.cardColor.withValues(alpha: 0.25),
+        color: selected
+            ? theme.colorScheme.onSurface
+            : theme.colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: borderColor, width: selected ? 2.r : 1.r),
       ),
-      margin: EdgeInsets.only(bottom: 8.r),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12.r),
@@ -107,9 +112,7 @@ class SettingsCardRow extends StatelessWidget {
                             subtitle,
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontSize: 9.r,
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: disabled ? 0.25 : 0.6,
-                              ),
+                              color: subtitleForeground,
                             ),
                             maxLines: subtitleMaxLines,
                             overflow: TextOverflow.ellipsis,
@@ -127,6 +130,15 @@ class SettingsCardRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    final rimWidth = NeoGlass.borderWidthOf(context);
+    final inset = rimWidth > 0 ? (rimWidth / 2 + 0.5).r : 0.0;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(inset, 0, inset, 12.r),
+      child: rimWidth > 0
+          ? NeoGlassRim(cornerRadius: 12.r, borderWidth: rimWidth, child: row)
+          : row,
     );
   }
 }

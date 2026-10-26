@@ -43,6 +43,18 @@
   },
   "emulators": [
     {
+      "name": "Standalone PokeDaisy",
+      "unique_id": "gb-hacks.com.pokedaisy.app",
+      "description": "Game Boy and Game Boy Color emulator with a dual-screen companion for supported Pokemon games and ROM hacks. Supported extensions: gb, gbc, zip, 7z.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.pokedaisy.app/.LaunchActivity -a android.intent.action.VIEW -d \"{file.localuri}\"",
+          "keep_saf_uri": true
+        }
+      }
+    },
+    {
       "name": "Standalone Pizza Boy C Basic",
       "unique_id": "gb-hacks.it.dbtecno.pizzaboy",
       "description": "Supported extensions: gb, gbc, gbs.",

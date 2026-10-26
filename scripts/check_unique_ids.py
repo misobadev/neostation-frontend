@@ -5,11 +5,17 @@ from pathlib import Path
 
 
 def main():
-    systems_dir = Path(__file__).parent / "assets/systems"
+    # The scripts live in scripts/, one level below the repository root.
+    systems_dir = Path(__file__).resolve().parent.parent / "assets" / "systems"
+    files = sorted(systems_dir.glob("*.json"))
+    if not files:
+        # A wrong path must not pass as "no duplicates".
+        print(f"ERROR: no systems JSON found in {systems_dir}")
+        sys.exit(1)
     seen = {}  # unique_id -> source file
     duplicates = []
 
-    for json_file in sorted(systems_dir.glob("*.json")):
+    for json_file in files:
         try:
             data = json.loads(json_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:

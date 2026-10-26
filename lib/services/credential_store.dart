@@ -39,7 +39,9 @@ class CredentialStoreException implements Exception {
 
 /// The single place the app keeps user credentials.
 ///
-/// Every platform prefers its own secure storage. What differs is what happens
+/// Gaming distributions (SteamOS, Bazzite, ChimeraOS) prefer the encrypted
+/// file in both desktop and gaming sessions.
+/// Other platforms prefer their own secure storage. What differs is what happens
 /// when that fails, which on Linux is routine rather than exceptional: SteamOS
 /// has no Secret Service at all, so libsecret cannot store anything and both
 /// the NeoSync token and the RetroAchievements key vanished on every restart
@@ -75,17 +77,68 @@ class CredentialStore {
   static CredentialBackend? _fileOverride;
   static bool _fileOverrideSet = false;
   static Future<CredentialBackend?>? _fileStore;
+  static bool? _preferFileOverride;
+
+  // OS identity is independent of Desktop/Game Mode and its D-Bus session.
+  static final bool _gamingDistro = Platform.isLinux && _detectGamingDistro();
+  static bool get _preferFile => _preferFileOverride ?? _gamingDistro;
+
+  /// Distributions that boot into a gamescope gaming session, where the
+  /// desktop keyring is not unlocked (or not running at all).
+  static const Set<String> _gamingDistroIds = {
+    'steamos',
+    'bazzite',
+    'chimeraos',
+  };
+
+  static bool _detectGamingDistro() {
+    try {
+      return isGamingDistro(File('/etc/os-release').readAsStringSync());
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Whether an `/etc/os-release` body names a gamescope-first distribution
+  /// in `ID` or `ID_LIKE`.
+  @visibleForTesting
+  static bool isGamingDistro(String osRelease) {
+    for (final line in osRelease.split('\n')) {
+      final separator = line.indexOf('=');
+      if (separator < 0) continue;
+      final field = line.substring(0, separator).trim();
+      if (field != 'ID' && field != 'ID_LIKE') continue;
+      final ids = line
+          .substring(separator + 1)
+          .trim()
+          .replaceAll('"', '')
+          .replaceAll("'", '')
+          .toLowerCase()
+          .split(RegExp(r'\s+'));
+      if (ids.any(_gamingDistroIds.contains)) return true;
+    }
+    return false;
+  }
+
+  /// File-store entry recording that the file store owns [key]: it has been
+  /// written or deleted there. From then on the keyring and preferences are
+  /// never consulted for it, so a copy the keyring still holds (it is out of
+  /// reach in Gaming Mode, so a delete there cannot clear it) cannot come back.
+  static String _ownedMarker(String key) => '\u0000owned:$key';
 
   static CredentialBackend get _secure =>
       _secureOverride ?? const _SecureStorageBackend(_secureStorage);
 
   /// Replaces the backends for tests. Passing null for [file] models a platform
-  /// with no fallback store.
+  /// with no fallback store. [preferEncryptedFile] forces the gaming-distro
+  /// file-first mode on or off; null keeps the real OS detection.
   @visibleForTesting
   static void debugUseBackends({
     CredentialBackend? secure,
     CredentialBackend? file,
+    bool? preferEncryptedFile,
   }) {
+    _preferFileOverride = preferEncryptedFile;
     _secureOverride = secure;
     _fileOverride = file;
     _fileOverrideSet = true;
@@ -103,6 +156,7 @@ class CredentialStore {
 
   @visibleForTesting
   static void debugReset() {
+    _preferFileOverride = null;
     _secureOverride = null;
     _fileOverride = null;
     _fileOverrideSet = false;
@@ -119,6 +173,8 @@ class CredentialStore {
     // freshest value by definition.
     final session = _session[key];
     if (session != null) return session;
+
+    if (_preferFile) return _readFileFirst(key);
 
     var secureFailed = false;
     var fallbackFailed = false;
@@ -166,10 +222,70 @@ class CredentialStore {
     return null;
   }
 
+  /// Existing encrypted entries win over a possibly stale desktop keyring.
+  /// Only migrate after a successful file read; failed decryption must never
+  /// cause a legacy value to overwrite the encrypted store.
+  static Future<String?> _readFileFirst(String key) async {
+    final file = await _fileBackend();
+    if (file == null) {
+      throw CredentialStoreException('Encrypted credential store unavailable');
+    }
+    try {
+      final value = await file.read(key);
+      if (value != null && value.isNotEmpty) return value;
+      // Written or deleted here before: an empty answer is the answer.
+      if (await file.read(_ownedMarker(key)) != null) return null;
+    } catch (_) {
+      throw CredentialStoreException('Encrypted credential store unreadable');
+    }
+
+    String? legacy;
+    try {
+      legacy = await _secure.read(key);
+    } catch (e) {
+      _log.w('CredentialStore: legacy keyring unreadable for "$key": $e');
+    }
+    try {
+      legacy ??= await _readLegacyPreference(key);
+    } catch (e) {
+      _log.w('CredentialStore: legacy preferences unreadable for "$key": $e');
+      throw CredentialStoreException(
+        'Legacy credential preferences unreadable',
+      );
+    }
+    if (legacy == null || legacy.isEmpty) return null;
+
+    // Keep the original keyring/preference until persistence has succeeded.
+    // write() also retains the credential for this session if storage fails.
+    await write(key, legacy);
+    return legacy;
+  }
+
   /// Persists [value], reporting where it landed so the caller can warn the
   /// user when the credential will not survive a restart.
   static Future<CredentialWriteOutcome> write(String key, String value) async {
     _session.remove(key);
+
+    if (_preferFile) {
+      final file = await _fileBackend();
+      try {
+        if (file == null) throw StateError('Encrypted store unavailable');
+        await file.write(key, value);
+        await file.write(_ownedMarker(key), '1');
+        await _clearLegacyPreference(key);
+        try {
+          await _secure.delete(key);
+        } catch (_) {
+          // The keyring may only be reachable in Desktop Mode. File reads
+          // take precedence, so a remaining legacy copy cannot supersede it.
+        }
+        return CredentialWriteOutcome.encryptedFile;
+      } catch (e) {
+        _log.e('CredentialStore: encrypted storage rejected "$key": $e');
+        _session[key] = value;
+        return CredentialWriteOutcome.sessionOnly;
+      }
+    }
 
     try {
       await _secure.write(key, value);
@@ -201,6 +317,28 @@ class CredentialStore {
   /// that cannot be reached now must not block clearing the others.
   static Future<void> delete(String key) async {
     _session.remove(key);
+
+    if (_preferFile) {
+      final file = await _fileBackend();
+      if (file != null) {
+        try {
+          // Mark ownership before removing the value, so the keyring copy
+          // that may survive below cannot migrate back on the next read.
+          await file.write(_ownedMarker(key), '1');
+          await file.delete(key);
+        } catch (e) {
+          _log.w('CredentialStore: could not clear "$key" from the file: $e');
+        }
+      }
+      try {
+        await _secure.delete(key);
+      } catch (e) {
+        // Expected in Gaming Mode; the ownership marker covers it.
+        _log.w('CredentialStore: could not clear "$key" from the keyring: $e');
+      }
+      await _clearLegacyPreference(key);
+      return;
+    }
 
     try {
       await _secure.delete(key);

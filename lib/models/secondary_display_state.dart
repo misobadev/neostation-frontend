@@ -12,6 +12,11 @@ import 'secondary_achievement_item.dart';
 /// the main screen and a connected secondary display (e.g., in dual-screen
 /// handhelds like the Ayaneo Flip DS).
 class SecondaryDisplayStateData {
+  /// The system name pushed before any system is focused. A language-neutral
+  /// token in the shared state; the second screen shows it as its translated
+  /// welcome text.
+  static const String welcomeSystemName = 'WELCOME';
+
   /// Name of the system currently being browsed.
   final String systemName;
 
@@ -747,7 +752,10 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     try {
       final current =
           value ??
-          SecondaryDisplayStateData(systemName: systemName ?? 'WELCOME');
+          SecondaryDisplayStateData(
+            systemName:
+                systemName ?? SecondaryDisplayStateData.welcomeSystemName,
+          );
       setState(
         current.copyWith(
           systemName: systemName,

@@ -136,7 +136,8 @@ class AchievementPanel extends StatelessWidget {
                   ),
                   SizedBox(width: 12.r),
                   Text(
-                    '${value.raPoints}/${value.raPointsTotal}p',
+                    '${value.raPoints}/${value.raPointsTotal} '
+                    '${AppLocale.raPointsAbbrev.getString(l10nContext ?? context)}',
                     style: TextStyle(
                       color: const Color(0xFFFFC107),
                       fontSize: 16.r,
@@ -237,7 +238,9 @@ class AchievementPanel extends StatelessWidget {
                     ),
                     SizedBox(width: 8.r),
                     Text(
-                      '+${newlyEarned.length} this session',
+                      AppLocale.raNewThisSession
+                          .getString(l10nContext ?? context)
+                          .replaceFirst('{count}', '${newlyEarned.length}'),
                       style: TextStyle(
                         color: Colors.black,
                         fontSize: 16.r,
@@ -390,7 +393,8 @@ class AchievementPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${a.points}p',
+                      '${a.points} '
+                      '${AppLocale.raPointsAbbrev.getString(l10nContext ?? context)}',
                       style: TextStyle(
                         color: const Color(0xFFFFC107),
                         fontSize: 13.r,

@@ -530,7 +530,10 @@ class GameListViewState extends State<GameListView>
                                     // A mark among the row's other marks: the
                                     // badges' own size, no chip, and no shadow
                                     // — this row is flat surface, not artwork.
-                                    size: titleFontSize,
+                                    // NeoSyncStatusIcon applies ScreenUtil scaling internally.
+                                    size: GameListSize.getFontSize(
+                                      widget.listSize,
+                                    ),
                                     showBackground: false,
                                     showGlyphShadow: false,
                                     // The selected row's foreground, for the

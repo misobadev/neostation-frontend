@@ -119,8 +119,10 @@ class GameService {
 
   /// Retrieves games for a system with metadata formatting applied.
   /// Delegates to [GameListService].
-  static Future<List<GameModel>> loadGamesForSystem(SystemModel system) =>
-      GameListService.loadGamesForSystem(system);
+  static Future<List<GameModel>> loadGamesForSystem(
+    SystemModel system, {
+    Set<String>? smartPaths,
+  }) => GameListService.loadGamesForSystem(system, smartPaths: smartPaths);
 
   /// Fetches detailed metadata for a specific game.
   /// Delegates to [GameListService].

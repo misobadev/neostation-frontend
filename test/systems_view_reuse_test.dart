@@ -381,6 +381,29 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
+    testWidgets('a host can keep Y for its touch route only', (tester) async {
+      final pressed = <String>[];
+
+      await tester.pumpWidget(
+        host(
+          SystemCardGridView(
+            crossAxisCount: 3,
+            systems: systems,
+            navLayerId: 'touch_only_y',
+            bindYButton: false,
+            onYPressed: () => pressed.add('options'),
+            cardOverrideBuilder: stubCards,
+          ),
+        ),
+      );
+      await settleInput(tester);
+
+      await press(tester, LogicalKeyboardKey.keyY);
+      expect(pressed, isEmpty);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
     testWidgets('Y fires the host\'s current callback, not the mounted one', (
       tester,
     ) async {

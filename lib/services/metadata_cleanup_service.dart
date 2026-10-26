@@ -36,7 +36,9 @@ class MetadataCleanupResult {
   /// Number of media files removed from NeoStation's `media/` directory.
   final int deletedMediaFiles;
 
-  /// Human-readable errors encountered while deleting files.
+  /// Human-readable errors encountered while deleting files: one per row that
+  /// couldn't be deleted (media failures are logged, not counted), so the
+  /// screen reports `errors.length` as the rows left behind.
   final List<String> errors;
 
   const MetadataCleanupResult({

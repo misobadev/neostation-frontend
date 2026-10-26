@@ -26,12 +26,15 @@ import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/services/game_service.dart';
+import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/secondary_achievements_controller.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/utils/romm_failure_message.dart';
 import 'package:neostation/utils/romm_local_matcher.dart';
 import 'package:neostation/utils/game_launch_utils.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/screens/game_screen/game_settings_dialog/romm_match_picker_dialog.dart';
 import 'package:neostation/screens/game_screen/my_games_list.dart';
 
@@ -118,6 +121,8 @@ class SearchScreen extends StatefulWidget {
 enum _FocusRegion { search, filters, results, filterMenu, action }
 
 class _SearchScreenState extends State<SearchScreen> {
+  static final _log = LoggerService.instance;
+
   late GamepadNavigation _gamepadNav;
 
   final TextEditingController _nameController = TextEditingController();
@@ -224,7 +229,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   List<RommRom> _remote = [];
   bool _remoteLoading = false;
-  String? _remoteError;
+
+  /// Why the last RomM page failed, said in the app language by the error
+  /// row; null when it didn't.
+  RommException? _remoteFailure;
   bool _remoteHasMore = false;
   int _remoteOffset = 0;
 
@@ -400,7 +408,7 @@ class _SearchScreenState extends State<SearchScreen> {
       rommFilterable: _criteria.rommFilterable,
       unmatchedFilter: _remoteUnmatchedFilter,
       visibleRemote: _visibleRemote,
-      hasError: _remoteError != null,
+      hasError: _remoteFailure != null,
       isLoading: _remoteLoading,
       hasMore: _remoteHasMore,
     );
@@ -489,7 +497,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _rommConfigured &&
       _criteria.includesRomm &&
       _nameController.text.trim().isNotEmpty &&
-      (_remote.isNotEmpty || _remoteLoading || _remoteError != null);
+      (_remote.isNotEmpty || _remoteLoading || _remoteFailure != null);
 
   bool get _rommConfigured {
     try {
@@ -520,7 +528,7 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() {
         _remote = [];
         _remoteLoading = false;
-        _remoteError = null;
+        _remoteFailure = null;
         _remoteHasMore = false;
         _remoteOffset = 0;
         _rebuildRows();
@@ -557,10 +565,11 @@ class _SearchScreenState extends State<SearchScreen> {
         _remoteVocab = const {};
       }
       _remoteLoading = true;
-      _remoteError = null;
+      _remoteFailure = null;
       _rebuildRows();
     });
 
+    final RommRomPage page;
     try {
       // Platform, genre and developer are matched by RomM across the whole
       // library; only year is left for the rows to be filtered on afterwards.
@@ -582,7 +591,7 @@ class _SearchScreenState extends State<SearchScreen> {
         return;
       }
 
-      final page = await provider.service.getRomsPage(
+      page = await provider.service.getRomsPage(
         search: term,
         platformIds: platformIds,
         genres: _genre == null ? const [] : [_genre!],
@@ -604,16 +613,32 @@ class _SearchScreenState extends State<SearchScreen> {
         _remoteLoading = false;
         _rebuildRows();
       });
-
-      await _resolveDownloadedFlags(page.items, seq);
     } on RommException catch (e) {
-      if (!mounted || seq != _remoteSeq) return;
-      setState(() {
-        _remoteLoading = false;
-        _remoteError = e.message;
-        _rebuildRows();
-      });
+      _log.w('RomM search failed (${e.kind.name}): ${e.message}');
+      _failRemoteSearch(seq, e);
+      return;
+    } catch (e, stackTrace) {
+      // Anything else would leave the loading row spinning until the next
+      // keystroke.
+      _log.e('RomM search failed: $e', stackTrace: stackTrace);
+      _failRemoteSearch(seq, RommException('RomM search failed: $e'));
+      return;
     }
+
+    // Outside the try: the badges are this device's, and a failure resolving
+    // them is not the server's.
+    await _resolveDownloadedFlags(page.items, seq);
+  }
+
+  /// Ends the loading row of search [seq] with [failure], unless a newer
+  /// search has replaced it.
+  void _failRemoteSearch(int seq, RommException failure) {
+    if (!mounted || seq != _remoteSeq) return;
+    setState(() {
+      _remoteLoading = false;
+      _remoteFailure = failure;
+      _rebuildRows();
+    });
   }
 
   /// Fills in the "already on this device" badge for a freshly fetched page.
@@ -1423,13 +1448,17 @@ class _SearchScreenState extends State<SearchScreen> {
       },
       onLaunchFailed: (ctx, result) async {
         _achievementsController.stop(hidePanel: true);
-        if (mounted) {
-          AppNotification.showNotification(
-            context,
-            AppLocale.errorLaunchingGame
-                .getString(context)
-                .replaceFirst('{error}', ''),
-            type: NotificationType.error,
+        if (ctx.mounted) {
+          await LaunchFailureDialog.show(
+            ctx,
+            title: AppLocale.launchGameFailed.getString(ctx),
+            intro: AppLocale.unableToLaunch
+                .getString(ctx)
+                .replaceFirst('{name}', game.name),
+            message: result.errorMessage?.isNotEmpty == true
+                ? result.errorMessage!
+                : AppLocale.unknownError.getString(ctx),
+            details: result.errorDetails,
           );
         }
         GamepadNavigationManager.restoreFocusOwner();
@@ -2297,8 +2326,13 @@ class _SearchScreenState extends State<SearchScreen> {
               Flexible(
                 child: Text(
                   isError
-                      ? (_remoteError ??
-                            AppLocale.rommConnectionFailed.getString(context))
+                      ? (_remoteFailure == null
+                            ? AppLocale.rommConnectionFailed.getString(context)
+                            : rommFailureMessage(
+                                _remoteFailure!,
+                                (key) => key.getString(context),
+                                browsing: true,
+                              ))
                       : AppLocale.rommLoadMore.getString(context),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

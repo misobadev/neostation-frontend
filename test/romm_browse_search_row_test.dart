@@ -279,6 +279,80 @@ void main() {
     );
   });
 
+  /// The scripted server with every browse endpoint answering 500.
+  void breakEverything() {
+    RommService.debugUseHttpClient(
+      MockClient((request) async {
+        if (request.url.path == '/api/users/me') {
+          return json({'username': 'tester'});
+        }
+        return http.Response('boom', 500);
+      }),
+    );
+  }
+
+  // What a browse failure reads as in English: the server's status, never the
+  // client's own "Request failed (500)".
+  final serverError = AppLocale.en[AppLocale.rommErrorServerStatus]
+      .toString()
+      .replaceFirst('{error}', '500');
+
+  testWidgets('a failed search says why under the search field, in the app '
+      'language', (tester) async {
+    final provider = await connectedIn(tester, snes);
+    await pumpBrowser(tester, provider);
+
+    breakEverything();
+    await tester.runAsync(() => provider.selectPlatform(snes, search: 'yyy'));
+    await settle(tester);
+
+    expect(provider.romsFailure, isNotNull);
+    expect(find.text(serverError), findsOneWidget);
+    expect(find.textContaining('Request failed'), findsNothing);
+  });
+
+  for (final view in [RommBrowseView.platforms, RommBrowseView.collections]) {
+    testWidgets('a ${view.name} list that failed to load says why rather than '
+        '"none found"', (tester) async {
+      late RommProvider provider;
+      await tester.runAsync(() async {
+        serveEmptyResults();
+        provider = RommProvider();
+        await provider.connect(
+          serverUrl: 'https://romm.local',
+          apiKey: 'test-key',
+        );
+        // Nothing loaded yet, and the server now fails every list.
+        breakEverything();
+        await provider.loadPlatforms(force: true);
+        await provider.loadCollections(force: true);
+      });
+      addTearDown(provider.dispose);
+      expect(provider.platforms, isEmpty);
+      expect(provider.collections, isEmpty);
+      RommBrowseScreen.position
+        ..owner = RommBrowsePosition.ownerOf(provider)
+        ..view = view;
+      await pumpBrowser(tester, provider);
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await settle(tester);
+
+      expect(find.text(serverError), findsOneWidget);
+      expect(
+        find.text(
+          AppLocale
+              .en[view == RommBrowseView.platforms
+                  ? AppLocale.rommNoPlatforms
+                  : AppLocale.rommNoCollections]
+              .toString(),
+        ),
+        findsNothing,
+      );
+    });
+  }
+
   testWidgets('directions leave the off-screen platform cursor where it was', (
     tester,
   ) async {

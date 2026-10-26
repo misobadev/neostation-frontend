@@ -4,16 +4,18 @@ part of '../sqlite_config_provider.dart';
 ///
 /// Each method writes a single field to the in-memory [ConfigModel], persists it
 /// via [SqliteConfigService], and notifies listeners (some also push the value to
-/// the secondary display). Extracted verbatim from the host, which retains the
+/// the secondary display). A failed save puts the field back
+/// (`_saveOrRevert`). Extracted verbatim from the host, which retains the
 /// class declaration, all state, and the scan/secondary-display orchestration.
 extension SqliteConfigMutators on SqliteConfigProvider {
   /// Updates the entire list of ROM folders and triggers a configuration save.
   Future<void> updateRomFolders(List<String> romFolders) async {
+    final previous = _config;
     _config = _config.copyWith(
       romFolders: romFolders,
       lastScan: DateTime.now(),
     );
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
@@ -30,29 +32,33 @@ extension SqliteConfigMutators on SqliteConfigProvider {
 
   /// Updates the preferred UI layout mode for game lists.
   Future<void> updateGameViewMode(String gameViewMode) async {
+    final previous = _config;
     _config = _config.copyWith(gameViewMode: gameViewMode);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Updates the preferred UI layout mode for system carousels/grids.
   Future<void> updateSystemViewMode(String systemViewMode) async {
+    final previous = _config;
     _config = _config.copyWith(systemViewMode: systemViewMode);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Updates the preferred grid column density for the systems grid.
   Future<void> updateSystemGridColumns(String systemGridColumns) async {
+    final previous = _config;
     _config = _config.copyWith(systemGridColumns: systemGridColumns);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Updates the preferred grid column density for the games grid.
   Future<void> updateGameGridColumns(String gameGridColumns) async {
+    final previous = _config;
     _config = _config.copyWith(gameGridColumns: gameGridColumns);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
@@ -63,12 +69,14 @@ extension SqliteConfigMutators on SqliteConfigProvider {
         : 'S';
     if (_config.gameListSize == normalized) return;
 
+    final previous = _config;
     _config = _config.copyWith(gameListSize: normalized);
+    final applied = _config;
     // Publish first so the open game screen updates on the same input event;
     // serialize writes so rapid size changes cannot persist out of order.
     _notify();
     final save = _pendingGameListSizeSave.then(
-      (_) => SqliteConfigService.saveConfig(_config),
+      (_) => _saveOrRevert(previous, applied: applied),
     );
     _pendingGameListSizeSave = save.catchError((_) {});
     await save;
@@ -76,58 +84,66 @@ extension SqliteConfigMutators on SqliteConfigProvider {
 
   /// Updates the preferred card style for the game carousel ('fanart' or 'box').
   Future<void> updateGameCarouselCardStyle(String cardStyle) async {
+    final previous = _config;
     _config = _config.copyWith(gameCarouselCardStyle: cardStyle);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Toggles the application's fullscreen state.
   Future<void> updateIsFullscreen(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(isFullscreen: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Persists the user's ES-DE application folder path (used by ES-DE import
   /// and read-time fallback artwork resolution).
   Future<void> updateEsdeFolderPath(String path) async {
+    final previous = _config;
     _config = _config.copyWith(esdeFolderPath: path);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   Future<void> updateHideRecentCard(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(hideRecentCard: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Shows or hides the Search card on the systems screen.
   Future<void> updateHideSearchCard(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(hideSearchCard: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Persists the cell span of the "Recently Played" card in the systems grid
   /// ('default' for the 3x2 block, '2x1' for the compact wide card).
   Future<void> updateRecentCardSize(String value) async {
+    final previous = _config;
     _config = _config.copyWith(recentCardSize: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Persists whether library tiles show the RetroAchievements badge.
   Future<void> updateShowAchievementsBadge(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(showAchievementsBadge: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Persists whether the game views draw the cloud-save status mark.
   Future<void> updateShowCloudSyncIcon(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(showCloudSyncIcon: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
@@ -135,8 +151,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// `DetailTab` enum name, so it carries across games, systems and restarts.
   Future<void> updateGameDetailsTab(String tabName) async {
     if (_config.gameDetailsTab == tabName) return;
+    final previous = _config;
     _config = _config.copyWith(gameDetailsTab: tabName);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
@@ -149,50 +166,57 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     final applyHidden = navTabSpec(tab).withHidden;
     if (applyHidden == null) return;
 
+    final previous = _config;
     _config = applyHidden(_config, hidden);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Chooses whether Android apps are opened from Systems or their own tab.
   Future<void> updateAndroidAppsAsTab(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(androidAppsAsTab: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   Future<void> updateActiveSyncProvider(String providerId) async {
+    final previous = _config;
     _config = _config.copyWith(activeSyncProvider: providerId);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Toggles the visibility of detailed game metadata in the UI.
   Future<void> updateShowGameInfo(bool show) async {
+    final previous = _config;
     _config = _config.copyWith(showGameInfo: show);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Configures whether the application should shut down the host OS upon exit (Arcade/Cabinet mode).
   Future<void> updateBartopExitPoweroff(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(bartopExitPoweroff: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Updates whether startup scan is enabled
   Future<void> updateScanOnStartup(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(scanOnStartup: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Persists whether the startup scan is followed by a RetroAchievements
   /// match pass over the ROMs it added.
   Future<void> updateRaMatchOnStartup(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(raMatchOnStartup: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
@@ -204,8 +228,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// keep their own toggle afterwards, and a later flip of this one overwrites
   /// them again.
   Future<void> updateSubfolderViewAll(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(subfolderViewAll: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     await SystemRepository.setSubfolderViewForAll(value);
     // The in-memory system models still carry the old per-system flag.
     await refreshDetectedSystems();
@@ -218,23 +243,26 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// stamping: the grid and carousel read the config directly.
   Future<void> updateHideSystemLogos(bool value) async {
     if (_config.hideSystemLogos == value) return;
+    final previous = _config;
     _config = _config.copyWith(hideSystemLogos: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Updates article handling for game title sorting.
   Future<void> updateIgnoreArticlesInGameSort(bool value) async {
     if (_config.ignoreArticlesInGameSort == value) return;
+    final previous = _config;
     _config = _config.copyWith(ignoreArticlesInGameSort: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Updates whether hidden files/folders are ignored during ROM scans.
   Future<void> updateIgnoreHiddenFiles(bool ignoreHiddenFiles) async {
+    final previous = _config;
     _config = _config.copyWith(ignoreHiddenFiles: ignoreHiddenFiles);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
@@ -243,8 +271,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// Also pushed to the secondary display, whose Now Playing corner clock uses
   /// the same preference and runs in an engine that can't see this provider.
   Future<void> updateUse12HourClock(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(use12HourClock: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _secondaryDisplayState?.updateState(use12HourClock: value);
     _notify();
   }
@@ -296,8 +325,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
 
   /// Updates whether UI navigation SFX sounds are enabled
   Future<void> updateSfxEnabled(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(sfxEnabled: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     // Apply immediately to the running service — no restart needed.
     SfxService().setEnabled(value);
     // The secondary display runs its own engine with its own SfxService
@@ -310,6 +340,7 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// so the choice can be heard as it is made.
   Future<void> updateSfxVolume(double value) async {
     final volume = value.clamp(0.0, SfxService.maxVolume).toDouble();
+    final previous = _config;
     _config = _config.copyWith(sfxVolume: volume);
     // Apply immediately to the running service — no restart needed.
     SfxService().setVolume(volume);
@@ -317,13 +348,21 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _secondaryDisplayState?.updateState(sfxVolume: volume);
     _notify();
     unawaited(SfxService().playVolumePreview());
-    await SqliteConfigService.saveConfig(_config);
+    try {
+      await _saveOrRevert(previous);
+    } catch (_) {
+      // Back to the stored volume on both engines.
+      SfxService().setVolume(_config.sfxVolume);
+      _secondaryDisplayState?.updateState(sfxVolume: _config.sfxVolume);
+      rethrow;
+    }
   }
 
   /// Updates the app display language and applies it immediately
   Future<void> updateAppLanguage(String langCode) async {
+    final previous = _config;
     _config = _config.copyWith(appLanguage: langCode);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     FlutterLocalization.instance.translate(langCode);
     _notify();
   }
@@ -333,9 +372,19 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// Automatically synchronizes the mute state with the secondary display if connected.
   Future<void> updateVideoSound(bool value) async {
     if (_config.videoSound == value) return;
+    final previous = _config;
     _config = _config.copyWith(videoSound: value);
-    // ignore: unawaited_futures
-    SqliteConfigService.saveConfig(_config); // No await to avoid lag
+    // No await to avoid lag. A failed save (already logged) puts the setting
+    // back; the secondary display is told the stored state again.
+    unawaited(
+      _saveOrRevert(previous).catchError((Object _) {
+        if (_secondaryDisplayState?.value != null) {
+          _secondaryDisplayState!.updateState(
+            isVideoMuted: !_config.videoSound,
+          );
+        }
+      }),
+    );
 
     // Sincronizar con pantalla secundaria si está activa
     if (_secondaryDisplayState != null) {
@@ -357,8 +406,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// dims; `0` disables dimming. Persists and pushes the value to the secondary
   /// display.
   Future<void> updateNowPlayingDimDelay(int seconds) async {
+    final previous = _config;
     _config = _config.copyWith(nowPlayingDimDelay: seconds);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _secondaryDisplayState?.updateState(nowPlayingDimDelay: seconds);
     _notify();
   }
@@ -367,8 +417,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// Persists and pushes the value to the secondary display.
   Future<void> updateNowPlayingDimLevel(int percent) async {
     final clamped = percent.clamp(0, 100);
+    final previous = _config;
     _config = _config.copyWith(nowPlayingDimLevel: clamped);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _secondaryDisplayState?.updateState(nowPlayingDimLevel: clamped);
     _notify();
   }
@@ -377,8 +428,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// the secondary screen (percentage 0–100, 0 = off). Persists and pushes it.
   Future<void> updateFanartDimLevel(int percent) async {
     final clamped = percent.clamp(0, 100);
+    final previous = _config;
     _config = _config.copyWith(fanartDimLevel: clamped);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _secondaryDisplayState?.updateState(fanartDimLevel: clamped);
     _notify();
   }
@@ -387,8 +439,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// slot, empty string = free) and pushes them to the secondary display.
   Future<void> updateDockApps(List<String> apps) async {
     final normalized = ConfigModel.normalizeDock(apps);
+    final previous = _config;
     _config = _config.copyWith(dockApps: normalized);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _secondaryDisplayState?.updateState(dockApps: normalized);
     _notify();
   }
@@ -396,8 +449,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// Enables or disables the secondary Now Playing app dock. Persists and
   /// pushes the value to the secondary display.
   Future<void> updateDockEnabled(bool enabled) async {
+    final previous = _config;
     _config = _config.copyWith(dockEnabled: enabled);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _secondaryDisplayState?.updateState(dockEnabled: enabled);
     _notify();
   }
@@ -410,46 +464,66 @@ extension SqliteConfigMutators on SqliteConfigProvider {
       ConfigModel.dockMinSlotCount,
       ConfigModel.dockMaxSlotCount,
     );
+    final previous = _config;
     _config = _config.copyWith(dockSlotCount: clamped);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _secondaryDisplayState?.updateState(dockSlotCount: clamped);
     _notify();
   }
 
   /// Marks the initial application onboarding as completed.
   Future<void> completeSetup() async {
+    final previous = _config;
     _config = _config.copyWith(setupCompleted: true);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   Future<void> updateAutoUpdateApp(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(autoUpdateApp: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   Future<void> updateAutoUpdateSystems(bool value) async {
+    final previous = _config;
     _config = _config.copyWith(autoUpdateSystems: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Updates the sorting criteria for the system list.
   Future<void> updateSystemSortBy(String sortBy) async {
     if (_config.systemSortBy == sortBy) return;
+    final previous = _config;
     _config = _config.copyWith(systemSortBy: sortBy);
     _sortDetectedSystems();
-    await SqliteConfigService.saveConfig(_config);
+    try {
+      await _saveOrRevert(previous);
+    } catch (_) {
+      // Back to the stored order.
+      _sortDetectedSystems();
+      _notify();
+      rethrow;
+    }
     _notify();
   }
 
   /// Updates the sorting direction (ascending or descending) for the system list.
   Future<void> updateSystemSortOrder(String order) async {
     if (_config.systemSortOrder == order) return;
+    final previous = _config;
     _config = _config.copyWith(systemSortOrder: order);
     _sortDetectedSystems();
-    await SqliteConfigService.saveConfig(_config);
+    try {
+      await _saveOrRevert(previous);
+    } catch (_) {
+      // Back to the stored order.
+      _sortDetectedSystems();
+      _notify();
+      rethrow;
+    }
     _notify();
   }
 
@@ -459,16 +533,18 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   /// systems list, and the browser re-reads the order itself when it rebuilds.
   Future<void> updateCollectionSortBy(String sortBy) async {
     if (_config.collectionSortBy == sortBy) return;
+    final previous = _config;
     _config = _config.copyWith(collectionSortBy: sortBy);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
   /// Updates the collections browser's sort direction (`asc` / `desc`).
   Future<void> updateCollectionSortOrder(String order) async {
     if (_config.collectionSortOrder == order) return;
+    final previous = _config;
     _config = _config.copyWith(collectionSortOrder: order);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
@@ -477,8 +553,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   Future<void> updateNeoglassBlur(int value) async {
     final clamped = value.clamp(0, 2);
     if (_config.neoglassBlur == clamped) return;
+    final previous = _config;
     _config = _config.copyWith(neoglassBlur: clamped);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
@@ -488,8 +565,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   Future<void> updateNeoglassTransparency(int value) async {
     final clamped = value.clamp(0, 30);
     if (_config.neoglassTransparency == clamped) return;
+    final previous = _config;
     _config = _config.copyWith(neoglassTransparency: clamped);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 
@@ -497,8 +575,9 @@ extension SqliteConfigMutators on SqliteConfigProvider {
   Future<void> updateNeoglassBorderWidth(double value) async {
     final clamped = value.clamp(0.0, 8.0).toDouble();
     if (_config.neoglassBorderWidth == clamped) return;
+    final previous = _config;
     _config = _config.copyWith(neoglassBorderWidth: clamped);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
     _notify();
   }
 }

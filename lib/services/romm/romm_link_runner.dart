@@ -97,10 +97,8 @@ class RommLinkRunner {
     _running = true;
     onProgressStateChanged?.call();
 
-    // Terminal rows go through `show` rather than `update`. `update` resolves
-    // progress as `progress ?? existing.progress`, so passing null keeps the
-    // bar the run left behind and the summary sits under a full or frozen one;
-    // `show` replaces the row outright.
+    // Terminal rows go through `show`, which replaces the row outright (title,
+    // type and no progress bar) rather than merging into it.
     void finish(String message, GlobalNotificationType type) {
       GlobalNotificationService().show(
         id: notificationId,

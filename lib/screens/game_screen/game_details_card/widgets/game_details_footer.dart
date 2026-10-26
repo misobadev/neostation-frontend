@@ -332,7 +332,6 @@ class GameDetailsFooter extends StatelessWidget {
   /// with it, and a games view whose one visible control was an achievements
   /// pill gave touch nothing to press.
   Widget _buildPlayButton(BuildContext context, {required double width}) {
-    final showLabel = width >= 88.r;
     // The one control on the row that keeps the theme's corner. Fully rounded
     // it read as one more chip in the set, and PLAY is not one of the set --
     // it is the row's primary action, and the squarer corner is part of what
@@ -343,9 +342,8 @@ class GameDetailsFooter extends StatelessWidget {
 
     return Container(
       // The row gives this button whatever width remains after reserving the
-      // achievements pill and the other controls. At its preferred width the
-      // localized label fits; when space is tight the row removes the label
-      // first and keeps the A-button action visible.
+      // achievements pill and the other controls. The localized label is the
+      // whole button now, so tight rows ellipsize rather than dropping it.
       width: width,
       height: _controlSize.r,
       decoration: BoxDecoration(
@@ -373,46 +371,23 @@ class GameDetailsFooter extends StatelessWidget {
             SfxService().playEnterSound();
             onPlayGame();
           },
-          child: Padding(
-            // The trailing inset balances the label in the wide button. With
-            // just the A glyph it would shift the glyph off the button centre.
-            padding: EdgeInsets.only(right: showLabel ? 8.r : 0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  'assets/images/gamepad/Xbox_A_button.png',
-                  width: math.min(
-                    28.r,
-                    math.max(0, width - (showLabel ? 8.r : 4.r)),
-                  ),
-                  height: math.min(
-                    28.r,
-                    math.max(0, width - (showLabel ? 8.r : 4.r)),
-                  ),
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.r),
+              child: Text(
+                AppLocale.playButton.getString(context),
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
                   color: Theme.of(context).colorScheme.onPrimary,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13.r,
+                  letterSpacing: 1.0,
+                  height: 1.0,
                 ),
-                if (showLabel) SizedBox(width: 6.r),
-                // The label is localized and the button is a fixed width. Keep
-                // the type size stable and ellipsize labels that are too long.
-                if (showLabel)
-                  Flexible(
-                    child: Text(
-                      AppLocale.playButton.getString(context),
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 13.r,
-                        letterSpacing: 1.0,
-                        height: 1.0,
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
           ),
         ),

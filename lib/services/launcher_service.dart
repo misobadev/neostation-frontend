@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import '../models/system_model.dart';
 import '../models/game_model.dart';
 import '../repositories/game_repository.dart';
+import '../utils/disc/disc_paths.dart';
+import '../utils/disc/m3u_playlist.dart';
 import 'logger_service.dart';
 import 'config_service.dart';
 import 'systems_update_service.dart';
@@ -220,6 +222,10 @@ class LauncherService {
       // (instead of our FileProvider rewrap) declare `"keep_saf_uri": true` in
       // their android config. Keeps the launcher free of hardcoded package names.
       result['keep_saf_uri'] = platformConfig['keep_saf_uri'] == true;
+      // Emulators that cannot open an `.m3u` handed over SAF declare
+      // `"m3u_first_disc": true` and are launched on the playlist's first disc
+      // instead (see [resolveAndroidLaunchFiles]).
+      result['m3u_first_disc'] = platformConfig['m3u_first_disc'] == true;
 
       if (platformConfig.containsKey('launch_arguments')) {
         final args = platformConfig['launch_arguments'].toString();
@@ -433,9 +439,103 @@ class LauncherService {
     return result;
   }
 
-  /// Resolves file-backed IDs after building the intent and before launching it.
-  /// Standalone ScummVM expects a registered target ID, not the descriptor URI.
+  /// Resolves file-backed values after building the intent and before launching
+  /// it: an `.m3u` becomes its first disc for emulators that declare
+  /// `m3u_first_disc`, and standalone ScummVM gets its registered target ID
+  /// instead of the descriptor URI.
   Future<void> resolveAndroidLaunchFiles(
+    Map<String, dynamic> command,
+    GameModel game,
+  ) async {
+    await _resolveM3uFirstDisc(command, game);
+    await _resolveScummVmTarget(command, game);
+  }
+
+  /// Swaps a multi-disc `.m3u` launch for the playlist's first disc.
+  ///
+  /// Android Dolphin resolves playlist entries by cutting the playlist path at
+  /// its last `/`, which on a SAF document URI (one `%2F`-encoded component)
+  /// yields a path that does not exist; the PCSX2 family has no playlist
+  /// support at all and drops to its main menu. Both boot the disc directly.
+  /// When the playlist cannot be read the launch keeps the playlist, which is
+  /// no worse than before.
+  Future<void> _resolveM3uFirstDisc(
+    Map<String, dynamic> command,
+    GameModel game,
+  ) async {
+    if (command['m3u_first_disc'] != true) return;
+    final playlist = game.romPath;
+    if (playlist == null || !playlist.toLowerCase().endsWith('.m3u')) return;
+
+    final String contents;
+    try {
+      contents = await GameRepository.readLaunchDescriptor(playlist);
+    } catch (e) {
+      LoggerService.instance.w(
+        'm3u first disc: cannot read $playlist ($e); launching the playlist',
+      );
+      return;
+    }
+    final disc = m3uFirstDisc(playlist, contents);
+    if (disc == null) {
+      LoggerService.instance.w('m3u first disc: empty playlist $playlist');
+      return;
+    }
+
+    final data = command['data'];
+    if (data is String) {
+      command['data'] = swapPlaylistForDisc(data, playlist, disc);
+    }
+    final extras = (command['extras'] as List?) ?? const [];
+    for (final extra in extras) {
+      final value = extra['value'];
+      if (value is String) {
+        extra['value'] = swapPlaylistForDisc(value, playlist, disc);
+      }
+    }
+    LoggerService.instance.i('m3u first disc: launching $disc');
+  }
+
+  /// The first disc of the playlist at [playlistPath] with [contents],
+  /// resolved beside the playlist (a `%2F`-encoded SAF sibling on Android), or
+  /// null when the playlist names no disc.
+  @visibleForTesting
+  static String? m3uFirstDisc(String playlistPath, String contents) {
+    final entries = parseM3uEntries(contents);
+    if (entries.isEmpty) return null;
+    return resolveDiscSibling(playlistPath, entries.first);
+  }
+
+  /// [value], a built launch value, with the playlist swapped for [disc].
+  ///
+  /// The placeholders embed the playlist verbatim (`{file.path}` and
+  /// `{file.localuri}` markers, a `content://` `{file.uri}`) or, for a bare
+  /// path, as a `file://` URI. The `file://` form is swapped first, so its
+  /// encoded path is not half-replaced by the verbatim pass; a `content://`
+  /// playlist has no `file://` form, so that pass is skipped.
+  ///
+  /// This replaces every occurrence. That is right for the shipped templates,
+  /// which carry the playlist as a whole value or a whole marker payload. A
+  /// template embedding it inside a longer string would have that occurrence
+  /// rewritten too.
+  @visibleForTesting
+  static String swapPlaylistForDisc(
+    String value,
+    String playlist,
+    String disc,
+  ) {
+    var swapped = value;
+    if (!playlist.startsWith('content://')) {
+      swapped = swapped.replaceAll(
+        Uri.file(playlist).toString(),
+        Uri.file(disc).toString(),
+      );
+    }
+    return swapped.replaceAll(playlist, disc);
+  }
+
+  /// Standalone ScummVM expects a registered target ID, not the descriptor URI.
+  Future<void> _resolveScummVmTarget(
     Map<String, dynamic> command,
     GameModel game,
   ) async {

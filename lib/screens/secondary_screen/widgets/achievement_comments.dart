@@ -103,7 +103,8 @@ class AchievementCommentsPage extends StatelessWidget {
                           ),
                         SizedBox(width: 10.r),
                         Text(
-                          '${achievement.points}p',
+                          '${achievement.points} '
+                          '${AppLocale.raPointsAbbrev.getString(l10nContext ?? context)}',
                           style: TextStyle(
                             color: const Color(0xFFFFC107),
                             fontSize: 15.r,

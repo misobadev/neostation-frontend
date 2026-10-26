@@ -1,3 +1,4 @@
+import 'package:neostation/services/collections/smart_collections_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/data/datasources/sqlite_migrations.dart';
 import 'package:neostation/models/game_model.dart';
@@ -137,7 +138,8 @@ void main() {
       );
       await CollectionsService.createCollection('Empty');
 
-      final collections = await CollectionsService.getCollections();
+      final collections =
+          (await SmartCollectionsService.snapshot()).collections;
 
       expect(collections.length, 2);
       expect(collections.firstWhere((c) => c.name == 'Faves').gameCount, 2);
@@ -261,7 +263,10 @@ void main() {
       final b = await CollectionsService.createCollection('Same');
 
       expect(a.id, isNot(b.id));
-      expect((await CollectionsService.getCollections()).length, 2);
+      expect(
+        ((await SmartCollectionsService.snapshot()).collections).length,
+        2,
+      );
     });
 
     test('created ids are uuid v4 shaped', () async {
@@ -282,7 +287,7 @@ void main() {
       await CollectionsService.createCollection('Zeta');
       await CollectionsService.createCollection('Alpha');
 
-      final names = (await CollectionsService.getCollections())
+      final names = ((await SmartCollectionsService.snapshot()).collections)
           .map((c) => c.name)
           .toList();
 

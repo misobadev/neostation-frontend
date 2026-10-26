@@ -66,7 +66,8 @@ class AppNotification {
     );
   }
 
-  /// Updates an active notification by id.
+  /// Updates an active notification by id, as a finished entry: it carries no
+  /// progress bar afterwards (see [GlobalNotificationService.update]).
   static void updateNotification(
     BuildContext context,
     String notificationId,

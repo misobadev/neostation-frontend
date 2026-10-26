@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/neo_sync_models.dart';
+import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 
 /// Delete Cloud Save Dialog with Gamepad Navigation
@@ -23,6 +24,14 @@ class DeleteCloudSaveDialog extends StatefulWidget {
 
 class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
   late GamepadNavigation _gamepadNav;
+
+  /// The dialogue's own navigation layer. Without one, a resume (or a modal
+  /// closing just before this opened) woke the screen underneath, and one A or
+  /// B press drove both. Modal, so a screen that mounts behind it can't take
+  /// the controller back; per instance, as [GamepadNavigationManager.popLayer]
+  /// removes the first layer with a matching id.
+  late final String _layerId = 'neo_sync_delete_save#${identityHashCode(this)}';
+
   bool disableNeoSync = false;
 
   @override
@@ -37,12 +46,21 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
         Navigator.of(context).pop(false);
       },
     );
-    _gamepadNav.initialize();
-    _gamepadNav.activate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _gamepadNav.initialize();
+      GamepadNavigationManager.pushLayer(
+        _layerId,
+        onActivate: _gamepadNav.activate,
+        onDeactivate: _gamepadNav.deactivate,
+        modal: true,
+      );
+    });
   }
 
   @override
   void dispose() {
+    GamepadNavigationManager.popLayer(_layerId);
     _gamepadNav.dispose();
     super.dispose();
   }
@@ -294,6 +312,9 @@ class SuccessDialog extends StatefulWidget {
 class _SuccessDialogState extends State<SuccessDialog> {
   late GamepadNavigation _gamepadNav;
 
+  /// The dialogue's own navigation layer, as for [DeleteCloudSaveDialog].
+  late final String _layerId = 'neo_sync_success#${identityHashCode(this)}';
+
   @override
   void initState() {
     super.initState();
@@ -301,12 +322,21 @@ class _SuccessDialogState extends State<SuccessDialog> {
       onSelectItem: widget.onClose,
       onBack: widget.onClose,
     );
-    _gamepadNav.initialize();
-    _gamepadNav.activate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _gamepadNav.initialize();
+      GamepadNavigationManager.pushLayer(
+        _layerId,
+        onActivate: _gamepadNav.activate,
+        onDeactivate: _gamepadNav.deactivate,
+        modal: true,
+      );
+    });
   }
 
   @override
   void dispose() {
+    GamepadNavigationManager.popLayer(_layerId);
     _gamepadNav.dispose();
     super.dispose();
   }
@@ -408,6 +438,9 @@ class ErrorDialog extends StatefulWidget {
 class _ErrorDialogState extends State<ErrorDialog> {
   late GamepadNavigation _gamepadNav;
 
+  /// The dialogue's own navigation layer, as for [DeleteCloudSaveDialog].
+  late final String _layerId = 'neo_sync_error#${identityHashCode(this)}';
+
   @override
   void initState() {
     super.initState();
@@ -415,12 +448,21 @@ class _ErrorDialogState extends State<ErrorDialog> {
       onSelectItem: widget.onClose,
       onBack: widget.onClose,
     );
-    _gamepadNav.initialize();
-    _gamepadNav.activate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _gamepadNav.initialize();
+      GamepadNavigationManager.pushLayer(
+        _layerId,
+        onActivate: _gamepadNav.activate,
+        onDeactivate: _gamepadNav.deactivate,
+        modal: true,
+      );
+    });
   }
 
   @override
   void dispose() {
+    GamepadNavigationManager.popLayer(_layerId);
     _gamepadNav.dispose();
     super.dispose();
   }

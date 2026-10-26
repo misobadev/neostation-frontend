@@ -33,13 +33,15 @@ class AchievementsBadge extends StatelessWidget {
     super.key,
     required this.game,
     required this.color,
-    this.inlineSize = 11,
+    this.inlineSize,
   }) : compact = true;
 
   final GameModel game;
   final bool compact;
   final Color? color;
-  final double inlineSize;
+
+  /// Resolved logical pixels, matching the host row’s already scaled font.
+  final double? inlineSize;
 
   /// Whether [game] would draw anything, so callers can skip the `Positioned`
   /// wrapper entirely rather than stacking an invisible child on every tile.
@@ -63,7 +65,7 @@ class AchievementsBadge extends StatelessWidget {
         label: 'RetroAchievements: $total achievements',
         child: Icon(
           Symbols.emoji_events_rounded,
-          size: inlineSize.r,
+          size: inlineSize ?? 11.r,
           color: color,
         ),
       );

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -33,6 +34,19 @@ class ConfigService {
   }
 
   static const String _customPathKey = 'custom_user_data_path';
+
+  static String? _defaultUserDataPathForTesting;
+
+  /// Replaces the platform default user-data folder (and the default media
+  /// folder) for tests, so a test run never reads or writes a real profile.
+  /// A custom user-data path still takes precedence.
+  /// `test/flutter_test_config.dart` sets this for every test file; passing
+  /// null points the rest of that file back at the real default.
+  @visibleForTesting
+  static void setDefaultUserDataPathForTesting(String? userDataPath) {
+    _defaultUserDataPathForTesting = userDataPath;
+  }
+
   static const Duration _androidStorageRetryDelay = Duration(seconds: 3);
   static const int _androidStorageMaxAttempts = 20;
 
@@ -193,6 +207,8 @@ class ConfigService {
   /// - Linux: AppImage-aware persistence or `~/.neostation`.
   /// - Windows: Portable directory relative to the binary.
   static Future<String> _computeDefaultUserDataPath() async {
+    final testingPath = _defaultUserDataPathForTesting;
+    if (testingPath != null) return testingPath;
     if (Platform.isAndroid) {
       final externalDir = await getExternalStorageDirectory();
       final dir = externalDir ?? await getApplicationDocumentsDirectory();
@@ -303,6 +319,8 @@ class ConfigService {
       if (customPath != null && customPath.isNotEmpty) {
         return path.join(customPath, 'media');
       }
+      final testingPath = _defaultUserDataPathForTesting;
+      if (testingPath != null) return path.join(testingPath, 'media');
 
       String basePath;
 

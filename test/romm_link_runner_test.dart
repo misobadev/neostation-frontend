@@ -63,9 +63,7 @@ void main() {
       final row = GlobalNotificationService().notifier.value.firstWhere(
         (n) => n.id == RommLinkRunner.notificationId,
       );
-      // `update` resolves progress as `progress ?? existing.progress`, so a
-      // terminal row written with `update(progress: null)` keeps whatever bar
-      // the run left behind. The runner uses `show`, which replaces the row.
+      // A finished run's summary must not sit under the bar it left behind.
       expect(row.progress, isNull);
       expect(row.ongoing, isFalse, reason: 'the run is over');
     });

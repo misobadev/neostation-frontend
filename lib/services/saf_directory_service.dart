@@ -59,16 +59,26 @@ class SafDirectoryService {
     }
   }
 
-  /// Releases persistent permissions for a given URI.
-  static Future<void> releasePermission(String uri) async {
+  /// Releases the persistent permission of the folder tree [uri] names.
+  ///
+  /// Returns whether a permission was released. Only that folder's own grant
+  /// goes: a folder inside it or around it, picked on its own, keeps its own.
+  static Future<bool> releasePermission(String uri) async {
     if (!Platform.isAndroid) {
-      return;
+      return false;
     }
 
     try {
-      await platform.invokeMethod('releasePermission', {'uri': uri});
+      final bool? released = await platform.invokeMethod('releasePermission', {
+        'uri': uri,
+      });
+      return released ?? false;
     } on PlatformException catch (e) {
       _log.e('Error releasing SAF permission: ${e.message}');
+      return false;
+    } on MissingPluginException catch (e) {
+      _log.e('Releasing a SAF permission is unavailable: $e');
+      return false;
     }
   }
 

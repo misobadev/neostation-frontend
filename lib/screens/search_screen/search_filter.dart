@@ -1,3 +1,4 @@
+import '../../utils/game_rating.dart';
 import '../../utils/game_name_sort.dart';
 import 'package:neostation/models/database_game_model.dart';
 import 'package:neostation/models/romm_rom.dart';
@@ -10,7 +11,7 @@ import 'package:neostation/models/romm_rom.dart';
 
 /// A stored rating as the 0..10 score the UI shows. Ratings are held on
 /// ScreenScraper's 0..20 scale and displayed out of 10 across the app.
-double searchRatingScore(double rating) => rating / 2;
+double searchRatingScore(double rating) => gameRatingScore(rating);
 
 /// The whole 1..10 score a game is filed under, or null when it is unrated.
 ///

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 
 import 'package:neostation/repositories/scraper_repository.dart';
@@ -84,8 +85,40 @@ class _DiscGroup {
   _DiscGroup({required this.displayBaseName, required this.normalizedGroupKey});
 }
 
+/// The Storage Access Framework calls the organiser makes, in one place so a
+/// test can stand in for Android's document provider.
+class OrganizerSaf {
+  const OrganizerSaf();
+
+  Future<List<Map<String, dynamic>>> listFiles(String uri) =>
+      SafDirectoryService.listFiles(uri);
+
+  Future<bool> hasPermission(String uri) =>
+      SafDirectoryService.hasPermission(uri);
+
+  Future<String?> createDirectory(String parentUri, String name) =>
+      SafDirectoryService.createDirectory(parentUri, name);
+
+  Future<bool> moveFile(
+    String sourceUri,
+    String targetDirectoryUri,
+    String name,
+  ) => SafDirectoryService.moveFile(sourceUri, targetDirectoryUri, name);
+
+  Future<bool> writeTextFile(String parentUri, String name, String contents) =>
+      SafDirectoryService.writeTextFile(parentUri, name, contents);
+}
+
 class RomFolderOrganizerService {
   static final _log = LoggerService.instance;
+
+  /// Replaceable so a test can organise a fake SAF tree.
+  @visibleForTesting
+  static OrganizerSaf saf = const OrganizerSaf();
+
+  /// Puts the real [saf] back.
+  @visibleForTesting
+  static void debugReset() => saf = const OrganizerSaf();
 
   // Matches common multi-disc markers such as: Disc 1, Disk1, CD 2, (Disc 03)
   static final RegExp _discTokenRegex = RegExp(
@@ -111,6 +144,13 @@ class RomFolderOrganizerService {
     for (final rootPath in romRoots) {
       if (_isM3uDirectory(rootPath)) continue;
       if (rootPath.startsWith('content://')) {
+        // The grant is held on the folder as picked (a tree URI). Check it
+        // here: the folders found inside have document URIs, which never
+        // match it, and without the grant the listing below comes back empty.
+        if (!await saf.hasPermission(rootPath)) {
+          result.rootsSkipped++;
+          continue;
+        }
         if (allowedFolders == null) {
           scanRoots.add(rootPath);
         } else {
@@ -173,7 +213,7 @@ class RomFolderOrganizerService {
     Set<String> allowedFolders,
   ) async {
     final roots = <String>[];
-    final entries = await SafDirectoryService.listFiles(rootUri);
+    final entries = await saf.listFiles(rootUri);
     for (final entry in entries) {
       if (entry['isDirectory'] != true) continue;
       final name = entry['name']?.toString().toLowerCase();
@@ -364,11 +404,7 @@ class RomFolderOrganizerService {
 
     Future<void> collect(String directoryUri, String directoryName) async {
       if (_isM3uDirectory(directoryName)) return;
-      final entries = await SafDirectoryService.listFiles(directoryUri);
-      if (entries.isEmpty && directoryUri == rootUri) {
-        final permission = await SafDirectoryService.hasPermission(rootUri);
-        if (!permission) result.rootsSkipped++;
-      }
+      final entries = await saf.listFiles(directoryUri);
       directories[directoryUri] = _SafDirectory(
         name: directoryName,
         files: entries.where((entry) => entry['isDirectory'] != true).toList(),
@@ -438,7 +474,7 @@ class RomFolderOrganizerService {
       );
     }
 
-    final directoryEntries = await SafDirectoryService.listFiles(directoryUri);
+    final directoryEntries = await saf.listFiles(directoryUri);
     for (final group in groups.values) {
       final discNumbers = group.discFiles
           .map((file) => file.discNumber)
@@ -466,10 +502,7 @@ class RomFolderOrganizerService {
           ? null
           : matchingDirectories.first;
       if (targetUri == null) {
-        targetUri = await SafDirectoryService.createDirectory(
-          directoryUri,
-          folderBaseName,
-        );
+        targetUri = await saf.createDirectory(directoryUri, folderBaseName);
         if (targetUri == null) {
           _log.e('[M3U] Could not create SAF folder for $folderBaseName.');
           result.groupsFailed++;
@@ -490,11 +523,7 @@ class RomFolderOrganizerService {
               (entry) => entry['uri'].toString() == disc.file.path,
             )['name']
             .toString();
-        final moved = await SafDirectoryService.moveFile(
-          disc.file.path,
-          targetUri,
-          filename,
-        );
+        final moved = await saf.moveFile(disc.file.path, targetUri, filename);
         if (!moved) {
           _log.e(
             '[M3U] Stopped organizing $folderBaseName because $filename could not be moved.',
@@ -512,7 +541,7 @@ class RomFolderOrganizerService {
 
       final playlistName = '$folderBaseName.m3u';
       if (playlist != null) {
-        final moved = await SafDirectoryService.moveFile(
+        final moved = await saf.moveFile(
           playlist['uri'].toString(),
           targetUri,
           playlistName,
@@ -526,7 +555,7 @@ class RomFolderOrganizerService {
         }
         result.filesMoved++;
       }
-      if (await SafDirectoryService.writeTextFile(
+      if (await saf.writeTextFile(
         targetUri,
         playlistName,
         '${playlistLines.join('\n')}\n',

@@ -123,6 +123,25 @@ void main() {
       },
     );
 
+    test('returning from carousel to list retains Options until dismissal', () {
+      final r = _Recorder();
+      r.push('games_list');
+      r.push('games_carousel');
+      r.push('game_options_dialog', modal: true);
+      r.events.clear();
+
+      // The list's config listener requests activation before the carousel
+      // unmounts. Only the stack owner may receive that activation.
+      GamepadNavigationManager.reactivate();
+      r.pop('games_carousel');
+      expect(r.events, ['+game_options_dialog']);
+
+      r.events.clear();
+      r.pop('game_options_dialog');
+      expect(r.events, ['-game_options_dialog', '+games_list']);
+      r.pop('games_list');
+    });
+
     test('a modal still stacks on top of another modal', () {
       final r = _Recorder();
       r.push('app_screen');

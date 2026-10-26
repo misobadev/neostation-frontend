@@ -126,12 +126,13 @@ void main() {
     WidgetTester tester, {
     int selectedIndex = 1,
     SystemModel? system,
+    Size designSize = const Size(1920, 1080),
   }) async {
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(size: Size(1920, 1080)),
         child: ScreenUtilInit(
-          designSize: const Size(1920, 1080),
+          designSize: designSize,
           builder: (context, child) => MaterialApp(
             localizationsDelegates:
                 FlutterLocalization.instance.localizationsDelegates,
@@ -172,6 +173,22 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
   }
+
+  testWidgets('cloud mark matches the resolved row font on desktop', (
+    tester,
+  ) async {
+    useProvider(_FakeSync(GameSyncStatus.upToDate));
+    await pumpList(tester, designSize: const Size(640, 480));
+    final title = tester.element(find.text('A Link to the Past'));
+    final fontSize = DefaultTextStyle.of(title).style.fontSize!;
+    expect(
+      tester
+          .widget<Icon>(find.byIcon(Symbols.check_circle_outline_rounded))
+          .size,
+      fontSize,
+    );
+    await drain(tester);
+  });
 
   testWidgets('the mark is on the selected row and nowhere else', (
     tester,

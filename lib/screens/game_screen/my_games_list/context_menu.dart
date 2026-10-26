@@ -1,36 +1,40 @@
 part of '../my_games_list.dart';
 
-/// The Y-button game context menu for the system games list.
+/// The Start-button Options menu for the games screen.
 ///
-/// Y used to toggle the favourite directly; it now opens an anchored menu that
-/// starts on `Settings`, with the favourite one submenu away in the `Add to…`
-/// checklist. With the vertical action rail gone this menu is also the
-/// only route to the view-level actions (view mode, random) for a user without
-/// a gamepad, so it carries those below a separator — and a long-press on a row
-/// opens it, which is what [_openGameContextMenuFor] is for. Scrape rides along
-/// for the same reason: Select + A is the only other way to reach it from a
-/// games view, and that chord needs a gamepad.
+/// Start opens the same left-side panel in every view. It carries the actions
+/// that used to live on Y (settings, scrape, identify, memberships) and the
+/// view-level ones that used to sit on X (search, view mode, random). The
+/// gamepad's Y and X are unbound here now; long-press still opens the panel,
+/// which is the touch route to it.
 extension _ContextMenu on _SystemGamesListState {
-  /// Long-press entry point: selects [game] first so the menu anchors to its
-  /// row, then opens the menu once that row has been laid out with the anchor
-  /// key attached (the key follows the *selected* row, so opening in the same
-  /// frame would anchor to whichever row was selected before the press).
-  Future<void> _openGameContextMenuFor(GameModel game) async {
+  /// Long-press entry point: selects [game] first, then opens the panel.
+  Future<void> _openGameOptionsFor(GameModel game) async {
     if (!identical(game, _selectedGame)) {
       await _selectGame(game);
       if (!mounted) return;
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
     }
-    await _openGameContextMenu();
+    await _openGameOptions();
   }
 
-  /// Opens the context menu for the selected game.
+  /// Guards against a rapid second Start stacking two panels.
+  Future<void> _openGameOptions() async {
+    if (_gameOptionsOpen) return;
+    _gameOptionsOpen = true;
+    try {
+      await _showGameOptions();
+    } finally {
+      _gameOptionsOpen = false;
+    }
+  }
+
+  /// Opens the Options panel for the selected game.
   ///
-  /// Music keeps Y = favourite (the music library has its own toggle branch),
-  /// and folder rows have no memberships at all, so both bail out before the
-  /// menu is built — mirroring [_toggleFavorite]'s guards.
-  Future<void> _openGameContextMenu() async {
+  /// Music keeps its own Y = favourite shortcut, and folder rows have no
+  /// memberships at all, so both bail out before the panel is built.
+  Future<void> _showGameOptions() async {
     final game = _selectedGame;
     if (game == null) return;
     if (_isFolderEntry(game)) return;
@@ -44,23 +48,18 @@ extension _ContextMenu on _SystemGamesListState {
     final collectionsProvider = context.read<CollectionsProvider>();
 
     // Membership is never held in memory (the second engine may have changed
-    // it), so resolve it before the menu is built — the menu must not resize
-    // under the cursor.
+    // it), so resolve it before the panel is built.
     final memberIds = await collectionsProvider.collectionIdsFor(game);
     if (!mounted) return;
 
     // Set when a toggle takes the game out of the bucket this very list *is*,
-    // which leaves the loaded list stale. The reload waits for the menu to
-    // close: the panel is anchored to the selected row, so pulling that row out
-    // from under it mid-checklist would move the menu — or strand it over a
-    // different game — half way through a run of changes.
+    // which leaves the loaded list stale. The reload waits for the panel to
+    // close so the row being read does not move mid-checklist.
     var reloadWhenClosed = false;
 
     // Scrape resolves the ScreenScraper platform from the game's *own* system,
     // so an aggregate view's id is no use: `all` / `favorites` have no mapping
-    // and `collection:<uuid>` has no `app_systems` row at all. A game with
-    // neither is one [_scrapeSelectedGame] would drop on the floor, so the row
-    // is left off rather than offered and ignored.
+    // and `collection:<uuid>` has no `app_systems` row at all.
     final canScrape = (game.systemId ?? widget.system.id) != null;
 
     final targets = <GameContextMenuTarget>[
@@ -81,7 +80,9 @@ extension _ContextMenu on _SystemGamesListState {
           return applied;
         },
       ),
-      for (final collection in collectionsProvider.collections)
+      for (final collection in collectionsProvider.collections.where(
+        (c) => !c.isSmart,
+      ))
         GameContextMenuTarget(
           id: '${SystemFolderNames.collectionPrefix}${collection.id}',
           label: collection.name,
@@ -104,40 +105,45 @@ extension _ContextMenu on _SystemGamesListState {
     ];
 
     // Membership changes land live, but a game leaving the favourites block
-    // must not move the row this menu is anchored to. Held until it closes.
+    // must not move the row the panel was opened from.
     _deferFavoriteReseat = true;
 
-    await showGameContextMenu(
+    final action = await showGameOptionsDialog(
       context: context,
+      gameTitle: game.name,
       targets: targets,
-      anchorKey: _selectedItemKey,
-      onSettings: _openGameSettingsDialog,
-      onCreateTarget: () => _createCollectionFromMenu(game),
+      canScrape: canScrape,
+      canIdentify: canScrape && (game.romPath?.isNotEmpty ?? false),
       createTargetLabel: AppLocale.newCollection.getString(context),
-      // The view-independent path, in every view. It feeds `_scrapeProgress`
-      // and `_selectedScrapeStatus`, which the details card renders as its own
-      // progress panel, so the list view loses nothing by not going through the
-      // card's registered action — and grid and carousel, which have no card to
-      // register one, work off the same call.
-      onScrape: canScrape ? _scrapeSelectedGame : null,
-      // Identify… stores a pick against the ROM's own row, so it also needs a
-      // ROM path to store it on.
-      onIdentify: canScrape && (game.romPath?.isNotEmpty ?? false)
-          ? _identifySelectedGame
-          : null,
-      onViewMode: () =>
-          GameViewModeDropdown.globalKey.currentState?.showDropdown(),
-      onRandom: _showRandomGameDialog,
-      onSearch: _openSearchFromMenu,
     );
 
     _deferFavoriteReseat = false;
     if (!mounted) return;
 
+    switch (action) {
+      case GameOptionsAction.settings:
+        _openGameSettingsDialog();
+      case GameOptionsAction.scrape:
+        _scrapeSelectedGame();
+      case GameOptionsAction.identify:
+        await _identifySelectedGame();
+      case GameOptionsAction.search:
+        await _openSearchFromMenu();
+      case GameOptionsAction.random:
+        _showRandomGameDialog();
+      case GameOptionsAction.newCollection:
+        await _createCollectionFromMenu(game);
+      case null:
+        break;
+    }
+
+    if (!mounted) return;
+
     // A reload rebuilds the list from the database in load order, which seats
     // everything correctly on its own — so the held moves are only owed when
     // there is no reload coming.
-    if (reloadWhenClosed) {
+    if (reloadWhenClosed || _pendingCollectionRefresh) {
+      _pendingCollectionRefresh = false;
       _pendingFavoriteReseats.clear();
       await _loadGames();
       return;

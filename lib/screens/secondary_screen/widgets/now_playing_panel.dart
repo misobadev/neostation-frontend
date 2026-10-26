@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../models/secondary_display_state.dart';
 import '../now_playing_helpers.dart';
+import '../../../l10n/app_locale.dart';
 import 'status_readout.dart';
 
 /// The Now Playing page shown on the secondary display: boxart + game/system
@@ -67,7 +69,9 @@ class NowPlayingPanel extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'NOW PLAYING',
+                        AppLocale.nowPlayingTitle
+                            .getString(context)
+                            .toUpperCase(),
                         style: TextStyle(
                           color: scheme.primary,
                           fontSize: 14.r,
@@ -101,15 +105,22 @@ class NowPlayingPanel extends StatelessWidget {
                       buildNowPlayingStat(
                         scheme: scheme,
                         icon: Symbols.schedule_rounded,
-                        label: 'PLAY TIME',
-                        text: formatPlayTime(value.playTimeSeconds),
+                        label: AppLocale.playTime
+                            .getString(context)
+                            .toUpperCase(),
+                        text: formatPlayTime(
+                          value.playTimeSeconds,
+                          (key) => key.getString(context),
+                        ),
                       ),
                       if (sessionRunning) ...[
                         SizedBox(height: 12.r),
                         buildNowPlayingStat(
                           scheme: scheme,
                           icon: Symbols.timer_rounded,
-                          label: 'SESSION',
+                          label: AppLocale.nowPlayingSession
+                              .getString(context)
+                              .toUpperCase(),
                           text: sessionTime,
                         ),
                       ],
@@ -117,12 +128,17 @@ class NowPlayingPanel extends StatelessWidget {
                       buildNowPlayingStat(
                         scheme: scheme,
                         icon: Symbols.history_rounded,
-                        label: 'LAST PLAYED',
-                        text: formatLastPlayed(value.lastPlayedMillis),
+                        label: AppLocale.nowPlayingLastPlayed
+                            .getString(context)
+                            .toUpperCase(),
+                        text: formatLastPlayed(
+                          value.lastPlayedMillis,
+                          (key) => key.getString(context),
+                        ),
                       ),
                       if (value.screenshotAccessEnabled) ...[
                         SizedBox(height: 28.r),
-                        _buildScreenshotButton(scheme),
+                        _buildScreenshotButton(context, scheme),
                       ],
                     ],
                   ),
@@ -150,7 +166,7 @@ class NowPlayingPanel extends StatelessWidget {
 
   /// Tappable pill that asks the main engine to capture a system screenshot of
   /// the main screen.
-  Widget _buildScreenshotButton(ColorScheme scheme) {
+  Widget _buildScreenshotButton(BuildContext context, ColorScheme scheme) {
     return GestureDetector(
       onTap: onRequestScreenshot,
       child: Container(
@@ -170,7 +186,7 @@ class NowPlayingPanel extends StatelessWidget {
             ),
             SizedBox(width: 12.r),
             Text(
-              'SCREENSHOT',
+              AppLocale.screenshot.getString(context).toUpperCase(),
               style: TextStyle(
                 color: scheme.onSurface,
                 fontSize: 14.r,

@@ -160,8 +160,9 @@ void main() {
 
   Future<void> pumpShell(
     WidgetTester tester,
-    RetroAchievementsProvider provider,
-  ) async {
+    RetroAchievementsProvider provider, {
+    Size designSize = const Size(1280, 720),
+  }) async {
     tester.view.physicalSize = const Size(1280, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -180,7 +181,7 @@ void main() {
           ChangeNotifierProvider(create: (_) => RommProvider()),
         ],
         child: ScreenUtilInit(
-          designSize: const Size(1280, 720),
+          designSize: designSize,
           builder: (context, _) => MaterialApp(
             localizationsDelegates:
                 FlutterLocalization.instance.localizationsDelegates,
@@ -252,6 +253,25 @@ void main() {
     await tester.tap(find.text(AppLocale.en[AppLocale.raAwards]!).first);
     await tester.pumpAndSettle();
     expect(find.byType(RaCollectionPage), findsOneWidget);
+  });
+
+  testWidgets('awards header and inherited text scale with the page', (
+    tester,
+  ) async {
+    await pumpShell(
+      tester,
+      _DashboardProvider(),
+      designSize: const Size(640, 480),
+    );
+    await tester.tap(find.text(AppLocale.en[AppLocale.raAwards]!).first);
+    await tester.pumpAndSettle();
+    final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(appBar.toolbarHeight, 32.r);
+    expect(appBar.titleTextStyle?.fontSize, 14.r);
+    expect(appBar.iconTheme?.size, 16.r);
+    final empty = find.text(AppLocale.en[AppLocale.noAwardsYet]!);
+    final context = tester.element(empty);
+    expect(DefaultTextStyle.of(context).style.fontSize, 11.r);
   });
 
   testWidgets('recent unlocks has a dedicated full-screen destination', (

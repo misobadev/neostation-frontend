@@ -162,3 +162,16 @@ String redactSecrets(String text) {
   );
   return result;
 }
+
+/// Control characters, line breaks included.
+final RegExp _controlCharacters = RegExp(r'[\x00-\x1f\x7f\u0085\u2028\u2029]');
+
+/// [text] made safe to embed in one log line: every control character (line
+/// breaks and tabs included) and Unicode's line and paragraph separators
+/// become a space.
+///
+/// For text that comes from outside the app, such as a file or platform name
+/// a server supplied: a name with a line break in it could otherwise forge
+/// log lines that the app never wrote. It does not redact anything; that is
+/// [redactSecrets]'s job, applied to every line regardless.
+String oneLine(String text) => text.replaceAll(_controlCharacters, ' ');

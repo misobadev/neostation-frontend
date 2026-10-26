@@ -453,74 +453,102 @@ class SqliteConfigService {
   // older whole-config save cannot revert a concurrent import.
   static Future<void> saveConfig(ConfigModel config) async {
     try {
-      await SqliteService.saveUserConfig(
-        lastScan: config.lastScan?.toIso8601String(),
-        gameViewMode: config.gameViewMode,
-        systemViewMode: config.systemViewMode,
-        showGameInfo: config.showGameInfo ? 1 : 0,
-        isFullscreen: config.isFullscreen ? 1 : 0,
-        bartopExitPoweroff: config.bartopExitPoweroff ? 1 : 0,
-        scanOnStartup: config.scanOnStartup ? 1 : 0,
-        ignoreHiddenFiles: config.ignoreHiddenFiles ? 1 : 0,
-        ignoreArticlesInGameSort: config.ignoreArticlesInGameSort ? 1 : 0,
-        setupCompleted: config.setupCompleted ? 1 : 0,
-        hideBottomScreen: config.hideBottomScreen ? 1 : 0,
-        videoSound: config.videoSound ? 1 : 0,
-        sfxEnabled: config.sfxEnabled ? 1 : 0,
-        sfxVolume: config.sfxVolume,
-        use12HourClock: config.use12HourClock ? 1 : 0,
-        systemSortBy: config.systemSortBy,
-        systemSortOrder: config.systemSortOrder,
-        collectionSortBy: config.collectionSortBy,
-        collectionSortOrder: config.collectionSortOrder,
-        appLanguage: config.appLanguage,
-        hideRecentCard: config.hideRecentCard ? 1 : 0,
-        recentCardSize: config.recentCardSize,
-        gameDetailsTab: config.gameDetailsTab,
-        hideTabSync: config.hideTabSync ? 1 : 0,
-        hideTabAchievements: config.hideTabAchievements ? 1 : 0,
-        hideTabScraper: config.hideTabScraper ? 1 : 0,
-        hideTabRomm: config.hideTabRomm ? 1 : 0,
-        hideSearchCard: config.hideSearchCard ? 1 : 0,
-        androidAppsAsTab: config.androidAppsAsTab ? 1 : 0,
-        activeSyncProvider: config.activeSyncProvider,
-        autoUpdateApp: config.autoUpdateApp ? 1 : 0,
-        autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
-        systemGridColumns: config.systemGridColumns,
-        gameGridColumns: config.gameGridColumns,
-        gameListSize: config.gameListSize,
-        gameCarouselCardStyle: config.gameCarouselCardStyle,
-        dockApps: jsonEncode(config.dockApps),
-        dockEnabled: config.dockEnabled ? 1 : 0,
-        dockSlotCount: config.dockSlotCount,
-        nowPlayingDimDelay: config.nowPlayingDimDelay,
-        nowPlayingDimLevel: config.nowPlayingDimLevel,
-        fanartDimLevel: config.fanartDimLevel,
-        esdeFolderPath: config.esdeFolderPath,
-        showAchievementsBadge: config.showAchievementsBadge ? 1 : 0,
-        showCloudSyncIcon: config.showCloudSyncIcon ? 1 : 0,
-        raMatchOnStartup: config.raMatchOnStartup ? 1 : 0,
-        subfolderViewAll: config.subfolderViewAll ? 1 : 0,
-        hideSystemLogos: config.hideSystemLogos ? 1 : 0,
-        neoglassBlur: config.neoglassBlur,
-        neoglassTransparency: config.neoglassTransparency,
-        neoglassBorderWidth: config.neoglassBorderWidth,
-      );
+      // One transaction, so a save that fails partway (say, the folders after
+      // the settings) stores nothing rather than half the config, and the
+      // provider's revert leaves memory matching the database.
+      final db = await SqliteService.getDatabase();
+      await db.transaction((_) async {
+        await SqliteService.saveUserConfig(
+          lastScan: config.lastScan?.toIso8601String(),
+          gameViewMode: config.gameViewMode,
+          systemViewMode: config.systemViewMode,
+          showGameInfo: config.showGameInfo ? 1 : 0,
+          isFullscreen: config.isFullscreen ? 1 : 0,
+          bartopExitPoweroff: config.bartopExitPoweroff ? 1 : 0,
+          scanOnStartup: config.scanOnStartup ? 1 : 0,
+          ignoreHiddenFiles: config.ignoreHiddenFiles ? 1 : 0,
+          ignoreArticlesInGameSort: config.ignoreArticlesInGameSort ? 1 : 0,
+          setupCompleted: config.setupCompleted ? 1 : 0,
+          hideBottomScreen: config.hideBottomScreen ? 1 : 0,
+          videoSound: config.videoSound ? 1 : 0,
+          sfxEnabled: config.sfxEnabled ? 1 : 0,
+          sfxVolume: config.sfxVolume,
+          use12HourClock: config.use12HourClock ? 1 : 0,
+          systemSortBy: config.systemSortBy,
+          systemSortOrder: config.systemSortOrder,
+          collectionSortBy: config.collectionSortBy,
+          collectionSortOrder: config.collectionSortOrder,
+          appLanguage: config.appLanguage,
+          hideRecentCard: config.hideRecentCard ? 1 : 0,
+          recentCardSize: config.recentCardSize,
+          gameDetailsTab: config.gameDetailsTab,
+          hideTabSync: config.hideTabSync ? 1 : 0,
+          hideTabAchievements: config.hideTabAchievements ? 1 : 0,
+          hideTabScraper: config.hideTabScraper ? 1 : 0,
+          hideTabRomm: config.hideTabRomm ? 1 : 0,
+          hideSearchCard: config.hideSearchCard ? 1 : 0,
+          androidAppsAsTab: config.androidAppsAsTab ? 1 : 0,
+          activeSyncProvider: config.activeSyncProvider,
+          autoUpdateApp: config.autoUpdateApp ? 1 : 0,
+          autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
+          systemGridColumns: config.systemGridColumns,
+          gameGridColumns: config.gameGridColumns,
+          gameListSize: config.gameListSize,
+          gameCarouselCardStyle: config.gameCarouselCardStyle,
+          dockApps: jsonEncode(config.dockApps),
+          dockEnabled: config.dockEnabled ? 1 : 0,
+          dockSlotCount: config.dockSlotCount,
+          nowPlayingDimDelay: config.nowPlayingDimDelay,
+          nowPlayingDimLevel: config.nowPlayingDimLevel,
+          fanartDimLevel: config.fanartDimLevel,
+          esdeFolderPath: config.esdeFolderPath,
+          showAchievementsBadge: config.showAchievementsBadge ? 1 : 0,
+          showCloudSyncIcon: config.showCloudSyncIcon ? 1 : 0,
+          raMatchOnStartup: config.raMatchOnStartup ? 1 : 0,
+          subfolderViewAll: config.subfolderViewAll ? 1 : 0,
+          hideSystemLogos: config.hideSystemLogos ? 1 : 0,
+          neoglassBlur: config.neoglassBlur,
+          neoglassTransparency: config.neoglassTransparency,
+          neoglassBorderWidth: config.neoglassBorderWidth,
+        );
 
-      await SqliteService.saveUserRomFolders(config.romFolders);
+        await SqliteService.saveUserRomFolders(config.romFolders);
 
-      for (final entry in config.emulators.entries) {
-        if (entry.value.detected && entry.value.path.isNotEmpty) {
-          await SqliteService.saveDetectedEmulatorPath(
-            emulatorName: entry.value.name,
-            emulatorPath: entry.value.path,
-          );
+        for (final entry in config.emulators.entries) {
+          if (entry.value.detected && entry.value.path.isNotEmpty) {
+            await SqliteService.saveDetectedEmulatorPath(
+              emulatorName: entry.value.name,
+              emulatorPath: entry.value.path,
+            );
+          }
         }
-      }
+      });
     } catch (e) {
       _log.e('Error saving config to SQLite: $e');
       rethrow;
     }
+  }
+
+  /// Deletes a ROM folder and its games and saves [config], which must no
+  /// longer list it, in one transaction.
+  ///
+  /// A failure partway stores none of it. Done step by step, a failure could
+  /// leave the games deleted with the folder kept, or the folder row deleted
+  /// while the caller, believing the removal had failed, still listed it, and
+  /// the next config save wrote it back.
+  static Future<void> removeRomFolder(
+    String folderPath,
+    ConfigModel config,
+  ) async {
+    assert(!config.romFolders.contains(folderPath));
+    final db = await SqliteService.getDatabase();
+    await db.transaction((_) async {
+      await SqliteService.deleteRomsByFolderPath(folderPath);
+      // saveConfig can't remove the last folder: saveUserRomFolders ignores an
+      // empty list so a blanket save never wipes the folders.
+      await SqliteService.removeRomFolder(folderPath);
+      await saveConfig(config);
+    });
   }
 
   /// Retrieves all supported systems from the repository.

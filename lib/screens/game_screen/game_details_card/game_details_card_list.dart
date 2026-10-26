@@ -1468,7 +1468,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       if (!mounted) return;
       AppNotification.showNotification(
         context,
-        'Error: System ID is missing.',
+        AppLocale.errorSystemNotFound.getString(context),
         type: NotificationType.error,
       );
       return;
@@ -1480,7 +1480,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       if (!mounted) return;
       AppNotification.showNotification(
         context,
-        'Please log in to ScreenScraper in the Scraping tab first.',
+        AppLocale.loginToScrape.getString(context),
         type: NotificationType.info,
       );
       return;

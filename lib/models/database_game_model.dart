@@ -4,6 +4,13 @@
 /// emulator configurations, and extensive metadata from services like ScreenScraper
 /// and RetroAchievements.
 class DatabaseGameModel {
+  /// Preferred scraped title, then stored title, then the ROM filename.
+  String get displayTitle => (screenscraperRealName?.trim().isNotEmpty ?? false)
+      ? screenscraperRealName!
+      : (realName?.trim().isNotEmpty ?? false)
+      ? realName!
+      : filename;
+
   /// Internal system identifier (e.g., 'nes', 'psx').
   final String? appSystemId;
 

@@ -1198,7 +1198,8 @@ class GamepadNavigation {
           key == LogicalKeyboardKey.arrowRight ||
           key == LogicalKeyboardKey.enter ||
           key == LogicalKeyboardKey.backspace ||
-          key == LogicalKeyboardKey.escape) {
+          key == LogicalKeyboardKey.escape ||
+          key == LogicalKeyboardKey.contextMenu) {
         return true;
       }
       return false;
@@ -1267,7 +1268,10 @@ class GamepadNavigation {
         onFavorite?.call();
       }
       handled = true;
-    } else if (key == LogicalKeyboardKey.escape) {
+    } else if (key == LogicalKeyboardKey.escape ||
+        // A TV remote's ≡ (Android's Menu key) arrives as a keyboard key, not
+        // through the gamepad plugin: it is the remote's Start.
+        key == LogicalKeyboardKey.contextMenu) {
       if (isKeyDown) {
         SfxService().playNavSound();
         onSettings?.call();

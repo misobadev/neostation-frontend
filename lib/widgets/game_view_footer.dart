@@ -246,34 +246,26 @@ class GameViewFooter extends StatelessWidget {
                 SfxService().playEnterSound();
                 onPlay();
               },
-              child: Padding(
-                padding: EdgeInsets.only(left: 8.r, right: 10.r),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/images/gamepad/Xbox_A_button.png',
-                      width: 20.r,
-                      height: 20.r,
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12.r),
+                  child: Text(
+                    isFolder
+                        // Same word the systems view uses for descending into
+                        // a container; upper-cased to match PLAY beside it.
+                        ? AppLocale.enter.getString(context).toUpperCase()
+                        : AppLocale.playButton.getString(context),
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
                       color: Theme.of(context).colorScheme.onPrimary,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11.r,
+                      letterSpacing: 1.5,
+                      height: 1.0,
                     ),
-                    SizedBox(width: 5.r),
-                    Text(
-                      isFolder
-                          // Same word the systems view uses for descending into
-                          // a container; upper-cased to match PLAY beside it.
-                          ? AppLocale.enter.getString(context).toUpperCase()
-                          : AppLocale.playButton.getString(context),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 11.r,
-                        letterSpacing: 1.5,
-                        height: 1.0,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

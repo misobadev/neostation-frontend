@@ -7,31 +7,18 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/models/config_model.dart';
 import 'package:neostation/services/game_service.dart';
-import 'package:neostation/widgets/core_footer.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 
 import '../themes/corner_radii.dart';
 
-class HeaderSortDropdown extends StatefulWidget {
-  static final GlobalKey<HeaderSortDropdownState> globalKey =
-      GlobalKey<HeaderSortDropdownState>();
-
-  HeaderSortDropdown() : super(key: globalKey);
-
-  @override
-  State<HeaderSortDropdown> createState() => HeaderSortDropdownState();
-}
-
-/// Opens the systems view/sort picker.
+/// Opens the view/sort picker used by the collections browser.
 ///
-/// This is the picker the systems screen's X button reaches, hoisted out of
-/// [HeaderSortDropdownState] so any screen built from the systems grid/carousel
-/// widgets can open the *same* menu rather than growing a lookalike. The
-/// collections browser calls it with [includeSorting] false: view mode and card
-/// size drive its cards exactly as they drive the systems screen's, while
-/// release year / manufacturer describe hardware and mean nothing for a
-/// collection.
+/// The systems screen moved its display and sorting controls into the centered
+/// Options dialog, so this picker is no longer reached from the app header.
+/// Collections still uses it: view mode and card size drive its cards exactly
+/// as they drive the systems screen's, while release year / manufacturer
+/// describe hardware and mean nothing for a collection.
 ///
 /// [includeCardStyle] adds the box-art/fanart row. Systems cards are drawn from
 /// theme artwork and have no such choice, but a collection card previews the
@@ -105,32 +92,6 @@ Future<void> showSystemViewDropdown(
       final style = result.substring('card_style_'.length);
       await configProvider.updateGameCarouselCardStyle(style);
     }
-  }
-}
-
-class HeaderSortDropdownState extends State<HeaderSortDropdown> {
-  final GlobalKey _buttonKey = GlobalKey();
-
-  void showDropdown() {
-    showSystemViewDropdown(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: _buttonKey,
-      margin: EdgeInsets.symmetric(horizontal: 10.r),
-      child: GamepadControl(
-        label: AppLocale.viewMode.getString(context),
-        iconPath: 'assets/images/gamepad/Xbox_X_button.png',
-        onTap: () {
-          SfxService().playNavSound();
-          showSystemViewDropdown(context);
-        },
-        backgroundColor: Theme.of(context).colorScheme.tertiaryFixed,
-        textColor: Theme.of(context).colorScheme.onTertiaryFixed,
-      ),
-    );
   }
 }
 

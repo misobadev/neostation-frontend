@@ -217,6 +217,11 @@ class _RaPageScaffold extends StatelessWidget {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 32.r,
+        leadingWidth: 32.r,
+        titleSpacing: 8.r,
+        titleTextStyle: theme.textTheme.titleMedium?.copyWith(fontSize: 14.r),
+        iconTheme: IconThemeData(size: 16.r, color: theme.colorScheme.primary),
         leading: IconButton(
           onPressed: onBack,
           icon: const Icon(Symbols.arrow_back_rounded),
@@ -224,7 +229,7 @@ class _RaPageScaffold extends StatelessWidget {
         ),
         title: Row(
           children: [
-            Icon(icon, size: 20.r, color: theme.colorScheme.primary),
+            Icon(icon, size: 16.r, color: theme.colorScheme.primary),
             SizedBox(width: 8.r),
             Text(title),
           ],
@@ -232,7 +237,16 @@ class _RaPageScaffold extends StatelessWidget {
       ),
       body: Padding(
         padding: EdgeInsets.fromLTRB(12.r, 8.r, 12.r, 12.r),
-        child: child,
+        // Inherited collection labels must scale alongside explicit .r sizes.
+        child: Theme(
+          data: theme.copyWith(
+            textTheme: theme.textTheme.apply(fontSizeFactor: 11.r / 14),
+          ),
+          child: DefaultTextStyle(
+            style: theme.textTheme.bodyMedium!.copyWith(fontSize: 11.r),
+            child: child,
+          ),
+        ),
       ),
     );
   }

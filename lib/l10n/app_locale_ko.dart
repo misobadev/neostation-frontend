@@ -1,6 +1,43 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleKo = {
+  AppLocale.smartMatchesOne: '일치하는 게임 1개',
+  AppLocale.smartCollection: '스마트 컬렉션',
+  AppLocale.manualCollection: '수동 컬렉션',
+  AppLocale.smartEditRules: '규칙 편집',
+  AppLocale.smartMatchAll: '모든 규칙 일치',
+  AppLocale.smartMatchAny: '하나 이상의 규칙 일치',
+  AppLocale.smartAddRule: '규칙 추가',
+  AppLocale.smartChooseValue: '값 선택',
+  AppLocale.smartCustomValue: '값 입력',
+  AppLocale.smartMatches: '일치하는 게임 {count}개',
+  AppLocale.smartInvalidRules: '규칙을 읽을 수 없습니다. 편집하여 컬렉션을 복원하세요.',
+  AppLocale.smartInvalidValue: '이 규칙에 유효한 값을 입력하세요.',
+  AppLocale.smartNoMatches: '아직 이 규칙에 일치하는 게임이 없습니다.',
+  AppLocale.smartPreviewError: '미리 보기를 불러올 수 없습니다. 다시 시도하세요.',
+  AppLocale.smartYes: '예',
+  AppLocale.smartNo: '아니요',
+  AppLocale.smartDone: '완료',
+  AppLocale.smartLower: '최소',
+  AppLocale.smartUpper: '최대',
+  AppLocale.smartRating: '평점 (0–10)',
+  AppLocale.smartPlayed: '플레이함',
+  AppLocale.smartIs: '같음',
+  AppLocale.smartIsNot: '다름',
+  AppLocale.smartContains: '포함',
+  AppLocale.smartNotContains: '포함하지 않음',
+  AppLocale.smartBefore: '이전',
+  AppLocale.smartAfter: '이후',
+  AppLocale.smartAtLeast: '이상',
+  AppLocale.smartAtMost: '이하',
+  AppLocale.smartBetween: '범위',
+  AppLocale.smartWithinDays: '최근 기간 내',
+  AppLocale.smartNotWithinDays: '최근 기간 외',
+  AppLocale.smartDays: '{count}일',
+  AppLocale.smartDaysOne: '{count}일',
+  AppLocale.smartDaysFew: '{count}일',
+  AppLocale.collectionLoadError: '이 컬렉션의 게임을 불러올 수 없습니다.',
+  AppLocale.smartRulesOnly: '이 규칙에 따라 게임이 자동으로 포함됩니다.',
   AppLocale.customSounds: "사용자 지정 효과음",
   AppLocale.customSoundsSubtitle: "이동, 확인, 뒤로 가기 효과음 선택",
   AppLocale.customSoundsHint: "WAV, MP3, OGG 또는 FLAC · 최대 5초 및 5 MiB",
@@ -310,8 +347,22 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.cleanOrphanedMetadataNothingFound: '고아 메타데이터를 찾을 수 없습니다.',
   AppLocale.cleanOrphanedMetadataDone:
       '{entries}개의 메타데이터 항목과 {files}개의 미디어 파일을 정리했습니다.',
+  AppLocale.cleanOrphanedMetadataDelete:
+      '고아 메타데이터 항목 {count}개가 데이터베이스와 디스크에서 삭제됩니다.',
+  AppLocale.cleanOrphanedMetadataDeleteOne:
+      '고아 메타데이터 항목 {count}개가 데이터베이스와 디스크에서 삭제됩니다.',
   AppLocale.cleanOrphanedMetadataEsdeSkippedSuffix:
-      '{count}개의 ES-DE 에서 가져온 항목은 그대로 유지되었습니다.',
+      ' ES-DE 에서 가져온 항목 {count}개는 그대로 유지됩니다.',
+  AppLocale.cleanOrphanedMetadataEsdeSkippedSuffixOne:
+      ' ES-DE 에서 가져온 항목 {count}개는 그대로 유지됩니다.',
+  AppLocale.cleanOrphanedMetadataNotRemoved:
+      ' 항목 {count}개를 제거하지 못했습니다. 도구를 다시 실행하세요.',
+  AppLocale.cleanOrphanedMetadataNotRemovedOne:
+      ' 항목 {count}개를 제거하지 못했습니다. 도구를 다시 실행하세요.',
+  AppLocale.cleanOrphanedMetadataNothingToDelete:
+      '삭제할 항목이 없습니다. 고아 메타데이터는 모두 ES-DE 에서 가져온 것이며, 이 도구는 이를 삭제하지 않습니다.',
+  AppLocale.cleanOrphanedMetadataMediaUnavailable:
+      'NeoStation 의 미디어 폴더를 찾을 수 없습니다. NeoStation 을 재시작한 후 다시 시도하세요.',
   AppLocale.cleanOrphanedMetadataFailed: '고아 메타데이터 정리 실패: {error}',
   AppLocale.rematchAchievements: 'RetroAchievements 게임 매칭',
   AppLocale.rommLinkLibrary: '라이브러리를 RomM에 연결',
@@ -354,6 +405,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.pressToRemoveFolder: '이 폴더를 제거하려면 확인을 누르세요',
   AppLocale.maxRomFoldersReached: 'ROM 폴더는 최대 5개까지 추가할 수 있습니다',
   AppLocale.romFolderRemoved: 'ROM 폴더가 제거되었습니다',
+  AppLocale.romFolderRemoveFailed: 'ROM 폴더를 제거하지 못했습니다: {error}',
+  AppLocale.romFolderAlreadyAdded: '이 폴더는 이미 ROM 폴더로 추가되어 있습니다',
   AppLocale.selectRomsFolder: 'ROM 폴더 선택',
   AppLocale.scanningSystem: '시스템 검색 중',
 
@@ -627,6 +680,18 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.hintScrape: '정보 가져오기',
   AppLocale.hintMoreActions: '더보기',
   AppLocale.hintOptions: '옵션',
+  AppLocale.gameOptionsThisGame: '이 게임',
+  AppLocale.gameOptionsView: '보기',
+  AppLocale.systemOptionsSelectedSystem: '선택한 시스템',
+  AppLocale.systemOptionsSystemView: '시스템 보기',
+  AppLocale.systemOptionsSystemLayout: '시스템 레이아웃',
+  AppLocale.systemOptionsGameSearch: '게임 검색',
+  AppLocale.systemOptionsSystemViewSubtitle: '시스템 표시 방법입니다.',
+  AppLocale.systemOptionsSystemSorting: '시스템 정렬',
+  AppLocale.systemOptionsSystemSortingSubtitle: '시스템 정렬 방법입니다.',
+  AppLocale.systemOptionsGameSettingsDescription: '에뮬레이터, 코어, 컨트롤 및 표시',
+  AppLocale.systemOptionsSearchDescription: '라이브러리 전체에서 게임 검색',
+  AppLocale.systemOptionsNoSystem: '게임 설정을 구성할 시스템을 선택하십시오.',
   AppLocale.addTo: '추가…',
   AppLocale.addedToCollection: '{name}에 추가했습니다',
   AppLocale.newCollection: '새 컬렉션…',
@@ -663,6 +728,25 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.cannotReadFolder: '이 폴더를 읽을 수 없습니다',
   AppLocale.noStorageFound: '저장소를 찾을 수 없습니다',
   AppLocale.lastPlayed: '마지막 플레이',
+  AppLocale.nowPlayingTitle: '플레이 중',
+  AppLocale.nowPlayingSession: '세션',
+  AppLocale.nowPlayingLastPlayed: '마지막 플레이',
+  AppLocale.launchAnApp: '앱 실행',
+  AppLocale.chooseAnApp: '앱 선택',
+  AppLocale.noAppsFound: '앱을 찾을 수 없습니다',
+  AppLocale.timeNever: '플레이 기록 없음',
+  AppLocale.timeYesterday: '어제',
+  AppLocale.timeDaysAgo: '{count}일 전',
+  AppLocale.timeHoursAgo: '{count}시간 전',
+  AppLocale.timeMinutesAgo: '{count}분 전',
+  AppLocale.timeJustNow: '방금 전',
+  AppLocale.clockAm: '오전',
+  AppLocale.clockPm: '오후',
+  AppLocale.clockTime12h: '{period} {time}',
+  AppLocale.playTimeHoursMinutes: '{h}시간 {m}분',
+  AppLocale.playTimeMinutes: '{m}분',
+  AppLocale.playTimeUnderMinute: '1분 미만',
+  AppLocale.raNewThisSession: '이번 세션 +{count}',
   AppLocale.apps: '앱',
   AppLocale.tracks: '트랙',
   AppLocale.games: '게임',
@@ -804,8 +888,13 @@ const Map<String, dynamic> appLocaleKo = {
       'NeoStation은 RetroArch 구성을 관리하고 게임 저장을 올바르게 동기화하려면 "모든 파일 액세스"가 필요합니다.\n\n다음 화면에서 이 권한을 부여해 주세요.',
   AppLocale.screenReturnAccess: '화면 복귀 권한',
   AppLocale.screenReturnAccessDesc:
-      '독에서 실행한 앱을 닫으면 플레이 중 화면으로 돌아오고 시스템 스크린샷을 사용할 수 있습니다. 현재 실행 중인 앱 이름만 읽으며 화면 내용은 수집하지 않습니다.',
+      'Dock에서 실행한 앱을 닫으면 플레이 중 화면으로 돌아오고 시스템 스크린샷을 사용할 수 있습니다. 현재 실행 중인 앱 이름만 읽으며 화면 내용은 수집하지 않습니다.',
   AppLocale.screenReturnAccessHint: 'NeoStation을 켠 뒤 허용을 누르세요',
+  AppLocale.screenReturnDialogTitle: '화면 복귀 사용',
+  AppLocale.screenReturnDialogBody:
+      'Dock에서 앱을 실행하려면 NeoStation에 화면 복귀 접근성 서비스가 필요합니다. 실행한 앱을 닫은 뒤 이 화면으로 돌아올 수 있게 해 줍니다. 이 서비스가 없으면 돌아올 방법이 없을 수 있습니다.',
+  AppLocale.screenReturnDialogSteps: '다음 화면의 서비스 목록에서 NeoStation을 찾아 켜세요.',
+  AppLocale.openSettings: '설정 열기',
   AppLocale.selectRomFolder: 'ROM 폴더 선택',
   AppLocale.romFolderSelected: 'ROM 폴더가 선택되었습니다!',
   AppLocale.chooseRomFolderDesc:
@@ -904,6 +993,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.platformNotSupported: '지원되지 않는 플랫폼',
   AppLocale.coreNotConfigured: '코어가 구성되지 않았습니다',
   AppLocale.coreNotInstalled: '코어 "{name}"이(가) 설치되지 않았습니다',
+  AppLocale.coreNotInstalledHint:
+      'RetroArch에서 코어가 설치되지 않았다고 보고합니다. Online Updater > Core Downloader에서 설치하세요.',
   AppLocale.retroArchNotFound: 'RetroArch를 찾을 수 없습니다',
   AppLocale.retroArchExecutableNotFound: 'RetroArch 실행 파일을 찾을 수 없습니다',
   AppLocale.coresDirectoryNotFound: '코어 폴더를 찾을 수 없습니다',
@@ -993,6 +1084,36 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.systemsUpdateDownloading: '시스템 구성 다운로드 중...',
   AppLocale.systemsUpdateCancelling: '취소하는 중...',
   AppLocale.systemsUpdateSyncing: '시스템 데이터베이스 동기화 중...',
+  AppLocale.waitingForRomStorage: 'ROM 저장소를 기다리는 중 ({attempt}/{max})...',
+  AppLocale.updatingSystemsList: '시스템 목록 업데이트 중...',
+  AppLocale.romsScanned: 'ROM 스캔을 마쳤습니다',
+  AppLocale.errorScanningRoms: 'ROM 스캔 중 오류가 발생했습니다',
+  AppLocale.romStorageNotReady: 'ROM 저장소가 준비되지 않았습니다. 기존 게임은 유지되었습니다.',
+  AppLocale.romFolderNotAddedTitle: 'ROM 폴더가 추가되지 않았습니다',
+  AppLocale.romFolderAddFailed: 'ROM 폴더를 저장하지 못했습니다: {error}',
+  AppLocale.romFolderSafMissingTitle: '저장소 접근 권한이 없는 ROM 폴더',
+  AppLocale.romFoldersSafMissingTitle: '저장소 접근 권한이 없는 ROM 폴더',
+  AppLocale.romFolderSafMissing:
+      'ROM 폴더를 읽을 수 없습니다. 설정 > 폴더에서 접근 권한을 다시 부여하세요.',
+  AppLocale.romFoldersSafMissing:
+      'ROM 폴더 {count}개를 읽을 수 없습니다. 설정 > 폴더에서 접근 권한을 다시 부여하세요.',
+  AppLocale.romStorageAccessRequired:
+      '저장소 접근 권한이 필요합니다. 파일 선택기로 ROM 폴더를 선택하세요.',
+  AppLocale.romFolderAccessDenied:
+      'ROM 폴더 {folder}에 접근할 수 없습니다. 저장소 권한을 확인하세요.',
+  AppLocale.romFolderUnreachableTitle: 'ROM 폴더를 사용할 수 없음',
+  AppLocale.romFoldersUnreachableTitle: 'ROM 폴더를 사용할 수 없음',
+  AppLocale.romFolderUnreachable:
+      'ROM 폴더 {folders}에 접근할 수 없습니다. 기존 게임은 유지되었습니다. {advice}',
+  AppLocale.romFoldersUnreachable:
+      '다음 ROM 폴더에 접근할 수 없습니다: {folders}. 기존 게임은 유지되었습니다. {advice}',
+  AppLocale.romFolderAdvicePortal:
+      '이 경로는 데스크톱 포털의 임시 권한에서 온 것이라 다시 사용할 수 없습니다. 설정 > 폴더에서 제거한 후 폴더를 다시 추가하세요.',
+  AppLocale.romFolderAdviceReconnect: '드라이브를 다시 연결하거나 설정 > 폴더에서 폴더를 제거하세요.',
+  AppLocale.noRomFolderTitle: 'ROM 폴더가 설정되지 않음',
+  AppLocale.noRomFolderConfigured:
+      'ROM 폴더가 설정되지 않아 스캔할 항목이 없었습니다. 기존 게임은 유지되었습니다. 설정 > 폴더에서 ROM 폴더를 다시 추가하세요.',
+  AppLocale.errorScanningRomsDetail: 'ROM 스캔 중 오류: {error}',
   AppLocale.systemsUpdateComplete: '시스템이 성공적으로 업데이트되었습니다!',
   AppLocale.systemsUpdateError: '시스템을 업데이트하지 못했습니다. 나중에 다시 시도해 주세요.',
 
@@ -1036,6 +1157,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.romDirectories: 'ROM 폴더',
   AppLocale.tools: '도구',
   AppLocale.toolsSubtitle: 'ROM 정리에 도움이 되는 도구',
+  AppLocale.toolsStillRunning: '도구가 아직 실행 중입니다. 완료될 때까지 기다려 주세요.',
   AppLocale.addRomFolder: 'ROM 폴더 추가',
   AppLocale.removeRomFolder: '제거',
   // RomM (원격 라이브러리 탐색 + 다운로드)
@@ -1067,6 +1189,18 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.rommTesting: '테스트 중...',
   AppLocale.rommConnectionSuccess: '연결에 성공했습니다',
   AppLocale.rommConnectionFailed: '연결에 실패했습니다',
+  AppLocale.rommErrorTls:
+      '보안(HTTPS) 연결을 설정할 수 없습니다. RomM 서버가 HTTPS를 사용하지 않는다면 http://로 시작하는 URL을 입력하세요.',
+  AppLocale.rommErrorUnreachable: 'RomM 서버에 연결할 수 없습니다: {error}',
+  AppLocale.rommErrorTimeout: 'RomM 서버가 제때 응답하지 않았습니다.',
+  AppLocale.rommErrorInvalidApiKey: 'API 키가 거부되었습니다.',
+  AppLocale.rommErrorUnexpectedStatus:
+      '서버가 오류로 응답했습니다({error}). URL이 RomM 서버를 가리키는지 확인하세요.',
+  AppLocale.rommErrorNotRomm: '이 URL은 RomM 서버처럼 응답하지 않았습니다. 서버 URL을 확인하세요.',
+  AppLocale.rommErrorServerStatus: 'RomM 서버가 오류로 응답했습니다({error}).',
+  AppLocale.rommErrorUnreadable: 'RomM 서버가 앱에서 읽을 수 없는 응답을 보냈습니다.',
+  AppLocale.rommErrorLoadFailed: 'RomM에서 불러오지 못했습니다. 다시 시도하세요.',
+  AppLocale.rommErrorSignInRejected: 'RomM 로그인이 거부되었습니다. 다시 로그인하세요.',
   AppLocale.rommConnectedAs: '{user}(으)로 연결됨',
   AppLocale.rommCredentialsRequired: '서버 URL, 사용자 이름, 비밀번호를 입력하세요',
   AppLocale.rommAuthPassword: '비밀번호',
@@ -1263,12 +1397,14 @@ const Map<String, dynamic> appLocaleKo = {
       'gamelists와 downloaded_media가 들어 있는 ES-DE 폴더를 선택하세요',
   AppLocale.esdeRunImport: 'ES-DE에서 가져오기',
   AppLocale.esdeRunImportSubtitle: '누락된 메타데이터를 채우고 ES-DE 아트워크를 대체 이미지로 사용합니다',
-  AppLocale.esdeImporting: 'ES-DE에서 가져오기',
+  AppLocale.esdeImporting: 'ES-DE에서 가져오는 중',
   AppLocale.esdeImportComplete: 'ES-DE 가져오기 완료',
   AppLocale.esdeImportNoFolder: '먼저 ES-DE 폴더를 선택하세요',
   AppLocale.esdeReset: 'ES-DE 가져오기 재설정',
   AppLocale.esdeResetSubtitle: '다시 가져올 수 있도록 가져온 메타데이터와 미디어 연결을 제거합니다',
-  AppLocale.esdeResetComplete: 'ES-DE 가져오기 재설정',
+  AppLocale.esdeResetComplete: 'ES-DE 가져오기를 재설정했습니다',
+  AppLocale.esdeImportFailed: 'ES-DE 가져오기 실패: {error}',
+  AppLocale.esdeResetFailed: 'ES-DE 가져오기 재설정 실패: {error}',
   AppLocale.esdeResetConfirmBody:
       '가져온 모든 ES-DE 메타데이터와 미디어 링크를 제거하고, 선택한 폴더 설정을 초기화합니다. 게임과 ROM 파일에는 영향을 주지 않습니다.',
   AppLocale.esdeImportNotEsdeFolder: '이 폴더는 ES-DE 설치 폴더가 아닙니다(gamelists 없음)',
@@ -1299,6 +1435,17 @@ const Map<String, dynamic> appLocaleKo = {
       'System Art Pack이 설치되었습니다! 나중에 설정에서 더 많은 팩을 살펴볼 수 있습니다.',
   AppLocale.wizardArtPackUnavailable:
       '현재 System Art Pack에 접근할 수 없습니다. 온라인 상태가 되면 설정에서 설치할 수 있습니다.',
+  AppLocale.wizardSaveFailedTitle: '설정을 완료하지 못했습니다',
+  AppLocale.wizardSaveFailedBody:
+      'NeoStation이 설정을 저장하지 못했습니다. 저장소를 사용할 수 있는지 확인한 후 다시 시도하세요.\n\n{error}',
+  AppLocale.wizardRomFolderNotAdded: 'NeoStation이 이 폴더를 추가하지 못했습니다.\n\n{error}',
+  AppLocale.wizardRomFolderTemporary:
+      'NeoStation은 다시 시작한 후에는 이 폴더에 계속 접근할 수 없습니다. 홈 폴더 안이나 이동식 미디어의 폴더를 선택하세요.',
+  AppLocale.wizardFolderNotUsable:
+      'NeoStation이 이 폴더를 사용할 수 없습니다. 기기 저장소나 SD 카드의 폴더를 선택하세요.',
+  AppLocale.wizardArtPackFailed:
+      'System Art Pack을 다운로드하지 못했습니다. 다시 시도하거나 나중에 하세요.',
+  AppLocale.wizardScanFailed: '스캔을 마치지 못했습니다. 다시 시도하거나 이 단계를 건너뛰세요.\n\n{error}',
 
   // Library search & filtering.
   AppLocale.searchTitle: '검색',

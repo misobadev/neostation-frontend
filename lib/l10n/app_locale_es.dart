@@ -1,6 +1,47 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleEs = {
+  AppLocale.smartMatchesOne: '1 juego coincidente',
+  AppLocale.smartCollection: 'Colección inteligente',
+  AppLocale.manualCollection: 'Colección manual',
+  AppLocale.smartEditRules: 'Editar reglas',
+  AppLocale.smartMatchAll: 'Cumplir todas las reglas',
+  AppLocale.smartMatchAny: 'Cumplir alguna regla',
+  AppLocale.smartAddRule: 'Añadir regla',
+  AppLocale.smartChooseValue: 'Elegir un valor',
+  AppLocale.smartCustomValue: 'Introducir un valor',
+  AppLocale.smartMatches: '{count} juegos coincidentes',
+  AppLocale.smartInvalidRules:
+      'No se pueden leer estas reglas. Edítalas para restaurar la colección.',
+  AppLocale.smartInvalidValue: 'Introduce un valor válido para esta regla.',
+  AppLocale.smartNoMatches: 'Todavía no hay juegos que cumplan estas reglas.',
+  AppLocale.smartPreviewError:
+      'No se pudo cargar la vista previa. Inténtalo de nuevo.',
+  AppLocale.smartYes: 'Sí',
+  AppLocale.smartNo: 'No',
+  AppLocale.smartDone: 'Listo',
+  AppLocale.smartLower: 'Mínimo',
+  AppLocale.smartUpper: 'Máximo',
+  AppLocale.smartRating: 'Valoración (0–10)',
+  AppLocale.smartPlayed: 'Jugado',
+  AppLocale.smartIs: 'Es',
+  AppLocale.smartIsNot: 'No es',
+  AppLocale.smartContains: 'Contiene',
+  AppLocale.smartNotContains: 'No contiene',
+  AppLocale.smartBefore: 'Antes de',
+  AppLocale.smartAfter: 'Después de',
+  AppLocale.smartAtLeast: 'Al menos',
+  AppLocale.smartAtMost: 'Como máximo',
+  AppLocale.smartBetween: 'Entre',
+  AppLocale.smartWithinDays: 'En los últimos',
+  AppLocale.smartNotWithinDays: 'Fuera de los últimos',
+  AppLocale.smartDays: '{count} días',
+  AppLocale.smartDaysOne: '{count} día',
+  AppLocale.smartDaysFew: '{count} días',
+  AppLocale.collectionLoadError:
+      'No se pudieron cargar los juegos de esta colección.',
+  AppLocale.smartRulesOnly:
+      'Los juegos se incluyen automáticamente según estas reglas.',
   AppLocale.customSounds: "Sonidos personalizados",
   AppLocale.customSoundsSubtitle:
       "Elige sonidos para moverte, confirmar y volver",
@@ -251,9 +292,9 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.nowPlayingDimOff: 'Desactivado',
   AppLocale.secondarySectionNowPlaying: 'Panel Reproduciendo',
   AppLocale.secondarySectionDock: 'Dock de apps',
-  AppLocale.screenshotAccess: 'Screen return & screenshots',
+  AppLocale.screenshotAccess: 'Retorno de pantalla y capturas',
   AppLocale.screenshotAccessSubtitle:
-      'Restores the Now Playing screen when you close an app opened from the dock, and lets the screenshot button capture the screen (opens Android accessibility settings)',
+      'Restaura la pantalla «Reproduciendo» al cerrar una app abierta desde el dock y permite que el botón de captura haga capturas de pantalla (abre los ajustes de Accesibilidad de Android)',
   AppLocale.scanOnStartupSubtitle:
       'Escanear carpetas de ROMs automáticamente al iniciar la app',
   AppLocale.ignoreHiddenFiles: 'Ignorar elementos ocultos',
@@ -369,8 +410,22 @@ const Map<String, dynamic> appLocaleEs = {
       'No se encontró metadata huérfana.',
   AppLocale.cleanOrphanedMetadataDone:
       'Se limpiaron {entries} entrada(s) de metadata y {files} archivo(s) multimedia.',
+  AppLocale.cleanOrphanedMetadataDelete:
+      'Se eliminarán {count} entradas de metadata huérfana de la base de datos y del disco.',
+  AppLocale.cleanOrphanedMetadataDeleteOne:
+      'Se eliminará {count} entrada de metadata huérfana de la base de datos y del disco.',
   AppLocale.cleanOrphanedMetadataEsdeSkippedSuffix:
-      ' {count} entrada(s) de ES-DE se dejaron intactas.',
+      ' {count} entradas importadas de ES-DE quedan intactas.',
+  AppLocale.cleanOrphanedMetadataEsdeSkippedSuffixOne:
+      ' {count} entrada importada de ES-DE queda intacta.',
+  AppLocale.cleanOrphanedMetadataNotRemoved:
+      ' No se pudieron eliminar {count} entradas. Vuelve a ejecutar la herramienta.',
+  AppLocale.cleanOrphanedMetadataNotRemovedOne:
+      ' No se pudo eliminar {count} entrada. Vuelve a ejecutar la herramienta.',
+  AppLocale.cleanOrphanedMetadataNothingToDelete:
+      'No hay nada que eliminar: la única metadata huérfana se importó de ES-DE y esta herramienta no la toca.',
+  AppLocale.cleanOrphanedMetadataMediaUnavailable:
+      'NeoStation no encuentra su carpeta de medios. Reinicia NeoStation y vuelve a intentarlo.',
   AppLocale.cleanOrphanedMetadataFailed:
       'No se pudo limpiar la metadata huérfana: {error}',
   AppLocale.rematchAchievements: 'Emparejar juegos de RetroAchievements',
@@ -421,6 +476,10 @@ const Map<String, dynamic> appLocaleEs = {
       'Presiona confirmar para eliminar esta carpeta',
   AppLocale.maxRomFoldersReached: 'Máximo 5 carpetas de ROMs permitidas',
   AppLocale.romFolderRemoved: 'Carpeta de ROMs eliminada',
+  AppLocale.romFolderRemoveFailed:
+      'No se pudo eliminar la carpeta de ROMs: {error}',
+  AppLocale.romFolderAlreadyAdded:
+      'Esa carpeta ya está entre tus carpetas de ROMs',
   AppLocale.selectRomsFolder: 'Seleccionar carpeta de ROMs',
   AppLocale.scanningSystem: 'Escaneando sistema',
 
@@ -716,6 +775,21 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.hintScrape: 'Escanear',
   AppLocale.hintMoreActions: 'Más',
   AppLocale.hintOptions: 'Opciones',
+  AppLocale.gameOptionsThisGame: 'Este juego',
+  AppLocale.gameOptionsView: 'Vista',
+  AppLocale.systemOptionsSelectedSystem: 'Sistema seleccionado',
+  AppLocale.systemOptionsSystemView: 'Vista del sistema',
+  AppLocale.systemOptionsSystemLayout: 'Diseño del sistema',
+  AppLocale.systemOptionsGameSearch: 'Búsqueda de juegos',
+  AppLocale.systemOptionsSystemViewSubtitle: 'Cómo se muestran los sistemas.',
+  AppLocale.systemOptionsSystemSorting: 'Ordenación del sistema',
+  AppLocale.systemOptionsSystemSortingSubtitle: 'Cómo se ordenan los sistemas.',
+  AppLocale.systemOptionsGameSettingsDescription:
+      'Emulador, cores, controles y visualización',
+  AppLocale.systemOptionsSearchDescription:
+      'Busca juegos en toda la biblioteca',
+  AppLocale.systemOptionsNoSystem:
+      'Selecciona un sistema para configurar los ajustes del juego.',
   AppLocale.addTo: 'Añadir a…',
   AppLocale.addedToCollection: 'Añadido a {name}',
   AppLocale.newCollection: 'Nueva colección…',
@@ -754,6 +828,25 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.cannotReadFolder: 'No se puede leer esta carpeta',
   AppLocale.noStorageFound: 'No se encontró almacenamiento',
   AppLocale.lastPlayed: 'Último jugado',
+  AppLocale.nowPlayingTitle: 'Reproduciendo',
+  AppLocale.nowPlayingSession: 'Sesión',
+  AppLocale.nowPlayingLastPlayed: 'Última partida',
+  AppLocale.launchAnApp: 'Iniciar una app',
+  AppLocale.chooseAnApp: 'Elegir una app',
+  AppLocale.noAppsFound: 'No se encontraron apps',
+  AppLocale.timeNever: 'Nunca',
+  AppLocale.timeYesterday: 'Ayer',
+  AppLocale.timeDaysAgo: 'Hace {count} días',
+  AppLocale.timeHoursAgo: 'Hace {count} h',
+  AppLocale.timeMinutesAgo: 'Hace {count} min',
+  AppLocale.timeJustNow: 'Justo ahora',
+  AppLocale.clockAm: 'a. m.',
+  AppLocale.clockPm: 'p. m.',
+  AppLocale.clockTime12h: '{time} {period}',
+  AppLocale.playTimeHoursMinutes: '{h} h {m} min',
+  AppLocale.playTimeMinutes: '{m} min',
+  AppLocale.playTimeUnderMinute: '<1 min',
+  AppLocale.raNewThisSession: '+{count} en esta sesión',
   AppLocale.apps: 'Apps',
   AppLocale.tracks: 'Pistas',
   AppLocale.games: 'Juegos',
@@ -899,10 +992,16 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.storagePermission: 'Permiso de Almacenamiento',
   AppLocale.storagePermissionDesc:
       'NeoStation necesita "Acceso a todos los archivos" para gestionar tus configuraciones de RetroArch y sincronizar tus partidas correctamente.\n\nPor favor, concede este permiso en la siguiente pantalla.',
-  AppLocale.screenReturnAccess: 'Screen Return Access',
+  AppLocale.screenReturnAccess: 'Acceso para el retorno de pantalla',
   AppLocale.screenReturnAccessDesc:
-      'Brings the Now Playing screen back when you close an app opened from the dock, and enables system screenshots. Only the foreground app name is read \u2014 no screen content is collected.',
-  AppLocale.screenReturnAccessHint: 'Turn on NeoStation, then tap Allow',
+      'Vuelve a mostrar la pantalla «Reproduciendo» al cerrar una app abierta desde el dock y activa las capturas de pantalla del sistema. Solo se lee el nombre de la app en primer plano: no se recopila ningún contenido de la pantalla.',
+  AppLocale.screenReturnAccessHint: 'Activa NeoStation y luego toca Permitir',
+  AppLocale.screenReturnDialogTitle: 'Activar el retorno de pantalla',
+  AppLocale.screenReturnDialogBody:
+      'Para abrir apps desde el dock, NeoStation necesita el servicio de accesibilidad de retorno de pantalla. Te trae de vuelta aquí cuando cierras la app que abriste. Sin él, podrías quedarte sin forma de volver.',
+  AppLocale.screenReturnDialogSteps:
+      'En la siguiente pantalla, busca NeoStation en la lista de servicios y actívalo.',
+  AppLocale.openSettings: 'Abrir ajustes',
   AppLocale.selectRomFolder: 'Seleccionar Carpeta de ROMs',
   AppLocale.romFolderSelected: '¡Carpeta de ROMs seleccionada!',
   AppLocale.chooseRomFolderDesc:
@@ -1011,6 +1110,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.platformNotSupported: 'Plataforma no soportada',
   AppLocale.coreNotConfigured: 'Núcleo no configurado',
   AppLocale.coreNotInstalled: 'El núcleo "{name}" no está instalado',
+  AppLocale.coreNotInstalledHint:
+      'RetroArch indica que el núcleo no está instalado. Instálalo desde Online Updater > Core Downloader.',
   AppLocale.retroArchNotFound: 'RetroArch no encontrado',
   AppLocale.retroArchExecutableNotFound:
       'Ejecutable de RetroArch no encontrado',
@@ -1111,6 +1212,42 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.systemsUpdateDownloading: 'Descargando configs de sistemas...',
   AppLocale.systemsUpdateCancelling: 'Cancelando...',
   AppLocale.systemsUpdateSyncing: 'Sincronizando base de datos de sistemas...',
+  AppLocale.waitingForRomStorage:
+      'Esperando al almacenamiento de ROMs ({attempt}/{max})...',
+  AppLocale.updatingSystemsList: 'Actualizando la lista de sistemas...',
+  AppLocale.romsScanned: 'ROMs escaneadas',
+  AppLocale.errorScanningRoms: 'Error al escanear las ROMs',
+  AppLocale.romStorageNotReady:
+      'El almacenamiento de ROMs no está listo; se conservaron los juegos existentes.',
+  AppLocale.romFolderNotAddedTitle: 'Carpeta de ROMs no añadida',
+  AppLocale.romFolderAddFailed:
+      'No se pudo guardar la carpeta de ROMs: {error}',
+  AppLocale.romFolderSafMissingTitle:
+      'Carpeta de ROMs sin acceso al almacenamiento',
+  AppLocale.romFoldersSafMissingTitle:
+      'Carpetas de ROMs sin acceso al almacenamiento',
+  AppLocale.romFolderSafMissing:
+      'No se puede leer una carpeta de ROMs. Vuelve a conceder el acceso en Ajustes > Directorios.',
+  AppLocale.romFoldersSafMissing:
+      'No se pueden leer {count} carpetas de ROMs. Vuelve a conceder el acceso en Ajustes > Directorios.',
+  AppLocale.romStorageAccessRequired:
+      'Se requiere acceso al almacenamiento. Elige una carpeta de ROMs con el selector de archivos.',
+  AppLocale.romFolderAccessDenied:
+      'No se puede acceder a la carpeta de ROMs {folder}. Comprueba los permisos de almacenamiento.',
+  AppLocale.romFolderUnreachableTitle: 'Carpeta de ROMs no disponible',
+  AppLocale.romFoldersUnreachableTitle: 'Carpetas de ROMs no disponibles',
+  AppLocale.romFolderUnreachable:
+      'No se puede acceder a la carpeta de ROMs {folders}. Se conservaron los juegos existentes. {advice}',
+  AppLocale.romFoldersUnreachable:
+      'No se puede acceder a estas carpetas de ROMs: {folders}. Se conservaron los juegos existentes. {advice}',
+  AppLocale.romFolderAdvicePortal:
+      'Esa ruta procedía de un permiso temporal del portal de escritorio y no se puede recuperar: quítala en Ajustes > Directorios y vuelve a añadir la carpeta.',
+  AppLocale.romFolderAdviceReconnect:
+      'Vuelve a conectar la unidad o quita la carpeta en Ajustes > Directorios.',
+  AppLocale.noRomFolderTitle: 'No hay ninguna carpeta de ROMs configurada',
+  AppLocale.noRomFolderConfigured:
+      'No hay ninguna carpeta de ROMs configurada, así que no había nada que escanear. Se conservaron los juegos existentes. Vuelve a añadir tu carpeta de ROMs en Ajustes > Directorios.',
+  AppLocale.errorScanningRomsDetail: 'Error al escanear las ROMs: {error}',
   AppLocale.systemsUpdateComplete: '¡Sistemas actualizados correctamente!',
   AppLocale.systemsUpdateError:
       'Error al actualizar los sistemas. Inténtalo más tarde.',
@@ -1161,6 +1298,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.romDirectories: 'Directorios de ROMs',
   AppLocale.tools: 'Herramientas',
   AppLocale.toolsSubtitle: 'Herramientas para ayudarte a organizar tus ROMs',
+  AppLocale.toolsStillRunning:
+      'Todavía hay una herramienta en ejecución. Espera a que termine.',
   AppLocale.addRomFolder: 'Añadir carpeta de ROMs',
   AppLocale.removeRomFolder: 'Eliminar',
   // RomM (remote library browse + download)
@@ -1195,6 +1334,24 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.rommTesting: 'Probando...',
   AppLocale.rommConnectionSuccess: 'Conexión correcta',
   AppLocale.rommConnectionFailed: 'Error de conexión',
+  AppLocale.rommErrorTls:
+      'No se pudo establecer una conexión segura (HTTPS). Si tu servidor RomM no usa HTTPS, introduce su URL empezando por http://.',
+  AppLocale.rommErrorUnreachable:
+      'No se puede acceder al servidor RomM: {error}',
+  AppLocale.rommErrorTimeout: 'El servidor RomM no respondió a tiempo.',
+  AppLocale.rommErrorInvalidApiKey: 'Se rechazó la clave de API.',
+  AppLocale.rommErrorUnexpectedStatus:
+      'El servidor respondió con un error ({error}). Comprueba que la URL apunte a tu servidor RomM.',
+  AppLocale.rommErrorNotRomm:
+      'Esa URL no respondió como un servidor RomM. Comprueba la URL del servidor.',
+  AppLocale.rommErrorServerStatus:
+      'El servidor RomM respondió con un error ({error}).',
+  AppLocale.rommErrorUnreadable:
+      'El servidor RomM envió una respuesta que la app no pudo leer.',
+  AppLocale.rommErrorLoadFailed:
+      'No se pudo cargar desde RomM. Inténtalo de nuevo.',
+  AppLocale.rommErrorSignInRejected:
+      'Se rechazó tu inicio de sesión en RomM. Vuelve a iniciar sesión.',
   AppLocale.rommConnectedAs: 'Conectado como {user}',
   AppLocale.rommCredentialsRequired:
       'Introduce la URL del servidor, el usuario y la contraseña',
@@ -1436,27 +1593,30 @@ const Map<String, dynamic> appLocaleEs = {
       'Migrar guardados de la nube a NeoSync v2',
 
   // ES-DE import
-  AppLocale.esdeImport: 'ES-DE Import',
-  AppLocale.esdeImportSubtitle: 'Import metadata and artwork from ES-DE',
-  AppLocale.esdeSelectFolder: 'Select ES-DE Folder',
+  AppLocale.esdeImport: 'Importación de ES-DE',
+  AppLocale.esdeImportSubtitle: 'Importar metadatos e imágenes desde ES-DE',
+  AppLocale.esdeSelectFolder: 'Seleccionar carpeta de ES-DE',
   AppLocale.esdeSelectFolderSubtitle:
-      'Choose the ES-DE folder containing gamelists and downloaded_media',
-  AppLocale.esdeRunImport: 'Import from ES-DE',
+      'Elige la carpeta de ES-DE que contiene gamelists y downloaded_media',
+  AppLocale.esdeRunImport: 'Importar desde ES-DE',
   AppLocale.esdeRunImportSubtitle:
-      'Fill in missing metadata and use ES-DE artwork as fallback',
-  AppLocale.esdeImporting: 'Importing from ES-DE',
-  AppLocale.esdeImportComplete: 'ES-DE import complete',
-  AppLocale.esdeImportNoFolder: 'Select your ES-DE folder first',
-  AppLocale.esdeReset: 'Reset ES-DE Import',
+      'Completar los metadatos que faltan y usar las imágenes de ES-DE como respaldo',
+  AppLocale.esdeImporting: 'Importando desde ES-DE',
+  AppLocale.esdeImportComplete: 'Importación de ES-DE completada',
+  AppLocale.esdeImportNoFolder: 'Primero selecciona tu carpeta de ES-DE',
+  AppLocale.esdeReset: 'Restablecer importación de ES-DE',
   AppLocale.esdeResetSubtitle:
-      'Remove imported metadata and media links so the import can be re-run',
-  AppLocale.esdeResetComplete: 'ES-DE import reset',
+      'Eliminar los metadatos importados y los enlaces multimedia para poder repetir la importación',
+  AppLocale.esdeResetComplete: 'Importación de ES-DE restablecida',
+  AppLocale.esdeImportFailed: 'Error en la importación de ES-DE: {error}',
+  AppLocale.esdeResetFailed:
+      'Error al restablecer la importación de ES-DE: {error}',
   AppLocale.esdeResetConfirmBody:
-      'This removes all imported ES-DE metadata and media links and clears the selected folder. Your games and ROM files are not affected.',
+      'Esto elimina todos los metadatos y enlaces multimedia importados de ES-DE y anula la selección de la carpeta. Tus juegos y archivos ROM no se ven afectados.',
   AppLocale.esdeImportNotEsdeFolder:
-      'This folder is not an ES-DE installation (no gamelists found)',
+      'Esta carpeta no es una instalación de ES-DE (no se encontró la carpeta gamelists)',
   AppLocale.esdeImportNothingFound:
-      'No matching systems or games were found to import',
+      'No se encontraron sistemas ni juegos coincidentes para importar',
   AppLocale.esdeSummarySystemsMatched: 'Sistemas coincidentes',
   AppLocale.esdeSummaryUnmatched: 'sin coincidencia',
   AppLocale.esdeSummarySkipped: 'omitidos (ilegibles)',
@@ -1485,6 +1645,19 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.wizardArtPackUnavailable:
       'No se pudo acceder al System Art Pack en este momento. Puedes instalarlo '
       'más tarde desde Ajustes cuando estés en línea.',
+  AppLocale.wizardSaveFailedTitle: 'La configuración no se ha completado',
+  AppLocale.wizardSaveFailedBody:
+      'NeoStation no pudo guardar tus ajustes. Comprueba que tu almacenamiento esté disponible y vuelve a intentarlo.\n\n{error}',
+  AppLocale.wizardRomFolderNotAdded:
+      'NeoStation no pudo añadir esta carpeta.\n\n{error}',
+  AppLocale.wizardRomFolderTemporary:
+      'NeoStation no puede conservar el acceso a esa carpeta tras reiniciar. Elige una carpeta dentro de tu carpeta personal o en un medio extraíble.',
+  AppLocale.wizardFolderNotUsable:
+      'NeoStation no puede usar esta carpeta. Elige una carpeta del almacenamiento del dispositivo o de la tarjeta SD.',
+  AppLocale.wizardArtPackFailed:
+      'No se pudo descargar el System Art Pack. Vuelve a intentarlo u omítelo por ahora.',
+  AppLocale.wizardScanFailed:
+      'El escaneo no terminó. Vuelve a intentarlo u omite este paso.\n\n{error}',
 
   // Hide / unhide games
   AppLocale.hideGame: 'Ocultar juego',

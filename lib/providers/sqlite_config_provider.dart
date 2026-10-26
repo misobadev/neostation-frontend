@@ -25,11 +25,13 @@ import '../models/secondary_display_state.dart';
 import 'package:flutter/services.dart';
 import '../widgets/tv_directory_picker.dart';
 import '../constants/system_folder_names.dart';
+import '../l10n/app_locale.dart';
 import '../utils/rom_folder_path.dart';
 import '../services/global_notification_service.dart';
 import '../services/game_session_persistence.dart';
 import '../utils/nav_tabs.dart';
 import '../services/saf_directory_service.dart';
+import '../services/saf_grant_service.dart';
 
 part 'sqlite_config_provider/mutators.dart';
 part 'sqlite_config_provider/scanning.dart';
@@ -65,6 +67,12 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// Flag to prevent concurrent ROM scanning operations.
   bool _isScanningRoms = false;
   bool _isSilentScanning = false;
+
+  /// Scans in progress (full scans and single-system rescans), and a future
+  /// that completes when the last of them ends. Removing a ROM folder waits on
+  /// it, so a running scan can't write the removed folder's games back.
+  int _activeScans = 0;
+  Completer<void>? _scansIdle;
   bool _pendingStartupScan = false;
   SystemModel? _silentScannedSystem;
   ScanSummary? _lastScanSummary;
@@ -104,6 +112,52 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
   static const _secondaryDisplayChannel = MethodChannel(
     'com.neogamelab.neostation/secondary_display',
   );
+
+  /// Forces whether [scanSystems] runs its Android pre-scan checks (storage
+  /// access, unreadable roots, the start-up storage wait, unreachable roots).
+  ///
+  /// Tests use it to exercise those checks on any CI host, with plain temp
+  /// paths as ROM roots. It covers only those checks: the scan itself, the
+  /// SAF grant check (which needs the platform channel) and the folder listing
+  /// the start-up wait uses still follow the real platform, so off a device a
+  /// `content://` root always lists as offline.
+  @visibleForTesting
+  static bool? debugAndroidOverride;
+
+  /// Whether the Android pre-scan checks apply: [debugAndroidOverride] under
+  /// test, the real platform otherwise.
+  static bool get _androidScanChecks =>
+      debugAndroidOverride ?? Platform.isAndroid;
+
+  /// The broad storage permission check behind the Android pre-scan checks.
+  /// Replaceable so a test can take the permission away.
+  @visibleForTesting
+  static Future<bool> Function() debugHasStoragePermissions =
+      PermissionService.hasStoragePermissions;
+
+  /// The readability check the Android pre-scan checks run on plain-path ROM
+  /// roots.
+  @visibleForTesting
+  static Future<bool> Function(String path) debugCanAccessDirectory =
+      PermissionService.canAccessDirectory;
+
+  /// The pause between looks while the start-up scan waits for Android ROM
+  /// storage to come up. Tests set it to zero rather than sit through 27 s
+  /// (nine pauses between ten looks).
+  @visibleForTesting
+  static Duration debugAndroidStorageRetryDelay =
+      _defaultAndroidStorageRetryDelay;
+
+  static const _defaultAndroidStorageRetryDelay = Duration(seconds: 3);
+
+  /// Puts the Android scan seams above back to their defaults.
+  @visibleForTesting
+  static void debugResetAndroidScanSeams() {
+    debugAndroidOverride = null;
+    debugHasStoragePermissions = PermissionService.hasStoragePermissions;
+    debugCanAccessDirectory = PermissionService.canAccessDirectory;
+    debugAndroidStorageRetryDelay = _defaultAndroidStorageRetryDelay;
+  }
 
   // Getters
   ConfigModel get config => _config;
@@ -233,7 +287,7 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
       // CRITICAL: Always reload and sync system JSONs with the database at startup
       // to ensure that new cores or systems modified in assets are reflected,
       // regardless of whether ROM scanning is enabled.
-      _scanStatus = 'Syncing system databases...';
+      _scanStatus = AppLocale.systemsUpdateSyncing.getStringForCurrentLocale();
       notifyListeners();
       await SqliteService.loadAndSyncSystems();
 
@@ -451,17 +505,61 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// bridge in [neo_sync_provider]. Behaviourally identical to a direct call.
   void _notify() => notifyListeners();
 
+  /// Saves the config after a change from [previous]. When the save fails
+  /// (a locked database, storage that went away), puts [previous] back and
+  /// rethrows, so the app doesn't show a value the database never got and the
+  /// next save of another setting doesn't store it after all.
+  ///
+  /// If another change has replaced the config meanwhile, nothing is put back:
+  /// that change is kept, and so is the failed one, which it builds on. A save
+  /// that runs later than its change (queued behind another) passes the config
+  /// the change produced as [applied].
+  Future<void> _saveOrRevert(
+    ConfigModel previous, {
+    ConfigModel? applied,
+  }) async {
+    final attempted = _config;
+    final change = applied ?? attempted;
+    try {
+      await SqliteConfigService.saveConfig(attempted);
+    } catch (_) {
+      if (identical(_config, change)) {
+        _config = previous;
+        notifyListeners();
+      }
+      rethrow;
+    }
+  }
+
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
 
   void _setScanning(bool scanning) {
+    // Count the transition only: a scan's early exits and its `finally` can
+    // both clear the flag.
+    if (scanning && !_isScanning) _scanStarted();
+    if (!scanning && _isScanning) _scanEnded();
     _isScanning = scanning;
     if (scanning) {
       _scanCompleted = false;
     }
     notifyListeners();
+  }
+
+  void _scanStarted() {
+    _activeScans++;
+    _scansIdle ??= Completer<void>();
+  }
+
+  void _scanEnded() {
+    if (_activeScans == 0) return;
+    _activeScans--;
+    if (_activeScans == 0) {
+      _scansIdle?.complete();
+      _scansIdle = null;
+    }
   }
 
   void clearError() {

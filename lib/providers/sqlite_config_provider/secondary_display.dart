@@ -15,8 +15,9 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
     bool value, {
     int? backgroundColor,
   }) async {
+    final previous = _config;
     _config = _config.copyWith(hideBottomScreen: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
 
     if (Platform.isAndroid && _secondaryDisplayState != null) {
       final current = _secondaryDisplayState!.value;

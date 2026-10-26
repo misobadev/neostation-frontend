@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -58,8 +59,10 @@ void main() {
     bool isScreenshotVideoHidden = false,
     bool hasRetroAchievements = true,
     ValueChanged<DetailTab>? onTabChanged,
+    Size designSize = const Size(1280, 720),
+    Size windowSize = const Size(1280, 720),
   }) async {
-    tester.view.physicalSize = const Size(1280, 720);
+    tester.view.physicalSize = windowSize;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -68,7 +71,7 @@ void main() {
       DefaultAssetBundle(
         bundle: _PixelBundle(),
         child: ScreenUtilInit(
-          designSize: const Size(1280, 720),
+          designSize: designSize,
           builder: (context, _) => MaterialApp(
             home: Scaffold(
               body: Align(
@@ -113,6 +116,33 @@ void main() {
             'the strip is the indicator; the glyphs are what say left/right is '
             'the way through it',
       );
+    },
+  );
+
+  testWidgets(
+    'fullscreen caps controls while smaller windows keep their scale',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await pumpHeader(
+        tester,
+        designSize: const Size(640, 480),
+        windowSize: const Size(1920, 1080),
+      );
+      expect(
+        tester.widget<Icon>(find.byIcon(Symbols.info_rounded)).size,
+        18 * 1.5,
+      );
+      await pumpHeader(
+        tester,
+        designSize: const Size(640, 480),
+        windowSize: const Size(800, 600),
+      );
+      expect(
+        tester.widget<Icon>(find.byIcon(Symbols.info_rounded)).size,
+        18 * 1.25,
+      );
+      debugDefaultTargetPlatformOverride = null;
     },
   );
 

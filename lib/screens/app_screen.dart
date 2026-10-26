@@ -588,24 +588,11 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
         return; // System tab manages its own secondary display state.
       }
 
-      String tabName = '';
-      switch (index) {
-        case AppTabs.sync:
-          tabName = 'Sync';
-          break;
-        case AppTabs.achievements:
-          tabName = 'Achievements';
-          break;
-        case AppTabs.romm:
-          tabName = 'RomM';
-          break;
-        case AppTabs.settings:
-          tabName = 'Settings';
-          break;
-        case AppTabs.androidApps:
-          tabName = AppLocale.androidApps.getString(context);
-          break;
-      }
+      // The same label as the header's tab strip, translated here: the
+      // second engine reads the language only when it starts.
+      final tabName = navTabSpec(
+        NavTab.values[index],
+      ).labelKey.getString(context);
 
       secondaryState.updateState(
         systemName: tabName,

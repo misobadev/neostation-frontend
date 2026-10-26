@@ -4,6 +4,7 @@ import '../models/romm_rom.dart';
 import '../models/romm_rom_page.dart';
 import '../services/logger_service.dart';
 import '../services/romm/romm_paging.dart';
+import '../utils/log_redaction.dart';
 import 'romm_provider.dart';
 
 /// Fetches one page of the source being synced. Offset/limit paging only — the
@@ -301,6 +302,10 @@ class RommBulkSync extends ChangeNotifier {
 
   RommDownloadError? _lastError;
 
+  /// The offset whose page could not be fetched, or null when the enumeration
+  /// read every page it asked for. For the end-of-run log line.
+  int? _enumerationFailedAt;
+
   bool _disposed = false;
 
   @override
@@ -409,9 +414,11 @@ class RommBulkSync extends ChangeNotifier {
   /// Without [confirm] the queue runs unconditionally (the enumeration is still
   /// the only thing that knows the size, so the check simply doesn't happen).
   ///
-  /// Never throws: a failure to enumerate ends the sync with [lastError] set,
-  /// and a failing ROM is counted and stepped over. Returns when the queue is
-  /// drained (or abandoned).
+  /// Never throws: a failure to enumerate stops the paging with [lastError]
+  /// set — on the first page that ends the sync, while a failure mid-way
+  /// carries on with the ROMs found so far — and a failing ROM is counted and
+  /// stepped over. Returns when the queue is drained (or abandoned), and logs
+  /// one line saying how the run ended and what it did.
   ///
   /// No-op while another sync is running — one at a time, by design.
   Future<void> run({
@@ -429,11 +436,13 @@ class RommBulkSync extends ChangeNotifier {
   }) async {
     if (isRunning) return;
 
+    final elapsed = Stopwatch()..start();
     _reset();
     _sourceLabel = sourceLabel;
     _phase = RommBulkSyncPhase.preparing;
     _notify();
 
+    Object? thrown;
     try {
       await _enumerate(fetchPage, isDownloaded, resolveLink, pageSize);
       // A cancel during the enumeration stops everything, links included:
@@ -476,10 +485,56 @@ class RommBulkSync extends ChangeNotifier {
       _phase = RommBulkSyncPhase.downloading;
       _notify();
       await _drain(download, cancelDownload, concurrency);
+    } catch (e) {
+      thrown = e;
+      rethrow;
     } finally {
       _activeRomIds.clear();
       _phase = RommBulkSyncPhase.idle;
+      _logSummary(thrown, elapsed.elapsedMilliseconds);
       _notify();
+    }
+  }
+
+  /// Logs the one line a finished run leaves behind: how it ended and what it
+  /// did. A warning when anything failed, so it stands out in a bug report.
+  ///
+  /// Worded so that no part reads as a credential to [redactSecrets]: a
+  /// sensitive name followed by `:` (`key:`, `token:`, `pass:`…) would have
+  /// whatever follows it blanked.
+  void _logSummary(Object? thrown, int elapsedMs) {
+    final failedAt = _enumerationFailedAt;
+    final nothingToDo = _queue.isEmpty && _pendingLinks.isEmpty;
+    final String outcome;
+    if (thrown != null) {
+      outcome = 'stopped by an error (${oneLine('$thrown')})';
+    } else if (_cancelRequested) {
+      outcome = 'cancelled';
+    } else if (_declined) {
+      outcome = 'declined';
+    } else if (nothingToDo) {
+      outcome = failedAt == null
+          ? 'nothing to do'
+          : 'enumeration failed at offset $failedAt';
+    } else {
+      outcome = 'complete';
+    }
+    // A failure mid-way is named even when the run went on to sync what it
+    // had found: the queue was partial.
+    final partial = failedAt != null && !outcome.startsWith('enumeration')
+        ? ' after enumeration failed at offset $failedAt'
+        : '';
+    final line =
+        'RomM bulk sync of "${oneLine(_sourceLabel)}" $outcome$partial: '
+        'enumerated $_enumerated/$_enumerateTotal, queued ${_queue.length}, '
+        'completed $_completed, failed $_failed, cancelled $_cancelled, '
+        'skipped $_skipped (linked $_linked, already linked $_alreadyLinked, '
+        'link failures $_linkFailures), $_doneBytes/$_queuedBytes bytes, '
+        'last error ${_lastError?.name ?? 'none'}, $elapsedMs ms';
+    if (_failed > 0 || failedAt != null || thrown != null) {
+      _log.w(line);
+    } else {
+      _log.i(line);
     }
   }
 
@@ -629,6 +684,7 @@ class RommBulkSync extends ChangeNotifier {
     _queuedBytes = 0;
     _activeRomIds.clear();
     _lastError = null;
+    _enumerationFailedAt = null;
   }
 
   /// Matches one on-disk ROM to its RomM entry, without writing.
@@ -648,7 +704,8 @@ class RommBulkSync extends ChangeNotifier {
     } catch (e) {
       _linkFailures++;
       _log.e(
-        'RomM bulk sync: matching ${rom.fsName} (rom ${rom.id}) failed: $e',
+        'RomM bulk sync: matching ${oneLine(rom.fsName)} (rom ${rom.id}) '
+        'failed: $e',
       );
     }
   }
@@ -702,6 +759,7 @@ class RommBulkSync extends ChangeNotifier {
       } catch (e) {
         _log.e('RomM bulk sync: enumeration failed at offset $offset: $e');
         _lastError = RommDownloadError.network;
+        _enumerationFailedAt = offset;
         return;
       }
 
@@ -730,7 +788,8 @@ class RommBulkSync extends ChangeNotifier {
     }
     _log.w(
       'RomM bulk sync: enumeration hit the $maxPages-page cap for '
-      '"$_sourceLabel" — syncing the ${_queue.length} ROMs found so far',
+      '"${oneLine(_sourceLabel)}" — syncing the ${_queue.length} ROMs found '
+      'so far',
     );
   }
 
@@ -783,7 +842,7 @@ class RommBulkSync extends ChangeNotifier {
           // downloadRom reports failures through the record rather than
           // throwing, so this is belt-and-braces: one bad ROM must not abandon
           // the rest of the queue.
-          _log.e('RomM bulk sync: ${rom.fsName} threw: $e');
+          _log.e('RomM bulk sync: ${oneLine(rom.fsName)} threw: $e');
           _failed++;
           _lastError = RommDownloadError.network;
         } finally {

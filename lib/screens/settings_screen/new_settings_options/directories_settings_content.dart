@@ -18,6 +18,7 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/services/user_data_location_service.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/move_user_data_dialog.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/permission_check_wrapper.dart';
 import 'package:neostation/widgets/restart_required_dialog.dart';
 import 'package:neostation/widgets/tv_directory_picker.dart';
@@ -62,6 +63,15 @@ class DirectoriesSettingsContentState
   List<String> _currentRomFolders = [];
   String? _currentUserDataPath;
   bool _isLoading = true;
+
+  // A ROM folder removal is running: a second press is ignored rather than
+  // asking again about a folder that may be gone by then.
+  bool _removingRomFolder = false;
+
+  // A ROM folder is being added (picker, save and scan): a second press is
+  // ignored rather than opening another picker whose folder would not be
+  // scanned while the first scan runs.
+  bool _addingRomFolder = false;
 
   // Migration progress state (shown inline, no dialog).
   bool _isMigrating = false;
@@ -286,7 +296,9 @@ class DirectoriesSettingsContentState
       if (mounted) {
         AppNotification.showNotification(
           context,
-          '$e',
+          AppLocale.errorConfiguringPath
+              .getString(context)
+              .replaceFirst('{error}', '$e'),
           type: NotificationType.error,
         );
       }
@@ -321,6 +333,9 @@ class DirectoriesSettingsContentState
       context,
     );
     final localeEsdeSummarySystems = AppLocale.esdeSummarySystems.getString(
+      context,
+    );
+    final localeEsdeImportFailed = AppLocale.esdeImportFailed.getString(
       context,
     );
 
@@ -365,7 +380,7 @@ class DirectoriesSettingsContentState
       // Rebuild the fallback map now that esde_media_dir rows exist.
       if (mounted) await context.read<FileProvider>().refreshEsde();
     } catch (e) {
-      error = e.toString();
+      error = localeEsdeImportFailed.replaceFirst('{error}', '$e');
       _log.e('ES-DE import failed: $e');
     }
 
@@ -457,7 +472,9 @@ class DirectoriesSettingsContentState
       if (mounted) {
         AppNotification.showNotification(
           context,
-          '$e',
+          AppLocale.esdeResetFailed
+              .getString(context)
+              .replaceFirst('{error}', '$e'),
           type: NotificationType.error,
         );
       }
@@ -469,81 +486,124 @@ class DirectoriesSettingsContentState
   // ---------------------------------------------------------------------------
 
   Future<void> _selectRomFolder() async {
-    final configProvider = Provider.of<SqliteConfigProvider>(
-      context,
-      listen: false,
-    );
-
-    if (configProvider.config.romFolders.length >= 5) {
-      if (mounted) {
-        AppNotification.showNotification(
-          context,
-          AppLocale.maxRomFoldersReached.getString(context),
-          type: NotificationType.info,
-        );
-      }
-      return;
-    }
-
+    if (_addingRomFolder) return;
+    _addingRomFolder = true;
     try {
-      String? selected;
+      final configProvider = Provider.of<SqliteConfigProvider>(
+        context,
+        listen: false,
+      );
 
-      if (Platform.isAndroid) {
-        final isTV = await PermissionService.isTelevision();
-        if (isTV) {
-          if (mounted) selected = await TvDirectoryPicker.show(context);
-        } else {
-          try {
-            final uri = await PermissionService.requestFolderAccess();
-            selected = uri?.toString();
-          } on PlatformException catch (e) {
-            if (e.code == 'PICKER_FAILED' && mounted) {
-              selected = await TvDirectoryPicker.show(context);
+      if (configProvider.config.romFolders.length >= 5) {
+        if (mounted) {
+          AppNotification.showNotification(
+            context,
+            AppLocale.maxRomFoldersReached.getString(context),
+            type: NotificationType.info,
+          );
+        }
+        return;
+      }
+
+      try {
+        String? selected;
+
+        if (Platform.isAndroid) {
+          final isTV = await PermissionService.isTelevision();
+          if (isTV) {
+            if (mounted) selected = await TvDirectoryPicker.show(context);
+          } else {
+            try {
+              final uri = await PermissionService.requestFolderAccess();
+              selected = uri?.toString();
+            } on PlatformException catch (e) {
+              if (e.code == 'PICKER_FAILED' && mounted) {
+                selected = await TvDirectoryPicker.show(context);
+              }
             }
           }
+        } else {
+          selected = await TvDirectoryPicker.pickDirectory(
+            context,
+            dialogTitle: AppLocale.selectRomsFolder.getString(context),
+          );
         }
-      } else {
-        selected = await TvDirectoryPicker.pickDirectory(
-          context,
-          dialogTitle: AppLocale.selectRomsFolder.getString(context),
-        );
-      }
 
-      if (selected != null) {
-        await configProvider.addRomFolder(selected);
+        if (selected == null) return;
+        if (configProvider.config.romFolders.contains(selected)) {
+          if (mounted) {
+            AppNotification.showNotification(
+              context,
+              AppLocale.romFolderAlreadyAdded.getString(context),
+              type: NotificationType.info,
+            );
+          }
+          return;
+        }
+        try {
+          await configProvider.addRomFolder(selected);
+        } catch (e) {
+          _log.e('Failed to add ROM folder: $e');
+          if (mounted) {
+            AppNotification.showNotification(
+              context,
+              AppLocale.romFolderAddFailed
+                  .getString(context)
+                  .replaceFirst('{error}', '$e'.split('\n').first),
+              type: NotificationType.error,
+            );
+          }
+        }
         await _loadCurrentPaths();
+      } catch (e) {
+        _log.e('ROM folder selection failed: $e');
       }
-    } catch (e) {
-      _log.e('ROM folder selection failed: $e');
+    } finally {
+      _addingRomFolder = false;
     }
   }
 
   Future<void> _removeRomFolder(String path) async {
-    final confirmed = await ConfirmActionDialog.show(
-      context,
-      title: AppLocale.removeRomFolder.getString(context),
-      body: AppLocale.removeRomFolderConfirmBody.getString(context),
-      confirmLabel: AppLocale.removeRomFolder.getString(context),
-      icon: Symbols.folder_delete_rounded,
-    );
-    if (!confirmed || !mounted) return;
-
-    final configProvider = Provider.of<SqliteConfigProvider>(
-      context,
-      listen: false,
-    );
+    if (_removingRomFolder) return;
+    _removingRomFolder = true;
     try {
-      await configProvider.removeRomFolder(path);
-      await _loadCurrentPaths();
-      if (mounted) {
-        AppNotification.showNotification(
-          context,
-          AppLocale.romFolderRemoved.getString(context),
-          type: NotificationType.info,
-        );
+      final confirmed = await ConfirmActionDialog.show(
+        context,
+        title: AppLocale.removeRomFolder.getString(context),
+        body: AppLocale.removeRomFolderConfirmBody.getString(context),
+        confirmLabel: AppLocale.removeRomFolder.getString(context),
+        icon: Symbols.folder_delete_rounded,
+      );
+      if (!confirmed || !mounted) return;
+
+      final configProvider = Provider.of<SqliteConfigProvider>(
+        context,
+        listen: false,
+      );
+      try {
+        await configProvider.removeRomFolder(path);
+        if (mounted) {
+          AppNotification.showNotification(
+            context,
+            AppLocale.romFolderRemoved.getString(context),
+            type: NotificationType.info,
+          );
+        }
+      } catch (e) {
+        _log.e('Failed to remove ROM folder: $e');
+        if (mounted) {
+          AppNotification.showNotification(
+            context,
+            AppLocale.romFolderRemoveFailed
+                .getString(context)
+                .replaceFirst('{error}', '$e'.split('\n').first),
+            type: NotificationType.error,
+          );
+        }
       }
-    } catch (e) {
-      _log.e('Failed to remove ROM folder: $e');
+      await _loadCurrentPaths();
+    } finally {
+      _removingRomFolder = false;
     }
   }
 
@@ -902,6 +962,7 @@ class DirectoriesSettingsContentState
                   return ListView.builder(
                     controller: _scrollController,
                     physics: const ClampingScrollPhysics(),
+                    padding: EdgeInsets.only(top: 6.r),
                     itemCount: visualRows.length,
                     itemBuilder: (context, visualIndex) {
                       final row = visualRows[visualIndex];
@@ -927,210 +988,231 @@ class DirectoriesSettingsContentState
                                 ? theme.colorScheme.error
                                 : theme.colorScheme.primary)
                           : theme.colorScheme.outline.withValues(alpha: 0);
+                      final foreground = isSelected
+                          ? (isRemoveItem
+                                ? theme.colorScheme.error
+                                : theme.colorScheme.surface)
+                          : theme.colorScheme.onSurface;
+                      final subtitleForeground = isSelected
+                          ? (isRemoveItem
+                                ? theme.colorScheme.error.withValues(alpha: 0.7)
+                                : theme.colorScheme.surface.withValues(
+                                    alpha: 0.6,
+                                  ))
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.6);
+                      final rimWidth = NeoGlass.borderWidthOf(context);
 
-                      return Opacity(
-                        key: _itemKeys[navIndex],
-                        opacity: isEsdeDisabled ? 0.4 : 1.0,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isSelected && isRemoveItem
-                                ? theme.colorScheme.error.withValues(
-                                    alpha: 0.08,
-                                  )
-                                : theme.cardColor.withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(12.r),
-                            border: Border.all(
-                              color: borderColor,
-                              width: isSelected ? 2.r : 1.r,
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 12.r),
+                        child: Opacity(
+                          key: _itemKeys[navIndex],
+                          opacity: isEsdeDisabled ? 0.4 : 1.0,
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: (rimWidth / 2 + 0.5).r,
                             ),
-                          ),
-                          margin: EdgeInsets.only(bottom: 8.r),
-                          child: InkWell(
-                            onTap: isEsdeDisabled
-                                ? null
-                                : () {
-                                    SfxService().playNavSound();
-                                    _handleItemTap(item);
-                                  },
-                            borderRadius: BorderRadius.circular(12.r),
-                            canRequestFocus: false,
-                            focusColor: Colors.transparent,
-                            hoverColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                            splashColor: Colors.transparent,
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 12.r,
-                                vertical: 8.r,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        _iconFor(item['action'] as String),
-                                        color: isSelected
-                                            ? (isRemoveItem
-                                                  ? theme.colorScheme.error
-                                                  : theme.colorScheme.primary)
-                                            : theme.colorScheme.onSurface,
-                                        size: 20.r,
-                                      ),
-                                      SizedBox(width: 12.r),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                            child: NeoGlassRim(
+                              cornerRadius: 12.r,
+                              borderWidth: rimWidth,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? theme.colorScheme.onSurface
+                                      : theme.colorScheme.surface.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(
+                                    color: borderColor,
+                                    width: isSelected ? 2.r : 1.r,
+                                  ),
+                                ),
+                                child: InkWell(
+                                  onTap: isEsdeDisabled
+                                      ? null
+                                      : () {
+                                          SfxService().playNavSound();
+                                          _handleItemTap(item);
+                                        },
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  canRequestFocus: false,
+                                  focusColor: Colors.transparent,
+                                  hoverColor: Colors.transparent,
+                                  highlightColor: Colors.transparent,
+                                  splashColor: Colors.transparent,
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 12.r,
+                                      vertical: 8.r,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           children: [
-                                            Text(
-                                              isRemoveItem
-                                                  ? (item['title'] as String)
-                                                  : (item['title'] as String)
-                                                        .getString(context),
-                                              style: theme.textTheme.titleSmall
-                                                  ?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: isRemoveItem
-                                                        ? 10.r
-                                                        : 12.r,
-                                                    color: isSelected
-                                                        ? (isRemoveItem
-                                                              ? theme
-                                                                    .colorScheme
-                                                                    .error
-                                                              : theme
-                                                                    .colorScheme
-                                                                    .primary)
-                                                        : theme
-                                                              .colorScheme
-                                                              .onSurface,
-                                                    fontFamily: isRemoveItem
-                                                        ? 'monospace'
-                                                        : null,
-                                                  ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
+                                            Icon(
+                                              _iconFor(
+                                                item['action'] as String,
+                                              ),
+                                              color: foreground,
+                                              size: 20.r,
                                             ),
-                                            SizedBox(height: 2.r),
-                                            Text(
-                                              (item['subtitle'] as String)
-                                                  .getString(context),
-                                              style: theme.textTheme.bodySmall
-                                                  ?.copyWith(
-                                                    color:
-                                                        isSelected &&
-                                                            isRemoveItem
-                                                        ? theme
-                                                              .colorScheme
-                                                              .error
-                                                              .withValues(
-                                                                alpha: 0.7,
-                                                              )
-                                                        : theme
-                                                              .colorScheme
-                                                              .onSurface
-                                                              .withValues(
-                                                                alpha: 0.6,
+                                            SizedBox(width: 12.r),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    isRemoveItem
+                                                        ? (item['title']
+                                                              as String)
+                                                        : (item['title']
+                                                                  as String)
+                                                              .getString(
+                                                                context,
                                                               ),
-                                                    fontSize: 9.r,
+                                                    style: theme
+                                                        .textTheme
+                                                        .titleSmall
+                                                        ?.copyWith(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: isRemoveItem
+                                                              ? 10.r
+                                                              : 12.r,
+                                                          color: foreground,
+                                                          fontFamily:
+                                                              isRemoveItem
+                                                              ? 'monospace'
+                                                              : null,
+                                                        ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
+                                                  SizedBox(height: 2.r),
+                                                  Text(
+                                                    (item['subtitle'] as String)
+                                                        .getString(context),
+                                                    style: theme
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.copyWith(
+                                                          color:
+                                                              subtitleForeground,
+                                                          fontSize: 9.r,
+                                                        ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
+                                            if (isRemoveItem)
+                                              SettingsActionButton(
+                                                icon: Symbols
+                                                    .delete_outline_rounded,
+                                                selected: isSelected,
+                                                isDestructive: true,
+                                              )
+                                            else if (item['action'] ==
+                                                'add_rom')
+                                              SettingsActionButton(
+                                                icon: Symbols.add_rounded,
+                                                selected: isSelected,
+                                              )
+                                            else if (item['action'] == 'rescan')
+                                              SettingsActionButton(
+                                                icon: Symbols.refresh_rounded,
+                                                selected: isSelected,
+                                              )
+                                            else if (isUserData)
+                                              SettingsActionButton(
+                                                icon: Symbols.edit_rounded,
+                                                selected: isSelected,
+                                              )
+                                            else if (item['action'] ==
+                                                'esde_select_folder')
+                                              SettingsActionButton(
+                                                icon: Symbols
+                                                    .folder_special_rounded,
+                                                selected: isSelected,
+                                              )
+                                            else if (item['action'] ==
+                                                'esde_run_import')
+                                              SettingsActionButton(
+                                                icon: Symbols.download_rounded,
+                                                selected: isSelected,
+                                              )
+                                            else if (item['action'] ==
+                                                'esde_reset')
+                                              SettingsActionButton(
+                                                icon:
+                                                    Symbols.restart_alt_rounded,
+                                                selected: isSelected,
+                                                isDestructive: true,
+                                              ),
                                           ],
                                         ),
-                                      ),
-                                      if (isRemoveItem)
-                                        SettingsActionButton(
-                                          icon: Symbols.delete_outline_rounded,
-                                          selected: isSelected,
-                                          isDestructive: true,
-                                        )
-                                      else if (item['action'] == 'add_rom')
-                                        SettingsActionButton(
-                                          icon: Symbols.add_rounded,
-                                          selected: isSelected,
-                                        )
-                                      else if (item['action'] == 'rescan')
-                                        SettingsActionButton(
-                                          icon: Symbols.refresh_rounded,
-                                          selected: isSelected,
-                                        )
-                                      else if (isUserData)
-                                        SettingsActionButton(
-                                          icon: Symbols.edit_rounded,
-                                          selected: isSelected,
-                                        )
-                                      else if (item['action'] ==
-                                          'esde_select_folder')
-                                        SettingsActionButton(
-                                          icon: Symbols.folder_special_rounded,
-                                          selected: isSelected,
-                                        )
-                                      else if (item['action'] ==
-                                          'esde_run_import')
-                                        SettingsActionButton(
-                                          icon: Symbols.download_rounded,
-                                          selected: isSelected,
-                                        )
-                                      else if (item['action'] == 'esde_reset')
-                                        SettingsActionButton(
-                                          icon: Symbols.restart_alt_rounded,
-                                          selected: isSelected,
-                                          isDestructive: true,
-                                        ),
-                                    ],
-                                  ),
-                                  // Show current ES-DE folder under its select item
-                                  if (item['action'] == 'esde_select_folder' &&
-                                      _esdePath.trim().isNotEmpty) ...[
-                                    SizedBox(height: 6.r),
-                                    _buildPathChip(theme, _esdePath),
-                                  ],
-                                  // Show current path under user_data item
-                                  if (isUserData &&
-                                      _currentUserDataPath != null) ...[
-                                    SizedBox(height: 6.r),
-                                    Container(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 8.r,
-                                        vertical: 4.r,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.primary
-                                            .withValues(alpha: 0.06),
-                                        borderRadius: BorderRadius.circular(
-                                          6.r,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Symbols.folder_rounded,
-                                            size: 11.r,
-                                            color: theme.colorScheme.primary
-                                                .withValues(alpha: 0.5),
-                                          ),
-                                          SizedBox(width: 6.r),
-                                          Expanded(
-                                            child: Text(
-                                              _currentUserDataPath!,
-                                              style: TextStyle(
-                                                fontSize: 9.r,
-                                                color: theme
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withValues(alpha: 0.55),
-                                                fontFamily: 'monospace',
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
+                                        // Show current ES-DE folder under its select item
+                                        if (item['action'] ==
+                                                'esde_select_folder' &&
+                                            _esdePath.trim().isNotEmpty) ...[
+                                          SizedBox(height: 6.r),
+                                          _buildPathChip(theme, _esdePath),
+                                        ],
+                                        // Show current path under user_data item
+                                        if (isUserData &&
+                                            _currentUserDataPath != null) ...[
+                                          SizedBox(height: 6.r),
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8.r,
+                                              vertical: 4.r,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  theme.scaffoldBackgroundColor,
+                                              borderRadius:
+                                                  BorderRadius.circular(6.r),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Symbols.folder_rounded,
+                                                  size: 11.r,
+                                                  color: theme
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.5),
+                                                ),
+                                                SizedBox(width: 6.r),
+                                                Expanded(
+                                                  child: Text(
+                                                    _currentUserDataPath!,
+                                                    style: TextStyle(
+                                                      fontSize: 9.r,
+                                                      color: theme
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: 0.55,
+                                                          ),
+                                                      fontFamily: 'monospace',
+                                                    ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
-                                      ),
+                                      ],
                                     ),
-                                  ],
-                                ],
+                                  ),
+                                ),
                               ),
                             ),
                           ),

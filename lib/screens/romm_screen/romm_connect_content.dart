@@ -12,11 +12,13 @@ import '../../providers/romm_provider.dart';
 import '../../providers/sqlite_config_provider.dart';
 import '../../services/game_service.dart' show GamepadNavigationManager;
 import '../../services/neosync/auth_service.dart';
+import '../../services/romm_service.dart' show RommException, RommFailure;
 import '../../sync/providers/neo_sync_adapter.dart';
 import '../../sync/providers/romm_provider.dart';
 import '../../sync/sync_manager.dart';
 import '../../utils/gamepad_nav.dart';
 import '../../utils/login_form_selection.dart';
+import '../../utils/romm_failure_message.dart';
 import '../../widgets/custom_notification.dart';
 import '../app_screen.dart';
 
@@ -271,7 +273,7 @@ class _RommConnectContentState extends State<RommConnectContent>
     if (error != null) {
       AppNotification.showNotification(
         context,
-        error,
+        rommFailureMessage(error, (key) => key.getString(context)),
         type: NotificationType.error,
       );
     } else {
@@ -359,27 +361,35 @@ class _RommConnectContentState extends State<RommConnectContent>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(height: 64.r), // Space for the top navigation dock.
-          Center(
+          // Vertical too: the reason a saved account was turned away puts a
+          // line above the form, and on a short screen (the AYN Thor's) that
+          // pushed Sign in off the bottom. Moving through the form with the
+          // D-pad scrolls the selected row into view (see _scrollToIndex).
+          Expanded(
             child: SingleChildScrollView(
-              controller: _scrollController,
-              scrollDirection: Axis.horizontal,
-              physics: const ClampingScrollPhysics(),
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.r),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      constraints: BoxConstraints(maxWidth: 260.r),
-                      child: _buildFormCard(theme, provider),
+              child: Center(
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.r),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          constraints: BoxConstraints(maxWidth: 260.r),
+                          child: _buildFormCard(theme, provider),
+                        ),
+                        if (!provider.isConnected) ...[
+                          SizedBox(width: 16.r),
+                          SizedBox(width: 300.r, child: _buildInfoBox(theme)),
+                        ],
+                      ],
                     ),
-                    if (!provider.isConnected) ...[
-                      SizedBox(width: 16.r),
-                      SizedBox(width: 300.r, child: _buildInfoBox(theme)),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -420,8 +430,10 @@ class _RommConnectContentState extends State<RommConnectContent>
             ],
           ),
           // The status line is redundant on the login form (you are visibly
-          // disconnected); show it only once connected, mirroring the peers.
-          if (connected) ...[
+          // disconnected); show it only once connected, mirroring the peers —
+          // or when the saved account was turned away, to say why the form is
+          // back.
+          if (connected || _rejectedAtRestore(provider) != null) ...[
             SizedBox(height: 8.r),
             _buildStatusLine(theme, provider),
           ],
@@ -561,8 +573,16 @@ class _RommConnectContentState extends State<RommConnectContent>
     );
   }
 
+  /// Why the server turned the saved account away at start-up, while that is
+  /// still the reason this form is showing instead of the library.
+  RommException? _rejectedAtRestore(RommProvider provider) =>
+      provider.status == RommConnectionStatus.error
+      ? provider.restoreFailure
+      : null;
+
   Widget _buildStatusLine(ThemeData theme, RommProvider provider) {
     final connected = provider.isConnected;
+    final rejected = _rejectedAtRestore(provider);
     final String text;
     if (connected) {
       text = AppLocale.rommConnectedAs
@@ -570,16 +590,29 @@ class _RommConnectContentState extends State<RommConnectContent>
           .replaceAll('{user}', provider.username);
     } else if (provider.status == RommConnectionStatus.connecting) {
       text = AppLocale.rommConnecting.getString(context);
+    } else if (rejected != null) {
+      text = switch (rejected.kind) {
+        RommFailure.invalidCredentials || RommFailure.invalidApiKey =>
+          AppLocale.rommErrorSignInRejected.getString(context),
+        _ => rommFailureMessage(rejected, (key) => key.getString(context)),
+      };
     } else {
       text = AppLocale.rommStatusDisconnected.getString(context);
     }
+    final error = theme.colorScheme.error;
     return Row(
       children: [
         Icon(
-          connected ? Symbols.cloud_done_rounded : Symbols.cloud_off_rounded,
+          connected
+              ? Symbols.cloud_done_rounded
+              : rejected != null
+              ? Symbols.error_rounded
+              : Symbols.cloud_off_rounded,
           size: 16.r,
           color: connected
               ? Colors.greenAccent
+              : rejected != null
+              ? error
               : theme.colorScheme.onSurface.withValues(alpha: 0.5),
         ),
         SizedBox(width: 8.r),
@@ -588,7 +621,9 @@ class _RommConnectContentState extends State<RommConnectContent>
             text,
             style: TextStyle(
               fontSize: 11.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+              color: rejected != null
+                  ? error
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.8),
             ),
           ),
         ),

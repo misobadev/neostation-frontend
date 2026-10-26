@@ -18,7 +18,6 @@ import 'package:neostation/utils/game_utils.dart';
 import 'package:neostation/providers/collections_provider.dart';
 import 'package:neostation/widgets/achievements_badge.dart';
 import 'package:neostation/widgets/collection_badge.dart';
-import 'package:neostation/widgets/game_view_mode_dropdown.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -40,7 +39,7 @@ class GamesGrid extends StatefulWidget {
   final VoidCallback onPlay;
   final VoidCallback onFavorite;
   final VoidCallback onRandom;
-  final VoidCallback? onSettings;
+  final VoidCallback? onOptions;
   final VoidCallback? onScrape;
   final Set<String> scrapingGameRomnames;
   final Map<String, double> scrapeProgress;
@@ -112,7 +111,7 @@ class GamesGrid extends StatefulWidget {
     required this.onPlay,
     required this.onFavorite,
     required this.onRandom,
-    this.onSettings,
+    this.onOptions,
     this.onScrape,
     this.scrapingGameRomnames = const {},
     this.scrapeProgress = const {},
@@ -479,8 +478,8 @@ class _GamesGridState extends State<GamesGrid> {
   /// Cheap positioning pass: turns cached aspect ratios + a target width into
   /// card rects and row bounds. No image reads, one allocation per card.
   void _positionCards(double availableWidth) {
-    final spX = 6.0.r;
-    final spY = 6.0.r;
+    final spX = 12.0.r;
+    final spY = 12.0.r;
     _spX = spX;
     _spY = spY;
 
@@ -747,17 +746,13 @@ class _GamesGridState extends State<GamesGrid> {
       onNavigateRight: _navigateRight,
       onSelectItem: widget.onPlay,
       onBack: widget.onBack,
-      onFavorite: widget.onYButton ?? widget.onFavorite, // Button Y.
-      onXButton: () {
-        try {
-          GameViewModeDropdown.globalKey.currentState?.showDropdown();
-        } catch (_) {}
-      },
+      onFavorite: null, // Options moved to Start.
+      onXButton: null, // Options moved to Start.
       onLeftStickClick: widget.onRandom,
       onSelectButton: _toggleVideoMute, // Select tap - Mute preview video.
       onSelectModifierA: widget.onScrape, // Select + A - Scrape.
       onSelectModifierY: widget.onRandom, // Select + Y - Random game.
-      onSettings: widget.onSettings,
+      onSettings: widget.onOptions,
     );
   }
 

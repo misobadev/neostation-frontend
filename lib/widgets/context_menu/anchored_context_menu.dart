@@ -82,6 +82,9 @@ typedef ContextMenuToggle =
 
 /// Which edge of the anchor the panel hangs off.
 enum ContextMenuAlignment {
+  /// Centre the entire panel in the viewport for a standalone chooser.
+  centerScreen,
+
   /// Panel starts just past the anchor's right edge. Right for a small anchor
   /// (an options button), where the menu should sit next to it.
   besideAnchor,
@@ -125,6 +128,7 @@ const double _kViewportMargin = 8;
 Future<String?> showAnchoredContextMenu({
   required BuildContext context,
   required List<ContextMenuItem> items,
+  String? title,
   GlobalKey? anchorKey,
   int initialIndex = 0,
   int? openSubmenuAtIndex,
@@ -150,6 +154,7 @@ Future<String?> showAnchoredContextMenu({
         opacity: animation,
         child: AnchoredContextMenu(
           items: items,
+          title: title,
           anchorRect: anchor,
           initialIndex: initialIndex,
           openSubmenuAtIndex: openSubmenuAtIndex,
@@ -220,6 +225,7 @@ ScrollPositionAlignmentPolicy contextMenuRevealPolicy({
 /// test), but the normal entry point is [showAnchoredContextMenu].
 class AnchoredContextMenu extends StatefulWidget {
   final List<ContextMenuItem> items;
+  final String? title;
 
   /// Global bounds of the widget the menu hangs off.
   final Rect anchorRect;
@@ -247,6 +253,7 @@ class AnchoredContextMenu extends StatefulWidget {
   const AnchoredContextMenu({
     super.key,
     required this.items,
+    this.title,
     required this.anchorRect,
     this.initialIndex = 0,
     this.openSubmenuAtIndex,
@@ -405,14 +412,28 @@ class _AnchoredContextMenuState extends State<AnchoredContextMenu> {
     return true;
   }
 
+  /// Set once this level has asked to close. Its layer is only popped in
+  /// `dispose`, after the fade-out, so a second press inside that window
+  /// would otherwise pop the route underneath as well.
+  bool _closing = false;
+
+  void _pop([String? result]) {
+    if (_closing || !mounted) return;
+    _closing = true;
+    _gamepadNav.deactivate();
+    Navigator.of(context).pop(result);
+  }
+
   void _close() {
+    if (_closing) return;
     SfxService().playBackSound();
-    Navigator.of(context).pop();
+    _pop();
   }
 
   void _dismissAll() {
+    if (_closing) return;
     SfxService().playBackSound();
-    Navigator.of(context).pop(_dismissAllResult);
+    _pop(_dismissAllResult);
   }
 
   void _openSubmenuIfAny() {
@@ -422,6 +443,7 @@ class _AnchoredContextMenuState extends State<AnchoredContextMenu> {
   }
 
   void _activate() {
+    if (_closing) return;
     final item = widget.items[_selectedIndex];
     if (item.hasSubmenu) {
       _openSubmenu(_selectedIndex);
@@ -435,7 +457,7 @@ class _AnchoredContextMenuState extends State<AnchoredContextMenu> {
       return;
     }
     SfxService().playEnterSound();
-    Navigator.of(context).pop(item.id);
+    _pop(item.id);
   }
 
   /// Flips [item]'s checkbox and reports it, reverting if the write did not
@@ -502,9 +524,7 @@ class _AnchoredContextMenuState extends State<AnchoredContextMenu> {
 
     if (!mounted) return;
     setState(() => _submenuOpen = false);
-    if (result != null) {
-      Navigator.of(context).pop(result);
-    }
+    if (result != null) _pop(result);
   }
 
   /// Height the panel would occupy if nothing constrained it. Computed from the
@@ -516,7 +536,7 @@ class _AnchoredContextMenuState extends State<AnchoredContextMenu> {
   /// while it renders at the capped one is what put the rows off the bottom of
   /// the screen in the first place.
   double get _panelHeight {
-    double height = _kVerticalPadding.r * 2;
+    double height = _kVerticalPadding.r * 2 + (widget.title == null ? 0 : 40.r);
     for (final item in widget.items) {
       if (item.separatorBefore) height += _kSeparatorHeight.r;
       height += _kItemHeight.r;
@@ -611,6 +631,11 @@ class _AnchoredContextMenuState extends State<AnchoredContextMenu> {
     );
     top = top.clamp(margin.clamp(0.0, maxTop), maxTop);
 
+    if (widget.alignment == ContextMenuAlignment.centerScreen) {
+      left = (screen.width - width) / 2;
+      top = (screen.height - height) / 2;
+    }
+
     return Stack(
       children: [
         Positioned(
@@ -625,7 +650,11 @@ class _AnchoredContextMenuState extends State<AnchoredContextMenu> {
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                  color: theme.colorScheme.primary.withValues(
+                    alpha: widget.alignment == ContextMenuAlignment.centerScreen
+                        ? 0.65
+                        : 0.2,
+                  ),
                   width: 1,
                 ),
                 boxShadow: [
@@ -659,7 +688,27 @@ class _AnchoredContextMenuState extends State<AnchoredContextMenu> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: _buildRows(theme),
+                      children: [
+                        if (widget.title != null)
+                          SizedBox(
+                            height: 40.r,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12.r),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  widget.title!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontSize: 13.r,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ..._buildRows(theme),
+                      ],
                     ),
                   ),
                 ),

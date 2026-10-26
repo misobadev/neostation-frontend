@@ -13,7 +13,7 @@ workspace:
   - packages/gamepads_platform_interface
   - packages/gamepads_windows
 
-version: 0.14.0+130
+version: 0.15.1+132
 
 environment:
   sdk: '>=3.9.2'
@@ -32,38 +32,38 @@ dependencies:
     path: packages/flutter_chd
 
   file_picker: ^12.2.0
-  device_info_plus: ^13.2.0
-  package_info_plus: ^10.2.1
+  device_info_plus: ^13.3.0
+  package_info_plus: ^10.2.2
   google_fonts: ^8.2.1
   material_symbols_icons: ^4.2960.0
   provider: ^6.1.5+1
-  battery_plus: ^7.1.1
+  battery_plus: ^7.1.2
   path: ^1.9.1
   path_provider: ^2.1.6
   xml: ^6.6.1
-  video_player: ^2.13.0
-  fvp: ^0.38.1
+  video_player: ^2.14.1
+  fvp: ^0.39.1
   flutter_secure_storage: ^10.3.1
-  shared_preferences: ^2.5.5
+  shared_preferences: ^2.5.6
   http: ^1.6.0
   flutter_svg: ^2.0.10
   crypto: ^3.0.7
-  archive: ^4.3.0
+  archive: ^4.5.2
   web_socket_channel: ^3.0.3
-  url_launcher: ^6.3.2
+  url_launcher: ^6.3.3
   widget_mask: ^1.0.0
   flutter_screenutil: 5.9.3
   window_manager: ^0.5.2
   permission_handler: ^12.0.3
   pointycastle: ^4.0.0
-  sqlite3: ^3.6.0
+  sqlite3: ^3.7.1
   fullscreen_window: ^1.2.1
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
   logger: ^2.8.0
   sub_screen: ^0.1.9
   flutter_soloud: ^4.1.7
-  audio_metadata_reader: ^1.8.0
+  audio_metadata_reader: ^1.8.1
   wakelock_plus: ^1.8.0
   flutter_localization: ^0.4.1
   flutter_tilt: ^4.1.0

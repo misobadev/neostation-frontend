@@ -1167,13 +1167,25 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
             children: [
               _buildDefaultLogo(),
               SizedBox(height: 40.r),
-              _buildSystemNameContainer('WELCOME'),
+              _buildSystemNameContainer(_welcomeText()),
             ],
           ),
         ),
       ],
     );
   }
+
+  /// The greeting shown before any system is focused. Shared state carries
+  /// the language-neutral [SecondaryDisplayStateData.welcomeSystemName]
+  /// token; it is translated here, on the engine that draws it.
+  String _welcomeText() =>
+      AppLocale.welcomeNeoStation.getString(_l10nContext ?? context);
+
+  String _displaySystemName(String systemName) =>
+      systemName.isEmpty ||
+          systemName == SecondaryDisplayStateData.welcomeSystemName
+      ? _welcomeText()
+      : systemName;
 
   Widget _buildCenterContent(
     SecondaryDisplayStateData value, {
@@ -1192,14 +1204,12 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
               _buildSystemLogo(value),
               if (value.systemLogo == null) ...[
                 SizedBox(height: 40.r),
-                _buildSystemNameContainer(
-                  value.systemName.isEmpty ? 'WELCOME' : value.systemName,
-                ),
+                _buildSystemNameContainer(_displaySystemName(value.systemName)),
               ],
             ] else ...[
               _buildDefaultLogo(),
               SizedBox(height: 8.r),
-              _buildSystemNameContainer(value.systemName.toUpperCase()),
+              _buildSystemNameContainer(_displaySystemName(value.systemName)),
             ],
           ],
         ),
@@ -1449,7 +1459,9 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                   : NowPlayingPanel(
                       value: value,
                       sessionRunning: _sessionWatch.isRunning,
-                      sessionTime: _formatSessionTime(),
+                      sessionTime: formatSessionTime(
+                        _sessionWatch.elapsed.inSeconds,
+                      ),
                       use12HourClock:
                           value.use12HourClock ?? widget.initialUse12HourClock,
                       onRequestScreenshot: _requestScreenshot,
@@ -1535,10 +1547,11 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
 
   /// Modal explainer shown before sending the user to accessibility settings.
   /// Tells them why the Screen Return service is needed and what to do once the
-  /// settings screen opens. Tapping the backdrop or CANCEL dismisses; OPEN
-  /// SETTINGS jumps straight to the accessibility page.
+  /// settings screen opens. Tapping the backdrop or Cancel dismisses; Open
+  /// settings jumps to the accessibility settings.
   Widget _buildAccessibilityDialog(SecondaryDisplayStateData value) {
     final scheme = panelScheme(value);
+    final l10n = _l10nContext ?? context;
     return Positioned.fill(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -1580,7 +1593,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                         SizedBox(width: 12.r),
                         Expanded(
                           child: Text(
-                            'Enable Screen Return',
+                            AppLocale.screenReturnDialogTitle.getString(l10n),
                             style: TextStyle(
                               color: scheme.onSurface,
                               fontSize: 20.r,
@@ -1592,12 +1605,8 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                     ),
                     SizedBox(height: 18.r),
                     Text(
-                      'To launch apps from the dock, NeoStation needs the '
-                      'Screen Return accessibility service. It lets NeoStation '
-                      'bring you back here after you close the app you opened. '
-                      "Without it you could be left with no way back.\n\n"
-                      'On the next screen, find NeoStation in the list of '
-                      'services and switch it on.',
+                      '${AppLocale.screenReturnDialogBody.getString(l10n)}\n\n'
+                      '${AppLocale.screenReturnDialogSteps.getString(l10n)}',
                       style: TextStyle(
                         color: scheme.onSurface.withValues(alpha: 0.8),
                         fontSize: 14.r,
@@ -1609,14 +1618,16 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         _buildDialogButton(
-                          label: 'CANCEL',
+                          label: AppLocale.cancel.getString(l10n).toUpperCase(),
                           onTap: _dismissAccessibilityDialog,
                           scheme: scheme,
                           filled: false,
                         ),
                         SizedBox(width: 12.r),
                         _buildDialogButton(
-                          label: 'OPEN SETTINGS',
+                          label: AppLocale.openSettings
+                              .getString(l10n)
+                              .toUpperCase(),
                           onTap: _confirmAccessibilityDialog,
                           scheme: scheme,
                           filled: true,
@@ -1693,7 +1704,11 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                   Row(
                     children: [
                       Text(
-                        _launcherOpen ? 'LAUNCH AN APP' : 'CHOOSE AN APP',
+                        (_launcherOpen
+                                ? AppLocale.launchAnApp
+                                : AppLocale.chooseAnApp)
+                            .getString(_l10nContext ?? context)
+                            .toUpperCase(),
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16.r,
@@ -1741,7 +1756,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     if (apps.isEmpty) {
       return Center(
         child: Text(
-          'No apps found',
+          AppLocale.noAppsFound.getString(_l10nContext ?? context),
           style: TextStyle(color: Colors.white70, fontSize: 14.r),
         ),
       );
@@ -1807,21 +1822,6 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     );
   }
 
-  /// The running session length, formatted down to the second so the per-second
-  /// tick is visible. Shown alongside the (static) total PLAY TIME while a game
-  /// is active.
-  String _formatSessionTime() {
-    final total = _sessionWatch.elapsed.inSeconds;
-    final h = total ~/ 3600;
-    final m = (total % 3600) ~/ 60;
-    final s = total % 60;
-    if (h > 0) {
-      return '${h}h ${m.toString().padLeft(2, '0')}m '
-          '${s.toString().padLeft(2, '0')}s';
-    }
-    return '${m}m ${s.toString().padLeft(2, '0')}s';
-  }
-
   Widget _buildScrapingOverlay(SecondaryDisplayStateData value) {
     if (value.isGameLaunching) return const SizedBox.shrink();
 
@@ -1868,7 +1868,10 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                       SizedBox(width: 12.r),
                       Expanded(
                         child: Text(
-                          value.scrapeStatus ?? 'Scrapeando...',
+                          value.scrapeStatus ??
+                              AppLocale.scrapingGameData.getString(
+                                _l10nContext ?? context,
+                              ),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16.r,
