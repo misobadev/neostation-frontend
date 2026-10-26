@@ -9,7 +9,7 @@ void main() {
   const surface = Color(0xFF121212);
   const onSurface = Color(0xFFEEEEEE);
 
-  testWidgets('the system label uses secondary; its count chip stays surface', (
+  testWidgets('the system label uses surface; its count chip uses secondary', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -30,8 +30,10 @@ void main() {
               body: FooterLabelPill(
                 label: 'Atari 2600',
                 countText: '88 Games',
-                backgroundColor: secondary,
-                foregroundColor: onSecondary,
+                backgroundColor: surface,
+                foregroundColor: onSurface,
+                countBackgroundColor: secondary,
+                countForegroundColor: onSecondary,
               ),
             ),
           ),
@@ -40,7 +42,7 @@ void main() {
     );
 
     final labelText = tester.widget<Text>(find.text('Atari 2600'));
-    expect(labelText.style?.color, onSecondary);
+    expect(labelText.style?.color, onSurface);
 
     final labelContainer = tester.widget<Container>(
       find
@@ -50,16 +52,16 @@ void main() {
           )
           .first,
     );
-    expect((labelContainer.decoration as BoxDecoration).color, secondary);
+    expect((labelContainer.decoration as BoxDecoration).color, surface);
 
     final countText = tester.widget<Text>(find.text('88 Games'));
-    expect(countText.style?.color, onSurface);
+    expect(countText.style?.color, onSecondary);
 
     final countContainer = tester.widget<Container>(
       find
           .ancestor(of: find.text('88 Games'), matching: find.byType(Container))
           .first,
     );
-    expect((countContainer.decoration as BoxDecoration).color, surface);
+    expect((countContainer.decoration as BoxDecoration).color, secondary);
   });
 }

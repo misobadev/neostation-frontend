@@ -16,11 +16,12 @@ class FooterLabelPill extends StatelessWidget {
   final String? countText;
 
   /// Optional palette for the outer label pill.
-  ///
-  /// The count chip keeps its own surface colours; hosts that want the label
-  /// to stand apart from it can override these without changing every footer.
   final Color? backgroundColor;
   final Color? foregroundColor;
+
+  /// Optional palette for the inner count chip.
+  final Color? countBackgroundColor;
+  final Color? countForegroundColor;
 
   const FooterLabelPill({
     super.key,
@@ -28,6 +29,8 @@ class FooterLabelPill extends StatelessWidget {
     this.countText,
     this.backgroundColor,
     this.foregroundColor,
+    this.countBackgroundColor,
+    this.countForegroundColor,
   });
 
   @override
@@ -77,7 +80,7 @@ class FooterLabelPill extends StatelessWidget {
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 2.r),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
+                  color: countBackgroundColor ?? theme.colorScheme.surface,
                   borderRadius:
                       radii?.radiusInternal ?? BorderRadius.circular(12.r),
                   boxShadow: [
@@ -91,7 +94,7 @@ class FooterLabelPill extends StatelessWidget {
                 child: Text(
                   countText!,
                   style: TextStyle(
-                    color: theme.colorScheme.onSurface,
+                    color: countForegroundColor ?? theme.colorScheme.onSurface,
                     fontSize: 10.r,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.5.r,
