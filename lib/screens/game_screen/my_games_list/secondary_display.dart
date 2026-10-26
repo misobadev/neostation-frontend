@@ -17,15 +17,17 @@ extension _SecondaryDisplay on _SystemGamesListState {
     _videoTimer = null;
 
     if (_videoController != null) {
-      final controller = _videoController!;
+      // The rebuild below drops the preview from the tree at once; only the
+      // (blocking) native release waits. See [_videoDisposeDelay].
+      _pendingVideoDisposals.add(_videoController!);
       _videoController = null;
-      try {
-        controller.dispose();
-      } catch (e) {
-        _SystemGamesListState._log.w(
-          'Error disposing video controller in reset: $e',
-        );
-      }
+    }
+    if (_pendingVideoDisposals.isNotEmpty) {
+      _videoDisposeTimer?.cancel();
+      _videoDisposeTimer = Timer(
+        _SystemGamesListState._videoDisposeDelay,
+        _flushPendingVideoDisposals,
+      );
     }
 
     if (mounted) {
@@ -34,6 +36,22 @@ extension _SecondaryDisplay on _SystemGamesListState {
         _isVideoLoading = false;
       });
     }
+  }
+
+  /// Releases the players [_resetVideoState] set aside.
+  void _flushPendingVideoDisposals() {
+    _videoDisposeTimer?.cancel();
+    _videoDisposeTimer = null;
+    for (final controller in _pendingVideoDisposals) {
+      try {
+        controller.dispose();
+      } catch (e) {
+        _SystemGamesListState._log.w(
+          'Error disposing video controller in reset: $e',
+        );
+      }
+    }
+    _pendingVideoDisposals.clear();
   }
 
   /// Graceful termination of video resources with state synchronization.

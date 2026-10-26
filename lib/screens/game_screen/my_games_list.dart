@@ -320,6 +320,14 @@ class _SystemGamesListState extends State<SystemGamesList> {
   static const Duration _videoDelay = Duration(
     milliseconds: 1500,
   ); // Debounce for video playback.
+  // Releasing a player blocks the Android main thread — which Dart shares —
+  // for up to ~600ms on slower handhelds. Done on the D-pad press that moves
+  // off the game, it held the release event back past the auto-repeat delay,
+  // so a single tap moved two games. Release only once navigation has been
+  // idle this long; every move restarts the wait.
+  static const Duration _videoDisposeDelay = Duration(milliseconds: 400);
+  final List<VideoPlayerController> _pendingVideoDisposals = [];
+  Timer? _videoDisposeTimer;
   bool _lastShowInfo = false; // Memoizes 'showGameInfo' config state.
   String? _lastGameViewMode; // Memoizes 'gameViewMode' config state.
   String? _lastGameListSize; // Memoizes the active List view size.
@@ -714,6 +722,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     _videoTimer?.cancel();
     _saveDetectionTimer?.cancel();
     _musicExtractionTimer?.cancel();
+    _flushPendingVideoDisposals();
 
     if (_videoController != null) {
       final controller = _videoController!;

@@ -255,6 +255,20 @@ class GamepadNavigation {
   /// letter and release on it, short enough to cross the alphabet quickly.
   static const Duration _letterJumpInterval = Duration(milliseconds: 360);
 
+  /// A repeat that fires this much later than scheduled means the isolate was
+  /// stalled — on Android it shares the main thread with input delivery — so a
+  /// release may still be queued behind it. Such a repeat is not acted on;
+  /// it re-checks after [_stallRecheckDelay] so the release can land first.
+  static const Duration _stallThreshold = Duration(milliseconds: 100);
+
+  /// Stricter [_stallThreshold] for the first repeat, the one that turns a tap
+  /// into a hold: a stall that ends just after it is due still left the
+  /// release queued behind it.
+  static const Duration _firstRepeatStallThreshold = Duration(milliseconds: 15);
+
+  /// Grace given to a queued release after a stall (see [_stallThreshold]).
+  static const Duration _stallRecheckDelay = Duration(milliseconds: 50);
+
   final Map<dynamic, Timer?> _repeatTimers = {};
 
   DateTime? _lastEventTime;
@@ -1391,13 +1405,23 @@ class GamepadNavigation {
     final bool forward = _isLetterJumpKey(key) ?? false;
     var repeats = 0;
 
-    void schedule(Duration delay) {
+    void schedule(Duration delay, {bool afterStall = false}) {
+      final due = DateTime.now().add(delay);
       _repeatTimers[key] = Timer(delay, () {
         // Guard: if the key was removed (by _stopRepeatTimer or
         // cancelAllRepeatTimers) before this callback ran, stop here.
         if (!_repeatTimers.containsKey(key)) return;
         if (!_isActive) {
           _repeatTimers.remove(key);
+          return;
+        }
+
+        final lateBy = DateTime.now().difference(due);
+        final threshold = repeats == 0
+            ? _firstRepeatStallThreshold
+            : _stallThreshold;
+        if (!afterStall && lateBy > threshold) {
+          schedule(_stallRecheckDelay, afterStall: true);
           return;
         }
 
