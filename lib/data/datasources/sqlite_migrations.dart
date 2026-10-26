@@ -659,6 +659,12 @@ class SqliteMigrations {
       case 175:
         await _migrateToVersion175(db);
         break;
+      // A pre-merge build of #691 stamped v175 without #665's RA table.
+      // Re-run both guarded checks so those databases heal on upgrade.
+      case 176:
+        db.execute(createRaCatalogueSyncTableSql);
+        await _migrateToVersion175(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
