@@ -34,7 +34,10 @@ class SystemsGridFooter extends CoreFooter {
 
   @override
   Widget? buildLeftContent(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return FooterLabelPill(
+      backgroundColor: scheme.secondary,
+      foregroundColor: scheme.onSecondary,
       label: system.isGame
           ? "${AppLocale.lastPlayed.getString(context)}: ${system.title}"
           : system.title ?? "",

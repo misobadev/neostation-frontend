@@ -15,7 +15,20 @@ class FooterLabelPill extends StatelessWidget {
   /// Optional chip on the right of the pill (e.g. "128 games"); hidden when null.
   final String? countText;
 
-  const FooterLabelPill({super.key, required this.label, this.countText});
+  /// Optional palette for the outer label pill.
+  ///
+  /// The count chip keeps its own surface colours; hosts that want the label
+  /// to stand apart from it can override these without changing every footer.
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+
+  const FooterLabelPill({
+    super.key,
+    required this.label,
+    this.countText,
+    this.backgroundColor,
+    this.foregroundColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +48,7 @@ class FooterLabelPill extends StatelessWidget {
           right: countText != null ? 6.r : 12.r,
         ),
         decoration: BoxDecoration(
-          color: theme.colorScheme.tertiaryFixed,
+          color: backgroundColor ?? theme.colorScheme.tertiaryFixed,
           borderRadius: radii?.radiusExternal ?? BorderRadius.circular(24.r),
           boxShadow: [
             BoxShadow(
@@ -52,7 +65,7 @@ class FooterLabelPill extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: theme.colorScheme.onTertiaryFixed,
+                  color: foregroundColor ?? theme.colorScheme.onTertiaryFixed,
                   fontSize: 14.r,
                   fontWeight: FontWeight.bold,
                   overflow: TextOverflow.ellipsis,
