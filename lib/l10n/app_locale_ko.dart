@@ -85,6 +85,9 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.ignoreArticlesInGameSort: "게임 정렬 시 관사 무시",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "제목 앞의 The, A, An을 무시합니다. 예: The Legend of Zelda는 L로 정렬됩니다.",
+  AppLocale.favoritesFirstInGameSort: "즐겨찾기를 맨 위에",
+  AppLocale.favoritesFirstInGameSortSubtitle:
+      "즐겨찾는 게임을 각 게임 목록의 맨 위에 고정합니다. 끄면 즐겨찾기가 목록의 원래 위치에 유지됩니다.",
   AppLocale.raEvents: '이벤트',
   AppLocale.raAotwYearTitle: '이번 주 업적 ({year})',
   AppLocale.raAotw: 'AOTW',

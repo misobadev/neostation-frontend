@@ -54,7 +54,8 @@ class RomGameEntry extends RomListEntry {
 /// derived from [games] and the system's [rootFolders].
 ///
 /// Folders are listed first (alphabetical, case-insensitive), then games using
-/// the same ordering as the flat list: favorites pinned first, then by name.
+/// the same ordering as the flat list: favorites pinned first when
+/// [favoritesFirst] is set, then by name.
 /// Games whose path is not under any root folder — or that have no path — are
 /// surfaced at the root level so nothing silently disappears.
 List<RomListEntry> buildRomLevel({
@@ -62,6 +63,7 @@ List<RomListEntry> buildRomLevel({
   required List<String> rootFolders,
   String currentRelPath = '',
   bool ignoreArticles = false,
+  bool favoritesFirst = true,
 }) {
   final normalizedRoots = rootFolders.map(_normalize).toList();
   final prefix = _normalize(currentRelPath);
@@ -110,9 +112,11 @@ List<RomListEntry> buildRomLevel({
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
   directGames.sort((a, b) {
-    final aFav = a.isFavorite == true;
-    final bFav = b.isFavorite == true;
-    if (aFav != bFav) return aFav ? -1 : 1;
+    if (favoritesFirst) {
+      final aFav = a.isFavorite == true;
+      final bFav = b.isFavorite == true;
+      if (aFav != bFav) return aFav ? -1 : 1;
+    }
     return compareGameNames(a, b, ignoreArticles: ignoreArticles);
   });
 

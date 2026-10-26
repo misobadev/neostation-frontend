@@ -83,6 +83,9 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.ignoreArticlesInGameSort: "排序遊戲時忽略冠詞",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "忽略標題開頭的 The、A 或 An。例如，The Legend of Zelda 排在 L 下。",
+  AppLocale.favoritesFirstInGameSort: "收藏置頂",
+  AppLocale.favoritesFirstInGameSortSubtitle:
+      "將收藏的遊戲固定在每個遊戲列表頂部。關閉時，收藏的遊戲保持其在列表中的原有位置。",
   AppLocale.raEvents: '活動',
   AppLocale.raAotwYearTitle: '本週成就（{year}）',
   AppLocale.raAotw: 'AOTW',

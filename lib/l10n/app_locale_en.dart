@@ -95,6 +95,9 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.ignoreArticlesInGameSort: "Ignore articles when sorting games",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Sort by title without leading The, A, or An. For example, The Legend of Zelda sorts under L.",
+  AppLocale.favoritesFirstInGameSort: "Favourites on top",
+  AppLocale.favoritesFirstInGameSortSubtitle:
+      "Pin favourite games to the top of each game list. When off, favourites keep their place in the list.",
   AppLocale.raEvents: 'Events',
   AppLocale.raAotwYearTitle: 'Achievement of the Week ({year})',
   AppLocale.raAotw: 'AOTW',

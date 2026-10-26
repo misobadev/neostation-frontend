@@ -105,11 +105,17 @@ class _SystemGamesListState extends State<SystemGamesList> {
   // Dataset management.
   List<GameModel> _games = [];
   bool _lastIgnoreArticles = false;
+  bool _lastFavoritesFirst = true;
 
   bool get _ignoreArticles => _configProvider.config.ignoreArticlesInGameSort;
+  bool get _favoritesFirst => _configProvider.config.favoritesFirstInGameSort;
 
-  int _compareGames(GameModel a, GameModel b) =>
-      _byFavouriteThenName(a, b, ignoreArticles: _ignoreArticles);
+  int _compareGames(GameModel a, GameModel b) => _byFavouriteThenName(
+    a,
+    b,
+    ignoreArticles: _ignoreArticles,
+    favoritesFirst: _favoritesFirst,
+  );
   Map<GameModel, int> _gameIndexMap = {};
   GameModel? _selectedGame;
 
@@ -211,6 +217,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
       rootFolders: _subfolderRoots,
       currentRelPath: _currentRelPath,
       ignoreArticles: _ignoreArticles,
+      favoritesFirst: _favoritesFirst,
     );
 
     final folders = <RomFolderEntry>[];
@@ -458,6 +465,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     _configProvider = context.read<SqliteConfigProvider>();
     _configProvider.addListener(_onConfigChanged);
     _lastIgnoreArticles = _ignoreArticles;
+    _lastFavoritesFirst = _favoritesFirst;
 
     _scrapingProvider = context.read<ScrapingProvider>();
     _lastArtworkRevision = _scrapingProvider.artworkRevision;
@@ -591,8 +599,10 @@ class _SystemGamesListState extends State<SystemGamesList> {
   void _onConfigChanged() {
     if (!mounted) return;
     final configProvider = context.read<SqliteConfigProvider>();
-    if (_lastIgnoreArticles != _ignoreArticles) {
+    if (_lastIgnoreArticles != _ignoreArticles ||
+        _lastFavoritesFirst != _favoritesFirst) {
       _lastIgnoreArticles = _ignoreArticles;
+      _lastFavoritesFirst = _favoritesFirst;
       _loadGames();
     }
     final newShowInfo = configProvider.config.showGameInfo;

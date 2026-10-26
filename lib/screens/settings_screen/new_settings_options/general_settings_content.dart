@@ -208,6 +208,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     count++; // Custom sounds
     count++; // 12-Hour Clock
     count++; // Ignore leading articles in game sorting
+    count++; // Favourites on top of game lists
     count++; // Show subfolders (every system)
     count++; // Cloud-save mark in the game views
     count++; // Achievement badges on game tiles
@@ -386,6 +387,15 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     if (index == currentItemIndex) {
       configProvider.updateIgnoreArticlesInGameSort(
         !configProvider.config.ignoreArticlesInGameSort,
+      );
+      return;
+    }
+    currentItemIndex++;
+
+    // Protocol: Favourites on top of game lists.
+    if (index == currentItemIndex) {
+      configProvider.updateFavoritesFirstInGameSort(
+        !configProvider.config.favoritesFirstInGameSort,
       );
       return;
     }
@@ -795,6 +805,31 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                       onChanged: (value) => context
                           .read<SqliteConfigProvider>()
                           .updateIgnoreArticlesInGameSort(value),
+                      activeColor: theme.colorScheme.primary,
+                    ),
+                  );
+                }(),
+
+                // Setting: Favourites on top of game lists.
+                SizedBox(height: 12.r),
+                () {
+                  final index = currentItemIdx++;
+                  return SettingRow(
+                    key: _itemKeys[index],
+                    onTap: () => selectItem(index),
+                    focused:
+                        widget.isContentFocused &&
+                        widget.selectedContentIndex == index,
+                    title: AppLocale.favoritesFirstInGameSort.getString(
+                      context,
+                    ),
+                    subtitle: AppLocale.favoritesFirstInGameSortSubtitle
+                        .getString(context),
+                    trailing: CustomToggleSwitch(
+                      value: config.favoritesFirstInGameSort,
+                      onChanged: (value) => context
+                          .read<SqliteConfigProvider>()
+                          .updateFavoritesFirstInGameSort(value),
                       activeColor: theme.colorScheme.primary,
                     ),
                   );

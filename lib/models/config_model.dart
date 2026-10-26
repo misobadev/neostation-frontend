@@ -77,6 +77,10 @@ class ConfigModel {
   /// Ignore leading English articles when ordering game titles.
   final bool ignoreArticlesInGameSort;
 
+  /// Pin favourite games to the top of game lists. When off, favourites keep
+  /// their alphabetical place.
+  final bool favoritesFirstInGameSort;
+
   /// Whether the initial onboarding/setup process has been finished.
   final bool setupCompleted;
 
@@ -272,6 +276,7 @@ class ConfigModel {
     this.scanOnStartup = true,
     this.ignoreHiddenFiles = true,
     this.ignoreArticlesInGameSort = false,
+    this.favoritesFirstInGameSort = true,
     this.setupCompleted = false,
     this.hideBottomScreen = false,
     this.videoSound = false,
@@ -407,6 +412,10 @@ class ConfigModel {
       ignoreArticlesInGameSort: [true, 1, '1', 'true'].contains(
         json['ignoreArticlesInGameSort'] ??
             json['ignore_articles_in_game_sort'],
+      ),
+      favoritesFirstInGameSort: ![false, 0, '0', 'false'].contains(
+        json['favoritesFirstInGameSort'] ??
+            json['favorites_first_in_game_sort'],
       ),
       collectionSortBy:
           (json['collectionSortBy'] ?? json['collection_sort_by'] ?? 'name')
@@ -627,6 +636,7 @@ class ConfigModel {
       'scanOnStartup': scanOnStartup,
       'ignoreHiddenFiles': ignoreHiddenFiles,
       'ignoreArticlesInGameSort': ignoreArticlesInGameSort,
+      'favoritesFirstInGameSort': favoritesFirstInGameSort,
       'setupCompleted': setupCompleted,
       'hideBottomScreen': hideBottomScreen,
       'videoSound': videoSound,
@@ -687,6 +697,7 @@ class ConfigModel {
     bool? scanOnStartup,
     bool? ignoreHiddenFiles,
     bool? ignoreArticlesInGameSort,
+    bool? favoritesFirstInGameSort,
     bool? setupCompleted,
     bool? hideBottomScreen,
     bool? videoSound,
@@ -745,6 +756,8 @@ class ConfigModel {
       ignoreHiddenFiles: ignoreHiddenFiles ?? this.ignoreHiddenFiles,
       ignoreArticlesInGameSort:
           ignoreArticlesInGameSort ?? this.ignoreArticlesInGameSort,
+      favoritesFirstInGameSort:
+          favoritesFirstInGameSort ?? this.favoritesFirstInGameSort,
       setupCompleted: setupCompleted ?? this.setupCompleted,
       hideBottomScreen: hideBottomScreen ?? this.hideBottomScreen,
       videoSound: videoSound ?? this.videoSound,

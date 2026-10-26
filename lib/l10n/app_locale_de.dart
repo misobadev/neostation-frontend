@@ -100,6 +100,9 @@ const Map<String, dynamic> appLocaleDe = {
       "Artikel beim Sortieren von Spielen ignorieren",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Führende The, A und An ignorieren. The Legend of Zelda wird zum Beispiel unter L einsortiert.",
+  AppLocale.favoritesFirstInGameSort: "Favoriten oben",
+  AppLocale.favoritesFirstInGameSortSubtitle:
+      "Favoriten oben in jeder Spieleliste anheften. Wenn aus, bleiben Favoriten an ihrer Stelle in der Liste.",
   AppLocale.raEvents: 'Events',
   AppLocale.raAotwYearTitle: 'Achievement der Woche ({year})',
   AppLocale.raAotw: 'AOTW',
