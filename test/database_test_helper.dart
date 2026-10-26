@@ -29,6 +29,7 @@ class DatabaseTestHelper {
 
   /// Creates the minimal set of tables required by repository tests.
   Future<void> createMinimalSchema(DatabaseAdapter db) async {
+    await db.execute(SqliteMigrations.createRaCatalogueSyncTableSql);
     await db.execute('''
       CREATE TABLE app_systems (
         id TEXT PRIMARY KEY,

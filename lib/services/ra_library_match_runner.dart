@@ -4,6 +4,7 @@ import '../repositories/retro_achievements_repository.dart';
 import 'global_notification_service.dart';
 import 'logger_service.dart';
 import 'retroachievements_hash_service.dart';
+import 'ra_catalogue_service.dart';
 
 /// What started a library-wide RetroAchievements pass. The two triggers want
 /// genuinely different behaviour, so this is the switch rather than three
@@ -53,6 +54,9 @@ class RaMatchStrings {
   /// Shown when the pass threw. Contains `{error}`.
   final String failed;
 
+  /// Manual refresh failed; local matching still completed using saved data.
+  final String? catalogueRefreshFailed;
+
   const RaMatchStrings({
     required this.title,
     required this.lookingUp,
@@ -61,6 +65,7 @@ class RaMatchStrings {
     required this.nothingToDo,
     required this.paused,
     required this.failed,
+    this.catalogueRefreshFailed,
   });
 }
 
@@ -96,6 +101,16 @@ class RaMatchProgress {
 class RaLibraryMatchRunner {
   RaLibraryMatchRunner._();
 
+  static bool _running = false;
+  static bool _pauseRequested = false;
+  static bool get isRunning =>
+      _running || RetroAchievementsHashService.isRematchRunning;
+
+  static void requestPause() {
+    _pauseRequested = true;
+    RetroAchievementsHashService.requestRematchPause();
+  }
+
   static final _log = LoggerService.instance;
 
   /// Non-null exactly while a pass is running. The systems grid shows this as
@@ -110,7 +125,9 @@ class RaLibraryMatchRunner {
   /// need two bars.
   static const String notificationId = 'rematch_achievements';
 
-  /// Runs the cheap lookup pass, then the hashing pass.
+  /// Refreshes catalogues, retries stored hashes, then optionally hashes ROMs.
+  /// [hashMissing] stays false for catalogue-only background refreshes when
+  /// the user has not enabled library hashing on startup.
   ///
   /// Returns true when the run was stopped before it finished — the caller may
   /// want to pick it up again, which is how the startup pass survives the user
@@ -123,7 +140,14 @@ class RaLibraryMatchRunner {
     RaMatchTrigger trigger = RaMatchTrigger.manual,
     bool holdsSplash = false,
     VoidCallback? onProgressStateChanged,
+    String apiKey = '',
+    Future<void> Function()? onCatalogueChanged,
+    RaCatalogueService? catalogueService,
+    bool hashMissing = true,
   }) async {
+    if (isRunning) return false;
+    _running = true;
+    _pauseRequested = false;
     final manual = trigger == RaMatchTrigger.manual;
     var notificationShown = false;
 
@@ -181,6 +205,22 @@ class RaLibraryMatchRunner {
         );
       }
 
+      var catalogueChanged = false;
+      var catalogueFailed = false;
+      if (apiKey.trim().isNotEmpty) {
+        final service = catalogueService ?? RaCatalogueService();
+        try {
+          catalogueChanged = await service.refresh(
+            apiKey: apiKey,
+            force: manual,
+            isCancelled: () => _pauseRequested,
+            onFailure: () => catalogueFailed = true,
+          );
+        } finally {
+          if (catalogueService == null) service.close();
+        }
+      }
+
       // The pass resumes: hashed ROMs are excluded from the candidate query, so
       // a stopped run picks up where it left off. Report progress against the
       // whole hashable library rather than the work left in this run, or the
@@ -189,18 +229,12 @@ class RaLibraryMatchRunner {
       final alreadyHashed = coverage.hashed;
       final eligible = coverage.eligible;
 
-      // Cheap pass: no file I/O, just retry the local lookup for ROMs that
-      // already carry a hash.
-      //
-      // "Cheap" is relative: it walks every hashed-but-unmatched ROM, which on
-      // a real library is thousands of rows and a couple of seconds, and it
-      // finds nothing every time by construction — those ROMs are not in the
-      // bundled RA database. It is worth doing after that database changes and
-      // pointless otherwise, so an unattended pass runs it only then. The user
-      // pressing the Tools button always gets it: they may be trying to repair
-      // exactly this.
+      // Retry saved hashes when either the bundle or downloaded catalogue
+      // changes. A manual run always retries; no ROM file reads are needed.
       final runLookup =
-          manual || RetroAchievementsRepository.raSeedChangedThisLaunch;
+          manual ||
+          catalogueChanged ||
+          RetroAchievementsRepository.raSeedChangedThisLaunch;
       final lookup = !runLookup
           ? const RaRematchResult(
               total: 0,
@@ -213,6 +247,7 @@ class RaLibraryMatchRunner {
           : await RetroAchievementsHashService.rematchLibrary(
               mode: RaRematchMode.lookupOnly,
               reopenSkipped: manual,
+              isCancelled: () => _pauseRequested,
               onProgress: (processed, total, _) {
                 if (total == 0) return;
                 publish();
@@ -224,12 +259,16 @@ class RaLibraryMatchRunner {
                 );
               },
             );
+      if (catalogueChanged && !lookup.cancelled && !_pauseRequested) {
+        await RetroAchievementsRepository.completeRaCatalogueMatch();
+      }
 
       // Expensive pass: hash the ROMs that have never been hashed.
-      final hashPass = lookup.cancelled
+      final hashPass = lookup.cancelled || !hashMissing
           ? null
           : await RetroAchievementsHashService.rematchLibrary(
               reopenSkipped: manual,
+              isCancelled: () => _pauseRequested,
               onProgress: (processed, total, _) {
                 if (total == 0) return;
                 publish(done: processed, total: total);
@@ -248,14 +287,25 @@ class RaLibraryMatchRunner {
 
       final matched = lookup.matched + (hashPass?.matched ?? 0);
       final hashed = hashPass?.hashed ?? 0;
-      final cancelled = lookup.cancelled || (hashPass?.cancelled ?? false);
+      final cancelled =
+          _pauseRequested || lookup.cancelled || (hashPass?.cancelled ?? false);
       final examined = lookup.total + (hashPass?.total ?? 0);
+      if (catalogueChanged) await onCatalogueChanged?.call();
 
       if (cancelled) {
         _finish(
           title: strings.title,
           message: strings.paused.replaceFirst('{matched}', matched.toString()),
           type: GlobalNotificationType.info,
+          notificationShown: notificationShown,
+        );
+      } else if (manual &&
+          catalogueFailed &&
+          strings.catalogueRefreshFailed != null) {
+        _finish(
+          title: strings.title,
+          message: strings.catalogueRefreshFailed!,
+          type: GlobalNotificationType.error,
           notificationShown: notificationShown,
         );
       } else if (!manual && matched == 0 && hashed == 0) {
@@ -305,6 +355,7 @@ class RaLibraryMatchRunner {
       );
       return false;
     } finally {
+      _running = false;
       progress.value = null;
       onProgressStateChanged?.call();
     }

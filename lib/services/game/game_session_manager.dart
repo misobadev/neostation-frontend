@@ -8,7 +8,7 @@ import '../../repositories/game_repository.dart';
 import '../../repositories/system_repository.dart';
 import '../../sync/sync_manager.dart';
 import '../game_session_persistence.dart';
-import '../retroachievements_hash_service.dart';
+import '../ra_library_match_runner.dart';
 import '../romm_playtime_service.dart';
 import 'playtime_meter.dart';
 
@@ -56,9 +56,9 @@ class GameSessionManager {
   /// pass is resumable by construction, so nothing is lost: whoever started it
   /// picks it up from where it stopped. A no-op when no pass is running.
   static void _pauseBackgroundHashing() {
-    if (!RetroAchievementsHashService.isRematchRunning) return;
+    if (!RaLibraryMatchRunner.isRunning) return;
     _log.i('Pausing RA match pass for the duration of the game session');
-    RetroAchievementsHashService.requestRematchPause();
+    RaLibraryMatchRunner.requestPause();
   }
 
   /// Closes the launch-pending window (e.g. on launch failure).

@@ -1,6 +1,8 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleEn = {
+  AppLocale.raCatalogueRefreshFailed:
+      'Could not refresh the RetroAchievements catalogue. Matching used saved data.',
   AppLocale.smartMatchesOne: '1 matching game',
   AppLocale.smartCollection: 'Smart collection',
   AppLocale.manualCollection: 'Manual collection',

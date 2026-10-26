@@ -1,6 +1,7 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleZh = {
+  AppLocale.raCatalogueRefreshFailed: '无法刷新RetroAchievements目录。已使用保存的数据进行匹配。',
   AppLocale.smartMatchesOne: '1 个匹配游戏',
   AppLocale.smartCollection: '智能合集',
   AppLocale.manualCollection: '手动合集',

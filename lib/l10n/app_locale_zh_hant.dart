@@ -1,6 +1,7 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleZhHant = {
+  AppLocale.raCatalogueRefreshFailed: '無法重新整理RetroAchievements目錄。已使用儲存的資料進行比對。',
   AppLocale.smartMatchesOne: '1 個符合的遊戲',
   AppLocale.smartCollection: '智慧合集',
   AppLocale.manualCollection: '手動合集',

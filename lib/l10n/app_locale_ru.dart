@@ -1,6 +1,8 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleRu = {
+  AppLocale.raCatalogueRefreshFailed:
+      'Не удалось обновить каталог RetroAchievements. Сопоставление выполнено по сохранённым данным.',
   AppLocale.smartMatchesOne: 'Подходящих игр: 1',
   AppLocale.smartCollection: 'Умная коллекция',
   AppLocale.manualCollection: 'Ручная коллекция',

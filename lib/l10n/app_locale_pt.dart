@@ -1,6 +1,8 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocalePt = {
+  AppLocale.raCatalogueRefreshFailed:
+      'Não foi possível atualizar o catálogo RetroAchievements. A busca de correspondências usou os dados salvos.',
   AppLocale.smartMatchesOne: '1 jogo correspondente',
   AppLocale.smartCollection: 'Coleção inteligente',
   AppLocale.manualCollection: 'Coleção manual',

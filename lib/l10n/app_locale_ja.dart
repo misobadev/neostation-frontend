@@ -1,6 +1,8 @@
 part of 'app_locale.dart';
 
 const Map<String, dynamic> appLocaleJa = {
+  AppLocale.raCatalogueRefreshFailed:
+      'RetroAchievementsカタログを更新できませんでした。保存済みのデータで照合しました。',
   AppLocale.smartMatchesOne: '一致するゲーム：1件',
   AppLocale.smartCollection: 'スマートコレクション',
   AppLocale.manualCollection: '手動コレクション',
