@@ -963,7 +963,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
       fontWeight: FontWeight.normal,
     );
     final selectedTextStyle = textStyle.copyWith(
-      color: theme.colorScheme.onSecondary,
+      color: theme.colorScheme.onPrimary,
       fontWeight: FontWeight.bold,
     );
 
@@ -1167,8 +1167,8 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                 ),
 
                 // Focused item sliding indicator. Painted between the
-                // backgrounds and the text so the selected label gets the
-                // secondary fill and onSecondary text used by the system badge.
+                // backgrounds and the text so the selected label gets a
+                // primary fill and onPrimary text.
                 Positioned.fill(
                   child: ValueListenableBuilder<double>(
                     valueListenable: _pageOffsetNotifier,
@@ -1183,7 +1183,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                             width: width,
                             child: Container(
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.secondary,
+                                color: theme.colorScheme.primary,
                                 borderRadius:
                                     Theme.of(context)
                                         .extension<CornerRadii>()
@@ -1200,7 +1200,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
                 // Foreground text track. Transparent background so the
                 // selector and surface backgrounds show through, while the
-                // selected label uses onSecondary for contrast.
+                // selected label uses onPrimary for contrast.
                 ValueListenableBuilder<double>(
                   valueListenable: _pageOffsetNotifier,
                   builder: (context, page, _) {

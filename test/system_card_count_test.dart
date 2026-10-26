@@ -91,14 +91,14 @@ void main() {
   );
 
   group('SystemCard count', () {
-    testWidgets('a selected system card uses primary and onPrimary', (
+    testWidgets('a selected system card uses secondary and onSecondary', (
       tester,
     ) async {
-      const primary = Color(0xFF123456);
-      const onPrimary = Color(0xFFABCDEF);
+      const secondary = Color(0xFF123456);
+      const onSecondary = Color(0xFFABCDEF);
       final scheme = const ColorScheme.dark().copyWith(
-        primary: primary,
-        onPrimary: onPrimary,
+        secondary: secondary,
+        onSecondary: onSecondary,
       );
 
       await tester.pumpWidget(
@@ -118,51 +118,52 @@ void main() {
             )
             .first,
       );
-      expect((chrome.decoration as BoxDecoration).color, primary);
+      expect((chrome.decoration as BoxDecoration).color, secondary);
 
       final logo = tester.widget<Text>(find.text('ATARI 2600'));
-      expect(logo.style?.color, onPrimary);
+      expect(logo.style?.color, onSecondary);
     });
 
-    testWidgets('a selected last-played card also uses primary and onPrimary', (
-      tester,
-    ) async {
-      const primary = Color(0xFF123456);
-      const onPrimary = Color(0xFFABCDEF);
-      final scheme = const ColorScheme.dark().copyWith(
-        primary: primary,
-        onPrimary: onPrimary,
-      );
+    testWidgets(
+      'a selected last-played card also uses secondary and onSecondary',
+      (tester) async {
+        const secondary = Color(0xFF123456);
+        const onSecondary = Color(0xFFABCDEF);
+        final scheme = const ColorScheme.dark().copyWith(
+          secondary: secondary,
+          onSecondary: onSecondary,
+        );
 
-      await tester.pumpWidget(
-        host(
-          system(
-            folderName: 'nes',
-            count: 0,
-            title: 'Last Played',
-            isGame: true,
+        await tester.pumpWidget(
+          host(
+            system(
+              folderName: 'nes',
+              count: 0,
+              title: 'Last Played',
+              isGame: true,
+            ),
+            isSelected: true,
+            theme: ThemeData.from(colorScheme: scheme),
           ),
-          isSelected: true,
-          theme: ThemeData.from(colorScheme: scheme),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      final chrome = tester.widget<Container>(
-        find
-            .ancestor(
-              of: find.byType(InkWell).first,
-              matching: find.byType(Container),
-            )
-            .first,
-      );
-      expect((chrome.decoration as BoxDecoration).color, primary);
+        final chrome = tester.widget<Container>(
+          find
+              .ancestor(
+                of: find.byType(InkWell).first,
+                matching: find.byType(Container),
+              )
+              .first,
+        );
+        expect((chrome.decoration as BoxDecoration).color, secondary);
 
-      final footer = tester.widget<Text>(
-        find.textContaining('TIME PLAYED').first,
-      );
-      expect(footer.style?.color, onPrimary);
-    });
+        final footer = tester.widget<Text>(
+          find.textContaining('TIME PLAYED').first,
+        );
+        expect(footer.style?.color, onSecondary);
+      },
+    );
 
     testWidgets('the grid can turn off the card drop shadow', (tester) async {
       await tester.pumpWidget(

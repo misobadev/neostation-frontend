@@ -310,9 +310,9 @@ class _SystemCardState extends State<SystemCard> {
           child: Container(
             decoration: BoxDecoration(
               // The chrome (the frame around the artwork and the footer)
-              // switches to primary on selection; the artwork itself stays.
+              // switches to secondary on selection; the artwork itself stays.
               color: widget.isSelected
-                  ? Theme.of(context).colorScheme.primary
+                  ? Theme.of(context).colorScheme.secondary
                   : Theme.of(context).colorScheme.surface,
               borderRadius: outerRadius,
               boxShadow: widget.showShadow
@@ -746,7 +746,7 @@ class _SystemCardState extends State<SystemCard> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: widget.isSelected
-                  ? Theme.of(context).colorScheme.onPrimary
+                  ? Theme.of(context).colorScheme.onSecondary
                   : Theme.of(context).colorScheme.onSurface,
               fontSize: 10.r,
               fontWeight: FontWeight.w800,
@@ -775,7 +775,7 @@ class _SystemCardState extends State<SystemCard> {
           assetLogoPath,
           height: 128.r,
           color: selected
-              ? Theme.of(context).colorScheme.onPrimary
+              ? Theme.of(context).colorScheme.onSecondary
               : Theme.of(context).colorScheme.onSurface,
         ),
       ),
