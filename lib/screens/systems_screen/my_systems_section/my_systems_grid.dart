@@ -11,7 +11,6 @@ import 'package:neostation/models/system_model.dart';
 import 'package:neostation/screens/app_screen.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
-import '../../../themes/corner_radii.dart';
 import '../../../utils/gamepad_nav.dart';
 import '../../../services/game_service.dart';
 import '../../../utils/game_launch_utils.dart';
@@ -1170,8 +1169,6 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
         final List<Widget> cardWidgets = [];
         final Set<int> placedIndices = {};
 
-        double? selLeft, selTop, selWidth, selHeight;
-
         for (int r = 0; r < grid.length; r++) {
           for (int c = 0; c < grid[r].length; c++) {
             final cardIdx = grid[r][c];
@@ -1198,13 +1195,6 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
               // Center the card vertically inside the row band.
               final rowItemHeight = rowItemHeights[r];
               top = rowTop(r) + (rowItemHeight - cardHeight) / 2;
-            }
-
-            if (cardIdx == widget.selectedIndex) {
-              selLeft = left;
-              selTop = top;
-              selWidth = width;
-              selHeight = cardHeight;
             }
 
             final bool cardIsSelected = cardIdx == widget.selectedIndex;
@@ -1242,6 +1232,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
                   key: ValueKey('system_card_${card.title}_$cardIdx'),
                   info: card,
                   isSelected: cardIsSelected,
+                  showShadow: false,
                   isCompact:
                       card.isGame &&
                       widget.recentCardSize == RecentCardSizes.twoByOne,
@@ -1287,35 +1278,6 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
           }
         }
 
-        final focusIndicator =
-            (selLeft != null &&
-                selTop != null &&
-                selWidth != null &&
-                selHeight != null)
-            ? Positioned(
-                key: const ValueKey('focus_indicator'),
-                left: selLeft + 1.r,
-                top: selTop + 1.r,
-                width: selWidth - 2.r,
-                height: selHeight - 2.r,
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius:
-                          Theme.of(
-                            context,
-                          ).extension<CornerRadii>()?.radiusExternal ??
-                          BorderRadius.circular(14.r),
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        width: 2.r,
-                      ),
-                    ),
-                  ),
-                ),
-              )
-            : const SizedBox.shrink();
-
         return SingleChildScrollView(
           controller: _scrollController,
           clipBehavior: Clip.none,
@@ -1324,10 +1286,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
           ),
           child: SizedBox(
             height: totalHeight,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [...cardWidgets, focusIndicator],
-            ),
+            child: Stack(clipBehavior: Clip.none, children: cardWidgets),
           ),
         );
       },

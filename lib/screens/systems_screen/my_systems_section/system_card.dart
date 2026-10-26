@@ -55,6 +55,7 @@ class SystemCard extends StatefulWidget {
     this.showCount = false,
     this.isCompact = false,
     this.artworkInset = 4,
+    this.showShadow = true,
   });
 
   /// The system or game metadata resolved for this card.
@@ -100,6 +101,9 @@ class SystemCard extends StatefulWidget {
   /// before responsive scaling. The grid passes a larger value than the
   /// carousel so its smaller cards get visible breathing room.
   final double artworkInset;
+
+  /// Whether the card casts its drop shadow.
+  final bool showShadow;
 
   @override
   State<SystemCard> createState() => _SystemCardState();
@@ -305,21 +309,23 @@ class _SystemCardState extends State<SystemCard> {
           cornerRadius: outerRadiusPx,
           child: Container(
             decoration: BoxDecoration(
-              // Only the surface-coloured chrome (the frame around the artwork
-              // and the footer) inverts on selection; the artwork itself stays.
+              // The chrome (the frame around the artwork and the footer)
+              // switches to primary on selection; the artwork itself stays.
               color: widget.isSelected
-                  ? Theme.of(context).colorScheme.onSurface
+                  ? Theme.of(context).colorScheme.primary
                   : Theme.of(context).colorScheme.surface,
               borderRadius: outerRadius,
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.shadow.withValues(alpha: 0.1),
-                  blurRadius: 4.r,
-                  offset: Offset(2.0.r, 2.0.r),
-                ),
-              ],
+              boxShadow: widget.showShadow
+                  ? [
+                      BoxShadow(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.shadow.withValues(alpha: 0.1),
+                        blurRadius: 4.r,
+                        offset: Offset(2.0.r, 2.0.r),
+                      ),
+                    ]
+                  : null,
             ),
             child: ClipRRect(
               borderRadius:
@@ -387,23 +393,39 @@ class _SystemCardState extends State<SystemCard> {
                                   ),
                                 ],
                               )
-                            : Column(
-                                children: [
-                                  AspectRatio(
-                                    aspectRatio: 1,
-                                    child: Stack(
-                                      key: _contentStackKey,
-                                      children: [
-                                        _buildSystemBackground(),
-                                        if (widget.info.isSmartCollection)
-                                          _buildSmartCollectionBadge(context),
-                                        if (widget.showCount)
-                                          _buildCountPill(context),
-                                      ],
-                                    ),
-                                  ),
-                                  _buildSystemFooter(context),
-                                ],
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  // Simple two-part card: artwork content on top,
+                                  // a dedicated footer strip for the logo below.
+                                  // Reserving real height for the footer stops it
+                                  // collapsing into a one-pixel line at size S.
+                                  final footerHeight = math.max(
+                                    28.r,
+                                    constraints.maxWidth * 0.24,
+                                  );
+                                  return Column(
+                                    children: [
+                                      Expanded(
+                                        child: Stack(
+                                          key: _contentStackKey,
+                                          children: [
+                                            _buildSystemBackground(),
+                                            if (widget.info.isSmartCollection)
+                                              _buildSmartCollectionBadge(
+                                                context,
+                                              ),
+                                            if (widget.showCount)
+                                              _buildCountPill(context),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        height: footerHeight,
+                                        child: _buildSystemFooter(context),
+                                      ),
+                                    ],
+                                  );
+                                },
                               )),
                 ),
               ),
@@ -724,7 +746,7 @@ class _SystemCardState extends State<SystemCard> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: widget.isSelected
-                  ? Theme.of(context).colorScheme.surface
+                  ? Theme.of(context).colorScheme.onPrimary
                   : Theme.of(context).colorScheme.onSurface,
               fontSize: 10.r,
               fontWeight: FontWeight.w800,
@@ -736,38 +758,25 @@ class _SystemCardState extends State<SystemCard> {
     );
   }
 
-  /// Renders a bottom footer with the system logo for non-game system cards.
+  /// Renders the dedicated logo footer.
   ///
-  /// The footer expands to fill the remaining space below the square artwork,
-  /// and the logo is auto-sized to fit while keeping its aspect ratio — the
-  /// whole strip is the logo's, which is the point of floating the count over
-  /// the artwork instead (see [_buildCountPill]).
+  /// No background of its own: the card surface already provides it. Keeping
+  /// the logo in a fixed-height strip (rather than overlaying it or squeezing
+  /// it into a gradient) is both simpler to reason about and cheaper to paint.
   Widget _buildSystemFooter(BuildContext context) {
     final assetLogoPath = _resolveSystemLogoPath();
     final selected = widget.isSelected;
 
-    return Expanded(
-      child: Container(
-        color: selected
-            ? Theme.of(context).colorScheme.onSurface
-            : Colors.transparent,
-        padding: EdgeInsets.only(top: 1.r, bottom: 1.r, left: 2.r, right: 2.r),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: FittedBox(
-                fit: BoxFit.contain,
-                child: _buildSystemLogo(
-                  assetLogoPath,
-                  height: 128.r,
-                  color: selected
-                      ? Theme.of(context).colorScheme.surface
-                      : Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ),
-          ],
+    return Padding(
+      padding: EdgeInsets.only(bottom: 2.r, left: 4.r, right: 4.r),
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: _buildSystemLogo(
+          assetLogoPath,
+          height: 128.r,
+          color: selected
+              ? Theme.of(context).colorScheme.onPrimary
+              : Theme.of(context).colorScheme.onSurface,
         ),
       ),
     );
