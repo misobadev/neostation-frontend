@@ -15,7 +15,7 @@ void main() {
       final theme = AppThemes.getThemeDataByName('dmg');
 
       expect(theme.colorScheme.brightness, Brightness.dark);
-      expect(theme.colorScheme.surface, const Color(0xFF9BBC0F)); // base-100
+      expect(theme.colorScheme.surface, const Color(0xFF8BAC0F)); // base-100
       expect(
         theme.colorScheme.onSurface,
         const Color(0xFF0F380F),
@@ -25,7 +25,7 @@ void main() {
       expect(theme.colorScheme.onTertiary, theme.colorScheme.onPrimary);
       expect(theme.colorScheme.tertiaryFixed, theme.colorScheme.surface);
       expect(theme.colorScheme.onTertiaryFixed, theme.colorScheme.onSurface);
-      expect(theme.cardColor, const Color(0xFF8BAC0F)); // base-200
+      expect(theme.cardColor, const Color(0xFF9BBC0F)); // base-200
       expect(theme.colorScheme.outline, const Color(0xFF306230)); // base-300
     });
 

@@ -3,18 +3,18 @@ import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 
 const Color _primaryColor = Color(0xFFf43098);
-const Color _onPrimaryColor = Color(0xFFffffff);
-const Color _secondaryColor = Color(0xFFab44ff);
-const Color _onSecondaryColor = Color(0xFFf8f3fd);
-const Color _surfaceColor = Color(0xFFfcf2f7);
-const Color _onSurfaceColor = Color(0xFFc5005a);
+const Color _onPrimaryColor = Color(0xFFf9cbe5);
+const Color _secondaryColor = Color(0xFF830c41);
+const Color _onSecondaryColor = Color(0xFFf9cbe5);
+const Color _surfaceColor = Color(0xFFf9cbe5);
+const Color _onSurfaceColor = Color(0xFF830c41);
 
 const Color _outlineColor = Color(0xFFf9e4f0);
 const Color _shadowColor = Color(0xFF830c41);
 
-const Color _backgroundColor = Color(0xFFf9e4f0);
+const Color _backgroundColor = Color(0xFFfcf2f8);
 
-const Color _batteryFull = Color(0xFF5ce8b3);
+const Color _batteryFull = Color(0xFF107C53);
 const Color _batteryMedium = Color(0xFFff8904);
 const Color _batteryLow = Color(0xFFf82834);
 const Color _batteryPower = Color(0xFF51e8fb);
@@ -23,8 +23,8 @@ const Color _errorColor = Color(0xFFf82834);
 const Color _onErrorColor = Color(0xFFfef2f2);
 const Color _warningColor = Color(0xFFff8904);
 const Color _onWarningColor = Color(0xFF421104);
-const Color _successColor = Color(0xFF5ce8b3);
-const Color _onSuccessColor = Color(0xFF006044);
+const Color _successColor = Color(0xFF107C53);
+const Color _onSuccessColor = Color(0xFF00241A);
 const Color _infoColor = Color(0xFF51e8fb);
 const Color _onInfoColor = Color(0xFF005889);
 

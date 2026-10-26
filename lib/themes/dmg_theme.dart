@@ -8,13 +8,13 @@ const Color _primaryColor = Color(0xFF306230);
 const Color _onPrimaryColor = Color(0xFF9BBC0F);
 const Color _secondaryColor = Color(0xFF0F380F);
 const Color _onSecondaryColor = Color(0xFF9BBC0F);
-const Color _surfaceColor = Color(0xFF9BBC0F);
+const Color _surfaceColor = Color(0xFF8BAC0F);
 const Color _onSurfaceColor = Color(0xFF0F380F);
 
 const Color _outlineColor = Color(0xFF306230);
 const Color _shadowColor = Color(0xFF306230);
 
-const Color _backgroundColor = Color(0xFF8BAC0F);
+const Color _backgroundColor = Color(0xFF9BBC0F);
 
 const Color _batteryFull = Color(0xFF0F380F);
 const Color _batteryMedium = Color(0xFF8BAC0F);

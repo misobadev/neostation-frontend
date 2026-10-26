@@ -4,8 +4,8 @@ import 'package:neostation/themes/chrome_surface.dart';
 
 const Color _primaryColor = Color(0xFFEFEFEF);
 const Color _onPrimaryColor = Color(0xFF1D1D1D);
-const Color _secondaryColor = Color(0xFF3B3B3B);
-const Color _onSecondaryColor = Color(0xFFEFEFEF);
+const Color _secondaryColor = Color(0xFFEFEFEF);
+const Color _onSecondaryColor = Color(0xFF1D1D1D);
 const Color _surfaceColor = Color(0xFF282828);
 const Color _onSurfaceColor = Color(0xFFEFEFEF);
 
