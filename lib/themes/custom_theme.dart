@@ -130,8 +130,6 @@ class CustomTheme {
     final onPrimary = read('primary-content');
     final secondary = read('secondary');
     final onSecondary = read('secondary-content');
-    final tertiary = read('accent');
-    final onTertiary = read('accent-content');
     final surface = read('base-100');
     final onSurface = read('base-content');
     final card = read('base-200');
@@ -141,12 +139,6 @@ class CustomTheme {
     final success = read('success');
     final warning = read('warning');
     final info = read('info');
-
-    // daisyUI's `neutral` maps onto Material's tertiaryFixed — the app uses it
-    // for the systems-grid footer and sort dropdown. Fall back to base-300 when
-    // absent so those surfaces stay legible.
-    final neutral = readOr('neutral', outline);
-    final onNeutral = readOr('neutral-content', onSurface);
 
     // daisyUI JSON has no dedicated on-success/on-info/on-warning; derive
     // sensible defaults so nothing renders unreadable.
@@ -158,13 +150,13 @@ class CustomTheme {
         ? ColorScheme.dark(
             primary: primary,
             secondary: secondary,
-            tertiary: tertiary,
-            tertiaryFixed: neutral,
+            tertiary: primary,
+            tertiaryFixed: surface,
             surface: surface,
             onPrimary: onPrimary,
             onSecondary: onSecondary,
-            onTertiary: onTertiary,
-            onTertiaryFixed: onNeutral,
+            onTertiary: onPrimary,
+            onTertiaryFixed: onSurface,
             onSurface: onSurface,
             error: error,
             onError: onError,
@@ -174,13 +166,13 @@ class CustomTheme {
         : ColorScheme.light(
             primary: primary,
             secondary: secondary,
-            tertiary: tertiary,
-            tertiaryFixed: neutral,
+            tertiary: primary,
+            tertiaryFixed: surface,
             surface: surface,
             onPrimary: onPrimary,
             onSecondary: onSecondary,
-            onTertiary: onTertiary,
-            onTertiaryFixed: onNeutral,
+            onTertiary: onPrimary,
+            onTertiaryFixed: onSurface,
             onSurface: onSurface,
             error: error,
             onError: onError,
@@ -251,14 +243,10 @@ class CustomTheme {
       onPrimary,
       secondary,
       onSecondary,
-      tertiary,
-      onTertiary,
       surface,
       onSurface,
       card,
       outline,
-      neutral,
-      onNeutral,
       error,
       onError,
       success,

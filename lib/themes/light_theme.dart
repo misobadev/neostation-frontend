@@ -2,32 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 
-const Color _primaryColor = Color(0xFF422ad5);
-const Color _onPrimaryColor = Color(0xFFe0e7ff);
-const Color _secondaryColor = Color(0xFFf43098);
-const Color _onSecondaryColor = Color(0xFFf9e4f0);
-const Color _tertiaryColor = Color(0xFF00d3bb);
-const Color _onTertiaryColor = Color(0xFF084d49);
-const Color _tertiaryFixedColor = Color(0xFF09090b);
-const Color _onTertiaryFixedColor = Color(0xFFe4e4e7);
-const Color _surfaceColor = Color(0xFFffffff);
-const Color _onSurfaceColor = Color(0xFF18181b);
+const Color _primaryColor = Color(0xFF232323);
+const Color _onPrimaryColor = Color(0xFFCECECE);
+const Color _secondaryColor = Color(0xFF3B3B3B);
+const Color _onSecondaryColor = Color(0xFFCECECE);
+const Color _surfaceColor = Color(0xFFCECECE);
+const Color _onSurfaceColor = Color(0xFF232323);
 
 const Color _outlineColor = Color(0xFFeeeeee);
 const Color _shadowColor = Color(0xFF09090b);
 
 const Color _backgroundColor = Color(0xFFeeeeee);
 
-const Color _batteryFull = Color(0xFF00d390);
+const Color _batteryFull = Color(0xFF009E6C);
 const Color _batteryMedium = Color(0xFFfcb700);
-const Color _batteryLow = Color(0xFFff627d);
+const Color _batteryLow = Color(0xFFB74255);
 const Color _batteryPower = Color(0xFF0284C7);
 
-const Color _errorColor = Color(0xFFff627d);
+const Color _errorColor = Color(0xFFB74255);
 const Color _onErrorColor = Color(0xFF4d0218);
 const Color _warningColor = Color(0xFFfcb700);
 const Color _onWarningColor = Color(0xFF793205);
-const Color _successColor = Color(0xFF00d390);
+const Color _successColor = Color(0xFF009E6C);
 const Color _onSuccessColor = Color(0xFF084d49);
 const Color _infoColor = Color(0xFF00bafe);
 const Color _onInfoColor = Color(0xFF042e49);
@@ -37,14 +33,14 @@ final ThemeData lightTheme = ThemeData(
   colorScheme: ColorScheme.light(
     primary: _primaryColor,
     secondary: _secondaryColor,
-    tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiary: _primaryColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
-    onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiary: _onPrimaryColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

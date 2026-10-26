@@ -6,10 +6,6 @@ const Color _primaryColor = Color(0xFFbdff00);
 const Color _onPrimaryColor = Color(0xFF417600);
 const Color _secondaryColor = Color(0xFFcebef4);
 const Color _onSecondaryColor = Color(0xFF564775);
-const Color _tertiaryColor = Color(0xFF505050);
-const Color _onTertiaryColor = Color(0xFFf8f8f8);
-const Color _tertiaryFixedColor = Color(0xFF003743);
-const Color _onTertiaryFixedColor = Color(0xFFffd6a7);
 const Color _surfaceColor = Color(0xFF001e29);
 const Color _onSurfaceColor = Color(0xFFffd6a7);
 
@@ -37,14 +33,14 @@ final ThemeData abyssTheme = ThemeData(
   colorScheme: ColorScheme.dark(
     primary: _primaryColor,
     secondary: _secondaryColor,
-    tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiary: _primaryColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
-    onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiary: _onPrimaryColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

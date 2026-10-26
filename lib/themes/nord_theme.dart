@@ -6,10 +6,6 @@ const Color _primaryColor = Color(0xFF5e81ac);
 const Color _onPrimaryColor = Color(0xFF03060b);
 const Color _secondaryColor = Color(0xFF81a1c1);
 const Color _onSecondaryColor = Color(0xFF06090d);
-const Color _tertiaryColor = Color(0xFF88c0d0);
-const Color _onTertiaryColor = Color(0xFF070d10);
-const Color _tertiaryFixedColor = Color(0xFF4c566a);
-const Color _onTertiaryFixedColor = Color(0xFFd8dee9);
 const Color _surfaceColor = Color(0xFFeceff4);
 const Color _onSurfaceColor = Color(0xFF2e3440);
 
@@ -37,14 +33,14 @@ final ThemeData nordTheme = ThemeData(
   colorScheme: ColorScheme.light(
     primary: _primaryColor,
     secondary: _secondaryColor,
-    tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiary: _primaryColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
-    onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiary: _onPrimaryColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

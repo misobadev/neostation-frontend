@@ -6,10 +6,6 @@ const Color _primaryColor = Color(0xFFff6596);
 const Color _onPrimaryColor = Color(0xFF180408);
 const Color _secondaryColor = Color(0xFF00e8ff);
 const Color _onSecondaryColor = Color(0xFF001316);
-const Color _tertiaryColor = Color(0xFFce74ff);
-const Color _onTertiaryColor = Color(0xFF0f0517);
-const Color _tertiaryFixedColor = Color(0xFF111a3b);
-const Color _onTertiaryFixedColor = Color(0xFFfff248);
 const Color _surfaceColor = Color(0xFFfff248);
 const Color _onSurfaceColor = Color(0xFF000000);
 
@@ -37,14 +33,14 @@ final ThemeData cyberpunkTheme = ThemeData(
   colorScheme: ColorScheme.light(
     primary: _primaryColor,
     secondary: _secondaryColor,
-    tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiary: _primaryColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
-    onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiary: _onPrimaryColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

@@ -6,10 +6,6 @@ const Color _primaryColor = Color(0xFF82AAFF);
 const Color _onPrimaryColor = Color(0xFF292D3E);
 const Color _secondaryColor = Color(0xFFC3E88D);
 const Color _onSecondaryColor = Color(0xFF292D3E);
-const Color _tertiaryColor = Color(0xFF89DDFF);
-const Color _onTertiaryColor = Color(0xFF292D3E);
-const Color _tertiaryFixedColor = Color(0xFF444267);
-const Color _onTertiaryFixedColor = Color(0xFFA6ACCD);
 const Color _surfaceColor = Color(0xFF32374D);
 const Color _onSurfaceColor = Color(0xFFA6ACCD);
 const Color _errorColor = Color(0xFFF07178);
@@ -36,14 +32,14 @@ final ThemeData palenightTheme = ThemeData(
   colorScheme: ColorScheme.dark(
     primary: _primaryColor,
     secondary: _secondaryColor,
-    tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiary: _primaryColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
-    onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiary: _onPrimaryColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

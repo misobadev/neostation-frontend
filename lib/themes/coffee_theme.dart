@@ -6,10 +6,6 @@ const Color _primaryColor = Color(0xFFdb924c);
 const Color _onPrimaryColor = Color(0xFF110802);
 const Color _secondaryColor = Color(0xFF273e3f);
 const Color _onSecondaryColor = Color(0xFFbad5d5);
-const Color _tertiaryColor = Color(0xFF11576d);
-const Color _onTertiaryColor = Color(0xFFd0dbe0);
-const Color _tertiaryFixedColor = Color(0xFF120c12);
-const Color _onTertiaryFixedColor = Color(0xFFc9c7c9);
 const Color _surfaceColor = Color(0xFF261b25);
 const Color _onSurfaceColor = Color(0xFFc59f61);
 
@@ -37,14 +33,14 @@ final ThemeData coffeeTheme = ThemeData(
   colorScheme: ColorScheme.dark(
     primary: _primaryColor,
     secondary: _secondaryColor,
-    tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiary: _primaryColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
-    onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiary: _onPrimaryColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

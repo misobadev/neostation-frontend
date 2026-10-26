@@ -6,10 +6,6 @@ const Color _primaryColor = Color(0xFFE97072);
 const Color _onPrimaryColor = Color(0xFF801518);
 const Color _secondaryColor = Color(0xFFb7f6cd);
 const Color _onSecondaryColor = Color(0xFF00642e);
-const Color _tertiaryColor = Color(0xFFd08700);
-const Color _onTertiaryColor = Color(0xFF793205);
-const Color _tertiaryFixedColor = Color(0xFF56524c);
-const Color _onTertiaryFixedColor = Color(0xFFd4d0ce);
 const Color _surfaceColor = Color(0xFFece3ca);
 const Color _onSurfaceColor = Color(0xFF793205);
 
@@ -37,14 +33,14 @@ final ThemeData retroTheme = ThemeData(
   colorScheme: ColorScheme.light(
     primary: _primaryColor,
     secondary: _secondaryColor,
-    tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiary: _primaryColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
-    onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiary: _onPrimaryColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

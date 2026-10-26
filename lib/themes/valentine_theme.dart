@@ -6,10 +6,6 @@ const Color _primaryColor = Color(0xFFf43098);
 const Color _onPrimaryColor = Color(0xFFffffff);
 const Color _secondaryColor = Color(0xFFab44ff);
 const Color _onSecondaryColor = Color(0xFFf8f3fd);
-const Color _tertiaryColor = Color(0xFF71d1fe);
-const Color _onTertiaryColor = Color(0xFF014a70);
-const Color _tertiaryFixedColor = Color(0xFF830c41);
-const Color _onTertiaryFixedColor = Color(0xFFf9cbe5);
 const Color _surfaceColor = Color(0xFFfcf2f7);
 const Color _onSurfaceColor = Color(0xFFc5005a);
 
@@ -37,14 +33,14 @@ final ThemeData valentineTheme = ThemeData(
   colorScheme: ColorScheme.light(
     primary: _primaryColor,
     secondary: _secondaryColor,
-    tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiary: _primaryColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
-    onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiary: _onPrimaryColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

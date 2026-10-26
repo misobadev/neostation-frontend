@@ -21,11 +21,10 @@ void main() {
         const Color(0xFF0F380F),
       ); // base-content
       expect(theme.colorScheme.primary, const Color(0xFF306230)); // primary
-      expect(theme.colorScheme.tertiary, const Color(0xFF8BAC0F)); // accent
-      expect(
-        theme.colorScheme.tertiaryFixed,
-        const Color(0xFF306230),
-      ); // neutral
+      expect(theme.colorScheme.tertiary, theme.colorScheme.primary);
+      expect(theme.colorScheme.onTertiary, theme.colorScheme.onPrimary);
+      expect(theme.colorScheme.tertiaryFixed, theme.colorScheme.surface);
+      expect(theme.colorScheme.onTertiaryFixed, theme.colorScheme.onSurface);
       expect(theme.cardColor, const Color(0xFF8BAC0F)); // base-200
       expect(theme.colorScheme.outline, const Color(0xFF306230)); // base-300
     });
