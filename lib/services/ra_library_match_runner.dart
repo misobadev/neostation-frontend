@@ -76,8 +76,9 @@ class RaMatchStrings {
 /// ordering of the two passes, the progress denominator and the completion
 /// wording are policy, not widget code, and duplicating them would let the two
 /// entry points drift apart.
-/// Live progress of a running pass, for UI that wants to show it in place
-/// rather than in the notification bell.
+///
+/// Live progress of a running pass. It is used by the startup splash; the
+/// library itself reports through [GlobalNotificationService].
 ///
 /// [done] and [total] are null during the cheap lookup pass: it walks every
 /// hashed-but-unmatched ROM on every launch and finding nothing is its normal
@@ -113,10 +114,9 @@ class RaLibraryMatchRunner {
 
   static final _log = LoggerService.instance;
 
-  /// Non-null exactly while a pass is running. The systems grid shows this as
-  /// a row above the (still usable) library, the same way it shows the ROM
-  /// scan — which is where someone actually looks when the app has just
-  /// started, unlike a bell that has to be clicked.
+  /// Non-null exactly while a pass is running. The startup sequence uses this
+  /// to hold and advance the splash; matching messages themselves go through
+  /// [GlobalNotificationService].
   static final ValueNotifier<RaMatchProgress?> progress =
       ValueNotifier<RaMatchProgress?>(null);
 
@@ -151,12 +151,11 @@ class RaLibraryMatchRunner {
     final manual = trigger == RaMatchTrigger.manual;
     var notificationShown = false;
 
-    // The automatic pass reports through `progress` and the systems grid row.
-    // It deliberately does NOT post a running notification: it starts on its
-    // own, so a bell pulsing for minutes with a filename churning behind it is
-    // noise nobody asked for. Its completion message still goes to the bell.
-    // The manual pass keeps its notification — Tools' own inline bar reads the
-    // notification's progress, so removing it would blank that row.
+    // The automatic pass reports through `progress` for the startup splash and
+    // stays silent during the cheap lookup. It does post progress once it starts
+    // hashing ROMs, which is the long part, and its completion still goes to the
+    // notification centre. The manual pass posts both passes — Tools' inline bar
+    // reads the notification's progress, so removing it would blank that row.
     void publish({int? done, int? total}) => progress.value = RaMatchProgress(
       done: done,
       total: total,
@@ -272,7 +271,6 @@ class RaLibraryMatchRunner {
               onProgress: (processed, total, _) {
                 if (total == 0) return;
                 publish(done: processed, total: total);
-                if (!manual) return;
                 showOrUpdate(
                   message: strings.hashing
                       .replaceFirst('{done}', processed.toString())

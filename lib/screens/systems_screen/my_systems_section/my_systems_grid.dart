@@ -24,7 +24,6 @@ import '../../game_screen/my_games_list.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'grid_geometry.dart';
 import 'widgets/grid_loading_state.dart';
-import '../../../services/ra_library_match_runner.dart';
 import 'widgets/grid_empty_state.dart';
 import 'my_systems_carousel.dart';
 import 'package:neostation/widgets/custom_notification.dart';
@@ -154,38 +153,18 @@ class MySystems extends StatelessWidget {
           }
 
           // If a non-blocking background scan is active, overlay a progress
-          // toast. The RetroAchievements pass that runs after the scan gets the
-          // same treatment: it is the other half of "the library is still
-          // settling", and it is deliberately on this branch and not the
-          // isGlobalScanning one above, so it never blocks the grid.
-          return ValueListenableBuilder<RaMatchProgress?>(
-            valueListenable: RaLibraryMatchRunner.progress,
-            builder: (context, raProgress, _) {
-              // A splash-holding pass is never seen here — the startup screen
-              // is still up. This row is for the pass that resumes after a game
-              // session, which runs against a library already on screen.
-              final showRaRow = raProgress != null && !raProgress.holdsSplash;
-              if (!configProvider.isScanning && !showRaRow) {
-                return systemsWidget;
-              }
-              return Column(
-                children: [
-                  if (configProvider.isScanning)
-                    const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: SystemScanProgressWidget(),
-                    ),
-                  Expanded(child: systemsWidget),
-                  // Below the grid, not above it: the header floats over the
-                  // top of this column and would clip the row out of sight.
-                  if (showRaRow)
-                    const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: SystemScanProgressWidget(),
-                    ),
-                ],
-              );
-            },
+          // toast above the grid. RetroAchievements matching reports through
+          // the global notification centre instead of adding a second row here.
+          if (!configProvider.isScanning) return systemsWidget;
+
+          return Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: SystemScanProgressWidget(),
+              ),
+              Expanded(child: systemsWidget),
+            ],
           );
         },
       ),

@@ -4,7 +4,6 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:provider/provider.dart';
 import '../providers/sqlite_config_provider.dart';
-import '../services/ra_library_match_runner.dart';
 
 class SystemScanProgressWidget extends StatelessWidget {
   const SystemScanProgressWidget({super.key});
@@ -13,21 +12,7 @@ class SystemScanProgressWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<SqliteConfigProvider>(
       builder: (context, configProvider, child) {
-        if (!configProvider.isScanning) {
-          // The ROM scan is done, but the RetroAchievements pass it feeds runs
-          // on afterwards. It gets the same row rather than only a bell nobody
-          // clicks: this is where someone is already looking when the app has
-          // just started. One calm line — never the per-ROM churn, and never
-          // holding the library up, since this branch renders above a grid the
-          // user can already use.
-          return ValueListenableBuilder<RaMatchProgress?>(
-            valueListenable: RaLibraryMatchRunner.progress,
-            builder: (context, raProgress, _) {
-              if (raProgress == null) return const SizedBox.shrink();
-              return _buildRaMatchRow(context, raProgress);
-            },
-          );
-        }
+        if (!configProvider.isScanning) return const SizedBox.shrink();
 
         return Container(
           padding: EdgeInsets.all(12),
@@ -138,49 +123,6 @@ class SystemScanProgressWidget extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-
-  /// The one-line form used while the RetroAchievements pass runs.
-  Widget _buildRaMatchRow(BuildContext context, RaMatchProgress raProgress) {
-    final counted = raProgress.done != null && raProgress.total != null;
-    final label = counted
-        ? AppLocale.raMatchProgressCounted
-              .getString(context)
-              .replaceFirst('{done}', raProgress.done.toString())
-              .replaceFirst('{total}', raProgress.total.toString())
-        : AppLocale.raMatchProgressBusy.getString(context);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
