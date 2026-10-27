@@ -26,9 +26,13 @@ class SettingsActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final color = isDestructive
-        ? theme.colorScheme.error
-        : theme.colorScheme.primary;
+        ? scheme.error
+        : (selected ? scheme.surface : scheme.onSurface);
+    final iconColor = isDestructive
+        ? scheme.onError
+        : (selected ? scheme.onSurface : scheme.surface);
 
     return Container(
       padding: EdgeInsets.all(4.r),
@@ -43,7 +47,7 @@ class SettingsActionButton extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(icon, color: theme.colorScheme.onPrimary, size: 16.r),
+      child: Icon(icon, color: iconColor, size: 16.r),
     );
   }
 }

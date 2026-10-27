@@ -28,9 +28,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
     return Container(
       margin: EdgeInsets.only(bottom: 6.r),
       decoration: BoxDecoration(
-        color: isSelected
-            ? theme.colorScheme.primary.withValues(alpha: 0.2)
-            : Colors.transparent,
+        color: isSelected ? theme.colorScheme.onSurface : Colors.transparent,
         borderRadius:
             Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
             BorderRadius.circular(9.r),
@@ -75,7 +73,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                           height: 24.r,
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? theme.colorScheme.primary.withValues(
+                                ? theme.colorScheme.surface.withValues(
                                     alpha: 0.2,
                                   )
                                 : theme.colorScheme.primary.withValues(
@@ -92,7 +90,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                             child: Image.asset(
                               'assets/images/emulators/retroarch.webp',
                               color: isSelected
-                                  ? theme.colorScheme.primary
+                                  ? theme.colorScheme.surface
                                   : theme.colorScheme.onSurface,
                               colorBlendMode: BlendMode.srcIn,
                               errorBuilder: (context, error, stackTrace) =>
@@ -100,7 +98,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                                     Symbols.gamepad_rounded,
                                     size: 14.r,
                                     color: isSelected
-                                        ? theme.colorScheme.primary
+                                        ? theme.colorScheme.surface
                                         : theme.colorScheme.onSurface,
                                   ),
                             ),
@@ -117,7 +115,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                                   fontSize: 12.r,
                                   fontWeight: FontWeight.w600,
                                   color: isSelected
-                                      ? theme.colorScheme.primary
+                                      ? theme.colorScheme.surface
                                       : theme.colorScheme.onSurface,
                                 ),
                               ),
@@ -158,7 +156,8 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                                     style: TextStyle(
                                       fontSize: 10.r,
                                       color: isSelected
-                                          ? theme.colorScheme.primary
+                                          ? theme.colorScheme.surface
+                                                .withValues(alpha: 0.7)
                                           : theme.colorScheme.onSurface
                                                 .withValues(alpha: 0.6),
                                     ),
@@ -446,7 +445,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
       margin: EdgeInsets.only(bottom: 6.r),
       decoration: BoxDecoration(
         color: isSelected
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
+            ? Theme.of(context).colorScheme.onSurface
             : Colors.transparent,
         borderRadius:
             Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
@@ -488,7 +487,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                     color: isSelected
                         ? Theme.of(
                             context,
-                          ).colorScheme.primary.withValues(alpha: 0.2)
+                          ).colorScheme.surface.withValues(alpha: 0.2)
                         : Theme.of(
                             context,
                           ).colorScheme.primary.withValues(alpha: 0.1),
@@ -503,7 +502,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                     child: Image.asset(
                       'assets/images/emulators/retroarch.webp',
                       color: isSelected
-                          ? Theme.of(context).colorScheme.primary
+                          ? Theme.of(context).colorScheme.surface
                           : Theme.of(context).colorScheme.onSurface,
                       colorBlendMode: BlendMode.srcIn,
                       errorBuilder: (context, error, stackTrace) => Icon(
@@ -529,7 +528,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                               fontSize: 12.r,
                               fontWeight: FontWeight.w600,
                               color: isSelected
-                                  ? Theme.of(context).colorScheme.primary
+                                  ? Theme.of(context).colorScheme.surface
                                   : Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
@@ -608,7 +607,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                                 style: TextStyle(
                                   fontSize: 11.r,
                                   color: isSelected
-                                      ? Theme.of(context).colorScheme.primary
+                                      ? Theme.of(context).colorScheme.surface
                                       : Theme.of(context).colorScheme.onSurface,
                                 ),
                               ),
@@ -818,9 +817,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
     return Container(
       margin: EdgeInsets.only(bottom: 6.r),
       decoration: BoxDecoration(
-        color: isSelected
-            ? theme.colorScheme.primary.withValues(alpha: 0.15)
-            : Colors.transparent,
+        color: isSelected ? theme.colorScheme.onSurface : Colors.transparent,
         borderRadius:
             Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
             BorderRadius.circular(9.r),
@@ -865,7 +862,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                           height: 24.r,
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? theme.colorScheme.primary.withValues(
+                                ? theme.colorScheme.surface.withValues(
                                     alpha: 0.2,
                                   )
                                 : theme.colorScheme.primary.withValues(
@@ -883,7 +880,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                               Symbols.apps_rounded,
                               size: 14.r,
                               color: isSelected
-                                  ? theme.colorScheme.primary
+                                  ? theme.colorScheme.surface
                                   : theme.colorScheme.onSurface,
                             ),
                           ),
@@ -899,7 +896,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                                   fontSize: 12.r,
                                   fontWeight: FontWeight.w600,
                                   color: isSelected
-                                      ? theme.colorScheme.primary
+                                      ? theme.colorScheme.surface
                                       : theme.colorScheme.onSurface,
                                 ),
                               ),
@@ -964,7 +961,7 @@ extension _RowBuilders on _SystemEmulatorSettingsDialogState {
                                     style: TextStyle(
                                       fontSize: 11.r,
                                       color: isSelected
-                                          ? theme.colorScheme.primary
+                                          ? theme.colorScheme.surface
                                           : theme.colorScheme.onSurface,
                                     ),
                                   ),

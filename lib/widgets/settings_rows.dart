@@ -120,6 +120,8 @@ class EmulatorRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = isSelected ? scheme.surface : scheme.onSurface;
     final raCompatible = emulator?.isretroAchievementsCompatible ?? false;
     final installed = emulator?.isInstalled ?? true;
     final disabled = emulator != null && !installed;
@@ -132,10 +134,8 @@ class EmulatorRow extends StatelessWidget {
           margin: EdgeInsets.only(bottom: 4.r),
           decoration: BoxDecoration(
             color: isSelected
-                ? theme.colorScheme.secondary.withValues(alpha: 0.15)
-                : theme.colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.1,
-                  ),
+                ? scheme.onSurface
+                : scheme.surfaceContainerHighest.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(6.r),
           ),
           child: Padding(
@@ -148,24 +148,20 @@ class EmulatorRow extends StatelessWidget {
                   height: 22.r,
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? theme.colorScheme.secondary.withValues(alpha: 0.2)
-                        : theme.colorScheme.secondary.withValues(alpha: 0.1),
+                        ? scheme.surface.withValues(alpha: 0.12)
+                        : scheme.secondary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4.r),
                   ),
                   child: Padding(
                     padding: EdgeInsets.all(3.r),
                     child: Image.asset(
                       'assets/images/emulators/retroarch.webp',
-                      color: isSelected
-                          ? theme.colorScheme.secondary
-                          : theme.colorScheme.onSurface,
+                      color: foreground,
                       colorBlendMode: BlendMode.srcIn,
                       errorBuilder: (_, _, _) => Icon(
                         Symbols.gamepad_rounded,
                         size: 12.r,
-                        color: isSelected
-                            ? theme.colorScheme.secondary
-                            : theme.colorScheme.onSurface,
+                        color: foreground,
                       ),
                     ),
                   ),
@@ -180,9 +176,7 @@ class EmulatorRow extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12.r,
                           fontWeight: FontWeight.w600,
-                          color: isSelected
-                              ? theme.colorScheme.secondary
-                              : theme.colorScheme.onSurface,
+                          color: foreground,
                         ),
                       ),
                       SizedBox(height: 1.r),
@@ -230,9 +224,7 @@ class EmulatorRow extends StatelessWidget {
                                   installed ? 'Ready' : 'Not configured',
                                   style: TextStyle(
                                     fontSize: 10.r,
-                                    color: isSelected
-                                        ? theme.colorScheme.secondary
-                                        : theme.colorScheme.onSurface,
+                                    color: foreground,
                                   ),
                                 ),
                               ],
@@ -247,7 +239,7 @@ class EmulatorRow extends StatelessWidget {
                   Icon(
                     Symbols.check_circle_rounded,
                     size: 14.r,
-                    color: theme.colorScheme.secondary,
+                    color: foreground,
                   ),
               ],
             ),

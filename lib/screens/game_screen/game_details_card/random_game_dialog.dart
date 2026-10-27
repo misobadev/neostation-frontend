@@ -11,7 +11,10 @@ import '../../../constants/system_folder_names.dart';
 import '../../../models/game_model.dart';
 import '../../../providers/file_provider.dart';
 import '../../../utils/game_utils.dart';
+import '../../../themes/corner_radii.dart';
 import '../../../utils/gamepad_nav.dart';
+import '../../../widgets/core_footer.dart';
+import '../../../widgets/neo_glass.dart';
 
 /// A modal dialog that facilitates random game selection with a slot-machine style animation.
 ///
@@ -49,10 +52,6 @@ class _RandomGameDialogState extends State<RandomGameDialog>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  late AnimationController _revealController;
-  late Animation<double> _revealScale;
-  late Animation<double> _revealOpacity;
-
   // Slot-machine configuration: handles timing and rhythmic SFX ticks.
   int _cycleCount = 0;
   static const int _totalCycles = 18;
@@ -76,17 +75,6 @@ class _RandomGameDialogState extends State<RandomGameDialog>
     );
     _fadeController.forward();
 
-    _revealController = AnimationController(
-      duration: const Duration(milliseconds: 320),
-      vsync: this,
-    );
-    _revealScale = Tween<double>(begin: 0.88, end: 1.0).animate(
-      CurvedAnimation(parent: _revealController, curve: Curves.easeOutBack),
-    );
-    _revealOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _revealController, curve: Curves.easeOut),
-    );
-
     _initializeGamepad();
     _startRandomCycle();
   }
@@ -94,15 +82,9 @@ class _RandomGameDialogState extends State<RandomGameDialog>
   /// Configures the gamepad layer for selection and re-roll protocols.
   void _initializeGamepad() {
     _gamepadNav = GamepadNavigation(
-      onBack: () => Navigator.of(context).pop(),
+      onBack: _close,
       // Gamepad A: Execute launching sequence for the chosen title.
-      onSelectItem: () {
-        if (!_isAnimating && _showPlayButton && _selectedGame != null) {
-          SfxService().playEnterSound();
-          Navigator.of(context).pop();
-          widget.onPlayGame(_selectedGame!);
-        }
-      },
+      onSelectItem: _playSelected,
       // Gamepad X: Restart the randomization process.
       onXButton: () {
         if (!_isAnimating && _showPlayButton) {
@@ -114,10 +96,22 @@ class _RandomGameDialogState extends State<RandomGameDialog>
     _gamepadNav?.activate();
   }
 
+  void _playSelected() {
+    final game = _selectedGame;
+    if (_isAnimating || !_showPlayButton || game == null) return;
+    SfxService().playEnterSound();
+    Navigator.of(context).pop();
+    widget.onPlayGame(game);
+  }
+
+  void _close() {
+    SfxService().playBackSound();
+    Navigator.of(context).pop();
+  }
+
   /// Resets the randomization state and initiates a new visual cycle.
   void _reroll() {
     _cycleTimer?.cancel();
-    _revealController.reset();
     setState(() {
       _cycleCount = 0;
       _sfxTickCount = 0;
@@ -131,7 +125,6 @@ class _RandomGameDialogState extends State<RandomGameDialog>
   void dispose() {
     _cycleTimer?.cancel();
     _fadeController.dispose();
-    _revealController.dispose();
     _gamepadNav?.dispose();
     super.dispose();
   }
@@ -161,7 +154,6 @@ class _RandomGameDialogState extends State<RandomGameDialog>
           _showPlayButton = true;
         });
         SfxService().playEnterSound();
-        _revealController.forward();
         return;
       }
 
@@ -217,50 +209,44 @@ class _RandomGameDialogState extends State<RandomGameDialog>
     if (widget.games.isEmpty) return _buildEmptyDialog();
 
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     final currentGame = widget.games[_currentIndex];
 
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      insetPadding: EdgeInsets.symmetric(horizontal: 40.r, vertical: 30.r),
+      insetPadding: EdgeInsets.all(16.r),
       child: FadeTransition(
         opacity: _fadeAnimation,
-        child: Container(
-          constraints: BoxConstraints(maxWidth: 320.r, maxHeight: 180.r),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(10.r),
-            border: Border.all(
-              color: _isAnimating
-                  ? theme.colorScheme.primary.withValues(alpha: 0.35)
-                  : theme.colorScheme.secondary.withValues(alpha: 0.4),
-              width: 1.r,
+        child: NeoGlassRim(
+          cornerRadius: radii.radiusExternalRadius,
+          child: Container(
+            constraints: const BoxConstraints(
+              maxWidth: 480.0,
+              maxHeight: 280.0,
             ),
-            boxShadow: [
-              BoxShadow(
-                color:
-                    (_isAnimating
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.secondary)
-                        .withValues(alpha: 0.12),
-                blurRadius: 18.r,
-                spreadRadius: 1.r,
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 8.r,
-                offset: Offset(0, 3.r),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(10.r),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildHeader(theme),
-                Expanded(child: _buildBody(theme, currentGame)),
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              borderRadius: radii.radiusExternal,
+              border: Border.all(color: scheme.outline.withValues(alpha: 0.15)),
+              boxShadow: [
+                BoxShadow(
+                  color: scheme.shadow.withValues(alpha: 0.5),
+                  blurRadius: 18.r,
+                  offset: Offset(0, 8.r),
+                ),
               ],
+            ),
+            child: ClipRRect(
+              borderRadius: radii.radiusExternal,
+              child: Column(
+                children: [
+                  _buildHeader(theme),
+                  Expanded(child: _buildBody(theme, currentGame)),
+                  _buildFooter(theme),
+                ],
+              ),
             ),
           ),
         ),
@@ -268,175 +254,73 @@ class _RandomGameDialogState extends State<RandomGameDialog>
     );
   }
 
-  /// Renders the top status bar with dynamic icons based on animation state.
+  /// NeoGlass-style header with the live selection state.
   Widget _buildHeader(ThemeData theme) {
+    final scheme = theme.colorScheme;
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 5.r),
+      padding: EdgeInsets.fromLTRB(12.r, 8.r, 12.r, 8.r),
       decoration: BoxDecoration(
-        color: _isAnimating
-            ? theme.colorScheme.primary.withValues(alpha: 0.08)
-            : theme.colorScheme.secondary.withValues(alpha: 0.08),
         border: Border(
-          bottom: BorderSide(
-            color: _isAnimating
-                ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                : theme.colorScheme.secondary.withValues(alpha: 0.12),
-            width: 1.r,
-          ),
+          bottom: BorderSide(color: scheme.outline.withValues(alpha: 0.12)),
         ),
       ),
       child: Row(
         children: [
-          Icon(
-            _isAnimating ? Symbols.casino_rounded : Symbols.stars_rounded,
-            size: 13.r,
-            color: _isAnimating
-                ? theme.colorScheme.primary
-                : theme.colorScheme.secondary,
-          ),
-          SizedBox(width: 5.r),
-          Text(
-            _isAnimating
-                ? AppLocale.randomGame.getString(context)
-                : AppLocale.selected.getString(context),
-            style: TextStyle(
-              fontSize: 11.r,
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
-              letterSpacing: 0.5,
+          Container(
+            width: 26.r,
+            height: 26.r,
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            child: Icon(
+              _isAnimating ? Symbols.casino_rounded : Symbols.stars_rounded,
+              size: 15.r,
+              color: scheme.primary,
             ),
           ),
-          const Spacer(),
-          // Prompt for 'Re-roll' action.
-          if (!_isAnimating) ...[
-            GestureDetector(
-              onTap: _reroll,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 6.r),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(6.r),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 2.r,
-                      offset: Offset(2.r, 2.r),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ColorFiltered(
-                      colorFilter: ColorFilter.mode(
-                        theme.colorScheme.tertiary,
-                        BlendMode.srcIn,
-                      ),
-                      child: Image.asset(
-                        'assets/images/gamepad/Xbox_X_button.png',
-                        width: 14.r,
-                        height: 14.r,
-                        errorBuilder: (context, e, s) => Icon(
-                          Symbols.casino_rounded,
-                          size: 14.r,
-                          color: theme.colorScheme.tertiary,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 2.r),
-                    Text(
-                      AppLocale.random.getString(context).toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 10.r,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
-                        color: theme.colorScheme.tertiary,
-                      ),
-                    ),
-                    SizedBox(width: 2.r),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(width: 6.r),
-          ],
-          // Prompt for 'Back' action (Dismissal).
-          GestureDetector(
-            onTap: () {
-              SfxService().playBackSound();
-              Navigator.of(context).pop();
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 6.r),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.error,
-                borderRadius: BorderRadius.circular(6.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 2.r,
-                    offset: Offset(2.r, 2.r),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ColorFiltered(
-                    colorFilter: ColorFilter.mode(
-                      theme.colorScheme.onError,
-                      BlendMode.srcIn,
-                    ),
-                    child: Image.asset(
-                      'assets/images/gamepad/Xbox_B_button.png',
-                      width: 14.r,
-                      height: 14.r,
-                      errorBuilder: (context, e, s) => Icon(
-                        Symbols.close_rounded,
-                        size: 14.r,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 2.r),
-                  Text(
-                    AppLocale.back.getString(context).toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10.r,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
-                      color: theme.colorScheme.onError,
-                    ),
-                  ),
-                  SizedBox(width: 2.r),
-                ],
+          SizedBox(width: 8.r),
+          Expanded(
+            child: Text(
+              AppLocale.randomGame.getString(context),
+              style: TextStyle(
+                fontSize: 12.r,
+                fontWeight: FontWeight.w700,
+                color: scheme.onSurface,
               ),
             ),
           ),
+          if (_isAnimating)
+            SizedBox(
+              width: 16.r,
+              height: 16.r,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.r,
+                color: scheme.primary,
+              ),
+            ),
         ],
       ),
     );
   }
 
-  /// Core UI layout: Features a gradient-masked screenshot background and meta-info overlay.
+  /// Hero area: the game screenshot on the left, fading into a NeoGlass card
+  /// with the wheel, title, system and metadata on the right.
   Widget _buildBody(ThemeData theme, GameModel currentGame) {
     final screenshotFile = _resolveBackgroundFile(currentGame);
-
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Background layer: Dynamic screenshot with horizontal opacity mask.
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 60),
           child: _buildScreenshotGradient(theme, screenshotFile, currentGame),
         ),
-        // Foreground layer: Metadata and launch controls.
         Align(
           alignment: Alignment.centerRight,
-          child: SizedBox(
-            width: 180.r,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 8.r),
+          child: Padding(
+            padding: EdgeInsets.all(10.r),
+            child: SizedBox(
+              width: 230.0,
               child: _buildGameInfo(theme, currentGame),
             ),
           ),
@@ -445,9 +329,11 @@ class _RandomGameDialogState extends State<RandomGameDialog>
     );
   }
 
-  /// Applies a complex linear gradient mask to the background screenshot for high-contrast text overlay.
+  /// Fades the screenshot into the dialog surface so the info panel stays
+  /// readable without hiding the artwork completely.
   Widget _buildScreenshotGradient(ThemeData theme, File file, GameModel game) {
-    Widget imageWidget = file.existsSync()
+    final scheme = theme.colorScheme;
+    final imageWidget = file.existsSync()
         ? Image.file(
             file,
             key: ValueKey(game.romname),
@@ -456,257 +342,310 @@ class _RandomGameDialogState extends State<RandomGameDialog>
             height: double.infinity,
             errorBuilder: (context, e, s) => _screenshotFallback(theme),
           )
-        : SizedBox(key: ValueKey(game.romname));
+        : _screenshotFallback(theme);
 
-    return ShaderMask(
-      shaderCallback: (bounds) => LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-        stops: const [0.0, 0.45, 0.75, 1.0],
-        colors: [
-          Colors.white,
-          Colors.white.withValues(alpha: 0.15),
-          Colors.white.withValues(alpha: 0.35),
-          Colors.transparent,
-        ],
-      ).createShader(bounds),
-      blendMode: BlendMode.dstIn,
-      child: imageWidget,
-    );
-  }
-
-  Widget _screenshotFallback(ThemeData theme) {
-    return Center(
-      child: Icon(
-        Symbols.image_not_supported_rounded,
-        color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
-        size: 28.r,
-      ),
-    );
-  }
-
-  /// Renders game identifiers (Wheel logo, name, system) and the primary 'Play' CTA.
-  Widget _buildGameInfo(ThemeData theme, GameModel game) {
-    final wheelPath = _getImagePath(game, 'wheels');
-    final wheelFile = File(wheelPath);
-
-    String systemName;
-    if (SystemFolderNames.isAggregate(widget.systemFolderName)) {
-      systemName = game.systemRealName ?? game.systemFolderName ?? '';
-    } else {
-      systemName = widget.systemRealName ?? widget.systemFolderName;
-    }
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        // Visual branding: Wheels logo or generic controller icon.
-        if (wheelFile.existsSync())
-          Image.file(
-            wheelFile,
-            height: 36.r,
-            fit: BoxFit.contain,
-            errorBuilder: (context, e, s) => Icon(
-              Symbols.videogame_asset_rounded,
-              size: 28.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+        imageWidget,
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              stops: const [0.0, 0.42, 0.72, 1.0],
+              colors: [
+                scheme.surface.withValues(alpha: 0.08),
+                scheme.surface.withValues(alpha: 0.32),
+                scheme.surface.withValues(alpha: 0.86),
+                scheme.surface,
+              ],
             ),
-          )
-        else
-          Icon(
-            Symbols.videogame_asset_rounded,
-            size: 28.r,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-          ),
-
-        SizedBox(height: 6.r),
-
-        // Primary title display with animation-state font sizing.
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 55),
-          child: Text(
-            key: ValueKey(game.romname),
-            GameUtils.formatGameName(game.name),
-            style: TextStyle(
-              fontSize: _isAnimating ? 11.r : 13.r,
-              fontWeight: FontWeight.w700,
-              color: _isAnimating
-                  ? theme.colorScheme.onSurface.withValues(alpha: 0.75)
-                  : theme.colorScheme.onSurface,
-              letterSpacing: 0.2,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
         ),
-
-        SizedBox(height: 3.r),
-
-        // System identifier badge.
-        if (systemName.isNotEmpty)
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 2.r),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary,
-              borderRadius: BorderRadius.circular(4.r),
-            ),
-            child: Text(
-              systemName,
-              style: TextStyle(
-                fontSize: 8.r,
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
-                letterSpacing: 0.3,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-
-        SizedBox(height: 10.r),
-
-        // Post-selection call to action (Play button).
-        if (_showPlayButton)
-          ScaleTransition(
-            scale: _revealScale,
-            child: FadeTransition(
-              opacity: _revealOpacity,
-              child: GestureDetector(
-                onTap: _selectedGame != null
-                    ? () {
-                        SfxService().playEnterSound();
-                        Navigator.of(context).pop();
-                        widget.onPlayGame(_selectedGame!);
-                      }
-                    : null,
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 20.r,
-                    vertical: 8.r,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2ECC71), Color(0xFF1E8449)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(7.r),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        blurRadius: 2.r,
-                        offset: Offset(2.r, 2.r),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset(
-                        'assets/images/gamepad/Xbox_A_button.png',
-                        width: 14.r,
-                        height: 14.r,
-                        color: Colors.white,
-                        errorBuilder: (context, e, s) => Icon(
-                          Symbols.play_arrow_rounded,
-                          size: 14.r,
-                          color: Colors.white,
-                        ),
-                      ),
-                      SizedBox(width: 6.r),
-                      Text(
-                        AppLocale.playButton.getString(context),
-                        style: TextStyle(
-                          fontSize: 11.r,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
-                          color: Colors.white,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              offset: const Offset(0, 1),
-                              blurRadius: 2,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          )
-        else
-          // Shuffling indicator.
-          SizedBox(
-            width: 16.r,
-            height: 16.r,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5.r,
-              color: theme.colorScheme.primary.withValues(alpha: 0.5),
-            ),
-          ),
       ],
     );
   }
 
-  /// Placeholder for empty list scenarios.
-  Widget _buildEmptyDialog() {
-    final theme = Theme.of(context);
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
+  Widget _screenshotFallback(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primary.withValues(alpha: 0.16), scheme.surface],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Symbols.casino_rounded,
+          color: scheme.primary.withValues(alpha: 0.25),
+          size: 64.r,
+        ),
+      ),
+    );
+  }
+
+  String _systemName(GameModel game) {
+    if (SystemFolderNames.isAggregate(widget.systemFolderName)) {
+      return game.systemRealName ?? game.systemFolderName ?? '';
+    }
+    return widget.systemRealName ?? widget.systemFolderName;
+  }
+
+  /// Shows only the year and month when [value] carries a full date.
+  String _yearMonth(String value) {
+    final raw = value.trim();
+    if (raw.isEmpty) return raw;
+    final separated = RegExp(r'^(\d{4})[-/.](\d{1,2})').firstMatch(raw);
+    if (separated != null) {
+      return '${separated.group(1)}-${separated.group(2)!.padLeft(2, '0')}';
+    }
+    final date = DateTime.tryParse(raw);
+    if (date != null) {
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}';
+    }
+    return raw;
+  }
+
+  /// Wheel, title, system badge and metadata inside a rounded NeoGlass panel.
+  Widget _buildGameInfo(ThemeData theme, GameModel game) {
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final wheelFile = File(_getImagePath(game, 'wheels'));
+    final systemName = _systemName(game);
+    final metadata = [
+      _yearMonth(game.year),
+      game.genre,
+    ].where((value) => value.trim().isNotEmpty).join('  ·  ');
+
+    return NeoGlassRim(
+      cornerRadius: radii.radiusInternalRadius,
       child: Container(
-        width: 260.r,
-        padding: EdgeInsets.all(16.r),
+        padding: EdgeInsets.all(10.r),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(10.r),
-          border: Border.all(
-            color: theme.colorScheme.error.withValues(alpha: 0.25),
-            width: 1.r,
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.16),
+          borderRadius: radii.radiusInternal,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (wheelFile.existsSync())
+                Image.file(
+                  wheelFile,
+                  height: 42.r,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, e, s) => Icon(
+                    Symbols.videogame_asset_rounded,
+                    size: 26.r,
+                    color: scheme.onSurface.withValues(alpha: 0.4),
+                  ),
+                )
+              else
+                Icon(
+                  Symbols.videogame_asset_rounded,
+                  size: 26.r,
+                  color: scheme.onSurface.withValues(alpha: 0.3),
+                ),
+              SizedBox(height: 7.r),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 55),
+                child: Text(
+                  key: ValueKey(game.romname),
+                  GameUtils.formatGameName(game.name),
+                  style: TextStyle(
+                    fontSize: _isAnimating ? 11.r : 14.r,
+                    fontWeight: FontWeight.w700,
+                    color: _isAnimating
+                        ? scheme.onSurface.withValues(alpha: 0.75)
+                        : scheme.onSurface,
+                    height: 1.15,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (systemName.isNotEmpty) ...[
+                SizedBox(height: 4.r),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 3.r),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999.r),
+                    border: Border.all(
+                      color: scheme.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Text(
+                    systemName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 9.r,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+              if (metadata.isNotEmpty) ...[
+                SizedBox(height: 3.r),
+                Text(
+                  metadata,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9.r,
+                    color: scheme.onSurface.withValues(alpha: 0.55),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Symbols.casino_rounded,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-              size: 28.r,
-            ),
-            SizedBox(height: 8.r),
-            Text(
-              AppLocale.noGamesAvailable.getString(context),
-              style: TextStyle(
-                fontSize: 12.r,
-                fontWeight: FontWeight.w700,
-                color: theme.colorScheme.onSurface,
+      ),
+    );
+  }
+
+  /// NeoGlass-style action row: Play, Re-roll (once revealed), Back.
+  Widget _buildFooter(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    final canPlay = !_isAnimating && _showPlayButton && _selectedGame != null;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 6.r),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.05),
+        border: Border(
+          top: BorderSide(color: scheme.outline.withValues(alpha: 0.12)),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: GamepadControl(
+                iconPath: 'assets/images/gamepad/Xbox_A_button.png',
+                label: AppLocale.playButton.getString(context),
+                onTap: canPlay ? _playSelected : null,
+                busy: _isAnimating,
+                backgroundColor: scheme.primary,
+                textColor: scheme.onPrimary,
               ),
             ),
-            SizedBox(height: 12.r),
-            SizedBox(
-              width: double.infinity,
-              height: 24.r,
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: FilledButton.styleFrom(
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  foregroundColor: theme.colorScheme.onSurface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6.r),
-                  ),
-                  padding: EdgeInsets.zero,
-                ),
-                child: Text(
-                  AppLocale.close.getString(context),
-                  style: TextStyle(fontSize: 11.r),
+          ),
+          if (!_isAnimating) ...[
+            SizedBox(width: 6.r),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: GamepadControl(
+                  iconPath: 'assets/images/gamepad/Xbox_X_button.png',
+                  label: AppLocale.random.getString(context),
+                  onTap: _reroll,
+                  backgroundColor: scheme.tertiaryFixed,
+                  textColor: scheme.onTertiaryFixed,
                 ),
               ),
             ),
           ],
+          SizedBox(width: 6.r),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: GamepadControl(
+                iconPath: 'assets/images/gamepad/Xbox_B_button.png',
+                label: AppLocale.back.getString(context),
+                onTap: _close,
+                backgroundColor: scheme.tertiary,
+                textColor: scheme.onTertiary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Empty state in the same NeoGlass card language.
+  Widget _buildEmptyDialog() {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: EdgeInsets.all(16.r),
+      child: NeoGlassRim(
+        cornerRadius: radii.radiusExternalRadius,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 480.0),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: radii.radiusExternal,
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.15)),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.shadow.withValues(alpha: 0.5),
+                blurRadius: 18.r,
+                offset: Offset(0, 8.r),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: radii.radiusExternal,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(16.r),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: scheme.outline.withValues(alpha: 0.12),
+                      ),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Symbols.casino_rounded,
+                        color: scheme.primary,
+                        size: 34.r,
+                      ),
+                      SizedBox(height: 8.r),
+                      Text(
+                        AppLocale.noGamesAvailable.getString(context),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13.r,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.all(12.r),
+                  child: GamepadControl(
+                    iconPath: 'assets/images/gamepad/Xbox_B_button.png',
+                    label: AppLocale.close.getString(context),
+                    onTap: _close,
+                    backgroundColor: scheme.tertiary,
+                    textColor: scheme.onTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -33,6 +33,9 @@ import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/utils/romm_failure_message.dart';
 import 'package:neostation/utils/romm_local_matcher.dart';
 import 'package:neostation/utils/game_launch_utils.dart';
+import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/screens/game_screen/game_settings_dialog/romm_match_picker_dialog.dart';
@@ -59,8 +62,14 @@ Future<void> openSearch(
   GamepadNavigationManager.deactivateAll();
   try {
     final picked = await Navigator.of(context).push<DatabaseGameModel>(
-      MaterialPageRoute(
-        builder: (_) => SearchScreen(initialSystemFolder: systemFolder),
+      PageRouteBuilder<DatabaseGameModel>(
+        opaque: false,
+        barrierColor: Colors.transparent,
+        transitionDuration: const Duration(milliseconds: 180),
+        pageBuilder: (_, _, _) =>
+            SearchScreen(initialSystemFolder: systemFolder),
+        transitionsBuilder: (_, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
       ),
     );
     if (picked == null || !context.mounted) return;
@@ -1480,36 +1489,50 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // A full-screen route with no header, like the Collections browser: the
-    // search field sits at the top of the screen. System back goes through
-    // [_handleBack], so it steps out of a menu or the results before it leaves.
-    final body = _loading
+    final content = _loading
         ? const Center(child: CircularProgressIndicator())
-        : Stack(
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12.r),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(height: 16.r),
-                    _buildSearchRow(theme),
-                    if (_filtersExpanded) ...[
-                      SizedBox(height: 6.r),
-                      _buildFilterChips(theme),
-                    ],
-                    SizedBox(height: 8.r),
-                    Expanded(child: _buildResults(theme)),
-                  ],
+                padding: EdgeInsets.fromLTRB(14.r, 10.r, 14.r, 0),
+                child: _buildSearchRow(theme),
+              ),
+              if (_filtersExpanded) ...[
+                SizedBox(height: 6.r),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14.r),
+                  child: _buildFilterChips(theme),
+                ),
+              ],
+              SizedBox(height: 8.r),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14.r),
+                  child: _buildResults(theme),
                 ),
               ),
-              if (_region == _FocusRegion.filterMenu && _menuKey != null)
-                _buildFilterMenu(theme, _menuKey!),
-              if (_region == _FocusRegion.action &&
-                  (_actionTarget != null || _actionRemoteTarget != null))
-                _buildActionChooser(theme),
             ],
           );
+
+    final body = Stack(
+      children: [
+        Positioned.fill(
+          child: ColoredBox(color: Colors.black.withValues(alpha: 0.54)),
+        ),
+        SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(16.r),
+            child: Center(child: _buildDialogShell(theme, content)),
+          ),
+        ),
+        if (_region == _FocusRegion.filterMenu && _menuKey != null)
+          _buildFilterMenu(theme, _menuKey!),
+        if (_region == _FocusRegion.action &&
+            (_actionTarget != null || _actionRemoteTarget != null))
+          _buildActionChooser(theme),
+      ],
+    );
 
     return PopScope(
       canPop: _canPop,
@@ -1517,10 +1540,128 @@ class _SearchScreenState extends State<SearchScreen> {
         if (didPop) return;
         _handleBack();
       },
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        body: body,
+      child: Scaffold(backgroundColor: Colors.transparent, body: body),
+    );
+  }
+
+  /// Large dialog shell that mirrors the settings dialog chrome.
+  ///
+  /// The outer surface is opaque and rimmed with [NeoGlassRim] rather than
+  /// blurred: a full-screen backdrop blur is costly on the low-end handhelds
+  /// this screen targets, while the inner cards still carry the same glass rim.
+  Widget _buildDialogShell(ThemeData theme, Widget content) {
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final radius = radii.radiusExternal;
+    final radiusPx = radii.radiusExternalRadius;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = math.min(constraints.maxWidth, 640.0);
+        final height = math.min(constraints.maxHeight, 480.0);
+        return SizedBox(
+          width: width,
+          height: height,
+          child: NeoGlassRim(
+            cornerRadius: radiusPx,
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: radius,
+                border: Border.all(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.shadow.withValues(alpha: 0.5),
+                    blurRadius: 18.r,
+                    offset: Offset(0, 8.r),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: radius,
+                child: Column(
+                  children: [
+                    Expanded(child: content),
+                    _buildDialogFooter(theme),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDialogFooter(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    return Container(
+      padding: EdgeInsets.all(8.r),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.only(
+          bottomLeft: radii.radiusExternal.bottomLeft,
+          bottomRight: radii.radiusExternal.bottomRight,
+        ),
       ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                GamepadControl(
+                  iconPath: 'assets/images/gamepad/Xbox_D-pad_ALL.png',
+                  label: AppLocale.navigate.getString(context),
+                  backgroundColor: scheme.tertiaryFixed,
+                  textColor: scheme.onTertiaryFixed,
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8.r),
+          GamepadControl(
+            iconPath: 'assets/images/gamepad/Xbox_B_button.png',
+            label: AppLocale.back.getString(context),
+            backgroundColor: scheme.tertiary,
+            textColor: scheme.onTertiary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Small glass rim used by the modal's inner cards.
+  Widget _rimmed(BuildContext context, Widget child, {double? radius}) {
+    final radii = Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m();
+    return NeoGlassRim(
+      cornerRadius: radius ?? radii.radiusInternalRadius,
+      child: child,
+    );
+  }
+
+  /// Selection colours shared by every focusable item in the search dialog.
+  ///
+  /// Focused rows invert the palette (`onSurface` fill with `surface` text) and
+  /// drop the old primary outline. Applied-but-not-focused filters use the same
+  /// muted selection tone as the system Options rows so they stay distinct.
+  ({Color background, Color foreground}) _selectionPalette(
+    ThemeData theme, {
+    required bool focused,
+    bool selected = false,
+  }) {
+    final scheme = theme.colorScheme;
+    if (focused) {
+      return (background: scheme.onSurface, foreground: scheme.surface);
+    }
+    return (
+      background: selected
+          ? Color.alphaBlend(
+              scheme.onSurface.withValues(alpha: 0.18),
+              scheme.surface,
+            )
+          : scheme.surface.withValues(alpha: 0.5),
+      foreground: scheme.onSurface,
     );
   }
 
@@ -1538,35 +1679,42 @@ class _SearchScreenState extends State<SearchScreen> {
           child: Center(
             child: GestureDetector(
               onTap: () {},
-              child: Container(
-                width: 320.r,
-                padding: EdgeInsets.all(16.r),
-                decoration: BoxDecoration(
-                  color: scheme.surface,
-                  borderRadius: BorderRadius.circular(16.r),
-                  border: Border.all(
-                    color: scheme.primary.withValues(alpha: 0.4),
-                    width: 1.r,
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15.r,
-                        fontWeight: FontWeight.w700,
-                        color: scheme.onSurface,
-                      ),
+              child: _rimmed(
+                context,
+                radius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                    .radiusExternalRadius,
+                Container(
+                  width: 380.r,
+                  padding: EdgeInsets.all(16.r),
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius:
+                        (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                            .radiusExternal,
+                    border: Border.all(
+                      color: scheme.outline.withValues(alpha: 0.15),
+                      width: 1.r,
                     ),
-                    SizedBox(height: 12.r),
-                    for (var i = 0; i < _actionOptions.length; i++)
-                      _buildActionOption(theme, _actionOptions[i], i),
-                  ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.r,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                      SizedBox(height: 12.r),
+                      for (var i = 0; i < _actionOptions.length; i++)
+                        _buildActionOption(theme, _actionOptions[i], i),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1581,8 +1729,9 @@ class _SearchScreenState extends State<SearchScreen> {
     SearchResultAction action,
     int index,
   ) {
-    final scheme = theme.colorScheme;
     final isFocused = _actionIndex == index;
+    final palette = _selectionPalette(theme, focused: isFocused);
+    final foreground = palette.foreground;
     final (icon, label) = switch (action) {
       SearchResultAction.goTo => (
         Symbols.my_location_rounded,
@@ -1610,29 +1759,20 @@ class _SearchScreenState extends State<SearchScreen> {
         margin: EdgeInsets.symmetric(vertical: 4.r),
         padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 12.r),
         decoration: BoxDecoration(
-          color: isFocused
-              ? scheme.primary.withValues(alpha: 0.18)
-              : scheme.surface.withValues(alpha: 0.5),
+          color: palette.background,
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: isFocused ? scheme.primary : Colors.transparent,
-            width: 2.r,
-          ),
+          border: Border.all(color: Colors.transparent, width: 2.r),
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 18.r,
-              color: isFocused ? scheme.primary : scheme.onSurface,
-            ),
+            Icon(icon, size: 18.r, color: foreground),
             SizedBox(width: 8.r),
             Text(
               label,
               style: TextStyle(
-                fontSize: 14.r,
+                fontSize: 12.r,
                 fontWeight: FontWeight.w700,
-                color: isFocused ? scheme.primary : scheme.onSurface,
+                color: foreground,
               ),
             ),
           ],
@@ -1694,18 +1834,18 @@ class _SearchScreenState extends State<SearchScreen> {
     return Row(
       children: [
         Expanded(child: _buildNameField(theme, _searchFocused('field'))),
-        SizedBox(width: 10.r),
+        SizedBox(width: 8.r),
         Text(
           AppLocale.searchResultsCount
               .getString(context)
               .replaceFirst('{count}', '${_results.length}'),
           style: TextStyle(
-            fontSize: 12.r,
+            fontSize: 10.r,
             fontWeight: FontWeight.w600,
             color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
-        SizedBox(width: 10.r),
+        SizedBox(width: 8.r),
         _buildAdvancedToggle(theme, _searchFocused('filters')),
       ],
     );
@@ -1716,80 +1856,78 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildAdvancedToggle(ThemeData theme, bool focused) {
     final scheme = theme.colorScheme;
     final count = _activeFilterCount;
-    final accent = focused || count > 0;
+    final palette = _selectionPalette(
+      theme,
+      focused: focused,
+      selected: count > 0,
+    );
+    final foreground = palette.foreground;
     return GestureDetector(
       onTap: _toggleFilters,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 9.r),
-        decoration: BoxDecoration(
-          color: focused
-              ? scheme.primary.withValues(alpha: 0.18)
-              : (count > 0
-                    ? scheme.primary.withValues(alpha: 0.10)
-                    : scheme.surface.withValues(alpha: 0.5)),
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: focused
-                ? scheme.primary
-                : (count > 0
-                      ? scheme.primary.withValues(alpha: 0.5)
-                      : Colors.transparent),
-            width: 2.r,
+      child: _rimmed(
+        context,
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
+          decoration: BoxDecoration(
+            color: palette.background,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: Colors.transparent, width: 2.r),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Symbols.tune_rounded,
-              size: 18.r,
-              color: accent ? scheme.primary : scheme.onSurface,
-            ),
-            SizedBox(width: 6.r),
-            Text(
-              AppLocale.searchFilters.getString(context),
-              style: TextStyle(
-                fontSize: 13.r,
-                fontWeight: FontWeight.w700,
-                color: accent ? scheme.primary : scheme.onSurface,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Symbols.tune_rounded,
+                size: 15.r,
+                color: foreground.withValues(alpha: focused ? 1 : 0.75),
               ),
-            ),
-            if (count > 0) ...[
-              SizedBox(width: 6.r),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 1.r),
-                decoration: BoxDecoration(
-                  color: scheme.primary,
-                  borderRadius: BorderRadius.circular(8.r),
+              SizedBox(width: 4.r),
+              Text(
+                AppLocale.searchFilters.getString(context),
+                style: TextStyle(
+                  fontSize: 12.r,
+                  fontWeight: FontWeight.w700,
+                  color: foreground,
                 ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 11.r,
-                    fontWeight: FontWeight.w800,
-                    color: scheme.onPrimary,
+              ),
+              if (count > 0) ...[
+                SizedBox(width: 4.r),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 1.r),
+                  decoration: BoxDecoration(
+                    color: focused ? scheme.surface : scheme.onSurface,
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 11.r,
+                      fontWeight: FontWeight.w800,
+                      color: focused ? scheme.onSurface : scheme.surface,
+                    ),
                   ),
                 ),
+              ],
+              SizedBox(width: 2.r),
+              Icon(
+                _filtersExpanded
+                    ? Symbols.expand_less_rounded
+                    : Symbols.expand_more_rounded,
+                size: 14.r,
+                color: foreground.withValues(alpha: focused ? 0.9 : 0.6),
               ),
             ],
-            SizedBox(width: 4.r),
-            Icon(
-              _filtersExpanded
-                  ? Symbols.expand_less_rounded
-                  : Symbols.expand_more_rounded,
-              size: 16.r,
-              color: scheme.onSurface.withValues(alpha: focused ? 0.9 : 0.5),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildNameField(ThemeData theme, bool focused) {
-    return Container(
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final field = Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: radii.radiusInternal,
         border: Border.all(
           color: focused ? theme.colorScheme.primary : Colors.transparent,
           width: 2.r,
@@ -1805,28 +1943,32 @@ class _SearchScreenState extends State<SearchScreen> {
           _scheduleRemoteSearch();
         },
         onSubmitted: (_) => _nameFocus.unfocus(),
+        style: TextStyle(fontSize: 12.r),
         decoration: InputDecoration(
           hintText: AppLocale.searchNameHint.getString(context),
-          prefixIcon: const Icon(Symbols.search_rounded),
+          hintStyle: TextStyle(fontSize: 12.r),
+          prefixIcon: Icon(Symbols.search_rounded, size: 16.r),
+          prefixIconConstraints: BoxConstraints(
+            minWidth: 30.r,
+            minHeight: 30.r,
+          ),
           suffixIcon: _nameController.text.isEmpty
               ? null
               : _buildClearQueryButton(theme, _searchFocused('clearQuery')),
           isDense: true,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: 12.r,
-            vertical: 10.r,
-          ),
+          contentPadding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
             alpha: 0.5,
           ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.r),
+            borderRadius: radii.radiusInternal,
             borderSide: BorderSide.none,
           ),
         ),
       ),
     );
+    return _rimmed(context, field);
   }
 
   /// The X inside the search field that empties the query.
@@ -1842,20 +1984,15 @@ class _SearchScreenState extends State<SearchScreen> {
         margin: EdgeInsets.symmetric(horizontal: 6.r, vertical: 4.r),
         padding: EdgeInsets.all(4.r),
         decoration: BoxDecoration(
-          color: focused
-              ? scheme.primary.withValues(alpha: 0.18)
-              : Colors.transparent,
+          color: focused ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(10.r),
-          border: Border.all(
-            color: focused ? scheme.primary : Colors.transparent,
-            width: 2.r,
-          ),
+          border: Border.all(color: Colors.transparent, width: 2.r),
         ),
         child: Icon(
           Symbols.close_rounded,
           size: 18.r,
           color: focused
-              ? scheme.primary
+              ? scheme.surface
               : scheme.onSurface.withValues(alpha: 0.6),
         ),
       ),
@@ -1864,10 +2001,18 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// A single filter chip showing "Label: value"; tapping opens its picker.
   Widget _buildFilterChip(ThemeData theme, String key, bool isFocused) {
-    final scheme = theme.colorScheme;
     final label = _filterLabel(key);
     final value = _filterValueLabel(key);
     final active = _isFilterActive(key);
+    final palette = _selectionPalette(
+      theme,
+      focused: isFocused,
+      selected: active,
+    );
+    final foreground = palette.foreground;
+    final mutedForeground = foreground.withValues(
+      alpha: isFocused ? 0.7 : 0.65,
+    );
 
     return GestureDetector(
       onTap: () {
@@ -1878,64 +2023,55 @@ class _SearchScreenState extends State<SearchScreen> {
         });
         _openFilterMenu(key);
       },
-      child: Container(
-        margin: EdgeInsets.only(right: 8.r),
-        padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
-        decoration: BoxDecoration(
-          color: isFocused
-              ? scheme.primary.withValues(alpha: 0.18)
-              : (active
-                    ? scheme.primary.withValues(alpha: 0.10)
-                    : scheme.surface.withValues(alpha: 0.5)),
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: isFocused
-                ? scheme.primary
-                : (active
-                      ? scheme.primary.withValues(alpha: 0.5)
-                      : Colors.transparent),
-            width: 2.r,
+      child: _rimmed(
+        context,
+        Container(
+          margin: EdgeInsets.only(right: 8.r),
+          padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 6.r),
+          decoration: BoxDecoration(
+            color: palette.background,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: Colors.transparent, width: 2.r),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$label: ',
-              style: TextStyle(
-                fontSize: 13.r,
-                fontWeight: FontWeight.w600,
-                color: scheme.onSurface.withValues(alpha: 0.7),
-              ),
-            ),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 140.r),
-              child: Text(
-                value,
-                overflow: TextOverflow.ellipsis,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$label: ',
                 style: TextStyle(
                   fontSize: 13.r,
-                  fontWeight: FontWeight.w700,
-                  color: (active || isFocused)
-                      ? scheme.primary
-                      : scheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                  color: mutedForeground,
                 ),
               ),
-            ),
-            SizedBox(width: 4.r),
-            Icon(
-              Symbols.expand_more_rounded,
-              size: 16.r,
-              color: scheme.onSurface.withValues(alpha: isFocused ? 0.9 : 0.4),
-            ),
-          ],
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 140.r),
+                child: Text(
+                  value,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.r,
+                    fontWeight: FontWeight.w700,
+                    color: foreground,
+                  ),
+                ),
+              ),
+              SizedBox(width: 4.r),
+              Icon(
+                Symbols.expand_more_rounded,
+                size: 16.r,
+                color: mutedForeground,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildClearChip(ThemeData theme, bool isFocused) {
-    final scheme = theme.colorScheme;
+    final palette = _selectionPalette(theme, focused: isFocused);
+    final foreground = palette.foreground;
     return GestureDetector(
       onTap: () {
         // Tapping Clear also lands focus on it, so gamepad navigation carries
@@ -1948,37 +2084,35 @@ class _SearchScreenState extends State<SearchScreen> {
         });
         _clearFilters();
       },
-      child: Container(
-        margin: EdgeInsets.only(right: 8.r),
-        padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
-        decoration: BoxDecoration(
-          color: isFocused
-              ? scheme.primary.withValues(alpha: 0.18)
-              : scheme.surface.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: isFocused ? scheme.primary : Colors.transparent,
-            width: 2.r,
+      child: _rimmed(
+        context,
+        Container(
+          margin: EdgeInsets.only(right: 8.r),
+          padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
+          decoration: BoxDecoration(
+            color: palette.background,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: Colors.transparent, width: 2.r),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Symbols.filter_alt_off_rounded,
-              size: 16.r,
-              color: scheme.onSurface,
-            ),
-            SizedBox(width: 6.r),
-            Text(
-              AppLocale.searchClearFilters.getString(context),
-              style: TextStyle(
-                fontSize: 13.r,
-                fontWeight: FontWeight.w700,
-                color: scheme.onSurface,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Symbols.filter_alt_off_rounded,
+                size: 16.r,
+                color: foreground,
               ),
-            ),
-          ],
+              SizedBox(width: 6.r),
+              Text(
+                AppLocale.searchClearFilters.getString(context),
+                style: TextStyle(
+                  fontSize: 12.r,
+                  fontWeight: FontWeight.w700,
+                  color: foreground,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2006,48 +2140,55 @@ class _SearchScreenState extends State<SearchScreen> {
             delegate: _FilterMenuLayout(topInset: 12.r, bottomInset: 12.r),
             child: GestureDetector(
               onTap: () {},
-              child: Container(
-                width: 320.r,
-                padding: EdgeInsets.all(12.r),
-                decoration: BoxDecoration(
-                  color: scheme.surface,
-                  borderRadius: BorderRadius.circular(16.r),
-                  border: Border.all(
-                    color: scheme.primary.withValues(alpha: 0.4),
-                    width: 1.r,
+              child: _rimmed(
+                context,
+                radius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                    .radiusExternalRadius,
+                Container(
+                  width: 420.r,
+                  padding: EdgeInsets.all(12.r),
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius:
+                        (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                            .radiusExternal,
+                    border: Border.all(
+                      color: scheme.outline.withValues(alpha: 0.15),
+                      width: 1.r,
+                    ),
                   ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.only(left: 4.r, bottom: 8.r),
-                      child: Text(
-                        _filterLabel(key),
-                        style: TextStyle(
-                          fontSize: 15.r,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.onSurface,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.only(left: 4.r, bottom: 8.r),
+                        child: Text(
+                          _filterLabel(key),
+                          style: TextStyle(
+                            fontSize: 15.r,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurface,
+                          ),
                         ),
                       ),
-                    ),
-                    Flexible(
-                      child: ListView.builder(
-                        controller: _menuScroll,
-                        shrinkWrap: true,
-                        itemExtent: _menuExtent.r,
-                        itemCount: labels.length,
-                        itemBuilder: (context, i) => _buildMenuOption(
-                          theme,
-                          key,
-                          labels[i],
-                          i,
-                          selected,
+                      Flexible(
+                        child: ListView.builder(
+                          controller: _menuScroll,
+                          shrinkWrap: true,
+                          itemExtent: _menuExtent.r,
+                          itemCount: labels.length,
+                          itemBuilder: (context, i) => _buildMenuOption(
+                            theme,
+                            key,
+                            labels[i],
+                            i,
+                            selected,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -2066,20 +2207,16 @@ class _SearchScreenState extends State<SearchScreen> {
   ) {
     final scheme = theme.colorScheme;
     final isSelected = index == selected;
+    final foreground = isSelected ? scheme.surface : scheme.onSurface;
     return GestureDetector(
       onTap: () => _applyMenuIndex(key, index),
       child: Container(
         margin: EdgeInsets.symmetric(vertical: 2.r),
         padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
         decoration: BoxDecoration(
-          color: isSelected
-              ? scheme.primary.withValues(alpha: 0.18)
-              : Colors.transparent,
+          color: isSelected ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(10.r),
-          border: Border.all(
-            color: isSelected ? scheme.primary : Colors.transparent,
-            width: 2.r,
-          ),
+          border: Border.all(color: Colors.transparent, width: 2.r),
         ),
         child: Row(
           children: [
@@ -2088,14 +2225,14 @@ class _SearchScreenState extends State<SearchScreen> {
                 label,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 13.r,
+                  fontSize: 12.r,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? scheme.primary : scheme.onSurface,
+                  color: foreground,
                 ),
               ),
             ),
             if (isSelected)
-              Icon(Symbols.check_rounded, size: 16.r, color: scheme.primary),
+              Icon(Symbols.check_rounded, size: 16.r, color: foreground),
           ],
         ),
       ),
@@ -2170,18 +2307,42 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildResults(ThemeData theme) {
     if (_rows.isEmpty) {
       return Center(
-        child: Text(
-          AppLocale.searchNoResults.getString(context),
-          style: TextStyle(
-            fontSize: 14.r,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+        child: _rimmed(
+          context,
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 24.r, vertical: 18.r),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withValues(alpha: 0.6),
+              borderRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                  .radiusInternal,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Symbols.search_off_rounded,
+                  size: 28.r,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                ),
+                SizedBox(height: 8.r),
+                Text(
+                  AppLocale.searchNoResults.getString(context),
+                  style: TextStyle(
+                    fontSize: 12.r,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
+    final rimInset = (NeoGlass.borderWidthOf(context) / 2 + 2).r;
     return ListView.builder(
       controller: _resultScroll,
+      padding: EdgeInsets.symmetric(horizontal: rimInset),
       itemExtent: _resultExtent.r,
       itemCount: _rows.length,
       itemBuilder: (context, index) => switch (_rows[index]) {
@@ -2295,6 +2456,9 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     final isError = status == RemoteStatus.error;
+    final foreground = isFocused
+        ? scheme.surface
+        : (isError ? scheme.error : scheme.onSurface);
     return GestureDetector(
       onTap: () => isError ? _runRemoteSearch(reset: true) : _loadMoreRemote(),
       child: Padding(
@@ -2303,14 +2467,9 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: EdgeInsets.symmetric(horizontal: 10.r),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isFocused
-                ? scheme.primary.withValues(alpha: 0.18)
-                : Colors.transparent,
+            color: isFocused ? scheme.onSurface : Colors.transparent,
             borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(
-              color: isFocused ? scheme.primary : Colors.transparent,
-              width: 2.r,
-            ),
+            border: Border.all(color: Colors.transparent, width: 2.r),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -2320,7 +2479,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     ? Symbols.error_rounded
                     : Symbols.keyboard_arrow_down_rounded,
                 size: 16.r,
-                color: isError ? scheme.error : scheme.onSurface,
+                color: foreground,
               ),
               SizedBox(width: 6.r),
               Flexible(
@@ -2339,9 +2498,9 @@ class _SearchScreenState extends State<SearchScreen> {
                   style: TextStyle(
                     fontSize: 12.r,
                     fontWeight: FontWeight.w600,
-                    color: isError
-                        ? scheme.error
-                        : scheme.onSurface.withValues(alpha: 0.8),
+                    color: isFocused
+                        ? foreground
+                        : foreground.withValues(alpha: 0.8),
                   ),
                 ),
               ),
@@ -2355,8 +2514,12 @@ class _SearchScreenState extends State<SearchScreen> {
   /// A ROM that lives on the RomM server, with a check badge when this device
   /// already has it.
   Widget _buildRemoteTile(ThemeData theme, RommRom rom, int index) {
-    final scheme = theme.colorScheme;
     final isFocused = _rowFocused(index);
+    final palette = _selectionPalette(theme, focused: isFocused);
+    final foreground = palette.foreground;
+    final mutedForeground = foreground.withValues(
+      alpha: isFocused ? 0.65 : 0.6,
+    );
     final downloaded = _remoteDownloaded[rom.id] ?? false;
 
     final subtitleParts = <String>[
@@ -2370,61 +2533,60 @@ class _SearchScreenState extends State<SearchScreen> {
       onTap: () => _handleResultTap(index),
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 3.r),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 6.r),
-          decoration: BoxDecoration(
-            color: isFocused
-                ? scheme.primary.withValues(alpha: 0.18)
-                : scheme.surface.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(
-              color: isFocused ? scheme.primary : Colors.transparent,
-              width: 2.r,
+        child: _rimmed(
+          context,
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 6.r),
+            decoration: BoxDecoration(
+              color: palette.background,
+              borderRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                  .radiusInternal,
+              border: Border.all(color: Colors.transparent, width: 2.r),
             ),
-          ),
-          child: Row(
-            children: [
-              _buildRemoteCover(theme, rom),
-              SizedBox(width: 10.r),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      rom.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13.r,
-                        fontWeight: FontWeight.w700,
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                    if (subtitleParts.isNotEmpty)
+            child: Row(
+              children: [
+                _buildRemoteCover(theme, rom, foreground: foreground),
+                SizedBox(width: 10.r),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        subtitleParts.join('  •  '),
+                        rom.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 11.r,
-                          color: scheme.onSurface.withValues(alpha: 0.6),
+                          fontSize: 13.r,
+                          fontWeight: FontWeight.w700,
+                          color: foreground,
                         ),
                       ),
-                  ],
+                      if (subtitleParts.isNotEmpty)
+                        Text(
+                          subtitleParts.join('  •  '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.r,
+                            color: mutedForeground,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              SizedBox(width: 8.r),
-              Icon(
-                downloaded
-                    ? Symbols.check_circle_rounded
-                    : Symbols.cloud_download_rounded,
-                size: 16.r,
-                color: downloaded
-                    ? scheme.primary
-                    : scheme.onSurface.withValues(alpha: 0.45),
-              ),
-            ],
+                SizedBox(width: 8.r),
+                Icon(
+                  downloaded
+                      ? Symbols.check_circle_rounded
+                      : Symbols.cloud_download_rounded,
+                  size: 16.r,
+                  color: downloaded
+                      ? foreground
+                      : foreground.withValues(alpha: 0.45),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2434,7 +2596,11 @@ class _SearchScreenState extends State<SearchScreen> {
   /// Cover art served by the RomM server, which needs the session's auth
   /// header — [RommService.imageHeadersFor] adds it only for URLs on the
   /// configured host.
-  Widget _buildRemoteCover(ThemeData theme, RommRom rom) {
+  Widget _buildRemoteCover(
+    ThemeData theme,
+    RommRom rom, {
+    required Color foreground,
+  }) {
     final scheme = theme.colorScheme;
     final provider = context.read<RommProvider>();
     final url = provider.service.coverUrl(rom);
@@ -2447,7 +2613,7 @@ class _SearchScreenState extends State<SearchScreen> {
         color: scheme.surface.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(6.r),
         border: Border.all(
-          color: scheme.onSurface.withValues(alpha: 0.12),
+          color: foreground.withValues(alpha: 0.18),
           width: 1.r,
         ),
       ),
@@ -2456,7 +2622,7 @@ class _SearchScreenState extends State<SearchScreen> {
           ? Icon(
               Symbols.cloud_rounded,
               size: 18.r,
-              color: scheme.onSurface.withValues(alpha: 0.35),
+              color: foreground.withValues(alpha: 0.45),
             )
           : Image.network(
               url,
@@ -2467,7 +2633,7 @@ class _SearchScreenState extends State<SearchScreen> {
               errorBuilder: (_, _, _) => Icon(
                 Symbols.cloud_rounded,
                 size: 18.r,
-                color: scheme.onSurface.withValues(alpha: 0.35),
+                color: foreground.withValues(alpha: 0.45),
               ),
             ),
     );
@@ -2484,8 +2650,12 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildResultTile(ThemeData theme, DatabaseGameModel g, int index) {
-    final scheme = theme.colorScheme;
     final isFocused = _rowFocused(index);
+    final palette = _selectionPalette(theme, focused: isFocused);
+    final foreground = palette.foreground;
+    final mutedForeground = foreground.withValues(
+      alpha: isFocused ? 0.65 : 0.6,
+    );
 
     final subtitleParts = <String>[
       if ((g.systemShortName ?? g.systemRealName) != null)
@@ -2500,67 +2670,66 @@ class _SearchScreenState extends State<SearchScreen> {
       onTap: () => _handleResultTap(index),
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 3.r),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 6.r),
-          decoration: BoxDecoration(
-            color: isFocused
-                ? scheme.primary.withValues(alpha: 0.18)
-                : scheme.surface.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(
-              color: isFocused ? scheme.primary : Colors.transparent,
-              width: 2.r,
+        child: _rimmed(
+          context,
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 6.r),
+            decoration: BoxDecoration(
+              color: palette.background,
+              borderRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                  .radiusInternal,
+              border: Border.all(color: Colors.transparent, width: 2.r),
             ),
-          ),
-          child: Row(
-            children: [
-              _buildBoxArt(theme, g),
-              SizedBox(width: 10.r),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      g.realName ?? g.filename,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13.r,
-                        fontWeight: FontWeight.w700,
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                    if (subtitleParts.isNotEmpty)
+            child: Row(
+              children: [
+                _buildBoxArt(theme, g, foreground: foreground),
+                SizedBox(width: 10.r),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        subtitleParts.join('  •  '),
+                        g.realName ?? g.filename,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 11.r,
-                          color: scheme.onSurface.withValues(alpha: 0.6),
+                          fontSize: 13.r,
+                          fontWeight: FontWeight.w700,
+                          color: foreground,
                         ),
                       ),
-                  ],
-                ),
-              ),
-              if (g.rating != null && g.rating! > 0) ...[
-                SizedBox(width: 8.r),
-                Icon(Symbols.star_rounded, size: 14.r, color: scheme.primary),
-                SizedBox(width: 2.r),
-                Text(
-                  // Stored 0..20, shown as a whole score out of 10 like the
-                  // game views' badge — and as the same bucket the rating
-                  // filter groups this result under.
-                  '${searchRatingBucket(g.rating)}',
-                  style: TextStyle(
-                    fontSize: 12.r,
-                    fontWeight: FontWeight.w600,
-                    color: scheme.onSurface.withValues(alpha: 0.8),
+                      if (subtitleParts.isNotEmpty)
+                        Text(
+                          subtitleParts.join('  •  '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.r,
+                            color: mutedForeground,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
+                if (g.rating != null && g.rating! > 0) ...[
+                  SizedBox(width: 8.r),
+                  Icon(Symbols.star_rounded, size: 14.r, color: foreground),
+                  SizedBox(width: 2.r),
+                  Text(
+                    // Stored 0..20, shown as a whole score out of 10 like the
+                    // game views' badge — and as the same bucket the rating
+                    // filter groups this result under.
+                    '${searchRatingBucket(g.rating)}',
+                    style: TextStyle(
+                      fontSize: 12.r,
+                      fontWeight: FontWeight.w600,
+                      color: foreground.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -2594,7 +2763,11 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// Box art (box2d) thumbnail for a result, or a neutral placeholder when the
   /// game has no scraped cover.
-  Widget _buildBoxArt(ThemeData theme, DatabaseGameModel g) {
+  Widget _buildBoxArt(
+    ThemeData theme,
+    DatabaseGameModel g, {
+    required Color foreground,
+  }) {
     final scheme = theme.colorScheme;
     final artPath = _resolveBoxArt(g);
 
@@ -2606,7 +2779,7 @@ class _SearchScreenState extends State<SearchScreen> {
         color: scheme.surface.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(6.r),
         border: Border.all(
-          color: scheme.onSurface.withValues(alpha: 0.12),
+          color: foreground.withValues(alpha: 0.18),
           width: 1.r,
         ),
       ),
@@ -2620,7 +2793,7 @@ class _SearchScreenState extends State<SearchScreen> {
           : Icon(
               Symbols.videogame_asset_rounded,
               size: 18.r,
-              color: scheme.onSurface.withValues(alpha: 0.35),
+              color: foreground.withValues(alpha: 0.45),
             ),
     );
   }

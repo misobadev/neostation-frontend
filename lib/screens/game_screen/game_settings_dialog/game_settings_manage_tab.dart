@@ -539,8 +539,11 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
     String label, {
     required Color color,
     bool enabled = true,
+    bool focused = false,
   }) {
-    final tint = enabled ? color : theme.colorScheme.onSurface;
+    final tint = focused
+        ? theme.colorScheme.surface
+        : (enabled ? color : theme.colorScheme.onSurface);
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 3.r),
       decoration: BoxDecoration(
@@ -567,7 +570,15 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final canReset = (widget.game.playTime ?? 0) > 0 && !_isResettingPlayTime;
+    final cloudSyncFocused = _selectedIndex == _cloudSyncIdx;
+    final playTimeFocused = _selectedIndex == _playTimeIdx;
+    final hideFocused = _selectedIndex == _hideIdx;
+    final deleteFocused = _selectedIndex == _deleteIdx;
+    final resetTint = playTimeFocused ? scheme.surface : scheme.error;
+    final hideTint = hideFocused ? scheme.surface : scheme.primary;
+    final deleteTint = deleteFocused ? scheme.surface : scheme.error;
     _rommConnected = context.watch<RommProvider>().isConnected;
     final hasRommLink = _rommMapping != null;
 
@@ -606,7 +617,9 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                         height: 20.r,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: theme.colorScheme.onSurface,
+                          color: cloudSyncFocused
+                              ? scheme.surface
+                              : scheme.onSurface,
                         ),
                       )
                     : ExcludeFocus(
@@ -642,7 +655,9 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                       height: 20.r,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: theme.colorScheme.onSurface,
+                        color: playTimeFocused
+                            ? scheme.surface
+                            : scheme.onSurface,
                       ),
                     )
                   : Container(
@@ -652,17 +667,13 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                       ),
                       decoration: BoxDecoration(
                         color: canReset
-                            ? theme.colorScheme.error.withValues(alpha: 0.15)
-                            : theme.colorScheme.onSurface.withValues(
-                                alpha: 0.05,
-                              ),
+                            ? resetTint.withValues(alpha: 0.15)
+                            : resetTint.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(4.r),
                         border: Border.all(
                           color: canReset
-                              ? theme.colorScheme.error.withValues(alpha: 0.4)
-                              : theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.1,
-                                ),
+                              ? resetTint.withValues(alpha: 0.4)
+                              : resetTint.withValues(alpha: 0.1),
                           width: 1.r,
                         ),
                       ),
@@ -672,10 +683,8 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                           fontSize: 11.r,
                           fontWeight: FontWeight.w600,
                           color: canReset
-                              ? theme.colorScheme.error
-                              : theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.3,
-                                ),
+                              ? resetTint
+                              : resetTint.withValues(alpha: 0.3),
                         ),
                       ),
                     ),
@@ -702,7 +711,7 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                       height: 20.r,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: theme.colorScheme.onSurface,
+                        color: hideFocused ? scheme.surface : scheme.onSurface,
                       ),
                     )
                   : Container(
@@ -711,14 +720,10 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                         vertical: 3.r,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(
-                          alpha: 0.15,
-                        ),
+                        color: hideTint.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4.r),
                         border: Border.all(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.4,
-                          ),
+                          color: hideTint.withValues(alpha: 0.4),
                           width: 1.r,
                         ),
                       ),
@@ -727,7 +732,7 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                         style: TextStyle(
                           fontSize: 11.r,
                           fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.primary,
+                          color: hideTint,
                         ),
                       ),
                     ),
@@ -754,7 +759,7 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                       height: 20.r,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: theme.colorScheme.error,
+                        color: deleteTint,
                       ),
                     )
                   : Container(
@@ -763,10 +768,10 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                         vertical: 3.r,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.error.withValues(alpha: 0.15),
+                        color: deleteTint.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4.r),
                         border: Border.all(
-                          color: theme.colorScheme.error.withValues(alpha: 0.4),
+                          color: deleteTint.withValues(alpha: 0.4),
                           width: 1.r,
                         ),
                       ),
@@ -775,7 +780,7 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                         style: TextStyle(
                           fontSize: 11.r,
                           fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.error,
+                          color: deleteTint,
                         ),
                       ),
                     ),
@@ -832,8 +837,9 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                 trailing: _actionChip(
                   theme,
                   AppLocale.rommLinkAction.getString(context),
-                  color: theme.colorScheme.primary,
+                  color: scheme.primary,
                   enabled: _rommConnected,
+                  focused: _selectedIndex == _linkRommIdx,
                 ),
               ),
             ),
@@ -859,13 +865,16 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
                         height: 20.r,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: theme.colorScheme.error,
+                          color: _selectedIndex == _unlinkRommIdx
+                              ? scheme.surface
+                              : scheme.error,
                         ),
                       )
                     : _actionChip(
                         theme,
                         AppLocale.rommUnlinkAction.getString(context),
-                        color: theme.colorScheme.error,
+                        color: scheme.error,
+                        focused: _selectedIndex == _unlinkRommIdx,
                       ),
               ),
             )

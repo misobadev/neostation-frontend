@@ -80,7 +80,9 @@ class ExitSettingsContentState extends State<ExitSettingsContent> {
                           : theme.colorScheme.error.withValues(alpha: 0.1),
                     ),
                     foregroundColor: WidgetStateProperty.all(
-                      isExitFocused ? Colors.white : theme.colorScheme.error,
+                      isExitFocused
+                          ? theme.colorScheme.onError
+                          : theme.colorScheme.error,
                     ),
                     padding: WidgetStateProperty.all(
                       EdgeInsets.symmetric(vertical: 8.r, horizontal: 12.r),

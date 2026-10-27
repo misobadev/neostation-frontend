@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -108,37 +109,22 @@ void main() {
         });
       }
 
-      final buttons = tester
-          .widgetList<OutlinedButton>(find.byType(OutlinedButton))
-          .toList();
-      expect(
-        buttons
-            .where((b) => (b.child as Text).data == 'Preview')
-            .every((b) => b.onPressed == null),
-        true,
+      InkWell buttonFor(String label) => tester.widget<InkWell>(
+        find
+            .ancestor(of: find.text(label), matching: find.byType(InkWell))
+            .first,
       );
-      expect(
-        buttons
-            .where((b) => (b.child as Text).data == 'Import / Replace')
-            .every((b) => b.onPressed != null),
-        true,
-      );
-      expect(
-        buttons
-            .where((b) => (b.child as Text).data == 'Restore default')
-            .every((b) => b.onPressed == null),
-        true,
-      );
+      expect(buttonFor('Preview').onTap, isNull);
+      expect(buttonFor('Import / Replace').onTap, isNotNull);
+      expect(buttonFor('Restore default').onTap, isNull);
       expect(GamepadNavigationManager.stackDepth, depth + 1);
-      await tester.tap(find.text('Close'));
+      await tester.tap(find.byIcon(Symbols.close_rounded));
       await tester.pumpAndSettle();
       expect(GamepadNavigationManager.stackDepth, depth);
     });
   }
 
-  testWidgets('keyboard navigation reaches close and dismisses the panel', (
-    tester,
-  ) async {
+  testWidgets('keyboard navigation and back dismiss the panel', (tester) async {
     final depth = GamepadNavigationManager.stackDepth;
     await showPanel(tester, const Size(1280, 800));
     await tester.runAsync(
@@ -151,7 +137,7 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 200)),
       );
     }
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
     await tester.pumpAndSettle();
     expect(find.byType(CustomSoundsDialog), findsNothing);
     expect(GamepadNavigationManager.stackDepth, depth);

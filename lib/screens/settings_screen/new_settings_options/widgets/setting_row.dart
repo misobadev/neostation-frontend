@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/widgets/custom_toggle_switch.dart';
 import 'package:neostation/widgets/neo_glass.dart';
+
+import 'settings_action_button.dart';
 
 /// A single focus-bordered settings row: a title/subtitle block paired with a
 /// trailing control (toggle, dropdown, etc.).
@@ -82,16 +85,14 @@ class SettingRow extends StatelessWidget {
       ],
     );
 
+    final trailingTheme = _settingsTrailingTheme(context, focused: focused);
     final row = Container(
       decoration: BoxDecoration(
         color: focused
             ? theme.colorScheme.onSurface
             : theme.colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(
-          color: focused ? theme.colorScheme.primary : Colors.transparent,
-          width: 2,
-        ),
+        border: Border.all(color: Colors.transparent, width: 2),
       ),
       child: Material(
         color: Colors.transparent,
@@ -115,7 +116,14 @@ class SettingRow extends StatelessWidget {
               children: [
                 expandTitle ? Expanded(child: titleColumn) : titleColumn,
                 SizedBox(width: 12.r),
-                trailing,
+                // These controls manage their own colours. Wrapping them in
+                // the row theme would recolour the toggle thumb/glyph or the
+                // action circle when the row is selected.
+                if (trailing is SettingsActionButton ||
+                    trailing is CustomToggleSwitch)
+                  trailing
+                else
+                  Theme(data: trailingTheme, child: trailing),
               ],
             ),
           ),
@@ -130,4 +138,27 @@ class SettingRow extends StatelessWidget {
       child: NeoGlassRim(cornerRadius: 8.r, borderWidth: rimWidth, child: row),
     );
   }
+}
+
+/// Themes the trailing control with the row's current text colour.
+///
+/// Chips, action buttons and glyphs must stay visible on both the normal surface
+/// and the inverted selected row, so their primary/onSurface accents follow the
+/// row foreground instead of the global accent.
+ThemeData _settingsTrailingTheme(
+  BuildContext context, {
+  required bool focused,
+}) {
+  final theme = Theme.of(context);
+  final scheme = theme.colorScheme;
+  final foreground = focused ? scheme.surface : scheme.onSurface;
+  final background = focused ? scheme.onSurface : scheme.surface;
+  return theme.copyWith(
+    colorScheme: scheme.copyWith(
+      primary: foreground,
+      onPrimary: background,
+      onSurface: foreground,
+    ),
+    iconTheme: IconThemeData(color: foreground),
+  );
 }

@@ -1003,11 +1003,7 @@ class DirectoriesSettingsContentState
                       final isEsdeDisabled = _isEsdeDisabled(
                         item['action'] as String,
                       );
-                      final borderColor = isSelected
-                          ? (isRemoveItem
-                                ? theme.colorScheme.error
-                                : theme.colorScheme.primary)
-                          : theme.colorScheme.outline.withValues(alpha: 0);
+                      const borderColor = Colors.transparent;
                       final foreground = isSelected
                           ? (isRemoveItem
                                 ? theme.colorScheme.error
@@ -1179,7 +1175,11 @@ class DirectoriesSettingsContentState
                                                 'esde_select_folder' &&
                                             _esdePath.trim().isNotEmpty) ...[
                                           SizedBox(height: 6.r),
-                                          _buildPathChip(theme, _esdePath),
+                                          _buildPathChip(
+                                            theme,
+                                            _esdePath,
+                                            selected: isSelected,
+                                          ),
                                         ],
                                         // Show current path under user_data item
                                         if (isUserData &&
@@ -1191,8 +1191,11 @@ class DirectoriesSettingsContentState
                                               vertical: 4.r,
                                             ),
                                             decoration: BoxDecoration(
-                                              color:
-                                                  theme.scaffoldBackgroundColor,
+                                              color: isSelected
+                                                  ? theme.colorScheme.surface
+                                                        .withValues(alpha: 0.12)
+                                                  : theme
+                                                        .scaffoldBackgroundColor,
                                               borderRadius:
                                                   BorderRadius.circular(6.r),
                                             ),
@@ -1201,10 +1204,9 @@ class DirectoriesSettingsContentState
                                                 Icon(
                                                   Symbols.folder_rounded,
                                                   size: 11.r,
-                                                  color: theme
-                                                      .colorScheme
-                                                      .primary
-                                                      .withValues(alpha: 0.5),
+                                                  color: foreground.withValues(
+                                                    alpha: 0.7,
+                                                  ),
                                                 ),
                                                 SizedBox(width: 6.r),
                                                 Expanded(
@@ -1212,11 +1214,9 @@ class DirectoriesSettingsContentState
                                                     _currentUserDataPath!,
                                                     style: TextStyle(
                                                       fontSize: 9.r,
-                                                      color: theme
-                                                          .colorScheme
-                                                          .onSurface
+                                                      color: foreground
                                                           .withValues(
-                                                            alpha: 0.55,
+                                                            alpha: 0.7,
                                                           ),
                                                       fontFamily: 'monospace',
                                                     ),
@@ -1270,11 +1270,16 @@ class DirectoriesSettingsContentState
     }
   }
 
-  Widget _buildPathChip(ThemeData theme, String path) {
+  Widget _buildPathChip(ThemeData theme, String path, {bool selected = false}) {
+    final foreground = selected
+        ? theme.colorScheme.surface
+        : theme.colorScheme.onSurface;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.06),
+        color: selected
+            ? theme.colorScheme.surface.withValues(alpha: 0.12)
+            : theme.colorScheme.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(6.r),
       ),
       child: Row(
@@ -1282,7 +1287,7 @@ class DirectoriesSettingsContentState
           Icon(
             Symbols.folder_rounded,
             size: 11.r,
-            color: theme.colorScheme.primary.withValues(alpha: 0.5),
+            color: foreground.withValues(alpha: 0.7),
           ),
           SizedBox(width: 6.r),
           Expanded(
@@ -1290,7 +1295,7 @@ class DirectoriesSettingsContentState
               path,
               style: TextStyle(
                 fontSize: 9.r,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                color: foreground.withValues(alpha: 0.7),
                 fontFamily: 'monospace',
               ),
               maxLines: 2,

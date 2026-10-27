@@ -346,10 +346,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
               ? theme.colorScheme.onSurface
               : theme.colorScheme.surface.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: isFocused ? theme.colorScheme.primary : Colors.transparent,
-            width: 2,
-          ),
+          border: Border.all(color: Colors.transparent, width: 2),
         ),
         child: Row(
           children: [

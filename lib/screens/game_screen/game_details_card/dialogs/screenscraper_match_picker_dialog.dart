@@ -9,7 +9,9 @@ import 'package:neostation/models/screenscraper_game_candidate.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/services/screenscraper_service.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 
 /// What the user chose in [ScreenScraperMatchPickerDialog].
 class ScreenScraperMatchChoice {
@@ -331,67 +333,129 @@ class _ScreenScraperMatchPickerDialogState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
 
     return Dialog(
-      backgroundColor: theme.cardColor,
-      insetPadding: EdgeInsets.symmetric(horizontal: 24.r, vertical: 24.r),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.r),
-        side: BorderSide(
-          color: theme.colorScheme.primary.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Container(
-        width: size.width * 0.6,
-        constraints: BoxConstraints(maxHeight: size.height * 0.7),
-        padding: EdgeInsets.all(12.r),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTitle(theme),
-            SizedBox(height: 10.r),
-            _buildSearchField(theme),
-            SizedBox(height: 8.r),
-            Flexible(child: _buildResults(theme)),
-            if (_resetIndex != null) ...[
-              SizedBox(height: 6.r),
-              _buildResetRow(theme),
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.all(16.r),
+      child: NeoGlassRim(
+        cornerRadius: radii.radiusExternalRadius,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 640.0, maxHeight: 480.0),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: radii.radiusExternal,
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.15)),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.shadow.withValues(alpha: 0.5),
+                blurRadius: 18.r,
+                offset: Offset(0, 8.r),
+              ),
             ],
-          ],
+          ),
+          child: ClipRRect(
+            borderRadius: radii.radiusExternal,
+            child: Column(
+              children: [
+                _buildTitle(theme),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(14.r, 10.r, 14.r, 10.r),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSearchField(theme),
+                        SizedBox(height: 8.r),
+                        Expanded(child: _buildResults(theme)),
+                        if (_resetIndex != null) ...[
+                          SizedBox(height: 6.r),
+                          _buildResetRow(theme),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildTitle(ThemeData theme) {
-    return Row(
-      children: [
-        Icon(
-          Symbols.manage_search_rounded,
-          color: theme.colorScheme.primary,
-          size: 18.r,
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 10.r),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: scheme.outline.withValues(alpha: 0.12)),
         ),
-        SizedBox(width: 8.r),
-        Expanded(
-          child: Text(
-            AppLocale.raFixMatchTitle.getString(context),
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontSize: 13.r,
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28.r,
+            height: 28.r,
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            child: Icon(
+              Symbols.manage_search_rounded,
+              color: scheme.primary,
+              size: 16.r,
             ),
           ),
-        ),
-        Text(
-          'ScreenScraper',
-          style: TextStyle(
-            fontSize: 10.r,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+          SizedBox(width: 10.r),
+          Expanded(
+            child: Text(
+              AppLocale.raFixMatchTitle.getString(context),
+              style: TextStyle(
+                fontSize: 12.r,
+                color: scheme.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
-        ),
-      ],
+          Text(
+            'ScreenScraper',
+            style: TextStyle(
+              fontSize: 9.r,
+              color: scheme.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+          SizedBox(width: 8.r),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              canRequestFocus: false,
+              focusColor: Colors.transparent,
+              hoverColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              splashColor: Colors.transparent,
+              borderRadius: BorderRadius.circular(8.r),
+              onTap: () {
+                if (_closing) return;
+                _closing = true;
+                _queryFocus.unfocus();
+                SfxService().playBackSound();
+                Navigator.of(context).pop();
+              },
+              child: Container(
+                padding: EdgeInsets.all(6.r),
+                child: Icon(
+                  Symbols.close_rounded,
+                  size: 18.r,
+                  color: scheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -521,7 +585,9 @@ class _ScreenScraperMatchPickerDialogState
   }
 
   Widget _buildResetRow(ThemeData theme) {
+    final scheme = theme.colorScheme;
     final selected = _selectedIndex == _resetIndex;
+    final foreground = selected ? scheme.surface : scheme.onSurface;
     return InkWell(
       // Not focusable: see [_ScreenScraperMatchRow].
       canRequestFocus: false,
@@ -531,25 +597,23 @@ class _ScreenScraperMatchPickerDialogState
         width: double.infinity,
         padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 8.r),
         decoration: BoxDecoration(
+          color: selected ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(6.r),
-          border: Border.all(
-            color: selected ? theme.colorScheme.primary : Colors.transparent,
-            width: 2.r,
-          ),
+          border: Border.all(color: Colors.transparent, width: 2.r),
         ),
         child: Row(
           children: [
             Icon(
               Symbols.restart_alt_rounded,
               size: 14.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              color: foreground.withValues(alpha: selected ? 1 : 0.7),
             ),
             SizedBox(width: 6.r),
             Text(
               AppLocale.raFixMatchUseAutomatic.getString(context),
               style: TextStyle(
                 fontSize: 11.r,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                color: foreground.withValues(alpha: selected ? 1 : 0.7),
               ),
             ),
           ],
@@ -577,6 +641,11 @@ class _ScreenScraperMatchRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = selected ? scheme.surface : scheme.onSurface;
+    final mutedForeground = selected
+        ? scheme.surface.withValues(alpha: 0.7)
+        : scheme.onSurface.withValues(alpha: 0.5);
     final details = [
       game.year,
       game.publisher,
@@ -594,23 +663,14 @@ class _ScreenScraperMatchRow extends StatelessWidget {
         height: 44.r,
         padding: EdgeInsets.symmetric(horizontal: 8.r),
         decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primary.withValues(alpha: 0.15)
-              : Colors.transparent,
+          color: selected ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(6.r),
-          border: Border.all(
-            color: selected ? theme.colorScheme.primary : Colors.transparent,
-            width: 2.r,
-          ),
+          border: Border.all(color: Colors.transparent, width: 2.r),
         ),
         child: Row(
           children: [
             if (isCurrent) ...[
-              Icon(
-                Symbols.check_circle_rounded,
-                size: 14.r,
-                color: theme.colorScheme.primary,
-              ),
+              Icon(Symbols.check_circle_rounded, size: 14.r, color: foreground),
               SizedBox(width: 6.r),
             ],
             Expanded(
@@ -624,7 +684,7 @@ class _ScreenScraperMatchRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11.r,
-                      color: theme.colorScheme.onSurface,
+                      color: foreground,
                       fontWeight: selected
                           ? FontWeight.w600
                           : FontWeight.normal,
@@ -635,12 +695,7 @@ class _ScreenScraperMatchRow extends StatelessWidget {
                       details,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 9.r,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.5,
-                        ),
-                      ),
+                      style: TextStyle(fontSize: 9.r, color: mutedForeground),
                     ),
                 ],
               ),

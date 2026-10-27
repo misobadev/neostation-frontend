@@ -622,11 +622,15 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
                     child: LinearProgressIndicator(
                       value: _scrapeProgress > 0 ? _scrapeProgress : null,
                       minHeight: 4.r,
-                      backgroundColor: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.1,
-                      ),
+                      backgroundColor:
+                          (_selectedIndex == _idxRescrape
+                                  ? theme.colorScheme.surface
+                                  : theme.colorScheme.onSurface)
+                              .withValues(alpha: 0.15),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        theme.colorScheme.secondary,
+                        _selectedIndex == _idxRescrape
+                            ? theme.colorScheme.surface
+                            : theme.colorScheme.secondary,
                       ),
                     ),
                   )
@@ -723,7 +727,9 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
                     height: 16.r,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: theme.colorScheme.secondary,
+                      color: _selectedIndex == _idxSave
+                          ? theme.colorScheme.surface
+                          : theme.colorScheme.secondary,
                     ),
                   )
                 : null,
@@ -798,6 +804,10 @@ class _SubTabItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = isSelected
+        ? scheme.surface
+        : scheme.onSurface.withValues(alpha: 0.6);
     return InkWell(
       canRequestFocus: false,
       focusColor: Colors.transparent,
@@ -812,15 +822,13 @@ class _SubTabItem extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: 6.r),
         decoration: BoxDecoration(
           color: isSelected
-              ? theme.colorScheme.secondary.withValues(alpha: 0.15)
-              : theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.3,
-                ),
+              ? scheme.onSurface
+              : scheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(6.r),
           border: Border.all(
             color: isSelected
-                ? theme.colorScheme.secondary.withValues(alpha: 0.5)
-                : theme.colorScheme.outline.withValues(alpha: 0.1),
+                ? Colors.transparent
+                : scheme.outline.withValues(alpha: 0.1),
             width: 1.r,
           ),
         ),
@@ -830,9 +838,7 @@ class _SubTabItem extends StatelessWidget {
           style: TextStyle(
             fontSize: 10.r,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            color: isSelected
-                ? theme.colorScheme.secondary
-                : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            color: foreground,
             letterSpacing: 0.5.r,
           ),
         ),
@@ -897,14 +903,17 @@ class _NavRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = isSelected ? scheme.surface : scheme.onSurface;
+    final mutedForeground = isSelected
+        ? scheme.surface.withValues(alpha: 0.7)
+        : scheme.onSurface.withValues(alpha: 0.7);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: EdgeInsets.only(bottom: 4.r),
         decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.secondary.withValues(alpha: 0.15)
-              : Colors.transparent,
+          color: isSelected ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(6.r),
         ),
         padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 6.r),
@@ -915,17 +924,11 @@ class _NavRow extends StatelessWidget {
               height: 18.r,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? theme.colorScheme.secondary.withValues(alpha: 0.2)
-                    : theme.colorScheme.secondary.withValues(alpha: 0.1),
+                    ? scheme.surface.withValues(alpha: 0.12)
+                    : scheme.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4.r),
               ),
-              child: Icon(
-                icon,
-                color: isSelected
-                    ? theme.colorScheme.secondary
-                    : theme.colorScheme.onSurface,
-                size: 11.r,
-              ),
+              child: Icon(icon, color: foreground, size: 11.r),
             ),
             SizedBox(width: 8.r),
             Expanded(
@@ -935,9 +938,7 @@ class _NavRow extends StatelessWidget {
                   Text(
                     label,
                     style: TextStyle(
-                      color: isSelected
-                          ? theme.colorScheme.secondary
-                          : theme.colorScheme.onSurface,
+                      color: foreground,
                       fontSize: 12.r,
                       fontWeight: FontWeight.w600,
                     ),
@@ -945,12 +946,7 @@ class _NavRow extends StatelessWidget {
                   if (subtitle.isNotEmpty)
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
-                        fontSize: 10.r,
-                      ),
+                      style: TextStyle(color: mutedForeground, fontSize: 10.r),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -991,6 +987,11 @@ class _MetadataFieldRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = isSelected ? scheme.surface : scheme.onSurface;
+    final labelForeground = isSelected
+        ? scheme.surface.withValues(alpha: 0.7)
+        : scheme.onSurface.withValues(alpha: 0.7);
     return GestureDetector(
       onTap: () {
         onTap();
@@ -999,14 +1000,14 @@ class _MetadataFieldRow extends StatelessWidget {
       child: Container(
         margin: EdgeInsets.only(bottom: 4.r),
         decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.secondary.withValues(alpha: 0.12)
-              : Colors.transparent,
+          color: isSelected ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(6.r),
           border: Border.all(
             color: focusNode.hasFocus
-                ? theme.colorScheme.secondary.withValues(alpha: 0.6)
-                : theme.colorScheme.outline.withValues(alpha: 0.15),
+                ? foreground.withValues(alpha: 0.6)
+                : (isSelected
+                      ? Colors.transparent
+                      : scheme.outline.withValues(alpha: 0.15)),
             width: 1.r,
           ),
         ),
@@ -1021,9 +1022,7 @@ class _MetadataFieldRow extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: isSelected
-                        ? theme.colorScheme.secondary
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: labelForeground,
                     fontSize: 10.r,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1041,10 +1040,7 @@ class _MetadataFieldRow extends StatelessWidget {
                       padding: EdgeInsets.only(top: 4.r, bottom: 4.r),
                       child: Text(
                         controller.text.isEmpty ? '—' : controller.text,
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurface,
-                          fontSize: 11.r,
-                        ),
+                        style: TextStyle(color: foreground, fontSize: 11.r),
                         maxLines: maxLines,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1069,10 +1065,8 @@ class _MetadataFieldRow extends StatelessWidget {
                         onSubmitted: maxLines == 1
                             ? (_) => onSubmitted?.call()
                             : null,
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurface,
-                          fontSize: 11.r,
-                        ),
+                        cursorColor: foreground,
+                        style: TextStyle(color: foreground, fontSize: 11.r),
                         decoration: InputDecoration(
                           isDense: true,
                           border: InputBorder.none,
@@ -1108,6 +1102,8 @@ class _ArtworkRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = isSelected ? scheme.surface : scheme.onSurface;
     final file = File(imagePath);
     final exists = file.existsSync();
 
@@ -1116,9 +1112,7 @@ class _ArtworkRow extends StatelessWidget {
       child: Container(
         margin: EdgeInsets.only(bottom: 4.r),
         decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.secondary.withValues(alpha: 0.15)
-              : Colors.transparent,
+          color: isSelected ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(6.r),
         ),
         padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
@@ -1129,7 +1123,9 @@ class _ArtworkRow extends StatelessWidget {
               child: Container(
                 width: 40.r,
                 height: 40.r,
-                color: theme.colorScheme.surfaceContainerHighest,
+                color: isSelected
+                    ? scheme.surface.withValues(alpha: 0.15)
+                    : scheme.surfaceContainerHighest,
                 child: exists
                     ? Image.file(
                         file,
@@ -1138,17 +1134,13 @@ class _ArtworkRow extends StatelessWidget {
                         errorBuilder: (_, _, _) => Icon(
                           Symbols.broken_image_rounded,
                           size: 16.r,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.4,
-                          ),
+                          color: foreground.withValues(alpha: 0.4),
                         ),
                       )
                     : Icon(
                         Symbols.image_rounded,
                         size: 16.r,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.4,
-                        ),
+                        color: foreground.withValues(alpha: 0.4),
                       ),
               ),
             ),
@@ -1157,9 +1149,7 @@ class _ArtworkRow extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: isSelected
-                      ? theme.colorScheme.secondary
-                      : theme.colorScheme.onSurface,
+                  color: foreground,
                   fontSize: 12.r,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1168,10 +1158,10 @@ class _ArtworkRow extends StatelessWidget {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 3.r),
               decoration: BoxDecoration(
-                color: theme.colorScheme.secondary.withValues(alpha: 0.12),
+                color: foreground.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(4.r),
                 border: Border.all(
-                  color: theme.colorScheme.secondary.withValues(alpha: 0.4),
+                  color: foreground.withValues(alpha: 0.4),
                   width: 1.r,
                 ),
               ),
@@ -1180,7 +1170,7 @@ class _ArtworkRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11.r,
                   fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.secondary,
+                  color: foreground,
                 ),
               ),
             ),

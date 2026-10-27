@@ -81,23 +81,25 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
   }) {
     final bool isFocused = _currentTab == 2 && _appearanceIndex == index;
     final theme = Theme.of(context);
+    // Use the row's text colour: surface on the focused inverse row, onSurface
+    // otherwise. Never a hardcoded white.
+    final previewIconColor = isFocused
+        ? theme.colorScheme.surface
+        : theme.colorScheme.onSurface;
+    final trailingIconColor = isFocused
+        ? theme.colorScheme.surface
+        : theme.colorScheme.onSurface;
 
     return Container(
       key: key,
       height: 50.r,
       padding: EdgeInsets.symmetric(horizontal: 12.r),
       decoration: BoxDecoration(
-        color: isFocused
-            ? theme.colorScheme.primary.withValues(alpha: 0.1)
-            : Colors.transparent,
+        color: isFocused ? theme.colorScheme.onSurface : Colors.transparent,
         borderRadius:
             Theme.of(context).extension<CornerRadii>()?.radiusExternal ??
             BorderRadius.circular(9.r),
-        border: isFocused
-            ? Border.all(
-                color: theme.colorScheme.primary.withValues(alpha: 0.5),
-              )
-            : null,
+        border: null,
       ),
       child: Row(
         children: [
@@ -117,9 +119,9 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                 ? Icon(
                     Symbols.image_not_supported_rounded,
                     size: 16.r,
-                    color: Colors.white54,
+                    color: previewIconColor,
                   )
-                : _buildPreviewImage(currentPath),
+                : _buildPreviewImage(currentPath, iconColor: previewIconColor),
           ),
 
           SizedBox(width: 12.r),
@@ -133,7 +135,9 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                   style: TextStyle(
                     fontSize: 12.r,
                     fontWeight: FontWeight.w500,
-                    color: theme.colorScheme.onSurface,
+                    color: isFocused
+                        ? theme.colorScheme.surface
+                        : theme.colorScheme.onSurface,
                   ),
                 ),
                 Text(
@@ -142,9 +146,13 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                       : subtitle,
                   style: TextStyle(
                     fontSize: 10.r,
-                    color: hasCustom
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: isFocused
+                        ? theme.colorScheme.surface.withValues(alpha: 0.7)
+                        : (hasCustom
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.6,
+                                )),
                     fontWeight: hasCustom ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
@@ -161,7 +169,7 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                 tooltip: AppLocale.upload.getString(context),
                 padding: EdgeInsets.zero,
                 constraints: BoxConstraints(minWidth: 24.r, minHeight: 24.r),
-                color: theme.colorScheme.primary,
+                color: trailingIconColor,
               ),
               if (hasCustom) ...[
                 SizedBox(width: 4.r),
@@ -171,7 +179,7 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                   tooltip: AppLocale.reset.getString(context),
                   padding: EdgeInsets.zero,
                   constraints: BoxConstraints(minWidth: 24.r, minHeight: 24.r),
-                  color: theme.colorScheme.error,
+                  color: trailingIconColor,
                 ),
               ],
             ],
@@ -429,7 +437,7 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
     }
   }
 
-  Widget _buildPreviewImage(String path) {
+  Widget _buildPreviewImage(String path, {required Color iconColor}) {
     if (path.isEmpty) return const SizedBox.shrink();
 
     if (ImageUtils.isGif(path)) {
@@ -440,31 +448,22 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
       return Image.file(
         File(path),
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Icon(
-          Symbols.broken_image_rounded,
-          size: 16.r,
-          color: Colors.white24,
-        ),
+        errorBuilder: (context, error, stackTrace) =>
+            Icon(Symbols.broken_image_rounded, size: 16.r, color: iconColor),
       );
     } else if (path.startsWith('assets')) {
       return Image.asset(
         path,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Icon(
-          Symbols.broken_image_rounded,
-          size: 16.r,
-          color: Colors.white24,
-        ),
+        errorBuilder: (context, error, stackTrace) =>
+            Icon(Symbols.broken_image_rounded, size: 16.r, color: iconColor),
       );
     } else {
       return Image.network(
         path,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Icon(
-          Symbols.broken_image_rounded,
-          size: 16.r,
-          color: Colors.white24,
-        ),
+        errorBuilder: (context, error, stackTrace) =>
+            Icon(Symbols.broken_image_rounded, size: 16.r, color: iconColor),
       );
     }
   }
@@ -553,9 +552,7 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
     return Container(
       key: key,
       decoration: BoxDecoration(
-        color: isFocused
-            ? theme.colorScheme.primary.withValues(alpha: 0.2)
-            : Colors.transparent,
+        color: isFocused ? theme.colorScheme.onSurface : Colors.transparent,
         borderRadius:
             Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
             BorderRadius.circular(9.r),
@@ -587,7 +584,7 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                           fontSize: 10.r,
                           fontWeight: FontWeight.w600,
                           color: isFocused
-                              ? theme.colorScheme.primary
+                              ? theme.colorScheme.surface
                               : theme.colorScheme.onSurface,
                         ),
                       ),
@@ -595,9 +592,11 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                         subtitle,
                         style: TextStyle(
                           fontSize: 9.r,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
+                          color: isFocused
+                              ? theme.colorScheme.surface.withValues(alpha: 0.7)
+                              : theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.6,
+                                ),
                         ),
                       ),
                     ],
@@ -698,9 +697,7 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
       padding: EdgeInsets.only(bottom: 4.r),
       child: Container(
         decoration: BoxDecoration(
-          color: isFocused
-              ? theme.colorScheme.primary.withValues(alpha: 0.2)
-              : Colors.transparent,
+          color: isFocused ? theme.colorScheme.onSurface : Colors.transparent,
           borderRadius:
               Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
               BorderRadius.circular(9.r),
@@ -731,7 +728,7 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                           fontSize: 10.r,
                           fontWeight: FontWeight.w600,
                           color: isFocused
-                              ? theme.colorScheme.primary
+                              ? theme.colorScheme.surface
                               : theme.colorScheme.onSurface,
                         ),
                       ),
@@ -742,9 +739,13 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 9.r,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
-                            ),
+                            color: isFocused
+                                ? theme.colorScheme.surface.withValues(
+                                    alpha: 0.7,
+                                  )
+                                : theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.6,
+                                  ),
                           ),
                         ),
                     ],
@@ -770,9 +771,7 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
       padding: EdgeInsets.only(top: 4.r, bottom: 4.r),
       child: Container(
         decoration: BoxDecoration(
-          color: isFocused
-              ? theme.colorScheme.primary.withValues(alpha: 0.2)
-              : Colors.transparent,
+          color: isFocused ? theme.colorScheme.onSurface : Colors.transparent,
           borderRadius:
               Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
               BorderRadius.circular(9.r),
@@ -794,7 +793,7 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                   Symbols.visibility_rounded,
                   size: 14.r,
                   color: isFocused
-                      ? theme.colorScheme.primary
+                      ? theme.colorScheme.surface
                       : theme.colorScheme.onSurface,
                 ),
                 SizedBox(width: 8.r),
@@ -805,7 +804,7 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
                       fontSize: 10.r,
                       fontWeight: FontWeight.w600,
                       color: isFocused
-                          ? theme.colorScheme.primary
+                          ? theme.colorScheme.surface
                           : theme.colorScheme.onSurface,
                     ),
                   ),

@@ -13,7 +13,9 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/sync/i_sync_provider.dart';
 import 'package:neostation/utils/effective_system.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 
 import 'game_settings_emulator_tab.dart';
 import 'game_settings_manage_tab.dart';
@@ -231,67 +233,74 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
     // Resolved once per build so all three tabs agree on the system.
     final effectiveSystem = _effectiveSystem;
 
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 16.r),
-      child: Container(
-        constraints: BoxConstraints(maxWidth: 640.r, maxHeight: 480.r),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: theme.colorScheme.shadow.withValues(alpha: 0.5),
-              blurRadius: 10.r,
-              offset: const Offset(0, 4),
+      child: NeoGlassRim(
+        cornerRadius: radii.radiusExternalRadius,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 640.0, maxHeight: 480.0),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: radii.radiusExternal,
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.1),
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isKeyboardVisible) ...[
-              _buildHeader(theme, displayName),
-              _buildTabsHeader(theme),
-            ],
-            Expanded(
-              child: IndexedStack(
-                index: _currentTab,
-                children: [
-                  GameSettingsEmulatorTab(
-                    key: _emulatorTabKey,
-                    game: widget.game,
-                    system: effectiveSystem,
-                    isAllMode: widget.isAllMode,
-                    onGameUpdated: widget.onGameUpdated,
-                  ),
-                  GameSettingsScrappingTab(
-                    key: _scrappingTabKey,
-                    game: widget.game,
-                    system: effectiveSystem,
-                    fileProvider: widget.fileProvider,
-                    isAllMode: widget.isAllMode,
-                    onGameUpdated: widget.onGameUpdated,
-                  ),
-                  GameSettingsManageTab(
-                    key: _manageTabKey,
-                    game: widget.game,
-                    system: effectiveSystem,
-                    fileProvider: widget.fileProvider,
-                    syncProvider: widget.syncProvider,
-                    isAllMode: widget.isAllMode,
-                    onGameUpdated: widget.onGameUpdated,
-                    onGameDeleted: _handleGameDeleted,
-                    onGameHidden: _handleGameHidden,
-                  ),
-                ],
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.shadow.withValues(alpha: 0.5),
+                blurRadius: 10.r,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: radii.radiusExternal,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isKeyboardVisible) ...[
+                  _buildHeader(theme, displayName),
+                  _buildTabsHeader(theme),
+                ],
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentTab,
+                    children: [
+                      GameSettingsEmulatorTab(
+                        key: _emulatorTabKey,
+                        game: widget.game,
+                        system: effectiveSystem,
+                        isAllMode: widget.isAllMode,
+                        onGameUpdated: widget.onGameUpdated,
+                      ),
+                      GameSettingsScrappingTab(
+                        key: _scrappingTabKey,
+                        game: widget.game,
+                        system: effectiveSystem,
+                        fileProvider: widget.fileProvider,
+                        isAllMode: widget.isAllMode,
+                        onGameUpdated: widget.onGameUpdated,
+                      ),
+                      GameSettingsManageTab(
+                        key: _manageTabKey,
+                        game: widget.game,
+                        system: effectiveSystem,
+                        fileProvider: widget.fileProvider,
+                        syncProvider: widget.syncProvider,
+                        isAllMode: widget.isAllMode,
+                        onGameUpdated: widget.onGameUpdated,
+                        onGameDeleted: _handleGameDeleted,
+                        onGameHidden: _handleGameHidden,
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isKeyboardVisible) _buildFooter(theme),
+              ],
             ),
-            if (!isKeyboardVisible) _buildFooter(theme),
-          ],
+          ),
         ),
       ),
     );
@@ -437,6 +446,7 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
   }
 
   Widget _buildFooter(ThemeData theme) {
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     return Container(
       padding: EdgeInsets.all(8.r),
       decoration: BoxDecoration(
@@ -444,8 +454,8 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
           alpha: 0.05,
         ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(12.r),
-          bottomRight: Radius.circular(12.r),
+          bottomLeft: radii.radiusExternal.bottomLeft,
+          bottomRight: radii.radiusExternal.bottomRight,
         ),
       ),
       child: Row(
@@ -456,8 +466,8 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
                 GamepadControl(
                   iconPath: 'assets/images/gamepad/Xbox_D-pad_ALL.png',
                   label: AppLocale.navigate.getString(context),
-                  backgroundColor: theme.colorScheme.tertiary,
-                  textColor: theme.colorScheme.onPrimary,
+                  backgroundColor: theme.colorScheme.tertiaryFixed,
+                  textColor: theme.colorScheme.onTertiaryFixed,
                 ),
               ],
             ),
@@ -466,8 +476,8 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
           GamepadControl(
             iconPath: 'assets/images/gamepad/Xbox_B_button.png',
             label: AppLocale.close.getString(context),
-            backgroundColor: theme.colorScheme.error,
-            textColor: theme.colorScheme.onError,
+            backgroundColor: theme.colorScheme.tertiary,
+            textColor: theme.colorScheme.onTertiary,
             onTap: () {
               SfxService().playBackSound();
               Navigator.of(context).pop();

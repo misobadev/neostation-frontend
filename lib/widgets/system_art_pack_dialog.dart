@@ -8,8 +8,10 @@ import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/services/game_service.dart'
     show GamepadNavigationManager;
 import 'package:neostation/services/neo_assets_service.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/system_art_pack_tile.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -113,273 +115,346 @@ class _SystemArtPackDialogState extends State<SystemArtPackDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     final pack = widget.pack;
     final neoAssets = context.watch<NeoAssetsProvider>();
     final isActive = neoAssets.isThemeActive(pack.folder);
     final downloading = neoAssets.downloading;
 
     return Dialog(
-      backgroundColor: theme.cardColor,
-      insetPadding: EdgeInsets.symmetric(horizontal: 24.r, vertical: 24.r),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.r),
-        side: BorderSide(
-          color: theme.colorScheme.primary.withValues(alpha: 0.3),
-        ),
-      ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 420.r, maxHeight: 560.r),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(16.r, 14.r, 10.r, 8.r),
-              child: Row(
-                children: [
-                  Icon(
-                    Symbols.image_rounded,
-                    color: theme.colorScheme.primary,
-                    size: 18.r,
-                  ),
-                  SizedBox(width: 8.r),
-                  Expanded(
-                    child: Text(
-                      pack.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 14.r,
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                  if (pack.isAi)
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 6.r,
-                        vertical: 1.r,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.62),
-                        borderRadius: BorderRadius.circular(999.r),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.35),
-                          width: 1.r,
-                        ),
-                      ),
-                      child: Text(
-                        'AI',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 8.r,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    ),
-                ],
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.all(16.r),
+      child: NeoGlassRim(
+        cornerRadius: radii.radiusExternalRadius,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 640.0, maxHeight: 480.0),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: radii.radiusExternal,
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.15)),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.shadow.withValues(alpha: 0.5),
+                blurRadius: 18.r,
+                offset: Offset(0, 8.r),
               ),
-            ),
-            Divider(
-              height: 1.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.1),
-            ),
-            // Foreground download indicator. The pack content can scroll, so
-            // the progress lives outside the scroll and stays visible the whole
-            // time the pack downloads.
-            if (downloading)
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 10.r),
-                color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: radii.radiusExternal,
+            child: Column(
+              children: [
+                _buildHeader(theme, pack, isActive),
+                if (downloading) _buildProgress(theme, neoAssets),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(14.r, 12.r, 14.r, 12.r),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          width: 16.r,
-                          height: 16.r,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.r,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              theme.colorScheme.primary,
-                            ),
+                        Center(
+                          child: SystemArtPackMosaic(
+                            images: pack.mosaicImages,
+                            size: 180,
                           ),
                         ),
-                        SizedBox(width: 8.r),
-                        Expanded(
-                          child: Text(
-                            AppLocale.systemArtDownloading.getString(context),
+                        SizedBox(height: 12.r),
+                        Wrap(
+                          spacing: 6.r,
+                          runSpacing: 4.r,
+                          children: [
+                            if (isActive)
+                              SystemArtPackChip(
+                                icon: Symbols.check_circle_rounded,
+                                label: AppLocale.systemArtApplied.getString(
+                                  context,
+                                ),
+                              ),
+                            if (pack.systemsCovered > 0)
+                              SystemArtPackChip(
+                                icon: Symbols.devices_rounded,
+                                label: AppLocale.systemArtSystemsCovered
+                                    .getString(context)
+                                    .replaceAll(
+                                      '{count}',
+                                      '${pack.systemsCovered}',
+                                    ),
+                              ),
+                            if (pack.downloads > 0)
+                              SystemArtPackChip(
+                                icon: Symbols.download_rounded,
+                                label: AppLocale.systemArtDownloads
+                                    .getString(context)
+                                    .replaceAll('{count}', '${pack.downloads}'),
+                              ),
+                          ],
+                        ),
+                        if (pack.description.isNotEmpty) ...[
+                          SizedBox(height: 12.r),
+                          Text(
+                            pack.description,
                             style: TextStyle(
                               fontSize: 11.r,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.primary,
+                              height: 1.4,
+                              color: scheme.onSurface.withValues(alpha: 0.85),
                             ),
                           ),
-                        ),
-                        Text(
-                          neoAssets.downloadTotal > 0
-                              ? '${(neoAssets.downloadProgress * 100).toInt()}%  '
-                                    '(${neoAssets.downloadDone}/${neoAssets.downloadTotal})'
-                              : '${(neoAssets.downloadProgress * 100).toInt()}%',
-                          style: TextStyle(
-                            fontSize: 11.r,
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 6.r),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8.r),
-                      child: LinearProgressIndicator(
-                        value: neoAssets.downloadProgress > 0
-                            ? neoAssets.downloadProgress
-                            : null,
-                        minHeight: 6.r,
-                        backgroundColor: theme.colorScheme.primary.withValues(
-                          alpha: 0.15,
-                        ),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(16.r),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: SystemArtPackMosaic(
-                        images: pack.mosaicImages,
-                        size: 200,
-                      ),
-                    ),
-                    SizedBox(height: 14.r),
-                    Text(
-                      [
-                        if (pack.author.isNotEmpty)
-                          AppLocale.systemArtByAuthor
-                              .getString(context)
-                              .replaceAll('{author}', pack.author),
-                        if (pack.version.isNotEmpty)
-                          AppLocale.systemArtVersion
-                              .getString(context)
-                              .replaceAll('{version}', pack.version),
-                      ].join('  ·  '),
-                      style: TextStyle(
-                        fontSize: 11.r,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 8.r),
-                    Wrap(
-                      spacing: 6.r,
-                      runSpacing: 4.r,
-                      children: [
-                        if (isActive)
-                          SystemArtPackChip(
-                            icon: Symbols.check_circle_rounded,
-                            label: AppLocale.systemArtApplied.getString(
-                              context,
+                        ],
+                        if (_failed) ...[
+                          SizedBox(height: 12.r),
+                          Container(
+                            padding: EdgeInsets.all(10.r),
+                            decoration: BoxDecoration(
+                              color: scheme.error.withValues(alpha: 0.12),
+                              borderRadius: radii.radiusInternal,
+                              border: Border.all(
+                                color: scheme.error.withValues(alpha: 0.45),
+                              ),
                             ),
-                          ),
-                        if (pack.systemsCovered > 0)
-                          SystemArtPackChip(
-                            icon: Symbols.devices_rounded,
-                            label: AppLocale.systemArtSystemsCovered
-                                .getString(context)
-                                .replaceAll(
-                                  '{count}',
-                                  '${pack.systemsCovered}',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Symbols.error_rounded,
+                                  size: 16.r,
+                                  color: scheme.error,
                                 ),
+                                SizedBox(width: 8.r),
+                                Expanded(
+                                  child: Text(
+                                    AppLocale.systemArtError.getString(context),
+                                    style: TextStyle(
+                                      fontSize: 10.r,
+                                      color: scheme.error,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        if (pack.downloads > 0)
-                          SystemArtPackChip(
-                            icon: Symbols.download_rounded,
-                            label: AppLocale.systemArtDownloads
-                                .getString(context)
-                                .replaceAll('{count}', '${pack.downloads}'),
-                          ),
+                        ],
                       ],
                     ),
-                    if (pack.description.isNotEmpty) ...[
-                      SizedBox(height: 14.r),
-                      Text(
-                        pack.description,
+                  ),
+                ),
+                _buildFooter(theme, isActive, downloading),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(ThemeData theme, NeoAssetsTheme pack, bool isActive) {
+    final scheme = theme.colorScheme;
+    final metadata = [
+      if (pack.author.isNotEmpty)
+        AppLocale.systemArtByAuthor
+            .getString(context)
+            .replaceAll('{author}', pack.author),
+      if (pack.version.isNotEmpty)
+        AppLocale.systemArtVersion
+            .getString(context)
+            .replaceAll('{version}', pack.version),
+    ].join('  ·  ');
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 10.r),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: scheme.outline.withValues(alpha: 0.12)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28.r,
+            height: 28.r,
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            child: Icon(
+              Symbols.image_rounded,
+              size: 16.r,
+              color: scheme.primary,
+            ),
+          ),
+          SizedBox(width: 10.r),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        pack.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 11.r,
-                          height: 1.4,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.85,
-                          ),
+                          fontSize: 12.r,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
                         ),
                       ),
-                    ],
-                    if (_failed) ...[
-                      SizedBox(height: 12.r),
-                      Text(
-                        AppLocale.systemArtError.getString(context),
-                        style: TextStyle(
-                          fontSize: 11.r,
-                          color: theme.colorScheme.error,
-                        ),
+                    ),
+                    if (isActive) ...[
+                      SizedBox(width: 6.r),
+                      Icon(
+                        Symbols.check_circle_rounded,
+                        size: 14.r,
+                        color: scheme.primary,
                       ),
                     ],
                   ],
                 ),
-              ),
-            ),
-            Divider(
-              height: 1.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.1),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  GamepadControl(
-                    iconPath: 'assets/images/gamepad/Xbox_A_button.png',
-                    label:
-                        (isActive
-                                ? AppLocale.systemArtApplied
-                                : AppLocale.apply)
-                            .getString(context),
-                    onTap: _applying ? null : _apply,
-                    busy: downloading,
-                    backgroundColor: theme.colorScheme.primary,
-                    textColor: theme.colorScheme.onPrimary,
-                  ),
-                  if (pack.donationUrl.isNotEmpty) ...[
-                    SizedBox(width: 8.r),
-                    GamepadControl(
-                      iconPath: 'assets/images/gamepad/Xbox_X_button.png',
-                      label: AppLocale.systemArtSupport.getString(context),
-                      onTap: _openSupport,
+                if (metadata.isNotEmpty) ...[
+                  SizedBox(height: 1.r),
+                  Text(
+                    metadata,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 9.r,
+                      color: scheme.onSurface.withValues(alpha: 0.55),
                     ),
-                  ],
-                  SizedBox(width: 8.r),
-                  GamepadControl(
-                    iconPath: 'assets/images/gamepad/Xbox_B_button.png',
-                    label: AppLocale.close.getString(context),
-                    onTap: () => Navigator.of(context).maybePop(),
                   ),
                 ],
+              ],
+            ),
+          ),
+          if (pack.isAi) ...[
+            SizedBox(width: 8.r),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 1.r),
+              decoration: BoxDecoration(
+                color: scheme.onSurface.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(999.r),
+                border: Border.all(
+                  color: scheme.outline.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Text(
+                'AI',
+                style: TextStyle(
+                  color: scheme.onSurface.withValues(alpha: 0.8),
+                  fontSize: 8.r,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
+                ),
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgress(ThemeData theme, NeoAssetsProvider neoAssets) {
+    final scheme = theme.colorScheme;
+    final pct = (neoAssets.downloadProgress * 100).toInt();
+    final counts = neoAssets.downloadTotal > 0
+        ? '${neoAssets.downloadDone}/${neoAssets.downloadTotal}'
+        : '';
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 8.r),
+      color: scheme.primary.withValues(alpha: 0.08),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 14.r,
+                height: 14.r,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.r,
+                  valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                ),
+              ),
+              SizedBox(width: 8.r),
+              Expanded(
+                child: Text(
+                  AppLocale.systemArtDownloading.getString(context),
+                  style: TextStyle(
+                    fontSize: 10.r,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.primary,
+                  ),
+                ),
+              ),
+              Text(
+                counts.isEmpty ? '$pct%' : '$pct%  ($counts)',
+                style: TextStyle(
+                  fontSize: 10.r,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.primary,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6.r),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8.r),
+            child: LinearProgressIndicator(
+              value: neoAssets.downloadProgress > 0
+                  ? neoAssets.downloadProgress
+                  : null,
+              minHeight: 4.r,
+              backgroundColor: scheme.primary.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooter(ThemeData theme, bool isActive, bool downloading) {
+    final scheme = theme.colorScheme;
+    final busy = _applying || downloading;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.05),
+        border: Border(
+          top: BorderSide(color: scheme.outline.withValues(alpha: 0.12)),
         ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          GamepadControl(
+            iconPath: 'assets/images/gamepad/Xbox_A_button.png',
+            label: (isActive ? AppLocale.systemArtApplied : AppLocale.apply)
+                .getString(context),
+            onTap: busy ? null : _apply,
+            busy: busy,
+            backgroundColor: scheme.tertiary,
+            textColor: scheme.onTertiary,
+          ),
+          if (widget.pack.donationUrl.isNotEmpty) ...[
+            SizedBox(width: 8.r),
+            GamepadControl(
+              iconPath: 'assets/images/gamepad/Xbox_X_button.png',
+              label: AppLocale.systemArtSupport.getString(context),
+              onTap: _openSupport,
+              backgroundColor: scheme.tertiaryFixed,
+              textColor: scheme.onTertiaryFixed,
+            ),
+          ],
+          SizedBox(width: 8.r),
+          GamepadControl(
+            iconPath: 'assets/images/gamepad/Xbox_B_button.png',
+            label: AppLocale.close.getString(context),
+            onTap: () => Navigator.of(context).maybePop(),
+            backgroundColor: scheme.tertiaryFixed,
+            textColor: scheme.onTertiaryFixed,
+          ),
+        ],
       ),
     );
   }

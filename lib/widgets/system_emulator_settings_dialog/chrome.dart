@@ -205,7 +205,7 @@ extension _Chrome on _SystemEmulatorSettingsDialogState {
           border: Border(
             bottom: BorderSide(
               color: isSelected
-                  ? Theme.of(context).colorScheme.primary
+                  ? Theme.of(context).colorScheme.secondary
                   : Colors.transparent,
               width: 2.r,
             ),
@@ -217,7 +217,7 @@ extension _Chrome on _SystemEmulatorSettingsDialogState {
             fontSize: 10.r,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             color: isSelected
-                ? Theme.of(context).colorScheme.primary
+                ? Theme.of(context).colorScheme.secondary
                 : Theme.of(
                     context,
                   ).colorScheme.onSurface.withValues(alpha: 0.5),
@@ -230,38 +230,57 @@ extension _Chrome on _SystemEmulatorSettingsDialogState {
 
   Widget _buildFooter() {
     final theme = Theme.of(context);
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     return Container(
-      padding: EdgeInsets.all(10.r),
-
+      padding: EdgeInsets.symmetric(vertical: 8.r, horizontal: 12.r),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.05,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: radii.radiusExternal.bottomLeft,
+          bottomRight: radii.radiusExternal.bottomRight,
+        ),
+      ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Gamepad controls hint
-          Expanded(
-            child: Row(
-              children: [
-                GamepadControl(
-                  iconPath: 'assets/images/gamepad/Xbox_D-pad_ALL.png',
-                  label: AppLocale.navigate.getString(context),
-                  backgroundColor: theme.colorScheme.tertiary,
-                  textColor: theme.colorScheme.onPrimary,
-                ),
-              ],
-            ),
+          _buildHint(
+            context,
+            'assets/images/gamepad/Xbox_D-pad_ALL.png',
+            AppLocale.hintNavigate.getString(context),
           ),
-          SizedBox(width: 8.r),
-          // Close button
-          GamepadControl(
-            iconPath: 'assets/images/gamepad/Xbox_B_button.png',
-            label: AppLocale.close.getString(context),
-            backgroundColor: theme.colorScheme.error,
-            textColor: theme.colorScheme.onError,
-            onTap: () {
-              SfxService().playBackSound();
-              Navigator.of(context).pop();
-            },
+          SizedBox(width: 18.r),
+          _buildHint(
+            context,
+            'assets/images/gamepad/Xbox_B_button.png',
+            AppLocale.close.getString(context),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildHint(BuildContext context, String asset, String label) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurface.withValues(alpha: 0.6);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ColorFiltered(
+          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          child: Image.asset(asset, width: 15.r, height: 15.r),
+        ),
+        SizedBox(width: 5.r),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9.r,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 }

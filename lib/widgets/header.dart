@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/responsive.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -13,6 +14,7 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/widgets/bumper_glyph.dart';
+import 'package:neostation/widgets/core_footer.dart';
 import 'package:neostation/widgets/notification_bell.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/utils/header_layout.dart';
@@ -26,10 +28,14 @@ class Header extends StatefulWidget {
   final int selectedTabIndex;
   final Function(int) onTabSelected;
 
+  /// Touch search entry shown on the Systems tab. Null hides it.
+  final VoidCallback? onSearch;
+
   const Header({
     super.key,
     required this.selectedTabIndex,
     required this.onTabSelected,
+    this.onSearch,
   });
 
   @override
@@ -283,6 +289,27 @@ class HeaderState extends State<Header> {
               return Stack(
                 alignment: Alignment.center,
                 children: [
+                  if (widget.onSearch != null)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: EdgeInsets.only(left: 8.r),
+                        child: GamepadControl(
+                          iconPath: 'assets/images/gamepad/Xbox_X_button.png',
+                          label: AppLocale.searchTitle.getString(context),
+                          onTap: () {
+                            SfxService().playNavSound();
+                            widget.onSearch?.call();
+                          },
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.tertiaryFixed,
+                          textColor: Theme.of(
+                            context,
+                          ).colorScheme.onTertiaryFixed,
+                        ),
+                      ),
+                    ),
                   // Grouped Tab Navigation with Background (Glass Style)
                   Align(
                     key: const ValueKey('tabs-container'),

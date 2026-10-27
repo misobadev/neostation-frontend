@@ -17,6 +17,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import '../widgets/fixed_header.dart';
 import 'systems_screen/system_content.dart';
+import 'search_screen/search_screen.dart';
 import 'systems_screen/my_systems_section/initial_setup_widget.dart';
 import 'retro_achievements_screen/ra_content.dart';
 import 'settings_screen/new_settings_screen.dart';
@@ -97,6 +98,9 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
 
   /// Internal state tracker for system selection within the System tab.
   int _selectedSystemIndex = 0;
+
+  /// Guards the header's touch Search control against a double push.
+  bool _searchOpen = false;
 
   /// Input orchestration layer for gamepad and keyboard support.
   late GamepadNavigation _gamepadNav;
@@ -673,6 +677,9 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
                       ? FixedHeader(
                           selectedTabIndex: _selectedTabIndex,
                           onTabSelected: _onTabSelected,
+                          onSearch: _selectedTabIndex == AppTabs.systems
+                              ? () => unawaited(_openSearchFromHeader())
+                              : null,
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -695,6 +702,16 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
         );
       },
     );
+  }
+
+  Future<void> _openSearchFromHeader() async {
+    if (_searchOpen) return;
+    _searchOpen = true;
+    try {
+      await openSearch(context);
+    } finally {
+      _searchOpen = false;
+    }
   }
 
   Widget _buildFooterForCurrentTab() {

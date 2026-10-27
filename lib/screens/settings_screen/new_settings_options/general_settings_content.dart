@@ -628,13 +628,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                       title: AppLocale.androidSystemSettings.getString(context),
                       subtitle: AppLocale.androidSystemSettingsSubtitle
                           .getString(context),
-                      trailing: Icon(
-                        Symbols.open_in_new_rounded,
-                        size: 18.r,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
-                      ),
+                      trailing: Icon(Symbols.open_in_new_rounded, size: 18.r),
                     );
                   }(),
                   SizedBox(height: 12.r),
