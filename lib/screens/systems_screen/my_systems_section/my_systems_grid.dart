@@ -145,10 +145,6 @@ class MySystems extends StatelessWidget {
                     currentSystem,
                     configProvider,
                   ),
-                  onSearch: () {
-                    SfxService().playNavSound();
-                    _openSearch(context);
-                  },
                 ),
               ],
             );
@@ -251,10 +247,6 @@ class MySystems extends StatelessWidget {
           },
           onOptions: () =>
               _openSystemOptions(context, currentSystem, configProvider),
-          onSearch: () {
-            SfxService().playNavSound();
-            _openSearch(context);
-          },
         ),
       ],
     );

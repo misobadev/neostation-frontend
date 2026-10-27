@@ -166,13 +166,18 @@ extension _ContextMenu on _SystemGamesListState {
     );
   }
 
-  /// Opens the library search from the West face button and its footer hint.
+  /// Opens the library search from the West face button.
   ///
-  /// Unlike [_openSearchFromMenu] this is a shortcut to search itself, not to
-  /// "search this system", so it always opens library-wide with no filters
-  /// set.
+  /// Inside a concrete system this is the same filtered search as Options →
+  /// Search. Aggregate views still span several systems, so they open
+  /// unfiltered.
   Future<void> _openSearchFromButton() async {
-    await openSearch(context, showInPlace: _selectSearchPickInPlace);
+    final folder = widget.system.folderName;
+    await openSearch(
+      context,
+      systemFolder: SystemFolderNames.isAggregate(folder) ? null : folder,
+      showInPlace: _selectSearchPickInPlace,
+    );
   }
 
   /// Selects [picked] in the loaded folder level, if it is there.

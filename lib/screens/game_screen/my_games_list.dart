@@ -2014,7 +2014,6 @@ class _SystemGamesListState extends State<SystemGamesList> {
           onPlayGame: _selectCurrentGame,
           onToggleFavorite: _toggleFavorite,
           onOpenGameSettings: _openGameOptions,
-          onSearch: _searchAction,
           onBack: _goBack,
           onGameUpdated: _handleGameUpdated, // Sync UI after metadata edits.
           onFavoriteToggled: _handleFavoriteToggledFromCard,

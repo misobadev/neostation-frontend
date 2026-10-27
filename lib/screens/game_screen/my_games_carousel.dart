@@ -608,7 +608,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
       currentGameInfo: settled ? _currentGameInfo : null,
       onShowAchievements: _showAchievementsDialog,
       onToggleMute: widget.isSecondaryScreenActive ? null : _toggleVideoMute,
-      onSearch: widget.onSearch,
       hasVideo: !isFolder && _hasVideoFor(settledGame),
       isFolder: isFolder,
       // The game's own system, so the cloud mark reflects the game rather than
