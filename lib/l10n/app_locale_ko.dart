@@ -84,6 +84,9 @@ const Map<String, dynamic> appLocaleKo = {
       '{game}의 {files}가 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
   AppLocale.rommDeleteKeepsSaves: '이 게임의 세이브 파일은 RomM에 그대로 남습니다.',
   AppLocale.rommDeleteKeepsStates: '이 게임의 세이브 상태는 RomM에 그대로 남습니다.',
+  AppLocale.videoPreviews: "미리보기 동영상 재생",
+  AppLocale.videoPreviewsSubtitle:
+      "게임을 선택하면 동영상을 재생합니다. 끄면 두 화면 모두 스크린샷이 유지됩니다.",
   AppLocale.ignoreArticlesInGameSort: "게임 정렬 시 관사 무시",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "제목 앞의 The, A, An을 무시합니다. 예: The Legend of Zelda는 L로 정렬됩니다.",

@@ -77,6 +77,11 @@ class ConfigModel {
   /// Ignore leading English articles when ordering game titles.
   final bool ignoreArticlesInGameSort;
 
+  /// Whether game preview videos play when a game is selected. Off by
+  /// default: the screenshot stays and no video player is created on either
+  /// screen.
+  final bool videoPreviews;
+
   /// Whether the initial onboarding/setup process has been finished.
   final bool setupCompleted;
 
@@ -272,6 +277,7 @@ class ConfigModel {
     this.scanOnStartup = true,
     this.ignoreHiddenFiles = true,
     this.ignoreArticlesInGameSort = false,
+    this.videoPreviews = false,
     this.setupCompleted = false,
     this.hideBottomScreen = false,
     this.videoSound = false,
@@ -408,6 +414,12 @@ class ConfigModel {
         json['ignoreArticlesInGameSort'] ??
             json['ignore_articles_in_game_sort'],
       ),
+      videoPreviews: [
+        true,
+        1,
+        '1',
+        'true',
+      ].contains(json['videoPreviews'] ?? json['video_previews']),
       collectionSortBy:
           (json['collectionSortBy'] ?? json['collection_sort_by'] ?? 'name')
               .toString(),
@@ -627,6 +639,7 @@ class ConfigModel {
       'scanOnStartup': scanOnStartup,
       'ignoreHiddenFiles': ignoreHiddenFiles,
       'ignoreArticlesInGameSort': ignoreArticlesInGameSort,
+      'videoPreviews': videoPreviews,
       'setupCompleted': setupCompleted,
       'hideBottomScreen': hideBottomScreen,
       'videoSound': videoSound,
@@ -687,6 +700,7 @@ class ConfigModel {
     bool? scanOnStartup,
     bool? ignoreHiddenFiles,
     bool? ignoreArticlesInGameSort,
+    bool? videoPreviews,
     bool? setupCompleted,
     bool? hideBottomScreen,
     bool? videoSound,
@@ -745,6 +759,7 @@ class ConfigModel {
       ignoreHiddenFiles: ignoreHiddenFiles ?? this.ignoreHiddenFiles,
       ignoreArticlesInGameSort:
           ignoreArticlesInGameSort ?? this.ignoreArticlesInGameSort,
+      videoPreviews: videoPreviews ?? this.videoPreviews,
       setupCompleted: setupCompleted ?? this.setupCompleted,
       hideBottomScreen: hideBottomScreen ?? this.hideBottomScreen,
       videoSound: videoSound ?? this.videoSound,

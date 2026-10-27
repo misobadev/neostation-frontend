@@ -321,6 +321,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     milliseconds: 1500,
   ); // Debounce for video playback.
   bool _lastShowInfo = false; // Memoizes 'showGameInfo' config state.
+  bool _lastVideoPreviews = false; // Memoizes 'videoPreviews' config state.
   String? _lastGameViewMode; // Memoizes 'gameViewMode' config state.
   String? _lastGameListSize; // Memoizes the active List view size.
   bool _isGameLaunching =
@@ -466,6 +467,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     _invalidateArtworkCaches();
 
     _lastShowInfo = _configProvider.config.showGameInfo;
+    _lastVideoPreviews = _configProvider.config.videoPreviews;
     _lastGameListSize = _configProvider.config.gameListSize;
     _lastGameViewMode = _configProvider.config.gameViewMode;
 
@@ -643,6 +645,18 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
       if (_selectedGame != null) {
         _updateSecondaryDisplay(_selectedGame!);
+      }
+    }
+
+    final videoPreviews = configProvider.config.videoPreviews;
+    if (videoPreviews != _lastVideoPreviews) {
+      _lastVideoPreviews = videoPreviews;
+      if (videoPreviews) {
+        if (_selectedGame != null && !_isGameLaunching) _startVideoTimer();
+      } else {
+        _resetVideoState();
+        _clearSecondaryDisplayVideo();
+        if (_selectedGame != null) _updateSecondaryDisplay(_selectedGame!);
       }
     }
 

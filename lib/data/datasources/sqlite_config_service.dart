@@ -308,6 +308,7 @@ class SqliteConfigService {
         systemSortOrder: userConfig?['system_sort_order']?.toString() ?? 'asc',
         ignoreArticlesInGameSort:
             userConfig?['ignore_articles_in_game_sort'] == 1,
+        videoPreviews: userConfig?['video_previews'] == 1,
         collectionSortBy:
             userConfig?['collection_sort_by']?.toString() ?? 'name',
         collectionSortOrder:
@@ -501,6 +502,7 @@ class SqliteConfigService {
           scanOnStartup: config.scanOnStartup ? 1 : 0,
           ignoreHiddenFiles: config.ignoreHiddenFiles ? 1 : 0,
           ignoreArticlesInGameSort: config.ignoreArticlesInGameSort ? 1 : 0,
+          videoPreviews: config.videoPreviews ? 1 : 0,
           setupCompleted: config.setupCompleted ? 1 : 0,
           hideBottomScreen: config.hideBottomScreen ? 1 : 0,
           videoSound: config.videoSound ? 1 : 0,

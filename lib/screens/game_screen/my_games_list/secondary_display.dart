@@ -11,6 +11,10 @@ part of '../my_games_list.dart';
 /// host [rebuild] bridge and the host static `_log` is qualified as
 /// `_SystemGamesListState._log` (both required from an extension).
 extension _SecondaryDisplay on _SystemGamesListState {
+  /// Whether the user allows preview videos on either screen.
+  bool get _videoPreviewsEnabled =>
+      mounted && context.read<SqliteConfigProvider>().config.videoPreviews;
+
   /// Hard reset of the video preview system.
   void _resetVideoState() {
     _videoTimer?.cancel();
@@ -112,6 +116,16 @@ extension _SecondaryDisplay on _SystemGamesListState {
       clearWheel: true,
       clearImageBytes: true,
     );
+  }
+
+  /// Clears an already-playing secondary video without waiting for the
+  /// media-dedup pass, which would otherwise skip an unchanged selection.
+  void _clearSecondaryDisplayVideo() {
+    final state = _secondaryDisplayState;
+    if (state == null) return;
+    // ignore: unawaited_futures
+    state.updateState(gameVideo: null, clearVideo: true);
+    _updateMusicDucking();
   }
 
   /// Synchronizes selection metadata and assets with secondary hardware displays.
@@ -300,12 +314,14 @@ extension _SecondaryDisplay on _SystemGamesListState {
   Future<void> _updateSecondaryDisplayVideo(GameModel game) async {
     if (_secondaryDisplayState == null ||
         _isNavigatingBack ||
-        _selectedGame != game) {
+        _selectedGame != game ||
+        !_videoPreviewsEnabled) {
       return;
     }
 
     final videoPath = _getVideoPath(game);
     final videoExists = await _fileProvider.fileExists(videoPath);
+    if (!mounted || !_videoPreviewsEnabled) return;
 
     if (videoExists && !_isNavigatingBack && _selectedGame == game) {
       // ignore: unawaited_futures
@@ -388,7 +404,7 @@ extension _SecondaryDisplay on _SystemGamesListState {
   /// Initiates the media preview sequence for the primary and secondary displays.
   void _startVideoTimer() {
     _videoTimer?.cancel();
-    if (!mounted || _isGameLaunching) return;
+    if (!mounted || _isGameLaunching || !_videoPreviewsEnabled) return;
 
     _videoTimer = Timer(_SystemGamesListState._videoDelay, () async {
       if (!mounted) return;
@@ -414,7 +430,8 @@ extension _SecondaryDisplay on _SystemGamesListState {
     if (!mounted ||
         _selectedGame == null ||
         _selectedGame != game ||
-        _isVideoLoading) {
+        _isVideoLoading ||
+        !_videoPreviewsEnabled) {
       return;
     }
 
@@ -438,9 +455,10 @@ extension _SecondaryDisplay on _SystemGamesListState {
         ? await _fileProvider.fileExists(videoPath)
         : file.existsSync();
 
-    if (!mounted || _selectedGame != game) {
+    if (!mounted || _selectedGame != game || !_videoPreviewsEnabled) {
       if (mounted) {
         rebuild(() {
+          _showVideo = false;
           _isVideoLoading = false;
         });
       }
@@ -479,6 +497,18 @@ extension _SecondaryDisplay on _SystemGamesListState {
       );
 
       await mainController.initialize();
+
+      // The setting can be turned off while the decoder initializes.
+      if (!mounted || _selectedGame != game || !_videoPreviewsEnabled) {
+        mainController.dispose();
+        if (mounted) {
+          rebuild(() {
+            _showVideo = false;
+            _isVideoLoading = false;
+          });
+        }
+        return;
+      }
 
       if (mounted && _selectedGame == game && _selectedGame != null) {
         rebuild(() {

@@ -81,6 +81,8 @@ const Map<String, dynamic> appLocaleZh = {
       '{game} 的 {files}将从你的 RomM 服务器永久删除。设备上的副本会保留，仍在同步此游戏的设备会再次上传其副本。',
   AppLocale.rommDeleteKeepsSaves: '此游戏的存档文件会保留在 RomM 上。',
   AppLocale.rommDeleteKeepsStates: '此游戏的即时存档会保留在 RomM 上。',
+  AppLocale.videoPreviews: "播放预览视频",
+  AppLocale.videoPreviewsSubtitle: "选中游戏时播放其视频。关闭后，两个屏幕都保持显示截图。",
   AppLocale.ignoreArticlesInGameSort: "排序游戏时忽略冠词",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "忽略标题开头的 The、A 或 An。例如，The Legend of Zelda 排在 L 下。",

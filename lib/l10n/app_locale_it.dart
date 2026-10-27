@@ -96,6 +96,9 @@ const Map<String, dynamic> appLocaleIt = {
       'I file di salvataggio di questo gioco restano su RomM.',
   AppLocale.rommDeleteKeepsStates:
       'Gli stati salvati di questo gioco restano su RomM.',
+  AppLocale.videoPreviews: "Riproduci video di anteprima",
+  AppLocale.videoPreviewsSubtitle:
+      "Riproduce il video del gioco quando viene selezionato. Disattivato, resta lo screenshot su entrambi gli schermi.",
   AppLocale.ignoreArticlesInGameSort:
       "Ignora gli articoli nel riordino dei giochi",
   AppLocale.ignoreArticlesInGameSortSubtitle:

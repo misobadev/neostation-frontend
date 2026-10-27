@@ -94,6 +94,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.rommDeleteKeepsSaves: 'Berkas simpanan game ini tetap ada di RomM.',
   AppLocale.rommDeleteKeepsStates:
       'Status simpanan game ini tetap ada di RomM.',
+  AppLocale.videoPreviews: "Putar video pratinjau",
+  AppLocale.videoPreviewsSubtitle:
+      "Memutar video game saat dipilih. Jika nonaktif, tangkapan layar tetap tampil di kedua layar.",
   AppLocale.ignoreArticlesInGameSort: "Abaikan artikel saat mengurutkan game",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Abaikan The, A, atau An di awal judul. Misalnya, The Legend of Zelda diurutkan di huruf L.",

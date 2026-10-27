@@ -83,6 +83,9 @@ const Map<String, dynamic> appLocaleJa = {
       '{game} の{files}をRomMサーバーから完全に削除します。デバイス上のコピーは残り、このゲームの同期を続けているデバイスからは再びアップロードされます。',
   AppLocale.rommDeleteKeepsSaves: 'このゲームのセーブデータはRomMに残ります。',
   AppLocale.rommDeleteKeepsStates: 'このゲームのセーブステートはRomMに残ります。',
+  AppLocale.videoPreviews: "プレビュー動画を再生",
+  AppLocale.videoPreviewsSubtitle:
+      "ゲームを選択すると動画を再生します。オフにすると両方の画面でスクリーンショットのままになります。",
   AppLocale.ignoreArticlesInGameSort: "ゲームの並び替えで冠詞を無視",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "タイトル先頭の The、A、An を無視します。例：The Legend of Zelda は L に分類されます。",

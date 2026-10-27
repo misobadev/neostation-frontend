@@ -97,6 +97,9 @@ const Map<String, dynamic> appLocaleFr = {
       'Les fichiers de sauvegarde de ce jeu restent sur RomM.',
   AppLocale.rommDeleteKeepsStates:
       'Les états sauvegardés de ce jeu restent sur RomM.',
+  AppLocale.videoPreviews: "Lire les vidéos d'aperçu",
+  AppLocale.videoPreviewsSubtitle:
+      "Lit la vidéo d'un jeu lorsqu'il est sélectionné. Désactivé, la capture reste affichée sur les deux écrans.",
   AppLocale.ignoreArticlesInGameSort:
       "Ignorer les articles dans le tri des jeux",
   AppLocale.ignoreArticlesInGameSortSubtitle:

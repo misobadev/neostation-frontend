@@ -258,6 +258,15 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Updates whether game previews play their video on either screen.
+  Future<void> updateVideoPreviews(bool value) async {
+    if (_config.videoPreviews == value) return;
+    final previous = _config;
+    _config = _config.copyWith(videoPreviews: value);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
   /// Updates whether hidden files/folders are ignored during ROM scans.
   Future<void> updateIgnoreHiddenFiles(bool ignoreHiddenFiles) async {
     final previous = _config;

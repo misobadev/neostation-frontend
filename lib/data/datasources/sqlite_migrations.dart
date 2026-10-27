@@ -665,6 +665,9 @@ class SqliteMigrations {
         db.execute(createRaCatalogueSyncTableSql);
         await _migrateToVersion175(db);
         break;
+      case 177:
+        await _migrateToVersion177(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7280,6 +7283,22 @@ class SqliteMigrations {
       _log.e('Error in migration v165: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
+    }
+  }
+
+  /// Migration v177: persists whether game preview videos play.
+  ///
+  /// Existing installs default to off, matching the new setting's default.
+  /// The column guard makes the migration safe to re-run.
+  static Future<void> _migrateToVersion177(Database db) async {
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('video_previews')) {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN video_previews INTEGER DEFAULT 0',
+      );
     }
   }
 

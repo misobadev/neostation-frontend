@@ -96,6 +96,9 @@ const Map<String, dynamic> appLocalePt = {
       'Os arquivos de save deste jogo continuam no RomM.',
   AppLocale.rommDeleteKeepsStates:
       'Os estados salvos deste jogo continuam no RomM.',
+  AppLocale.videoPreviews: "Reproduzir prévias em vídeo",
+  AppLocale.videoPreviewsSubtitle:
+      "Reproduz o vídeo do jogo ao selecioná-lo. Desativado, a captura permanece nas duas telas.",
   AppLocale.ignoreArticlesInGameSort: "Ignorar artigos ao ordenar jogos",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Ignorar The, A e An no início do título. Por exemplo, The Legend of Zelda fica na letra L.",
