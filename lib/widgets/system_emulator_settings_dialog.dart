@@ -45,7 +45,18 @@ part 'system_emulator_settings_dialog/tabs.dart';
 class SystemEmulatorSettingsDialog extends StatefulWidget {
   final SystemModel system;
 
-  const SystemEmulatorSettingsDialog({super.key, required this.system});
+  /// Tab the dialog opens on. [hiddenTab] is how the Android apps grid sends
+  /// the user straight to the apps they hid.
+  final int initialTab;
+
+  /// Index of the Hidden tab.
+  static const int hiddenTab = 3;
+
+  const SystemEmulatorSettingsDialog({
+    super.key,
+    required this.system,
+    this.initialTab = 0,
+  });
 
   @override
   State<SystemEmulatorSettingsDialog> createState() =>
@@ -115,6 +126,7 @@ class _SystemEmulatorSettingsDialogState
 
     // Initialize local system state
     _system = widget.system;
+    _currentTab = widget.initialTab;
     // Recursive scan + subfolder view (items 4/5) only mean something for a
     // system that owns a ROM directory. Aggregate libraries ('all',
     // 'favorites', 'collections', a single collection) own none, and a
@@ -372,19 +384,19 @@ class _SystemEmulatorSettingsDialogState
   String? get _hiddenScopeSystemId =>
       _isVirtualLibrarySystem ? null : _system.id;
 
-  /// Whether a game of this system can be hidden in the first place.
+  /// Whether the Hidden tab is offered even while it is empty.
   ///
-  /// The Android system is browsed through [AndroidAppsGrid], a separate screen
-  /// that binds no settings action, so an installed app has no "Hide Game" row
-  /// to reach — a Hidden tab there could only ever be empty. Everything else
-  /// (music included) goes through the games list, where START opens the game
-  /// settings dialog.
+  /// Not for Android: apps are hidden from [AndroidAppsGrid]'s options menu
+  /// (Y or a long press), not from a settings dialog, so the empty state's
+  /// "hide a game from its own settings" would point nowhere. The tab still
+  /// appears once an app is hidden, and that same menu links straight to it.
+  /// Everything else (music included) goes through the games list, where
+  /// START opens the game settings dialog.
   bool get _systemSupportsHiding => _system.folderName != 'android';
 
   /// Whether the Hidden tab is offered. Kept visible whenever games *are*
   /// hidden even if the system can't hide them, so a row can never end up with
-  /// no way back — and so this starts working on its own if hiding is later
-  /// wired into the Android apps grid.
+  /// no way back.
   bool get _showHiddenTab => _systemSupportsHiding || _hiddenGames.isNotEmpty;
 
   /// Tab indices this system offers, in strip order. Single source of truth for

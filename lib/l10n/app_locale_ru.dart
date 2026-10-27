@@ -1633,6 +1633,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.gameUnhidden: '{name} восстановлена',
   AppLocale.allGamesUnhidden: 'Все скрытые игры восстановлены',
   AppLocale.hiddenGames: 'Скрытые',
+  AppLocale.hideApp: 'Скрыть приложение',
+  AppLocale.hiddenApps: 'Скрытые приложения',
   AppLocale.noHiddenGames: 'Нет скрытых игр',
   AppLocale.noHiddenGamesSubtitle:
       'Скройте игру в её настройках, и она появится здесь.',

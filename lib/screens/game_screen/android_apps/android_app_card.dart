@@ -14,11 +14,15 @@ class AndroidAppCard extends StatefulWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
+  /// Touch route to the app's options menu; the gamepad reaches it with Y.
+  final VoidCallback? onLongPress;
+
   const AndroidAppCard({
     super.key,
     required this.app,
     required this.isSelected,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -68,6 +72,7 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
       child: InkWell(
         focusNode: _focusNode,
         onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
         child: Center(child: _buildIconStack()),

@@ -1613,6 +1613,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.gameUnhidden: '{name} restored',
   AppLocale.allGamesUnhidden: 'All hidden games restored',
   AppLocale.hiddenGames: 'Hidden',
+  AppLocale.hideApp: 'Hide App',
+  AppLocale.hiddenApps: 'Hidden Apps',
   AppLocale.noHiddenGames: 'No hidden games',
   AppLocale.noHiddenGamesSubtitle:
       'Hide a game from its own settings and it appears here.',

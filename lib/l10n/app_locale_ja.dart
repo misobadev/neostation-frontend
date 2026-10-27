@@ -1481,6 +1481,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.gameUnhidden: '{name} を再表示しました',
   AppLocale.allGamesUnhidden: '非表示のゲームをすべて再表示しました',
   AppLocale.hiddenGames: '非表示',
+  AppLocale.hideApp: 'アプリを非表示',
+  AppLocale.hiddenApps: '非表示のアプリ',
   AppLocale.noHiddenGames: '非表示のゲームはありません',
   AppLocale.noHiddenGamesSubtitle: 'ゲーム設定から非表示にすると、ここに表示されます。',
   AppLocale.rommLinkRow: 'RomM にリンク',

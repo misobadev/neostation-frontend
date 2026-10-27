@@ -12,12 +12,16 @@ class AndroidAppsFooter extends CoreFooter {
   final VoidCallback? onBack;
   final bool showBack;
 
+  /// Opens the focused app's options (Y). Hidden when null.
+  final VoidCallback? onOptions;
+
   const AndroidAppsFooter({
     super.key,
     required this.appName,
     required this.onLaunch,
     this.onBack,
     this.showBack = true,
+    this.onOptions,
   });
 
   @override
@@ -52,6 +56,16 @@ class AndroidAppsFooter extends CoreFooter {
           onTap: onBack,
           backgroundColor: theme.colorScheme.tertiary,
           textColor: theme.colorScheme.onTertiary,
+        ),
+        SizedBox(width: 8.r),
+      ],
+      if (onOptions != null) ...[
+        GamepadControl(
+          iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
+          label: AppLocale.hintOptions.getString(context),
+          onTap: onOptions,
+          textColor: theme.colorScheme.onTertiaryFixed,
+          backgroundColor: theme.colorScheme.tertiaryFixed,
         ),
         SizedBox(width: 8.r),
       ],

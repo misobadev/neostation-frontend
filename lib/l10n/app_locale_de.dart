@@ -1694,6 +1694,8 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.allGamesUnhidden:
       'Alle ausgeblendeten Spiele wurden wiederhergestellt',
   AppLocale.hiddenGames: 'Ausgeblendet',
+  AppLocale.hideApp: 'App ausblenden',
+  AppLocale.hiddenApps: 'Ausgeblendete Apps',
   AppLocale.noHiddenGames: 'Keine ausgeblendeten Spiele',
   AppLocale.noHiddenGamesSubtitle:
       'Blende ein Spiel in seinen Einstellungen aus, dann erscheint es hier.',

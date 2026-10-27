@@ -1701,6 +1701,8 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.gameUnhidden: '{name} restauré',
   AppLocale.allGamesUnhidden: 'Tous les jeux masqués ont été restaurés',
   AppLocale.hiddenGames: 'Masqués',
+  AppLocale.hideApp: "Masquer l'app",
+  AppLocale.hiddenApps: 'Apps masquées',
   AppLocale.noHiddenGames: 'Aucun jeu masqué',
   AppLocale.noHiddenGamesSubtitle:
       'Masquez un jeu depuis ses paramètres pour le retrouver ici.',

@@ -1491,6 +1491,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.gameUnhidden: '{name} 복원됨',
   AppLocale.allGamesUnhidden: '숨긴 게임을 모두 복원했습니다',
   AppLocale.hiddenGames: '숨김',
+  AppLocale.hideApp: '앱 숨기기',
+  AppLocale.hiddenApps: '숨긴 앱',
   AppLocale.noHiddenGames: '숨긴 게임 없음',
   AppLocale.noHiddenGamesSubtitle: '게임 설정에서 게임을 숨기면 여기에 표시됩니다.',
   AppLocale.rommLinkRow: 'RomM에 연결',

@@ -1337,6 +1337,8 @@ mixin AppLocale {
   static const String gameUnhidden = 'game_unhidden';
   static const String allGamesUnhidden = 'all_games_unhidden';
   static const String hiddenGames = 'hidden_games';
+  static const String hideApp = 'hide_app';
+  static const String hiddenApps = 'hidden_apps';
   static const String noHiddenGames = 'no_hidden_games';
   static const String noHiddenGamesSubtitle = 'no_hidden_games_subtitle';
   static const String restartRequired = 'restart_required';

@@ -1426,6 +1426,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.gameUnhidden: '已恢復 {name}',
   AppLocale.allGamesUnhidden: '已恢復所有隱藏的遊戲',
   AppLocale.hiddenGames: '已隱藏',
+  AppLocale.hideApp: '隱藏應用程式',
+  AppLocale.hiddenApps: '已隱藏的應用程式',
   AppLocale.noHiddenGames: '沒有隱藏的遊戲',
   AppLocale.noHiddenGamesSubtitle: '在遊戲設定中隱藏遊戲後，它會顯示在這裡。',
   AppLocale.rommLinkRow: '連結至 RomM',

@@ -1,5 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_localization/flutter_localization.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/providers/sqlite_config_provider.dart';
+import 'package:neostation/providers/sqlite_database_provider.dart';
+import 'package:neostation/repositories/game_repository.dart';
+import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/responsive.dart';
 import 'package:neostation/services/android_service.dart';
 import 'package:neostation/services/logger_service.dart';
@@ -12,6 +20,9 @@ import '../../../services/game_service.dart';
 import '../../../utils/gamepad_nav.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../widgets/android_apps_footer.dart';
+import '../../../widgets/context_menu/anchored_context_menu.dart';
+import '../../../widgets/custom_notification.dart';
+import '../../../widgets/system_emulator_settings_dialog.dart';
 import 'android_app_card.dart';
 
 /// A specialized grid view for browsing and launching native Android applications.
@@ -58,6 +69,20 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
   List<GameModel> _apps = [];
   bool _isLoading = true;
   int _selectedIndex = 0;
+
+  /// How many of this system's apps the user has hidden. The options menu
+  /// offers a way back to them only while there are any.
+  int _hiddenCount = 0;
+
+  /// One key per app, by package. It keeps each card's state (its loaded
+  /// icon) with its app when hiding one shifts the rest, and anchors the
+  /// options menu to the focused card.
+  final Map<String, GlobalKey> _cardKeys = {};
+
+  bool _isMenuOpen = false;
+
+  static const String _menuHide = 'hide';
+  static const String _menuHidden = 'hidden';
   late GamepadNavigation _gamepadNav;
   final ScrollController _scrollController = ScrollController();
 
@@ -97,6 +122,7 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
       onNavigateLeft: _navigateLeft,
       onNavigateRight: _navigateRight,
       onSelectItem: _launchSelectedApp,
+      onFavorite: _openAppOptions,
       onBack: widget.embedded ? null : _goBack,
       onPreviousTab: widget.embedded ? widget.onPreviousTab : null,
       onNextTab: widget.embedded ? widget.onNextTab : null,
@@ -128,9 +154,17 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
   Future<void> _loadApps() async {
     try {
       final apps = await GameService.loadGamesForSystem(widget.system);
+      final hidden = widget.system.id == null
+          ? const []
+          : await GameRepository.getHiddenGames(systemId: widget.system.id);
       if (mounted) {
         setState(() {
           _apps = apps;
+          _hiddenCount = hidden.length;
+          _selectedIndex = _selectedIndex.clamp(
+            0,
+            math.max(0, apps.length - 1),
+          );
           _isLoading = false;
         });
       }
@@ -261,6 +295,114 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
     }
   }
 
+  /// Opens the focused app's options: hide it, or open the ones already
+  /// hidden. Y on the gamepad, a long press on touch.
+  ///
+  /// With every app hidden the grid is empty, and the menu still opens with
+  /// only the way back, so hiding can never strand the user.
+  Future<void> _openAppOptions() async {
+    if (_isMenuOpen || _isLoading) return;
+    final app = _apps.isEmpty ? null : _apps[_selectedIndex];
+    if (app == null && _hiddenCount == 0) return;
+
+    _isMenuOpen = true;
+    final String? result;
+    try {
+      result = await showAnchoredContextMenu(
+        context: context,
+        items: [
+          if (app != null)
+            ContextMenuItem(
+              id: _menuHide,
+              label: AppLocale.hideApp.getString(context),
+              icon: Symbols.visibility_off_rounded,
+            ),
+          if (_hiddenCount > 0)
+            ContextMenuItem(
+              id: _menuHidden,
+              label:
+                  '${AppLocale.hiddenApps.getString(context)} '
+                  '($_hiddenCount)',
+              icon: Symbols.visibility_rounded,
+              separatorBefore: app != null,
+            ),
+        ],
+        anchorKey: app == null ? null : _cardKeys[_appKey(app)],
+        alignment: ContextMenuAlignment.overAnchor,
+        layerId: 'android_app_context_menu',
+        submenuLayerId: 'android_app_context_submenu',
+      );
+    } finally {
+      _isMenuOpen = false;
+    }
+
+    if (!mounted || result == null) return;
+    switch (result) {
+      case _menuHide:
+        await _hideApp(app!);
+      case _menuHidden:
+        await _openHiddenApps();
+    }
+  }
+
+  /// Takes [app] out of the grid without touching the installed app.
+  ///
+  /// Unconfirmed, like hiding a game: nothing is removed and the app is one
+  /// visit to the Hidden tab away from coming back.
+  Future<void> _hideApp(GameModel app) async {
+    // Read before the awaits.
+    final databaseProvider = context.read<SqliteDatabaseProvider>();
+    final configProvider = context.read<SqliteConfigProvider>();
+
+    try {
+      await GameRepository.setGameHidden(
+        widget.system.folderName,
+        app.romname,
+        true,
+      );
+    } catch (e) {
+      _log.e('Hiding app failed: $e');
+      return;
+    }
+    if (!mounted) return;
+
+    setState(() {
+      _apps = [..._apps]..remove(app);
+      _hiddenCount++;
+      _selectedIndex = _selectedIndex.clamp(0, math.max(0, _apps.length - 1));
+    });
+    AppNotification.showNotification(
+      context,
+      AppLocale.gameHidden.getString(context).replaceFirst('{name}', app.name),
+      type: NotificationType.info,
+    );
+
+    // The systems screen caches the recent-games row and the system card's
+    // count; re-read both, as hiding a game does.
+    await databaseProvider.loadGamesForSystem(widget.system.folderName);
+    final system = await SystemRepository.getSystemByFolderName(
+      widget.system.folderName,
+    );
+    if (system != null) await configProvider.refreshSystem(system);
+  }
+
+  /// Opens the Android system's Hidden tab, where hidden apps are restored.
+  ///
+  /// The only way back when the apps are a tab of their own: the Android card,
+  /// whose settings hold the same tab, is not on the systems screen then.
+  Future<void> _openHiddenApps() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => SystemEmulatorSettingsDialog(
+        system: widget.system,
+        initialTab: SystemEmulatorSettingsDialog.hiddenTab,
+      ),
+    );
+    if (mounted) await _loadApps();
+  }
+
+  String _appKey(GameModel app) => app.romPath ?? app.romname;
+
   /// Standard exit handler with gamepad input management.
   void _goBack() {
     if (_isNavigatingBack) return;
@@ -333,6 +475,9 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
                 AndroidAppsFooter(
                   appName: _apps.isNotEmpty ? _apps[_selectedIndex].name : '',
                   onLaunch: _launchSelectedApp,
+                  onOptions: _apps.isNotEmpty || _hiddenCount > 0
+                      ? _openAppOptions
+                      : null,
                   onBack: widget.embedded ? null : _goBack,
                   showBack: !widget.embedded,
                 ),
@@ -432,14 +577,22 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
                   final left = col * (itemWidth + spacing);
                   final top = row * (itemHeight + spacing);
 
+                  final app = _apps[index];
                   return Positioned(
+                    key: _cardKeys.putIfAbsent(_appKey(app), GlobalKey.new),
                     left: left,
                     top: top,
                     width: itemWidth,
                     height: itemHeight,
                     child: AndroidAppCard(
-                      app: _apps[index],
+                      app: app,
                       isSelected: _selectedIndex == index,
+                      onLongPress: () {
+                        if (index != _selectedIndex) {
+                          setState(() => _selectedIndex = index);
+                        }
+                        _openAppOptions();
+                      },
                       onTap: () {
                         // Touch users have no A button: tapping the app that is
                         // already selected launches it. (_launchSelectedApp
@@ -489,15 +642,30 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
   }
 
   /// Placeholder visual for empty app libraries.
+  ///
+  /// When the grid is empty because every app is hidden, it also offers the
+  /// way back, since there is no card left to long-press.
   Widget _buildEmptyState() {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Center(
-      child: Opacity(
-        opacity: 0.2,
-        child: Icon(
-          Symbols.apps_rounded,
-          size: 48.r,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Opacity(
+            opacity: 0.2,
+            child: Icon(Symbols.apps_rounded, size: 48.r, color: onSurface),
+          ),
+          if (_hiddenCount > 0) ...[
+            SizedBox(height: 12.r),
+            TextButton.icon(
+              onPressed: _openHiddenApps,
+              icon: const Icon(Symbols.visibility_rounded),
+              label: Text(
+                '${AppLocale.hiddenApps.getString(context)} ($_hiddenCount)',
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
