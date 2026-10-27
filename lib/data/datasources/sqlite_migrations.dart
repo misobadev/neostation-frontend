@@ -7288,8 +7288,9 @@ class SqliteMigrations {
 
   /// Migration v177: persists whether game preview videos play.
   ///
-  /// Existing installs default to off, matching the new setting's default.
-  /// The column guard makes the migration safe to re-run.
+  /// Existing installs default to on, preserving the current behaviour until
+  /// the user turns previews off. The column guard makes the migration safe to
+  /// re-run.
   static Future<void> _migrateToVersion177(Database db) async {
     final columns = db
         .select('PRAGMA table_info(user_config)')
@@ -7297,7 +7298,7 @@ class SqliteMigrations {
         .toSet();
     if (!columns.contains('video_previews')) {
       db.execute(
-        'ALTER TABLE user_config ADD COLUMN video_previews INTEGER DEFAULT 0',
+        'ALTER TABLE user_config ADD COLUMN video_previews INTEGER DEFAULT 1',
       );
     }
   }

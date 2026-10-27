@@ -1937,7 +1937,7 @@ class SqliteService {
         custom_sfx TEXT,
         system_sort_by TEXT DEFAULT 'alphabetical',
         ignore_articles_in_game_sort INTEGER DEFAULT 0,
-        video_previews INTEGER DEFAULT 0,
+        video_previews INTEGER DEFAULT 1,
         collection_sort_by TEXT DEFAULT 'name',
         collection_sort_order TEXT DEFAULT 'asc',
         system_sort_order TEXT DEFAULT 'asc',

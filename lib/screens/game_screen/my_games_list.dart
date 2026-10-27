@@ -321,7 +321,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     milliseconds: 1500,
   ); // Debounce for video playback.
   bool _lastShowInfo = false; // Memoizes 'showGameInfo' config state.
-  bool _lastVideoPreviews = false; // Memoizes 'videoPreviews' config state.
+  bool _lastVideoPreviews = true; // Memoizes 'videoPreviews' config state.
   String? _lastGameViewMode; // Memoizes 'gameViewMode' config state.
   String? _lastGameListSize; // Memoizes the active List view size.
   bool _isGameLaunching =

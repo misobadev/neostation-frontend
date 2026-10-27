@@ -7,7 +7,7 @@ void main() {
       db.select('SELECT video_previews FROM user_config').first.values.single
           as int;
 
-  test('v177 adds video_previews off by default and preserves the value '
+  test('v177 adds video_previews on by default and preserves the value '
       'when rerun', () async {
     final db = sqlite3.openInMemory();
     addTearDown(db.close);
@@ -15,10 +15,10 @@ void main() {
     db.execute('INSERT INTO user_config (id) VALUES (1)');
 
     await SqliteMigrations.migrateToVersion(db, 177);
-    expect(videoPreviews(db), 0);
-
-    db.execute('UPDATE user_config SET video_previews = 1');
-    await SqliteMigrations.migrateToVersion(db, 177);
     expect(videoPreviews(db), 1);
+
+    db.execute('UPDATE user_config SET video_previews = 0');
+    await SqliteMigrations.migrateToVersion(db, 177);
+    expect(videoPreviews(db), 0);
   });
 }

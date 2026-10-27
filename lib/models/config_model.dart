@@ -77,8 +77,8 @@ class ConfigModel {
   /// Ignore leading English articles when ordering game titles.
   final bool ignoreArticlesInGameSort;
 
-  /// Whether game preview videos play when a game is selected. Off by
-  /// default: the screenshot stays and no video player is created on either
+  /// Whether game preview videos play when a game is selected. On by
+  /// default; off keeps the screenshot and creates no video player on either
   /// screen.
   final bool videoPreviews;
 
@@ -277,7 +277,7 @@ class ConfigModel {
     this.scanOnStartup = true,
     this.ignoreHiddenFiles = true,
     this.ignoreArticlesInGameSort = false,
-    this.videoPreviews = false,
+    this.videoPreviews = true,
     this.setupCompleted = false,
     this.hideBottomScreen = false,
     this.videoSound = false,
@@ -414,11 +414,11 @@ class ConfigModel {
         json['ignoreArticlesInGameSort'] ??
             json['ignore_articles_in_game_sort'],
       ),
-      videoPreviews: [
-        true,
-        1,
-        '1',
-        'true',
+      videoPreviews: ![
+        false,
+        0,
+        '0',
+        'false',
       ].contains(json['videoPreviews'] ?? json['video_previews']),
       collectionSortBy:
           (json['collectionSortBy'] ?? json['collection_sort_by'] ?? 'name')

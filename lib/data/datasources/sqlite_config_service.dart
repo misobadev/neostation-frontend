@@ -308,7 +308,7 @@ class SqliteConfigService {
         systemSortOrder: userConfig?['system_sort_order']?.toString() ?? 'asc',
         ignoreArticlesInGameSort:
             userConfig?['ignore_articles_in_game_sort'] == 1,
-        videoPreviews: userConfig?['video_previews'] == 1,
+        videoPreviews: userConfig?['video_previews'] != 0,
         collectionSortBy:
             userConfig?['collection_sort_by']?.toString() ?? 'name',
         collectionSortOrder:
