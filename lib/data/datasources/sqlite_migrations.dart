@@ -671,6 +671,9 @@ class SqliteMigrations {
       case 178:
         await _migrateToVersion178(db);
         break;
+      case 180:
+        await _migrateToVersion180(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7353,6 +7356,38 @@ class SqliteMigrations {
       _log.i('Migration v175 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v175: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v180: adds `user_config.game_view_hidden_items`, the parts of
+  /// the games views the user has switched off, per view (comma-separated
+  /// `view.item` ids from `GameViewItem`). One column rather than one per item
+  /// and view, so items added to the views later need no migration of their
+  /// own.
+  ///
+  /// Defaults to empty: everything shown, as before the setting existed.
+  /// Idempotent — the column is added only when absent.
+  static Future<void> _migrateToVersion180(Database db) async {
+    _log.i('Migration v180: Adding game_view_hidden_items to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((row) => row['name'].toString())
+          .toSet();
+      if (!columns.contains('game_view_hidden_items')) {
+        db.execute(
+          "ALTER TABLE user_config ADD COLUMN game_view_hidden_items "
+          "TEXT DEFAULT ''",
+        );
+        _log.i('Column game_view_hidden_items added via v180');
+      } else {
+        _log.i('Column game_view_hidden_items already exists');
+      }
+      _log.i('Migration v180 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v180: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

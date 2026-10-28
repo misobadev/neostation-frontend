@@ -1,3 +1,4 @@
+import 'package:neostation/constants/game_view_items.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -305,6 +306,24 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
           ),
         ),
       ],
+      // What this view shows, under its size and style. Each view keeps its
+      // own choices and lists only the items its footer has.
+      if (GameViewItem.itemsFor[mode] case final items?) ...[
+        _MenuEntry.group(AppLocale.viewShowGroup.getString(context)),
+        for (final item in items)
+          _MenuEntry.row(
+            _OptionRow(
+              id: '$_viewItemPrefix$mode.$item',
+              label: _viewItemLabel(context, item),
+              icon: _viewItemIcon(item),
+              toggle: true,
+              checked: !GameViewItem.hiddenIn(
+                config.gameViewHiddenItems,
+                mode,
+              ).contains(item),
+            ),
+          ),
+      ],
     ];
   }
 
@@ -367,7 +386,7 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
       return;
     }
     if (row.toggle) {
-      _toggleTarget(row);
+      _toggleRow(row);
       return;
     }
     _activateRow(row);
@@ -421,6 +440,48 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
     _clampCurrent(rows);
     if (rows.isNotEmpty) _revealRow(rows[_submenuIndex]);
   }
+
+  /// Flips a toggle row: the visibility of an item in a games view, or
+  /// membership of an "Add to" target.
+  void _toggleRow(_OptionRow row) {
+    if (row.id.startsWith(_viewItemPrefix)) {
+      final viewItem = row.id.substring(_viewItemPrefix.length);
+      final dot = viewItem.indexOf('.');
+      SfxService().playNavSound();
+      // Checked means shown, so a checked row is being hidden.
+      context.read<SqliteConfigProvider>().updateGameViewItemHidden(
+        viewItem.substring(0, dot),
+        viewItem.substring(dot + 1),
+        row.checked,
+      );
+      return;
+    }
+    _toggleTarget(row);
+  }
+
+  static const String _viewItemPrefix = 'view_item:';
+
+  String _viewItemLabel(BuildContext context, String item) => switch (item) {
+    GameViewItem.fileName => AppLocale.fileName.getString(context),
+    GameViewItem.playTime => AppLocale.playTime.getString(context),
+    GameViewItem.rating => AppLocale.viewItemRating.getString(context),
+    GameViewItem.achievements => AppLocale.achievements.getString(context),
+    GameViewItem.random => AppLocale.randomGame.getString(context),
+    GameViewItem.favorite => AppLocale.favorite.getString(context),
+    GameViewItem.settings => AppLocale.gameSettings.getString(context),
+    _ => AppLocale.play.getString(context),
+  };
+
+  static IconData _viewItemIcon(String item) => switch (item) {
+    GameViewItem.fileName => Symbols.description_rounded,
+    GameViewItem.playTime => Symbols.schedule_rounded,
+    GameViewItem.rating => Symbols.star_rounded,
+    GameViewItem.achievements => Symbols.trophy_rounded,
+    GameViewItem.random => Symbols.casino_rounded,
+    GameViewItem.favorite => Symbols.favorite_rounded,
+    GameViewItem.settings => Symbols.settings_rounded,
+    _ => Symbols.play_arrow_rounded,
+  };
 
   Future<void> _toggleTarget(_OptionRow row) async {
     final targetId = row.id.substring('target:'.length);
@@ -558,7 +619,7 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
                                       onTap: () {
                                         _focusRow(rows.indexOf(entry.row!));
                                         if (entry.row!.toggle) {
-                                          _toggleTarget(entry.row!);
+                                          _toggleRow(entry.row!);
                                         } else {
                                           _activateRow(entry.row!);
                                         }

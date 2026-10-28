@@ -1,3 +1,4 @@
+import 'package:neostation/constants/game_view_items.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -58,6 +59,11 @@ class GameViewFooter extends StatelessWidget {
   final SystemModel? system;
   final ISyncProvider? syncProvider;
 
+  /// Which games view this footer belongs to ([GameViewItem.grid] or
+  /// [GameViewItem.carousel]): each keeps its own choice of what the footer
+  /// shows.
+  final String view;
+
   const GameViewFooter({
     super.key,
     required this.game,
@@ -71,6 +77,7 @@ class GameViewFooter extends StatelessWidget {
     this.isFolder = false,
     this.system,
     this.syncProvider,
+    this.view = GameViewItem.grid,
   });
 
   @override
@@ -83,6 +90,16 @@ class GameViewFooter extends StatelessWidget {
     // Take the colours from the scheme and drop the shadows: there is no busy
     // background here for them to lift the text off.
     final scheme = Theme.of(context).colorScheme;
+    // Watched here rather than passed in, like the cloud-mark setting below:
+    // the hosts memoize this widget, so a value read there would not reach a
+    // footer already built.
+    final hidden = GameViewItem.hiddenIn(
+      context.select<SqliteConfigProvider, Set<String>>(
+        (p) => p.config.gameViewHiddenItems,
+      ),
+      view,
+    );
+    bool shown(String item) => !hidden.contains(item);
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
@@ -110,7 +127,9 @@ class GameViewFooter extends StatelessWidget {
                 // re-centers the rating/RA pill + PLAY row upward. The empty
                 // string still lays out a full line box via the forced strut.
                 Text(
-                  game.showRomFileNameSubtitle ? game.romname : '',
+                  game.showRomFileNameSubtitle && shown(GameViewItem.fileName)
+                      ? game.romname
+                      : '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   strutStyle: StrutStyle(
@@ -166,7 +185,7 @@ class GameViewFooter extends StatelessWidget {
                   _MuteHintPill(onToggleMute: onToggleMute!),
                   SizedBox(width: 6.r),
                 ],
-                if (game.rating > 0) ...[
+                if (game.rating > 0 && shown(GameViewItem.rating)) ...[
                   _SteamStyleRating(game: game),
                   SizedBox(width: 6.r),
                 ],
@@ -177,13 +196,14 @@ class GameViewFooter extends StatelessWidget {
                 // and a game RetroAchievements has answered zero for gets no
                 // pill at all rather than one saying so. A lookup still in
                 // flight keeps it — only a settled zero hides it.
-                if (GameDetailsFooter.showsAchievementsFor(
-                  context,
-                  game: game,
-                  hasRetroAchievements: hasRetroAchievements,
-                  isLoadingAchievements: isLoadingAchievements,
-                  currentGameInfo: currentGameInfo,
-                )) ...[
+                if (shown(GameViewItem.achievements) &&
+                    GameDetailsFooter.showsAchievementsFor(
+                      context,
+                      game: game,
+                      hasRetroAchievements: hasRetroAchievements,
+                      isLoadingAchievements: isLoadingAchievements,
+                      currentGameInfo: currentGameInfo,
+                    )) ...[
                   _CompactAchievementsIndicator(
                     game: game,
                     isLoading: isLoadingAchievements,
@@ -195,11 +215,12 @@ class GameViewFooter extends StatelessWidget {
                 // Accumulated play time as its own pill to the left of PLAY
                 // (only once the game has been played), mirroring the details
                 // card footer.
-                if (GameUtils.formatPlayTime(game.playTime ?? 0) != '0s') ...[
+                if (shown(GameViewItem.playTime) &&
+                    GameUtils.formatPlayTime(game.playTime ?? 0) != '0s') ...[
                   _PlayTimePill(game: game),
                   SizedBox(width: 6.r),
                 ],
-                _buildPlayButton(context),
+                if (shown(GameViewItem.play)) _buildPlayButton(context),
               ],
             ),
           ),

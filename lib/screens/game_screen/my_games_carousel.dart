@@ -1,3 +1,4 @@
+import 'package:neostation/constants/game_view_items.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -600,6 +601,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
     }
     _chromeSig = sig;
     _chromeFooter = GameViewFooter(
+      view: GameViewItem.carousel,
       game: settledGame,
       onPlay: widget.onPlay,
       hasRetroAchievements: hasRa,

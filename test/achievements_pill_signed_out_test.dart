@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
+import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/widgets/game_view_footer.dart';
 
@@ -80,8 +81,16 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      ChangeNotifierProvider<RetroAchievementsProvider>.value(
-        value: _FakeRaProvider(connected: connected),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<RetroAchievementsProvider>.value(
+            value: _FakeRaProvider(connected: connected),
+          ),
+          // The footer reads which of its items the user has hidden.
+          ChangeNotifierProvider<SqliteConfigProvider>(
+            create: (_) => SqliteConfigProvider(),
+          ),
+        ],
         child: ScreenUtilInit(
           designSize: const Size(1280, 720),
           builder: (context, _) => MaterialApp(

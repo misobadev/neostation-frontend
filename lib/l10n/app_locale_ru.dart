@@ -856,6 +856,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.descending: 'По убыванию',
   AppLocale.viewModeGroup: 'РЕЖИМ ПРОСМОТРА',
   AppLocale.cardSizeGroup: 'РАЗМЕР КАРТОЧКИ',
+  AppLocale.viewShowGroup: 'ПОКАЗЫВАТЬ',
+  AppLocale.viewItemRating: 'Рейтинг',
   AppLocale.listSizeGroup: 'РАЗМЕР СПИСКА',
   AppLocale.cardStyleGroup: 'СТИЛЬ КАРТОЧКИ',
   AppLocale.fanartCard: 'Фанарт',

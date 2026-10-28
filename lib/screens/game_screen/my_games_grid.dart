@@ -1,3 +1,4 @@
+import 'package:neostation/constants/game_view_items.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:async';
@@ -1369,6 +1370,7 @@ class _GamesGridState extends State<GamesGrid> {
     }
     _chromeSig = sig;
     _chromeFooter = GameViewFooter(
+      view: GameViewItem.grid,
       game: settledGame,
       onPlay: widget.onPlay,
       hasRetroAchievements: hasRa,

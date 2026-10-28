@@ -172,6 +172,26 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Shows or hides [item] in the games [view] ([GameViewItem]). Each view
+  /// keeps its own choices.
+  Future<void> updateGameViewItemHidden(
+    String view,
+    String item,
+    bool hidden,
+  ) async {
+    final items = GameViewItem.withHidden(
+      _config.gameViewHiddenItems,
+      view,
+      item,
+      hide: hidden,
+    );
+    if (items.length == _config.gameViewHiddenItems.length) return;
+    final previous = _config;
+    _config = _config.copyWith(gameViewHiddenItems: items);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
   /// Chooses whether Android apps are opened from Systems or their own tab.
   Future<void> updateAndroidAppsAsTab(bool value) async {
     final previous = _config;

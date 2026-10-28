@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'custom_sfx.dart';
 
+import 'package:neostation/constants/game_view_items.dart';
 import 'package:neostation/constants/recent_card_sizes.dart';
 import 'emulator_model.dart';
 
@@ -238,6 +239,10 @@ class ConfigModel {
   /// syncs and still wants the row clean.
   final bool showCloudSyncIcon;
 
+  /// Parts of the games views the user has switched off, as `view.item` ids
+  /// ([GameViewItem]). Empty shows everything.
+  final Set<String> gameViewHiddenItems;
+
   /// Whether the startup folder scan is followed by a RetroAchievements match
   /// pass over whatever it just added.
   ///
@@ -328,6 +333,7 @@ class ConfigModel {
     this.esdeFolderPath = '',
     this.showAchievementsBadge = false,
     this.showCloudSyncIcon = true,
+    this.gameViewHiddenItems = const {},
     this.raMatchOnStartup = false,
     this.subfolderViewAll = false,
     this.hideSystemLogos = false,
@@ -561,6 +567,9 @@ class ConfigModel {
               '1' ||
           (json['showCloudSyncIcon'] ?? false).toString().toLowerCase() ==
               'true',
+      gameViewHiddenItems: GameViewItem.decode(
+        json['gameViewHiddenItems'] ?? json['game_view_hidden_items'],
+      ),
       // Same reasoning: absent => 0 => off, matching the column default.
       raMatchOnStartup:
           (json['raMatchOnStartup'] ?? json['ra_match_on_startup'] ?? 0)
@@ -686,6 +695,7 @@ class ConfigModel {
       'esdeFolderPath': esdeFolderPath,
       'showAchievementsBadge': showAchievementsBadge,
       'showCloudSyncIcon': showCloudSyncIcon,
+      'gameViewHiddenItems': GameViewItem.encode(gameViewHiddenItems),
       'raMatchOnStartup': raMatchOnStartup,
       'subfolderViewAll': subfolderViewAll,
       'hideSystemLogos': hideSystemLogos,
@@ -747,6 +757,7 @@ class ConfigModel {
     String? esdeFolderPath,
     bool? showAchievementsBadge,
     bool? showCloudSyncIcon,
+    Set<String>? gameViewHiddenItems,
     bool? raMatchOnStartup,
     bool? subfolderViewAll,
     bool? hideSystemLogos,
@@ -808,6 +819,7 @@ class ConfigModel {
       showAchievementsBadge:
           showAchievementsBadge ?? this.showAchievementsBadge,
       showCloudSyncIcon: showCloudSyncIcon ?? this.showCloudSyncIcon,
+      gameViewHiddenItems: gameViewHiddenItems ?? this.gameViewHiddenItems,
       raMatchOnStartup: raMatchOnStartup ?? this.raMatchOnStartup,
       subfolderViewAll: subfolderViewAll ?? this.subfolderViewAll,
       hideSystemLogos: hideSystemLogos ?? this.hideSystemLogos,

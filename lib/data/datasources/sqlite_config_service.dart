@@ -1,3 +1,4 @@
+import 'package:neostation/constants/game_view_items.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:neostation/constants/recent_card_sizes.dart';
@@ -430,6 +431,9 @@ class SqliteConfigService {
                 ) ??
                 1) ==
             1,
+        gameViewHiddenItems: GameViewItem.decode(
+          userConfig?['game_view_hidden_items'],
+        ),
         raMatchOnStartup:
             (int.tryParse(
                   userConfig?['ra_match_on_startup']?.toString() ?? '0',
@@ -544,6 +548,7 @@ class SqliteConfigService {
           esdeFolderPath: config.esdeFolderPath,
           showAchievementsBadge: config.showAchievementsBadge ? 1 : 0,
           showCloudSyncIcon: config.showCloudSyncIcon ? 1 : 0,
+          gameViewHiddenItems: GameViewItem.encode(config.gameViewHiddenItems),
           raMatchOnStartup: config.raMatchOnStartup ? 1 : 0,
           subfolderViewAll: config.subfolderViewAll ? 1 : 0,
           hideSystemLogos: config.hideSystemLogos ? 1 : 0,

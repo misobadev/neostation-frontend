@@ -469,7 +469,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 178;
+  static const int _databaseVersion = 180;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1985,7 +1985,8 @@ class SqliteService {
         hide_system_logos INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
-        neoglass_border_width REAL DEFAULT 2
+        neoglass_border_width REAL DEFAULT 2,
+        game_view_hidden_items TEXT DEFAULT ''
       );
       ''',
       '''
@@ -2853,6 +2854,7 @@ class SqliteService {
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
+    String? gameViewHiddenItems,
   }) async {
     final db = await instance.database;
 
@@ -3029,6 +3031,10 @@ class SqliteService {
 
     if (showCloudSyncIcon != null) {
       updates['show_cloud_sync_icon'] = showCloudSyncIcon;
+    }
+
+    if (gameViewHiddenItems != null) {
+      updates['game_view_hidden_items'] = gameViewHiddenItems;
     }
 
     // Both statements run in one transaction. Apart alone they can straddle a

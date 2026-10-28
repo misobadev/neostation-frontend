@@ -1,3 +1,4 @@
+import 'package:neostation/constants/game_view_items.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -184,6 +185,102 @@ void main() {
       expect(find.text(size), findsOneWidget);
     }
   });
+
+  testWidgets('list mode puts a toggle per list item under List Size', (
+    tester,
+  ) async {
+    final db = DatabaseTestHelper();
+    await db.setUp();
+    addTearDown(db.tearDown);
+    final config = SqliteConfigProvider();
+    await config.updateGameViewMode('list');
+    await tester.pumpWidget(host(config: config));
+    await openDialog(tester);
+
+    final context = tester.element(find.byType(GameOptionsDialog));
+    await tester.tap(find.text(AppLocale.viewMode.getString(context)));
+    await tester.pumpAndSettle();
+
+    final sizeGroup = find.text(AppLocale.listSizeGroup.getString(context));
+    final showGroup = find.text(AppLocale.viewShowGroup.getString(context));
+    expect(sizeGroup, findsOneWidget);
+    expect(showGroup, findsOneWidget);
+    expect(
+      tester.getTopLeft(showGroup).dy,
+      greaterThan(tester.getTopLeft(sizeGroup).dy),
+      reason: 'underneath the list size',
+    );
+
+    final fileName = find.text(AppLocale.fileName.getString(context));
+    for (final label in [
+      AppLocale.fileName,
+      AppLocale.playTime,
+      AppLocale.viewItemRating,
+      AppLocale.achievements,
+      AppLocale.randomGame,
+      AppLocale.favorite,
+      AppLocale.gameSettings,
+      AppLocale.play,
+    ]) {
+      await tester.ensureVisible(find.text(label.getString(context)));
+      expect(find.text(label.getString(context)), findsOneWidget);
+    }
+
+    await tester.ensureVisible(fileName);
+    await tester.pumpAndSettle();
+    await tester.tap(fileName);
+    await tester.pumpAndSettle();
+    expect(config.config.gameViewHiddenItems, {'list.file_name'});
+
+    await tester.tap(fileName);
+    await tester.pumpAndSettle();
+    expect(
+      config.config.gameViewHiddenItems,
+      isEmpty,
+      reason: 'a second tap shows it again',
+    );
+  });
+
+  for (final view in [GameViewItem.grid, GameViewItem.carousel]) {
+    testWidgets('$view lists only its own items, and keeps its own choices', (
+      tester,
+    ) async {
+      final db = DatabaseTestHelper();
+      await db.setUp();
+      addTearDown(db.tearDown);
+      final config = SqliteConfigProvider();
+      await config.updateGameViewMode(view);
+      await tester.pumpWidget(host(config: config));
+      await openDialog(tester);
+
+      final context = tester.element(find.byType(GameOptionsDialog));
+      await tester.tap(find.text(AppLocale.viewMode.getString(context)));
+      await tester.pumpAndSettle();
+
+      final styleGroup = find.text(AppLocale.cardStyleGroup.getString(context));
+      final showGroup = find.text(AppLocale.viewShowGroup.getString(context));
+      await tester.ensureVisible(showGroup);
+      expect(
+        tester.getTopLeft(showGroup).dy,
+        greaterThan(tester.getTopLeft(styleGroup).dy),
+        reason: 'underneath the card style',
+      );
+      for (final absent in [
+        AppLocale.randomGame,
+        AppLocale.favorite,
+        AppLocale.gameSettings,
+      ]) {
+        expect(find.text(absent.getString(context)), findsNothing);
+      }
+
+      final play = find.text(AppLocale.play.getString(context));
+      await tester.ensureVisible(play);
+      await tester.pumpAndSettle();
+      await tester.tap(play);
+      await tester.pumpAndSettle();
+      expect(config.config.gameViewHiddenItems, {'$view.play'});
+    });
+  }
 
   testWidgets('remounting the game view keeps input in Options', (
     tester,

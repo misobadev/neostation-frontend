@@ -871,6 +871,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.descending: 'Decrescente',
   AppLocale.viewModeGroup: 'Modalità Vista',
   AppLocale.cardSizeGroup: 'Dimensione Carta',
+  AppLocale.viewShowGroup: 'MOSTRA',
+  AppLocale.viewItemRating: 'Valutazione',
   AppLocale.listSizeGroup: 'DIMENSIONE ELENCO',
   AppLocale.cardStyleGroup: 'Stile Carta',
   AppLocale.fanartCard: 'Fanart',

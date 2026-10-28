@@ -774,6 +774,8 @@ mixin AppLocale {
   static const String sortByGroup = 'sort_by_group';
   static const String orderGroup = 'order_group';
   static const String cardSizeGroup = 'card_size_group';
+  static const String viewShowGroup = 'view_show_group';
+  static const String viewItemRating = 'view_item_rating';
   static const String listSizeGroup = 'list_size_group';
   static const String cardStyleGroup = 'card_style_group';
   static const String fanartCard = 'fanart_card';

@@ -1,3 +1,4 @@
+import 'package:neostation/constants/game_view_items.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -1020,6 +1021,13 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
             onShowRandomGame: widget.onShowRandomGame,
             onToggleFavorite: widget.onToggleFavorite,
             onOpenGameSettings: widget.onOpenGameSettings,
+            // Watched so a toggle in the list view options lands at once.
+            hiddenItems: GameViewItem.hiddenIn(
+              context.select<SqliteConfigProvider, Set<String>>(
+                (p) => p.config.gameViewHiddenItems,
+              ),
+              GameViewItem.list,
+            ),
           ),
 
           // Panel layer: the tabs share one strip so a D-pad step or a

@@ -764,6 +764,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.descending: '降順',
   AppLocale.viewModeGroup: '表示モード',
   AppLocale.cardSizeGroup: 'カードサイズ',
+  AppLocale.viewShowGroup: '表示',
+  AppLocale.viewItemRating: '評価',
   AppLocale.listSizeGroup: 'リストサイズ',
   AppLocale.cardStyleGroup: 'カードスタイル',
   AppLocale.fanartCard: 'ファンアート',

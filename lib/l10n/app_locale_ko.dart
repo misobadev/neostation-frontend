@@ -771,6 +771,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.descending: '내림차순',
   AppLocale.viewModeGroup: '보기 모드',
   AppLocale.cardSizeGroup: '카드 크기',
+  AppLocale.viewShowGroup: '표시',
+  AppLocale.viewItemRating: '평점',
   AppLocale.listSizeGroup: '목록 크기',
   AppLocale.cardStyleGroup: '카드 스타일',
   AppLocale.fanartCard: '팬아트',

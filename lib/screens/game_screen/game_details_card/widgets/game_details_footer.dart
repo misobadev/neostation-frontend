@@ -1,3 +1,4 @@
+import 'package:neostation/constants/game_view_items.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -59,6 +60,10 @@ class GameDetailsFooter extends StatelessWidget {
   /// them rather than doing nothing.
   final VoidCallback onShowGameInfo;
 
+  /// Items the user switched off in the list view's options, as bare item ids
+  /// ([GameViewItem]).
+  final Set<String> hiddenItems;
+
   const GameDetailsFooter({
     super.key,
     required this.system,
@@ -75,6 +80,7 @@ class GameDetailsFooter extends StatelessWidget {
     required this.onToggleFavorite,
     required this.onOpenGameSettings,
     required this.onShowGameInfo,
+    this.hiddenItems = const {},
     this.textScaler,
     this.playTextScaler,
   });
@@ -92,10 +98,26 @@ class GameDetailsFooter extends StatelessWidget {
     }
 
     // Scenario 2: Standard Game Metadata UI.
-    final bool hasRating = game.rating > 0;
+    bool shown(String item) => !hiddenItems.contains(item);
+    final bool hasRating = game.rating > 0 && shown(GameViewItem.rating);
     final bool hasPlayTime =
-        GameUtils.formatPlayTime(game.playTime ?? 0) != '0s';
-    final bool showsAchievements = _showsAchievements(context);
+        GameUtils.formatPlayTime(game.playTime ?? 0) != '0s' &&
+        shown(GameViewItem.playTime);
+    final bool showsAchievements =
+        _showsAchievements(context) && shown(GameViewItem.achievements);
+    final bool showsRandom =
+        onShowRandomGame != null && shown(GameViewItem.random);
+    final bool showsFavorite = shown(GameViewItem.favorite);
+    final bool showsSettings = shown(GameViewItem.settings);
+    final bool showsPlay = shown(GameViewItem.play);
+    final bool showsFileName = shown(GameViewItem.fileName);
+    // The icon controls between the achievements pill and Play.
+    final int iconCount =
+        (showsRandom ? 1 : 0) +
+        (showsFavorite ? 1 : 0) +
+        (showsSettings ? 1 : 0);
+    // One gap after the rating, and one before each control after the pill.
+    final int gapCount = (hasRating ? 1 : 0) + iconCount + (showsPlay ? 1 : 0);
 
     // One row, always the same height, in reading order: what the game *is*
     // on the left, what you can *do* with it on the right.
@@ -161,7 +183,11 @@ class GameDetailsFooter extends StatelessWidget {
                         // Takes the line's whole width when there is no reading
                         // beside it, and scrolls when it is longer than what it
                         // gets.
-                        Expanded(child: _InlineRomFileName(game: game)),
+                        Expanded(
+                          child: showsFileName
+                              ? _InlineRomFileName(game: game)
+                              : const SizedBox.shrink(),
+                        ),
                         if (hasPlayTime) ...[
                           SizedBox(width: 10.r),
                           _InlinePlayTime(game: game),
@@ -190,12 +216,8 @@ class GameDetailsFooter extends StatelessWidget {
                               : 0.0;
                           final fullControlsWidth =
                               (hasRating ? _scoreWidth.r : 0) +
-                              (onShowRandomGame != null ? _controlSize.r : 0) +
-                              2 * _controlSize.r +
-                              (3 +
-                                      (hasRating ? 1 : 0) +
-                                      (onShowRandomGame != null ? 1 : 0)) *
-                                  _rowGap;
+                              iconCount * _controlSize.r +
+                              gapCount * _rowGap;
                           // Narrower list panels leave less room in the details
                           // card. Contract the score and icon controls after
                           // Play loses its label, keeping every action visible.
@@ -210,17 +232,13 @@ class GameDetailsFooter extends StatelessWidget {
                           final gap = compact ? 4.r : _rowGap;
                           final fixedControlsWidth =
                               (hasRating ? scoreWidth : 0) +
-                              (onShowRandomGame != null ? controlWidth : 0) +
-                              2 * controlWidth +
-                              (3 +
-                                      (hasRating ? 1 : 0) +
-                                      (onShowRandomGame != null ? 1 : 0)) *
-                                  gap;
+                              iconCount * controlWidth +
+                              gapCount * gap;
                           // PLAY always retains enough space for its A glyph.
                           // If the achievement pill cannot fit beside that
                           // minimum, leave the pill unreserved so it can hide
                           // instead of collapsing the primary action.
-                          final minimumPlayWidth = 32.r;
+                          final minimumPlayWidth = showsPlay ? 32.r : 0.0;
                           final reservedAchievementsWidth =
                               showsAchievements &&
                                   constraints.maxWidth >=
@@ -268,48 +286,51 @@ class GameDetailsFooter extends StatelessWidget {
                                     // pushes the controls to the right margin.
                                     : const SizedBox.shrink(),
                               ),
-                              SizedBox(width: gap),
-                              // Controls, in the order the removed rail had them.
-                              if (onShowRandomGame != null) ...[
-                                _FooterActionButton(
-                                  // The same dice the Y context menu gives Random, so the
-                                  // action carries one glyph wherever it is offered.
-                                  icon: Symbols.casino_rounded,
-                                  onTap: onShowRandomGame!,
-                                  size: controlWidth,
-                                ),
-                                SizedBox(width: gap),
-                              ],
-                              _FooterActionButton(
-                                icon: Symbols.favorite_rounded,
-                                // Filled and tinted when the game is already a
-                                // favourite: the button is a toggle, so its state has to
-                                // be readable without pressing it.
-                                isOn: game.isFavorite == true,
-                                onTap: onToggleFavorite,
-                                size: controlWidth,
-                              ),
-                              SizedBox(width: gap),
-                              _FooterActionButton(
-                                icon: Symbols.settings_rounded,
-                                onTap: onOpenGameSettings,
-                                size: controlWidth,
-                              ),
-                              SizedBox(width: gap),
-                              MediaQuery(
-                                data: playTextScaler == null
-                                    ? MediaQuery.of(context)
-                                    : MediaQuery.of(
-                                        context,
-                                      ).copyWith(textScaler: playTextScaler),
-                                child: SizedBox(
-                                  width: playWidth,
-                                  child: _buildPlayButton(
-                                    context,
-                                    width: playWidth,
+                              // Controls, in the order the removed rail had them,
+                              // each one only if the list view options show it.
+                              for (final control in [
+                                if (showsRandom)
+                                  _FooterActionButton(
+                                    // The same dice the Y context menu gives
+                                    // Random, so the action carries one glyph
+                                    // wherever it is offered.
+                                    icon: Symbols.casino_rounded,
+                                    onTap: onShowRandomGame!,
+                                    size: controlWidth,
                                   ),
-                                ),
-                              ),
+                                if (showsFavorite)
+                                  _FooterActionButton(
+                                    icon: Symbols.favorite_rounded,
+                                    // Filled and tinted when the game is already
+                                    // a favourite: the button is a toggle, so its
+                                    // state has to be readable without pressing
+                                    // it.
+                                    isOn: game.isFavorite == true,
+                                    onTap: onToggleFavorite,
+                                    size: controlWidth,
+                                  ),
+                                if (showsSettings)
+                                  _FooterActionButton(
+                                    icon: Symbols.settings_rounded,
+                                    onTap: onOpenGameSettings,
+                                    size: controlWidth,
+                                  ),
+                                if (showsPlay)
+                                  MediaQuery(
+                                    data: playTextScaler == null
+                                        ? MediaQuery.of(context)
+                                        : MediaQuery.of(context).copyWith(
+                                            textScaler: playTextScaler,
+                                          ),
+                                    child: SizedBox(
+                                      width: playWidth,
+                                      child: _buildPlayButton(
+                                        context,
+                                        width: playWidth,
+                                      ),
+                                    ),
+                                  ),
+                              ]) ...[SizedBox(width: gap), control],
                             ],
                           );
                         },

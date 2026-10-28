@@ -172,7 +172,8 @@ class DatabaseTestHelper {
         hide_system_logos INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
-        neoglass_border_width REAL DEFAULT 2
+        neoglass_border_width REAL DEFAULT 2,
+        game_view_hidden_items TEXT DEFAULT ''
       )
     ''');
 
