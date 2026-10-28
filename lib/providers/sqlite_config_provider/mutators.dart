@@ -258,12 +258,18 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
-  /// Updates whether game previews play their video on either screen.
-  Future<void> updateVideoPreviews(bool value) async {
-    if (_config.videoPreviews == value) return;
+  /// Updates the preview video delay in seconds.
+  ///
+  /// -1 disables previews, 0 starts as soon as the decoder is ready, and 1..5
+  /// holds the screenshot for that long. Pushed to the secondary display when
+  /// it is connected.
+  Future<void> updateVideoPreviewDelay(int seconds) async {
+    final value = seconds.clamp(-1, 5);
+    if (_config.videoPreviewDelay == value) return;
     final previous = _config;
-    _config = _config.copyWith(videoPreviews: value);
+    _config = _config.copyWith(videoPreviewDelay: value);
     await _saveOrRevert(previous);
+    _secondaryDisplayState?.updateState(videoPreviewDelay: value);
     _notify();
   }
 

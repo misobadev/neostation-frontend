@@ -75,6 +75,9 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     SfxService.maxVolume,
   ];
 
+  /// Off, then the available preview-video delays in seconds.
+  static const List<int> _videoPreviewDelayCycle = [-1, 0, 1, 2, 3, 4, 5];
+
   @override
   void initState() {
     super.initState();
@@ -448,9 +451,9 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     }
     currentItemIndex++;
 
-    // Protocol: Play preview videos.
+    // Protocol: Preview video delay.
     if (index == currentItemIndex) {
-      configProvider.updateVideoPreviews(!configProvider.config.videoPreviews);
+      _cycleVideoPreviewDelay(configProvider);
       return;
     }
     currentItemIndex++;
@@ -591,6 +594,25 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
       1 => AppLocale.sfxVolumeMedium.getString(context),
       _ => AppLocale.sfxVolumeHigh.getString(context),
     };
+  }
+
+  /// Advances the preview delay through Off, 0 s, 1 s ... 5 s and persists it.
+  void _cycleVideoPreviewDelay(SqliteConfigProvider provider) {
+    final current = provider.config.videoPreviewDelay;
+    final index = _videoPreviewDelayCycle.indexOf(current);
+    final next =
+        _videoPreviewDelayCycle[(index < 0
+            ? 0
+            : (index + 1) % _videoPreviewDelayCycle.length)];
+    provider.updateVideoPreviewDelay(next);
+  }
+
+  /// Human label for the current preview delay.
+  String _videoPreviewDelayLabel(BuildContext context, int seconds) {
+    if (seconds < 0) {
+      return AppLocale.videoPreviewsOff.getString(context);
+    }
+    return '$seconds ${AppLocale.secondsShort.getString(context)}';
   }
 
   /// Synchronizes the scroll viewport with the currently focused setting item.
@@ -900,12 +922,11 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                     subtitle: AppLocale.videoPreviewsSubtitle.getString(
                       context,
                     ),
-                    trailing: CustomToggleSwitch(
-                      value: config.videoPreviews,
-                      onChanged: (value) => context
-                          .read<SqliteConfigProvider>()
-                          .updateVideoPreviews(value),
-                      activeColor: theme.colorScheme.primary,
+                    trailing: SettingValueChip(
+                      text: _videoPreviewDelayLabel(
+                        context,
+                        config.videoPreviewDelay,
+                      ),
                     ),
                   );
                 }(),

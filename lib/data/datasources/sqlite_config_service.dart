@@ -221,6 +221,10 @@ class SqliteConfigService {
   static Future<ConfigModel> loadConfig() async {
     try {
       final userConfig = await SqliteService.getUserConfig();
+      final rawPreviewDelay = userConfig?['video_preview_delay'];
+      final videoPreviewDelay = rawPreviewDelay != null
+          ? (int.tryParse(rawPreviewDelay.toString()) ?? 2).clamp(-1, 5)
+          : (userConfig?['video_previews'] == 0 ? -1 : 2);
       var romFolders = await SqliteService.getUserRomFolders();
       if (Platform.isAndroid && romFolders.isEmpty) {
         final recoveredFolders =
@@ -308,7 +312,7 @@ class SqliteConfigService {
         systemSortOrder: userConfig?['system_sort_order']?.toString() ?? 'asc',
         ignoreArticlesInGameSort:
             userConfig?['ignore_articles_in_game_sort'] == 1,
-        videoPreviews: userConfig?['video_previews'] != 0,
+        videoPreviewDelay: videoPreviewDelay,
         collectionSortBy:
             userConfig?['collection_sort_by']?.toString() ?? 'name',
         collectionSortOrder:
@@ -502,7 +506,8 @@ class SqliteConfigService {
           scanOnStartup: config.scanOnStartup ? 1 : 0,
           ignoreHiddenFiles: config.ignoreHiddenFiles ? 1 : 0,
           ignoreArticlesInGameSort: config.ignoreArticlesInGameSort ? 1 : 0,
-          videoPreviews: config.videoPreviews ? 1 : 0,
+          videoPreviews: config.videoPreviewDelay >= 0 ? 1 : 0,
+          videoPreviewDelay: config.videoPreviewDelay,
           setupCompleted: config.setupCompleted ? 1 : 0,
           hideBottomScreen: config.hideBottomScreen ? 1 : 0,
           videoSound: config.videoSound ? 1 : 0,

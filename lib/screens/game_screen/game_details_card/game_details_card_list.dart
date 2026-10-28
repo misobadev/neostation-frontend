@@ -51,6 +51,24 @@ class GameDetailsCardList extends StatefulWidget {
   final bool showVideo;
   final VideoPlayerController? videoController;
   final bool isVideoLoading;
+
+  /// Absolute time at which the preview video may start. Null when previews
+  /// are disabled.
+  final DateTime? videoPreviewDeadline;
+
+  /// Configured screenshot dwell, used to keep the countdown ring in step when
+  /// this card is shown after part of the delay already elapsed.
+  final Duration videoPreviewTotal;
+
+  /// Whether the host already checked the selected game for a preview file and
+  /// what that check found. Used to avoid a screenshot flash at 0 s when the
+  /// video exists but its controller is still starting.
+  final bool videoPreviewFileChecked;
+  final bool videoPreviewFileExists;
+
+  /// Called after the card starts or pauses preview playback so the host can
+  /// refresh music ducking from the controller's real playing state.
+  final VoidCallback? onVideoPlaybackChanged;
   final bool isAllMode;
   final RetroAchievementsProvider retroAchievementsProvider;
   final ISyncProvider syncProvider;
@@ -131,9 +149,6 @@ class GameDetailsCardList extends StatefulWidget {
   final Function(bool Function() enter, bool Function() exit)?
   onRegisterPanelFocus;
 
-  /// Callback to register the Select button action.
-  final Function(VoidCallback)? onRegisterSelectButton;
-
   /// Callback to register the scrape action (Select + A combo).
   final Function(VoidCallback)? onRegisterScrapeAction;
 
@@ -151,6 +166,11 @@ class GameDetailsCardList extends StatefulWidget {
     this.showVideo = false,
     this.videoController,
     this.isVideoLoading = false,
+    this.videoPreviewDeadline,
+    this.videoPreviewTotal = const Duration(seconds: 2),
+    this.videoPreviewFileChecked = false,
+    this.videoPreviewFileExists = false,
+    this.onVideoPlaybackChanged,
     this.isAllMode = false,
     required this.retroAchievementsProvider,
     required this.syncProvider,
@@ -181,7 +201,6 @@ class GameDetailsCardList extends StatefulWidget {
     this.onRegisterIsPlayingGameBlocked,
     this.onRegisterTabNavigation,
     this.onRegisterPanelFocus,
-    this.onRegisterSelectButton,
     this.onRegisterScrapeAction,
     this.isSecondaryScreenActive = false,
     this.isNavigatingFast = false,
@@ -236,6 +255,10 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
 
   // Resource lifecycle and deferred timers.
   bool _isVideoDelayActive = false;
+  bool _previewPlaying = false;
+  bool _isStartingPreview = false;
+  Duration _previewRemaining = Duration.zero;
+  Duration _previewTotal = Duration.zero;
   Timer? _videoDelayTimer;
   double _scrapeProgress = 0.0;
   String _scrapeStatus = '';
@@ -457,7 +480,6 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     widget.onRegisterCloseOverlays?.call(_closeAllOverlays);
     widget.onRegisterTabNavigation?.call(_handleTabNavigation);
     widget.onRegisterPanelFocus?.call(_activatePanel, _dismissPanel);
-    widget.onRegisterSelectButton?.call(_handleSelectAction);
     widget.onRegisterScrapeAction?.call(_onScrapeGameCompact);
     widget.onRegisterNavigation?.call(
       moveUp: () => _movePanel(
@@ -579,6 +601,27 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       _applyVideoMuteState();
     }
 
+    if (_currentTab == DetailTab.screenshotVideo) {
+      final deadlineChanged =
+          oldWidget.videoPreviewDeadline != widget.videoPreviewDeadline;
+      final controllerChanged =
+          oldWidget.videoController != widget.videoController;
+      if (deadlineChanged) {
+        if (widget.videoPreviewDeadline != null) {
+          _startVideoDelay();
+        } else {
+          _cancelVideoDelay();
+        }
+      } else if (controllerChanged &&
+          !_isVideoDelayActive &&
+          widget.videoController?.value.isInitialized == true) {
+        // The player became ready after a countdown that already elapsed (or
+        // while none was running). Start it now; an active countdown keeps its
+        // own timer and must not be cut short by this rebuild.
+        _startVideoDelay();
+      }
+    }
+
     if ((_isGameInfoHidden && _currentTab == DetailTab.screenshotVideo) ||
         (!_hasRetroAchievements && _currentTab == DetailTab.achievements)) {
       _currentTab = DetailTab.wheel;
@@ -595,14 +638,6 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
             : DetailTab.screenshotVideo,
       );
     });
-  }
-
-  void _handleSelectAction() {
-    // Select mutes the preview video on every tab. Achievements used to take
-    // it over for its refresh, which is now a D-pad target in the panel's own
-    // header — a hidden second binding for a visible button just made Select
-    // mean two things depending on where you were.
-    _toggleVideoMute();
   }
 
   @override
@@ -623,36 +658,105 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     super.dispose();
   }
 
-  /// Initiates a 3-second aesthetic delay before transitioning to video playback.
-  void _startVideoDelay() {
+  /// Starts (or immediately finishes) the visual countdown for the current
+  /// selection. The deadline comes from the game-selection time, so switching
+  /// to this tab late only shows the remaining part of the countdown.
+  void _startVideoDelay({DateTime? deadline}) {
     _videoDelayTimer?.cancel();
+    _videoDelayTimer = null;
+
+    final target = deadline ?? widget.videoPreviewDeadline;
+    if (target == null) {
+      _cancelVideoDelay();
+      return;
+    }
+
+    final remaining = target.difference(DateTime.now());
+    if (remaining > Duration.zero &&
+        widget.videoController?.value.isPlaying == true) {
+      unawaited(widget.videoController!.pause());
+      widget.onVideoPlaybackChanged?.call();
+    }
+
+    if (remaining <= Duration.zero) {
+      setState(() {
+        _isVideoDelayActive = false;
+        _previewPlaying = false;
+        _previewRemaining = Duration.zero;
+        _previewTotal = widget.videoPreviewTotal;
+      });
+      unawaited(_startPreviewPlayback());
+      return;
+    }
 
     setState(() {
       _isVideoDelayActive = true;
+      _previewPlaying = false;
+      _previewRemaining = remaining;
+      _previewTotal = widget.videoPreviewTotal;
     });
 
-    _videoDelayTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _isVideoDelayActive = false;
-        });
+    _videoDelayTimer = Timer(remaining, () {
+      if (!mounted) return;
+      setState(() {
+        _isVideoDelayActive = false;
+        _previewRemaining = Duration.zero;
+      });
+      unawaited(_startPreviewPlayback());
+    });
+  }
 
-        if (widget.videoController?.value.isInitialized == true) {
-          widget.videoController?.play();
-        }
+  Future<void> _startPreviewPlayback() async {
+    final controller = widget.videoController;
+    if (_isStartingPreview ||
+        controller == null ||
+        !controller.value.isInitialized ||
+        _currentTab != DetailTab.screenshotVideo) {
+      return;
+    }
+
+    _isStartingPreview = true;
+    try {
+      // Apply the current mute state before the first audible frame.
+      await _applyVideoMuteState();
+      if (!mounted ||
+          widget.videoController != controller ||
+          _currentTab != DetailTab.screenshotVideo) {
+        return;
       }
-    });
+
+      // Entering the media tab again restarts the preview from its first frame.
+      await controller.seekTo(Duration.zero);
+      if (!mounted ||
+          widget.videoController != controller ||
+          _currentTab != DetailTab.screenshotVideo) {
+        return;
+      }
+
+      await controller.play();
+      if (!mounted || widget.videoController != controller) return;
+      setState(() => _previewPlaying = true);
+      widget.onVideoPlaybackChanged?.call();
+    } finally {
+      _isStartingPreview = false;
+    }
   }
 
   void _cancelVideoDelay() {
     _videoDelayTimer?.cancel();
     _videoDelayTimer = null;
-    setState(() {
-      _isVideoDelayActive = false;
-    });
-    if (widget.videoController?.value.isPlaying == true) {
+    final wasPlaying = widget.videoController?.value.isPlaying == true;
+    if (wasPlaying) {
       widget.videoController?.pause();
     }
+    if (mounted) {
+      setState(() {
+        _isVideoDelayActive = false;
+        _previewPlaying = false;
+        _previewRemaining = Duration.zero;
+      });
+    }
+    if (wasPlaying) widget.onVideoPlaybackChanged?.call();
   }
 
   /// Loads RetroAchievements data for the current game, including MD5 hash generation.
@@ -974,6 +1078,12 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
                         bottomOffset: panelBottomOffset,
                         screenshotPath: screenshotPath,
                         isVideoDelayActive: _isVideoDelayActive,
+                        hasVideoPreview: widget.videoPreviewDeadline != null,
+                        previewRemaining: _previewRemaining,
+                        previewTotal: _previewTotal,
+                        videoPreviewPlaying: _previewPlaying,
+                        videoPreviewFileChecked: widget.videoPreviewFileChecked,
+                        videoPreviewFileExists: widget.videoPreviewFileExists,
                         videoController: widget.videoController,
                         imageVersion: _artworkImageVersion,
                         onToggleVideoMute: _toggleVideoMute,
@@ -1427,7 +1537,13 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       if (tab == DetailTab.screenshotVideo) {
         config.updateShowGameInfo(true);
         widget.videoController?.setVolume(0);
-        _startVideoDelay();
+        if (widget.videoPreviewDeadline != null) {
+          _startVideoDelay(
+            deadline: DateTime.now().add(widget.videoPreviewTotal),
+          );
+        } else {
+          _cancelVideoDelay();
+        }
       } else {
         if (config.config.showGameInfo) {
           config.updateShowGameInfo(false);

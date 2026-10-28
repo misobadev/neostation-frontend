@@ -368,6 +368,7 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
           dockSlotCount: _config.dockSlotCount,
           nowPlayingDimDelay: _config.nowPlayingDimDelay,
           nowPlayingDimLevel: _config.nowPlayingDimLevel,
+          videoPreviewDelay: _config.videoPreviewDelay,
           fanartDimLevel: _config.fanartDimLevel,
           sfxEnabled: _config.sfxEnabled,
           sfxVolume: _config.sfxVolume,

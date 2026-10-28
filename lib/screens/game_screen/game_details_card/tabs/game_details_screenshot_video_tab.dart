@@ -7,10 +7,26 @@ import 'package:video_player/video_player.dart';
 import '../../../../providers/sqlite_config_provider.dart';
 import '../../../../services/sfx_service.dart';
 import '../../../../themes/corner_radii.dart';
+import '../../../../widgets/video_preview_countdown.dart';
 
 class GameDetailsScreenshotVideoTab extends StatefulWidget {
   final String screenshotPath;
   final bool isVideoDelayActive;
+
+  /// Whether a preview video exists or is still being prepared. Used only to
+  /// decide whether the countdown is worth showing before the player appears.
+  final bool hasVideoPreview;
+
+  /// Remaining and total countdown for the screenshot preview.
+  final Duration previewRemaining;
+  final Duration previewTotal;
+
+  /// Whether the controller has actually started playing.
+  final bool videoPreviewPlaying;
+
+  /// Whether the host has checked for a video file and whether it exists.
+  final bool videoPreviewFileChecked;
+  final bool videoPreviewFileExists;
   final VideoPlayerController? videoController;
   final int imageVersion;
   final VoidCallback onToggleVideoMute;
@@ -28,6 +44,12 @@ class GameDetailsScreenshotVideoTab extends StatefulWidget {
     super.key,
     required this.screenshotPath,
     required this.isVideoDelayActive,
+    this.hasVideoPreview = false,
+    this.previewRemaining = Duration.zero,
+    this.previewTotal = Duration.zero,
+    this.videoPreviewPlaying = false,
+    this.videoPreviewFileChecked = false,
+    this.videoPreviewFileExists = false,
     this.videoController,
     required this.imageVersion,
     required this.onToggleVideoMute,
@@ -109,6 +131,13 @@ class _GameDetailsScreenshotVideoTabState
         widget.videoController != null &&
         widget.videoController!.value.isInitialized;
 
+    // At 0 s there is no countdown to cover the decoder start. If the game has
+    // a video (or the host has not checked yet), keep the screenshot out of
+    // the way so the panel doesn't flash it before the player appears.
+    final bool hideScreenshotForImmediateVideo =
+        widget.previewTotal == Duration.zero &&
+        (!widget.videoPreviewFileChecked || widget.videoPreviewFileExists);
+
     if (screenshotPath.isNotEmpty) {
       _loadImageAspectRatio(screenshotPath);
     }
@@ -160,6 +189,7 @@ class _GameDetailsScreenshotVideoTabState
                 fit: StackFit.expand,
                 children: [
                   if (!widget.isVideoDelayActive &&
+                      widget.videoPreviewPlaying &&
                       hasVideo &&
                       widget.videoController!.value.isInitialized &&
                       widget.videoController!.value.size.width > 0 &&
@@ -168,6 +198,13 @@ class _GameDetailsScreenshotVideoTabState
                       builder: (context, config, child) {
                         return VideoPlayer(widget.videoController!);
                       },
+                    ),
+                  ] else if (hideScreenshotForImmediateVideo) ...[
+                    Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.r,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                   ] else if (File(screenshotPath).existsSync()) ...[
                     Image.file(
@@ -186,6 +223,24 @@ class _GameDetailsScreenshotVideoTabState
                         Symbols.videogame_asset_rounded,
                         size: 48.r,
                         color: Colors.white24,
+                      ),
+                    ),
+
+                  if (widget.isVideoDelayActive &&
+                      widget.hasVideoPreview &&
+                      widget.videoPreviewFileChecked &&
+                      widget.videoPreviewFileExists)
+                    Positioned(
+                      left: 8.r,
+                      bottom: 8.r,
+                      child: VideoPreviewCountdown(
+                        key: ValueKey(
+                          '${widget.screenshotPath}_'
+                          '${widget.videoController?.dataSource}_'
+                          '${widget.previewRemaining.inMilliseconds}',
+                        ),
+                        remaining: widget.previewRemaining,
+                        total: widget.previewTotal,
                       ),
                     ),
 

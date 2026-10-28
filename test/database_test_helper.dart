@@ -122,6 +122,7 @@ class DatabaseTestHelper {
         ignore_hidden_files INTEGER DEFAULT 1,
         ignore_articles_in_game_sort INTEGER DEFAULT 0,
         video_previews INTEGER DEFAULT 1,
+        video_preview_delay INTEGER DEFAULT 2,
         setup_completed INTEGER DEFAULT 0,
         hide_bottom_screen INTEGER DEFAULT 0,
         sfx_enabled INTEGER DEFAULT 1,

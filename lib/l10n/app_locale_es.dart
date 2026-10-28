@@ -96,9 +96,10 @@ const Map<String, dynamic> appLocaleEs = {
       'Las partidas guardadas de este juego se mantienen en RomM.',
   AppLocale.rommDeleteKeepsStates:
       'Los estados guardados de este juego se mantienen en RomM.',
-  AppLocale.videoPreviews: "Reproducir vídeos de vista previa",
+  AppLocale.videoPreviews: "Retraso del video de vista previa",
   AppLocale.videoPreviewsSubtitle:
-      "Reproduce el vídeo del juego al seleccionarlo. Desactivado, se mantiene la captura en ambas pantallas.",
+      "Desactivado, o espera de 0 a 5 segundos antes de reproducir. Se aplica a la vista de juegos y a la segunda pantalla.",
+  AppLocale.videoPreviewsOff: "Desactivado",
   AppLocale.ignoreArticlesInGameSort: "Ignorar artículos al ordenar juegos",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Ignorar The, A y An al inicio. Por ejemplo, The Legend of Zelda se ordena en la L.",

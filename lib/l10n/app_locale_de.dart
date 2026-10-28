@@ -98,9 +98,10 @@ const Map<String, dynamic> appLocaleDe = {
       'Die Spielstände dieses Spiels bleiben auf RomM.',
   AppLocale.rommDeleteKeepsStates:
       'Die Speicherstände dieses Spiels bleiben auf RomM.',
-  AppLocale.videoPreviews: "Vorschauvideos abspielen",
+  AppLocale.videoPreviews: "Verzögerung der Vorschauvideos",
   AppLocale.videoPreviewsSubtitle:
-      "Spielt das Video eines Spiels ab, wenn es ausgewählt wird. Aus bleibt der Screenshot auf beiden Bildschirmen.",
+      "Aus oder 0–5 Sekunden warten, bevor abgespielt wird. Gilt für die Spieleansicht und den zweiten Bildschirm.",
+  AppLocale.videoPreviewsOff: "Aus",
   AppLocale.ignoreArticlesInGameSort:
       "Artikel beim Sortieren von Spielen ignorieren",
   AppLocale.ignoreArticlesInGameSortSubtitle:

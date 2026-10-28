@@ -76,6 +76,7 @@ mixin AppLocale {
       'ignoreArticlesInGameSortSubtitle';
   static const String videoPreviews = 'videoPreviews';
   static const String videoPreviewsSubtitle = 'videoPreviewsSubtitle';
+  static const String videoPreviewsOff = 'videoPreviewsOff';
   // ---------------------------------------------------------------------------
   // Navigation / Controls
   // ---------------------------------------------------------------------------

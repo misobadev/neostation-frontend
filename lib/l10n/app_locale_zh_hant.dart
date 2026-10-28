@@ -81,8 +81,9 @@ const Map<String, dynamic> appLocaleZhHant = {
       '{game} 的 {files}將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
   AppLocale.rommDeleteKeepsSaves: '此遊戲的存檔檔案會保留在 RomM 上。',
   AppLocale.rommDeleteKeepsStates: '此遊戲的即時存檔會保留在 RomM 上。',
-  AppLocale.videoPreviews: "播放預覽影片",
-  AppLocale.videoPreviewsSubtitle: "選取遊戲時播放其影片。關閉後，兩個畫面都保持顯示截圖。",
+  AppLocale.videoPreviews: "預覽影片延遲",
+  AppLocale.videoPreviewsSubtitle: "關閉，或在播放前等待 0–5 秒。適用於遊戲檢視與第二畫面。",
+  AppLocale.videoPreviewsOff: "關閉",
   AppLocale.ignoreArticlesInGameSort: "排序遊戲時忽略冠詞",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "忽略標題開頭的 The、A 或 An。例如，The Legend of Zelda 排在 L 下。",

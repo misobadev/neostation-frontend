@@ -30,7 +30,16 @@ void main() {
   Rect mediaRect(WidgetTester tester) =>
       tester.getRect(find.byType(AspectRatio).first);
 
-  Future<void> pumpPanel(WidgetTester tester, {required double offset}) async {
+  Future<void> pumpPanel(
+    WidgetTester tester, {
+    required double offset,
+    bool isVideoDelayActive = false,
+    bool hasVideoPreview = false,
+    bool videoPreviewFileChecked = false,
+    bool videoPreviewFileExists = false,
+    Duration previewRemaining = const Duration(seconds: 3),
+    Duration previewTotal = const Duration(seconds: 3),
+  }) async {
     tester.view.physicalSize = const Size(panelWidth, panelHeight);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -54,7 +63,12 @@ void main() {
                     // to 16:9 and draws its placeholder, which is enough to
                     // measure the box the media would fill.
                     screenshotPath: '',
-                    isVideoDelayActive: false,
+                    isVideoDelayActive: isVideoDelayActive,
+                    hasVideoPreview: hasVideoPreview,
+                    videoPreviewFileChecked: videoPreviewFileChecked,
+                    videoPreviewFileExists: videoPreviewFileExists,
+                    previewRemaining: previewRemaining,
+                    previewTotal: previewTotal,
                     imageVersion: 0,
                     onToggleVideoMute: () {},
                     bottomOffset: offset,
@@ -102,6 +116,56 @@ void main() {
       greaterThan(stale.width),
       reason: 'height-bound media trades reserved height for width',
     );
+  });
+
+  testWidgets('the preview countdown fills over the screenshot', (
+    tester,
+  ) async {
+    await pumpPanel(
+      tester,
+      offset: gameDetailsPanelBottomOffset(),
+      isVideoDelayActive: true,
+      hasVideoPreview: true,
+      videoPreviewFileChecked: true,
+      videoPreviewFileExists: true,
+    );
+
+    final indicator = find.byType(CircularProgressIndicator);
+    expect(indicator, findsOneWidget);
+    final before = tester.widget<CircularProgressIndicator>(indicator).value;
+
+    await tester.pump(const Duration(seconds: 1));
+
+    final after = tester.widget<CircularProgressIndicator>(indicator).value;
+    expect(after, isNotNull);
+    expect(after!, greaterThan(before!));
+  });
+
+  testWidgets('no countdown is drawn for a screenshot without a video', (
+    tester,
+  ) async {
+    await pumpPanel(
+      tester,
+      offset: gameDetailsPanelBottomOffset(),
+      isVideoDelayActive: true,
+      hasVideoPreview: true,
+      videoPreviewFileChecked: true,
+      videoPreviewFileExists: false,
+    );
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('no countdown is drawn when no preview will play', (
+    tester,
+  ) async {
+    await pumpPanel(
+      tester,
+      offset: gameDetailsPanelBottomOffset(),
+      isVideoDelayActive: true,
+    );
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
   testWidgets('the media is centred in what is left', (tester) async {

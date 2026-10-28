@@ -8,23 +8,35 @@ void main() {
   setUp(helper.setUp);
   tearDown(helper.tearDown);
 
-  test('video previews default on and persist both states', () async {
-    expect((await SqliteConfigService.loadConfig()).videoPreviews, true);
-    await SqliteConfigService.saveConfig(
-      const ConfigModel(videoPreviews: false),
-    );
-    expect((await SqliteConfigService.loadConfig()).videoPreviews, false);
-    await SqliteConfigService.saveConfig(
-      const ConfigModel(videoPreviews: true),
-    );
-    expect((await SqliteConfigService.loadConfig()).videoPreviews, true);
-  });
+  test(
+    'preview delay defaults to two seconds and persists every state',
+    () async {
+      expect((await SqliteConfigService.loadConfig()).videoPreviewDelay, 2);
+      for (final seconds in [-1, 0, 1, 2, 3, 4, 5]) {
+        await SqliteConfigService.saveConfig(
+          ConfigModel(videoPreviewDelay: seconds),
+        );
+        expect(
+          (await SqliteConfigService.loadConfig()).videoPreviewDelay,
+          seconds,
+        );
+      }
+    },
+  );
 
-  test('a config without the key reads as on', () {
-    expect(ConfigModel.fromJson(const {}).videoPreviews, true);
+  test('JSON defaults to two seconds and understands the old flag', () {
+    expect(ConfigModel.fromJson(const {}).videoPreviewDelay, 2);
     expect(
-      ConfigModel.fromJson(const {'video_previews': 0}).videoPreviews,
-      false,
+      ConfigModel.fromJson(const {'video_preview_delay': 0}).videoPreviewDelay,
+      0,
+    );
+    expect(
+      ConfigModel.fromJson(const {'video_previews': 0}).videoPreviewDelay,
+      -1,
+    );
+    expect(
+      ConfigModel.fromJson(const {'video_previews': 1}).videoPreviewDelay,
+      2,
     );
   });
 }

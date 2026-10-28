@@ -7,6 +7,20 @@ import 'emulator_model.dart';
 String _normalizeGameListSize(String value) =>
     const {'S', 'M', 'L', 'XL'}.contains(value) ? value : 'S';
 
+/// Reads the preview delay from the new integer key, falling back to the old
+/// on/off boolean from builds before the setting became a delay.
+int _parseVideoPreviewDelay(Map<String, dynamic> json) {
+  final raw = json['videoPreviewDelay'] ?? json['video_preview_delay'];
+  if (raw != null) {
+    final parsed = int.tryParse(raw.toString());
+    if (parsed != null) return parsed.clamp(-1, 5);
+  }
+
+  final legacy = json['videoPreviews'] ?? json['video_previews'];
+  if (legacy == null) return 2;
+  return [false, 0, '0', 'false'].contains(legacy) ? -1 : 2;
+}
+
 /// Represents the global application configuration and user preferences.
 class ConfigModel {
   /// Maximum number of storable slots in the secondary "Now Playing" app dock.
@@ -77,10 +91,9 @@ class ConfigModel {
   /// Ignore leading English articles when ordering game titles.
   final bool ignoreArticlesInGameSort;
 
-  /// Whether game preview videos play when a game is selected. On by
-  /// default; off keeps the screenshot and creates no video player on either
-  /// screen.
-  final bool videoPreviews;
+  /// Preview video delay in seconds: -1 disables previews, 0 plays as soon as
+  /// the decoder is ready, and 1..5 holds the screenshot for that long.
+  final int videoPreviewDelay;
 
   /// Whether the initial onboarding/setup process has been finished.
   final bool setupCompleted;
@@ -277,7 +290,7 @@ class ConfigModel {
     this.scanOnStartup = true,
     this.ignoreHiddenFiles = true,
     this.ignoreArticlesInGameSort = false,
-    this.videoPreviews = true,
+    this.videoPreviewDelay = 2,
     this.setupCompleted = false,
     this.hideBottomScreen = false,
     this.videoSound = false,
@@ -414,12 +427,7 @@ class ConfigModel {
         json['ignoreArticlesInGameSort'] ??
             json['ignore_articles_in_game_sort'],
       ),
-      videoPreviews: ![
-        false,
-        0,
-        '0',
-        'false',
-      ].contains(json['videoPreviews'] ?? json['video_previews']),
+      videoPreviewDelay: _parseVideoPreviewDelay(json),
       collectionSortBy:
           (json['collectionSortBy'] ?? json['collection_sort_by'] ?? 'name')
               .toString(),
@@ -639,7 +647,8 @@ class ConfigModel {
       'scanOnStartup': scanOnStartup,
       'ignoreHiddenFiles': ignoreHiddenFiles,
       'ignoreArticlesInGameSort': ignoreArticlesInGameSort,
-      'videoPreviews': videoPreviews,
+      'videoPreviewDelay': videoPreviewDelay,
+      'videoPreviews': videoPreviewDelay >= 0,
       'setupCompleted': setupCompleted,
       'hideBottomScreen': hideBottomScreen,
       'videoSound': videoSound,
@@ -700,7 +709,7 @@ class ConfigModel {
     bool? scanOnStartup,
     bool? ignoreHiddenFiles,
     bool? ignoreArticlesInGameSort,
-    bool? videoPreviews,
+    int? videoPreviewDelay,
     bool? setupCompleted,
     bool? hideBottomScreen,
     bool? videoSound,
@@ -759,7 +768,7 @@ class ConfigModel {
       ignoreHiddenFiles: ignoreHiddenFiles ?? this.ignoreHiddenFiles,
       ignoreArticlesInGameSort:
           ignoreArticlesInGameSort ?? this.ignoreArticlesInGameSort,
-      videoPreviews: videoPreviews ?? this.videoPreviews,
+      videoPreviewDelay: videoPreviewDelay ?? this.videoPreviewDelay,
       setupCompleted: setupCompleted ?? this.setupCompleted,
       hideBottomScreen: hideBottomScreen ?? this.hideBottomScreen,
       videoSound: videoSound ?? this.videoSound,

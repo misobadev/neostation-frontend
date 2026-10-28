@@ -32,6 +32,21 @@ class SecondaryDisplayStateData {
   /// Absolute path to the current game's preview video.
   final String? gameVideo;
 
+  /// Preview delay in seconds shared with the primary engine. -1 disables
+  /// previews; 0 starts as soon as the decoder is ready; 1..5 holds the
+  /// screenshot.
+  final int videoPreviewDelay;
+
+  /// Absolute deadline for the preview countdown, in milliseconds since epoch.
+  /// 0 means there is no active countdown.
+  final int videoPreviewDeadlineMillis;
+
+  /// Whether the primary engine has checked for a preview file for this game.
+  final bool videoPreviewFileChecked;
+
+  /// Whether that check found a preview file.
+  final bool videoPreviewFileExists;
+
   /// Raw image bytes for dynamic display (used when path resolution isn't possible).
   final Uint8List? gameImageBytes;
 
@@ -245,6 +260,10 @@ class SecondaryDisplayStateData {
     this.gameScreenshot,
     this.gameWheel,
     this.gameVideo,
+    this.videoPreviewDelay = 2,
+    this.videoPreviewDeadlineMillis = 0,
+    this.videoPreviewFileChecked = false,
+    this.videoPreviewFileExists = false,
     this.gameImageBytes,
     this.isGameSelected = false,
     this.isVideoMuted = false,
@@ -323,6 +342,10 @@ class SecondaryDisplayStateData {
     bool clearWheel = false,
     String? gameVideo,
     bool clearVideo = false,
+    int? videoPreviewDelay,
+    int? videoPreviewDeadlineMillis,
+    bool? videoPreviewFileChecked,
+    bool? videoPreviewFileExists,
     Uint8List? gameImageBytes,
     bool clearImageBytes = false,
     bool? isGameSelected,
@@ -401,6 +424,13 @@ class SecondaryDisplayStateData {
           : (gameScreenshot ?? this.gameScreenshot),
       gameWheel: clearWheel ? null : (gameWheel ?? this.gameWheel),
       gameVideo: clearVideo ? null : (gameVideo ?? this.gameVideo),
+      videoPreviewDelay: videoPreviewDelay ?? this.videoPreviewDelay,
+      videoPreviewDeadlineMillis:
+          videoPreviewDeadlineMillis ?? this.videoPreviewDeadlineMillis,
+      videoPreviewFileChecked:
+          videoPreviewFileChecked ?? this.videoPreviewFileChecked,
+      videoPreviewFileExists:
+          videoPreviewFileExists ?? this.videoPreviewFileExists,
       gameImageBytes: clearImageBytes
           ? null
           : (gameImageBytes ?? this.gameImageBytes),
@@ -486,6 +516,12 @@ class SecondaryDisplayStateData {
       gameScreenshot: json['gameScreenshot'] as String?,
       gameWheel: json['gameWheel'] as String?,
       gameVideo: json['gameVideo'] as String?,
+      videoPreviewDelay: json['videoPreviewDelay'] as int? ?? 2,
+      videoPreviewDeadlineMillis:
+          json['videoPreviewDeadlineMillis'] as int? ?? 0,
+      videoPreviewFileChecked:
+          json['videoPreviewFileChecked'] as bool? ?? false,
+      videoPreviewFileExists: json['videoPreviewFileExists'] as bool? ?? false,
       gameImageBytes: json['gameImageBytes'] != null
           ? base64Decode(json['gameImageBytes'] as String)
           : null,
@@ -571,6 +607,10 @@ class SecondaryDisplayStateData {
       'gameScreenshot': gameScreenshot,
       'gameWheel': gameWheel,
       'gameVideo': gameVideo,
+      'videoPreviewDelay': videoPreviewDelay,
+      'videoPreviewDeadlineMillis': videoPreviewDeadlineMillis,
+      'videoPreviewFileChecked': videoPreviewFileChecked,
+      'videoPreviewFileExists': videoPreviewFileExists,
       'gameImageBytes': gameImageBytes != null
           ? base64Encode(gameImageBytes!)
           : null,
@@ -677,6 +717,10 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     bool clearWheel = false,
     String? gameVideo,
     bool clearVideo = false,
+    int? videoPreviewDelay,
+    int? videoPreviewDeadlineMillis,
+    bool? videoPreviewFileChecked,
+    bool? videoPreviewFileExists,
     Uint8List? gameImageBytes,
     bool clearImageBytes = false,
     bool? isGameSelected,
@@ -767,6 +811,10 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
           clearWheel: clearWheel,
           gameVideo: gameVideo,
           clearVideo: clearVideo,
+          videoPreviewDelay: videoPreviewDelay,
+          videoPreviewDeadlineMillis: videoPreviewDeadlineMillis,
+          videoPreviewFileChecked: videoPreviewFileChecked,
+          videoPreviewFileExists: videoPreviewFileExists,
           gameImageBytes: gameImageBytes,
           clearImageBytes: clearImageBytes,
           isGameSelected: isGameSelected,

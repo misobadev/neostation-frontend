@@ -668,6 +668,9 @@ class SqliteMigrations {
       case 177:
         await _migrateToVersion177(db);
         break;
+      case 178:
+        await _migrateToVersion178(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7283,6 +7286,30 @@ class SqliteMigrations {
       _log.e('Error in migration v165: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
+    }
+  }
+
+  /// Migration v178: turns the preview on/off flag into a delay in seconds.
+  ///
+  /// -1 disables previews, 0 plays as soon as the decoder is ready, and 1..5
+  /// holds the screenshot. Existing installs with previews off stay off; every
+  /// other install gets the new two-second default. The guard and the
+  /// conditional backfill make the step safe to re-run.
+  static Future<void> _migrateToVersion178(Database db) async {
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('video_preview_delay')) {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN video_preview_delay INTEGER DEFAULT 2',
+      );
+      if (columns.contains('video_previews')) {
+        db.execute(
+          'UPDATE user_config SET video_preview_delay = -1 '
+          'WHERE video_previews = 0',
+        );
+      }
     }
   }
 

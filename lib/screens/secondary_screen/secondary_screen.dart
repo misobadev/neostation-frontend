@@ -17,6 +17,7 @@ import '../../repositories/retro_achievements_repository.dart';
 import '../../services/retro_achievements_service.dart';
 import '../../utils/display_metrics_log.dart';
 import '../../utils/no_glow_scroll_behavior.dart';
+import '../../widgets/video_preview_countdown.dart';
 import 'background_builders.dart';
 import 'now_playing_helpers.dart';
 import 'widgets/achievement_comments.dart';
@@ -87,8 +88,10 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   /// `_l10nContext ?? context` so they resolve against this instead.
   BuildContext? _l10nContext;
   Timer? _videoTimer;
+  Timer? _previewCountdownTimer;
   bool _showVideo = false;
   String? _currentVideoPath;
+  int _lastPreviewDeadlineMillis = 0;
 
   /// Bumped every time the preview is torn down. [_initializeVideo] captures it
   /// on entry and re-checks after each await, so an in-flight init that started
@@ -233,6 +236,11 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     final state = _secondaryDisplayState?.value;
     if (state == null) return;
 
+    final previousDeadline = _lastPreviewDeadlineMillis;
+    _syncPreviewCountdown(state);
+    final deadlineChanged =
+        state.videoPreviewDeadlineMillis != previousDeadline;
+
     // This engine has its own SfxService singleton, so the main engine's
     // setEnabled/setVolume never reach it — the UI-sounds setting arrives only
     // as pushed state. Without this the bottom screen kept clicking after the
@@ -278,6 +286,12 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       return;
     }
 
+    if (state.videoPreviewDelay < 0) {
+      _stopVideo();
+      _currentVideoPath = null;
+      return;
+    }
+
     // Device asleep (lid closed / screen off): tear down the preview so its
     // audio output device stops and the CPU can deep-sleep. This engine never
     // receives Android lifecycle callbacks, so the bridged screen state is the
@@ -292,10 +306,16 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       _currentVideoPath = state.gameVideo;
       _stopVideo();
       if (state.isGameSelected && state.gameVideo != null) {
-        _startVideoTimer(state.gameVideo!);
+        _startVideoTimer(state.gameVideo!, state);
       }
     } else if (!state.isGameSelected) {
       _stopVideo();
+    } else if (deadlineChanged && state.gameVideo != null) {
+      // The delay changed while this game stayed selected. Restart the
+      // countdown so the new timing applies to the already-selected preview.
+      _currentVideoPath = null;
+      _stopVideo();
+      _startVideoTimer(state.gameVideo!, state);
     } else {
       // Game selected, same video, but maybe mute changed
       if (_videoController != null && _videoController!.value.isInitialized) {
@@ -618,9 +638,32 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     _inGameDimmed = false;
   }
 
-  void _startVideoTimer(String path) {
+  /// Keeps the secondary countdown rebuild armed for the exact selection
+  /// deadline, so the ring disappears when it is full even if the video path is
+  /// still in flight.
+  void _syncPreviewCountdown(SecondaryDisplayStateData state) {
+    final deadline = state.videoPreviewDeadlineMillis;
+    if (deadline == _lastPreviewDeadlineMillis) return;
+    _lastPreviewDeadlineMillis = deadline;
+    _previewCountdownTimer?.cancel();
+
+    if (!state.isGameSelected || deadline <= 0) return;
+    final remaining = deadline - DateTime.now().millisecondsSinceEpoch;
+    if (remaining <= 0) return;
+
+    _previewCountdownTimer = Timer(Duration(milliseconds: remaining), () {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _startVideoTimer(String path, SecondaryDisplayStateData state) {
     _videoTimer?.cancel();
-    _videoTimer = Timer(const Duration(milliseconds: 500), () {
+    if (state.videoPreviewDelay < 0) return;
+    final deadline = state.videoPreviewDeadlineMillis;
+    final remaining = deadline > 0
+        ? (deadline - DateTime.now().millisecondsSinceEpoch).clamp(0, 5 * 1000)
+        : 0;
+    _videoTimer = Timer(Duration(milliseconds: remaining), () {
       _initializeVideo(path);
     });
   }
@@ -660,23 +703,31 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       // IMPORTANT: Set volume BEFORE playing to ensure sync and avoid audio burst
       final isMuted = _secondaryDisplayState?.value?.isVideoMuted ?? true;
       await controller.setVolume(isMuted ? 0.0 : 1.0);
-
       await controller.setLooping(true);
-      await controller.play();
 
-      if (!mounted || gen != _videoGeneration) {
-        await controller.dispose();
-        return;
-      }
-
+      // Paint the video frame before starting audio, so the preview can never
+      // be heard over the screenshot.
       setState(() {
         _videoController = controller;
         _showVideo = true;
       });
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || gen != _videoGeneration) {
+        await controller.dispose();
+        return;
+      }
+      await controller.play();
     } catch (e) {
       debugPrint('SecondaryScreen: Error initializing video: $e');
-      // Don't leak the controller if we threw after creating it.
-      if (controller != null && _videoController != controller) {
+      // Don't leak the controller if we threw after creating it, and undo the
+      // "video is visible" state if it was already painted.
+      if (controller != null) {
+        if (identical(_videoController, controller) && mounted) {
+          setState(() {
+            _videoController = null;
+            _showVideo = false;
+          });
+        }
         try {
           await controller.dispose();
         } catch (_) {}
@@ -882,6 +933,11 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                 // Capture a context from under this MaterialApp's Localizations
                 // so the _buildXxx helpers can resolve AppLocale strings.
                 _l10nContext = context;
+                final hideScreenshotForImmediateVideo =
+                    value != null &&
+                    value.videoPreviewDelay == 0 &&
+                    (!value.videoPreviewFileChecked ||
+                        value.videoPreviewFileExists);
                 return Scaffold(
                   // Falls back to the resolved theme rather than black: before
                   // the main engine pushes a background, a light-theme user
@@ -940,7 +996,8 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                       fit: StackFit.expand,
                                       children: [
                                         // Only show background images IF video is NOT showing (user request: "quitando del fondo el screenshot")
-                                        if (!_showVideo) ...[
+                                        if (!_showVideo &&
+                                            !hideScreenshotForImmediateVideo) ...[
                                           if (value.isGameLaunching) ...[
                                             if (value.gameImageBytes != null)
                                               buildBackgroundBytes(
@@ -980,6 +1037,16 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                       ],
                                     ),
                                   ),
+                                  if (!_showVideo &&
+                                      hideScreenshotForImmediateVideo)
+                                    Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.r,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
+                                    ),
                                   if (_showVideo && _videoController != null)
                                     SizedBox.expand(
                                       child: FittedBox(
@@ -1031,6 +1098,35 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                               _buildCenterContent(
                                 value,
                                 isTab: value.useFluidShader,
+                              ),
+
+                            if (value.isGameSelected &&
+                                !_showVideo &&
+                                !value.isGameLaunching &&
+                                value.videoPreviewFileChecked &&
+                                value.videoPreviewFileExists &&
+                                value.videoPreviewDeadlineMillis > 0 &&
+                                value.videoPreviewDeadlineMillis >
+                                    DateTime.now().millisecondsSinceEpoch)
+                              Positioned(
+                                left: 24.r,
+                                bottom: 24.r,
+                                child: VideoPreviewCountdown(
+                                  key: ValueKey(
+                                    value.videoPreviewDeadlineMillis,
+                                  ),
+                                  remaining: Duration(
+                                    milliseconds:
+                                        value.videoPreviewDeadlineMillis -
+                                        DateTime.now().millisecondsSinceEpoch,
+                                  ),
+                                  total: Duration(
+                                    seconds: value.videoPreviewDelay.clamp(
+                                      0,
+                                      5,
+                                    ),
+                                  ),
+                                ),
                               ),
 
                             if (value.isGameSelected && _showVideo)

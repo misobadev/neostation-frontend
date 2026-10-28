@@ -95,6 +95,7 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
         isSecondaryActive: true,
         nowPlayingDimDelay: _config.nowPlayingDimDelay,
         nowPlayingDimLevel: _config.nowPlayingDimLevel,
+        videoPreviewDelay: _config.videoPreviewDelay,
         fanartDimLevel: _config.fanartDimLevel,
         dockApps: _config.dockApps,
         dockEnabled: _config.dockEnabled,
@@ -197,6 +198,7 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
               state.dockSlotCount != _config.dockSlotCount ||
               state.nowPlayingDimDelay != _config.nowPlayingDimDelay ||
               state.nowPlayingDimLevel != _config.nowPlayingDimLevel ||
+              state.videoPreviewDelay != _config.videoPreviewDelay ||
               state.fanartDimLevel != _config.fanartDimLevel ||
               state.sfxEnabled != _config.sfxEnabled ||
               state.sfxVolume != _config.sfxVolume ||
@@ -231,6 +233,7 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
           dockSlotCount: _config.dockSlotCount,
           nowPlayingDimDelay: _config.nowPlayingDimDelay,
           nowPlayingDimLevel: _config.nowPlayingDimLevel,
+          videoPreviewDelay: _config.videoPreviewDelay,
           fanartDimLevel: _config.fanartDimLevel,
           sfxEnabled: _config.sfxEnabled,
           sfxVolume: _config.sfxVolume,

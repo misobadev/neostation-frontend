@@ -94,9 +94,10 @@ const Map<String, dynamic> appLocaleEn = {
       '{files} for {game} will be permanently deleted from your RomM server. Copies on your devices are kept, and any device that still syncs this game will upload its copies again.',
   AppLocale.rommDeleteKeepsSaves: "This game's save files stay on RomM.",
   AppLocale.rommDeleteKeepsStates: "This game's save states stay on RomM.",
-  AppLocale.videoPreviews: "Play preview videos",
+  AppLocale.videoPreviews: "Preview video delay",
   AppLocale.videoPreviewsSubtitle:
-      "Play a game's video after it is selected. Off, the screenshot stays on both screens.",
+      "Off, or wait 0-5 seconds before playing. Applies to the game view and the second screen.",
+  AppLocale.videoPreviewsOff: "Off",
   AppLocale.ignoreArticlesInGameSort: "Ignore articles when sorting games",
   AppLocale.ignoreArticlesInGameSortSubtitle:
       "Sort by title without leading The, A, or An. For example, The Legend of Zelda sorts under L.",
