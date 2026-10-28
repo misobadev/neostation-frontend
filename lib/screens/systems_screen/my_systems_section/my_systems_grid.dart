@@ -25,7 +25,7 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'grid_geometry.dart';
 import 'widgets/grid_loading_state.dart';
 import 'widgets/grid_empty_state.dart';
-import 'widgets/spring_selected_card.dart';
+import 'package:neostation/widgets/spring_selected_card.dart';
 import 'my_systems_carousel.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/launch_failure_dialog.dart';

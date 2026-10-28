@@ -36,6 +36,9 @@ class _SpringSelectedCardState extends State<SpringSelectedCard> {
   late double _from;
   late double _to;
   int _version = 0;
+  late SpringController _controller;
+  late final ValueNotifier<Widget> _child;
+  Widget? _animated;
 
   @override
   void initState() {
@@ -45,44 +48,68 @@ class _SpringSelectedCardState extends State<SpringSelectedCard> {
     // actually moves to or away from a card.
     _from = widget.selected ? _raised : _rest;
     _to = _from;
+    _child = ValueNotifier(widget.child);
+    _controller = SpringController(initialAnim: Motion.play);
+    _animated = _buildAnimated();
   }
 
   @override
   void didUpdateWidget(SpringSelectedCard oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    if (!identical(widget.child, oldWidget.child)) {
+      _child.value = widget.child;
+    }
+
     if (widget.selected) {
       if (oldWidget.selected) return;
-      _from = _rest;
-      _to = _raised;
-      _version++;
+      _start(_rest, _raised);
     } else if (widget.previouslySelected) {
       if (oldWidget.previouslySelected) return;
-      _from = _raised;
-      _to = _rest;
-      _version++;
+      _start(_raised, _rest);
     } else if (oldWidget.selected || oldWidget.previouslySelected) {
       // The cursor has moved beyond this card. Stop its old animation
       // immediately instead of letting every previously visited card keep
       // settling while the user keeps navigating.
-      _from = _rest;
-      _to = _rest;
-      _version++;
+      _start(_rest, _rest);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  void _start(double from, double to) {
+    _from = from;
+    _to = to;
+    _version++;
+    // A fresh controller and keyed SpringScale are created for exactly one
+    // transition. Reusing a controller across keyed subtrees would leave the
+    // old SpringScale closing the stream the next one needs.
+    _controller = SpringController(initialAnim: Motion.play);
+    _animated = _buildAnimated();
+  }
+
+  Widget _buildAnimated() {
     final raising = _to > _from;
     return KeyedSubtree(
       key: ValueKey(_version),
       child: Spring.scale(
+        springController: _controller,
         start: _from,
         end: _to,
         animDuration: raising ? _raiseDuration : _settleDuration,
         curve: raising ? Curves.easeOutBack : Curves.easeOutCubic,
-        child: widget.child,
+        child: ValueListenableBuilder<Widget>(
+          valueListenable: _child,
+          builder: (context, child, _) => child,
+        ),
       ),
     );
   }
+
+  @override
+  void dispose() {
+    _child.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _animated!;
 }

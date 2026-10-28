@@ -179,7 +179,14 @@ extension _GamepadGridNav on _SystemCardGridViewState {
     }
   }
 
-  /// Automatically adjusts scroll position to keep the selected item centered in the viewport.
+  /// Keeps the selected card inside a comfortable vertical band instead of
+  /// recentering it on every D-pad step.
+  ///
+  /// The old version always animated the selected row to the middle of the
+  /// viewport, which made a one-row move read as a full-screen jump. This
+  /// version only scrolls when the card leaves the band, moves by the minimum
+  /// needed, and uses the same per-row heights as the renderer (including
+  /// wide recent cards and square logo-less cards).
   void _ensureSelectedItemVisibleUniversal() {
     if (!_scrollController.hasClients || widget.systems.isEmpty) return;
 
@@ -196,36 +203,99 @@ extension _GamepadGridNav on _SystemCardGridViewState {
     }
     if (selectedRow == -1) return;
 
+    final dimensions = _calculateGridDimensions();
+    final colWidth = dimensions['itemWidth']!;
+    final mainAxisSpacing = dimensions['mainAxisSpacing']!;
+
+    double aspectRatio(int index) {
+      final ratios = widget.aspectRatios;
+      if (ratios != null && index >= 0 && index < ratios.length) {
+        return ratios[index];
+      }
+      return widget.childAspectRatio;
+    }
+
+    final rowItemHeights = List<double>.filled(grid.length, 0);
+    final rowHeights = List<double>.filled(grid.length, 0);
+    for (int r = 0; r < grid.length; r++) {
+      final seen = <int>{};
+      double maxHeight = 0;
+      for (int c = 0; c < grid[r].length; c++) {
+        final cardIdx = grid[r][c];
+        if (cardIdx == -1 || seen.contains(cardIdx)) continue;
+        seen.add(cardIdx);
+        final height = colWidth / aspectRatio(cardIdx);
+        if (height > maxHeight) maxHeight = height;
+      }
+      rowItemHeights[r] = maxHeight;
+      rowHeights[r] = maxHeight + mainAxisSpacing;
+    }
+
+    double rowTop(int row) {
+      double top = 0;
+      for (int i = 0; i < row; i++) {
+        top += rowHeights[i];
+      }
+      return top;
+    }
+
     final selectedCard = cards[widget.selectedIndex];
     final (_, recentH) = recentCardSpan(widget.recentCardSize, cols);
     final spanH = selectedCard.isGame ? recentH : 1;
 
-    final dimensions = _calculateGridDimensions();
-    final rowHeight = dimensions['rowHeight']!;
-    final itemHeight = dimensions['itemHeight']!;
-    final mainAxisSpacing = dimensions['mainAxisSpacing']!;
+    double itemTop = rowTop(selectedRow);
+    double itemHeight;
+    if (selectedCard.isGame) {
+      itemHeight = 0;
+      for (
+        int i = 0;
+        i < spanH && selectedRow + i < rowItemHeights.length;
+        i++
+      ) {
+        itemHeight += rowItemHeights[selectedRow + i];
+      }
+      itemHeight += (spanH - 1) * mainAxisSpacing;
+    } else {
+      itemHeight = colWidth / aspectRatio(widget.selectedIndex);
+      itemTop += (rowItemHeights[selectedRow] - itemHeight) / 2;
+    }
+    final itemBottom = itemTop + itemHeight;
 
     final viewportHeight = _scrollController.position.viewportDimension;
     final maxScrollExtent = _scrollController.position.maxScrollExtent;
     final minScrollExtent = _scrollController.position.minScrollExtent;
+    final currentOffset = _scrollController.offset;
 
-    final double itemActualHeight =
-        spanH * itemHeight + (spanH - 1) * mainAxisSpacing;
+    // Keep a fifth of the viewport clear at each edge. A card already inside
+    // this band is left alone; moving one row no longer animates the whole
+    // list.
+    final safeTop = viewportHeight * 0.2;
+    final safeBottom = viewportHeight * 0.8;
+    final safeHeight = safeBottom - safeTop;
 
-    final double itemTop = selectedRow * rowHeight;
-    final double itemCenter = itemTop + (itemActualHeight / 2);
+    double targetOffset = currentOffset;
+    if (itemHeight > safeHeight) {
+      targetOffset = itemTop - safeTop;
+    } else if (itemTop < currentOffset + safeTop) {
+      targetOffset = itemTop - safeTop;
+    } else if (itemBottom > currentOffset + safeBottom) {
+      targetOffset = itemBottom - safeBottom;
+    }
 
-    final double targetOffset = (itemCenter - (viewportHeight / 2)).clamp(
-      minScrollExtent,
-      maxScrollExtent,
-    );
+    targetOffset = targetOffset.clamp(minScrollExtent, maxScrollExtent);
+    if ((targetOffset - currentOffset).abs() < 1) return;
+
+    final distance = (targetOffset - currentOffset).abs();
+    final duration = _isNavigatingFast
+        ? const Duration(milliseconds: 150)
+        : Duration(
+            milliseconds: (220 + distance * 0.25).clamp(220, 360).toInt(),
+          );
 
     _scrollController.animateTo(
       targetOffset,
-      duration: _isNavigatingFast
-          ? const Duration(milliseconds: 180)
-          : const Duration(milliseconds: 360),
-      curve: Curves.easeOutQuart,
+      duration: duration,
+      curve: Curves.easeOutCubic,
     );
   }
 }

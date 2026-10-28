@@ -332,7 +332,9 @@ extension _SecondaryDisplay on _SystemGamesListState {
 
   /// Pushes specific video path updates to the secondary screen.
   Future<void> _updateSecondaryDisplayVideo(GameModel game) async {
-    if (_secondaryDisplayState == null ||
+    final secondary = _secondaryDisplayState?.value;
+    if (secondary == null ||
+        !secondary.isSecondaryActive ||
         _isNavigatingBack ||
         _selectedGame != game ||
         !_videoPreviewsEnabled) {
@@ -444,7 +446,7 @@ extension _SecondaryDisplay on _SystemGamesListState {
       final path = _getVideoPath(game);
       final exists = _fileProvider.isInitialized
           ? await _fileProvider.fileExists(path)
-          : File(path).existsSync();
+          : await File(path).exists();
       if (!mounted || _selectedGame != game) return;
       rebuild(() {
         _videoPreviewFileChecked = true;
@@ -464,6 +466,15 @@ extension _SecondaryDisplay on _SystemGamesListState {
   /// Initiates the media preview sequence for the primary and secondary displays.
   void _startVideoTimer() {
     if (!mounted || _isGameLaunching || !_videoPreviewsEnabled) return;
+
+    final viewMode = context.read<SqliteConfigProvider>().config.gameViewMode;
+    final secondaryActive =
+        _secondaryDisplayState?.value?.isSecondaryActive ?? false;
+    if (viewMode != 'list' && !secondaryActive) {
+      _videoPreviewDeadline = null;
+      _resetVideoState();
+      return;
+    }
 
     // The selection path runs this once immediately and again when rapid
     // navigation settles. Reuse an already prepared controller, or let the
@@ -491,19 +502,21 @@ extension _SecondaryDisplay on _SystemGamesListState {
     timer = Timer(wait.isNegative ? Duration.zero : wait, () async {
       if (identical(_videoTimer, timer)) _videoTimer = null;
       if (!mounted) return;
-      if (mounted && _selectedGame != null) {
-        // Always attempt secondary display video update.
-        await _updateSecondaryDisplayVideo(_selectedGame!);
-        if (!mounted) return;
+      final game = _selectedGame;
+      if (game == null) return;
 
-        // Primary display video is conditional based on user preference for 'Game Info'.
-        final showGameInfo = context
-            .read<SqliteConfigProvider>()
-            .config
-            .showGameInfo;
-        if (showGameInfo) {
-          await _initializeVideo(_selectedGame!);
-        }
+      final config = context.read<SqliteConfigProvider>().config;
+      final secondaryActive =
+          _secondaryDisplayState?.value?.isSecondaryActive ?? false;
+
+      if (secondaryActive) {
+        await _updateSecondaryDisplayVideo(game);
+        if (!mounted) return;
+      }
+
+      // The primary preview only exists in the list view's media tab.
+      if (config.gameViewMode == 'list' && config.showGameInfo) {
+        await _initializeVideo(game);
       }
     });
     _videoTimer = timer;
@@ -512,6 +525,7 @@ extension _SecondaryDisplay on _SystemGamesListState {
   /// Initializes the video player for the primary UI, including volume and loop management.
   Future<void> _initializeVideo(GameModel game) async {
     if (!mounted ||
+        context.read<SqliteConfigProvider>().config.gameViewMode != 'list' ||
         _selectedGame == null ||
         _selectedGame != game ||
         _isVideoLoading ||
@@ -546,7 +560,7 @@ extension _SecondaryDisplay on _SystemGamesListState {
     final file = File(videoPath);
     final fileExists = _fileProvider.isInitialized
         ? await _fileProvider.fileExists(videoPath)
-        : file.existsSync();
+        : await file.exists();
 
     if (!mounted || _selectedGame != game || !_videoPreviewsEnabled) {
       if (mounted) {

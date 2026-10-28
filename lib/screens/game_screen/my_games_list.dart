@@ -291,6 +291,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
   // Secondary display hardware management (OEM support).
   SecondaryDisplayState? _secondaryDisplayState;
+  bool _lastSecondaryActive = false;
 
   /// Drives the live RetroAchievements panel on the secondary display for the
   /// duration of a launched game (push at launch, poll during play, stop on
@@ -482,6 +483,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
     if (Platform.isAndroid) {
       _secondaryDisplayState = SecondaryDisplayState.instance;
+      _lastSecondaryActive =
+          _secondaryDisplayState?.value?.isSecondaryActive ?? false;
       _secondaryDisplayState!.addListener(_onSecondaryDisplayChanged);
     }
   }
@@ -549,10 +552,29 @@ class _SystemGamesListState extends State<SystemGamesList> {
   }
 
   void _onSecondaryDisplayChanged() {
-    if (mounted) {
-      setState(() {});
-      _updateMusicDucking();
+    if (!mounted) return;
+
+    final active = _secondaryDisplayState?.value?.isSecondaryActive ?? false;
+    if (active != _lastSecondaryActive) {
+      _lastSecondaryActive = active;
+      final listMode = _lastGameViewMode == 'list';
+
+      if (!active) {
+        _clearSecondaryDisplayVideo();
+        if (!listMode) {
+          _videoPreviewDeadline = null;
+          _resetVideoState();
+        }
+      } else if (_selectedGame != null && !_isGameLaunching) {
+        _videoPreviewSelectedAt = DateTime.now();
+        _videoPreviewDeadline = null;
+        _resetVideoState();
+        _startVideoTimer();
+      }
     }
+
+    setState(() {});
+    _updateMusicDucking();
   }
 
   @override
@@ -630,6 +652,20 @@ class _SystemGamesListState extends State<SystemGamesList> {
           GamepadNavigationManager.reactivate();
         }
       } catch (_) {}
+
+      // Grid and carousel have nowhere to render the primary preview. Only
+      // keep video work alive when the list is showing or a second screen can
+      // display it.
+      final secondaryActive =
+          _secondaryDisplayState?.value?.isSecondaryActive ?? false;
+      _videoPreviewSelectedAt = DateTime.now();
+      _videoPreviewDeadline = null;
+      _resetVideoState();
+      if (gameViewMode == 'list' || secondaryActive) {
+        if (_selectedGame != null && !_isGameLaunching) _startVideoTimer();
+      } else {
+        _clearSecondaryDisplayVideo();
+      }
     }
 
     if (newShowInfo != _lastShowInfo) {
@@ -775,13 +811,15 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
     final now = DateTime.now();
     _videoPreviewSelectedAt = now;
-    final previewDelay = context
-        .read<SqliteConfigProvider>()
-        .config
-        .videoPreviewDelay;
-    _videoPreviewDeadline = previewDelay < 0
-        ? null
-        : now.add(Duration(seconds: previewDelay));
+    final config = context.read<SqliteConfigProvider>().config;
+    final previewDelay = config.videoPreviewDelay;
+    final secondaryActive =
+        _secondaryDisplayState?.value?.isSecondaryActive ?? false;
+    final previewAvailable =
+        previewDelay >= 0 && (config.gameViewMode == 'list' || secondaryActive);
+    _videoPreviewDeadline = previewAvailable
+        ? now.add(Duration(seconds: previewDelay))
+        : null;
     _videoPreviewFileChecked = false;
     _videoPreviewFileExists = false;
     _videoPreviewFileCheckGame = null;

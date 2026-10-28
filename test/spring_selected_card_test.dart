@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:neostation/screens/systems_screen/my_systems_section/widgets/spring_selected_card.dart';
+import 'package:neostation/widgets/spring_selected_card.dart';
 
 void main() {
   testWidgets('selected card springs up and settles when deselected', (
