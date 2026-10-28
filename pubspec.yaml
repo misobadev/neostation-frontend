@@ -67,6 +67,8 @@ dependencies:
   wakelock_plus: ^1.8.0
   flutter_localization: ^0.4.1
   flutter_tilt: ^4.1.0
+  flutter_staggered_animations: ^1.1.1
+  spring: ^2.0.2
 
 dev_dependencies:
   flutter_test:

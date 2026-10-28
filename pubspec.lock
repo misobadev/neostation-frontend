@@ -395,6 +395,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.7"
+  flutter_staggered_animations:
+    dependency: "direct main"
+    description:
+      name: flutter_staggered_animations
+      sha256: "81d3c816c9bb0dca9e8a5d5454610e21ffb068aedb2bde49d2f8d04f75538351"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.1"
   flutter_svg:
     dependency: "direct main"
     description:
@@ -741,6 +749,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.0"
+  pedantic:
+    dependency: transitive
+    description:
+      name: pedantic
+      sha256: "67fc27ed9639506c856c840ccce7594d0bdcd91bc8d53d6e52359449a1d50602"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.11.1"
   permission_handler:
     dependency: "direct main"
     description:
@@ -981,6 +997,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.1"
+  simple_animations:
+    dependency: transitive
+    description:
+      name: simple_animations
+      sha256: "48e065ed7264fa6b3e82450544ecde8ae84ff2aaa00fb39e8a90fc05d608084f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.1"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -994,6 +1018,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.10.2"
+  spring:
+    dependency: "direct main"
+    description:
+      name: spring
+      sha256: "25a433dd5dc47e58cd9bd524a536dd164f9b0d7622a80fcda7622a2bbefddedc"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.2"
   sqlite3:
     dependency: "direct main"
     description:
@@ -1034,6 +1066,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.1.9"
+  supercharged:
+    dependency: transitive
+    description:
+      name: supercharged
+      sha256: ab49c848b33e28243f5ce82b976736de17d0852b71d0dfbde53fbb5e2ecca7cb
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.1"
+  supercharged_dart:
+    dependency: transitive
+    description:
+      name: supercharged_dart
+      sha256: cb95edda32eacd27664089700a750120be41daa84aa6cd2aeded46227c16b867
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.1"
   term_glyph:
     dependency: transitive
     description:
@@ -1066,6 +1114,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.1"
+  universal_platform:
+    dependency: transitive
+    description:
+      name: universal_platform
+      sha256: "64e16458a0ea9b99260ceb5467a214c1f298d647c659af1bff6d3bf82536b1ec"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
   upower:
     dependency: transitive
     description:

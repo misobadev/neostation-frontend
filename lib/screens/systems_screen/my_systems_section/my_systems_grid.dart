@@ -21,9 +21,11 @@ import '../../../providers/file_provider.dart';
 import '../../../widgets/system_scan_progress_widget.dart';
 import '../../game_screen/my_games_list.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'grid_geometry.dart';
 import 'widgets/grid_loading_state.dart';
 import 'widgets/grid_empty_state.dart';
+import 'widgets/spring_selected_card.dart';
 import 'my_systems_carousel.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/launch_failure_dialog.dart';
@@ -809,6 +811,10 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   /// Cached conversion of widget.systems to SystemInfo list, rebuilt only on systems change.
   late List<SystemInfo> _systemCards;
 
+  /// The card the selection left on the latest move. Only this card runs the
+  /// settle animation; all earlier cards snap back to rest.
+  int? _previousSelectedIndex;
+
   /// Cached ThemeData with scrollbar overrides — rebuilt only in didChangeDependencies.
   ThemeData? _cachedThemeData;
   ScrollBehavior? _cachedScrollBehavior;
@@ -898,6 +904,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
       _systemCards = _toSystemCards(widget.systems);
     }
     if (oldWidget.selectedIndex != widget.selectedIndex) {
+      _previousSelectedIndex = oldWidget.selectedIndex;
       if (mounted && _scrollController.hasClients) {
         _ensureSelectedItemVisibleUniversal();
       }
@@ -1176,6 +1183,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
 
         final List<Widget> cardWidgets = [];
         final Set<int> placedIndices = {};
+        var animationPosition = 0;
 
         for (int r = 0; r < grid.length; r++) {
           for (int c = 0; c < grid[r].length; c++) {
@@ -1256,45 +1264,72 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
                 top: top,
                 width: width,
                 height: cardHeight,
-                child: RepaintBoundary(
-                  // The anchor is a sibling overlay, never a wrapper around the
-                  // card. Wrapping only the selected card changes that card's
-                  // subtree shape as the selection travels, which remounts
-                  // `SystemCard` and reloads its artwork — a visible flicker on
-                  // every D-pad press. Here the tree is identical for every
-                  // card and only the `SizedBox`'s key moves; a `SizedBox` has
-                  // no state to lose. `passthrough` hands the card exactly the
-                  // constraints it had before the Stack existed.
-                  child: Stack(
-                    fit: StackFit.passthrough,
-                    children: [
-                      cardWidget,
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: SizedBox.expand(
-                            key: cardIsSelected ? widget.selectedItemKey : null,
+                child: AnimationConfiguration.staggeredGrid(
+                  position: animationPosition,
+                  columnCount: cols,
+                  duration: const Duration(milliseconds: 360),
+                  delay: const Duration(milliseconds: 32),
+                  child: FadeInAnimation(
+                    duration: const Duration(milliseconds: 360),
+                    child: SlideAnimation(
+                      verticalOffset: 18.r,
+                      child: ScaleAnimation(
+                        scale: 0.97,
+                        child: SpringSelectedCard(
+                          key: ValueKey('spring_card_${card.title}_$cardIdx'),
+                          selected: cardIsSelected,
+                          previouslySelected: cardIdx == _previousSelectedIndex,
+                          child: RepaintBoundary(
+                            // The anchor is a sibling overlay, never a wrapper
+                            // around the card. Wrapping only the selected card
+                            // changes that card's subtree shape as the selection
+                            // travels, which remounts `SystemCard` and reloads
+                            // its artwork — a visible flicker on every D-pad
+                            // press. Here the tree is identical for every card
+                            // and only the `SizedBox`'s key moves; a `SizedBox`
+                            // has no state to lose. `passthrough` hands the card
+                            // exactly the constraints it had before the Stack
+                            // existed.
+                            child: Stack(
+                              fit: StackFit.passthrough,
+                              children: [
+                                cardWidget,
+                                Positioned.fill(
+                                  child: IgnorePointer(
+                                    child: SizedBox.expand(
+                                      key: cardIsSelected
+                                          ? widget.selectedItemKey
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             );
 
             placedIndices.add(cardIdx);
+            animationPosition++;
           }
         }
 
-        return SingleChildScrollView(
-          controller: _scrollController,
-          clipBehavior: Clip.none,
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          child: SizedBox(
-            height: totalHeight,
-            child: Stack(clipBehavior: Clip.none, children: cardWidgets),
+        return AnimationLimiter(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            clipBehavior: Clip.none,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            child: SizedBox(
+              height: totalHeight,
+              child: Stack(clipBehavior: Clip.none, children: cardWidgets),
+            ),
           ),
         );
       },
