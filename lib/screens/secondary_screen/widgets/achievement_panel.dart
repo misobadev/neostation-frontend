@@ -460,20 +460,17 @@ Widget buildAchievementBadge(
       ? 'https://media.retroachievements.org/Badge/${a.badgeName}.png'
       : 'https://media.retroachievements.org/Badge/${a.badgeName}_lock.png';
 
-  Widget badge = ClipRRect(
-    borderRadius: BorderRadius.circular(8.r),
-    child: Image.network(
-      url,
+  Widget badge = Image.network(
+    url,
+    width: size,
+    height: size,
+    fit: BoxFit.cover,
+    gaplessPlayback: true,
+    errorBuilder: (context, error, stackTrace) => Container(
       width: size,
       height: size,
-      fit: BoxFit.cover,
-      gaplessPlayback: true,
-      errorBuilder: (context, error, stackTrace) => Container(
-        width: size,
-        height: size,
-        color: Colors.white10,
-        child: Icon(Symbols.trophy_rounded, color: Colors.white24, size: 24.r),
-      ),
+      color: Colors.white10,
+      child: Icon(Symbols.trophy_rounded, color: Colors.white24, size: 24.r),
     ),
   );
 

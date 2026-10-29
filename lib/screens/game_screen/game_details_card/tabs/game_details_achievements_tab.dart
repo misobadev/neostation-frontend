@@ -974,7 +974,6 @@ class _AchievementsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radii = Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m();
     return GridView.builder(
       controller: scrollController,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -1002,21 +1001,18 @@ class _AchievementsGrid extends StatelessWidget {
                     : Colors.transparent,
                 width: isSelected ? 2.r : 1.r,
               ),
-              borderRadius: radii.radiusInternal,
+              borderRadius: BorderRadius.circular(RaEarnedBadge.radius + 2.r),
             ),
             child: RaEarnedBadge(
               casual: achievement.isUnlocked,
               hardcore: (achievement.dateEarnedHardcore ?? '').isNotEmpty,
-              child: ClipRRect(
-                borderRadius: radii.radiusInternal,
-                child: Image.network(
-                  // Use the standard RA Badge CDN protocol for locked vs unlocked icons.
-                  isUnlocked
-                      ? 'https://media.retroachievements.org/Badge/${achievement.badgeName}.png'
-                      : 'https://media.retroachievements.org/Badge/${achievement.badgeName}_lock.png',
-                  cacheWidth: 64,
-                  fit: BoxFit.cover,
-                ),
+              child: Image.network(
+                // Use the standard RA Badge CDN protocol for locked vs unlocked icons.
+                isUnlocked
+                    ? 'https://media.retroachievements.org/Badge/${achievement.badgeName}.png'
+                    : 'https://media.retroachievements.org/Badge/${achievement.badgeName}_lock.png',
+                cacheWidth: 64,
+                fit: BoxFit.cover,
               ),
             ),
           ),

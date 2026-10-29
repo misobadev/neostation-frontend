@@ -267,6 +267,8 @@ extension _SectionLists on RADashboardHubState {
                         : '/Badge/${item.badgeName}.png',
                   ),
                   icon: Symbols.emoji_events_rounded,
+                  // RaEarnedBadge does the (near-square) clipping.
+                  borderRadius: 0,
                 ),
               ),
               SizedBox(width: 10.r),

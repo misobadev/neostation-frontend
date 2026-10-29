@@ -127,12 +127,16 @@ extension _SharedHelpers on RADashboardHubState {
     );
   }
 
-  Widget _networkThumb(String url, {required IconData icon}) {
+  Widget _networkThumb(
+    String url, {
+    required IconData icon,
+    double? borderRadius,
+  }) {
     return Builder(
       builder: (context) {
         final theme = Theme.of(context);
         return ClipRRect(
-          borderRadius: BorderRadius.circular(8.r),
+          borderRadius: BorderRadius.circular(borderRadius ?? 8.r),
           child: SizedBox(
             width: 40.r,
             height: 40.r,
