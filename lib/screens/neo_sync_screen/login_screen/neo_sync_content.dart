@@ -19,6 +19,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/sync/providers/neo_sync_adapter.dart';
 import '../../app_screen.dart';
@@ -547,213 +548,155 @@ class NeoSyncContentState extends State<NeoSyncContent>
     final user = authService.currentUser;
     final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
 
-    return Container(
-      padding: EdgeInsets.all(8.r),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: radii.radiusExternal,
-        border: Border.all(color: theme.colorScheme.outline, width: 1.r),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.1),
-            blurRadius: 4.r,
-            offset: Offset(2.0.r, 2.0.r),
+    return NeoGlassRim(
+      cornerRadius: radii.radiusExternalRadius,
+      child: Container(
+        padding: EdgeInsets.all(10.r),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: radii.radiusExternal,
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.15),
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: radii.radiusInternal,
-        child: Container(
-          padding: EdgeInsets.all(10.r),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                theme.colorScheme.primary.withValues(alpha: 0.18),
-                theme.colorScheme.primary.withValues(alpha: 0.04),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Identity: name + plan ──
+            Text(
+              AppLocale.helloUser
+                  .getString(context)
+                  .replaceFirst('{name}', user?.username ?? ''),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 13.r,
+                color: theme.colorScheme.onSurface,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            SizedBox(height: 3.r),
+            // Plan + online save count.
+            Wrap(
+              spacing: 4.r,
+              runSpacing: 3.r,
+              children: [
+                _buildDashboardPill(
+                  theme,
+                  icon: Symbols.storage_rounded,
+                  label:
+                      '${user?.plan.toUpperCase() ?? ''} ${AppLocale.quota.getString(context).toUpperCase()}',
+                  background: theme.colorScheme.secondary,
+                  foreground: theme.colorScheme.onSecondary,
+                ),
+                _buildDashboardPill(
+                  theme,
+                  icon: Symbols.cloud_rounded,
+                  label:
+                      '${neoSyncProvider.onlineTotal} ${AppLocale.onlineSaves.getString(context).toUpperCase()}',
+                  background: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  foreground: theme.colorScheme.onSurface,
+                  border: theme.colorScheme.primary.withValues(alpha: 0.25),
+                ),
               ],
             ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Identity: name + plan ──
-              Text(
-                AppLocale.helloUser
-                    .getString(context)
-                    .replaceFirst('{name}', user?.username ?? ''),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.r,
-                  color: theme.colorScheme.onSurface,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              SizedBox(height: 3.r),
-              // Plan badge
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 7.r, vertical: 2.r),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.secondary,
-                  borderRadius: BorderRadius.circular(6.r),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Symbols.storage_rounded,
-                      size: 9.r,
-                      color: theme.colorScheme.onSecondary,
-                    ),
-                    SizedBox(width: 3.r),
-                    Text(
-                      '${user?.plan.toUpperCase() ?? ''} ${AppLocale.quota.getString(context).toUpperCase()}',
-                      style: TextStyle(
-                        color: theme.colorScheme.onSecondary,
-                        fontSize: 7.r,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Storage bar — right under name + plan
-              if (neoSyncProvider.quota != null) ...[
-                SizedBox(height: 10.r),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      neoSyncProvider.quota!.usedQuotaFormatted,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.8,
-                        ),
-                        fontSize: 8.r,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${neoSyncProvider.quota!.usagePercentage.toStringAsFixed(1)}%',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 8.r,
-                        color: neoSyncProvider.quota!.usagePercentage >= 90
-                            ? Colors.red.shade400
-                            : theme.colorScheme.primary,
-                      ),
-                    ),
-                    Text(
-                      neoSyncProvider.quota!.totalQuotaFormatted,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.8,
-                        ),
-                        fontSize: 8.r,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 4.r),
-                Container(
-                  height: 8.r,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.5,
-                    ),
-                    borderRadius: BorderRadius.circular(4.r),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4.r),
-                    child: LinearProgressIndicator(
-                      value: neoSyncProvider.quota!.usagePercentage / 100,
-                      backgroundColor: Colors.transparent,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        neoSyncProvider.quota!.usagePercentage >= 100
-                            ? Colors.red.shade400
-                            : neoSyncProvider.quota!.usagePercentage >= 90
-                            ? Colors.orange.shade400
-                            : theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              // Mini stat cards — one per row
+            // Storage bar — right under name + plan
+            if (neoSyncProvider.quota != null) ...[
               SizedBox(height: 10.r),
-              _buildHeaderStat(
-                context,
-                icon: Symbols.cloud_rounded,
-                label: AppLocale.onlineSaves.getString(context),
-                value: '${neoSyncProvider.onlineTotal}',
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    neoSyncProvider.quota!.usedQuotaFormatted,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                      fontSize: 8.r,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '${neoSyncProvider.quota!.usagePercentage.toStringAsFixed(1)}%',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 8.r,
+                      color: neoSyncProvider.quota!.usagePercentage >= 90
+                          ? Colors.red.shade400
+                          : theme.colorScheme.primary,
+                    ),
+                  ),
+                  Text(
+                    neoSyncProvider.quota!.totalQuotaFormatted,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                      fontSize: 8.r,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(height: 6.r),
-              _buildHeaderStat(
-                context,
-                icon: Symbols.storage_rounded,
-                label: AppLocale.storageLabel.getString(context),
-                value: neoSyncProvider.quota != null
-                    ? '${neoSyncProvider.quota!.usagePercentage.toStringAsFixed(0)}%'
-                    : '—',
-              ),
-              SizedBox(height: 6.r),
-              _buildHeaderGameStat(
-                context,
-                neoSyncProvider.onlineFiles.isEmpty
-                    ? null
-                    : neoSyncProvider.onlineFiles.first,
+              SizedBox(height: 4.r),
+              Container(
+                height: 8.r,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.5,
+                  ),
+                  borderRadius: BorderRadius.circular(4.r),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4.r),
+                  child: LinearProgressIndicator(
+                    value: neoSyncProvider.quota!.usagePercentage / 100,
+                    backgroundColor: Colors.transparent,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      neoSyncProvider.quota!.usagePercentage >= 100
+                          ? Colors.red.shade400
+                          : neoSyncProvider.quota!.usagePercentage >= 90
+                          ? Colors.orange.shade400
+                          : theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
               ),
             ],
-          ),
+            SizedBox(height: 10.r),
+            Expanded(
+              child: _buildLatestSavesList(
+                context,
+                neoSyncProvider.onlineFiles.take(10).toList(),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildHeaderStat(
-    BuildContext context, {
+  Widget _buildDashboardPill(
+    ThemeData theme, {
     required IconData icon,
     required String label,
-    required String value,
+    required Color background,
+    required Color foreground,
+    Color? border,
   }) {
-    final theme = Theme.of(context);
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 5.r),
+      padding: EdgeInsets.symmetric(horizontal: 7.r, vertical: 2.r),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1.r,
-        ),
+        color: background,
+        borderRadius: BorderRadius.circular(6.r),
+        border: Border.all(color: border ?? Colors.transparent),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12.r, color: theme.colorScheme.primary),
-          SizedBox(width: 6.r),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 11.r,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 7.r,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-              ],
+          Icon(icon, size: 9.r, color: foreground),
+          SizedBox(width: 3.r),
+          Text(
+            label,
+            style: TextStyle(
+              color: foreground,
+              fontSize: 7.r,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -761,89 +704,115 @@ class NeoSyncContentState extends State<NeoSyncContent>
     );
   }
 
-  /// Header stat showing the most recently synced save with its game thumbnail.
-  ///
-  /// Uses the same CDN game image as the save list (`gameHash` → webp). Falls
-  /// back to a generic icon when there is no save or no game hash.
-  Widget _buildHeaderGameStat(BuildContext context, NeoSyncFile? lastSave) {
+  Widget _buildLatestSavesList(
+    BuildContext context,
+    List<NeoSyncFile> latestSaves,
+  ) {
     final theme = Theme.of(context);
-    final gameHash = lastSave?.gameHash;
-    final hasImage = gameHash != null && gameHash.isNotEmpty;
-    final imageUrl = hasImage
+    if (latestSaves.isEmpty) {
+      return Center(
+        child: Text(
+          AppLocale.noOnlineSavesFound.getString(context),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 8.r,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 2.r),
+      physics: const ClampingScrollPhysics(),
+      itemCount: latestSaves.length,
+      separatorBuilder: (_, _) => SizedBox(height: 9.r),
+      itemBuilder: (context, index) =>
+          _buildLatestSaveRow(theme, latestSaves[index]),
+    );
+  }
+
+  Widget _buildLatestSaveRow(ThemeData theme, NeoSyncFile file) {
+    final gameHash = file.gameHash;
+    final imageUrl = gameHash != null && gameHash.isNotEmpty
         ? 'https://media.neosync.cloud/games/$gameHash.webp'
         : null;
+    final name = file.gameName.isNotEmpty ? file.gameName : file.fileName;
 
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 5.r),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1.r,
+    return NeoGlassRim(
+      cornerRadius: 8.r,
+      child: Container(
+        height: 42.r,
+        padding: EdgeInsets.symmetric(horizontal: 7.r, vertical: 5.r),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.16,
+          ),
+          borderRadius: BorderRadius.circular(8.r),
         ),
-      ),
-      child: Row(
-        children: [
-          // Game thumbnail (28x28) or fallback icon
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6.r),
-            child: Container(
-              width: 24.r,
-              height: 24.r,
-              decoration: BoxDecoration(
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(5.r),
+              child: Container(
+                width: 28.r,
+                height: 28.r,
                 color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                child: imageUrl == null
+                    ? _buildLatestSaveIcon(theme)
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => _buildLatestSaveIcon(theme),
+                        loadingBuilder: (_, child, progress) => progress == null
+                            ? child
+                            : _buildLatestSaveIcon(theme),
+                      ),
               ),
-              child: imageUrl != null
-                  ? Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildHeaderStatIcon(theme),
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return _buildHeaderStatIcon(theme);
-                      },
-                    )
-                  : _buildHeaderStatIcon(theme),
             ),
-          ),
-          SizedBox(width: 6.r),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  lastSave != null
-                      ? lastSave.gameName.isNotEmpty
-                            ? lastSave.gameName
-                            : lastSave.fileName
-                      : '—',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 9.r,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
+            SizedBox(width: 6.r),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 8.5.r,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onSurface,
+                    ),
                   ),
-                ),
-                Text(
-                  AppLocale.lastSyncedSave.getString(context),
-                  style: TextStyle(
-                    fontSize: 7.r,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  SizedBox(height: 1.r),
+                  Text(
+                    [
+                      if (file.systemName != null &&
+                          file.systemName!.isNotEmpty)
+                        file.systemName!,
+                      file.fileSizeFormatted,
+                    ].join('  ·  '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 7.r,
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.55,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildHeaderStatIcon(ThemeData theme) {
+  Widget _buildLatestSaveIcon(ThemeData theme) {
     return Center(
       child: Icon(
         Symbols.videogame_asset_rounded,
@@ -880,84 +849,92 @@ class NeoSyncContentState extends State<NeoSyncContent>
       itemBuilder: (context, index) {
         final entry = entries[index];
         final isSelected = index == _selectedMenuIndex;
-        final radii =
-            theme.extension<CornerRadii>()?.radiusExternal ??
-            BorderRadius.circular(14.r);
+        final cornerRadii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+        final radii = cornerRadii.radiusExternal;
+        final foreground = isSelected
+            ? theme.colorScheme.surface
+            : theme.colorScheme.onSurface;
+        final mutedForeground = foreground.withValues(alpha: 0.65);
 
         return Padding(
           padding: EdgeInsets.only(bottom: 6.r),
-          child: Material(
-            color: isSelected
-                ? theme.colorScheme.secondary.withValues(alpha: 0.12)
-                : theme.colorScheme.surface,
-            borderRadius: radii,
-            child: InkWell(
-              onTap: () {
-                SfxService().playNavSound();
-                setState(() => _selectedMenuIndex = index);
-                _goToSection(_menuSections[index]);
-              },
+          child: NeoGlassRim(
+            cornerRadius: cornerRadii.radiusExternalRadius,
+            child: Material(
+              color: isSelected
+                  ? theme.colorScheme.onSurface
+                  : theme.colorScheme.surface,
               borderRadius: radii,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
-                decoration: BoxDecoration(
-                  borderRadius: radii,
-                  border: Border.all(
-                    color: isSelected
-                        ? theme.colorScheme.secondary.withValues(alpha: 0.6)
-                        : theme.colorScheme.outline,
-                    width: isSelected ? 2.r : 1.r,
+              child: InkWell(
+                onTap: () {
+                  SfxService().playNavSound();
+                  setState(() => _selectedMenuIndex = index);
+                  _goToSection(_menuSections[index]);
+                },
+                borderRadius: radii,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.r,
+                    vertical: 8.r,
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(6.r),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8.r),
+                  decoration: BoxDecoration(
+                    borderRadius: radii,
+                    border: Border.all(color: Colors.transparent, width: 2.r),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(6.r),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? theme.colorScheme.surface.withValues(
+                                  alpha: 0.12,
+                                )
+                              : theme.colorScheme.primary.withValues(
+                                  alpha: 0.1,
+                                ),
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Icon(
+                          entry.icon,
+                          color: isSelected
+                              ? foreground
+                              : theme.colorScheme.primary,
+                          size: 18.r,
+                        ),
                       ),
-                      child: Icon(
-                        entry.icon,
-                        color: isSelected
-                            ? theme.colorScheme.secondary
-                            : theme.colorScheme.primary,
-                        size: 18.r,
-                      ),
-                    ),
-                    SizedBox(width: 10.r),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            entry.title,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12.r,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                          SizedBox(height: 1.r),
-                          Text(
-                            entry.subtitle,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 9.r,
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: 0.6,
+                      SizedBox(width: 10.r),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              entry.title,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12.r,
+                                color: foreground,
                               ),
                             ),
-                          ),
-                        ],
+                            SizedBox(height: 1.r),
+                            Text(
+                              entry.subtitle,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 9.r,
+                                color: mutedForeground,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Icon(
-                      Symbols.chevron_right_rounded,
-                      size: 16.r,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                    ),
-                  ],
+                      Icon(
+                        Symbols.chevron_right_rounded,
+                        size: 16.r,
+                        color: mutedForeground,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -969,96 +946,101 @@ class NeoSyncContentState extends State<NeoSyncContent>
 
   Widget _buildInfoBox(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: EdgeInsets.all(16.r),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1,
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    return NeoGlassRim(
+      cornerRadius: radii.radiusExternalRadius,
+      child: Container(
+        padding: EdgeInsets.all(16.r),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: radii.radiusExternal,
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.15),
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Symbols.cloud_rounded,
-                color: theme.colorScheme.primary,
-                size: 24.r,
-              ),
-              SizedBox(width: 12.r),
-              Expanded(
-                child: Text(
-                  AppLocale.whatIsNeoSync.getString(context),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                    fontSize: 14.r,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 6.r),
-          Text(
-            AppLocale.neoSyncDescription.getString(context),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
-              fontSize: 8.r,
-            ),
-            softWrap: true,
-          ),
-          SizedBox(height: 6.r),
-          _buildInfoItem(
-            context,
-            Symbols.cloud_upload_rounded,
-            AppLocale.neoSyncSavesSync.getString(context),
-          ),
-          _buildInfoItem(
-            context,
-            Symbols.devices_rounded,
-            AppLocale.crossPlatformDesc.getString(context),
-          ),
-          _buildInfoItem(
-            context,
-            Symbols.security_rounded,
-            AppLocale.securePrivateDesc.getString(context),
-          ),
-          SizedBox(height: 6.r),
-          RichText(
-            softWrap: true,
-            text: TextSpan(
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 8.r,
-              ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                TextSpan(text: AppLocale.learnMoreEcosystem.getString(context)),
-                TextSpan(
-                  text: 'neosync.cloud',
-                  style: TextStyle(
-                    color: theme.colorScheme.primary,
-                    decoration: TextDecoration.underline,
+                Icon(
+                  Symbols.cloud_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 24.r,
+                ),
+                SizedBox(width: 12.r),
+                Expanded(
+                  child: Text(
+                    AppLocale.whatIsNeoSync.getString(context),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                      fontSize: 14.r,
+                    ),
                   ),
-                  recognizer: TapGestureRecognizer()
-                    ..onTap = () async {
-                      final url = Uri.parse('https://neosync.cloud');
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(
-                          url,
-                          mode: LaunchMode.externalApplication,
-                        );
-                      }
-                    },
                 ),
               ],
             ),
-          ),
-        ],
+            SizedBox(height: 6.r),
+            Text(
+              AppLocale.neoSyncDescription.getString(context),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
+                fontSize: 8.r,
+              ),
+              softWrap: true,
+            ),
+            SizedBox(height: 6.r),
+            _buildInfoItem(
+              context,
+              Symbols.cloud_upload_rounded,
+              AppLocale.neoSyncSavesSync.getString(context),
+            ),
+            _buildInfoItem(
+              context,
+              Symbols.devices_rounded,
+              AppLocale.crossPlatformDesc.getString(context),
+            ),
+            _buildInfoItem(
+              context,
+              Symbols.security_rounded,
+              AppLocale.securePrivateDesc.getString(context),
+            ),
+            SizedBox(height: 6.r),
+            RichText(
+              softWrap: true,
+              text: TextSpan(
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  fontSize: 8.r,
+                ),
+                children: [
+                  TextSpan(
+                    text: AppLocale.learnMoreEcosystem.getString(context),
+                  ),
+                  TextSpan(
+                    text: 'neosync.cloud',
+                    style: TextStyle(
+                      color: theme.colorScheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () async {
+                        final url = Uri.parse('https://neosync.cloud');
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(
+                            url,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        }
+                      },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

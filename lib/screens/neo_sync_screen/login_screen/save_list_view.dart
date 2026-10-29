@@ -12,10 +12,12 @@ import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/centered_scroll_controller.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/widgets/custom_notification.dart' as custom;
 import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import '../../app_screen.dart';
 import 'neo_sync_dialogs.dart';
 
@@ -790,40 +792,47 @@ class _SaveListViewState extends State<SaveListView> {
               Expanded(
                 child: Consumer<NeoSyncProvider>(
                   builder: (context, neoSyncProvider, child) {
-                    return Container(
-                      padding: EdgeInsets.all(6.r),
-                      decoration: BoxDecoration(
-                        color: theme.cardColor.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.15,
+                    return NeoGlassRim(
+                      cornerRadius:
+                          (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                              .radiusExternalRadius,
+                      child: Container(
+                        padding: EdgeInsets.all(6.r),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius:
+                              (theme.extension<CornerRadii>() ??
+                                      CornerRadii.m())
+                                  .radiusExternal,
+                          border: Border.all(
+                            color: theme.colorScheme.outline.withValues(
+                              alpha: 0.15,
+                            ),
                           ),
-                          width: 1.r,
                         ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: neoSyncProvider.isLoadingOnlineFiles
-                                ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : neoSyncProvider.onlineFiles.isEmpty
-                                ? _buildEmptyState(context, neoSyncProvider)
-                                : OnlineSavesListView(
-                                    key: _onlineSavesListKey,
-                                    files: neoSyncProvider.onlineFiles,
-                                    selectedIndex: _selectedSaveIndex,
-                                    isNavigatingFast: _isNavigatingFast,
-                                    onSelectionChanged: (index) {
-                                      _updateSelectionIndex(index);
-                                    },
-                                  ),
-                          ),
-                          _buildPagination(context, neoSyncProvider),
-                        ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: neoSyncProvider.isLoadingOnlineFiles
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : neoSyncProvider.onlineFiles.isEmpty
+                                  ? _buildEmptyState(context, neoSyncProvider)
+                                  : OnlineSavesListView(
+                                      key: _onlineSavesListKey,
+                                      files: neoSyncProvider.onlineFiles,
+                                      selectedIndex: _selectedSaveIndex,
+                                      isNavigatingFast: _isNavigatingFast,
+                                      onSelectionChanged: (index) {
+                                        _updateSelectionIndex(index);
+                                      },
+                                    ),
+                            ),
+                            _buildPagination(context, neoSyncProvider),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -840,6 +849,26 @@ class _SaveListViewState extends State<SaveListView> {
     );
   }
 
+  ({Color background, Color foreground}) _selectionPalette(
+    ThemeData theme, {
+    required bool focused,
+    bool selected = false,
+  }) {
+    final scheme = theme.colorScheme;
+    if (focused) {
+      return (background: scheme.onSurface, foreground: scheme.surface);
+    }
+    return (
+      background: selected
+          ? Color.alphaBlend(
+              scheme.onSurface.withValues(alpha: 0.18),
+              scheme.surface,
+            )
+          : scheme.surface.withValues(alpha: 0.5),
+      foreground: scheme.onSurface,
+    );
+  }
+
   Widget _buildSearchRow(ThemeData theme) {
     return Row(
       children: [
@@ -851,47 +880,48 @@ class _SaveListViewState extends State<SaveListView> {
   }
 
   Widget _buildAdvancedToggle(ThemeData theme, bool focused) {
-    final scheme = theme.colorScheme;
+    final palette = _selectionPalette(
+      theme,
+      focused: focused,
+      selected: _filtersExpanded,
+    );
+    final foreground = palette.foreground;
     return GestureDetector(
       onTap: _toggleFilters,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 9.r),
-        decoration: BoxDecoration(
-          color: focused
-              ? scheme.primary.withValues(alpha: 0.18)
-              : scheme.surface.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: focused ? scheme.primary : Colors.transparent,
-            width: 2.r,
+      child: NeoGlassRim(
+        cornerRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+            .radiusInternalRadius,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 9.r),
+          decoration: BoxDecoration(
+            color: palette.background,
+            borderRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                .radiusInternal,
+            border: Border.all(color: Colors.transparent, width: 2.r),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Symbols.tune_rounded,
-              size: 18.r,
-              color: focused ? scheme.primary : scheme.onSurface,
-            ),
-            SizedBox(width: 6.r),
-            Text(
-              AppLocale.searchFilters.getString(context),
-              style: TextStyle(
-                fontSize: 13.r,
-                fontWeight: FontWeight.w700,
-                color: focused ? scheme.primary : scheme.onSurface,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Symbols.tune_rounded, size: 18.r, color: foreground),
+              SizedBox(width: 6.r),
+              Text(
+                AppLocale.searchFilters.getString(context),
+                style: TextStyle(
+                  fontSize: 13.r,
+                  fontWeight: FontWeight.w700,
+                  color: foreground,
+                ),
               ),
-            ),
-            SizedBox(width: 4.r),
-            Icon(
-              _filtersExpanded
-                  ? Symbols.expand_less_rounded
-                  : Symbols.expand_more_rounded,
-              size: 16.r,
-              color: scheme.onSurface.withValues(alpha: focused ? 0.9 : 0.5),
-            ),
-          ],
+              SizedBox(width: 4.r),
+              Icon(
+                _filtersExpanded
+                    ? Symbols.expand_less_rounded
+                    : Symbols.expand_more_rounded,
+                size: 16.r,
+                color: foreground.withValues(alpha: 0.75),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -952,20 +982,15 @@ class _SaveListViewState extends State<SaveListView> {
         margin: EdgeInsets.symmetric(horizontal: 6.r, vertical: 4.r),
         padding: EdgeInsets.all(4.r),
         decoration: BoxDecoration(
-          color: focused
-              ? scheme.primary.withValues(alpha: 0.18)
-              : Colors.transparent,
+          color: focused ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(10.r),
-          border: Border.all(
-            color: focused ? scheme.primary : Colors.transparent,
-            width: 2.r,
-          ),
+          border: Border.all(color: Colors.transparent, width: 2.r),
         ),
         child: Icon(
           Symbols.close_rounded,
           size: 18.r,
           color: focused
-              ? scheme.primary
+              ? scheme.surface
               : scheme.onSurface.withValues(alpha: 0.6),
         ),
       ),
@@ -995,7 +1020,6 @@ class _SaveListViewState extends State<SaveListView> {
   }
 
   Widget _buildFilterChip(ThemeData theme, String key, bool isFocused) {
-    final scheme = theme.colorScheme;
     final neoSyncProvider = Provider.of<NeoSyncProvider>(
       context,
       listen: false,
@@ -1010,6 +1034,12 @@ class _SaveListViewState extends State<SaveListView> {
             (filter.dir ?? 'desc') != 'desc',
     };
 
+    final palette = _selectionPalette(
+      theme,
+      focused: isFocused,
+      selected: active,
+    );
+    final foreground = palette.foreground;
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -1019,45 +1049,37 @@ class _SaveListViewState extends State<SaveListView> {
         });
         _openFilterMenu(key);
       },
-      child: Container(
-        margin: EdgeInsets.only(right: 8.r),
-        padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
-        decoration: BoxDecoration(
-          color: isFocused
-              ? scheme.primary.withValues(alpha: 0.18)
-              : (active
-                    ? scheme.primary.withValues(alpha: 0.10)
-                    : scheme.surface.withValues(alpha: 0.5)),
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: isFocused
-                ? scheme.primary
-                : (active
-                      ? scheme.primary.withValues(alpha: 0.5)
-                      : Colors.transparent),
-            width: 2.r,
+      child: NeoGlassRim(
+        cornerRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+            .radiusInternalRadius,
+        child: Container(
+          margin: EdgeInsets.only(right: 8.r),
+          padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
+          decoration: BoxDecoration(
+            color: palette.background,
+            borderRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                .radiusInternal,
+            border: Border.all(color: Colors.transparent, width: 2.r),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _barLabel(key),
-              style: TextStyle(
-                fontSize: 13.r,
-                fontWeight: FontWeight.w600,
-                color: (active || isFocused)
-                    ? scheme.primary
-                    : scheme.onSurface,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _barLabel(key),
+                style: TextStyle(
+                  fontSize: 13.r,
+                  fontWeight: FontWeight.w600,
+                  color: foreground,
+                ),
               ),
-            ),
-            SizedBox(width: 4.r),
-            Icon(
-              Symbols.expand_more_rounded,
-              size: 16.r,
-              color: scheme.onSurface.withValues(alpha: isFocused ? 0.9 : 0.4),
-            ),
-          ],
+              SizedBox(width: 4.r),
+              Icon(
+                Symbols.expand_more_rounded,
+                size: 16.r,
+                color: foreground.withValues(alpha: 0.75),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1121,7 +1143,7 @@ class _SaveListViewState extends State<SaveListView> {
                               ),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? scheme.primary.withValues(alpha: 0.18)
+                                    ? scheme.onSurface
                                     : Colors.transparent,
                                 border: Border(
                                   bottom: BorderSide(
@@ -1145,7 +1167,7 @@ class _SaveListViewState extends State<SaveListView> {
                                             ? FontWeight.w700
                                             : FontWeight.w500,
                                         color: isSelected
-                                            ? scheme.primary
+                                            ? scheme.surface
                                             : scheme.onSurface,
                                       ),
                                     ),
@@ -1154,7 +1176,7 @@ class _SaveListViewState extends State<SaveListView> {
                                     Icon(
                                       Symbols.check_rounded,
                                       size: 16.r,
-                                      color: scheme.primary,
+                                      color: scheme.surface,
                                     ),
                                 ],
                               ),
@@ -1196,8 +1218,8 @@ class _SaveListViewState extends State<SaveListView> {
           label: AppLocale.delete.getString(context),
           iconPath: 'assets/images/gamepad/Xbox_View_button.png',
           onTap: _selectSaveItem,
-          textColor: theme.colorScheme.onError,
-          backgroundColor: theme.colorScheme.error,
+          textColor: theme.colorScheme.onTertiaryFixed,
+          backgroundColor: theme.colorScheme.tertiaryFixed,
         ),
         SizedBox(width: 8.r),
         GamepadControl(
@@ -1436,7 +1458,7 @@ class OnlineSavesListViewState extends State<OnlineSavesListView>
               height: itemHeight,
               child: Container(
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.secondary,
+                  color: theme.colorScheme.onSurface,
                   borderRadius: BorderRadius.circular(12.r),
                 ),
               ),
@@ -1527,14 +1549,14 @@ class OnlineSavesListViewState extends State<OnlineSavesListView>
       height: 44.r,
       decoration: BoxDecoration(
         color: isSelected
-            ? Theme.of(context).colorScheme.onSecondary.withValues(alpha: 0.2)
+            ? Theme.of(context).colorScheme.surface.withValues(alpha: 0.12)
             : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10.r),
       ),
       child: Icon(
         Symbols.save_rounded,
         color: isSelected
-            ? Theme.of(context).colorScheme.onSecondary
+            ? Theme.of(context).colorScheme.surface
             : Theme.of(context).colorScheme.primary,
         size: 22.r,
       ),
@@ -1586,7 +1608,7 @@ class OnlineSavesListViewState extends State<OnlineSavesListView>
                     fontSize: 10.r,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                     color: isSelected
-                        ? theme.colorScheme.onSecondary
+                        ? theme.colorScheme.surface
                         : theme.colorScheme.onSurface,
                     fontFamily: theme.textTheme.bodyMedium?.fontFamily,
                   ),
@@ -1605,7 +1627,7 @@ class OnlineSavesListViewState extends State<OnlineSavesListView>
                   style: TextStyle(
                     fontSize: 8.r,
                     color: isSelected
-                        ? theme.colorScheme.onSecondary.withValues(alpha: 0.8)
+                        ? theme.colorScheme.surface.withValues(alpha: 0.8)
                         : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     fontFamily: theme.textTheme.bodySmall?.fontFamily,
                   ),
@@ -1654,7 +1676,7 @@ class OnlineSavesListViewState extends State<OnlineSavesListView>
       padding: EdgeInsets.symmetric(horizontal: 5.r, vertical: 1.r),
       decoration: BoxDecoration(
         color: isSelected
-            ? theme.colorScheme.onSecondary.withValues(alpha: 0.15)
+            ? theme.colorScheme.surface.withValues(alpha: 0.12)
             : theme.colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4.r),
       ),
@@ -1665,7 +1687,7 @@ class OnlineSavesListViewState extends State<OnlineSavesListView>
             icon,
             size: 8.r,
             color: isSelected
-                ? theme.colorScheme.onSecondary
+                ? theme.colorScheme.surface
                 : theme.colorScheme.primary,
           ),
           SizedBox(width: 3.r),
@@ -1677,7 +1699,7 @@ class OnlineSavesListViewState extends State<OnlineSavesListView>
               fontSize: 7.r,
               fontWeight: FontWeight.w600,
               color: isSelected
-                  ? theme.colorScheme.onSecondary
+                  ? theme.colorScheme.surface
                   : theme.colorScheme.primary,
             ),
           ),

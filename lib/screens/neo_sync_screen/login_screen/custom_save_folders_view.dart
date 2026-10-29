@@ -17,9 +17,11 @@ import 'package:neostation/services/user_data_location_service.dart';
 import 'package:neostation/widgets/custom_notification.dart' as custom;
 import 'package:neostation/widgets/tv_directory_picker.dart';
 import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import '../../app_screen.dart';
 import 'custom_save_folders_panel.dart';
 import 'neo_sync_shared.dart';
@@ -369,123 +371,145 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
           ),
           SizedBox(height: 8.r),
           Expanded(
-            child: Container(
-              padding: EdgeInsets.all(12.r),
-              decoration: BoxDecoration(
-                color: theme.cardColor.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                  width: 1.r,
+            child: NeoGlassRim(
+              cornerRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                  .radiusExternalRadius,
+              child: Container(
+                padding: EdgeInsets.all(12.r),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius:
+                      (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                          .radiusExternal,
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                  ),
                 ),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 8.r),
-                    Text(
-                      AppLocale.customSaveFolderConfiguredList.getString(
-                        context,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: 8.r),
+                      Text(
+                        AppLocale.customSaveFolderConfiguredList.getString(
+                          context,
+                        ),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11.r,
+                        ),
                       ),
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11.r,
-                      ),
-                    ),
-                    SizedBox(height: 6.r),
-                    if (_configured.isEmpty)
-                      Padding(
-                        padding: EdgeInsets.all(12.r),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              Icon(
-                                Symbols.folder_special_rounded,
-                                size: 40.r,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.4,
-                                ),
-                              ),
-                              SizedBox(height: 8.r),
-                              Text(
-                                AppLocale.noCustomFoldersConfigured.getString(
-                                  context,
-                                ),
-                                style: TextStyle(
-                                  fontSize: 12.r,
+                      SizedBox(height: 6.r),
+                      if (_configured.isEmpty)
+                        Padding(
+                          padding: EdgeInsets.all(12.r),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Symbols.folder_special_rounded,
+                                  size: 40.r,
                                   color: theme.colorScheme.onSurface.withValues(
-                                    alpha: 0.6,
+                                    alpha: 0.4,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    else
-                      for (var i = 0; i < _configured.length; i++) ...[
-                        Padding(
-                          padding: EdgeInsets.only(bottom: 6.r),
-                          child: Container(
-                            padding: EdgeInsets.all(8.r),
-                            decoration: BoxDecoration(
-                              color: i == _selectedFolderIndex
-                                  ? theme.colorScheme.secondary.withValues(
-                                      alpha: 0.12,
-                                    )
-                                  : theme.colorScheme.primary.withValues(
-                                      alpha: 0.05,
-                                    ),
-                              borderRadius: BorderRadius.circular(8.r),
-                              border: Border.all(
-                                color: i == _selectedFolderIndex
-                                    ? theme.colorScheme.secondary.withValues(
-                                        alpha: 0.6,
-                                      )
-                                    : theme.colorScheme.primary.withValues(
-                                        alpha: 0.15,
-                                      ),
-                                width: i == _selectedFolderIndex ? 2.r : 1.r,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${_configured[i].$1} / ${_configured[i].$2}',
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 10.r,
-                                            ),
-                                      ),
-                                      SizedBox(height: 2.r),
-                                      Text(
-                                        _configured[i].$3,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              fontSize: 9.r,
-                                              fontFamily: 'monospace',
-                                              color: theme.colorScheme.onSurface
-                                                  .withValues(alpha: 0.7),
-                                            ),
-                                      ),
-                                    ],
+                                SizedBox(height: 8.r),
+                                Text(
+                                  AppLocale.noCustomFoldersConfigured.getString(
+                                    context,
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 12.r,
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.6),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      ],
-                  ],
+                        )
+                      else
+                        for (var i = 0; i < _configured.length; i++) ...[
+                          Padding(
+                            padding: EdgeInsets.only(bottom: 6.r),
+                            child: NeoGlassRim(
+                              cornerRadius:
+                                  (theme.extension<CornerRadii>() ??
+                                          CornerRadii.m())
+                                      .radiusInternalRadius,
+                              child: Container(
+                                padding: EdgeInsets.all(8.r),
+                                decoration: BoxDecoration(
+                                  color: i == _selectedFolderIndex
+                                      ? theme.colorScheme.onSurface
+                                      : theme
+                                            .colorScheme
+                                            .surfaceContainerHighest
+                                            .withValues(alpha: 0.16),
+                                  borderRadius:
+                                      (theme.extension<CornerRadii>() ??
+                                              CornerRadii.m())
+                                          .radiusInternal,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${_configured[i].$1} / ${_configured[i].$2}',
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 10.r,
+                                                  color:
+                                                      i == _selectedFolderIndex
+                                                      ? theme
+                                                            .colorScheme
+                                                            .surface
+                                                      : theme
+                                                            .colorScheme
+                                                            .onSurface,
+                                                ),
+                                          ),
+                                          SizedBox(height: 2.r),
+                                          Text(
+                                            _configured[i].$3,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  fontSize: 9.r,
+                                                  fontFamily: 'monospace',
+                                                  color:
+                                                      i == _selectedFolderIndex
+                                                      ? theme
+                                                            .colorScheme
+                                                            .surface
+                                                            .withValues(
+                                                              alpha: 0.7,
+                                                            )
+                                                      : theme
+                                                            .colorScheme
+                                                            .onSurface
+                                                            .withValues(
+                                                              alpha: 0.7,
+                                                            ),
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -506,8 +530,8 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
                 label: AppLocale.delete.getString(context),
                 iconPath: 'assets/images/gamepad/Xbox_View_button.png',
                 onTap: busy ? null : () => _handleSelectFolder(),
-                textColor: theme.colorScheme.onError,
-                backgroundColor: theme.colorScheme.error,
+                textColor: theme.colorScheme.onTertiaryFixed,
+                backgroundColor: theme.colorScheme.tertiaryFixed,
               ),
               SizedBox(width: 8.r),
               NeoSyncBackButton(onTap: () => widget.onBack()),

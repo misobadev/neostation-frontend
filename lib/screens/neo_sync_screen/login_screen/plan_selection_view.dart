@@ -13,6 +13,8 @@ import 'package:neostation/utils/centered_scroll_controller.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/neo_glass.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import '../../app_screen.dart';
 import 'neo_sync_shared.dart';
 
@@ -234,17 +236,22 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
           ),
           SizedBox(height: 8.r),
           Expanded(
-            child: Container(
-              padding: EdgeInsets.all(12.r),
-              decoration: BoxDecoration(
-                color: theme.cardColor.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                  width: 1.r,
+            child: NeoGlassRim(
+              cornerRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                  .radiusExternalRadius,
+              child: Container(
+                padding: EdgeInsets.all(12.r),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius:
+                      (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                          .radiusExternal,
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                  ),
                 ),
+                child: _buildPlansContent(context, user),
               ),
-              child: _buildPlansContent(context, user),
             ),
           ),
           SizedBox(height: 6.r),
@@ -355,8 +362,8 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
     final Color actionTextColor;
     if (_focusedPlanIsCurrent) {
       actionLabel = AppLocale.endSubscription.getString(context);
-      actionColor = theme.colorScheme.error;
-      actionTextColor = theme.colorScheme.onError;
+      actionColor = theme.colorScheme.tertiaryFixed;
+      actionTextColor = theme.colorScheme.onTertiaryFixed;
     } else if (_focusedPlanIsUpgrade(user?.plan)) {
       actionLabel = AppLocale.upgrade.getString(context);
       actionColor = theme.colorScheme.primary;
@@ -518,7 +525,7 @@ class _PlanListViewState extends State<PlanListView>
               height: itemHeight,
               child: Container(
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.secondary,
+                  color: theme.colorScheme.onSurface,
                   borderRadius: BorderRadius.circular(12.r),
                 ),
               ),
@@ -556,10 +563,10 @@ class _PlanListViewState extends State<PlanListView>
     final isSelected = index == widget.selectedIndex;
 
     final Color primaryColor = isSelected
-        ? theme.colorScheme.onSecondary
+        ? theme.colorScheme.surface
         : theme.colorScheme.primary;
     final Color secondaryColor = isSelected
-        ? theme.colorScheme.onSecondary.withValues(alpha: 0.8)
+        ? theme.colorScheme.surface.withValues(alpha: 0.8)
         : theme.colorScheme.onSurface.withValues(alpha: 0.6);
 
     return Container(
@@ -587,7 +594,7 @@ class _PlanListViewState extends State<PlanListView>
                               ? FontWeight.bold
                               : FontWeight.w600,
                           color: isSelected
-                              ? theme.colorScheme.onSecondary
+                              ? theme.colorScheme.surface
                               : theme.colorScheme.onSurface,
                         ),
                       ),
@@ -650,7 +657,7 @@ class _PlanListViewState extends State<PlanListView>
                   fontSize: 15.r,
                   fontWeight: FontWeight.bold,
                   color: isSelected
-                      ? theme.colorScheme.onSecondary
+                      ? theme.colorScheme.surface
                       : theme.colorScheme.onSurface,
                 ),
               ),
