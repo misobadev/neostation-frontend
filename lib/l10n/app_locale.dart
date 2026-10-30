@@ -1676,6 +1676,14 @@ mixin AppLocale {
   static const String genreAction = 'genre_action';
   static const String genreArcade = 'genre_arcade';
   static const String genreOther = 'genre_other';
+  static const String genreBeatEmUp = 'genre_beat_em_up';
+  static const String genreShootEmUp = 'genre_shoot_em_up';
+  static const String genreMusicRhythm = 'genre_music_rhythm';
+  static const String genreBoardCard = 'genre_board_card';
+  static const String genrePinball = 'genre_pinball';
+  static const String genreEducational = 'genre_educational';
+  static const String genreQuiz = 'genre_quiz';
+  static const String genreCompilation = 'genre_compilation';
 
   // RomM manual link picker / Manage tab link rows.
   static const String rommLinkRow = 'romm_link_row';

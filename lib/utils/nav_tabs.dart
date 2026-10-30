@@ -155,11 +155,16 @@ List<NavTab> visibleNavTabs(ConfigModel config) {
   return orderNavTabs(visible);
 }
 
-/// Places Android Apps beside Systems without changing tab identities.
+/// Places Android Apps right after Discovery, or after Systems when Discovery
+/// is hidden, without changing tab identities.
 List<NavTab> orderNavTabs(List<NavTab> tabs) {
   final ordered = List<NavTab>.of(tabs);
   if (ordered.remove(NavTab.androidApps)) {
-    ordered.insert(1, NavTab.androidApps);
+    final discoveryIndex = ordered.indexOf(NavTab.discovery);
+    ordered.insert(
+      discoveryIndex >= 0 ? discoveryIndex + 1 : 1,
+      NavTab.androidApps,
+    );
   }
   return ordered;
 }

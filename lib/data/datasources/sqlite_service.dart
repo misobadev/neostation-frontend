@@ -469,7 +469,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 183;
+  static const int _databaseVersion = 186;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1968,6 +1968,9 @@ class SqliteService {
         auto_update_app INTEGER DEFAULT 1,
         auto_update_systems INTEGER DEFAULT 1,
         system_grid_columns TEXT DEFAULT 'M',
+        discovery_grid_columns TEXT DEFAULT 'M',
+        discovery_view_mode TEXT DEFAULT 'grid',
+        android_grid_columns TEXT DEFAULT 'M',
         game_grid_columns TEXT DEFAULT 'M',
         game_list_size TEXT DEFAULT 'S',
         game_carousel_card_style TEXT DEFAULT 'fanart',
@@ -2859,6 +2862,9 @@ class SqliteService {
     int? autoUpdateApp,
     int? autoUpdateSystems,
     String? systemGridColumns,
+    String? discoveryGridColumns,
+    String? discoveryViewMode,
+    String? androidGridColumns,
     String? gameGridColumns,
     String? gameListSize,
     String? gameCarouselCardStyle,
@@ -3001,6 +3007,15 @@ class SqliteService {
     }
     if (systemGridColumns != null) {
       updates['system_grid_columns'] = systemGridColumns;
+    }
+    if (discoveryGridColumns != null) {
+      updates['discovery_grid_columns'] = discoveryGridColumns;
+    }
+    if (discoveryViewMode != null) {
+      updates['discovery_view_mode'] = discoveryViewMode;
+    }
+    if (androidGridColumns != null) {
+      updates['android_grid_columns'] = androidGridColumns;
     }
     if (gameGridColumns != null) {
       updates['game_grid_columns'] = gameGridColumns;
@@ -3254,6 +3269,33 @@ class SqliteService {
       return results.first;
     }
     return {};
+  }
+
+  /// Retrieves settings for several systems in one query.
+  ///
+  /// The Discovery board names a handful of games spread across many systems;
+  /// reading those systems one by one turned a board load into dozens of
+  /// round-trips.
+  static Future<Map<String, Map<String, dynamic>>> getSystemSettingsMap(
+    Iterable<String> systemIds,
+  ) async {
+    final ids = systemIds.where((id) => id.isNotEmpty).toSet().toList();
+    if (ids.isEmpty) return {};
+    final db = await instance.database;
+    final placeholders = List.filled(ids.length, '?').join(', ');
+    final rows = await db.rawQuery(
+      'SELECT * FROM user_system_settings '
+      'WHERE app_system_id IN ($placeholders)',
+      ids,
+    );
+    final result = <String, Map<String, dynamic>>{};
+    for (final row in rows) {
+      final id = row['app_system_id']?.toString();
+      if (id != null && id.isNotEmpty) {
+        result[id] = Map<String, dynamic>.from(row);
+      }
+    }
+    return result;
   }
 
   static Future<void> _updateSystemSetting(
@@ -5128,7 +5170,9 @@ class SqliteService {
       LEFT JOIN user_screenscraper_metadata usm
              ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
       LEFT JOIN (SELECT game_id, MAX(num_achievements) AS num_achievements, MAX(points) AS points
-                 FROM app_ra_game_list GROUP BY game_id) ra
+                 FROM app_ra_game_list
+                 WHERE game_id IN (SELECT id_ra FROM user_roms WHERE id_ra IS NOT NULL)
+                 GROUP BY game_id) ra
              ON ra.game_id = ur.id_ra
       WHERE s.folder_name NOT IN ('android', 'music')
     ''');
@@ -5186,6 +5230,49 @@ class SqliteService {
       'VALUES (?, ?, ?, ?, ?, ?, ?)',
       [weekKey, slotId, section, genreBucket, slotOrder, romPath, rerollCount],
     );
+  }
+
+  /// Writes several Discovery picks in one transaction.
+  ///
+  /// The first load of a week fills every slot at once. Writing those rows one
+  /// by one meant one autocommit/fsync per pick, which is what made the very
+  /// first visit to the tab feel slow on Android; the transaction commits them
+  /// together.
+  static Future<void> upsertDiscoveryPicks(
+    Iterable<
+      ({
+        String weekKey,
+        String slotId,
+        String section,
+        String? genreBucket,
+        int slotOrder,
+        String romPath,
+        int rerollCount,
+      })
+    >
+    picks,
+  ) async {
+    final rows = picks.toList(growable: false);
+    if (rows.isEmpty) return;
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      for (final pick in rows) {
+        await txn.execute(
+          'INSERT OR REPLACE INTO user_discovery_picks '
+          '(week_key, slot_id, section, genre_bucket, slot_order, rom_path, reroll_count) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [
+            pick.weekKey,
+            pick.slotId,
+            pick.section,
+            pick.genreBucket,
+            pick.slotOrder,
+            pick.romPath,
+            pick.rerollCount,
+          ],
+        );
+      }
+    });
   }
 
   /// Deletes every pick from before [weekKey], keeping the table bounded.
@@ -5692,6 +5779,29 @@ class SqliteService {
     return results
         .map((row) => (row['extension'].toString()).toLowerCase())
         .toSet();
+  }
+
+  /// Retrieves extensions for several systems in one query.
+  static Future<Map<String, Set<String>>> getExtensionsMapForSystems(
+    Iterable<String> systemIds,
+  ) async {
+    final ids = systemIds.where((id) => id.isNotEmpty).toSet().toList();
+    if (ids.isEmpty) return {};
+    final db = await instance.database;
+    final placeholders = List.filled(ids.length, '?').join(', ');
+    final rows = await db.rawQuery(
+      'SELECT system_id, extension FROM app_system_extensions '
+      'WHERE system_id IN ($placeholders)',
+      ids,
+    );
+    final result = <String, Set<String>>{};
+    for (final row in rows) {
+      final id = row['system_id']?.toString();
+      final extension = row['extension']?.toString().toLowerCase();
+      if (id == null || id.isEmpty || extension == null) continue;
+      result.putIfAbsent(id, () => <String>{}).add(extension);
+    }
+    return result;
   }
 
   /// Generates a mapping of system folder names to their supported file extensions.

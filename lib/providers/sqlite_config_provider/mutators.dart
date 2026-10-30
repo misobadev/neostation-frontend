@@ -54,6 +54,30 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Updates the preferred grid column density for the Discovery board.
+  Future<void> updateDiscoveryGridColumns(String discoveryGridColumns) async {
+    final previous = _config;
+    _config = _config.copyWith(discoveryGridColumns: discoveryGridColumns);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
+  /// Updates the Discovery board layout ('grid' or 'carousel').
+  Future<void> updateDiscoveryViewMode(String discoveryViewMode) async {
+    final previous = _config;
+    _config = _config.copyWith(discoveryViewMode: discoveryViewMode);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
+  /// Updates the preferred grid column density for the Android apps board.
+  Future<void> updateAndroidGridColumns(String androidGridColumns) async {
+    final previous = _config;
+    _config = _config.copyWith(androidGridColumns: androidGridColumns);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
   /// Updates the preferred grid column density for the games grid.
   Future<void> updateGameGridColumns(String gameGridColumns) async {
     final previous = _config;

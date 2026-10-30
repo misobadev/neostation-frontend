@@ -108,10 +108,10 @@ class LocalLibrarySignal extends DiscoverySignal {
       case DiscoverySection.genrePick:
         return c.normalizedRating + (c.isNeverPlayed ? 0.2 : 0);
       case DiscoverySection.hiddenGem:
-        // Deliberately flat: every eligible game is by definition unrated and
-        // unplayed, so there is nothing to rank on and the seeded shuffle is
-        // the whole point of the section.
-        return 0;
+        // Every eligible game is unplayed and rated above 9/10, so rating is
+        // the only useful signal; the seeded draw then keeps the pick from
+        // being the same top-rated game every week.
+        return c.normalizedRating;
       case DiscoverySection.achievementSpotlight:
         // A bell around 30 achievements: big enough to be a real set, small
         // enough to be finishable. Rating only breaks ties.
@@ -154,10 +154,10 @@ class DiscoveryPickEngine {
 
   /// Genre picks a full board carries.
   ///
-  /// The board shows six in its grid and the rest along the bottom strip, so
-  /// eight fills the shape with a little over for the strip. A library without
-  /// eight qualifying genres simply gets fewer.
-  static const int _genreSlots = 8;
+  /// One shelf per genre the app knows about. The board scrolls, so the whole
+  /// line-up does not have to share one screen; a library without enough
+  /// candidates in a genre simply gets fewer shelves.
+  static int get _genreSlots => GenreBucket.values.length;
 
   /// How many genres are in the running for each slot of the line-up.
   ///
@@ -184,7 +184,7 @@ class DiscoveryPickEngine {
     required String weekKey,
     Set<String> recentPickPaths = const {},
     Map<String, DiscoveryPick> pinned = const {},
-    int genreSlots = _genreSlots,
+    int? genreSlots,
   }) {
     if (candidates.isEmpty) {
       return const DiscoveryPlan(picks: [], newPicks: []);
@@ -197,7 +197,7 @@ class DiscoveryPickEngine {
       candidates: candidates,
       weekKey: weekKey,
       pinned: pinned,
-      genreSlots: genreSlots,
+      genreSlots: genreSlots ?? _genreSlots,
       skipHiddenGem: coverageLow,
     );
 
@@ -444,16 +444,11 @@ class DiscoveryPickEngine {
           (c) => c.genre == slot.genre,
         ];
       case DiscoverySection.hiddenGem:
-        // Single rung on purpose: relaxing `isScraped` here would show a game
-        // with no metadata at all, and "unrated" would then mean "unscraped" —
-        // the one thing this section must never do.
-        return [
-          (c) =>
-              (c.rating == null || c.rating == 0) &&
-              c.lastPlayed == null &&
-              c.playTimeSeconds == 0 &&
-              c.isScraped,
-        ];
+        // A gem is a game the user has not touched that is also rated above
+        // 9/10 (the stored scale is 0..20). Scraped-only keeps "no rating" from
+        // meaning "nobody looked at it yet" on the one section that cannot tell
+        // the difference at a glance.
+        return [(c) => (c.rating ?? 0) > 18 && c.isNeverPlayed && c.isScraped];
       case DiscoverySection.achievementSpotlight:
         return [
           (c) =>
@@ -478,8 +473,8 @@ class DiscoveryPickEngine {
     final ranked = [...pool]
       ..sort((a, b) {
         final byScore = _scoreOf(b, section).compareTo(_scoreOf(a, section));
-        // ROM path breaks ties so equal scores (the hidden gem's flat 0, most
-        // of all) still rank in a stable order on every device.
+        // ROM path breaks ties so equal scores still rank in a stable order on
+        // every device.
         return byScore != 0 ? byScore : a.romPath.compareTo(b.romPath);
       });
 

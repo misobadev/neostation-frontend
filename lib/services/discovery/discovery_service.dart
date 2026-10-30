@@ -193,15 +193,13 @@ class DiscoveryService {
     }
     final shufflePool = _sampleShufflePool(byPath.values);
 
-    // Every name on the board goes through the games lists' naming, so an
-    // unscraped pick reads the way it does in its system's list rather than
-    // as a raw file name. The shuffle pool too: its titles flash through the
-    // same tiles. Only the display name changes — the art is found by file
-    // name and opening a pick goes by rom path, neither of which moves.
-    final names = await displayNames([
-      for (final entry in entries) entry.game,
-      ...shufflePool,
-    ]);
+    // The picks' names go through the games lists' naming, so the selected
+    // pick reads the way it does in its system's list rather than as a raw
+    // file name. The shuffle pool is art-only — the cards no longer print a
+    // game name — so naming it would add system queries for nothing. Only the
+    // display name changes: art is found by file name and opening a pick goes
+    // by rom path.
+    final names = await displayNames([for (final entry in entries) entry.game]);
     DatabaseGameModel named(DatabaseGameModel game) {
       final name = names[game.romPath];
       return name == null || name.isEmpty
@@ -220,7 +218,7 @@ class DiscoveryService {
           ),
       ],
       scrapeCoverageLow: plan.scrapeCoverageLow,
-      shufflePool: [for (final game in shufflePool) named(game)],
+      shufflePool: shufflePool,
     );
   }
 

@@ -28,6 +28,12 @@ class ConfigModel {
   /// survive when the user shrinks the visible count ([dockSlotCount]).
   static const int dockMaxSlots = 5;
 
+  /// Normalizes a persisted grid size, defaulting to M.
+  static String normalizeGridColumns(Object? value) {
+    final size = value?.toString() ?? 'M';
+    return const {'S', 'M', 'L', 'XL'}.contains(size) ? size : 'M';
+  }
+
   /// Smallest and largest number of dock slots the user may choose to show.
   static const int dockMinSlotCount = 0;
   static const int dockMaxSlotCount = dockMaxSlots;
@@ -215,6 +221,17 @@ class ConfigModel {
   /// Preferred grid column density for the systems grid ('S', 'M', 'L', 'XL').
   final String systemGridColumns;
 
+  /// Preferred grid column density for the Discovery board ('S', 'M', 'L',
+  /// 'XL'). Discovery uses the same scale as the systems grid.
+  final String discoveryGridColumns;
+
+  /// Discovery layout: `'grid'` or `'carousel'`.
+  final String discoveryViewMode;
+
+  /// Preferred grid column density for the Android apps board ('S', 'M', 'L',
+  /// 'XL').
+  final String androidGridColumns;
+
   /// Preferred grid column density for the games grid ('S', 'M', 'L', 'XL').
   final String gameGridColumns;
 
@@ -325,6 +342,9 @@ class ConfigModel {
     this.autoUpdateApp = true,
     this.autoUpdateSystems = true,
     this.systemGridColumns = 'M',
+    this.discoveryGridColumns = 'M',
+    this.discoveryViewMode = 'grid',
+    this.androidGridColumns = 'M',
     this.gameGridColumns = 'M',
     this.gameListSize = 'S',
     this.gameCarouselCardStyle = 'fanart',
@@ -517,6 +537,18 @@ class ConfigModel {
       systemGridColumns:
           (json['systemGridColumns'] ?? json['system_grid_columns'] ?? 'M')
               .toString(),
+      discoveryGridColumns: normalizeGridColumns(
+        json['discoveryGridColumns'] ?? json['discovery_grid_columns'],
+      ),
+      discoveryViewMode:
+          (json['discoveryViewMode'] ?? json['discovery_view_mode'] ?? 'grid')
+                  .toString() ==
+              'carousel'
+          ? 'carousel'
+          : 'grid',
+      androidGridColumns: normalizeGridColumns(
+        json['androidGridColumns'] ?? json['android_grid_columns'],
+      ),
       gameGridColumns:
           (json['gameGridColumns'] ?? json['game_grid_columns'] ?? 'M')
               .toString(),
@@ -700,6 +732,9 @@ class ConfigModel {
       'autoUpdateApp': autoUpdateApp,
       'autoUpdateSystems': autoUpdateSystems,
       'systemGridColumns': systemGridColumns,
+      'discoveryGridColumns': discoveryGridColumns,
+      'discoveryViewMode': discoveryViewMode,
+      'androidGridColumns': androidGridColumns,
       'gameGridColumns': gameGridColumns,
       'gameListSize': gameListSize,
       'gameCarouselCardStyle': gameCarouselCardStyle,
@@ -763,6 +798,9 @@ class ConfigModel {
     bool? autoUpdateApp,
     bool? autoUpdateSystems,
     String? systemGridColumns,
+    String? discoveryGridColumns,
+    String? discoveryViewMode,
+    String? androidGridColumns,
     String? gameGridColumns,
     String? gameListSize,
     String? gameCarouselCardStyle,
@@ -824,6 +862,9 @@ class ConfigModel {
       autoUpdateApp: autoUpdateApp ?? this.autoUpdateApp,
       autoUpdateSystems: autoUpdateSystems ?? this.autoUpdateSystems,
       systemGridColumns: systemGridColumns ?? this.systemGridColumns,
+      discoveryGridColumns: discoveryGridColumns ?? this.discoveryGridColumns,
+      discoveryViewMode: discoveryViewMode ?? this.discoveryViewMode,
+      androidGridColumns: androidGridColumns ?? this.androidGridColumns,
       gameGridColumns: gameGridColumns ?? this.gameGridColumns,
       gameListSize: gameListSize ?? this.gameListSize,
       gameCarouselCardStyle:

@@ -86,7 +86,7 @@ void main() {
       await insertGame('rpg$i.sfc', rating: 13 + i / 10, genre: 'RPG');
     }
     for (var i = 0; i < 4; i++) {
-      await insertGame('gem$i.sfc', genre: 'Puzzle');
+      await insertGame('gem$i.sfc', rating: 18 + i / 10, genre: 'Puzzle');
     }
     for (var i = 0; i < 3; i++) {
       await insertGame(
@@ -294,7 +294,7 @@ void main() {
       // a user with a scraped library to "scrape more" is nonsense, and it cost
       // them the hidden gem every week.
       for (var i = 0; i < 11; i++) {
-        await insertGame('meta$i.sfc', isFullyScraped: 0);
+        await insertGame('meta$i.sfc', rating: 19, isFullyScraped: 0);
       }
 
       final board = await serviceAt(monday).loadBoard();
@@ -370,14 +370,6 @@ void main() {
       final board = await serviceAt(monday).loadBoard();
 
       expect(board.entries.single.game.realName, 'Chrono Trigger (USA)');
-    });
-
-    test('the shuffle pool is named the same way', () async {
-      await insertGame('Super Metroid (USA) [!].sfc', scraped: false);
-
-      final board = await serviceAt(monday).loadBoard();
-
-      expect(board.shufflePool.single.realName, 'Super Metroid');
     });
   });
 

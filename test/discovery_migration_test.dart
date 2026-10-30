@@ -4,10 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:neostation/data/datasources/sqlite_migrations.dart';
 
-/// Tests for the two Discovery schema migrations, v182 (`user_discovery_picks`)
-/// and v183 (`user_config.hide_tab_discovery`).
+/// Tests for the Discovery/Android schema migrations: v182
+/// (`user_discovery_picks`), v183 (`user_config.hide_tab_discovery`), v184
+/// (`user_config.discovery_grid_columns`), v185
+/// (`user_config.discovery_view_mode`) and v186
+/// (`user_config.android_grid_columns`).
 ///
-/// Both must be safe to re-run, because a device that already carries the
+/// All must be safe to re-run, because a device that already carries the
 /// change — from another branch, or from a partially applied upgrade — runs
 /// them again on the next launch.
 ///
@@ -30,6 +33,9 @@ void main() {
 
   Future<void> runV182() => SqliteMigrations.migrateToVersion(db, 182);
   Future<void> runV183() => SqliteMigrations.migrateToVersion(db, 183);
+  Future<void> runV184() => SqliteMigrations.migrateToVersion(db, 184);
+  Future<void> runV185() => SqliteMigrations.migrateToVersion(db, 185);
+  Future<void> runV186() => SqliteMigrations.migrateToVersion(db, 186);
 
   void createUserConfig() {
     db.execute('''
@@ -231,6 +237,180 @@ void main() {
     });
   });
 
+  group('migration v184', () {
+    test('adds discovery_grid_columns, defaulting to M', () async {
+      createUserConfig();
+
+      await runV184();
+
+      expect(columnsOf('user_config'), contains('discovery_grid_columns'));
+      db.execute('INSERT INTO user_config (id) VALUES (1)');
+      expect(
+        db
+            .select('SELECT discovery_grid_columns FROM user_config')
+            .first['discovery_grid_columns'],
+        'M',
+      );
+    });
+
+    test('re-running it is a no-op and keeps the stored value', () async {
+      createUserConfig();
+      await runV184();
+      db.execute(
+        "INSERT INTO user_config (id, discovery_grid_columns) VALUES (1, 'L')",
+      );
+
+      await runV184();
+
+      expect(
+        db
+            .select('SELECT discovery_grid_columns FROM user_config')
+            .first['discovery_grid_columns'],
+        'L',
+      );
+      expect(
+        columnsOf(
+          'user_config',
+        ).where((c) => c == 'discovery_grid_columns').length,
+        1,
+      );
+    });
+
+    test('a column that already exists is not added twice', () async {
+      db.execute('''
+        CREATE TABLE user_config (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          discovery_grid_columns TEXT DEFAULT 'M'
+        )
+      ''');
+
+      await runV184();
+
+      expect(
+        columnsOf(
+          'user_config',
+        ).where((c) => c == 'discovery_grid_columns').length,
+        1,
+      );
+    });
+  });
+
+  group('migration v185', () {
+    test('adds discovery_view_mode, defaulting to grid', () async {
+      createUserConfig();
+
+      await runV185();
+
+      expect(columnsOf('user_config'), contains('discovery_view_mode'));
+      db.execute('INSERT INTO user_config (id) VALUES (1)');
+      expect(
+        db
+            .select('SELECT discovery_view_mode FROM user_config')
+            .first['discovery_view_mode'],
+        'grid',
+      );
+    });
+
+    test('re-running it is a no-op and keeps the stored value', () async {
+      createUserConfig();
+      await runV185();
+      db.execute(
+        "INSERT INTO user_config (id, discovery_view_mode) VALUES (1, 'carousel')",
+      );
+
+      await runV185();
+
+      expect(
+        db
+            .select('SELECT discovery_view_mode FROM user_config')
+            .first['discovery_view_mode'],
+        'carousel',
+      );
+      expect(
+        columnsOf(
+          'user_config',
+        ).where((c) => c == 'discovery_view_mode').length,
+        1,
+      );
+    });
+
+    test('a column that already exists is not added twice', () async {
+      db.execute('''
+        CREATE TABLE user_config (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          discovery_view_mode TEXT DEFAULT 'grid'
+        )
+      ''');
+
+      await runV185();
+
+      expect(
+        columnsOf(
+          'user_config',
+        ).where((c) => c == 'discovery_view_mode').length,
+        1,
+      );
+    });
+  });
+
+  group('migration v186', () {
+    test('adds android_grid_columns, defaulting to M', () async {
+      createUserConfig();
+
+      await runV186();
+
+      expect(columnsOf('user_config'), contains('android_grid_columns'));
+      db.execute('INSERT INTO user_config (id) VALUES (1)');
+      expect(
+        db
+            .select('SELECT android_grid_columns FROM user_config')
+            .first['android_grid_columns'],
+        'M',
+      );
+    });
+
+    test('re-running it is a no-op and keeps the stored value', () async {
+      createUserConfig();
+      await runV186();
+      db.execute(
+        "INSERT INTO user_config (id, android_grid_columns) VALUES (1, 'XL')",
+      );
+
+      await runV186();
+
+      expect(
+        db
+            .select('SELECT android_grid_columns FROM user_config')
+            .first['android_grid_columns'],
+        'XL',
+      );
+      expect(
+        columnsOf(
+          'user_config',
+        ).where((c) => c == 'android_grid_columns').length,
+        1,
+      );
+    });
+
+    test('a column that already exists is not added twice', () async {
+      db.execute('''
+        CREATE TABLE user_config (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          android_grid_columns TEXT DEFAULT 'M'
+        )
+      ''');
+
+      await runV186();
+
+      expect(
+        columnsOf(
+          'user_config',
+        ).where((c) => c == 'android_grid_columns').length,
+        1,
+      );
+    });
+  });
+
   group('fresh install parity', () {
     // `_onCreate` never runs migrations, so these DDL strings are the only
     // thing a brand new database is built from. They are read from the source
@@ -311,6 +491,69 @@ void main() {
 
       // Running the migration over the fresh schema must find nothing to do.
       await SqliteMigrations.migrateToVersion(fresh, 183);
+
+      final after = fresh
+          .select('PRAGMA table_info(user_config)')
+          .map((row) => row['name'].toString())
+          .toList();
+      expect(after, before);
+    });
+
+    test(
+      'a fresh user_config already carries discovery_grid_columns',
+      () async {
+        final fresh = sqlite3.openInMemory();
+        addTearDown(fresh.close);
+        fresh.execute(createTableDdl('user_config'));
+
+        final before = fresh
+            .select('PRAGMA table_info(user_config)')
+            .map((row) => row['name'].toString())
+            .toList();
+        expect(before, contains('discovery_grid_columns'));
+
+        await SqliteMigrations.migrateToVersion(fresh, 184);
+
+        final after = fresh
+            .select('PRAGMA table_info(user_config)')
+            .map((row) => row['name'].toString())
+            .toList();
+        expect(after, before);
+      },
+    );
+
+    test('a fresh user_config already carries discovery_view_mode', () async {
+      final fresh = sqlite3.openInMemory();
+      addTearDown(fresh.close);
+      fresh.execute(createTableDdl('user_config'));
+
+      final before = fresh
+          .select('PRAGMA table_info(user_config)')
+          .map((row) => row['name'].toString())
+          .toList();
+      expect(before, contains('discovery_view_mode'));
+
+      await SqliteMigrations.migrateToVersion(fresh, 185);
+
+      final after = fresh
+          .select('PRAGMA table_info(user_config)')
+          .map((row) => row['name'].toString())
+          .toList();
+      expect(after, before);
+    });
+
+    test('a fresh user_config already carries android_grid_columns', () async {
+      final fresh = sqlite3.openInMemory();
+      addTearDown(fresh.close);
+      fresh.execute(createTableDdl('user_config'));
+
+      final before = fresh
+          .select('PRAGMA table_info(user_config)')
+          .map((row) => row['name'].toString())
+          .toList();
+      expect(before, contains('android_grid_columns'));
+
+      await SqliteMigrations.migrateToVersion(fresh, 186);
 
       final after = fresh
           .select('PRAGMA table_info(user_config)')

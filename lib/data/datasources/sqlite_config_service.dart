@@ -382,6 +382,16 @@ class SqliteConfigService {
             1,
         systemGridColumns:
             userConfig?['system_grid_columns']?.toString() ?? 'M',
+        discoveryGridColumns: ConfigModel.normalizeGridColumns(
+          userConfig?['discovery_grid_columns'],
+        ),
+        discoveryViewMode:
+            userConfig?['discovery_view_mode']?.toString() == 'carousel'
+            ? 'carousel'
+            : 'grid',
+        androidGridColumns: ConfigModel.normalizeGridColumns(
+          userConfig?['android_grid_columns'],
+        ),
         gameGridColumns: userConfig?['game_grid_columns']?.toString() ?? 'M',
         gameListSize:
             const {
@@ -546,6 +556,9 @@ class SqliteConfigService {
           autoUpdateApp: config.autoUpdateApp ? 1 : 0,
           autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
           systemGridColumns: config.systemGridColumns,
+          discoveryGridColumns: config.discoveryGridColumns,
+          discoveryViewMode: config.discoveryViewMode,
+          androidGridColumns: config.androidGridColumns,
           gameGridColumns: config.gameGridColumns,
           gameListSize: config.gameListSize,
           gameCarouselCardStyle: config.gameCarouselCardStyle,

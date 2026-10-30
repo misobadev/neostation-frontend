@@ -21,7 +21,15 @@ void main() {
       expect(genreBucketOf('Strategy'), GenreBucket.strategy);
       expect(genreBucketOf('Simulation'), GenreBucket.simulation);
       expect(genreBucketOf('Action'), GenreBucket.action);
-      expect(genreBucketOf('Arcade'), GenreBucket.arcade);
+      expect(genreBucketOf('Arcade'), GenreBucket.action);
+      expect(genreBucketOf('Beat \'em Up'), GenreBucket.beatEmUp);
+      expect(genreBucketOf('Shoot \'em Up'), GenreBucket.shootEmUp);
+      expect(genreBucketOf('Music'), GenreBucket.musicRhythm);
+      expect(genreBucketOf('Board & Card'), GenreBucket.boardCard);
+      expect(genreBucketOf('Pinball'), GenreBucket.pinball);
+      expect(genreBucketOf('Educational'), GenreBucket.educational);
+      expect(genreBucketOf('Quiz'), GenreBucket.quiz);
+      expect(genreBucketOf('Compilation'), GenreBucket.compilation);
     });
 
     test('matching is case insensitive', () {
@@ -31,15 +39,18 @@ void main() {
 
     test('a compound genre takes its first matching part', () {
       expect(genreBucketOf('Platform / Action'), GenreBucket.platform);
-      expect(genreBucketOf('Shoot\'em up > Vertical'), GenreBucket.shooter);
+      expect(genreBucketOf('Shoot\'em up > Vertical'), GenreBucket.shootEmUp);
       expect(genreBucketOf('Action, Adventure'), GenreBucket.adventure);
     });
 
     test('a more specific part wins over the generic action part', () {
-      // The whole point of the ordered table: `Action-RPG` is an RPG.
+      // The whole point of the ordered table: `Action-RPG` is an RPG, and a
+      // beat 'em up is not just another fighter.
       expect(genreBucketOf('Action-RPG'), GenreBucket.rpg);
       expect(genreBucketOf('Action / Platform'), GenreBucket.platform);
       expect(genreBucketOf('Action|Fighting'), GenreBucket.fighting);
+      expect(genreBucketOf('Action / Beat\'em Up'), GenreBucket.beatEmUp);
+      expect(genreBucketOf('Action / Shoot\'em Up'), GenreBucket.shootEmUp);
     });
 
     test('French genre names map like their English equivalents', () {
@@ -94,7 +105,7 @@ void main() {
       expect(genreBucketOf(''), GenreBucket.other);
       expect(genreBucketOf('   '), GenreBucket.other);
       expect(genreBucketOf('Misc'), GenreBucket.other);
-      expect(genreBucketOf('Compilation'), GenreBucket.other);
+      expect(genreBucketOf('Miscellaneous'), GenreBucket.other);
     });
 
     test('a keyword only matches at the start of a word', () {

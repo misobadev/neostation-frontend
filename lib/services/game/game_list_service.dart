@@ -372,13 +372,11 @@ class GameListService {
         .whereType<String>()
         .toSet();
 
-    final settingsBySystem = <String, Map<String, dynamic>>{};
-    final extensionsBySystem = <String, Set<String>>{};
-    for (final sid in systemIds) {
-      settingsBySystem[sid] = await SystemRepository.getSystemSettings(sid);
-      final exts = await SystemRepository.getExtensionsForSystem(sid);
-      extensionsBySystem[sid] = exts.map((e) => e.toLowerCase()).toSet();
-    }
+    final settingsBySystem = await SystemRepository.getSystemSettingsMap(
+      systemIds,
+    );
+    final extensionsBySystem =
+        await SystemRepository.getExtensionsMapForSystems(systemIds);
     return (
       settingsBySystem: settingsBySystem,
       extensionsBySystem: extensionsBySystem,

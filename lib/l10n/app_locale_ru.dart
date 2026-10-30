@@ -1682,7 +1682,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.discoveryAchievementSpotlight: 'В центре внимания: достижения',
   AppLocale.discoveryGenrePicks: 'Подборки по жанрам',
   AppLocale.discoveryReroll: 'Другая игра',
-  AppLocale.discoveryRerollHint: 'Нажмите Y, чтобы выбрать другую игру',
+  AppLocale.discoveryRerollHint: 'Нажмите X, чтобы выбрать другую игру',
   AppLocale.discoveryNeverPlayed: 'Не запускалась',
   AppLocale.discoveryEmptyLibrary:
       'Добавьте ROM-файлы, чтобы начать открывать игры',
@@ -1704,4 +1704,12 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.genreAction: 'Экшен',
   AppLocale.genreArcade: 'Аркада',
   AppLocale.genreOther: 'Другое',
+  AppLocale.genreBeatEmUp: "Beat 'em Up",
+  AppLocale.genreShootEmUp: "Shoot 'em Up",
+  AppLocale.genreMusicRhythm: 'Музыка и ритм',
+  AppLocale.genreBoardCard: 'Настольные и карточные',
+  AppLocale.genrePinball: 'Пинбол',
+  AppLocale.genreEducational: 'Обучающая',
+  AppLocale.genreQuiz: 'Викторина',
+  AppLocale.genreCompilation: 'Сборник',
 };

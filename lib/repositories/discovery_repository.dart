@@ -43,12 +43,21 @@ class DiscoveryRepository {
         rerollCount: pick.rerollCount,
       );
 
-  /// Persists several picks. Written one row at a time so a slot write stays
-  /// narrow even in bulk.
-  static Future<void> upsertPicks(Iterable<DiscoveryPick> picks) async {
-    for (final pick in picks) {
-      await upsertPick(pick);
-    }
+  /// Persists several picks. A bulk board fill is committed in one
+  /// transaction rather than one row at a time.
+  static Future<void> upsertPicks(Iterable<DiscoveryPick> picks) {
+    return SqliteService.upsertDiscoveryPicks([
+      for (final pick in picks)
+        (
+          weekKey: pick.weekKey,
+          slotId: pick.slotId,
+          section: pick.section.name,
+          genreBucket: pick.genre?.name,
+          slotOrder: pick.slotOrder,
+          romPath: pick.romPath,
+          rerollCount: pick.rerollCount,
+        ),
+    ]);
   }
 
   /// Drops the pick held by [slotId] in [weekKey].

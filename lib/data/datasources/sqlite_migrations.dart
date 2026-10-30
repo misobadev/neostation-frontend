@@ -686,6 +686,15 @@ class SqliteMigrations {
       case 183:
         await _migrateToVersion183(db);
         break;
+      case 184:
+        await _migrateToVersion184(db);
+        break;
+      case 185:
+        await _migrateToVersion185(db);
+        break;
+      case 186:
+        await _migrateToVersion186(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7499,6 +7508,85 @@ class SqliteMigrations {
       _log.i('Migration v183 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v183: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v184: Adds `user_config.discovery_grid_columns`, the persisted
+  /// column density of the Discovery board ('M' or 'L').
+  ///
+  /// Guarded like every other migration: a device whose database is already
+  /// past this number (or that picked up a branch build with a different v184)
+  /// still gets the column instead of failing every config read.
+  static Future<void> _migrateToVersion184(Database db) async {
+    _log.i('Migration v184: Adding discovery_grid_columns to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('discovery_grid_columns')) {
+        db.execute(
+          "ALTER TABLE user_config ADD COLUMN discovery_grid_columns TEXT DEFAULT 'M'",
+        );
+        _log.i('Column discovery_grid_columns added via v184');
+      } else {
+        _log.i('Column discovery_grid_columns already exists');
+      }
+      _log.i('Migration v184 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v184: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v185: Adds `user_config.discovery_view_mode`, the Discovery
+  /// board's grid/carousel preference.
+  static Future<void> _migrateToVersion185(Database db) async {
+    _log.i('Migration v185: Adding discovery_view_mode to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('discovery_view_mode')) {
+        db.execute(
+          "ALTER TABLE user_config ADD COLUMN discovery_view_mode TEXT DEFAULT 'grid'",
+        );
+        _log.i('Column discovery_view_mode added via v185');
+      } else {
+        _log.i('Column discovery_view_mode already exists');
+      }
+      _log.i('Migration v185 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v185: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v186: Adds `user_config.android_grid_columns`, the persisted
+  /// column density of the Android apps board.
+  static Future<void> _migrateToVersion186(Database db) async {
+    _log.i('Migration v186: Adding android_grid_columns to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('android_grid_columns')) {
+        db.execute(
+          "ALTER TABLE user_config ADD COLUMN android_grid_columns TEXT DEFAULT 'M'",
+        );
+        _log.i('Column android_grid_columns added via v186');
+      } else {
+        _log.i('Column android_grid_columns already exists');
+      }
+      _log.i('Migration v186 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v186: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

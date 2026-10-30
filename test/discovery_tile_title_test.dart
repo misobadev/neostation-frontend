@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:marquee/marquee.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/database_game_model.dart';
@@ -13,32 +12,29 @@ import 'package:neostation/screens/discovery_screen/widgets/discovery_tile.dart'
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Tests for how a Discovery tile prints its game's name.
+/// Tests for what a Discovery card prints.
 ///
-/// The board's tiles are small and truncate most titles, and since the footer
-/// went there is nowhere else on the board a pick's full name appears. The
-/// focused tile therefore scrolls its title; every other tile keeps the
-/// ellipsis, so the board is not a wall of moving text.
-const _longName =
-    'Phoenix Wright: Ace Attorney - Justice for All - Special Edition';
+/// The game's own name belongs to the screen footer; the card carries only the
+/// section name, set large and bold where a system card puts its logo.
+const _gameName = 'Garou: Mark of the Wolves';
 
-DiscoveryTile _tile({String name = _longName}) => DiscoveryTile(
+DiscoveryTile _tile() => DiscoveryTile(
   kind: DiscoveryTileKind.grid,
-  labelKey: AppLocale.genreAdventure,
-  icon: Symbols.explore_rounded,
+  labelKey: AppLocale.genreFighting,
+  icon: Symbols.sports_martial_arts_rounded,
   entry: DiscoveryBoardEntry(
     pick: const DiscoveryPick(
       weekKey: '2026-W33',
-      slotId: 'genre:adventure',
+      slotId: 'genre:fighting',
       section: DiscoverySection.genrePick,
-      romPath: '/roms/nds/pw.nds',
+      romPath: '/roms/neogeo/garou.zip',
     ),
-    // No system folder, so the tile draws its placeholder rather than asking
+    // No system folder, so the card draws its placeholder rather than asking
     // the file provider for art.
     game: DatabaseGameModel(
-      filename: 'pw.nds',
-      romPath: '/roms/nds/pw.nds',
-      realName: name,
+      filename: 'garou.zip',
+      romPath: '/roms/neogeo/garou.zip',
+      realName: _gameName,
     ),
   ),
 );
@@ -55,7 +51,7 @@ void main() {
     );
   });
 
-  Future<void> mount(WidgetTester tester, Widget tile) async {
+  Future<void> mount(WidgetTester tester, {bool isSelected = false}) async {
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(size: Size(1920, 1080)),
@@ -68,7 +64,15 @@ void main() {
             theme: ThemeData(extensions: [CornerRadii.m()]),
             home: Scaffold(
               body: Center(
-                child: SizedBox(width: 160, height: 110, child: tile),
+                child: SizedBox(
+                  width: 360,
+                  height: 300,
+                  child: DiscoveryCard(
+                    tile: _tile(),
+                    isSelected: isSelected,
+                    fileProvider: FileProvider(),
+                  ),
+                ),
               ),
             ),
           ),
@@ -78,78 +82,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  /// A running marquee keeps a timer armed between rounds, which the test
-  /// binding rejects once the test ends; unmount it and let the timer lapse.
-  Future<void> unmount(WidgetTester tester) async {
-    await tester.pumpWidget(const SizedBox());
-    await tester.pump(const Duration(seconds: 5));
-  }
-
-  group('grid tile', () {
-    testWidgets('scrolls a truncated title while focused', (tester) async {
-      await mount(
-        tester,
-        DiscoveryGridTile(
-          tile: _tile(),
-          isSelected: true,
-          fileProvider: FileProvider(),
-        ),
-      );
-      expect(find.byType(Marquee), findsOneWidget);
-      await unmount(tester);
-    });
-
-    testWidgets('keeps the ellipsis while not focused', (tester) async {
-      await mount(
-        tester,
-        DiscoveryGridTile(
-          tile: _tile(),
-          isSelected: false,
-          fileProvider: FileProvider(),
-        ),
-      );
-      expect(find.byType(Marquee), findsNothing);
-      expect(find.text(_longName), findsOneWidget);
-    });
-
-    testWidgets('does not scroll a title that already fits', (tester) async {
-      await mount(
-        tester,
-        DiscoveryGridTile(
-          tile: _tile(name: 'Tetris'),
-          isSelected: true,
-          fileProvider: FileProvider(),
-        ),
-      );
-      expect(find.byType(Marquee), findsNothing);
-      expect(find.text('Tetris'), findsOneWidget);
-    });
+  testWidgets('shows the section name in the card footer', (tester) async {
+    await mount(tester);
+    expect(find.text('FIGHTING'), findsOneWidget);
   });
 
-  group('band tile', () {
-    testWidgets('scrolls a truncated title while focused', (tester) async {
-      await mount(
-        tester,
-        DiscoveryBandTile(
-          tile: _tile(),
-          isSelected: true,
-          fileProvider: FileProvider(),
-        ),
-      );
-      expect(find.byType(Marquee), findsOneWidget);
-      await unmount(tester);
-    });
+  testWidgets('does not print the game name on the card', (tester) async {
+    await mount(tester);
+    expect(find.text(_gameName), findsNothing);
+  });
 
-    testWidgets('keeps the ellipsis while not focused', (tester) async {
-      await mount(
-        tester,
-        DiscoveryBandTile(
-          tile: _tile(),
-          isSelected: false,
-          fileProvider: FileProvider(),
-        ),
-      );
-      expect(find.byType(Marquee), findsNothing);
-    });
+  testWidgets('sets the section name in bold', (tester) async {
+    await mount(tester);
+    final label = tester.widget<Text>(find.text('FIGHTING'));
+    expect(label.style?.fontWeight, FontWeight.w900);
   });
 }

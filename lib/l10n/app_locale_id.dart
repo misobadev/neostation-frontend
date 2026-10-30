@@ -1689,7 +1689,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.discoveryAchievementSpotlight: 'Sorotan Pencapaian',
   AppLocale.discoveryGenrePicks: 'Pilihan Genre',
   AppLocale.discoveryReroll: 'Acak ulang',
-  AppLocale.discoveryRerollHint: 'Tekan Y untuk pilihan lain',
+  AppLocale.discoveryRerollHint: 'Tekan X untuk pilihan lain',
   AppLocale.discoveryNeverPlayed: 'Belum dimainkan',
   AppLocale.discoveryEmptyLibrary: 'Tambahkan ROM untuk mulai menemukan game',
   AppLocale.discoveryNeedsScraping:
@@ -1711,4 +1711,12 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.genreAction: 'Aksi',
   AppLocale.genreArcade: 'Arkade',
   AppLocale.genreOther: 'Lainnya',
+  AppLocale.genreBeatEmUp: "Beat 'em Up",
+  AppLocale.genreShootEmUp: "Shoot 'em Up",
+  AppLocale.genreMusicRhythm: 'Musik & Irama',
+  AppLocale.genreBoardCard: 'Papan & Kartu',
+  AppLocale.genrePinball: 'Pinball',
+  AppLocale.genreEducational: 'Edukasi',
+  AppLocale.genreQuiz: 'Kuis',
+  AppLocale.genreCompilation: 'Kompilasi',
 };

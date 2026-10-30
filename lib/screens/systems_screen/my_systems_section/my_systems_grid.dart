@@ -672,6 +672,10 @@ class SystemCardGridView extends StatefulWidget {
     this.enableTabBumpers = true,
     this.enablePullToRescan = true,
     this.enablePinchResize = true,
+    this.pinchSizes = const ['S', 'M', 'L', 'XL'],
+    this.pinchSize,
+    this.onPinchSizeChanged,
+    this.crossAxisCountForSize,
     this.enableSecondaryDisplay = true,
     this.enableThemeAssets = true,
     this.selectedItemKey,
@@ -744,6 +748,22 @@ class SystemCardGridView extends StatefulWidget {
   /// Whether a two-finger pinch changes `config.systemGridColumns`. Shared with
   /// the systems screen, so a host that reads the same setting keeps it.
   final bool enablePinchResize;
+
+  /// Sizes the pinch gesture cycles through. Hosts that persist their own
+  /// scale pass their own list; the default is the systems grid's S/M/L/XL.
+  final List<String> pinchSizes;
+
+  /// The stored value the pinch starts from. When null the systems grid's
+  /// `config.systemGridColumns` is used.
+  final String? pinchSize;
+
+  /// Persists a pinch result. When null the systems grid's column setting is
+  /// updated; Discovery passes its own setter.
+  final ValueChanged<String>? onPinchSizeChanged;
+
+  /// Column count for a pinch size, used to lay the grid out on the same
+  /// frame. When null the systems mapping is used.
+  final int Function(String size)? crossAxisCountForSize;
 
   /// Whether the selection is pushed to a dual-screen device's second display.
   /// Off for hosts whose entries are not systems: the secondary screen shows

@@ -37,7 +37,7 @@ void main() {
   );
 
   /// A library broad enough to fill every section: rated unplayed games, a few
-  /// unrated ones for the gem slot, and RA sets.
+  /// highly rated ones for the gem slot, and RA sets.
   List<DiscoveryCandidate> library() => [
     for (var i = 0; i < 6; i++)
       candidate(
@@ -52,7 +52,11 @@ void main() {
         genre: GenreBucket.rpg,
       ),
     for (var i = 0; i < 4; i++)
-      candidate('/roms/snes/gem$i.sfc', genre: GenreBucket.puzzle),
+      candidate(
+        '/roms/snes/gem$i.sfc',
+        rating: 18 + i.toDouble() / 10,
+        genre: GenreBucket.puzzle,
+      ),
     for (var i = 0; i < 3; i++)
       candidate(
         '/roms/snes/ra$i.sfc',
@@ -298,7 +302,8 @@ void main() {
     test('prefers a highly rated, never played game', () {
       final plan = engine.buildPlan(candidates: library(), weekKey: week);
       final hero = pickFor(plan, kSlotGameOfTheWeek)!;
-      expect(hero.romPath, startsWith('/roms/snes/rated'));
+      // The gem fixtures are the highest-rated unplayed games in the library.
+      expect(hero.romPath, startsWith('/roms/snes/gem'));
     });
 
     test('falls back through the rungs down to any game at all', () {
@@ -346,7 +351,7 @@ void main() {
   });
 
   group('hidden gem', () {
-    test('picks an unrated, never played, fully scraped game', () {
+    test('picks a game rated above 9/10 that was never played', () {
       final plan = engine.buildPlan(candidates: library(), weekKey: week);
       expect(
         pickFor(plan, kSlotHiddenGem)?.romPath,
@@ -354,11 +359,33 @@ void main() {
       );
     });
 
+    test('a well-rated but already played game is not a gem', () {
+      final candidates = [
+        for (var i = 0; i < 8; i++)
+          candidate('/roms/snes/rated$i.sfc', rating: 19, playTime: 120),
+        candidate('/roms/snes/touched.sfc', rating: 19, playTime: 60),
+      ];
+
+      final plan = engine.buildPlan(candidates: candidates, weekKey: week);
+      expect(pickFor(plan, kSlotHiddenGem), isNull);
+    });
+
+    test('a game rated 9/10 or less is not a gem', () {
+      final candidates = [
+        for (var i = 0; i < 8; i++)
+          candidate('/roms/snes/mid$i.sfc', rating: 18),
+        candidate('/roms/snes/low.sfc', rating: 16),
+      ];
+
+      final plan = engine.buildPlan(candidates: candidates, weekKey: week);
+      expect(pickFor(plan, kSlotHiddenGem), isNull);
+    });
+
     test('an unscraped game is never offered, even as a last resort', () {
       final candidates = [
         for (var i = 0; i < 8; i++)
           candidate('/roms/snes/rated$i.sfc', rating: 16),
-        candidate('/roms/snes/raw.sfc', scraped: false),
+        candidate('/roms/snes/raw.sfc', rating: 19, scraped: false),
       ];
 
       final plan = engine.buildPlan(candidates: candidates, weekKey: week);
@@ -480,9 +507,10 @@ void main() {
     test('history is bypassed rather than leaving a section empty', () {
       // The only game that can fill the gem slot is also in the history.
       final candidates = [
+        candidate('/roms/snes/hero.sfc', rating: 20, playTime: 60),
         for (var i = 0; i < 5; i++)
           candidate('/roms/snes/rated$i.sfc', rating: 16),
-        candidate('/roms/snes/onlygem.sfc'),
+        candidate('/roms/snes/onlygem.sfc', rating: 19),
       ];
 
       final plan = engine.buildPlan(

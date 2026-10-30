@@ -1745,7 +1745,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.discoveryAchievementSpotlight: 'Erfolge im Fokus',
   AppLocale.discoveryGenrePicks: 'Genre-Auswahl',
   AppLocale.discoveryReroll: 'Neu würfeln',
-  AppLocale.discoveryRerollHint: 'Drücke Y für einen anderen Vorschlag',
+  AppLocale.discoveryRerollHint: 'Drücke X für einen anderen Vorschlag',
   AppLocale.discoveryNeverPlayed: 'Nie gespielt',
   AppLocale.discoveryEmptyLibrary: 'Füge ROMs hinzu, um Spiele zu entdecken',
   AppLocale.discoveryNeedsScraping:
@@ -1767,4 +1767,12 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.genreAction: 'Action',
   AppLocale.genreArcade: 'Arcade',
   AppLocale.genreOther: 'Sonstige',
+  AppLocale.genreBeatEmUp: 'Prügelspiel',
+  AppLocale.genreShootEmUp: "Shoot 'em Up",
+  AppLocale.genreMusicRhythm: 'Musik & Rhythmus',
+  AppLocale.genreBoardCard: 'Brett- & Kartenspiel',
+  AppLocale.genrePinball: 'Flipper',
+  AppLocale.genreEducational: 'Lernspiel',
+  AppLocale.genreQuiz: 'Quiz',
+  AppLocale.genreCompilation: 'Sammlung',
 };

@@ -763,16 +763,11 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _gamepadNav.deactivate();
         });
-        return AndroidAppsGrid(
-          system: androidSystem,
-          embedded: true,
-          onPreviousTab: AppNavigation.previousTab,
-          onNextTab: AppNavigation.nextTab,
-        );
+        return AndroidAppsGrid(system: androidSystem, embedded: true);
       case AppTabs.discovery:
-        // Like RAContent, Discovery pushes its own gamepad layer from initState
-        // and needs no deactivate callback here. Adding one would double-
-        // dispatch every press (#255).
+        // Discovery hosts the systems grid, which pushes its own gamepad layer
+        // on top of this one. Adding a deactivate callback here would leave two
+        // navigators competing for the same presses (#255).
         return DiscoveryContent();
       default:
         return SystemContent(

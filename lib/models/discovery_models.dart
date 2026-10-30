@@ -9,7 +9,7 @@ enum DiscoverySection {
   /// One pick per genre shelf; several of these exist per week.
   genrePick,
 
-  /// An unrated, never-played, fully scraped game.
+  /// A highly rated (above 9/10) game the user has never played.
   hiddenGem,
 
   /// An owned game whose RetroAchievements set has never been started.

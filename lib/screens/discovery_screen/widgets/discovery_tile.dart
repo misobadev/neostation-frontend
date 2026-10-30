@@ -1,30 +1,31 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:neostation/l10n/app_locale.dart';
 
 import '../../../models/game_model.dart';
 import '../../../providers/file_provider.dart';
+import '../../../services/sfx_service.dart';
 import '../../../themes/corner_radii.dart';
-import '../../../widgets/marquee_text.dart';
+import '../../../widgets/neo_glass.dart';
 import '../discovery_mosaic.dart';
 
-/// One cell of the mosaic's 3x2 grid.
+/// One card of the Discovery board, built from the same chrome as [SystemCard].
 ///
-/// Reads like the concept's category tiles: scene art edge to edge with the
-/// label burned across the foot of it, rather than a cover with a caption
-/// underneath. The game's own name sits under the label, smaller, because here
-/// the tile is a single game and not a category to browse.
-class DiscoveryGridTile extends StatelessWidget {
-  const DiscoveryGridTile({
+/// Artwork fills the card, with the game wheel over it. The footer strip —
+/// where a system card puts its console logo — carries only the section name,
+/// set large and bold. The game's own name lives in the screen footer.
+class DiscoveryCard extends StatelessWidget {
+  const DiscoveryCard({
     super.key,
     required this.tile,
     required this.isSelected,
     required this.fileProvider,
     this.onTap,
+    this.heroFooterUsesHalfWidth = true,
   });
 
   final DiscoveryTile tile;
@@ -32,250 +33,272 @@ class DiscoveryGridTile extends StatelessWidget {
   final FileProvider fileProvider;
   final VoidCallback? onTap;
 
+  /// Whether the headline spans two grid columns. It then uses half its width
+  /// as the footer basis so its strip matches the cards beside it. In the
+  /// carousel every page is one card wide, so this is false.
+  final bool heroFooterUsesHalfWidth;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final entry = tile.entry;
+    final radii = theme.extension<CornerRadii>();
+    final outerRadius = radii?.radiusExternal ?? BorderRadius.circular(14.r);
+    final outerRadiusPx = radii?.radiusExternalRadius ?? 14.r;
+    final innerRadius = radii?.radiusInternal ?? BorderRadius.circular(9.r);
+    const artworkInset = 4.0;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: discoveryTileBackground(context),
-        foregroundDecoration: discoveryTileBorder(
-          context,
-          isSelected: isSelected,
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            DiscoveryTileArt(tile: tile, fileProvider: fileProvider),
-            const _BottomScrim(),
-            Padding(
-              padding: EdgeInsets.all(8.r),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    tile.labelKey.getString(context).toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13.r,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.6.r,
-                      height: 1.1,
-                      color: Colors.white,
-                      shadows: const [
-                        Shadow(blurRadius: 6, color: Colors.black87),
-                      ],
-                    ),
+    return Padding(
+      padding: EdgeInsets.all(2.r),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.basic,
+        child: NeoGlassRim(
+          cornerRadius: outerRadiusPx,
+          child: Container(
+            decoration: BoxDecoration(
+              color: isSelected ? scheme.secondary : scheme.surface,
+              borderRadius: outerRadius,
+              boxShadow: [
+                BoxShadow(
+                  color: scheme.shadow.withValues(alpha: 0.1),
+                  blurRadius: 4.r,
+                  offset: Offset(2.0.r, 2.0.r),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: innerRadius,
+              child: InkWell(
+                onTap: () {
+                  // Touch users have no A button: tapping the selected card
+                  // confirms it, so it earns the enter sound.
+                  if (isSelected) {
+                    SfxService().playEnterSound();
+                  } else {
+                    SfxService().playNavSound();
+                  }
+                  onTap?.call();
+                },
+                canRequestFocus: false,
+                focusColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: artworkInset.r,
+                    left: artworkInset.r,
+                    right: artworkInset.r,
                   ),
-                  // Grid tiles are narrow and truncate most names, and the
-                  // board has nowhere else to print one in full, so the focused
-                  // tile scrolls its title the way the game lists do.
-                  if (entry != null)
-                    MarqueeText(
-                      text: entry.game.realName ?? entry.game.filename,
-                      isActive: isSelected,
-                      style: TextStyle(
-                        fontSize: 8.r,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white.withValues(alpha: 0.72),
-                        shadows: const [
-                          Shadow(blurRadius: 4, color: Colors.black87),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // The headline spans two columns, so it uses half its
+                      // width as the basis — otherwise its footer would be
+                      // twice as tall as the one on the cards beside it.
+                      final footerBasis =
+                          tile.kind == DiscoveryTileKind.hero &&
+                              heroFooterUsesHalfWidth
+                          ? constraints.maxWidth / 2
+                          : constraints.maxWidth;
+                      final footerHeight = math
+                          .max(32.r, footerBasis * 0.22)
+                          .clamp(32.r, 52.r)
+                          .toDouble();
+                      return Column(
+                        children: [
+                          Expanded(
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: innerRadius,
+                                  child: DiscoveryTileArt(
+                                    tile: tile,
+                                    fileProvider: fileProvider,
+                                  ),
+                                ),
+                                _DiscoveryWheel(
+                                  tile: tile,
+                                  fileProvider: fileProvider,
+                                ),
+                                if (tile.achievementCount > 0)
+                                  Positioned(
+                                    right: 6.r,
+                                    top: 6.r,
+                                    child: _AchievementPill(
+                                      count: tile.achievementCount,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            height: footerHeight,
+                            width: double.infinity,
+                            child: _DiscoveryFooter(
+                              tile: tile,
+                              isSelected: isSelected,
+                            ),
+                          ),
                         ],
-                      ),
-                    ),
-                ],
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
-            if (_isNeverPlayed(tile))
-              // Bounded on the left so a long translation ellipsises before it
-              // reaches the selection icon (6.r + 14.r) in the opposite corner.
-              Positioned(
-                top: 6.r,
-                left: 24.r,
-                right: 6.r,
-                child: const Align(
-                  alignment: Alignment.centerRight,
-                  child: DiscoveryNeverPlayedBadge(),
-                ),
-              ),
-            if (isSelected)
-              Positioned(
-                top: 6.r,
-                left: 6.r,
-                child: Icon(
-                  tile.icon,
-                  size: 14.r,
-                  color: scheme.primary,
-                  shadows: const [Shadow(blurRadius: 6, color: Colors.black)],
-                ),
-              ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// One of the short, wide tiles along the foot of the board.
-///
-/// Carries an icon chip beside its label the way the concept's bottom row does,
-/// which is what separates the two one-off features from the genre picks
-/// sharing the strip with them.
-class DiscoveryBandTile extends StatelessWidget {
-  const DiscoveryBandTile({
-    super.key,
-    required this.tile,
-    required this.isSelected,
-    required this.fileProvider,
-    this.onTap,
-  });
+/// The footer strip: the section name, scaled to read like a system logo.
+class _DiscoveryFooter extends StatelessWidget {
+  const _DiscoveryFooter({required this.tile, required this.isSelected});
 
   final DiscoveryTile tile;
   final bool isSelected;
-  final FileProvider fileProvider;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final entry = tile.entry;
-    final notice = tile.noticeKey;
+    final color = isSelected ? scheme.onSecondary : scheme.onSurface;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: discoveryTileBackground(context),
-        foregroundDecoration: discoveryTileBorder(
-          context,
-          isSelected: isSelected,
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            DiscoveryTileArt(tile: tile, fileProvider: fileProvider),
-            // Wide tiles carry their text across the art rather than under
-            // it, so they need a scrim over the whole face and not just the
-            // foot of it.
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.85),
-                    Colors.black.withValues(alpha: 0.3),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 6.r),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(5.r),
-                    decoration: BoxDecoration(
-                      color: scheme.primary.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    child: Icon(tile.icon, size: 12.r, color: scheme.onPrimary),
-                  ),
-                  SizedBox(width: 7.r),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          tile.labelKey.getString(context).toUpperCase(),
-                          // Two lines: a long section name such as
-                          // Achievement Spotlight otherwise ellipsises before
-                          // it can be read.
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 9.r,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5.r,
-                            height: 1.2,
-                            color: Colors.white,
-                          ),
-                        ),
-                        MarqueeText(
-                          text: notice != null
-                              ? notice.getString(context)
-                              : entry?.game.realName ??
-                                    entry?.game.filename ??
-                                    '',
-                          isActive: isSelected,
-                          style: TextStyle(
-                            fontSize: 7.5.r,
-                            color: Colors.white.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (tile.achievementCount > 0)
-                    Text(
-                      '${tile.achievementCount}',
-                      style: TextStyle(
-                        fontSize: 8.r,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white.withValues(alpha: 0.75),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: Text(
+          tile.labelKey.getString(context).toUpperCase(),
+          maxLines: 1,
+          softWrap: false,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: color,
+            fontSize: 18.r,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.6.r,
+          ),
         ),
       ),
     );
   }
 }
 
-/// The badge marking a game the user has never launched — the whole point of
-/// most of the board, so it is called out on the tile itself.
-class DiscoveryNeverPlayedBadge extends StatelessWidget {
-  const DiscoveryNeverPlayedBadge({super.key});
+/// The small trophy count shown on an achievement spotlight card.
+class _AchievementPill extends StatelessWidget {
+  const _AchievementPill({required this.count});
+
+  final int count;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 7.r, vertical: 3.r),
+      padding: EdgeInsets.symmetric(horizontal: 5.r, vertical: 2.r),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.9),
+        color: Colors.black.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(999.r),
       ),
-      child: Text(
-        AppLocale.discoveryNeverPlayed.getString(context),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 8.r,
-          fontWeight: FontWeight.w700,
-          color: theme.colorScheme.onPrimary,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Symbols.trophy_rounded,
+            size: 8.r,
+            color: theme.colorScheme.primary,
+          ),
+          SizedBox(width: 3.r),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 7.r,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// The art behind a tile.
+/// The game wheel over the Game of the Week art, matching the compact recent
+/// card in Systems.
+class _DiscoveryWheel extends StatelessWidget {
+  const _DiscoveryWheel({required this.tile, required this.fileProvider});
+
+  final DiscoveryTile tile;
+  final FileProvider fileProvider;
+
+  @override
+  Widget build(BuildContext context) {
+    final entry = tile.entry;
+    final folder = entry?.game.systemFolderName ?? '';
+    if (entry == null || folder.isEmpty) return const SizedBox.shrink();
+
+    final path = discoveryFirstExistingImage([
+      GameModel.fromDatabaseModel(
+        entry.game,
+      ).getImagePath(folder, 'wheels', fileProvider),
+    ]);
+    if (path == null) return const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (tile.kind == DiscoveryTileKind.hero) {
+          final shortestSide = constraints.biggest.shortestSide;
+          // The headline is the compact two-column shape, so it uses the same
+          // wheel inset the recent-game card does, opened up a little.
+          final inset = shortestSide.isFinite
+              ? math.min(28.r, shortestSide * 0.16)
+              : 28.r;
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.all(inset),
+              child: Image.file(
+                File(path),
+                height: 256.r,
+                fit: BoxFit.contain,
+                cacheWidth: 512,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          );
+        }
+
+        // Small cards use the game list's wheel strategy: the image is given the
+        // card's width and left to keep its own ratio, so wheels with different
+        // source dimensions still read at a consistent size.
+        final wheelWidth = constraints.maxWidth.isFinite
+            ? math.max(0.0, constraints.maxWidth - 16.r)
+            : 120.r;
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 4.r),
+            child: SizedBox(
+              width: wheelWidth,
+              child: Image.file(
+                File(path),
+                fit: BoxFit.contain,
+                cacheWidth: 388,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// The art behind a card.
 ///
-/// Landscape art first: these tiles are wider than they are tall, so a scene
-/// fills them where a cover would be cropped to its middle. Box art is the
-/// fallback for the many games scraped without either.
+/// Landscape art first, then box art, then a placeholder.
 class DiscoveryTileArt extends StatelessWidget {
   const DiscoveryTileArt({
     super.key,
@@ -315,9 +338,6 @@ class DiscoveryTileArt extends StatelessWidget {
       builder: (context, constraints) => Image.file(
         File(path),
         fit: BoxFit.cover,
-        // Decode at roughly the size actually drawn: a board of
-        // full-resolution art is the fastest way to blow the image cache on a
-        // handheld.
         cacheWidth: constraints.maxWidth.isFinite
             ? (constraints.maxWidth * 2).round()
             : 640,
@@ -331,81 +351,17 @@ class DiscoveryTileArt extends StatelessWidget {
     child: Center(
       child: Icon(
         Symbols.videogame_asset_rounded,
-        size: 22.r,
+        size: 18.r,
         color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
       ),
     ),
   );
 }
 
-/// A tile's shape: its corner radius, shared by the clip and both decorations.
-BorderRadius discoveryTileRadius(BuildContext context) =>
-    Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
-    BorderRadius.circular(10.r);
-
-/// What sits behind a tile, in the gap art of the wrong aspect leaves.
-BoxDecoration discoveryTileBackground(BuildContext context) => BoxDecoration(
-  color: Theme.of(context).cardColor.withValues(alpha: 0.35),
-  borderRadius: discoveryTileRadius(context),
-);
-
-/// The frame every tile shares: a hairline normally, the primary colour when
-/// the cursor is on it.
-///
-/// Belongs in a `foregroundDecoration`, never in the background one. Tile art
-/// is clipped to the same rounded rect the border is drawn on, so a background
-/// border is painted over by the art — the ring vanishes on any tile that has
-/// artwork, which is all of them.
-BoxDecoration discoveryTileBorder(
-  BuildContext context, {
-  required bool isSelected,
-}) {
-  final theme = Theme.of(context);
-  return BoxDecoration(
-    borderRadius: discoveryTileRadius(context),
-    border: Border.all(
-      color: isSelected
-          ? theme.colorScheme.primary
-          : theme.colorScheme.onSurface.withValues(alpha: 0.12),
-      width: isSelected ? 2.r : 1.r,
-    ),
-  );
-}
-
 /// The first path that is actually on disk, or null.
-///
-/// `getImagePath` returns a best-effort path even when nothing matched, so the
-/// existence check is what decides between fanart, screenshot, cover and
-/// placeholder.
 String? discoveryFirstExistingImage(List<String> paths) {
   for (final path in paths) {
     if (path.isNotEmpty && File(path).existsSync()) return path;
   }
   return null;
-}
-
-bool _isNeverPlayed(DiscoveryTile tile) {
-  final game = tile.entry?.game;
-  if (game == null) return false;
-  return game.lastPlayed == null && (game.playTime ?? 0) == 0;
-}
-
-/// The gradient that keeps a label legible over arbitrary art.
-class _BottomScrim extends StatelessWidget {
-  const _BottomScrim();
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.bottomCenter,
-        end: Alignment.topCenter,
-        colors: [
-          Colors.black.withValues(alpha: 0.88),
-          Colors.black.withValues(alpha: 0.1),
-        ],
-        stops: const [0.0, 0.65],
-      ),
-    ),
-  );
 }

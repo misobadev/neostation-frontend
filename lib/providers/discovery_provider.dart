@@ -37,8 +37,8 @@ class DiscoveryProvider extends ChangeNotifier {
   /// the current week.
   ///
   /// [force] re-reads regardless, which is what a returning launch needs: play
-  /// time changed while the game was running, and "never played" badges and the
-  /// hero's eligibility both depend on it.
+  /// time changed while the game was running, and the hero's eligibility and
+  /// the hidden gem's "never played" rule both depend on it.
   Future<void> load({bool force = false}) async {
     if (_loading) return;
     if (!force &&

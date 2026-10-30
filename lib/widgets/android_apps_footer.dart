@@ -3,6 +3,7 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'core_footer.dart';
+import 'footer_label_pill.dart';
 
 /// Specific footer for the Android apps screen
 /// Now extends CoreFooter to use the unified button and layout system
@@ -28,15 +29,12 @@ class AndroidAppsFooter extends CoreFooter {
 
   @override
   Widget? buildLeftContent(BuildContext context) {
-    return Text(
-      appName.toUpperCase(),
-      style: TextStyle(
-        fontSize: 14.r,
-        color: Theme.of(context).colorScheme.onSurface,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.2.r,
-        overflow: TextOverflow.ellipsis,
-      ),
+    if (appName.isEmpty) return null;
+    final scheme = Theme.of(context).colorScheme;
+    return FooterLabelPill(
+      backgroundColor: scheme.surface,
+      foregroundColor: scheme.onSurface,
+      label: appName,
     );
   }
 
@@ -50,8 +48,8 @@ class AndroidAppsFooter extends CoreFooter {
           iconPath: 'assets/images/gamepad/Xbox_B_button.png',
           label: AppLocale.hintBack.getString(context),
           onTap: onBack,
-          backgroundColor: theme.colorScheme.tertiary,
-          textColor: theme.colorScheme.onTertiary,
+          backgroundColor: theme.colorScheme.tertiaryFixed,
+          textColor: theme.colorScheme.onTertiaryFixed,
         ),
         SizedBox(width: 8.r),
       ],
@@ -59,8 +57,8 @@ class AndroidAppsFooter extends CoreFooter {
         iconPath: 'assets/images/gamepad/Xbox_A_button.png',
         label: AppLocale.launch.getString(context),
         onTap: onLaunch,
-        textColor: Colors.white,
-        backgroundColor: const Color(0xFF2ECC71),
+        textColor: theme.colorScheme.onTertiary,
+        backgroundColor: theme.colorScheme.tertiary,
       ),
     ];
   }

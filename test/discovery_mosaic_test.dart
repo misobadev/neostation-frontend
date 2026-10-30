@@ -2,15 +2,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/database_game_model.dart';
 import 'package:neostation/models/discovery_models.dart';
+import 'package:neostation/responsive.dart';
 import 'package:neostation/screens/discovery_screen/discovery_mosaic.dart';
 import 'package:neostation/utils/genre_buckets.dart';
 
-/// Tests for the board's layout and the cursor that walks it.
+/// Tests for the Discovery board's tile order.
 ///
-/// The mosaic has a fixed shape and a variable amount of content, so what is
-/// worth pinning down is how the picks are dealt into it — and that every pick
-/// dealt in stays reachable by the D-pad, including the tall hero beside a
-/// two-row grid and the notice tile that holds no game at all.
+/// Layout, spans and navigation belong to the systems grid, so what is pinned
+/// here is the content: the headline leads, every genre shelf follows it, and
+/// the two one-off features close the board. A promoted headline is not also an
+/// ordinary tile, and the scrape notice keeps its place.
 void main() {
   DiscoveryBoardEntry entry(
     String slotId,
@@ -70,178 +71,97 @@ void main() {
     );
   }
 
-  group('buildDiscoveryMosaic', () {
-    test('deals genre picks into the grid and the leftovers into the band', () {
-      final mosaic = buildDiscoveryMosaic(
-        boardWith(genres: 8, gem: true, achievement: true),
+  group('buildDiscoveryTiles', () {
+    test('leads with the headline, then achievement, gem and genres', () {
+      final tiles = buildDiscoveryTiles(
+        boardWith(genres: 6, gem: true, achievement: true),
       );
 
-      expect(mosaic.hero?.entry?.pick.slotId, kSlotGameOfTheWeek);
-      expect(mosaic.grid.length, kMosaicGridSlots);
-      expect(mosaic.gridRowCount, 2);
-
-      // Gem first, the two genres the grid had no room for next, spotlight
-      // last: the two one-off features bookend the strip.
-      expect(mosaic.band.map((t) => t.entry?.pick.slotId).toList(), [
-        kSlotHiddenGem,
-        genreSlotId(GenreBucket.values[6]),
-        genreSlotId(GenreBucket.values[7]),
+      expect(tiles.first.kind, DiscoveryTileKind.hero);
+      expect(tiles.first.entry?.pick.slotId, kSlotGameOfTheWeek);
+      expect(tiles.map((t) => t.entry?.pick.slotId).toList(), [
+        kSlotGameOfTheWeek,
         kSlotAchievementSpotlight,
+        kSlotHiddenGem,
+        for (var i = 0; i < 6; i++) genreSlotId(GenreBucket.values[i]),
+      ]);
+      expect(tiles[1].achievementCount, 42);
+    });
+
+    test('puts Miscellaneous last after every named genre', () {
+      final board = DiscoveryBoard(
+        weekKey: '2026-W33',
+        entries: [
+          entry(kSlotGameOfTheWeek, DiscoverySection.gameOfTheWeek),
+          genreEntry(GenreBucket.other, 0),
+          genreEntry(GenreBucket.platform, 1),
+          genreEntry(GenreBucket.rpg, 2),
+        ],
+      );
+
+      final tiles = buildDiscoveryTiles(board);
+      expect(tiles.last.entry?.pick.genre, GenreBucket.other);
+      expect(tiles.map((t) => t.entry?.pick.genre).whereType<GenreBucket>(), [
+        GenreBucket.platform,
+        GenreBucket.rpg,
+        GenreBucket.other,
       ]);
     });
 
-    test('keeps every pick on the board when there are more than tiles', () {
-      final board = boardWith(genres: 13, gem: true, achievement: true);
-      final mosaic = buildDiscoveryMosaic(board);
+    test('keeps every pick when the library has every genre', () {
+      final board = boardWith(
+        genres: GenreBucket.values.length,
+        gem: true,
+        achievement: true,
+      );
+      final tiles = buildDiscoveryTiles(board);
 
-      final shown = [
-        mosaic.hero,
-        ...mosaic.grid,
-        ...mosaic.band,
-      ].map((t) => t?.entry?.pick.slotId).toSet();
-
+      final shown = tiles.map((t) => t.entry?.pick.slotId).toSet();
       for (final boardEntry in board.entries) {
-        expect(
-          shown,
-          contains(boardEntry.pick.slotId),
-          reason: 'every pick has a tile; the band scrolls rather than drops',
-        );
+        expect(shown, contains(boardEntry.pick.slotId));
       }
-    });
-
-    test('the grid is only as wide as the picks justify', () {
-      // Four picks square up rather than sitting three-across with a hole.
-      final four = buildDiscoveryMosaic(boardWith(genres: 4));
-      expect(four.gridColumns, 2);
-      expect(four.gridRowCount, 2);
-      expect(four.navRows.map((r) => r.length).toList(), [3, 3]);
-
-      // Up to three stay on one row beside the hero.
-      final three = buildDiscoveryMosaic(boardWith(genres: 3));
-      expect(three.gridColumns, 3);
-      expect(three.gridRowCount, 1);
-
-      // A full board is the concept's 3x2.
-      final six = buildDiscoveryMosaic(boardWith(genres: 6));
-      expect(six.gridColumns, kMosaicGridColumns);
-      expect(six.gridRowCount, 2);
-
-      // Five leaves the one hole there is no way to avoid.
-      final five = buildDiscoveryMosaic(boardWith(genres: 5));
-      expect(five.gridColumns, 3);
-      expect(five.navRows.map((r) => r.length).toList(), [4, 3]);
+      expect(tiles.length, board.entries.length);
     });
 
     test('promotes a pick into the headline when the hero slot is empty', () {
-      final mosaic = buildDiscoveryMosaic(boardWith(hero: false, genres: 2));
+      final tiles = buildDiscoveryTiles(boardWith(hero: false, genres: 2));
 
-      expect(mosaic.hero, isNotNull);
-      expect(mosaic.hero?.entry?.pick.genre, GenreBucket.values.first);
-      // The promoted pick is the headline, not also a grid tile.
-      expect(mosaic.grid.length, 1);
-      expect(mosaic.hero?.labelKey, isNot(AppLocale.discoveryGameOfTheWeek));
+      expect(tiles.first.kind, DiscoveryTileKind.hero);
+      expect(tiles.first.entry?.pick.genre, GenreBucket.values.first);
+      expect(tiles.first.labelKey, isNot(AppLocale.discoveryGameOfTheWeek));
+      // The promoted pick is the headline, not also an ordinary tile.
+      expect(tiles.length, 2);
     });
 
     test('the scrape gate replaces the gem with a notice, not a gap', () {
-      final mosaic = buildDiscoveryMosaic(
+      final tiles = buildDiscoveryTiles(
         boardWith(genres: 2, gem: true, scrapeCoverageLow: true),
       );
 
-      expect(mosaic.band.length, 1);
-      expect(mosaic.band.single.entry, isNull);
-      expect(mosaic.band.single.noticeKey, AppLocale.discoveryNeedsScraping);
-      expect(mosaic.band.single.isFocusable, isFalse);
+      final notice = tiles.singleWhere((t) => t.noticeKey != null);
+      expect(notice.entry, isNull);
+      expect(notice.noticeKey, AppLocale.discoveryNeedsScraping);
+      expect(notice.isFocusable, isFalse);
     });
 
-    test('a board with only a hero is still a board', () {
-      final mosaic = buildDiscoveryMosaic(boardWith());
-
-      expect(mosaic.grid, isEmpty);
-      expect(mosaic.band, isEmpty);
-      expect(mosaic.navRows, [
-        [mosaic.hero],
-      ]);
-      expect(mosaic.firstFocusable, (0, 0));
-    });
-
-    test('an empty board has nothing to focus', () {
-      final mosaic = buildDiscoveryMosaic(
-        const DiscoveryBoard.empty('2026-W33'),
+    test('an empty board has no tiles', () {
+      expect(
+        buildDiscoveryTiles(const DiscoveryBoard.empty('2026-W33')),
+        isEmpty,
       );
-
-      expect(mosaic.hasFocusableTile, isFalse);
-      expect(mosaic.firstFocusable, isNull);
     });
   });
 
-  group('cursor', () {
-    // Hero + 6 genres + gem + spotlight: the full mosaic.
-    final full = buildDiscoveryMosaic(
-      boardWith(genres: 6, gem: true, achievement: true),
-    );
-
-    test('Right off the hero enters the grid on the row the cursor is on', () {
-      expect(full.step(0, 0, dCol: 1), (0, 1));
-      expect(full.step(1, 0, dCol: 1), (1, 1));
+  group('discovery card sizes', () {
+    test('uses the same scale as the systems grid', () {
+      expect(Responsive.getDiscoveryCrossAxisCountFromSize('S'), 7);
+      expect(Responsive.getDiscoveryCrossAxisCountFromSize('M'), 6);
+      expect(Responsive.getDiscoveryCrossAxisCountFromSize('L'), 5);
+      expect(Responsive.getDiscoveryCrossAxisCountFromSize('XL'), 4);
     });
 
-    test('Left off the grid returns to the hero', () {
-      expect(full.step(0, 1, dCol: -1), (0, 0));
-      expect(full.step(1, 3, dCol: -1), (1, 2));
-    });
-
-    test('Down the grid walks its two rows and then the band', () {
-      expect(full.step(0, 2, dRow: 1), (1, 2));
-      expect(full.step(1, 2, dRow: 1), (2, 1));
-    });
-
-    test('Down the hero skips its second row and lands on the band', () {
-      // The hero occupies (0,0) and (1,0): stepping onto itself is not a move,
-      // so Down carries on to the strip below.
-      expect(full.step(0, 0, dRow: 1), (2, 0));
-    });
-
-    test('Up from the band lands on whatever the tile sits under', () {
-      // The strip spans the full width while the grid covers only the right of
-      // it, so Up is answered by position and not by column index: the left
-      // half of the strip is under the hero, the right half under the grid.
-      expect(full.step(2, 1, dRow: -1), (1, 2));
-      expect(full.step(2, 0, dRow: -1), (1, 0));
-    });
-
-    test('the edges of the board stop the cursor', () {
-      expect(full.step(0, 0, dCol: -1), isNull);
-      expect(full.step(0, 0, dRow: -1), isNull);
-      expect(full.step(0, 3, dCol: 1), isNull);
-      expect(full.step(2, full.band.length - 1, dCol: 1), isNull);
-      expect(full.step(2, 0, dRow: 1), isNull);
-    });
-
-    test('a full strip lines up with the grid above it', () {
-      // Five band tiles across the whole width against three grid columns down
-      // the right of it: the rightmost of each still meet.
-      final wide = buildDiscoveryMosaic(
-        boardWith(genres: 9, gem: true, achievement: true),
-      );
-
-      expect(wide.band.length, kMosaicBandVisible);
-      expect(wide.step(2, wide.band.length - 1, dRow: -1), (1, 3));
-    });
-
-    test('a notice is stepped over rather than being a dead stop', () {
-      // Gem gated out, so the band leads with a notice tile: the cursor never
-      // lands on it, and it does not swallow the press either.
-      final gated = buildDiscoveryMosaic(
-        boardWith(genres: 7, achievement: true, scrapeCoverageLow: true),
-      );
-
-      expect(gated.band.first.isFocusable, isFalse);
-      expect(gated.firstFocusable, (0, 0));
-      expect(gated.step(2, 0, dCol: 1), (2, 1));
-      // Nothing focusable to the left of the strip's first pick.
-      expect(gated.step(2, 1, dCol: -1), isNull);
-      // Nor does Up ever answer with the notice.
-      expect(gated.step(1, 1, dRow: 1)?.$2, isNot(0));
+    test('an unknown value falls back to M', () {
+      expect(Responsive.getDiscoveryCrossAxisCountFromSize('nope'), 6);
     });
   });
 }
