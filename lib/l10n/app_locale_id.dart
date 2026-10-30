@@ -1611,6 +1611,31 @@ const Map<String, dynamic> appLocaleId = {
       'Sudah menggunakan ES-DE? Impor metadata dan gambar game Anda. Pilih '
       'folder utama ES-DE yang berisi folder "gamelists" dan "downloaded_media" '
       'Anda. Opsional; Anda dapat menjalankannya nanti dari Pengaturan.',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc:
+      'Masuk untuk mendapatkan pencapaian di game yang didukung dan memantau progresmu.',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc:
+      'Hubungkan server RomM-mu untuk menjelajah dan mengunduh game dari koleksimu sendiri.',
+  AppLocale.wizardRommSkipNote:
+      'Jika dilewati, tab RomM akan disembunyikan. Kamu bisa mengaturnya nanti di Pengaturan.',
+  AppLocale.wizardMetadataStepTitle: 'Gambar & Info Game',
+  AppLocale.wizardMetadataStepDesc:
+      'Masuk ke ScreenScraper untuk mengambil sampul, tangkapan layar, dan detail game untuk pustakamu.',
+  AppLocale.wizardSyncStepTitle: 'Sinkronisasi Simpanan',
+  AppLocale.wizardSyncStepDesc:
+      'Masuk ke NeoSync untuk mencadangkan simpanan game dan membawanya antar perangkat.',
+  AppLocale.wizardSyncSkipNote:
+      'Jika dilewati, tab Simpanan akan disembunyikan. Kamu bisa mengaturnya nanti di Pengaturan.',
+  AppLocale.wizardSignedInAs: 'Masuk sebagai {name}',
+  AppLocale.wizardAccountLater:
+      'Opsional. Kamu bisa mengaturnya nanti di Pengaturan.',
+  AppLocale.wizardSignIn: 'Masuk',
+  AppLocale.wizardScrapeStepTitle: 'Scraping',
+  AppLocale.wizardScrapeStepDesc:
+      'Pilih apa yang ingin diambil, lalu mulai scraping. Prosesnya berjalan di latar belakang selagi kamu menyelesaikan pengaturan. Gunakan ↑↓ untuk memilih baris dan ←→ untuk mengubahnya.',
+  AppLocale.wizardPreferredRegion: 'Wilayah Pilihan',
+  AppLocale.wizardStartScraping: 'Mulai Scraping',
   AppLocale.wizardArtPackTitle: 'Dapatkan System Art Pack',
   AppLocale.wizardArtPackDesc:
       'Kami sangat menyarankan untuk mengunduh System Art Pack (SAP) agar latar '

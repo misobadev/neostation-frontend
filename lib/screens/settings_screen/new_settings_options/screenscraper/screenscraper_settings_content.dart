@@ -1,3 +1,4 @@
+import 'package:neostation/constants/screenscraper_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -52,37 +53,10 @@ class ScreenScraperSettingsContentState
   /// Scrape mode values, in the order A cycles through them.
   static const List<String> _scrapeModes = ['new_only', 'all'];
 
-  /// Metadata languages ScreenScraper serves, in the order A cycles through
-  /// them. Names are endonyms, so they read the same in every UI language.
-  static const Map<String, String> _languages = {
-    'en': 'English',
-    'es': 'Español',
-    'fr': 'Français',
-    'de': 'Deutsch',
-    'it': 'Italiano',
-    'pt': 'Português',
-  };
-
-  static const List<String> _mediaTypes = [
-    'fanart',
-    'ss',
-    'wheel',
-    'box2D',
-    'video',
-  ];
-
-  static const Map<String, String> _regionNames = {
-    'wor': 'World',
-    'us': 'USA',
-    'eu': 'Europe',
-    'fr': 'France',
-    'sp': 'Spain',
-    'it': 'Italy',
-    'de': 'Germany',
-    'jp': 'Japan',
-    'kr': 'Korea',
-    'cn': 'China',
-  };
+  static const Map<String, String> _languages = ScreenScraperOptions.languages;
+  static const List<String> _mediaTypes = ScreenScraperOptions.mediaTypes;
+  static const Map<String, String> _regionNames =
+      ScreenScraperOptions.regionNames;
 
   static const int _gridColumns = 5;
 

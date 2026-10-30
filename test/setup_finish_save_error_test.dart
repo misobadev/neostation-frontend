@@ -35,8 +35,11 @@ void main() {
     setUp(() => finish = method(wizard, 'Future<void> _finishSetup()'));
 
     test('saves and completes setup inside a try', () {
+      // Hiding the tabs a new user didn't set up writes settings too, so it
+      // sits inside the same try.
       final match = RegExp(
-        r'try \{\s*await configProvider\.saveConfig\(\);\s*'
+        r'try \{\s*await _hideUnconfiguredTabs\(configProvider\);\s*'
+        r'await configProvider\.saveConfig\(\);\s*'
         r'await widget\.onComplete\(\);\s*return;\s*\} catch \(e\) \{',
       ).firstMatch(finish);
       expect(match, isNotNull, reason: 'both saves must be caught');

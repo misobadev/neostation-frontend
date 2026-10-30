@@ -1652,6 +1652,31 @@ const Map<String, dynamic> appLocaleIt = {
       'Seleziona la cartella principale di ES-DE che contiene le cartelle '
       '"gamelists" e "downloaded_media". Facoltativo; puoi eseguirlo più tardi '
       'dalle Impostazioni.',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc:
+      'Accedi per sbloccare obiettivi nei giochi supportati e tenere traccia dei tuoi progressi.',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc:
+      'Collega il tuo server RomM per sfogliare e scaricare i giochi della tua collezione.',
+  AppLocale.wizardRommSkipNote:
+      'Se salti questo passaggio, la scheda RomM resterà nascosta. Puoi configurarla più tardi nelle Impostazioni.',
+  AppLocale.wizardMetadataStepTitle: 'Immagini e info dei giochi',
+  AppLocale.wizardMetadataStepDesc:
+      'Accedi a ScreenScraper per scaricare copertine, screenshot e dettagli dei giochi della tua libreria.',
+  AppLocale.wizardSyncStepTitle: 'Sincronizzazione salvataggi',
+  AppLocale.wizardSyncStepDesc:
+      'Accedi a NeoSync per fare il backup dei salvataggi e portarli da un dispositivo all\'altro.',
+  AppLocale.wizardSyncSkipNote:
+      'Se salti questo passaggio, la scheda Salvataggi resterà nascosta. Puoi configurarla più tardi nelle Impostazioni.',
+  AppLocale.wizardSignedInAs: 'Accesso effettuato come {name}',
+  AppLocale.wizardAccountLater:
+      'Facoltativo. Puoi configurarlo più tardi nelle Impostazioni.',
+  AppLocale.wizardSignIn: 'Accedi',
+  AppLocale.wizardScrapeStepTitle: 'Scraping',
+  AppLocale.wizardScrapeStepDesc:
+      'Scegli cosa scaricare, poi avvia lo scraping. Prosegue in background mentre completi la configurazione. Usa ↑↓ per scegliere una riga e ←→ per modificarla.',
+  AppLocale.wizardPreferredRegion: 'Regione preferita',
+  AppLocale.wizardStartScraping: 'Avvia scraping',
   AppLocale.wizardArtPackTitle: 'Ottieni un System Art Pack',
   AppLocale.wizardArtPackDesc:
       'Consigliamo vivamente di scaricare un System Art Pack (SAP) per '

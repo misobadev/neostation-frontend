@@ -1452,6 +1452,26 @@ const Map<String, dynamic> appLocaleJa = {
       'インポートできます。「gamelists」と「downloaded_media」フォルダーが含まれる '
       'ES-DE のメインフォルダーを選択してください。任意です。後で設定から'
       '実行できます。',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc: 'サインインすると、対応ゲームで実績を獲得し、進行状況を記録できます。',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc: 'RomM サーバーに接続すると、自分のコレクションのゲームを閲覧・ダウンロードできます。',
+  AppLocale.wizardRommSkipNote: 'スキップすると RomM タブは非表示になります。あとから設定で設定できます。',
+  AppLocale.wizardMetadataStepTitle: 'ゲームのアートと情報',
+  AppLocale.wizardMetadataStepDesc:
+      'ScreenScraper にサインインすると、ライブラリのパッケージ画像、スクリーンショット、ゲーム情報を取得できます。',
+  AppLocale.wizardSyncStepTitle: 'セーブ同期',
+  AppLocale.wizardSyncStepDesc:
+      'NeoSync にサインインすると、セーブデータをバックアップしてデバイス間で引き継げます。',
+  AppLocale.wizardSyncSkipNote: 'スキップするとセーブタブは非表示になります。あとから設定で設定できます。',
+  AppLocale.wizardSignedInAs: '{name} としてサインイン中',
+  AppLocale.wizardAccountLater: '任意です。あとから設定で設定できます。',
+  AppLocale.wizardSignIn: 'サインイン',
+  AppLocale.wizardScrapeStepTitle: 'スクレイピング',
+  AppLocale.wizardScrapeStepDesc:
+      '取得する内容を選んでスクレイピングを開始します。セットアップを進める間もバックグラウンドで続きます。↑↓ で項目を選び、←→ で変更します。',
+  AppLocale.wizardPreferredRegion: '優先地域',
+  AppLocale.wizardStartScraping: 'スクレイピング開始',
   AppLocale.wizardArtPackTitle: 'System Art Pack を入手',
   AppLocale.wizardArtPackDesc:
       'ライブラリ全体で美しいコンソール背景を表示するために、System Art Pack'

@@ -1634,6 +1634,31 @@ const Map<String, dynamic> appLocalePt = {
       'Selecione a pasta principal do ES-DE que contém suas pastas "gamelists" '
       'e "downloaded_media". Opcional; você pode fazer isso mais tarde nas '
       'Configurações.',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc:
+      'Entre para ganhar conquistas nos jogos compatíveis e acompanhar seu progresso.',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc:
+      'Conecte seu servidor RomM para explorar e baixar jogos da sua própria coleção.',
+  AppLocale.wizardRommSkipNote:
+      'Se pular esta etapa, a aba RomM ficará oculta. Você pode configurá-la depois em Configurações.',
+  AppLocale.wizardMetadataStepTitle: 'Arte e informações dos jogos',
+  AppLocale.wizardMetadataStepDesc:
+      'Entre no ScreenScraper para obter capas, capturas de tela e detalhes dos jogos da sua biblioteca.',
+  AppLocale.wizardSyncStepTitle: 'Sincronização de saves',
+  AppLocale.wizardSyncStepDesc:
+      'Entre no NeoSync para fazer backup dos seus saves e levá-los entre dispositivos.',
+  AppLocale.wizardSyncSkipNote:
+      'Se pular esta etapa, a aba Saves ficará oculta. Você pode configurá-la depois em Configurações.',
+  AppLocale.wizardSignedInAs: 'Conectado como {name}',
+  AppLocale.wizardAccountLater:
+      'Opcional. Você pode configurar isso depois em Configurações.',
+  AppLocale.wizardSignIn: 'Entrar',
+  AppLocale.wizardScrapeStepTitle: 'Scraping',
+  AppLocale.wizardScrapeStepDesc:
+      'Escolha o que baixar e inicie o scraping. Ele continua em segundo plano enquanto você conclui a configuração. Use ↑↓ para escolher uma linha e ←→ para alterá-la.',
+  AppLocale.wizardPreferredRegion: 'Região preferida',
+  AppLocale.wizardStartScraping: 'Iniciar scraping',
   AppLocale.wizardArtPackTitle: 'Obtenha um System Art Pack',
   AppLocale.wizardArtPackDesc:
       'Recomendamos fortemente baixar um System Art Pack (SAP) para ter belos '

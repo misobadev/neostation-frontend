@@ -80,6 +80,11 @@ extension _GamepadNav on _RAContentState {
 
   void _handleBack() {
     if (!context.read<RetroAchievementsProvider>().isConnected) {
+      final onBack = widget.onBack;
+      if (onBack != null && !isAnyFieldFocused()) {
+        onBack();
+        return;
+      }
       exitTextEntry();
       return;
     }

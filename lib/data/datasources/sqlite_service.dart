@@ -1933,7 +1933,7 @@ class SqliteService {
         setup_completed INTEGER DEFAULT 0,
         hide_bottom_screen INTEGER DEFAULT 0,
         sfx_enabled INTEGER DEFAULT 1,
-        sfx_volume REAL DEFAULT 0.75,
+        sfx_volume REAL DEFAULT 0.5,
         custom_sfx TEXT,
         system_sort_by TEXT DEFAULT 'alphabetical',
         ignore_articles_in_game_sort INTEGER DEFAULT 0,
@@ -1956,7 +1956,7 @@ class SqliteService {
         hide_tab_romm INTEGER DEFAULT 0,
         hide_tab_search INTEGER DEFAULT 0,
         hide_search_card INTEGER DEFAULT 1,
-        android_apps_as_tab INTEGER DEFAULT 0,
+        android_apps_as_tab INTEGER DEFAULT 1,
         active_sync_provider TEXT DEFAULT 'neosync',
         systems_version TEXT DEFAULT '',
         -- Generation stamp of the bundled RA seed asset that is currently
@@ -1975,11 +1975,11 @@ class SqliteService {
         dock_enabled INTEGER DEFAULT 1,
         secondary_hide_system_logo INTEGER DEFAULT 0,
         dock_slot_count INTEGER DEFAULT 3,
-        now_playing_dim_delay INTEGER DEFAULT 3,
-        now_playing_dim_level INTEGER DEFAULT 100,
+        now_playing_dim_delay INTEGER DEFAULT 5,
+        now_playing_dim_level INTEGER DEFAULT 25,
         fanart_dim_level INTEGER DEFAULT 25,
         esde_folder_path TEXT DEFAULT '',
-        show_achievements_badge INTEGER DEFAULT 0,
+        show_achievements_badge INTEGER DEFAULT 1,
         show_cloud_sync_icon INTEGER DEFAULT 1,
         ra_match_on_startup INTEGER DEFAULT 0,
         subfolder_view_all INTEGER DEFAULT 0,
@@ -2606,6 +2606,13 @@ class SqliteService {
         'ra_user': null,
         'show_game_info': 0,
         'is_fullscreen': 1,
+        // New-install defaults, written explicitly so they don't rest on the
+        // CREATE TABLE text alone. Existing installs keep their stored values.
+        'sfx_volume': 0.5,
+        'show_achievements_badge': 1,
+        'now_playing_dim_delay': 5,
+        'now_playing_dim_level': 25,
+        'android_apps_as_tab': 1,
       });
     } catch (e) {
       _log.e('Error creating initial user configuration', error: e);

@@ -88,9 +88,6 @@ Future<void> startScrapeSession(
     );
 
     if (scrapingSuccess) {
-      if (scrapingProvider.successfulGames > 0) {
-        scrapingProvider.markArtworkUpdated();
-      }
       final summary = scrapingProvider.totalGames > 0
           ? '${scrapingProvider.processedGames} / ${scrapingProvider.totalGames}'
           : '';
@@ -135,6 +132,11 @@ Future<void> startScrapeSession(
     );
   } finally {
     scrapingProvider.stopScraping();
+    // However the session ended — finished, cancelled, out of quota — any
+    // game it did scrape has artwork on disk that the screen should show.
+    if (scrapingProvider.successfulGames > 0) {
+      scrapingProvider.markArtworkUpdated();
+    }
     onFinished?.call();
   }
 }

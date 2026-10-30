@@ -1584,6 +1584,31 @@ const Map<String, dynamic> appLocaleEn = {
       'Already using ES-DE? Import your game metadata and artwork. Select the '
       'main ES-DE folder containing your "gamelists" and "downloaded_media" '
       'folders. Optional; you can run it later from Settings.',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc:
+      'Sign in to earn achievements in supported games and keep track of your progress.',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc:
+      'Connect your RomM server to browse and download games from your own collection.',
+  AppLocale.wizardRommSkipNote:
+      'Skip this and the RomM tab stays hidden. You can set it up later in Settings.',
+  AppLocale.wizardMetadataStepTitle: 'Game Artwork & Info',
+  AppLocale.wizardMetadataStepDesc:
+      'Sign in to ScreenScraper to fetch box art, screenshots and game details for your library.',
+  AppLocale.wizardSyncStepTitle: 'Save Syncing',
+  AppLocale.wizardSyncStepDesc:
+      'Sign in to NeoSync to back up your saves and carry them between devices.',
+  AppLocale.wizardSyncSkipNote:
+      'Skip this and the Saves tab stays hidden. You can set it up later in Settings.',
+  AppLocale.wizardSignedInAs: 'Signed in as {name}',
+  AppLocale.wizardAccountLater:
+      'Optional. You can set this up later in Settings.',
+  AppLocale.wizardSignIn: 'Sign In',
+  AppLocale.wizardScrapeStepTitle: 'Scraping',
+  AppLocale.wizardScrapeStepDesc:
+      'Choose what to fetch, then start scraping. It carries on in the background while you finish setting up. Use ↑↓ to pick a row and ←→ to change it.',
+  AppLocale.wizardPreferredRegion: 'Preferred Region',
+  AppLocale.wizardStartScraping: 'Start Scraping',
   AppLocale.wizardArtPackTitle: 'Get a System Art Pack',
   AppLocale.wizardArtPackDesc:
       'We strongly recommend downloading a System Art Pack (SAP) for beautiful '

@@ -1604,6 +1604,31 @@ const Map<String, dynamic> appLocaleRu = {
       'Выберите основную папку ES-DE, содержащую папки "gamelists" и '
       '"downloaded_media". Необязательно; вы можете сделать это позже в '
       'Настройках.',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc:
+      'Войдите, чтобы получать достижения в поддерживаемых играх и следить за прогрессом.',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc:
+      'Подключите свой сервер RomM, чтобы просматривать и скачивать игры из своей коллекции.',
+  AppLocale.wizardRommSkipNote:
+      'Если пропустить этот шаг, вкладка RomM будет скрыта. Настроить её можно позже в настройках.',
+  AppLocale.wizardMetadataStepTitle: 'Обложки и сведения об играх',
+  AppLocale.wizardMetadataStepDesc:
+      'Войдите в ScreenScraper, чтобы загрузить обложки, скриншоты и сведения об играх вашей библиотеки.',
+  AppLocale.wizardSyncStepTitle: 'Синхронизация сохранений',
+  AppLocale.wizardSyncStepDesc:
+      'Войдите в NeoSync, чтобы создавать резервные копии сохранений и переносить их между устройствами.',
+  AppLocale.wizardSyncSkipNote:
+      'Если пропустить этот шаг, вкладка «Сохранения» будет скрыта. Настроить её можно позже в настройках.',
+  AppLocale.wizardSignedInAs: 'Вы вошли как {name}',
+  AppLocale.wizardAccountLater:
+      'Необязательно. Настроить можно позже в настройках.',
+  AppLocale.wizardSignIn: 'Войти',
+  AppLocale.wizardScrapeStepTitle: 'Скрейпинг',
+  AppLocale.wizardScrapeStepDesc:
+      'Выберите, что загружать, и запустите скрейпинг. Он продолжится в фоне, пока вы завершаете настройку. ↑↓ — выбрать строку, ←→ — изменить её.',
+  AppLocale.wizardPreferredRegion: 'Предпочитаемый регион',
+  AppLocale.wizardStartScraping: 'Начать скрейпинг',
   AppLocale.wizardArtPackTitle: 'Получите System Art Pack',
   AppLocale.wizardArtPackDesc:
       'Мы настоятельно рекомендуем загрузить System Art Pack (SAP) для '

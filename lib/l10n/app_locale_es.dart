@@ -1654,6 +1654,31 @@ const Map<String, dynamic> appLocaleEs = {
       'Selecciona la carpeta principal de ES-DE que contiene tus carpetas '
       '"gamelists" y "downloaded_media". Opcional; puedes ejecutarlo más tarde '
       'desde Ajustes.',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc:
+      'Inicia sesión para conseguir logros en los juegos compatibles y seguir tu progreso.',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc:
+      'Conecta tu servidor RomM para explorar y descargar juegos de tu propia colección.',
+  AppLocale.wizardRommSkipNote:
+      'Si lo omites, la pestaña RomM quedará oculta. Puedes configurarlo más tarde en Ajustes.',
+  AppLocale.wizardMetadataStepTitle: 'Arte e información de juegos',
+  AppLocale.wizardMetadataStepDesc:
+      'Inicia sesión en ScreenScraper para obtener carátulas, capturas y detalles de los juegos de tu biblioteca.',
+  AppLocale.wizardSyncStepTitle: 'Sincronización de partidas',
+  AppLocale.wizardSyncStepDesc:
+      'Inicia sesión en NeoSync para hacer copia de tus partidas guardadas y llevarlas entre dispositivos.',
+  AppLocale.wizardSyncSkipNote:
+      'Si lo omites, la pestaña Guardados quedará oculta. Puedes configurarlo más tarde en Ajustes.',
+  AppLocale.wizardSignedInAs: 'Sesión iniciada como {name}',
+  AppLocale.wizardAccountLater:
+      'Opcional. Puedes configurarlo más tarde en Ajustes.',
+  AppLocale.wizardSignIn: 'Iniciar sesión',
+  AppLocale.wizardScrapeStepTitle: 'Scraping',
+  AppLocale.wizardScrapeStepDesc:
+      'Elige qué descargar y empieza el scraping. Seguirá en segundo plano mientras terminas la configuración. Usa ↑↓ para elegir una fila y ←→ para cambiarla.',
+  AppLocale.wizardPreferredRegion: 'Región preferida',
+  AppLocale.wizardStartScraping: 'Iniciar scraping',
   AppLocale.wizardArtPackTitle: 'Consigue un System Art Pack',
   AppLocale.wizardArtPackDesc:
       'Recomendamos encarecidamente descargar un System Art Pack (SAP) para '

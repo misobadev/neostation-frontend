@@ -146,7 +146,7 @@ void main() {
       expect(restored.isScraperLoggedIn, isTrue);
       expect(restored.deviceScreenOn, isTrue);
       expect(restored.nowPlayingDimDelay, 5);
-      expect(restored.nowPlayingDimLevel, 100);
+      expect(restored.nowPlayingDimLevel, 25);
       // Mirrors the config default (fanart_dim_level DEFAULT 25) so the 25% dim
       // applies from the first-launch WELCOME seed, not just after a relaunch.
       expect(restored.fanartDimLevel, 25);
@@ -161,10 +161,10 @@ void main() {
       expect(restored.appReady, isFalse);
       expect(restored.setupWizardActive, isFalse);
       // Mirror the config defaults (sfx_enabled DEFAULT 1, sfx_volume DEFAULT
-      // 0.75) so a snapshot predating these fields sounds like the persisted
+      // 0.5) so a snapshot predating these fields sounds like the persisted
       // setting rather than silently muting the bottom screen.
       expect(restored.sfxEnabled, isTrue);
-      expect(restored.sfxVolume, 0.75);
+      expect(restored.sfxVolume, 0.5);
       // Null, not false: the secondary engine seeds the clock format from the
       // config row itself, and a `false` here would look like a real push and
       // overwrite that seed with 24-hour on every snapshot.

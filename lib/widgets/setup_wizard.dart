@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -25,8 +26,38 @@ import '../widgets/info_dialog.dart';
 import '../utils/rom_folder_path.dart';
 import 'core_footer.dart';
 import '../models/secondary_display_state.dart';
+import 'package:neostation/providers/retro_achievements_provider.dart';
+import 'package:neostation/providers/romm_provider.dart';
+import 'package:neostation/services/neosync/auth_service.dart';
+import 'package:neostation/services/screenscraper_service.dart';
+import 'package:neostation/screens/retro_achievements_screen/ra_content.dart';
+import 'package:neostation/screens/romm_screen/romm_connect_content.dart';
+import 'package:neostation/screens/settings_screen/new_settings_options/screenscraper/screenscraper_login_dialog.dart';
+import 'package:neostation/sync/providers/romm_provider.dart';
+import 'package:neostation/sync/sync_manager.dart';
+import 'package:neostation/utils/nav_tabs.dart';
+import 'auth_form.dart';
+import 'wizard_account_step.dart';
+import 'wizard_scrape_step.dart';
+import 'package:neostation/screens/settings_screen/new_settings_options/screenscraper/scrape_session.dart';
 
 /// Initial configuration wizard for the first time the app is opened
+/// The wizard's steps, in the order they are shown. Not every step exists on
+/// every device — see [_SetupWizardState._steps].
+enum _WizardStep {
+  userData,
+  permissions,
+  folder,
+  scanning,
+  esde,
+  retroAchievements,
+  romm,
+  metadata,
+  scrapeSetup,
+  saveSync,
+  artPack,
+}
+
 class SetupWizard extends StatefulWidget {
   final Future<void> Function() onComplete;
 
@@ -98,20 +129,87 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
   GamepadNavigation? _gamepadNav;
 
-  // Step indices. Android has two extra steps (Permissions + Accessibility)
-  // that don't exist on desktop; the getters resolve to -1 there so a
-  // comparison against a real (>= 0) step never matches.
-  //   Android: 0=UserData, 1=Permissions, 2=Folder, 3=Scanning,
-  //            4=EsdeImport, 5=ArtPack
-  //   Desktop: 0=UserData, 1=Folder, 2=Scanning, 3=EsdeImport, 4=ArtPack
-  // The Permissions step covers both All-Files access and the accessibility
-  // (Screen Return) service.
-  int get _stepUserData => 0;
-  int get _stepPermissions => Platform.isAndroid ? 1 : -1;
-  int get _stepFolder => Platform.isAndroid ? 2 : 1;
-  int get _stepScanning => Platform.isAndroid ? 3 : 2;
-  int get _stepEsde => Platform.isAndroid ? 4 : 3;
-  int get _stepArtPack => Platform.isAndroid ? 5 : 4;
+  /// The steps this device shows. Permissions exist only on Android, and the
+  /// metadata step only in builds that can sign in to ScreenScraper. (It names
+  /// the metadata provider generically so NeoAssets can take ScreenScraper's
+  /// place there once it lands.) The getters below resolve to -1 for a step
+  /// that isn't shown, so a comparison against a real (>= 0) step never
+  /// matches.
+  late final List<_WizardStep> _steps = [
+    _WizardStep.userData,
+    if (Platform.isAndroid) _WizardStep.permissions,
+    _WizardStep.folder,
+    _WizardStep.scanning,
+    _WizardStep.esde,
+    _WizardStep.retroAchievements,
+    _WizardStep.romm,
+    if (ScreenScraperService.isAvailable) ...[
+      _WizardStep.metadata,
+      _WizardStep.scrapeSetup,
+    ],
+    _WizardStep.saveSync,
+    _WizardStep.artPack,
+  ];
+
+  int get _stepUserData => _steps.indexOf(_WizardStep.userData);
+  int get _stepPermissions => _steps.indexOf(_WizardStep.permissions);
+  int get _stepFolder => _steps.indexOf(_WizardStep.folder);
+  int get _stepScanning => _steps.indexOf(_WizardStep.scanning);
+  int get _stepEsde => _steps.indexOf(_WizardStep.esde);
+  int get _stepArtPack => _steps.indexOf(_WizardStep.artPack);
+
+  /// The optional account steps between the ES-DE import and the art pack.
+  /// Each describes a service, opens its own sign-in form, and can be skipped.
+  bool get _isAccountStep => switch (_steps[_currentStep]) {
+    _WizardStep.retroAchievements ||
+    _WizardStep.romm ||
+    _WizardStep.metadata ||
+    _WizardStep.saveSync => true,
+    _ => false,
+  };
+
+  bool get _isScrapeSetupStep =>
+      _steps[_currentStep] == _WizardStep.scrapeSetup;
+
+  /// The scraping step's region, language and media choices.
+  final ScrapeSetupChoices _scrapeChoices = ScrapeSetupChoices();
+
+  /// Moves to the next step. The scraping step only follows a ScreenScraper
+  /// sign-in, so it is passed over when the metadata step was skipped.
+  void _advance() {
+    var next = _currentStep + 1;
+    if (next < _steps.length &&
+        _steps[next] == _WizardStep.scrapeSetup &&
+        _scraperUser == null) {
+      next++;
+    }
+    if (next < _steps.length && _steps[next] == _WizardStep.scrapeSetup) {
+      _scrapeChoices.load();
+    }
+    setState(() => _currentStep = next);
+  }
+
+  /// Left/right on the scraping step. Reports no move anywhere else, so the
+  /// other steps stay as silent to left/right as they were.
+  bool _changeScrapeChoice(int delta) {
+    if (!_isScrapeSetupStep) return false;
+    _scrapeChoices.change(delta);
+    return true;
+  }
+
+  /// Saves the scraping choices, starts the first scrape in the background
+  /// and moves on. The session outlives the wizard, as it outlives Settings,
+  /// and reports through the persistent notification once setup is done.
+  Future<void> _startWizardScrape() async {
+    await _scrapeChoices.apply();
+    if (!mounted) return;
+    unawaited(startScrapeSession(context));
+    _advance();
+  }
+
+  /// ScreenScraper account name, read from the database (the service has no
+  /// provider to watch). Refreshed after its sign-in dialog closes.
+  String? _scraperUser;
 
   /// The art-pack step is always the final step of the wizard.
   bool get _isLastStep => _currentStep == _stepArtPack;
@@ -211,8 +309,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       onBack: () {
         _handleSkip();
       },
-      onNavigateUp: () => _moveArtPackSelection(-1),
-      onNavigateDown: () => _moveArtPackSelection(1),
+      onNavigateUp: () => _isScrapeSetupStep
+          ? _scrapeChoices.moveRow(-1)
+          : _moveArtPackSelection(-1),
+      onNavigateDown: () => _isScrapeSetupStep
+          ? _scrapeChoices.moveRow(1)
+          : _moveArtPackSelection(1),
+      onNavigateLeft: () => _changeScrapeChoice(-1),
+      onNavigateRight: () => _changeScrapeChoice(1),
     );
     _gamepadNav?.initialize();
     _gamepadNav?.activate();
@@ -256,6 +360,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     _secondaryDisplayState?.removeListener(_onSecondaryStateChanged);
     _gamepadNav?.dispose();
     _artPackScrollController.dispose();
+    _scrapeChoices.dispose();
     // Shared singleton — never dispose the instance.
     super.dispose();
   }
@@ -324,11 +429,11 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       return;
     }
 
-    // Both trailing steps (ES-DE import, art pack) are optional — skipping
-    // the ES-DE step advances to the art-pack step; skipping the art-pack
-    // step finishes setup.
-    if (_currentStep == _stepEsde) {
-      setState(() => _currentStep = _stepArtPack);
+    // Every step after the scan is optional: skipping the ES-DE import or an
+    // account step moves on to the next step; skipping the art pack finishes
+    // setup.
+    if (_currentStep == _stepEsde || _isAccountStep || _isScrapeSetupStep) {
+      _advance();
       return;
     }
     if (_currentStep == _stepArtPack) {
@@ -340,6 +445,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   void _initializeSteps() {
     // Load the current user-data path for display in step 0.
     _loadUserDataPath();
+    _loadScraperUser();
+  }
+
+  Future<void> _loadScraperUser() async {
+    final credentials = await ScreenScraperService.getSavedCredentials();
+    final user = credentials?['username'];
+    if (mounted) {
+      setState(() => _scraperUser = (user?.isEmpty ?? true) ? null : user);
+    }
   }
 
   Future<void> _loadUserDataPath() async {
@@ -373,12 +487,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     }
   }
 
-  // Step layout:
-  // Android: 0=UserData, 1=Permissions, 2=FolderSelect, 3=Scanning,
-  //          4=EsdeImport, 5=ArtPack (6 steps)
-  // Desktop: 0=UserData, 1=FolderSelect, 2=Scanning, 3=EsdeImport,
-  //          4=ArtPack (5 steps)
-  int get _totalSteps => Platform.isAndroid ? 6 : 5;
+  int get _totalSteps => _steps.length;
 
   @override
   Widget build(BuildContext context) {
@@ -588,6 +697,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     );
   }
 
+  /// The step column in landscape. It is scaled down to fit the card, so with
+  /// eleven steps what sets the numbers' size on screen is their share of the
+  /// column: big circles and short connectors keep them legible.
   Widget _buildVerticalProgressIndicator(ThemeData theme) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -598,8 +710,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
         return Column(
           children: [
             Container(
-              width: 24.r,
-              height: 24.r,
+              width: 28.r,
+              height: 28.r,
               decoration: BoxDecoration(
                 color: isCompleted || isCurrent
                     ? theme.colorScheme.primary
@@ -617,12 +729,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     ? Icon(
                         Symbols.check_rounded,
                         color: Colors.white,
-                        size: 14.r,
+                        size: 18.r,
                       )
                     : Text(
                         '${index + 1}',
                         style: TextStyle(
-                          fontSize: 10.r,
+                          fontSize: 14.r,
                           fontWeight: FontWeight.bold,
                           color: isCurrent
                               ? Colors.white
@@ -636,7 +748,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             if (index < _totalSteps - 1)
               Container(
                 width: 2.r,
-                height: 18.r,
+                height: 8.r,
                 color: isCompleted
                     ? theme.colorScheme.primary
                     : theme.colorScheme.primary.withValues(alpha: 0.2),
@@ -725,6 +837,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     }
     if (_currentStep == _stepEsde) {
       return _buildEsdeStep(theme);
+    }
+    if (_isAccountStep) {
+      return _buildAccountStep(_steps[_currentStep]);
+    }
+    if (_isScrapeSetupStep) {
+      return WizardScrapeStep(choices: _scrapeChoices);
     }
     if (_currentStep == _stepArtPack) {
       return _buildArtPackStep(theme);
@@ -1917,6 +2035,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     // _handleSkip for why it must never be gated on a grant succeeding.
     final showSkip =
         _currentStep == _stepEsde ||
+        (_isAccountStep && _accountName(_steps[_currentStep]) == null) ||
+        _isScrapeSetupStep ||
         _currentStep == _stepArtPack ||
         (Platform.isAndroid &&
             (_currentStep == _stepFolder || _currentStep == _stepPermissions));
@@ -1989,6 +2109,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           ? AppLocale.next.getString(context)
           : AppLocale.esdeRunImport.getString(context);
     }
+    if (_isScrapeSetupStep) {
+      return AppLocale.wizardStartScraping.getString(context);
+    }
+    if (_isAccountStep) {
+      return _accountName(_steps[_currentStep]) != null
+          ? AppLocale.next.getString(context)
+          : AppLocale.wizardSignIn.getString(context);
+    }
     if (_currentStep == _stepArtPack) {
       // Offer download until the selected pack is installed (or none are
       // available), then the primary action finishes setup.
@@ -2055,9 +2183,24 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     if (_currentStep == _stepEsde) {
       // Run the import, or advance once one has already been run.
       if (_esdeResult != null) {
-        setState(() => _currentStep = _stepArtPack);
+        setState(() => _currentStep++);
       } else {
         await _runWizardEsdeImport();
+      }
+      return;
+    }
+
+    if (_isScrapeSetupStep) {
+      await _startWizardScrape();
+      return;
+    }
+
+    if (_isAccountStep) {
+      // Signed in already: A moves on. Otherwise it opens the sign-in form.
+      if (_accountName(_steps[_currentStep]) != null) {
+        _advance();
+      } else {
+        await _openAccountSignIn(_steps[_currentStep]);
       }
       return;
     }
@@ -2074,6 +2217,145 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       }
       return;
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Account steps (optional): RetroAchievements, RomM, metadata, save syncing
+  // ---------------------------------------------------------------------------
+
+  /// Who [step]'s service is signed in as, or null while it isn't set up.
+  String? _accountName(_WizardStep step) {
+    switch (step) {
+      case _WizardStep.retroAchievements:
+        final ra = context.read<RetroAchievementsProvider>();
+        return ra.isConnected ? ra.username : null;
+      case _WizardStep.romm:
+        final romm = context.read<RommProvider>();
+        if (!romm.isConnected) return null;
+        // An API-key connection has no username; name the server instead.
+        return romm.username.isNotEmpty
+            ? romm.username
+            : (Uri.tryParse(romm.serverUrl)?.host ?? romm.serverUrl);
+      case _WizardStep.metadata:
+        return _scraperUser;
+      case _WizardStep.saveSync:
+        final auth = context.read<AuthService>();
+        if (!auth.isLoggedIn) return null;
+        final user = auth.currentUser;
+        return user == null
+            ? ''
+            : (user.username.isNotEmpty ? user.username : user.email);
+      default:
+        return null;
+    }
+  }
+
+  /// Opens [step]'s own sign-in form. The wizard's navigation is paused while
+  /// it is open: each form pushes a gamepad layer of its own, and the wizard's
+  /// navigator isn't a layer, so it would otherwise answer the same presses.
+  Future<void> _openAccountSignIn(_WizardStep step) async {
+    _gamepadNav?.deactivate();
+    try {
+      switch (step) {
+        case _WizardStep.retroAchievements:
+          final ra = context.read<RetroAchievementsProvider>();
+          await pushWizardServicePage(
+            context,
+            listenable: ra,
+            isDone: () => ra.isConnected,
+            builder: (close) => RAContent(onBack: close),
+          );
+        case _WizardStep.romm:
+          final romm = context.read<RommProvider>();
+          await pushWizardServicePage(
+            context,
+            listenable: romm,
+            isDone: () => romm.isConnected,
+            builder: (close) => RommConnectContent(onBack: close),
+          );
+        case _WizardStep.metadata:
+          await ScreenScraperLoginDialog.show(context);
+          await _loadScraperUser();
+        case _WizardStep.saveSync:
+          final auth = context.read<AuthService>();
+          await pushWizardServicePage(
+            context,
+            listenable: auth,
+            isDone: () => auth.isLoggedIn,
+            builder: (close) => AuthForm(onLoginSuccess: close, onBack: close),
+          );
+        default:
+          break;
+      }
+    } finally {
+      // Let the press that closed the form drain before the wizard listens.
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) _gamepadNav?.activate();
+    }
+  }
+
+  Widget _buildAccountStep(_WizardStep step) {
+    // Watched so the status line flips as soon as a sign-in lands.
+    context.watch<RetroAchievementsProvider>();
+    context.watch<RommProvider>();
+    context.watch<AuthService>();
+    final name = _accountName(step);
+    return switch (step) {
+      _WizardStep.retroAchievements => WizardAccountStep(
+        icon: Symbols.trophy_rounded,
+        title: AppLocale.wizardRaStepTitle.getString(context),
+        description: AppLocale.wizardRaStepDesc.getString(context),
+        signedInAs: name,
+      ),
+      _WizardStep.romm => WizardAccountStep(
+        icon: Symbols.dns_rounded,
+        title: AppLocale.wizardRommStepTitle.getString(context),
+        description: AppLocale.wizardRommStepDesc.getString(context),
+        signedInAs: name,
+        skipNote: AppLocale.wizardRommSkipNote.getString(context),
+      ),
+      _WizardStep.metadata => WizardAccountStep(
+        icon: Symbols.image_search_rounded,
+        title: AppLocale.wizardMetadataStepTitle.getString(context),
+        description: AppLocale.wizardMetadataStepDesc.getString(context),
+        signedInAs: name,
+      ),
+      _ => WizardAccountStep(
+        icon: Symbols.cloud_sync_rounded,
+        title: AppLocale.wizardSyncStepTitle.getString(context),
+        description: AppLocale.wizardSyncStepDesc.getString(context),
+        signedInAs: name,
+        skipNote: AppLocale.wizardSyncSkipNote.getString(context),
+      ),
+    };
+  }
+
+  /// Settles the optional services as setup ends.
+  ///
+  /// Save sync goes to NeoSync when it is signed in. Connecting RomM claims
+  /// save sync while NeoSync is signed out, and the RomM step comes first, so
+  /// without this a user who set up both would end up syncing to RomM.
+  ///
+  /// Then the RomM and Saves tabs are hidden for a user who didn't set those
+  /// up, so a new library doesn't open on tabs that can only say "sign in".
+  /// Both can be turned back on in Settings → General.
+  Future<void> _hideUnconfiguredTabs(SqliteConfigProvider config) async {
+    if (context.read<AuthService>().isLoggedIn) {
+      await SyncManager.instance.releaseIfActive(
+        RomMSyncProvider.kProviderId,
+        persist: config.updateActiveSyncProvider,
+      );
+      if (!mounted) return;
+    }
+    final hidden = tabsHiddenAfterSetup(
+      rommConnected: context.read<RommProvider>().isConnected,
+      neoSyncSignedIn: context.read<AuthService>().isLoggedIn,
+      savesUseRomm:
+          context.read<SyncManager>().activeProviderId ==
+          RomMSyncProvider.kProviderId,
+    );
+    await config.updateNavTabHidden(NavTab.romm, hidden.hideRomm);
+    await config.updateNavTabHidden(NavTab.sync, hidden.hideSaves);
   }
 
   /// Drives the combined permissions step: grants the next pending permission
@@ -2267,6 +2549,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
     // Save the configuration, then mark setup as completed.
     try {
+      await _hideUnconfiguredTabs(configProvider);
       await configProvider.saveConfig();
       await widget.onComplete();
       return;

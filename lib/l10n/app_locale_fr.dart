@@ -1671,6 +1671,31 @@ const Map<String, dynamic> appLocaleFr = {
       'jeux. Sélectionnez le dossier principal ES-DE contenant vos dossiers '
       '"gamelists" et "downloaded_media". Facultatif ; vous pourrez le faire '
       'plus tard depuis les Paramètres.',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc:
+      'Connectez-vous pour débloquer des succès dans les jeux compatibles et suivre votre progression.',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc:
+      'Connectez votre serveur RomM pour parcourir et télécharger les jeux de votre propre collection.',
+  AppLocale.wizardRommSkipNote:
+      'Si vous passez cette étape, l\'onglet RomM restera masqué. Vous pourrez le configurer plus tard dans les Paramètres.',
+  AppLocale.wizardMetadataStepTitle: 'Visuels et infos des jeux',
+  AppLocale.wizardMetadataStepDesc:
+      'Connectez-vous à ScreenScraper pour récupérer jaquettes, captures d\'écran et fiches de jeux pour votre bibliothèque.',
+  AppLocale.wizardSyncStepTitle: 'Synchronisation des sauvegardes',
+  AppLocale.wizardSyncStepDesc:
+      'Connectez-vous à NeoSync pour sauvegarder vos parties et les retrouver sur vos autres appareils.',
+  AppLocale.wizardSyncSkipNote:
+      'Si vous passez cette étape, l\'onglet Sauvegardes restera masqué. Vous pourrez le configurer plus tard dans les Paramètres.',
+  AppLocale.wizardSignedInAs: 'Connecté en tant que {name}',
+  AppLocale.wizardAccountLater:
+      'Facultatif. Vous pourrez le configurer plus tard dans les Paramètres.',
+  AppLocale.wizardSignIn: 'Se connecter',
+  AppLocale.wizardScrapeStepTitle: 'Scraping',
+  AppLocale.wizardScrapeStepDesc:
+      'Choisissez ce qu\'il faut récupérer, puis lancez le scraping. Il continue en arrière-plan pendant que vous terminez la configuration. Utilisez ↑↓ pour choisir une ligne et ←→ pour la modifier.',
+  AppLocale.wizardPreferredRegion: 'Région préférée',
+  AppLocale.wizardStartScraping: 'Lancer le scraping',
   AppLocale.wizardArtPackTitle: 'Obtenez un System Art Pack',
   AppLocale.wizardArtPackDesc:
       'Nous vous recommandons vivement de télécharger un System Art Pack (SAP) '

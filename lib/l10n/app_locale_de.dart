@@ -1663,6 +1663,31 @@ const Map<String, dynamic> appLocaleDe = {
       'Wähle den ES-DE-Hauptordner, der deine Ordner "gamelists" und '
       '"downloaded_media" enthält. Optional; du kannst es später in den '
       'Einstellungen ausführen.',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc:
+      'Melde dich an, um in unterstützten Spielen Erfolge freizuschalten und deinen Fortschritt zu verfolgen.',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc:
+      'Verbinde deinen RomM-Server, um Spiele aus deiner eigenen Sammlung zu durchsuchen und herunterzuladen.',
+  AppLocale.wizardRommSkipNote:
+      'Wenn du das überspringst, bleibt der RomM-Tab ausgeblendet. Du kannst ihn später in den Einstellungen einrichten.',
+  AppLocale.wizardMetadataStepTitle: 'Spiel-Artworks & Infos',
+  AppLocale.wizardMetadataStepDesc:
+      'Melde dich bei ScreenScraper an, um Cover, Screenshots und Spieldetails für deine Bibliothek zu laden.',
+  AppLocale.wizardSyncStepTitle: 'Spielstand-Synchronisierung',
+  AppLocale.wizardSyncStepDesc:
+      'Melde dich bei NeoSync an, um deine Spielstände zu sichern und zwischen Geräten mitzunehmen.',
+  AppLocale.wizardSyncSkipNote:
+      'Wenn du das überspringst, bleibt der Spielstände-Tab ausgeblendet. Du kannst ihn später in den Einstellungen einrichten.',
+  AppLocale.wizardSignedInAs: 'Angemeldet als {name}',
+  AppLocale.wizardAccountLater:
+      'Optional. Du kannst das später in den Einstellungen einrichten.',
+  AppLocale.wizardSignIn: 'Anmelden',
+  AppLocale.wizardScrapeStepTitle: 'Scraping',
+  AppLocale.wizardScrapeStepDesc:
+      'Wähle aus, was geladen werden soll, und starte das Scraping. Es läuft im Hintergrund weiter, während du die Einrichtung abschließt. Mit ↑↓ wählst du eine Zeile, mit ←→ änderst du sie.',
+  AppLocale.wizardPreferredRegion: 'Bevorzugte Region',
+  AppLocale.wizardStartScraping: 'Scraping starten',
   AppLocale.wizardArtPackTitle: 'Hol dir ein System Art Pack',
   AppLocale.wizardArtPackDesc:
       'Wir empfehlen dringend, ein System Art Pack (SAP) herunterzuladen, um in '

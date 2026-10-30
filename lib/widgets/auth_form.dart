@@ -16,7 +16,12 @@ import 'package:neostation/services/logger_service.dart';
 class AuthForm extends StatefulWidget {
   final VoidCallback onLoginSuccess;
 
-  const AuthForm({super.key, required this.onLoginSuccess});
+  /// Where B goes from the sign-in view once no field is focused. Null on the
+  /// NeoSync tab, where B there does nothing; the setup wizard uses it to close
+  /// the page it opened the form on.
+  final VoidCallback? onBack;
+
+  const AuthForm({super.key, required this.onLoginSuccess, this.onBack});
 
   @override
   AuthFormState createState() => AuthFormState();
@@ -198,7 +203,9 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         _showVerification ||
         _showEmailVerification) {
       _goBackToLogin();
+      return;
     }
+    widget.onBack?.call();
   }
 
   void _goBackToLogin() {

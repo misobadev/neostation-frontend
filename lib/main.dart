@@ -884,7 +884,7 @@ Future<void> subDisplay() async {
       (int.tryParse(rawConfig?['sfx_enabled']?.toString() ?? '1') ?? 1) == 1,
     );
     SfxService().setVolume(
-      double.tryParse(rawConfig?['sfx_volume']?.toString() ?? '0.75') ?? 0.75,
+      double.tryParse(rawConfig?['sfx_volume']?.toString() ?? '0.5') ?? 0.5,
     );
     await SfxService().setCustomSounds(
       CustomSfx.decode(rawConfig?['custom_sfx']),

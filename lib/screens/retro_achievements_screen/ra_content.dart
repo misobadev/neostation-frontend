@@ -31,7 +31,12 @@ part 'ra_content/login_form.dart';
 part 'ra_content/drill_down_host.dart';
 
 class RAContent extends StatefulWidget {
-  const RAContent({super.key});
+  const RAContent({super.key, this.onBack});
+
+  /// Where B goes on the signed-out form once no field is focused. Null on the
+  /// RetroAchievements tab, where B there does nothing; the setup wizard uses
+  /// it to close the page it opened the form on.
+  final VoidCallback? onBack;
 
   @override
   State<RAContent> createState() => _RAContentState();

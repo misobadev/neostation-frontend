@@ -5,8 +5,10 @@ import 'package:neostation/models/config_model.dart';
 
 import 'database_test_helper.dart';
 
-/// The achievements badge is opt-in, and the setting is only a feature if the
-/// read path picks it up again. A column that is written and never read has
+/// The achievements badge is on for new installs (existing devices, whose
+/// column came from a migration with DEFAULT 0, keep it off — see
+/// show_achievements_badge_migration_test.dart), and the setting is only a
+/// feature if the read path picks it up again. A column that is written and never read has
 /// happened twice in this area already (the manual match picker, and the
 /// console filter), and in both cases the write test passed on its own.
 void main() {
@@ -16,19 +18,20 @@ void main() {
   tearDown(() async => dbHelper.tearDown());
 
   group('show achievements badge setting', () {
-    test('a fresh config has the badge off', () {
-      expect(const ConfigModel().showAchievementsBadge, isFalse);
+    test('a fresh config has the badge on', () {
+      expect(const ConfigModel().showAchievementsBadge, isTrue);
     });
 
     test(
-      'a database row written before the setting existed reads as off',
+      'a fresh-install row with no badge value written reads as on',
       () async {
-        // No badge column value ever written: the column default stands in.
+        // No badge column value ever written: the fresh schema's column
+        // default stands in.
         await SqliteService.saveUserConfig(appLanguage: 'en');
 
         final loaded = await SqliteConfigService.loadConfig();
 
-        expect(loaded.showAchievementsBadge, isFalse);
+        expect(loaded.showAchievementsBadge, isTrue);
       },
     );
 

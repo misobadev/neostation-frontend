@@ -312,14 +312,14 @@ class SecondaryDisplayStateData {
     this.playTimeSeconds,
     this.lastPlayedMillis,
     this.nowPlayingDimDelay = 5,
-    this.nowPlayingDimLevel = 100,
+    this.nowPlayingDimLevel = 25,
     // Mirror the config default (fanart_dim_level DEFAULT 25). On first launch
     // the native shared-state store is empty, so the initial WELCOME seed
     // constructs a *fresh* data object and broadcasts it to the secondary
     // engine before the real _config value is pushed. If this defaulted to 0,
     // that first snapshot would render the system art undimmed until the later
     // seed landed. Keeping it in sync with the config default (like
-    // nowPlayingDimLevel = 100 above) makes the 25% dim apply from frame one.
+    // nowPlayingDimLevel = 25 above) makes the 25% dim apply from frame one.
     this.fanartDimLevel = 25,
     this.dockApps = const ['', '', '', '', ''],
     this.dockEditTrigger = 0,
@@ -329,10 +329,10 @@ class SecondaryDisplayStateData {
     this.appReady = false,
     this.setupWizardActive = false,
     // Mirror the config defaults (sfx_enabled DEFAULT 1, sfx_volume DEFAULT
-    // 0.75) so a snapshot built before the main engine's seed lands behaves
+    // 0.5) so a snapshot built before the main engine's seed lands behaves
     // like the persisted setting rather than silently muting or blasting.
     this.sfxEnabled = true,
-    this.sfxVolume = 0.75,
+    this.sfxVolume = 0.5,
     this.customSfx = const {},
     this.use12HourClock,
   });
@@ -588,7 +588,7 @@ class SecondaryDisplayStateData {
       playTimeSeconds: (json['playTimeSeconds'] as num?)?.toInt(),
       lastPlayedMillis: (json['lastPlayedMillis'] as num?)?.toInt(),
       nowPlayingDimDelay: (json['nowPlayingDimDelay'] as num?)?.toInt() ?? 5,
-      nowPlayingDimLevel: (json['nowPlayingDimLevel'] as num?)?.toInt() ?? 100,
+      nowPlayingDimLevel: (json['nowPlayingDimLevel'] as num?)?.toInt() ?? 25,
       fanartDimLevel: (json['fanartDimLevel'] as num?)?.toInt() ?? 25,
       dockApps: json['dockApps'] is List
           ? (json['dockApps'] as List<dynamic>)
@@ -602,7 +602,7 @@ class SecondaryDisplayStateData {
       appReady: json['appReady'] as bool? ?? false,
       setupWizardActive: json['setupWizardActive'] as bool? ?? false,
       sfxEnabled: json['sfxEnabled'] as bool? ?? true,
-      sfxVolume: (json['sfxVolume'] as num?)?.toDouble() ?? 0.75,
+      sfxVolume: (json['sfxVolume'] as num?)?.toDouble() ?? 0.5,
       customSfx: CustomSfx.decode(json['customSfx']),
       use12HourClock: json['use12HourClock'] as bool?,
     );

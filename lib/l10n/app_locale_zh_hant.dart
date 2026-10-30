@@ -1403,6 +1403,24 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.wizardEsdeStepDesc:
       '已經在使用 ES-DE 了嗎？匯入你的遊戲中繼資料和圖片。選擇包含「gamelists」和'
       '「downloaded_media」資料夾的 ES-DE 主資料夾。選用；你可以稍後在「設定」中執行。',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc: '登入後即可在支援的遊戲中獲得成就並記錄你的進度。',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc: '連線你的 RomM 伺服器，即可瀏覽並下載你自己收藏中的遊戲。',
+  AppLocale.wizardRommSkipNote: '略過此步驟後，RomM 分頁將保持隱藏。你可以稍後在設定中進行設定。',
+  AppLocale.wizardMetadataStepTitle: '遊戲圖片與資訊',
+  AppLocale.wizardMetadataStepDesc: '登入 ScreenScraper，為你的遊戲庫取得封面、截圖和遊戲詳細資訊。',
+  AppLocale.wizardSyncStepTitle: '存檔同步',
+  AppLocale.wizardSyncStepDesc: '登入 NeoSync，備份你的遊戲存檔並在裝置之間同步。',
+  AppLocale.wizardSyncSkipNote: '略過此步驟後，存檔分頁將保持隱藏。你可以稍後在設定中進行設定。',
+  AppLocale.wizardSignedInAs: '已登入為 {name}',
+  AppLocale.wizardAccountLater: '選用。你可以稍後在設定中進行設定。',
+  AppLocale.wizardSignIn: '登入',
+  AppLocale.wizardScrapeStepTitle: '刮削',
+  AppLocale.wizardScrapeStepDesc:
+      '選擇要取得的內容，然後開始刮削。在你完成設定期間，它會在背景繼續執行。用 ↑↓ 選擇項目，用 ←→ 變更。',
+  AppLocale.wizardPreferredRegion: '偏好地區',
+  AppLocale.wizardStartScraping: '開始刮削',
   AppLocale.wizardArtPackTitle: '取得 System Art Pack',
   AppLocale.wizardArtPackDesc:
       '我們強烈建議下載 System Art Pack（SAP），為你的整個遊戲庫帶來精美的'

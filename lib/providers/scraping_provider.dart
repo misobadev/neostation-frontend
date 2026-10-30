@@ -89,6 +89,23 @@ class ThreadProgress {
 /// Implements estimated time remaining (ETA) calculation based on batch processing
 /// performance and prevents the device from sleeping during long operations.
 class ScrapingProvider extends ChangeNotifier {
+  ScrapingProvider({DateTime Function()? clock})
+    : _clock = clock ?? DateTime.now;
+
+  final DateTime Function() _clock;
+
+  /// How often new artwork is pushed to the screen while a session runs.
+  ///
+  /// Each refresh makes an open games list reload and re-read its images, so
+  /// it is throttled rather than sent per game; the first success goes out at
+  /// once so art starts appearing within seconds of a scrape starting.
+  static const Duration artworkRefreshInterval = Duration(seconds: 15);
+
+  /// When artwork was last pushed mid-session, and how many games had been
+  /// scraped by then. Null until the first push of a session.
+  DateTime? _lastArtworkRefresh;
+  int _successfulAtLastRefresh = 0;
+
   /// Whether a scraping session is currently active.
   bool _isScraping = false;
 
@@ -131,7 +148,9 @@ class ScrapingProvider extends ChangeNotifier {
   /// Fixed list of worker threads available for the session.
   List<ThreadProgress> _threads = [];
 
-  /// Increments after a completed scrape writes new artwork to disk.
+  /// Increments when a scrape has written new artwork to disk: during a
+  /// session as games succeed (see [artworkRefreshInterval]) and once more
+  /// when it ends.
   int _artworkRevision = 0;
 
   bool get isScraping => _isScraping;
@@ -169,6 +188,8 @@ class ScrapingProvider extends ChangeNotifier {
     _timePerGameHistory.clear();
     _lastProcessedCount = 0;
     _lastUpdateTime = DateTime.now();
+    _lastArtworkRefresh = null;
+    _successfulAtLastRefresh = 0;
 
     _threads = List.generate(
       15,
@@ -196,6 +217,18 @@ class ScrapingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Moves [artworkRevision] when games have been scraped since the last move
+  /// and [artworkRefreshInterval] has passed (or nothing has moved yet).
+  void _refreshArtworkIfDue() {
+    if (_successfulGames <= _successfulAtLastRefresh) return;
+    final now = _clock();
+    final last = _lastArtworkRefresh;
+    if (last != null && now.difference(last) < artworkRefreshInterval) return;
+    _lastArtworkRefresh = now;
+    _successfulAtLastRefresh = _successfulGames;
+    _artworkRevision++;
+  }
+
   /// Updates the global scraping progress metrics.
   ///
   /// Recalculates the estimated time remaining using a moving average of
@@ -214,6 +247,8 @@ class ScrapingProvider extends ChangeNotifier {
     if (processedGames != null) _processedGames = processedGames;
     if (successfulGames != null) _successfulGames = successfulGames;
     if (failedGames != null) _failedGames = failedGames;
+
+    _refreshArtworkIfDue();
 
     if (_startTime != null &&
         _processedGames > 0 &&

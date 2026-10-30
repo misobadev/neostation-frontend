@@ -92,6 +92,10 @@ class ScreenScraperService {
     return Platform.environment['SCREENSCRAPER_DEV_ID'] ?? '';
   }
 
+  /// Whether this build carries the developer credentials ScreenScraper needs.
+  /// Without them nobody can sign in, so the setup wizard leaves its step out.
+  static bool get isAvailable => _devId.isNotEmpty && _devPassword.isNotEmpty;
+
   static String get _devPassword {
     const compileTime = String.fromEnvironment('SCREENSCRAPER_DEV_PASSWORD');
     if (compileTime.isNotEmpty) return compileTime;

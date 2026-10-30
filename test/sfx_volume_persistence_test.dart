@@ -6,8 +6,8 @@ import 'database_test_helper.dart';
 
 void main() {
   group('ConfigModel.sfxVolume serialization', () {
-    test('defaults to the existing full UI-sounds volume', () {
-      expect(const ConfigModel().sfxVolume, 0.75);
+    test('a new install starts at the Medium stop (50%)', () {
+      expect(const ConfigModel().sfxVolume, 0.5);
     });
 
     test('round-trips and clamps persisted values', () {

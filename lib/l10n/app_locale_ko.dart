@@ -1444,6 +1444,26 @@ const Map<String, dynamic> appLocaleKo = {
       '이미 ES-DE를 사용 중이신가요? 게임 메타데이터와 아트워크를 가져오세요. '
       '"gamelists"와 "downloaded_media" 폴더가 포함된 ES-DE 메인 폴더를 '
       '선택하세요. 선택 사항이며, 나중에 설정에서 실행할 수 있습니다.',
+  AppLocale.wizardRaStepTitle: 'RetroAchievements',
+  AppLocale.wizardRaStepDesc: '로그인하면 지원되는 게임에서 업적을 달성하고 진행 상황을 기록할 수 있습니다.',
+  AppLocale.wizardRommStepTitle: 'RomM',
+  AppLocale.wizardRommStepDesc: 'RomM 서버에 연결하면 내 컬렉션의 게임을 둘러보고 다운로드할 수 있습니다.',
+  AppLocale.wizardRommSkipNote: '건너뛰면 RomM 탭이 숨겨집니다. 나중에 설정에서 설정할 수 있습니다.',
+  AppLocale.wizardMetadataStepTitle: '게임 아트 및 정보',
+  AppLocale.wizardMetadataStepDesc:
+      'ScreenScraper에 로그인하면 라이브러리의 박스 아트, 스크린샷, 게임 정보를 가져올 수 있습니다.',
+  AppLocale.wizardSyncStepTitle: '세이브 동기화',
+  AppLocale.wizardSyncStepDesc:
+      'NeoSync에 로그인하면 세이브를 백업하고 여러 기기에서 이어서 할 수 있습니다.',
+  AppLocale.wizardSyncSkipNote: '건너뛰면 세이브 탭이 숨겨집니다. 나중에 설정에서 설정할 수 있습니다.',
+  AppLocale.wizardSignedInAs: '{name}(으)로 로그인됨',
+  AppLocale.wizardAccountLater: '선택 사항입니다. 나중에 설정에서 설정할 수 있습니다.',
+  AppLocale.wizardSignIn: '로그인',
+  AppLocale.wizardScrapeStepTitle: '스크래핑',
+  AppLocale.wizardScrapeStepDesc:
+      '가져올 항목을 고른 뒤 스크래핑을 시작하세요. 설정을 마치는 동안 백그라운드에서 계속 진행됩니다. ↑↓로 항목을 고르고 ←→로 변경합니다.',
+  AppLocale.wizardPreferredRegion: '선호 지역',
+  AppLocale.wizardStartScraping: '스크래핑 시작',
   AppLocale.wizardArtPackTitle: 'System Art Pack 받기',
   AppLocale.wizardArtPackDesc:
       '라이브러리 전체에 아름다운 콘솔 배경을 제공하는 System Art Pack(SAP) '
