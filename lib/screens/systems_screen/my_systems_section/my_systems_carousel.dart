@@ -12,6 +12,8 @@ import 'package:provider/provider.dart';
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../providers/file_provider.dart';
+import '../../../providers/recent_games_cycler.dart';
+import 'widgets/recent_card_cycle.dart';
 import '../../../themes/corner_radii.dart';
 import '../../../utils/gamepad_nav.dart';
 import '../../../services/game_service.dart';
@@ -53,6 +55,8 @@ class MySystemsCarousel extends StatefulWidget {
     super.key,
     this.selectedIndex = 0,
     this.onCardTapped,
+    this.onLeftTrigger,
+    this.onRightTrigger,
     this.items,
     this.onActivate,
     this.onOptions,
@@ -80,6 +84,11 @@ class MySystemsCarousel extends StatefulWidget {
 
   /// Callback for system selection via interaction.
   final Function(int index)? onCardTapped;
+
+  /// LT and RT. Read on every press so the host can rebind them around the
+  /// currently selected card; left unbound (silent) when null.
+  final VoidCallback? onLeftTrigger;
+  final VoidCallback? onRightTrigger;
 
   /// Cards to show. Null means "the systems list", which this widget builds
   /// itself from the providers.
@@ -226,6 +235,11 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   /// firing redundant postFrameCallbacks on every build.
   int _lastBackgroundBuildIndex = -1;
 
+  /// Game on the focused card when the background was last pushed, so a recent
+  /// card that cycles in place still refreshes the background and the second
+  /// screen even though the index did not change.
+  String? _lastBackgroundGamePath;
+
   /// Cached systems list and indicator-label widths from the last build.
   /// The continuous scroll handler (fired every frame while swiping) reads
   /// these instead of rebuilding the list + re-measuring text every frame.
@@ -317,6 +331,12 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
       onFavorite: widget.bindYButton ? () => widget.onYPressed?.call() : null,
       onBack: widget.onBackPressed,
       onXButton: widget.onXPressed,
+      onLeftTrigger: widget.onLeftTrigger == null
+          ? null
+          : () => widget.onLeftTrigger?.call(),
+      onRightTrigger: widget.onRightTrigger == null
+          ? null
+          : () => widget.onRightTrigger?.call(),
       onWestButton: widget.onWestPressed,
       onPreviousTab: widget.enableTabBumpers ? AppNavigation.previousTab : null,
       onNextTab: widget.enableTabBumpers ? AppNavigation.nextTab : null,
@@ -917,12 +937,19 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
       child: widget.items != null
           ? Builder(builder: _buildContent)
           : Selector2<SqliteConfigProvider, SqliteDatabaseProvider, int>(
-              selector: (_, config, db) => Object.hash(
+              selector: (context, config, db) => Object.hash(
                 config.detectedSystems.length,
                 config.hiddenSystemFolders.length,
                 config.totalGames,
                 config.config.hideRecentCard,
-                db.getRecentlyPlayedGames(1).firstOrNull?.romPath.hashCode,
+                Object.hashAll(
+                  db
+                      .getRecentlyPlayedGames(RecentGamesCycler.maxGames)
+                      .map((g) => g.romPath),
+                ),
+                // Listening here re-runs this selector when the recent card
+                // cycles, which is what repaints it.
+                Provider.of<RecentGamesCycler?>(context)?.position,
                 db.totalFavorites,
               ),
               builder: (context, _, child) => _buildContent(context),
@@ -954,12 +981,22 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
     if (_currentIndex < 0) _currentIndex = 0;
 
     // Trigger background update only when the displayed index changes.
+    final focusedGamePath = allSystems[_currentIndex].gameModel?.romPath;
     if (_lastBackgroundBuildIndex != _currentIndex) {
       _lastBackgroundBuildIndex = _currentIndex;
+      _lastBackgroundGamePath = focusedGamePath;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _updateBackground(allSystems[_currentIndex]);
         }
+      });
+    } else if (_lastBackgroundGamePath != focusedGamePath) {
+      // Same slot, different game: the recent card cycled while focused.
+      _lastBackgroundGamePath = focusedGamePath;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _updateBackground(allSystems[_currentIndex]);
+        _updateSecondaryScreenName();
       });
     }
 
@@ -1105,7 +1142,16 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                       return Stack(
                         fit: StackFit.passthrough,
                         children: [
-                          card,
+                          // The recent card slides between the last few played
+                          // games. Always wrapped (never only when centred), so
+                          // the subtree keeps its shape as selection travels.
+                          if (system.isGame && widget.items == null)
+                            RecentCardCycle(
+                              gameKey: system.gameModel?.romPath,
+                              card: card,
+                            )
+                          else
+                            card,
                           Positioned.fill(
                             child: IgnorePointer(
                               child: SizedBox.expand(

@@ -107,6 +107,9 @@ class SystemCard extends StatefulWidget {
 
   @override
   State<SystemCard> createState() => _SystemCardState();
+
+  /// Height of the "time played" strip under a game card's artwork.
+  static double get gameFooterHeight => 32.r;
 }
 
 class _SystemCardState extends State<SystemCard> {
@@ -725,7 +728,7 @@ class _SystemCardState extends State<SystemCard> {
   /// Renders a footer for game cards, matching the system card footer style.
   Widget _buildGameFooter(BuildContext context) {
     return Container(
-      height: 32.r,
+      height: SystemCard.gameFooterHeight,
       alignment: Alignment.center,
       padding: EdgeInsets.symmetric(horizontal: 8.r),
       child: Column(

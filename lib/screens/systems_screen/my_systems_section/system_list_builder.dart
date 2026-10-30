@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/models/database_game_model.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/my_systems.dart';
 import 'package:neostation/providers/collections_provider.dart';
 import 'package:neostation/providers/file_provider.dart';
+import 'package:neostation/providers/recent_games_cycler.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/providers/sqlite_database_provider.dart';
 import 'package:provider/provider.dart';
@@ -29,13 +31,19 @@ List<SystemInfo> buildSystemsList({
       collectionsProvider ??
       Provider.of<CollectionsProvider>(context, listen: false);
   final collectionGames = collections.totalGameCount;
-  const recentCount = 1;
+  // One recent card, showing whichever of the last few played games the
+  // shared cycler is on. Looked up nullable so a host without one (tests, a
+  // pushed screen) still gets the most recent game.
   final hideRecent = configProvider.config.hideRecentCard;
   final recentDbGames = hideRecent
-      ? dbProvider.getRecentlyPlayedGames(0)
-      : dbProvider.getRecentlyPlayedGames(recentCount);
+      ? const <DatabaseGameModel>[]
+      : dbProvider.getRecentlyPlayedGames(RecentGamesCycler.maxGames);
+  final cycler = Provider.of<RecentGamesCycler?>(context, listen: false);
+  final shown = cycler?.pick([for (final g in recentDbGames) g.romPath]) ?? 0;
 
   final recentGames = recentDbGames
+      .skip(shown)
+      .take(1)
       .map((dbGame) => GameModel.fromDatabaseModel(dbGame))
       .map((game) => SystemInfo.fromGameModel(game, fileProvider))
       .toList();
