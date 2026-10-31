@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -34,12 +35,34 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
 
   bool disableNeoSync = false;
 
-  /// Where keyboard focus is decides what Enter does, as it reaches the
-  /// navigation's select as well as the focused control: on Cancel it
-  /// cancels, on the switch it only toggles the switch.
+  /// Where keyboard focus is decides what Enter and A do, as Enter reaches
+  /// the navigation's select as well as the focused control: on Cancel it
+  /// cancels, on the switch it only toggles the switch. The navigation's
+  /// direction callbacks move this focus for the D-pad and the arrow keys;
+  /// Flutter's own focus traversal is switched off in the build.
   final FocusNode _cancelFocus = FocusNode(debugLabel: 'delete_save_cancel');
   final FocusNode _switchFocus = FocusNode(debugLabel: 'delete_save_switch');
+  final FocusNode _deleteFocus = FocusNode(debugLabel: 'delete_save_delete');
   bool _closing = false;
+
+  /// Moves focus to [to] if it is on [from]; whether it moved. An edge of the
+  /// prompt reports false, so no navigation sound plays there.
+  bool _move(FocusNode from, FocusNode to) {
+    if (!from.hasFocus) return false;
+    to.requestFocus();
+    return true;
+  }
+
+  void _setDisableNeoSync(bool value) {
+    setState(() => disableNeoSync = value);
+    widget.onDisableNeoSyncChanged(value);
+  }
+
+  /// Redraws the focus highlights, which a controller relies on: on Android
+  /// its keys never reach Flutter, so Flutter's own focus ring stays off.
+  void _onFocusChange() {
+    if (mounted) setState(() {});
+  }
 
   /// Closes the prompt once. A keyboard Enter reaches both the navigation's
   /// select and the focused button, so it arrives here twice.
@@ -53,10 +76,24 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
   @override
   void initState() {
     super.initState();
+    for (final node in [_cancelFocus, _switchFocus, _deleteFocus]) {
+      node.addListener(_onFocusChange);
+    }
+    // The switch sits above the buttons, Cancel to the left of Delete.
     _gamepadNav = GamepadNavigation(
+      onNavigateUp: () =>
+          _move(_cancelFocus, _switchFocus) ||
+          _move(_deleteFocus, _switchFocus),
+      onNavigateDown: () => _move(_switchFocus, _deleteFocus),
+      onNavigateLeft: () => _move(_deleteFocus, _cancelFocus),
+      onNavigateRight: () => _move(_cancelFocus, _deleteFocus),
       onSelectItem: () {
-        // The switch toggles itself through focus.
-        if (_switchFocus.hasFocus) return;
+        // A on the switch only toggles it. Enter there toggles it here too,
+        // so the switch itself ignores Enter (see the build).
+        if (_switchFocus.hasFocus) {
+          _setDisableNeoSync(!disableNeoSync);
+          return;
+        }
         _close(!_cancelFocus.hasFocus);
       },
       onBack: () => _close(false),
@@ -79,11 +116,46 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
     _gamepadNav.dispose();
     _cancelFocus.dispose();
     _switchFocus.dispose();
+    _deleteFocus.dispose();
     super.dispose();
+  }
+
+  /// Outlines [button] while [focus] has it, as the custom save folders
+  /// dialogue outlines its focused button.
+  Widget _outlineWhenFocused(
+    FocusNode focus,
+    BorderRadius radius,
+    Widget button,
+  ) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        border: Border.all(
+          color: focus.hasFocus
+              ? Theme.of(context).colorScheme.onSurface
+              : Colors.transparent,
+          width: 2.r,
+        ),
+      ),
+      child: button,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // On Android an arrow key from a TV remote or a keyboard also reaches
+    // Flutter's focus traversal, after the navigation has moved focus, and so
+    // took a second step. Only the navigation moves focus here.
+    return Actions(
+      actions: <Type, Action<Intent>>{
+        DirectionalFocusIntent: DoNothingAction(),
+      },
+      child: _buildDialog(context),
+    );
+  }
+
+  Widget _buildDialog(BuildContext context) {
     return AlertDialog(
       backgroundColor: Theme.of(context).colorScheme.surface,
       surfaceTintColor: Theme.of(context).colorScheme.surface,
@@ -172,17 +244,27 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
             ),
           ),
           SizedBox(height: 10.r),
-          Container(
+          // Highlighted while focused, as the custom save folders dialogue
+          // highlights its rows.
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
             padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.secondaryContainer.withValues(alpha: 0.05),
+              color: _switchFocus.hasFocus
+                  ? Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.12)
+                  : Theme.of(
+                      context,
+                    ).colorScheme.secondaryContainer.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(6.r),
               border: Border.all(
-                color: Theme.of(
-                  context,
-                ).colorScheme.secondary.withValues(alpha: 0.2),
+                color: _switchFocus.hasFocus
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(
+                        context,
+                      ).colorScheme.secondary.withValues(alpha: 0.2),
+                width: _switchFocus.hasFocus ? 2.r : 1.r,
               ),
             ),
             child: Row(
@@ -190,19 +272,22 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
               children: [
                 Transform.scale(
                   scale: 0.7,
-                  child: Switch(
-                    focusNode: _switchFocus,
-                    value: disableNeoSync,
-                    onChanged: (value) {
-                      setState(() {
-                        disableNeoSync = value;
-                      });
-                      widget.onDisableNeoSyncChanged(value);
+                  // The navigation's select already toggles the focused
+                  // switch on Enter; the switch toggling too would undo it.
+                  child: Shortcuts(
+                    shortcuts: const {
+                      SingleActivator(LogicalKeyboardKey.enter):
+                          DoNothingAndStopPropagationIntent(),
                     },
-                    activeThumbColor: Theme.of(context).colorScheme.secondary,
-                    activeTrackColor: Theme.of(
-                      context,
-                    ).colorScheme.secondary.withValues(alpha: 0.3),
+                    child: Switch(
+                      focusNode: _switchFocus,
+                      value: disableNeoSync,
+                      onChanged: _setDisableNeoSync,
+                      activeThumbColor: Theme.of(context).colorScheme.secondary,
+                      activeTrackColor: Theme.of(
+                        context,
+                      ).colorScheme.secondary.withValues(alpha: 0.3),
+                    ),
                   ),
                 ),
                 SizedBox(width: 4.r),
@@ -240,67 +325,76 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
       ),
       actionsPadding: EdgeInsets.only(right: 12.r, bottom: 12.r),
       actions: [
-        TextButton(
-          focusNode: _cancelFocus,
-          onPressed: () => _close(false),
-          style: TextButton.styleFrom(
-            padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/images/gamepad/Xbox_B_button.png',
-                width: 14.r,
-                height: 14.r,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-              SizedBox(width: 6.r),
-              Text(
-                AppLocale.cancel.getString(context),
-                style: TextStyle(
-                  fontSize: 12.r,
+        _outlineWhenFocused(
+          _cancelFocus,
+          BorderRadius.circular(22.r),
+          TextButton(
+            focusNode: _cancelFocus,
+            onPressed: () => _close(false),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/gamepad/Xbox_B_button.png',
+                  width: 14.r,
+                  height: 14.r,
                   color: Theme.of(
                     context,
                   ).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
-              ),
-            ],
-          ),
-        ),
-        ElevatedButton(
-          autofocus: true,
-          onPressed: () => _close(true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-            foregroundColor: Theme.of(context).colorScheme.onError,
-            elevation: 0,
-            padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.r),
+                SizedBox(width: 6.r),
+                Text(
+                  AppLocale.cancel.getString(context),
+                  style: TextStyle(
+                    fontSize: 12.r,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/images/gamepad/Xbox_A_button.png',
-                width: 14.r,
-                height: 14.r,
-                color: Theme.of(context).colorScheme.onError,
+        ),
+        _outlineWhenFocused(
+          _deleteFocus,
+          BorderRadius.circular(10.r),
+          ElevatedButton(
+            focusNode: _deleteFocus,
+            autofocus: true,
+            onPressed: () => _close(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8.r),
               ),
-              SizedBox(width: 6.r),
-              Text(
-                AppLocale.delete.getString(context),
-                style: TextStyle(
-                  fontSize: 12.r,
-                  fontWeight: FontWeight.bold,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/gamepad/Xbox_A_button.png',
+                  width: 14.r,
+                  height: 14.r,
                   color: Theme.of(context).colorScheme.onError,
                 ),
-              ),
-            ],
+                SizedBox(width: 6.r),
+                Text(
+                  AppLocale.delete.getString(context),
+                  style: TextStyle(
+                    fontSize: 12.r,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onError,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
