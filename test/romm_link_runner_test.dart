@@ -1,6 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/global_notification_service.dart';
+import 'package:neostation/services/romm/romm_library_linker.dart';
 import 'package:neostation/services/romm/romm_link_runner.dart';
+import 'package:neostation/services/romm_service.dart';
+import 'package:neostation/utils/romm_failure_message.dart';
 
 /// The Tools runner's notification contract.
 ///
@@ -18,10 +22,105 @@ void main() {
     failed: 'Linking failed',
     unavailable: 'Not available right now',
     stoppedEarlyTemplate: 'Stopped early — linked {count} games so far',
+    failureTexts: {},
   );
 
   setUp(() => GlobalNotificationService().notifier.value = []);
   tearDown(() => GlobalNotificationService().notifier.value = []);
+
+  group('a pass that could not run', () {
+    final withReasons = RommLinkStrings(
+      title: strings.title,
+      preparing: strings.preparing,
+      progressTemplate: strings.progressTemplate,
+      doneTemplate: strings.doneTemplate,
+      nothingToDo: strings.nothingToDo,
+      failed: strings.failed,
+      unavailable: strings.unavailable,
+      stoppedEarlyTemplate: strings.stoppedEarlyTemplate,
+      failureTexts: {
+        for (final key in rommBrowseFailureKeys)
+          key: AppLocale.en[key] as String,
+      },
+    );
+
+    test('says why when RomM failed, in the browse screen\'s words', () {
+      expect(
+        withReasons.failedBecause(
+          RommLinkPassException(
+            'platform enumeration failed',
+            RommException(
+              'Cannot reach server',
+              kind: RommFailure.unreachable,
+              detail: 'Connection refused',
+            ),
+          ),
+        ),
+        "Can't reach the RomM server: Connection refused",
+      );
+      expect(
+        withReasons.failedBecause(
+          RommLinkPassException(
+            'platform enumeration failed',
+            RommException(
+              'Request failed (500)',
+              statusCode: 500,
+              kind: RommFailure.serverError,
+            ),
+          ),
+        ),
+        'The RomM server answered with an error (500).',
+      );
+      // The server is already known to be RomM, so not "check the server
+      // URL" as when connecting.
+      expect(
+        withReasons.failedBecause(
+          RommLinkPassException(
+            'platform enumeration failed',
+            RommException('Not a RomM answer', kind: RommFailure.notRomm),
+          ),
+        ),
+        "The RomM server sent an answer the app couldn't read.",
+      );
+    });
+
+    test('keeps "Linking failed" for anything that isn\'t a RomM failure', () {
+      expect(
+        withReasons.failedBecause(
+          RommLinkPassException('library index failed', StateError('db')),
+        ),
+        'Linking failed',
+      );
+      expect(withReasons.failedBecause(Exception('boom')), 'Linking failed');
+    });
+
+    test('keeps "Linking failed" without the failure texts', () {
+      expect(
+        strings.failedBecause(
+          RommException('Request timed out', kind: RommFailure.timeout),
+        ),
+        'Linking failed',
+      );
+    });
+
+    test('every text a RomM failure can need is resolved up front', () {
+      // The texts are looked up before the run, while the Tools screen is
+      // still there; one missing here would read "Linking failed" instead.
+      final used = <String>{};
+      for (final kind in RommFailure.values) {
+        for (final e in [
+          RommException('x', kind: kind),
+          RommException('x', kind: kind, statusCode: 502, detail: 'why'),
+        ]) {
+          rommFailureMessage(e, (key) {
+            used.add(key);
+            return key;
+          }, browsing: true);
+        }
+      }
+      expect(rommBrowseFailureKeys.toSet(), containsAll(used));
+    });
+  });
 
   group('string substitution', () {
     test('progress fills all three placeholders', () {
