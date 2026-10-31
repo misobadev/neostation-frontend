@@ -148,12 +148,16 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Consecutive failed upload attempts due to storage quota limits.
   int _quotaExceededAttempts = 0;
 
-  /// Active pre-launch deadline, set for the duration of
-  /// [syncGameSavesBeforeLaunch]. When expired, [_downloadCloudFile] abandons
-  /// its write so a late download can't clobber a save the emulator already
-  /// has open. Null outside the pre-launch path (background syncs are
-  /// unaffected).
-  SyncDeadline? _launchDeadline;
+  /// Deadlines of the pre-launch syncs still running, by the launched game's
+  /// ROM name and, when its system's games share memory cards, also by
+  /// `system:<folder>`. Once one has passed, [_downloadCloudFile] abandons a
+  /// late download of that game or, on such a system, of any of its games,
+  /// whichever sync started it (the launch's own, or the games-list sync of
+  /// the highlighted game), so it can't clobber a save or shared card the
+  /// emulator has open. Kept per launch rather than in one field, so a launch
+  /// doesn't hold back games on other systems, and never loses its deadline
+  /// when an earlier launch's sync finishes.
+  final Map<String, SyncDeadline> _launchDeadlines = {};
 
   /// Whether the user has already been notified of a quota issue in the current session.
   bool _quotaExceededDialogShown = false;
@@ -312,11 +316,30 @@ class NeoSyncProvider extends ChangeNotifier {
     _quotaExceededActive = false;
   }
 
+  /// The deadline of a running launch of the game [romName] or, when
+  /// [sharedCardsSystem] names the game's system because its games share
+  /// memory cards, of any running launch on that system.
+  SyncDeadline? _launchDeadlineFor(String romName, String? sharedCardsSystem) =>
+      _launchDeadlines[romName] ??
+      (sharedCardsSystem == null
+          ? null
+          : _launchDeadlines[_systemLaunchKey(sharedCardsSystem)]);
+
+  static String _systemLaunchKey(String systemFolderName) =>
+      'system:$systemFolderName';
+
   /// Downloads a file from NeoSync storage and writes it to the local filesystem.
   ///
   /// Upon successful download, it synchronizes the local database sync state
-  /// to match the cloud version.
-  Future<void> _downloadCloudFile(NeoSyncFile cloudFile, File localFile) async {
+  /// to match the cloud version. Returns false, having written nothing, when
+  /// the pre-launch deadline that [deadline] returns has passed. It is asked
+  /// once the file is in, so a launch that started during the download counts.
+  /// A failed download throws.
+  Future<bool> _downloadCloudFile(
+    NeoSyncFile cloudFile,
+    File localFile, {
+    SyncDeadline? Function()? deadline,
+  }) async {
     _log.i('Download: starting ${cloudFile.fileName} -> ${localFile.path}');
     final result = await _neoSyncService.downloadFile(cloudFile.id);
     if (result['success'] == true && result['data'] != null) {
@@ -324,11 +347,11 @@ class NeoSyncProvider extends ChangeNotifier {
       // launch-blocking wait has already elapsed the game is running on the
       // local save. Abandon before any write so we never clobber the file the
       // emulator now has open or record bogus sync state.
-      if (_launchDeadline?.isExpired ?? false) {
+      if (deadline?.call()?.isExpired ?? false) {
         _log.i(
           'Abandoning download of ${cloudFile.fileName} (launch deadline passed)',
         );
-        return;
+        return false;
       }
 
       final bytes = result['data'] as List<int>;
@@ -361,6 +384,7 @@ class NeoSyncProvider extends ChangeNotifier {
       } catch (e) {
         _log.w('Could not save sync state for ${localFile.path}: $e');
       }
+      return true;
     } else {
       final reason = result['message'] ?? 'Unknown download failure';
       final statusCode = result['status_code'];

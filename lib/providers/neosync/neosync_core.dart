@@ -788,6 +788,10 @@ extension NeoSyncCore on NeoSyncProvider {
   }
 
   /// Descarga automáticamente un save de la nube
+  ///
+  /// Also returns false when a download was abandoned at the deadline of a
+  /// launch of [game] (or, on a system whose games share memory cards, of
+  /// any of its games) still running, so it is never taken for a synced save.
   Future<bool> _autoDownloadCloudSave(
     GameModel game,
     NeoSyncFile cloudSave, {
@@ -822,7 +826,10 @@ extension NeoSyncCore on NeoSyncProvider {
       NeoSyncProvider._log.i(
         'Auto-download: ${cloudSave.fileName} -> ${localPaths.join(', ')}',
       );
-      bool anySuccess = false;
+      final sharedCardsSystem = _sharesMemoryCards(system?.folderName)
+          ? system!.folderName
+          : null;
+      bool allWritten = true;
       for (final localPath in localPaths) {
         final localFile = File(localPath);
 
@@ -830,11 +837,15 @@ extension NeoSyncCore on NeoSyncProvider {
         await localFile.parent.create(recursive: true);
 
         // 3. Descargar el archivo
-        await _downloadCloudFile(cloudSave, localFile);
-        anySuccess = true;
+        final wrote = await _downloadCloudFile(
+          cloudSave,
+          localFile,
+          deadline: () => _launchDeadlineFor(game.romname, sharedCardsSystem),
+        );
+        if (!wrote) allWritten = false;
       }
 
-      return anySuccess;
+      return allWritten;
     } on QuotaExceededException {
       rethrow;
     } catch (e) {
@@ -1384,7 +1395,7 @@ extension NeoSyncCore on NeoSyncProvider {
 
   /// Descarga un archivo de la nube a un archivo local (método público)
   Future<void> downloadCloudFile(NeoSyncFile cloudFile, File localFile) async {
-    return _downloadCloudFile(cloudFile, localFile);
+    await _downloadCloudFile(cloudFile, localFile);
   }
 
   /// Helper to calculate relative path for sync, with special handling for Dreamcast
@@ -1396,15 +1407,28 @@ extension NeoSyncCore on NeoSyncProvider {
     if (!isNeoSyncAuthenticated) return;
     if (game.cloudSyncEnabled != true) return;
 
-    // Expose the deadline to the shared download path (_downloadCloudFile) so a
-    // late download abandons its write once the launch has proceeded.
-    _launchDeadline = deadline;
     // A save made on another device since the list was fetched must be seen
     // before the game starts, or the game is played on the old one.
     _markCloudListStale(olderThan: NeoSyncProvider._cloudListLaunchMaxAge);
     // Shared memory cards too, even if another game checked them already.
     _processedMultiEmulatorFilesInSession.clear();
+    // Registered so a late download of this game, or on a system whose games
+    // share memory cards of any of its games, abandons its write once the
+    // launch has proceeded, whichever sync started it; games on other systems
+    // are not held to this deadline.
+    final launchKeys = <String>[];
     try {
+      if (deadline != null) {
+        _launchDeadlines[game.romname] = deadline;
+        launchKeys.add(game.romname);
+        final system = await _getSystemForGame(game);
+        if (_sharesMemoryCards(system?.folderName)) {
+          final key = NeoSyncProvider._systemLaunchKey(system!.folderName);
+          _launchDeadlines[key] = deadline;
+          launchKeys.add(key);
+        }
+      }
+
       // Detectar saves actuales
       await detectGameSaveFiles(game);
 
@@ -1445,7 +1469,13 @@ extension NeoSyncCore on NeoSyncProvider {
     } catch (e) {
       NeoSyncProvider._log.w('Error in pre-launch sync for ${game.name}: $e');
     } finally {
-      _launchDeadline = null;
+      // Only this launch's own entries: a later launch of the game or system
+      // keeps its deadline.
+      for (final key in launchKeys) {
+        if (identical(_launchDeadlines[key], deadline)) {
+          _launchDeadlines.remove(key);
+        }
+      }
     }
   }
 
