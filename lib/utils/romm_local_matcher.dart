@@ -29,7 +29,7 @@ class RommLocalMatcher {
   /// On-disk names under which [rom] may exist locally, in match priority.
   ///
   /// A single-file ROM lands as its [RommRom.fsName]. A multi-disc ROM is
-  /// served as a zip that `extractMultiDiscZip` unpacks into disc files plus a
+  /// served as a zip that `RommArchiveService` unpacks into disc files plus a
   /// `.m3u` playlist and then deletes — so the fsName itself never exists on
   /// disk; only the playlist does. We match the playlist names that extraction
   /// would produce: the synthesised fallback (`<fsName>.m3u`) and, defensively,
