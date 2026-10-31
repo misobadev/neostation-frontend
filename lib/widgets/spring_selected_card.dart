@@ -12,10 +12,15 @@ class SpringSelectedCard extends StatefulWidget {
     super.key,
     required this.selected,
     this.previouslySelected = false,
+    this.animate = true,
     required this.child,
   });
 
   final bool selected;
+
+  /// Whether the selection lift/settle animation runs. Performance mode turns
+  /// this off while keeping the card mounted and the selection state intact.
+  final bool animate;
 
   /// The card the cursor just left. Only this card gets the settle animation;
   /// older cards snap back so fast navigation never leaves a trail of cards in
@@ -60,6 +65,8 @@ class _SpringSelectedCardState extends State<SpringSelectedCard> {
     if (!identical(widget.child, oldWidget.child)) {
       _child.value = widget.child;
     }
+
+    if (!widget.animate) return;
 
     if (widget.selected) {
       if (oldWidget.selected) return;
@@ -111,5 +118,13 @@ class _SpringSelectedCardState extends State<SpringSelectedCard> {
   }
 
   @override
-  Widget build(BuildContext context) => _animated!;
+  Widget build(BuildContext context) {
+    if (!widget.animate) {
+      return ValueListenableBuilder<Widget>(
+        valueListenable: _child,
+        builder: (context, child, _) => child,
+      );
+    }
+    return _animated!;
+  }
 }

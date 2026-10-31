@@ -274,6 +274,11 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.androidAppLayoutSystem: 'Система',
   AppLocale.androidAppLayoutTab: 'Вкладка',
   AppLocale.scanOnStartup: 'Сканировать папки при запуске',
+  AppLocale.performanceMode: 'Режим производительности',
+  AppLocale.performanceModeSubtitle:
+      'Снижает визуальные эффекты и анимации для плавной работы на слабом оборудовании',
+  AppLocale.performanceModeNeoglassDisabled:
+      'Настройки стекла недоступны в режиме производительности.',
   AppLocale.nowPlayingDimAfter: 'Затемнять Now Playing через',
   AppLocale.nowPlayingDimAfterSubtitle:
       'Бездействие перед затемнением панели на втором экране',

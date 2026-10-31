@@ -35,6 +35,35 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(_scale(tester), closeTo(1.0, 0.001));
   });
+
+  testWidgets('performance mode bypasses the scale animation', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 100,
+              height: 100,
+              child: SpringSelectedCard(
+                selected: true,
+                animate: false,
+                child: const ColoredBox(color: Colors.red),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      find.descendant(
+        of: find.byType(SpringSelectedCard),
+        matching: find.byType(Transform),
+      ),
+      findsNothing,
+    );
+  });
 }
 
 double _scale(WidgetTester tester) {

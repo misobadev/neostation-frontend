@@ -273,6 +273,18 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Trades visual effects for speed on modest hardware.
+  ///
+  /// This only overrides rendering; it does not overwrite the user's saved
+  /// NeoGlass, theme, animation or image-quality preferences.
+  Future<void> updatePerformanceMode(bool value) async {
+    if (_config.performanceMode == value) return;
+    final previous = _config;
+    _config = _config.copyWith(performanceMode: value);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
   /// Updates article handling for game title sorting.
   Future<void> updateIgnoreArticlesInGameSort(bool value) async {
     if (_config.ignoreArticlesInGameSort == value) return;
@@ -623,7 +635,7 @@ extension SqliteConfigMutators on SqliteConfigProvider {
 
   /// Sets the frosted-glass rim stroke width, clamped to a sane range.
   Future<void> updateNeoglassBorderWidth(double value) async {
-    final clamped = value.clamp(0.0, 8.0).toDouble();
+    final clamped = value.clamp(0.0, 2.0).toDouble();
     if (_config.neoglassBorderWidth == clamped) return;
     final previous = _config;
     _config = _config.copyWith(neoglassBorderWidth: clamped);

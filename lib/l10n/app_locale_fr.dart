@@ -287,6 +287,11 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.androidAppLayoutSystem: 'Système',
   AppLocale.androidAppLayoutTab: 'Onglet',
   AppLocale.scanOnStartup: 'Analyser les dossiers au démarrage',
+  AppLocale.performanceMode: 'Mode performance',
+  AppLocale.performanceModeSubtitle:
+      "Réduit les effets visuels et les animations pour garder l'application fluide sur du matériel modeste",
+  AppLocale.performanceModeNeoglassDisabled:
+      'Les contrôles du verre sont indisponibles en mode performance.',
   AppLocale.nowPlayingDimAfter: 'Atténuer Now Playing après',
   AppLocale.nowPlayingDimAfterSubtitle:
       'Inactivité avant que le panneau ne s\'atténue sur l\'écran secondaire',

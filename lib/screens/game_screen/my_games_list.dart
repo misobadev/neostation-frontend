@@ -26,6 +26,7 @@ import '../../repositories/game_repository.dart';
 import '../../services/screenscraper_service.dart';
 import '../../services/secondary_achievements_controller.dart';
 import '../../utils/gamepad_nav.dart';
+import '../../utils/performance_mode.dart';
 import '../../utils/letter_jump.dart';
 import '../../providers/file_provider.dart';
 import '../../providers/sqlite_config_provider.dart';
@@ -1691,6 +1692,32 @@ class _SystemGamesListState extends State<SystemGamesList> {
       _fileProvider,
     );
 
+    final performanceMode = context.performanceMode;
+    final child = Builder(
+      key: ValueKey(
+        'list_fanart_${game.romPath ?? game.romname}_v$artworkVersion',
+      ),
+      builder: (context) {
+        final file = File(fanartPath);
+        if (file.existsSync()) {
+          return Image.file(
+            file,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            cacheWidth: performanceCacheWidth(
+              1920,
+              performanceMode: performanceMode,
+            ),
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+
+    if (performanceMode) return child;
+
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 512),
       switchInCurve: Curves.easeOutExpo,
@@ -1713,25 +1740,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
           ),
         );
       },
-      child: Builder(
-        key: ValueKey(
-          'list_fanart_${game.romPath ?? game.romname}_v$artworkVersion',
-        ),
-        builder: (context) {
-          final file = File(fanartPath);
-          if (file.existsSync()) {
-            return Image.file(
-              file,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              cacheWidth: 1920,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            );
-          }
-          return const SizedBox.shrink();
-        },
-      ),
+      child: child,
     );
   }
 

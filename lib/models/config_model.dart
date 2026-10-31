@@ -7,6 +7,12 @@ import 'emulator_model.dart';
 String _normalizeGameListSize(String value) =>
     const {'S', 'M', 'L', 'XL'}.contains(value) ? value : 'S';
 
+bool _parseBool(Object? value) {
+  if (value is bool) return value;
+  final text = value?.toString().toLowerCase();
+  return text == '1' || text == 'true';
+}
+
 /// Reads the preview delay from the new integer key, falling back to the old
 /// on/off boolean from builds before the setting became a delay.
 int _parseVideoPreviewDelay(Map<String, dynamic> json) {
@@ -286,6 +292,13 @@ class ConfigModel {
   /// footer and becomes a 1:1 tile.
   final bool hideSystemLogos;
 
+  /// Whether the app trades visual effects for speed on modest hardware.
+  ///
+  /// This is a render-time override, not a change to the user's saved visual
+  /// preferences: turning it off restores their theme, glass, animation and
+  /// image-quality choices untouched.
+  final bool performanceMode;
+
   /// Gaussian blur sigma of the frosted-glass chrome (NeoGlass), clamped to
   /// 0–2. `0` (the default) disables the blur entirely (flat translucent
   /// panel, cheapest). Higher values are only smooth on a powerful GPU.
@@ -361,6 +374,7 @@ class ConfigModel {
     this.raMatchOnStartup = false,
     this.subfolderViewAll = false,
     this.hideSystemLogos = false,
+    this.performanceMode = false,
     this.neoglassBlur = 0,
     this.neoglassTransparency = 10,
     this.neoglassBorderWidth = 2,
@@ -638,6 +652,10 @@ class ConfigModel {
                   .toString() ==
               '1' ||
           (json['hideSystemLogos'] ?? false).toString().toLowerCase() == 'true',
+      // Absent => 0 => off: upgrades keep the existing visual behaviour.
+      performanceMode: _parseBool(
+        json['performanceMode'] ?? json['performance_mode'],
+      ),
       // Absent => 0 => blur off (the default). The frosted blur is only smooth
       // on a powerful GPU, so it starts disabled.
       neoglassBlur:
@@ -660,7 +678,7 @@ class ConfigModel {
                         .toString(),
                   ) ??
                   2)
-              .clamp(0.0, 8.0),
+              .clamp(0.0, 2.0),
     );
   }
 
@@ -751,6 +769,7 @@ class ConfigModel {
       'raMatchOnStartup': raMatchOnStartup,
       'subfolderViewAll': subfolderViewAll,
       'hideSystemLogos': hideSystemLogos,
+      'performanceMode': performanceMode,
       'neoglassBlur': neoglassBlur,
       'neoglassTransparency': neoglassTransparency,
       'neoglassBorderWidth': neoglassBorderWidth,
@@ -817,6 +836,7 @@ class ConfigModel {
     bool? raMatchOnStartup,
     bool? subfolderViewAll,
     bool? hideSystemLogos,
+    bool? performanceMode,
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
@@ -884,6 +904,7 @@ class ConfigModel {
       raMatchOnStartup: raMatchOnStartup ?? this.raMatchOnStartup,
       subfolderViewAll: subfolderViewAll ?? this.subfolderViewAll,
       hideSystemLogos: hideSystemLogos ?? this.hideSystemLogos,
+      performanceMode: performanceMode ?? this.performanceMode,
       neoglassBlur: neoglassBlur ?? this.neoglassBlur,
       neoglassTransparency: neoglassTransparency ?? this.neoglassTransparency,
       neoglassBorderWidth: neoglassBorderWidth ?? this.neoglassBorderWidth,

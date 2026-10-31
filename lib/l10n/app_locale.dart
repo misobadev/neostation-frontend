@@ -234,6 +234,10 @@ mixin AppLocale {
   static const String androidAppLayoutTab = 'android_app_layout_tab';
   static const String scanOnStartup = 'scan_on_startup';
   static const String scanOnStartupSubtitle = 'scan_on_startup_subtitle';
+  static const String performanceMode = 'performance_mode';
+  static const String performanceModeSubtitle = 'performance_mode_subtitle';
+  static const String performanceModeNeoglassDisabled =
+      'performance_mode_neoglass_disabled';
   static const String nowPlayingDimAfter = 'now_playing_dim_after';
   static const String nowPlayingDimAfterSubtitle =
       'now_playing_dim_after_subtitle';

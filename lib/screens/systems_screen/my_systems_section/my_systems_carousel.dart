@@ -226,6 +226,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   /// firing redundant postFrameCallbacks on every build.
   int _lastBackgroundBuildIndex = -1;
 
+  /// Set from the config in build; disables decorative effects at render time.
+  bool _performanceMode = false;
+
   /// Cached systems list and indicator-label widths from the last build.
   /// The continuous scroll handler (fired every frame while swiping) reads
   /// these instead of rebuilding the list + re-measuring text every frame.
@@ -837,7 +840,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
   /// Logic to update the global system background provider on selection change.
   void _updateBackground(SystemInfo system) {
-    if (!mounted || !widget.enableDynamicBackground) return;
+    if (!mounted || !widget.enableDynamicBackground || _performanceMode) return;
 
     final displayFolderName = system.primaryFolderName;
     final customBgPath = system.customBackgroundPath;
@@ -933,6 +936,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
     final allSystems = _getSystemsList();
+    _performanceMode = context.select<SqliteConfigProvider, bool>(
+      (p) => p.config.performanceMode,
+    );
     // When the logo footer is hidden the card is square, so the carousel drops
     // its reserved footer height and uses square pages.
     final hideSystemLogos = widget.hideSystemLogos;
@@ -1045,13 +1051,22 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                     // edge, leaving a ~16px sliver. Floor the scale, lift
                     // the fade, and pull the outer pair back toward the
                     // pack so the row visibly continues past both edges.
-                    depth: const CarouselDepth(
-                      minScale: 0.7,
-                      opacityBase: 0.75,
-                      opacityFalloff: 0.55,
-                      minOpacity: 0.3,
-                      edgePull: 0.15,
-                    ),
+                    performanceMode: _performanceMode,
+                    depth: _performanceMode
+                        ? const CarouselDepth(
+                            minScale: 1,
+                            opacityBase: 1,
+                            opacityFalloff: 0,
+                            minOpacity: 1,
+                            edgePull: 0,
+                          )
+                        : const CarouselDepth(
+                            minScale: 0.7,
+                            opacityBase: 0.75,
+                            opacityFalloff: 0.55,
+                            minOpacity: 0.3,
+                            edgePull: 0.15,
+                          ),
                     itemBuilder: (context, index) {
                       final system = allSystems[index];
                       final isSelected = index == _currentIndex;

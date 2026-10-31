@@ -281,6 +281,11 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.androidAppLayoutSystem: 'System',
   AppLocale.androidAppLayoutTab: 'Tab',
   AppLocale.scanOnStartup: 'Ordner beim Start scannen',
+  AppLocale.performanceMode: 'Leistungsmodus',
+  AppLocale.performanceModeSubtitle:
+      'Reduziert visuelle Effekte und Animationen für flüssigere Bedienung auf schwacher Hardware',
+  AppLocale.performanceModeNeoglassDisabled:
+      'Die Glas-Optionen sind im Leistungsmodus nicht verfügbar.',
   AppLocale.nowPlayingDimAfter: 'Now Playing abdunkeln nach',
   AppLocale.nowPlayingDimAfterSubtitle:
       'Inaktivität bevor das In-Game-Panel auf dem Zweitbildschirm abgedunkelt wird',

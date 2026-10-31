@@ -281,6 +281,11 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.androidAppLayoutSystem: 'Sistema',
   AppLocale.androidAppLayoutTab: 'Scheda',
   AppLocale.scanOnStartup: 'Scansiona cartelle all’avvio',
+  AppLocale.performanceMode: 'Modalità prestazioni',
+  AppLocale.performanceModeSubtitle:
+      "Riduce effetti visivi e animazioni per mantenere l'app fluida su hardware modesto",
+  AppLocale.performanceModeNeoglassDisabled:
+      'I controlli del vetro non sono disponibili in modalità prestazioni.',
   AppLocale.nowPlayingDimAfter: 'Oscura Now Playing dopo',
   AppLocale.nowPlayingDimAfterSubtitle:
       'Inattività prima che il panel si oscuri sullo schermo secondario',

@@ -25,6 +25,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/widgets/game_view_footer.dart';
 import 'package:neostation/widgets/spring_selected_card.dart';
+import 'package:neostation/utils/performance_mode.dart';
 import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/models/retro_achievements_game_info.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
@@ -236,6 +237,9 @@ class _GamesGridState extends State<GamesGrid> {
   List<double> _cardHOverW = [];
   bool _needsMeasure = true;
 
+  /// Set from the config in build; disables decorative effects at render time.
+  bool _performanceMode = false;
+
   // Image dimension cache
   static final Map<String, Size?> _imageSizeCache = {};
 
@@ -384,6 +388,9 @@ class _GamesGridState extends State<GamesGrid> {
   /// `_cardWidth * _heightRatioFor(i)`.
   double _heightRatioFor(int index) {
     if (_isFanart) return 1.0;
+    // Header reads are the expensive part of this lookup; performance mode
+    // uses the square fallback rather than opening every box-art file.
+    if (_performanceMode) return 1.0;
 
     // Folder tiles are always square (no box art to measure).
     if (index < widget.folderCount) return 1.0;
@@ -419,6 +426,11 @@ class _GamesGridState extends State<GamesGrid> {
     final n = widget.games.length;
     _cardHOverW = List<double>.filled(n, 1.0);
     _loadedDims.clear();
+    if (_performanceMode) {
+      _loadedDims.addAll(List<int>.generate(n, (i) => i));
+      _needsMeasure = false;
+      return;
+    }
     if (!_isFanart) {
       for (int i = 0; i < n; i++) {
         _cardHOverW[i] = _heightRatioFor(i);
@@ -536,7 +548,7 @@ class _GamesGridState extends State<GamesGrid> {
 
   // Lazy dimension loading for newly visible cards
   void _ensureDims(int index) {
-    if (_isFanart) return;
+    if (_isFanart || _performanceMode) return;
     if (_loadedDims.contains(index)) return;
     final path = _box2dPath(index);
     final hadBefore = _imageSizeCache.containsKey(path);
@@ -1058,6 +1070,14 @@ class _GamesGridState extends State<GamesGrid> {
     _showAchievementsBadge = context.select<SqliteConfigProvider, bool>(
       (p) => p.config.showAchievementsBadge,
     );
+    final performanceMode = context.select<SqliteConfigProvider, bool>(
+      (p) => p.config.performanceMode,
+    );
+    if (performanceMode != _performanceMode) {
+      _performanceMode = performanceMode;
+      // Turning it off must re-read the box-art ratios the mode skipped.
+      _needsMeasure = true;
+    }
     _collections = SystemFolderNames.isCollection(widget.system.folderName)
         ? null
         : context.watch<CollectionsProvider>();
@@ -1210,21 +1230,24 @@ class _GamesGridState extends State<GamesGrid> {
                         key: ValueKey('spring_game_$identity'),
                         selected: idx == _selectedIndex,
                         previouslySelected: idx == _previousSelectedIndex,
+                        animate: !_performanceMode,
                         child: cell,
                       );
-                      cell = AnimationConfiguration.staggeredGrid(
-                        position: idx,
-                        columnCount: _cols,
-                        duration: const Duration(milliseconds: 320),
-                        delay: const Duration(milliseconds: 24),
-                        child: FadeInAnimation(
+                      if (!_performanceMode) {
+                        cell = AnimationConfiguration.staggeredGrid(
+                          position: idx,
+                          columnCount: _cols,
                           duration: const Duration(milliseconds: 320),
-                          child: SlideAnimation(
-                            verticalOffset: 14.r,
-                            child: ScaleAnimation(scale: 0.98, child: cell),
+                          delay: const Duration(milliseconds: 24),
+                          child: FadeInAnimation(
+                            duration: const Duration(milliseconds: 320),
+                            child: SlideAnimation(
+                              verticalOffset: 14.r,
+                              child: ScaleAnimation(scale: 0.98, child: cell),
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      }
                       cards.add(
                         SizedBox(
                           width: rect.width,
@@ -1469,7 +1492,10 @@ class _GamesGridState extends State<GamesGrid> {
                 key: ValueKey('img_${game.romname}_${widget.artworkVersion}'),
                 box2dPath: box2dPath,
                 game: game,
-                targetWidth: targetWidth,
+                targetWidth: performanceCacheWidth(
+                  targetWidth,
+                  performanceMode: _performanceMode,
+                ),
               ),
             ),
             if (game.isFavorite == true)
@@ -1604,7 +1630,10 @@ class _GamesGridState extends State<GamesGrid> {
                     File(bgPath),
                     key: ValueKey('fanart_bg_${game.romname}'),
                     fit: BoxFit.cover,
-                    cacheWidth: 388,
+                    cacheWidth: performanceCacheWidth(
+                      388,
+                      performanceMode: _performanceMode,
+                    ),
                     errorBuilder: (ctx, e, s) =>
                         _buildFallbackCard(game, theme),
                   )
@@ -1639,7 +1668,10 @@ class _GamesGridState extends State<GamesGrid> {
                         File(wheelsPath),
                         key: ValueKey('wheel_${game.romname}'),
                         fit: BoxFit.contain,
-                        cacheWidth: 388,
+                        cacheWidth: performanceCacheWidth(
+                          388,
+                          performanceMode: _performanceMode,
+                        ),
                         errorBuilder: (ctx, e, s) => const SizedBox.shrink(),
                       ),
                     ),
@@ -1757,6 +1789,10 @@ class _GamesGridState extends State<GamesGrid> {
         file,
         fit: BoxFit.cover,
         gaplessPlayback: true,
+        cacheWidth: performanceCacheWidth(
+          512,
+          performanceMode: _performanceMode,
+        ),
         errorBuilder: (_, _, _) => const SizedBox.shrink(),
       ),
     );

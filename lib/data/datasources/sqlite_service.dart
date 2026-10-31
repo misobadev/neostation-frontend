@@ -469,7 +469,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 186;
+  static const int _databaseVersion = 188;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1988,6 +1988,7 @@ class SqliteService {
         ra_match_on_startup INTEGER DEFAULT 0,
         subfolder_view_all INTEGER DEFAULT 0,
         hide_system_logos INTEGER DEFAULT 0,
+        performance_mode INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
         neoglass_border_width REAL DEFAULT 2
@@ -2881,6 +2882,7 @@ class SqliteService {
     int? raMatchOnStartup,
     int? subfolderViewAll,
     int? hideSystemLogos,
+    int? performanceMode,
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
@@ -3058,6 +3060,9 @@ class SqliteService {
     }
     if (hideSystemLogos != null) {
       updates['hide_system_logos'] = hideSystemLogos;
+    }
+    if (performanceMode != null) {
+      updates['performance_mode'] = performanceMode;
     }
     if (neoglassBlur != null) {
       updates['neoglass_blur'] = neoglassBlur;

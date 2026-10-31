@@ -74,32 +74,56 @@ class NeoGlass extends StatelessWidget {
   /// Reads the user's NeoGlass preferences from [SqliteConfigProvider], falling
   /// back to the feature defaults when the provider is absent (e.g. a preview
   /// subtree built without it).
-  static ({double blur, int transparency, double borderWidth}) _prefs(
-    BuildContext context,
-  ) {
+  static ({
+    double blur,
+    int transparency,
+    double borderWidth,
+    bool performanceMode,
+  })
+  _prefs(BuildContext context) {
     try {
       final config = context.watch<SqliteConfigProvider>().config;
+      // Performance mode only overrides the effects, never the stored
+      // preferences: turning it off restores the user's glass untouched.
+      if (config.performanceMode) {
+        return (
+          blur: 0,
+          transparency: config.neoglassTransparency,
+          borderWidth: 0,
+          performanceMode: true,
+        );
+      }
       return (
         blur: config.neoglassBlur.toDouble(),
         transparency: config.neoglassTransparency,
         borderWidth: config.neoglassBorderWidth,
+        performanceMode: false,
       );
     } catch (_) {
-      return (blur: 0, transparency: 10, borderWidth: 2);
+      return (
+        blur: 0,
+        transparency: 10,
+        borderWidth: 2,
+        performanceMode: false,
+      );
     }
   }
 
   /// The rim stroke width NeoGlass will draw: the explicit [override] when
   /// given, otherwise the user's configured value. `0` means no rim/border.
-  static double borderWidthOf(BuildContext context, {double? override}) =>
-      override ?? _prefs(context).borderWidth;
+  static double borderWidthOf(BuildContext context, {double? override}) {
+    final prefs = _prefs(context);
+    return prefs.performanceMode ? 0.0 : (override ?? prefs.borderWidth);
+  }
 
   @override
   Widget build(BuildContext context) {
     final prefs = _prefs(context);
-    final effectiveBlur = blur ?? prefs.blur;
+    final effectiveBlur = prefs.performanceMode ? 0.0 : (blur ?? prefs.blur);
     final effectiveTransparency = transparency ?? prefs.transparency;
-    final effectiveBorderWidth = borderWidth ?? prefs.borderWidth;
+    final effectiveBorderWidth = prefs.performanceMode
+        ? 0.0
+        : (borderWidth ?? prefs.borderWidth);
     // Transparency 0–30 maps to the tint alpha: 0 → opaque (1.0), 30 → the
     // maximum see-through (0.5). The scale never reaches full transparency, so
     // the glass always stays readable against the backdrop.
@@ -173,7 +197,10 @@ class NeoGlassRim extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = borderWidth ?? NeoGlass._prefs(context).borderWidth;
+    final prefs = NeoGlass._prefs(context);
+    final width = prefs.performanceMode
+        ? 0.0
+        : (borderWidth ?? prefs.borderWidth);
     return CustomPaint(
       foregroundPainter: (intensity > 0 && width > 0)
           ? _GlassRimPainter(

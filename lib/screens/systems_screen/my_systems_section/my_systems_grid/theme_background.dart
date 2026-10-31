@@ -69,7 +69,7 @@ extension _ThemeBackground on _SystemCardGridViewState {
   }
 
   void _precacheSystemBackgrounds() {
-    if (!mounted) return;
+    if (!mounted || _performanceMode) return;
     final systems = _toSystemCards(widget.systems);
     for (final sys in systems) {
       if (sys.isGame) {

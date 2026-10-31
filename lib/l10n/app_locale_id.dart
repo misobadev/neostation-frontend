@@ -274,6 +274,11 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.androidAppLayoutSystem: 'Sistem',
   AppLocale.androidAppLayoutTab: 'Tab',
   AppLocale.scanOnStartup: 'Pindai folder saat mulai',
+  AppLocale.performanceMode: 'Mode Performa',
+  AppLocale.performanceModeSubtitle:
+      'Mengurangi efek visual dan animasi agar aplikasi tetap lancar di perangkat kelas bawah',
+  AppLocale.performanceModeNeoglassDisabled:
+      'Kontrol kaca tidak tersedia saat Mode Performa aktif.',
   AppLocale.nowPlayingDimAfter: 'Redupkan Now Playing setelah',
   AppLocale.nowPlayingDimAfterSubtitle:
       'Waktu tidak aktif sebelum panel meredup di layar sekunder',

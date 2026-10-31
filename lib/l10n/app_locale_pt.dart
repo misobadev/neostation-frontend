@@ -280,6 +280,11 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.androidAppLayoutSystem: 'Sistema',
   AppLocale.androidAppLayoutTab: 'Aba',
   AppLocale.scanOnStartup: 'Varrer pastas ao iniciar',
+  AppLocale.performanceMode: 'Modo desempenho',
+  AppLocale.performanceModeSubtitle:
+      'Reduz efeitos visuais e animações para manter o app fluido em hardware modesto',
+  AppLocale.performanceModeNeoglassDisabled:
+      'Os controles de vidro não estão disponíveis no modo desempenho.',
   AppLocale.nowPlayingDimAfter: 'Escurecer Now Playing após',
   AppLocale.nowPlayingDimAfterSubtitle:
       'Inatividade antes do painel escurecer na tela secundária',

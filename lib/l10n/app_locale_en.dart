@@ -271,6 +271,11 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.androidAppLayoutSystem: 'System',
   AppLocale.androidAppLayoutTab: 'Tab',
   AppLocale.scanOnStartup: 'Scan folders on Startup',
+  AppLocale.performanceMode: 'Performance Mode',
+  AppLocale.performanceModeSubtitle:
+      'Reduces visual effects and animations to keep the app responsive on low-end hardware',
+  AppLocale.performanceModeNeoglassDisabled:
+      'Glass controls are unavailable while Performance Mode is on.',
   AppLocale.nowPlayingDimAfter: 'Dim Now Playing after',
   AppLocale.nowPlayingDimAfterSubtitle:
       'Inactivity before the in-game panel dims on the secondary screen',

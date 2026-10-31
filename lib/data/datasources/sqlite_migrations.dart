@@ -695,6 +695,12 @@ class SqliteMigrations {
       case 186:
         await _migrateToVersion186(db);
         break;
+      case 187:
+        await _migrateToVersion187(db);
+        break;
+      case 188:
+        await _migrateToVersion188(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7587,6 +7593,62 @@ class SqliteMigrations {
       _log.i('Migration v186 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v186: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v187: adds `user_config.performance_mode`.
+  ///
+  /// Off by default, so upgrades keep the current visual behaviour. Guarded
+  /// like every other migration: a database already past this version still
+  /// gets the column instead of failing every config read.
+  static Future<void> _migrateToVersion187(Database db) async {
+    _log.i('Migration v187: Adding performance_mode to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('performance_mode')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN performance_mode '
+          'INTEGER DEFAULT 0',
+        );
+        _log.i('Column performance_mode added via v187');
+      } else {
+        _log.i('Column performance_mode already exists');
+      }
+      _log.i('Migration v187 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v187: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v188: clamps the NeoGlass border width to the new 0–2 range.
+  ///
+  /// Older builds allowed 0–4 (and briefly higher); the settings UI and config
+  /// model now cap at 2, so existing rows are lowered to the new maximum.
+  static Future<void> _migrateToVersion188(Database db) async {
+    _log.i('Migration v188: Clamping neoglass border width');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('neoglass_border_width')) {
+        _log.i('v188: neoglass_border_width is not present, nothing to clamp');
+        return;
+      }
+      db.execute(
+        'UPDATE user_config SET neoglass_border_width = 2 '
+        'WHERE neoglass_border_width > 2',
+      );
+      _log.i('Migration v188 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v188: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

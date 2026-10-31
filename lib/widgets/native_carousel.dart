@@ -125,6 +125,13 @@ class NativeCarousel extends StatefulWidget {
   /// Shrink/fade envelope applied to off-centre pages.
   final CarouselDepth depth;
 
+  /// Whether to skip the per-page scale/fade envelope entirely.
+  ///
+  /// Performance mode keeps the PageView and its snapping, navigation and page
+  /// callbacks untouched; it only omits the decorative transforms that make
+  /// off-centre cards shrink and fade.
+  final bool performanceMode;
+
   /// Whether stepping past either end continues from the other.
   ///
   /// Off by default, which is what the systems carousel wants: it is a short
@@ -144,6 +151,7 @@ class NativeCarousel extends StatefulWidget {
     this.footerHeight,
     this.depth = const CarouselDepth(),
     this.wrap = false,
+    this.performanceMode = false,
   });
 
   @override
@@ -423,6 +431,7 @@ class NativeCarouselState extends State<NativeCarousel> {
                       child: widget.itemBuilder(context, index),
                     ),
                   );
+                  if (widget.performanceMode) return card;
                   return ValueListenableBuilder<double>(
                     valueListenable: _pageNotifier,
                     child: card,

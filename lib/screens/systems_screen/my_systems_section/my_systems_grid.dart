@@ -835,6 +835,9 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   /// settle animation; all earlier cards snap back to rest.
   int? _previousSelectedIndex;
 
+  /// Set from the config in build; disables decorative effects at render time.
+  bool _performanceMode = false;
+
   /// Cached ThemeData with scrollbar overrides — rebuilt only in didChangeDependencies.
   ThemeData? _cachedThemeData;
   ScrollBehavior? _cachedScrollBehavior;
@@ -997,6 +1000,9 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
         final isScanning = context.select<SqliteConfigProvider, bool>(
           (p) => p.isScanning,
         );
+        _performanceMode = context.select<SqliteConfigProvider, bool>(
+          (p) => p.config.performanceMode,
+        );
         if (neoThemeFolder != _lastThemeFolder) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _loadThemeAssetsForSystems();
@@ -1145,6 +1151,42 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   /// System cards can now have per-card aspect ratios (e.g. 1:1 when the system
   /// logo is hidden). Each row's height is derived from the tallest card in that
   /// row, eliminating empty footer space inside the card itself.
+  Widget _buildCardNode({
+    required Widget cardWidget,
+    required SystemInfo card,
+    required int cardIdx,
+    required bool cardIsSelected,
+  }) {
+    return SpringSelectedCard(
+      key: ValueKey('spring_card_${card.title}_$cardIdx'),
+      selected: cardIsSelected,
+      previouslySelected: cardIdx == _previousSelectedIndex,
+      animate: !_performanceMode,
+      child: RepaintBoundary(
+        // The anchor is a sibling overlay, never a wrapper around the card.
+        // Wrapping only the selected card changes that card's subtree shape as
+        // the selection travels, which remounts `SystemCard` and reloads its
+        // artwork — a visible flicker on every D-pad press. Here the tree is
+        // identical for every card and only the `SizedBox`'s key moves; a
+        // `SizedBox` has no state to lose. `passthrough` hands the card exactly
+        // the constraints it had before the Stack existed.
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            cardWidget,
+            Positioned.fill(
+              child: IgnorePointer(
+                child: SizedBox.expand(
+                  key: cardIsSelected ? widget.selectedItemKey : null,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildWideCardGrid(
     BuildContext context,
     List<SystemInfo> systemCards,
@@ -1284,53 +1326,34 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
                 top: top,
                 width: width,
                 height: cardHeight,
-                child: AnimationConfiguration.staggeredGrid(
-                  position: animationPosition,
-                  columnCount: cols,
-                  duration: const Duration(milliseconds: 360),
-                  delay: const Duration(milliseconds: 32),
-                  child: FadeInAnimation(
-                    duration: const Duration(milliseconds: 360),
-                    child: SlideAnimation(
-                      verticalOffset: 18.r,
-                      child: ScaleAnimation(
-                        scale: 0.97,
-                        child: SpringSelectedCard(
-                          key: ValueKey('spring_card_${card.title}_$cardIdx'),
-                          selected: cardIsSelected,
-                          previouslySelected: cardIdx == _previousSelectedIndex,
-                          child: RepaintBoundary(
-                            // The anchor is a sibling overlay, never a wrapper
-                            // around the card. Wrapping only the selected card
-                            // changes that card's subtree shape as the selection
-                            // travels, which remounts `SystemCard` and reloads
-                            // its artwork — a visible flicker on every D-pad
-                            // press. Here the tree is identical for every card
-                            // and only the `SizedBox`'s key moves; a `SizedBox`
-                            // has no state to lose. `passthrough` hands the card
-                            // exactly the constraints it had before the Stack
-                            // existed.
-                            child: Stack(
-                              fit: StackFit.passthrough,
-                              children: [
-                                cardWidget,
-                                Positioned.fill(
-                                  child: IgnorePointer(
-                                    child: SizedBox.expand(
-                                      key: cardIsSelected
-                                          ? widget.selectedItemKey
-                                          : null,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                child: _performanceMode
+                    ? _buildCardNode(
+                        cardWidget: cardWidget,
+                        card: card,
+                        cardIdx: cardIdx,
+                        cardIsSelected: cardIsSelected,
+                      )
+                    : AnimationConfiguration.staggeredGrid(
+                        position: animationPosition,
+                        columnCount: cols,
+                        duration: const Duration(milliseconds: 360),
+                        delay: const Duration(milliseconds: 32),
+                        child: FadeInAnimation(
+                          duration: const Duration(milliseconds: 360),
+                          child: SlideAnimation(
+                            verticalOffset: 18.r,
+                            child: ScaleAnimation(
+                              scale: 0.97,
+                              child: _buildCardNode(
+                                cardWidget: cardWidget,
+                                card: card,
+                                cardIdx: cardIdx,
+                                cardIsSelected: cardIsSelected,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
               ),
             );
 

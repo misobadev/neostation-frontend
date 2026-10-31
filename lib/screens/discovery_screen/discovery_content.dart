@@ -205,6 +205,15 @@ class DiscoveryContentState extends State<DiscoveryContent> {
 
     final slotId = entry.pick.slotId;
     final provider = context.read<DiscoveryProvider>();
+
+    // Performance mode skips the sixteen-frame slot machine. The re-roll is
+    // the same database write; only the visual shuffle is dropped.
+    if (context.read<SqliteConfigProvider>().config.performanceMode) {
+      await provider.reroll(slotId);
+      if (mounted) SfxService().playEnterSound();
+      return;
+    }
+
     final pool = provider.board?.shufflePool ?? const <DatabaseGameModel>[];
 
     // Nothing to flash through: re-roll plainly rather than sit still.

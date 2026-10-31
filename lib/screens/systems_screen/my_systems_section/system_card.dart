@@ -21,6 +21,7 @@ import '../../../utils/image_utils.dart';
 import '../../../widgets/cover_mosaic.dart';
 import '../../../widgets/system_logo_fallback.dart';
 import '../../../utils/game_utils.dart';
+import '../../../utils/performance_mode.dart';
 import '../../../utils/count_label.dart';
 
 /// Replaces the card the systems grid/carousel would otherwise build for one
@@ -122,6 +123,9 @@ class _SystemCardState extends State<SystemCard> {
 
   String? _themeBackgroundPath;
   String _lastThemeFolder = '';
+
+  /// Set from the config in build; controls the render-time effect overrides.
+  bool _performanceMode = false;
 
   /// Cached wheel file and existence check — computed once, not on every build.
   File? _cachedWheelFile;
@@ -284,6 +288,7 @@ class _SystemCardState extends State<SystemCard> {
           (p) => p.config.hideSystemLogos,
         ) &&
         !SystemFolderNames.isCollection(widget.info.folderName);
+    _performanceMode = context.performanceMode;
 
     if (!widget.info.isGame && themeFolder != _lastThemeFolder) {
       _lastThemeFolder = themeFolder;
@@ -315,7 +320,7 @@ class _SystemCardState extends State<SystemCard> {
                   ? Theme.of(context).colorScheme.secondary
                   : Theme.of(context).colorScheme.surface,
               borderRadius: outerRadius,
-              boxShadow: widget.showShadow
+              boxShadow: widget.showShadow && !_performanceMode
                   ? [
                       BoxShadow(
                         color: Theme.of(
@@ -439,7 +444,7 @@ class _SystemCardState extends State<SystemCard> {
   /// Orchestrates background rendering, selecting between static images,
   /// music cover shaders, or GIF animators.
   Widget _buildSystemBackground() {
-    if (widget.info.folderName == 'music') {
+    if (widget.info.folderName == 'music' && !_performanceMode) {
       return AnimatedBuilder(
         animation: _musicPlayerService,
         builder: (context, child) {
@@ -476,6 +481,14 @@ class _SystemCardState extends State<SystemCard> {
   Widget _buildDefaultSystemBackground() {
     final customBgPath = widget.info.customBackgroundPath;
     final hasCustomBg = customBgPath != null && customBgPath.isNotEmpty;
+
+    // Performance mode never creates the GIF shader; the card falls back to
+    // its static tint/mosaic instead of animating a background.
+    if (_performanceMode &&
+        ((hasCustomBg && ImageUtils.isGif(customBgPath)) ||
+            (!hasCustomBg && ImageUtils.isGif(_themeBackgroundPath)))) {
+      return _buildArtlessBackground();
+    }
 
     // SCENARIO A: Animated GIF (custom or theme-provided).
     if (hasCustomBg && ImageUtils.isGif(customBgPath)) {
@@ -540,7 +553,10 @@ class _SystemCardState extends State<SystemCard> {
                 File(activeBgPath),
                 key: ValueKey('${activeBgPath}_${widget.info.imageVersion}'),
                 fit: BoxFit.cover,
-                cacheWidth: widget.backgroundCacheWidth,
+                cacheWidth: performanceCacheWidth(
+                  widget.backgroundCacheWidth,
+                  performanceMode: _performanceMode,
+                ),
                 errorBuilder: (context, error, stackTrace) =>
                     _buildArtlessBackground(),
               )
@@ -588,7 +604,7 @@ class _SystemCardState extends State<SystemCard> {
       );
     }
 
-    if (mosaicPaths.isEmpty) return tint;
+    if (mosaicPaths.isEmpty || _performanceMode) return tint;
 
     return Stack(
       fit: StackFit.expand,
@@ -645,7 +661,7 @@ class _SystemCardState extends State<SystemCard> {
     Widget assetLogo() => Image.asset(
       assetLogoPath,
       height: resolvedHeight,
-      cacheWidth: 256,
+      cacheWidth: performanceCacheWidth(256, performanceMode: _performanceMode),
       fit: BoxFit.contain,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
           tint(child),
@@ -658,7 +674,10 @@ class _SystemCardState extends State<SystemCard> {
         File(customLogoPath),
         key: ValueKey('${customLogoPath}_${widget.info.imageVersion}'),
         height: resolvedHeight,
-        cacheWidth: 256,
+        cacheWidth: performanceCacheWidth(
+          256,
+          performanceMode: _performanceMode,
+        ),
         fit: BoxFit.contain,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
             tint(child),
@@ -710,7 +729,10 @@ class _SystemCardState extends State<SystemCard> {
                         _cachedWheelFile!,
                         height: 256.r,
                         fit: BoxFit.contain,
-                        cacheWidth: 512,
+                        cacheWidth: performanceCacheWidth(
+                          512,
+                          performanceMode: _performanceMode,
+                        ),
                         errorBuilder: (context, error, stackTrace) =>
                             const SizedBox.shrink(),
                       ),

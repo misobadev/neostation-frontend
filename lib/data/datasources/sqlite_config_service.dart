@@ -472,6 +472,11 @@ class SqliteConfigService {
                 ) ??
                 0) ==
             1,
+        // Missing column/row => 0 => off (the default).
+        performanceMode:
+            (int.tryParse(userConfig?['performance_mode']?.toString() ?? '0') ??
+                0) ==
+            1,
         // Missing column/row => 0 => blur off (the default). The frosted blur
         // is only smooth on a powerful GPU, so it starts disabled.
         neoglassBlur:
@@ -490,7 +495,7 @@ class SqliteConfigService {
                       userConfig?['neoglass_border_width']?.toString() ?? '2',
                     ) ??
                     2)
-                .clamp(0.0, 8.0),
+                .clamp(0.0, 2.0),
       );
     } catch (e) {
       _log.e('Error applying configuration in loadConfig: $e');
@@ -575,6 +580,7 @@ class SqliteConfigService {
           raMatchOnStartup: config.raMatchOnStartup ? 1 : 0,
           subfolderViewAll: config.subfolderViewAll ? 1 : 0,
           hideSystemLogos: config.hideSystemLogos ? 1 : 0,
+          performanceMode: config.performanceMode ? 1 : 0,
           neoglassBlur: config.neoglassBlur,
           neoglassTransparency: config.neoglassTransparency,
           neoglassBorderWidth: config.neoglassBorderWidth,

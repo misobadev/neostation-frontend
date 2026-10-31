@@ -175,6 +175,7 @@ class DatabaseTestHelper {
         ra_match_on_startup INTEGER DEFAULT 0,
         subfolder_view_all INTEGER DEFAULT 0,
         hide_system_logos INTEGER DEFAULT 0,
+        performance_mode INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
         neoglass_border_width REAL DEFAULT 2

@@ -11,6 +11,7 @@ import '../../../providers/file_provider.dart';
 import '../../../services/sfx_service.dart';
 import '../../../themes/corner_radii.dart';
 import '../../../widgets/neo_glass.dart';
+import '../../../utils/performance_mode.dart';
 import '../discovery_mosaic.dart';
 
 /// One card of the Discovery board, built from the same chrome as [SystemCard].
@@ -47,6 +48,7 @@ class DiscoveryCard extends StatelessWidget {
     final outerRadiusPx = radii?.radiusExternalRadius ?? 14.r;
     final innerRadius = radii?.radiusInternal ?? BorderRadius.circular(9.r);
     const artworkInset = 4.0;
+    final performanceMode = context.performanceMode;
 
     return Padding(
       padding: EdgeInsets.all(2.r),
@@ -58,13 +60,15 @@ class DiscoveryCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: isSelected ? scheme.secondary : scheme.surface,
               borderRadius: outerRadius,
-              boxShadow: [
-                BoxShadow(
-                  color: scheme.shadow.withValues(alpha: 0.1),
-                  blurRadius: 4.r,
-                  offset: Offset(2.0.r, 2.0.r),
-                ),
-              ],
+              boxShadow: performanceMode
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: scheme.shadow.withValues(alpha: 0.1),
+                        blurRadius: 4.r,
+                        offset: Offset(2.0.r, 2.0.r),
+                      ),
+                    ],
             ),
             child: ClipRRect(
               borderRadius: innerRadius,
@@ -263,7 +267,10 @@ class _DiscoveryWheel extends StatelessWidget {
                 File(path),
                 height: 256.r,
                 fit: BoxFit.contain,
-                cacheWidth: 512,
+                cacheWidth: performanceCacheWidth(
+                  512,
+                  performanceMode: context.performanceMode,
+                ),
                 errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
             ),
@@ -285,7 +292,10 @@ class _DiscoveryWheel extends StatelessWidget {
               child: Image.file(
                 File(path),
                 fit: BoxFit.contain,
-                cacheWidth: 388,
+                cacheWidth: performanceCacheWidth(
+                  388,
+                  performanceMode: context.performanceMode,
+                ),
                 errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
             ),
@@ -338,9 +348,12 @@ class DiscoveryTileArt extends StatelessWidget {
       builder: (context, constraints) => Image.file(
         File(path),
         fit: BoxFit.cover,
-        cacheWidth: constraints.maxWidth.isFinite
-            ? (constraints.maxWidth * 2).round()
-            : 640,
+        cacheWidth: performanceCacheWidth(
+          constraints.maxWidth.isFinite
+              ? (constraints.maxWidth * 2).round()
+              : 640,
+          performanceMode: context.performanceMode,
+        ),
         errorBuilder: (_, _, _) => _placeholder(theme),
       ),
     );

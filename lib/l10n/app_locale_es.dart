@@ -279,6 +279,11 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.androidAppLayoutSystem: 'Sistema',
   AppLocale.androidAppLayoutTab: 'Pestaña',
   AppLocale.scanOnStartup: 'Escanear al Iniciar',
+  AppLocale.performanceMode: 'Modo rendimiento',
+  AppLocale.performanceModeSubtitle:
+      'Reduce efectos visuales y animaciones para mantener la app fluida en hardware modesto',
+  AppLocale.performanceModeNeoglassDisabled:
+      'Los controles de cristal no están disponibles con el Modo rendimiento activado.',
   AppLocale.nowPlayingDimAfter: 'Atenuar «Reproduciendo» tras',
   AppLocale.nowPlayingDimAfterSubtitle:
       'Inactividad antes de atenuar el panel en la pantalla secundaria',

@@ -10,6 +10,7 @@ import '../../../services/android_service.dart';
 import '../../../services/sfx_service.dart';
 import '../../../themes/corner_radii.dart';
 import '../../../widgets/neo_glass.dart';
+import '../../../utils/performance_mode.dart';
 
 /// One Android app card, built from the same chrome as [SystemCard].
 ///
@@ -109,13 +110,15 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
             decoration: BoxDecoration(
               color: widget.isSelected ? scheme.secondary : scheme.surface,
               borderRadius: outerRadius,
-              boxShadow: [
-                BoxShadow(
-                  color: scheme.shadow.withValues(alpha: 0.1),
-                  blurRadius: 4.r,
-                  offset: Offset(2.0.r, 2.0.r),
-                ),
-              ],
+              boxShadow: context.performanceMode
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: scheme.shadow.withValues(alpha: 0.1),
+                        blurRadius: 4.r,
+                        offset: Offset(2.0.r, 2.0.r),
+                      ),
+                    ],
             ),
             child: ClipRRect(
               borderRadius: innerRadius,
