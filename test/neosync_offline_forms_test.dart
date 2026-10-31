@@ -7,13 +7,24 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/models/billing_models.dart';
+import 'package:neostation/models/neo_sync_models.dart';
+import 'package:neostation/models/user.dart';
+import 'package:neostation/providers/neo_sync_provider.dart';
+import 'package:neostation/screens/neo_sync_screen/login_screen/neo_sync_content.dart';
+import 'package:neostation/screens/neo_sync_screen/login_screen/neo_sync_dialogs.dart';
 import 'package:neostation/screens/neo_sync_screen/login_screen/plan_selection_view.dart';
 import 'package:neostation/services/credential_store.dart';
+import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/billing_service.dart';
+import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/auth_form.dart';
+import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -23,6 +34,11 @@ import 'fake_credential_backends.dart';
 // long as the socket lived and then showed the client's English "Network
 // error: …" text. Each A press while it spun sent another request, and backing
 // out of the password-reset view mid-request left the Login button spinning.
+//
+// On the plans view, each A press, Enter or footer tap while an upgrade or a
+// cancellation was out sent it again, and a change NeoSync didn't confirm in
+// time was reported as NeoSync being out of reach, inviting a retry of a
+// change that may have gone through.
 
 /// Never answers, and counts the requests it was sent.
 class _SilentClient extends http.BaseClient {
@@ -38,6 +54,113 @@ class _SilentClient extends http.BaseClient {
 class _SignedIn extends AuthService {
   @override
   bool get isLoggedIn => true;
+}
+
+/// Signed in on [plan]; each profile refresh is written to [log].
+class _Subscriber extends AuthService {
+  _Subscriber(this.plan, [List<String>? log]) : log = log ?? [];
+
+  final String plan;
+  final List<String> log;
+
+  /// The subscription status the account reports once reloaded, unless the
+  /// reload fails ([reloadFails]); [status] is the one held before.
+  String? statusOnReload;
+  bool reloadFails = false;
+  String? status;
+
+  @override
+  bool get isLoggedIn => true;
+
+  @override
+  User? get currentUser => User(
+    id: 'player',
+    username: 'player',
+    email: 'player@example.com',
+    plan: plan,
+    storageQuotaBytes: 0,
+    storageUsedBytes: 0,
+    emailVerified: true,
+    createdAt: DateTime(2026),
+    updatedAt: DateTime(2026),
+    stripeSubscriptionStatus: status,
+  );
+
+  @override
+  Future<Map<String, dynamic>> getProfile() async {
+    log.add('profile');
+    if (reloadFails) return {'success': false, 'message': 'Network error'};
+    status = statusOnReload ?? status;
+    return {'success': true};
+  }
+}
+
+PlanInfo _plan(String name) => PlanInfo(
+  name: name,
+  displayName: name.toUpperCase(),
+  description: '',
+  storageQuotaBytes: 0,
+  priceMonthly: 1,
+  priceYearly: 10,
+  features: const [],
+);
+
+/// Offers the mini and mega plans, and answers each checkout and cancellation
+/// with [answer], writing them to [log].
+class _Billing extends BillingService {
+  _Billing([List<String>? log, this.answer = const {'success': false}])
+    : log = log ?? [];
+
+  final List<String> log;
+  final Map<String, dynamic> answer;
+
+  /// A change started from an earlier visit to the plans view, still out.
+  bool changing = false;
+
+  @override
+  bool get isChangeInFlight => changing;
+
+  @override
+  Future<Map<String, dynamic>> getAvailablePlans() async => {
+    'success': true,
+    'plans': [_plan('mini'), _plan('mega')],
+  };
+
+  @override
+  Future<Map<String, dynamic>> createCheckoutSession({
+    required String userId,
+    required String planName,
+    required String billingPeriod,
+    required String email,
+  }) async {
+    log.add('checkout');
+    return answer;
+  }
+
+  @override
+  Future<Map<String, dynamic>> cancelSubscription(String userId) async {
+    log.add('cancel');
+    return answer;
+  }
+}
+
+/// Writes each quota and save-list request to [log], without the network.
+class _NeoSyncService extends NeoSyncService {
+  _NeoSyncService(this.log);
+
+  final List<String> log;
+
+  @override
+  Future<Map<String, dynamic>> getQuota() async {
+    log.add('quota');
+    return {'success': false};
+  }
+
+  @override
+  Future<Map<String, dynamic>> getFiles({NeoSyncFileFilter? filter}) async {
+    log.add('files');
+    return {'success': true, 'files': <NeoSyncFile>[], 'total': 0};
+  }
 }
 
 void main() {
@@ -72,6 +195,7 @@ void main() {
     Widget child, {
     required AuthService auth,
     BillingService? billing,
+    NeoSyncProvider? neoSync,
   }) async {
     const size = Size(1280, 720);
     await tester.binding.setSurfaceSize(size);
@@ -94,6 +218,10 @@ void main() {
               ChangeNotifierProvider<AuthService>.value(value: auth),
               if (billing != null)
                 ChangeNotifierProvider<BillingService>.value(value: billing),
+              if (neoSync != null) ...[
+                ChangeNotifierProvider<NeoSyncProvider>.value(value: neoSync),
+                ChangeNotifierProvider.value(value: SyncManager.instance),
+              ],
             ],
             child: Scaffold(body: child),
           ),
@@ -254,8 +382,8 @@ void main() {
       tester,
       PlanSelectionView(
         initialPlans: const [],
-        onUpgrade: (_, _) {},
-        onCancel: () {},
+        onUpgrade: (_, _) async {},
+        onCancel: () async {},
         getPlanIcon: (_) => Icons.storage,
         onBack: () {},
       ),
@@ -269,5 +397,297 @@ void main() {
     expect(find.text(unreachable), findsOneWidget);
     expect(find.textContaining('Network error'), findsNothing);
     expect(find.text(en(AppLocale.retry)), findsOneWidget);
+  });
+
+  group('the plans view', () {
+    // A notification left by a failed test would show in the next one.
+    tearDown(() => GlobalNotificationService().dismiss());
+
+    final unconfirmed =
+        AppLocale.en[AppLocale.neoSyncBillingUnconfirmed] as String;
+
+    /// The footer's action control, found by its [label].
+    GamepadControl action(WidgetTester tester, String label) =>
+        tester.widget<GamepadControl>(
+          find.ancestor(
+            of: find.text(label),
+            matching: find.byType(GamepadControl),
+          ),
+        );
+
+    for (final (current, label, change) in [
+      ('free', AppLocale.upgrade, 'an upgrade'),
+      ('mini', AppLocale.endSubscription, 'a cancellation'),
+    ]) {
+      testWidgets('Enter and a footer tap while $change is out start it '
+          'once', (tester) async {
+        final pending = <Completer<void>>[];
+        Future<void> start() {
+          final done = Completer<void>();
+          pending.add(done);
+          return done.future;
+        }
+
+        await pump(
+          tester,
+          PlanSelectionView(
+            initialPlans: [_plan('mini'), _plan('mega')],
+            onUpgrade: (_, _) => start(),
+            onCancel: start,
+            getPlanIcon: (_) => Icons.storage,
+            onBack: () {},
+          ),
+          auth: _Subscriber(current),
+          billing: _Billing(),
+        );
+        expect(action(tester, en(label)).busy, isFalse);
+
+        await press(tester, LogicalKeyboardKey.enter);
+        expect(pending, hasLength(1));
+        expect(action(tester, en(label)).busy, isTrue);
+
+        await press(tester, LogicalKeyboardKey.enter);
+        await press(tester, LogicalKeyboardKey.enter);
+        await tester.tap(find.text(en(label)));
+        await tester.pump();
+        expect(pending, hasLength(1), reason: 'the first is still out');
+
+        pending.single.complete();
+        await tester.pump();
+        expect(action(tester, en(label)).busy, isFalse);
+
+        await tester.tap(find.text(en(label)));
+        await tester.pump();
+        expect(pending, hasLength(2), reason: 'usable again once it ended');
+        await press(tester, LogicalKeyboardKey.enter);
+        expect(pending, hasLength(2));
+
+        pending.last.complete();
+        await tester.pump(const Duration(seconds: 1));
+      });
+    }
+
+    testWidgets(
+      'a change still out from an earlier visit keeps the view busy',
+      (tester) async {
+        var calls = 0;
+        final billing = _Billing()..changing = true;
+        await pump(
+          tester,
+          PlanSelectionView(
+            initialPlans: [_plan('mini'), _plan('mega')],
+            onUpgrade: (_, _) async => calls++,
+            onCancel: () async => calls++,
+            getPlanIcon: (_) => Icons.storage,
+            onBack: () {},
+          ),
+          auth: _Subscriber('free'),
+          billing: billing,
+        );
+        expect(action(tester, en(AppLocale.upgrade)).busy, isTrue);
+
+        await press(tester, LogicalKeyboardKey.enter);
+        await tester.tap(find.text(en(AppLocale.upgrade)));
+        await tester.pump();
+        expect(calls, 0);
+
+        billing
+          ..changing = false
+          ..notifyListeners();
+        await tester.pump();
+        expect(action(tester, en(AppLocale.upgrade)).busy, isFalse);
+        await tester.tap(find.text(en(AppLocale.upgrade)));
+        await tester.pump();
+        expect(calls, 1);
+        await tester.pump(const Duration(seconds: 1));
+      },
+    );
+
+    /// The NeoSync screen on [auth]'s account, opened on the plans with Y.
+    Future<void> openPlans(
+      WidgetTester tester, {
+      required _Subscriber auth,
+      required _Billing billing,
+      required List<String> log,
+    }) async {
+      await pump(
+        tester,
+        const NeoSyncContent(),
+        auth: auth,
+        billing: billing,
+        neoSync: NeoSyncProvider(_NeoSyncService(log))..setAuthService(auth),
+      );
+      await press(tester, LogicalKeyboardKey.keyY);
+      await tester.pump();
+      expect(find.byType(PlanSelectionView), findsOneWidget);
+      log.clear();
+    }
+
+    List<String> shown() => GlobalNotificationService().notifier.value
+        .map((n) => n.message)
+        .toList();
+
+    testWidgets('an upgrade NeoSync did not confirm refreshes the plan, then '
+        'says it may have gone through', (tester) async {
+      final log = <String>[];
+      void onShown() {
+        if (shown().isNotEmpty) log.add('shown');
+      }
+
+      GlobalNotificationService().notifier.addListener(onShown);
+      addTearDown(
+        () => GlobalNotificationService().notifier.removeListener(onShown),
+      );
+      await openPlans(
+        tester,
+        auth: _Subscriber('free', log),
+        billing: _Billing(log, const {
+          'success': false,
+          'message': 'Network error: TimeoutException',
+          'isNetworkError': true,
+          'outcomeUnknown': true,
+        }),
+        log: log,
+      );
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      expect(log, ['checkout', 'profile', 'shown']);
+      // Not reported as an error: the upgrade may well have worked.
+      expect(shown(), [unconfirmed]);
+      expect(
+        GlobalNotificationService().notifier.value.single.type,
+        isNot(GlobalNotificationType.error),
+      );
+
+      // Lets the notification's timer run out.
+      await tester.pump(const Duration(seconds: 10));
+    });
+
+    testWidgets('a checkout turned away as busy shows nothing', (tester) async {
+      final log = <String>[];
+      await openPlans(
+        tester,
+        auth: _Subscriber('free', log),
+        billing: _Billing(log, const {'success': false, 'busy': true}),
+        log: log,
+      );
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      expect(log, ['checkout']);
+      expect(shown(), isEmpty);
+
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('a cancellation NeoSync did not confirm reloads the account, '
+        'then says it may have gone through', (tester) async {
+      final log = <String>[];
+      await openPlans(
+        tester,
+        auth: _Subscriber('mini', log),
+        billing: _Billing(log, const {
+          'success': false,
+          'message': 'Network error: TimeoutException',
+          'isNetworkError': true,
+          'outcomeUnknown': true,
+        }),
+        log: log,
+      );
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(find.text(en(AppLocale.cancelSubscriptionConfirm)), findsOne);
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(ErrorDialog), findsOneWidget);
+      expect(log, ['cancel', 'profile', 'quota', 'files']);
+      expect(find.text(unconfirmed), findsOneWidget);
+      expect(find.text(unreachable), findsNothing);
+      // Not titled "Error": it may well have worked.
+      expect(
+        tester.widget<ErrorDialog>(find.byType(ErrorDialog)).title,
+        en(AppLocale.cancelSubscription),
+      );
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byType(ErrorDialog), findsNothing);
+    });
+
+    // NeoSync marks a cancelled subscription "canceling" until its period
+    // ends, so the reload tells whether an unanswered cancellation went
+    // through.
+    testWidgets('a cancellation NeoSync did not confirm, which the reloaded '
+        'account shows went through, is reported as done', (tester) async {
+      final log = <String>[];
+      await openPlans(
+        tester,
+        auth: _Subscriber('mini', log)..statusOnReload = 'canceling',
+        billing: _Billing(log, const {
+          'success': false,
+          'message': 'Network error: TimeoutException',
+          'isNetworkError': true,
+          'outcomeUnknown': true,
+        }),
+        log: log,
+      );
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(find.byType(ConfirmActionDialog), findsOneWidget);
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump();
+
+      expect(log, ['cancel', 'profile', 'quota', 'files']);
+      expect(find.byType(SuccessDialog), findsOneWidget);
+      expect(
+        tester.widget<SuccessDialog>(find.byType(SuccessDialog)).title,
+        en(AppLocale.cancelSubscription),
+      );
+      expect(find.byType(ErrorDialog), findsNothing);
+      expect(find.text(unconfirmed), findsNothing);
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('a cancellation NeoSync did not confirm is not taken as done '
+        'from an account that could not be reloaded', (tester) async {
+      final log = <String>[];
+      await openPlans(
+        tester,
+        // Held from an earlier cancellation, since undone elsewhere.
+        auth: _Subscriber('mini', log)
+          ..status = 'canceling'
+          ..reloadFails = true,
+        billing: _Billing(log, const {
+          'success': false,
+          'message': 'Network error: TimeoutException',
+          'isNetworkError': true,
+          'outcomeUnknown': true,
+        }),
+        log: log,
+      );
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(find.byType(ConfirmActionDialog), findsOneWidget);
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(SuccessDialog), findsNothing);
+      expect(find.text(unconfirmed), findsOneWidget);
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(seconds: 1));
+    });
   });
 }

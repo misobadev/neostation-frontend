@@ -116,6 +116,8 @@ class NeoSyncContentState extends State<NeoSyncContent>
       billingPeriod: billingPeriod,
       email: user.email,
     );
+    // Another change is still out; the plans view shows it running.
+    if (result['busy'] == true) return;
 
     if (result['success']) {
       if (result['upgrade'] == true) {
@@ -149,12 +151,26 @@ class NeoSyncContentState extends State<NeoSyncContent>
         }
       }
     } else {
+      final unconfirmed = result['outcomeUnknown'] == true;
+      if (unconfirmed) {
+        // The upgrade may have gone through: show the plan NeoSync now has
+        // before saying so, so the user checks the right one.
+        await authService.getProfile();
+      }
       if (!mounted) return;
+      final message = neoSyncFailureMessage(
+        result,
+        (key) => key.getString(context),
+      );
+      // Not reported as an error: it may well have worked.
       custom.AppNotification.showNotification(
         context,
-        '${AppLocale.error.getString(context)}: '
-        '${neoSyncFailureMessage(result, (key) => key.getString(context))}',
-        type: custom.NotificationType.error,
+        unconfirmed
+            ? message!
+            : '${AppLocale.error.getString(context)}: $message',
+        type: unconfirmed
+            ? custom.NotificationType.info
+            : custom.NotificationType.error,
       );
     }
   }
@@ -196,9 +212,22 @@ class NeoSyncContentState extends State<NeoSyncContent>
     }
 
     final result = await billingService.cancelSubscription(user.id);
+    // Another change is still out; the plans view shows it running.
+    if (result['busy'] == true) return;
 
-    if (result['success']) {
-      await authService.getProfile();
+    // A cancellation NeoSync didn't confirm may have gone through, so the
+    // account is reloaded as for one that did before the user is told.
+    var cancelled = result['success'] == true;
+    if (cancelled || result['outcomeUnknown'] == true) {
+      final reload = await authService.getProfile();
+      // NeoSync marks a cancelled subscription "canceling" until its period
+      // ends, so the reloaded account shows whether it went through. Only a
+      // reload that worked counts: the account held from before may be out
+      // of date.
+      if (reload['success'] == true &&
+          authService.currentUser?.stripeSubscriptionStatus == 'canceling') {
+        cancelled = true;
+      }
       if (mounted) {
         final neoSyncProvider = Provider.of<NeoSyncProvider>(
           context,
@@ -207,6 +236,9 @@ class NeoSyncContentState extends State<NeoSyncContent>
         await neoSyncProvider.loadQuota();
         await neoSyncProvider.loadOnlineFiles();
       }
+    }
+
+    if (cancelled) {
       if (mounted) {
         await showDialog(
           context: context,
@@ -227,7 +259,12 @@ class NeoSyncContentState extends State<NeoSyncContent>
           barrierDismissible: false,
           builder: (BuildContext context) {
             return ErrorDialog(
-              title: AppLocale.error.getString(context),
+              // Not "Error" when it may well have worked.
+              title:
+                  (result['outcomeUnknown'] == true
+                          ? AppLocale.cancelSubscription
+                          : AppLocale.error)
+                      .getString(context),
               message: neoSyncFailureMessage(
                 result,
                 (key) => key.getString(context),

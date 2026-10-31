@@ -508,6 +508,8 @@ mixin AppLocale {
   static const String neoSyncSynchronizing = 'neo_sync_synchronizing';
   static const String neoSyncNotConnected = 'neo_sync_not_connected';
   static const String neoSyncUnreachable = 'neo_sync_unreachable';
+  static const String neoSyncBillingUnconfirmed =
+      'neo_sync_billing_unconfirmed';
   static const String neoSyncSynchronized = 'neo_sync_synchronized';
   static const String neoSyncSavesSync = 'neo_sync_saves_sync';
   static const String neoSyncNoSave = 'neo_sync_no_save';

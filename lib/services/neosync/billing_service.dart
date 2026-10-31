@@ -43,8 +43,25 @@ class BillingService extends ChangeNotifier {
   /// The last error message encountered during billing operations.
   String? _lastError;
 
+  /// Whether a checkout or a cancellation is out. One flag for both: they
+  /// change the same subscription, so a second change sent before the first
+  /// is answered (a repeated A press, or an upgrade racing a cancellation)
+  /// would be applied on top of a state neither request saw. Not
+  /// [_isLoading], which the plan list shares: loading the plans is a read,
+  /// and neither holds up nor is held up by a change.
+  bool _changeInFlight = false;
+
+  /// Gateway answers (bad gateway, unavailable, gateway timeout): a proxy in
+  /// front of the billing server answered for it, so a change may still have
+  /// been applied behind it.
+  static const Set<int> _gatewayStatuses = {502, 503, 504};
+
   bool get isLoading => _isLoading;
   String? get lastError => _lastError;
+
+  /// Whether a checkout or a cancellation is still out, so a view opened
+  /// meanwhile shows it running rather than sending another.
+  bool get isChangeInFlight => _changeInFlight;
 
   @override
   void dispose() {
@@ -90,11 +107,15 @@ class BillingService extends ChangeNotifier {
     required String billingPeriod,
     required String email,
   }) async {
+    // Set before the first await, so a second call made straight after this
+    // one already sees it.
+    if (_changeInFlight) return {'success': false, 'busy': true};
+    _changeInFlight = true;
     _isLoading = true;
     _lastError = null;
-    _safeNotifyListeners();
 
     try {
+      _safeNotifyListeners();
       final headers = await _getHeaders();
       final baseUrl = AppConfig.billingBaseUrl;
       final uri = Uri.parse('$baseUrl/create-checkout-session');
@@ -114,6 +135,10 @@ class BillingService extends ChangeNotifier {
         body: jsonEncode(body),
         timeout: requestTimeout,
       );
+      if (_gatewayStatuses.contains(response.statusCode)) {
+        _log.e('Checkout unconfirmed: HTTP ${response.statusCode}');
+        return _unconfirmed('HTTP ${response.statusCode}');
+      }
 
       final data = jsonDecode(response.body);
 
@@ -134,8 +159,9 @@ class BillingService extends ChangeNotifier {
       final error = redactSecrets('Network error: $e');
       _log.e('Checkout creation error: $error');
       _lastError = error;
-      return {'success': false, 'message': error, 'isNetworkError': true};
+      return _unconfirmed(error);
     } finally {
+      _changeInFlight = false;
       _isLoading = false;
       _safeNotifyListeners();
     }
@@ -143,11 +169,14 @@ class BillingService extends ChangeNotifier {
 
   /// Requests the immediate cancellation of the user's active subscription.
   Future<Map<String, dynamic>> cancelSubscription(String userId) async {
+    // See createCheckoutSession.
+    if (_changeInFlight) return {'success': false, 'busy': true};
+    _changeInFlight = true;
     _isLoading = true;
     _lastError = null;
-    _safeNotifyListeners();
 
     try {
+      _safeNotifyListeners();
       final headers = await _getHeaders();
       final baseUrl = AppConfig.billingBaseUrl;
       final uri = Uri.parse('$baseUrl/cancel-subscription');
@@ -165,6 +194,9 @@ class BillingService extends ChangeNotifier {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true};
+      } else if (_gatewayStatuses.contains(response.statusCode)) {
+        _log.e('Cancellation unconfirmed: HTTP ${response.statusCode}');
+        return _unconfirmed('HTTP ${response.statusCode}');
       } else {
         final data = jsonDecode(response.body);
         final error = redactSecrets(
@@ -177,12 +209,25 @@ class BillingService extends ChangeNotifier {
       final error = redactSecrets('Network error: $e');
       _log.e('Cancellation error: $error');
       _lastError = error;
-      return {'success': false, 'message': error, 'isNetworkError': true};
+      return _unconfirmed(error);
     } finally {
+      _changeInFlight = false;
       _isLoading = false;
       _safeNotifyListeners();
     }
   }
+
+  /// The answer to a checkout or cancellation that got no readable reply: it
+  /// timed out, the connection failed or dropped, the body wasn't JSON, or a
+  /// gateway answered for the server. The server may still have applied the
+  /// change (`outcomeUnknown`); `isNetworkError` stays for callers that only
+  /// tell a failure to reach NeoSync from a refusal.
+  Map<String, dynamic> _unconfirmed(String error) => {
+    'success': false,
+    'message': error,
+    'isNetworkError': true,
+    'outcomeUnknown': true,
+  };
 
   /// Fetches the list of subscription tiers and pricing currently offered by the service.
   Future<Map<String, dynamic>> getAvailablePlans() async {

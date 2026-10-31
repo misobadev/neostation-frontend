@@ -7,13 +7,18 @@ import 'package:neostation/l10n/app_locale.dart';
 ///
 /// A request that never got an answer (`isNetworkError`) says the server
 /// couldn't be reached, in the app language; the service's own "Network
-/// error: …" text is English and meant for the log. What the server itself
+/// error: …" text is English and meant for the log. A billing change that got
+/// no readable answer (`outcomeUnknown`) may still have been applied, so it
+/// says to check the plan rather than inviting a retry. What the server itself
 /// said is passed on as it was, or [fallback] when it said nothing.
 String? neoSyncFailureMessage(
   Map<String, dynamic> result,
   String Function(String key) text, {
   String? fallback,
 }) {
+  if (result['outcomeUnknown'] == true) {
+    return text(AppLocale.neoSyncBillingUnconfirmed);
+  }
   if (result['isNetworkError'] == true) {
     return text(AppLocale.neoSyncUnreachable);
   }

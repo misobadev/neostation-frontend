@@ -524,6 +524,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.neoSyncNotConnected: 'NeoSync: Не подключено',
   AppLocale.neoSyncUnreachable:
       'Не удалось подключиться к NeoSync. Проверьте подключение и повторите попытку.',
+  AppLocale.neoSyncBillingUnconfirmed:
+      'NeoSync не подтвердил изменение вовремя. Возможно, оно всё же применено, поэтому проверьте тариф, прежде чем повторять попытку.',
   AppLocale.neoSyncSynchronized: 'NeoSync: Сохранения синхронизированы',
   AppLocale.neoSyncSavesSync:
       'Файлы сохранений будут синхронизированы с NeoSync',

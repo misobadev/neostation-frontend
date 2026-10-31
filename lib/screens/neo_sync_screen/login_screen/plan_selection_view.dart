@@ -28,8 +28,8 @@ import 'neo_sync_shared.dart';
 /// previous upgrade dialog with a full view that has its own navigation layer.
 class PlanSelectionView extends StatefulWidget {
   final List<PlanInfo> initialPlans;
-  final Function(String, String) onUpgrade;
-  final Function() onCancel;
+  final Future<void> Function(String, String) onUpgrade;
+  final Future<void> Function() onCancel;
   final IconData Function(String) getPlanIcon;
   final VoidCallback onBack;
 
@@ -52,6 +52,12 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
   bool _plansLoading = true;
   String? _errorMessage;
   int _selectedPlanIndex = 0;
+
+  /// Whether an upgrade, downgrade or cancellation started here is still
+  /// running (its confirmation, the request and what it shows after). A, Enter
+  /// and the footer control all reach [_handleSelect]; each press while it ran
+  /// used to send the change again.
+  bool _actionBusy = false;
 
   static const List<String> _planOrder = [
     'free',
@@ -91,17 +97,25 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
   }
 
   /// A on the focused plan: current → cancel subscription; otherwise upgrade
-  /// or downgrade depending on how it compares to the user's plan.
-  void _handleSelect() {
+  /// or downgrade depending on how it compares to the user's plan. Ignored
+  /// while the last one is still running.
+  Future<void> _handleSelect() async {
+    // A change started from an earlier visit to this view may still be out.
+    if (_actionBusy || context.read<BillingService>().isChangeInFlight) return;
     final plans = _availablePlans;
     if (plans.isEmpty || _selectedPlanIndex >= plans.length) return;
     final plan = plans[_selectedPlanIndex];
     final user = context.read<AuthService>().currentUser;
 
-    if (user?.plan == plan.name) {
-      widget.onCancel();
-    } else {
-      widget.onUpgrade(plan.name, 'monthly');
+    setState(() => _actionBusy = true);
+    try {
+      if (user?.plan == plan.name) {
+        await widget.onCancel();
+      } else {
+        await widget.onUpgrade(plan.name, 'monthly');
+      }
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
     }
   }
 
@@ -387,6 +401,7 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
           onTap: _handleSelect,
           textColor: actionTextColor,
           backgroundColor: actionColor,
+          busy: _actionBusy || context.watch<BillingService>().isChangeInFlight,
         ),
         SizedBox(width: 8.r),
         NeoSyncBackButton(onTap: () => widget.onBack()),

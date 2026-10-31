@@ -29,6 +29,26 @@ void main() {
     );
   });
 
+  test('a billing change NeoSync did not confirm says it may have gone '
+      'through, not that NeoSync was out of reach', () {
+    final result = {
+      'success': false,
+      'message': 'Network error: TimeoutException after 0:00:15.000000',
+      'isNetworkError': true,
+      'outcomeUnknown': true,
+    };
+
+    expect(
+      neoSyncFailureMessage(result, english),
+      "NeoSync didn't confirm the change in time. It may still have gone "
+      'through, so check your plan before trying again.',
+    );
+    expect(
+      neoSyncFailureMessage(result, (key) => AppLocale.de[key] as String),
+      AppLocale.de[AppLocale.neoSyncBillingUnconfirmed],
+    );
+  });
+
   test("the server's own message is passed on as it was", () {
     final result = {'success': false, 'message': 'Invalid credentials'};
 
@@ -59,24 +79,29 @@ void main() {
     }
   });
 
-  test('every language has the message', () {
-    for (final map in [
-      AppLocale.de,
-      AppLocale.es,
-      AppLocale.fr,
-      AppLocale.id,
-      AppLocale.it,
-      AppLocale.ja,
-      AppLocale.ko,
-      AppLocale.pt,
-      AppLocale.ru,
-      AppLocale.zh,
-      AppLocale.zhHant,
+  test('every language has the messages', () {
+    for (final key in [
+      AppLocale.neoSyncUnreachable,
+      AppLocale.neoSyncBillingUnconfirmed,
     ]) {
-      final text = map[AppLocale.neoSyncUnreachable];
-      expect(text, isA<String>());
-      expect(text, isNot(AppLocale.en[AppLocale.neoSyncUnreachable]));
-      expect(text, contains('NeoSync'));
+      for (final map in [
+        AppLocale.de,
+        AppLocale.es,
+        AppLocale.fr,
+        AppLocale.id,
+        AppLocale.it,
+        AppLocale.ja,
+        AppLocale.ko,
+        AppLocale.pt,
+        AppLocale.ru,
+        AppLocale.zh,
+        AppLocale.zhHant,
+      ]) {
+        final text = map[key];
+        expect(text, isA<String>(), reason: key);
+        expect(text, isNot(AppLocale.en[key]), reason: key);
+        expect(text, contains('NeoSync'), reason: key);
+      }
     }
   });
 }
