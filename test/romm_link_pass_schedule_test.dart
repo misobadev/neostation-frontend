@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/romm_link_row.dart';
 import 'package:neostation/models/romm_platform.dart';
 import 'package:neostation/models/romm_rom.dart';
@@ -10,12 +11,15 @@ import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
+import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/romm/romm_library_linker.dart';
+import 'package:neostation/services/romm/romm_link_runner.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
+import 'package:neostation/utils/romm_failure_message.dart';
 
 import 'database_test_helper.dart';
 
@@ -27,6 +31,21 @@ import 'database_test_helper.dart';
 ///
 /// The linker itself is a recording fake — its algorithm has its own tests —
 /// so the linker is faked here, but the real platform loader classifies against app_systems, so a test database is seeded.
+
+/// The Tools run's text, in English, with the failure messages it may need.
+final _linkStrings = RommLinkStrings(
+  title: 'Link library to RomM',
+  preparing: 'Preparing…',
+  progressTemplate: '{done} of {total} — {system}',
+  doneTemplate: 'Linked {count} games',
+  nothingToDo: 'Nothing new to link',
+  failed: 'Linking failed',
+  unavailable: 'Not available right now',
+  stoppedEarlyTemplate: 'Stopped early — linked {count} games so far',
+  failureTexts: {
+    for (final key in rommBrowseFailureKeys) key: AppLocale.en[key] as String,
+  },
+);
 
 class _FakeRommService extends RommService {
   /// What [getPlatforms] answers — after [platformsGate] completes, when one
@@ -353,10 +372,14 @@ void main() {
       },
     );
 
-    test('a platform list that failed to load fails the pass', () async {
+    // The failure itself, not its English message, so the Tools row can say
+    // why in the app language.
+    test('a platform list that failed to load fails the pass with its '
+        'failure', () async {
       (browse.fakeService as _FakeRommService).platformsError = RommException(
         'Request failed (500)',
         statusCode: 500,
+        kind: RommFailure.serverError,
       );
       await build(autoSweep: false, withLinker: realLinker());
       browse.connected = true;
@@ -365,13 +388,35 @@ void main() {
         provider.linkLibrary(),
         throwsA(
           isA<RommLinkPassException>().having(
-            (e) => e.toString(),
-            'toString',
-            'RomM link pass failed: platform enumeration failed: '
-                'Bad state: Request failed (500)',
+            (e) => e.cause,
+            'cause',
+            isA<RommException>()
+                .having((c) => c.kind, 'kind', RommFailure.serverError)
+                .having((c) => c.statusCode, 'statusCode', 500),
           ),
         ),
       );
+    });
+
+    test('the Tools run says why the platform list failed to load', () async {
+      (browse.fakeService as _FakeRommService).platformsError = RommException(
+        'Cannot reach server',
+        kind: RommFailure.unreachable,
+        detail: 'Connection refused',
+      );
+      await build(autoSweep: false, withLinker: realLinker());
+      browse.connected = true;
+      GlobalNotificationService().notifier.value = [];
+      addTearDown(() => GlobalNotificationService().notifier.value = []);
+
+      final linked = await RommLinkRunner.run(strings: _linkStrings);
+
+      expect(linked, isNull);
+      final row = GlobalNotificationService().notifier.value.firstWhere(
+        (n) => n.id == RommLinkRunner.notificationId,
+      );
+      expect(row.message, "Can't reach the RomM server: Connection refused");
+      expect(row.type, GlobalNotificationType.error);
     });
 
     // Only the platform load's own failure counts. Another RomM load (the RomM

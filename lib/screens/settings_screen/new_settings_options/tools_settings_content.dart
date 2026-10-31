@@ -21,6 +21,7 @@ import 'package:neostation/services/metadata_cleanup_service.dart';
 import 'package:neostation/services/retro_achievements_helper.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/count_label.dart';
+import 'package:neostation/utils/romm_failure_message.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/info_dialog.dart';
@@ -131,6 +132,9 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
       stoppedEarlyTemplate: AppLocale.rommLinkLibraryStoppedEarly.getString(
         context,
       ),
+      failureTexts: {
+        for (final key in rommBrowseFailureKeys) key: key.getString(context),
+      },
     );
 
     final confirmed = await ConfirmActionDialog.show(
