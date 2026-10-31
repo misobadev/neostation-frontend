@@ -376,4 +376,39 @@ void main() {
       );
     });
   });
+
+  group('resolveBackgroundPathSync', () {
+    late String backgrounds;
+
+    setUp(() {
+      NeoAssetsService.debugConfigure(cacheDir: tempDir.path);
+      backgrounds = path.join(tempDir.path, 'iisu-dark', 'backgrounds');
+      Directory(backgrounds).createSync(recursive: true);
+    });
+
+    // Packs ship whatever format their author exported: iiSU-Dark is all
+    // `.png`, and reading only `.webp`/`.gif` left every system on it blank.
+    for (final ext in ['webp', 'gif', 'png', 'jpg', 'jpeg']) {
+      test('finds a .$ext background', () {
+        final file = File(path.join(backgrounds, 'gb.$ext'))
+          ..writeAsBytesSync([0]);
+
+        expect(
+          NeoAssetsService.resolveBackgroundPathSync('iisu-dark', 'gb'),
+          file.path,
+        );
+      });
+    }
+
+    test('prefers .webp when a pack carries several formats', () {
+      File(path.join(backgrounds, 'gb.png')).writeAsBytesSync([0]);
+      final webp = File(path.join(backgrounds, 'gb.webp'))
+        ..writeAsBytesSync([0]);
+
+      expect(
+        NeoAssetsService.resolveBackgroundPathSync('iisu-dark', 'gb'),
+        webp.path,
+      );
+    });
+  });
 }

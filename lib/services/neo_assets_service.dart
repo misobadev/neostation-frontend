@@ -686,9 +686,20 @@ class NeoAssetsService {
     return path.join(dir, themeFolder, 'backgrounds', '$systemFolderName.$ext');
   }
 
-  /// Resolves the cached background path checking both .webp and .gif formats.
-  /// Returns the path to the existing file, preferring .webp over .gif.
-  /// If neither exists, returns the .webp path as default.
+  /// Background formats a pack may ship, in lookup order. Packs keep whatever
+  /// format their author exported (iiSU-Dark is all `.png`), so every format
+  /// the image decoder handles has to be checked, not just `.webp`/`.gif`.
+  static const List<String> _backgroundExtensions = [
+    'webp',
+    'gif',
+    'png',
+    'jpg',
+    'jpeg',
+  ];
+
+  /// Resolves the cached background path, checking each of
+  /// [_backgroundExtensions] in order and returning the first that exists.
+  /// If none exists, returns the .webp path as default.
   static String? resolveBackgroundPathSync(
     String themeFolder,
     String systemFolderName,
@@ -696,23 +707,12 @@ class NeoAssetsService {
     final dir = _cachedThemeDir;
     if (dir == null) return null;
 
-    final webpPath = path.join(
-      dir,
-      themeFolder,
-      'backgrounds',
-      '$systemFolderName.webp',
-    );
-    if (File(webpPath).existsSync()) return webpPath;
-
-    final gifPath = path.join(
-      dir,
-      themeFolder,
-      'backgrounds',
-      '$systemFolderName.gif',
-    );
-    if (File(gifPath).existsSync()) return gifPath;
-
-    return webpPath;
+    final base = path.join(dir, themeFolder, 'backgrounds', systemFolderName);
+    for (final ext in _backgroundExtensions) {
+      final candidate = '$base.$ext';
+      if (File(candidate).existsSync()) return candidate;
+    }
+    return '$base.webp';
   }
 
   /// Returns the local cache path for a specific background.

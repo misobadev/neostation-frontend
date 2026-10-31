@@ -202,7 +202,7 @@ class NeoAssetsProvider extends ChangeNotifier {
   }
 
   /// Synchronous variant for resolving background paths.
-  /// Checks the cache for both .webp and .gif formats.
+  /// Checks the cache for every background format a pack may ship.
   String? getBackgroundForSystemSync(String systemFolderName) {
     if (!hasActiveTheme) return null;
     return NeoAssetsService.resolveBackgroundPathSync(
