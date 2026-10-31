@@ -655,8 +655,8 @@ class LauncherService {
   ///                       real path (RetroArch, DuckStation, AetherSX2, Dolphin…).
   /// - `{file.uri}`      — URI: content:// passes through as-is, bare paths → file://.
   ///                       Use for emulators that accept content:// natively (-d flag).
-  /// - `{file.localuri}` — same resolution as {file.path} returned as a file:// URI.
-  ///                       Use for emulators that need file:// but not content://.
+  /// - `{file.localuri}` — keeps a content:// SAF URI as-is (so the launch can grant
+  ///                       read access to it); a bare path becomes a file:// URI.
   String resolvePlaceholdersAndroid(String template, GameModel game) {
     if (template.isEmpty) return template;
 
@@ -718,10 +718,7 @@ class LauncherService {
   String _fillDesktopPlaceholders(String token, GameModel game) {
     final romPath = game.romPath;
     if (romPath == null) return token;
-    var result = token
-        .replaceAll('{file.path}', romPath)
-        .replaceAll('{file.dir}', _gameDirectory(game))
-        .replaceAll('{file.uri}', Uri.file(romPath).toString());
+    var result = _fillDesktopFilePlaceholders(token, romPath, game);
     final titleId = game.titleId;
     if (titleId != null) {
       for (final tag in _titleIdTags) {
@@ -729,6 +726,21 @@ class LauncherService {
       }
     }
     return result;
+  }
+
+  /// Fills the ROM's own placeholders in [text]. A desktop path is never a
+  /// content:// URI, so `{file.localuri}` is the same file:// URI as `{file.uri}`.
+  String _fillDesktopFilePlaceholders(
+    String text,
+    String romPath,
+    GameModel game,
+  ) {
+    final uri = Uri.file(romPath).toString();
+    return text
+        .replaceAll('{file.path}', romPath)
+        .replaceAll('{file.dir}', _gameDirectory(game))
+        .replaceAll('{file.uri}', uri)
+        .replaceAll('{file.localuri}', uri);
   }
 
   static const List<String> _titleIdTags = [
@@ -764,6 +776,7 @@ class LauncherService {
 
       final uri = Uri.file(game.romPath!).toString();
       result = result.replaceAll('{file.uri}', uri);
+      result = result.replaceAll('{file.localuri}', uri);
 
       if (game.titleId != null) {
         result = result.replaceAll('{tags.vita_game_id}', game.titleId!);
@@ -797,10 +810,7 @@ class LauncherService {
     var result = ConfigService.resolvePath(template);
     final romPath = game.romPath;
     if (romPath != null && romPath.isNotEmpty) {
-      result = result
-          .replaceAll('{file.path}', romPath)
-          .replaceAll('{file.dir}', _gameDirectory(game))
-          .replaceAll('{file.uri}', Uri.file(romPath).toString());
+      result = _fillDesktopFilePlaceholders(result, romPath, game);
     }
     return result;
   }
@@ -811,10 +821,7 @@ class LauncherService {
     var result = ConfigService.resolvePath(template);
     final romPath = game.romPath;
     if (romPath != null && romPath.isNotEmpty) {
-      result = result
-          .replaceAll('{file.path}', romPath)
-          .replaceAll('{file.dir}', _gameDirectory(game))
-          .replaceAll('{file.uri}', Uri.file(romPath).toString());
+      result = _fillDesktopFilePlaceholders(result, romPath, game);
     }
     return result;
   }
