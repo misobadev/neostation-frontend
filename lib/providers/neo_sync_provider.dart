@@ -198,6 +198,10 @@ class NeoSyncProvider extends ChangeNotifier {
   /// under way can't mark it fresh again with an older list.
   int _filesGeneration = 0;
 
+  /// Bumped whenever a save is deleted from the cloud here. A listing already
+  /// under way may still have it in, so its answer is never taken.
+  int _filesRemovals = 0;
+
   /// How long a game's sync trusts the cloud file list it already has.
   static const _cloudListMaxAge = Duration(seconds: 60);
 

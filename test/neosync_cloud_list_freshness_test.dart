@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +25,10 @@ import 'database_test_helper.dart';
 /// Lists [cloud] (or fails when [listFails], or throws when [listThrows]),
 /// records uploads (or refuses them as over quota when [accountFull]) and
 /// downloads, and never touches the network or the real save folders.
+///
+/// A listing takes its copy of [cloud] when it starts; the next listing waits
+/// for [holds]' first gate, if any, before answering, so a save can be
+/// deleted while the listing is on its way. [listing] completes as it starts.
 class _FakeNeoSync extends NeoSyncService {
   List<NeoSyncFile> cloud = [];
   bool listFails = false;
@@ -32,13 +37,19 @@ class _FakeNeoSync extends NeoSyncService {
   int listCalls = 0;
   final uploads = <String>[];
   final downloads = <String>[];
+  final holds = <Completer<void>>[];
+  Completer<void> listing = Completer<void>();
 
   @override
   Future<Map<String, dynamic>> getAllFiles({NeoSyncFileFilter? filter}) async {
     listCalls++;
+    final files = List<NeoSyncFile>.of(cloud);
+    final hold = holds.isEmpty ? null : holds.removeAt(0);
+    if (!listing.isCompleted) listing.complete();
+    if (hold != null) await hold.future;
     if (listThrows) throw const SocketException('Network is unreachable');
     if (listFails) return {'success': false, 'message': 'Network error'};
-    return {'success': true, 'files': List<NeoSyncFile>.of(cloud)};
+    return {'success': true, 'files': files};
   }
 
   @override
@@ -67,9 +78,10 @@ class _FakeNeoSync extends NeoSyncService {
   }
 
   @override
-  Future<Map<String, dynamic>> deleteFile(String fileId) async => {
-    'success': true,
-  };
+  Future<Map<String, dynamic>> deleteFile(String fileId) async {
+    cloud = cloud.where((f) => f.id != fileId).toList();
+    return {'success': true};
+  }
 }
 
 class _SignedIn extends AuthService {
@@ -139,6 +151,14 @@ void main() {
   }
 
   void later(Duration by) => now = now.add(by);
+
+  /// Waits until the cloud list has been asked for [times] times.
+  Future<void> askedFor(int times) async {
+    for (var i = 0; i < 100 && service.listCalls < times; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    expect(service.listCalls, times);
+  }
 
   setUp(() async {
     final db = await dbHelper.setUp();
@@ -290,6 +310,120 @@ void main() {
     await provider.deleteOnlineFile('Zelda.sav');
 
     expect(provider.files, isEmpty);
+  });
+
+  // A listing that was already on its way when a save was deleted answered
+  // with the save still in it, and that older list replaced the trimmed one
+  // and counted as fresh for a minute: the next sync tried to download the
+  // deleted save, got a 404 and marked the game as failing.
+  test('a save deleted from the save list makes the next sync fetch the '
+      'list again', () async {
+    service.cloud = [cloudSave('Mario.sav', gameName: 'Mario')];
+    await sync();
+
+    await provider.deleteOnlineFile('Mario.sav');
+    later(const Duration(seconds: 5));
+    await sync();
+
+    expect(service.listCalls, 2);
+  });
+
+  test('a list loaded while a save is deleted does not bring it '
+      'back', () async {
+    service.cloud = [cloudSave('Zelda.sav')];
+    final gate = Completer<void>();
+    service.holds.add(gate);
+    final load = provider.loadFiles();
+    await service.listing.future;
+
+    await provider.deleteOnlineFile('Zelda.sav');
+    gate.complete();
+    await load;
+
+    expect(provider.files, isEmpty);
+    later(const Duration(seconds: 5));
+    expect(await sync(), GameSyncStatus.noSaveFound);
+    expect(service.downloads, isEmpty);
+  });
+
+  test('a sync whose list was fetched while a save was deleted fetches it '
+      'again rather than download the save', () async {
+    service.cloud = [cloudSave('Zelda.sav')];
+    final gate = Completer<void>();
+    service.holds.add(gate);
+    final syncing = sync();
+    await service.listing.future;
+
+    await provider.deleteOnlineFile('Zelda.sav');
+    gate.complete();
+
+    expect(await syncing, GameSyncStatus.noSaveFound);
+    expect(service.downloads, isEmpty);
+    expect(service.listCalls, 2);
+  });
+
+  test('a sync overtaken by deletes twice uses its second list without '
+      'keeping it', () async {
+    service.cloud = [
+      cloudSave('Mario.sav', gameName: 'Mario'),
+      cloudSave('Luigi.sav', gameName: 'Luigi'),
+      cloudSave('Zelda.sav'),
+    ];
+    final first = Completer<void>();
+    final second = Completer<void>();
+    service.holds.addAll([first, second]);
+    final syncing = sync();
+    await service.listing.future;
+    await provider.deleteOnlineFile('Mario.sav');
+    first.complete();
+    await askedFor(2);
+    await provider.deleteOnlineFile('Luigi.sav');
+    second.complete();
+    await syncing;
+
+    expect(service.listCalls, 2, reason: 'asked for once more, not again');
+    expect(service.downloads, ['Zelda.sav'], reason: 'used for this sync');
+    later(const Duration(seconds: 5));
+    await sync();
+    expect(service.listCalls, 3, reason: 'the second list was not kept');
+  });
+
+  test('a list overtaken by a delete never replaces a newer one', () async {
+    service.cloud = [
+      cloudSave('Mario.sav', gameName: 'Mario'),
+      cloudSave('Luigi.sav', gameName: 'Luigi'),
+    ];
+    final first = Completer<void>();
+    final second = Completer<void>();
+    service.holds.addAll([first, second]);
+    final syncing = sync();
+    await service.listing.future;
+    await provider.deleteOnlineFile('Mario.sav');
+    first.complete();
+    await askedFor(2);
+    await provider.deleteOnlineFile('Luigi.sav');
+    // Another listing, asked for after the delete, lands first.
+    await provider.loadFiles();
+    second.complete();
+    await syncing;
+
+    // The list game sync goes on using for the next minute.
+    expect(provider.files, isEmpty);
+  });
+
+  test('a game launched while its list is on its way fetches it only once '
+      'more', () async {
+    service.cloud = [cloudSave('Mario.sav', gameName: 'Mario')];
+    final gate = Completer<void>();
+    service.holds.add(gate);
+    final syncing = sync();
+    await service.listing.future;
+
+    await provider.syncGameSavesBeforeLaunch(game);
+    gate.complete();
+    await syncing;
+
+    expect(service.listCalls, 2);
   });
 
   // Listing the cloud files is not a sync: when it fails, the games' marks

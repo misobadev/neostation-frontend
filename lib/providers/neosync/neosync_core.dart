@@ -1127,15 +1127,26 @@ extension NeoSyncCore on NeoSyncProvider {
           fetchedAt != null &&
           _filesAccountId == account &&
           _now().difference(fetchedAt) < NeoSyncProvider._cloudListMaxAge;
+      var cloudFiles = _files;
       if (!fresh) {
-        final generation = _filesGeneration;
-        final result = await _neoSyncService.getAllFiles();
-        if (result['success'] != true) return null;
-        _files = result['files'];
-        // Only a list asked for since the last "stale" mark counts as fresh.
-        if (generation == _filesGeneration) {
-          _filesFetchedAt = _now();
-          _filesAccountId = account;
+        // A list asked for before a save was deleted may still have it in, so
+        // it's asked for once more; should a delete overtake that one too,
+        // it's used for this sync only. A list that is kept counts as fresh
+        // only if asked for since the last "stale" mark.
+        for (var attempt = 1; attempt <= 2; attempt++) {
+          final generation = _filesGeneration;
+          final removals = _filesRemovals;
+          final result = await _neoSyncService.getAllFiles();
+          if (result['success'] != true) return null;
+          cloudFiles = result['files'];
+          if (removals == _filesRemovals) {
+            _files = cloudFiles;
+            if (generation == _filesGeneration) {
+              _filesFetchedAt = _now();
+              _filesAccountId = account;
+            }
+            break;
+          }
         }
       }
 
@@ -1147,7 +1158,7 @@ extension NeoSyncCore on NeoSyncProvider {
       // Identificar si es un sistema de "memory cards compartidas"
       final isSharedSystem = _sharesMemoryCards(system.folderName);
 
-      for (final cloudFile in _files) {
+      for (final cloudFile in cloudFiles) {
         final fileName = path.basename(cloudFile.fileName).toLowerCase();
         bool isMatch = false;
 
