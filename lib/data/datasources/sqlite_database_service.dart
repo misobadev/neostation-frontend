@@ -186,42 +186,50 @@ class SqliteDatabaseService {
     final scanTargets =
         <({String dirPath, String canonicalPath, bool useSaf, bool isLink})>[];
 
+    // Folder names are matched ignoring case, and every directory that matches
+    // is scanned: on a case-sensitive filesystem "Xbox" and "xbox" can sit side
+    // by side, and keeping only one of them dropped the other's games.
+    final aliasNames = {
+      for (final name in allPossibleFolderNames) name.toLowerCase(),
+    };
+
     for (final romFolder in romFolders) {
       final bool useSaf =
           Platform.isAndroid && romFolder.startsWith('content://');
       final Map<String, String>? subdirsForRoot = rootFoldersMap?[romFolder];
 
-      for (final folderToScan in allPossibleFolderNames) {
-        try {
-          final String? dirPath;
+      try {
+        final List<String> dirPaths;
 
-          if (subdirsForRoot != null) {
-            dirPath = subdirsForRoot[folderToScan.toLowerCase()];
-          } else if (useSaf) {
-            dirPath = await _resolveSafSubfolderUri(
-              romFolder,
-              folderToScan,
-              ignoreHiddenFiles: ignoreHiddenFiles,
-            );
-          } else {
-            dirPath = await _resolveStandardSubfolderPath(
-              romFolder,
-              folderToScan,
-              ignoreHiddenFiles: ignoreHiddenFiles,
-            );
-          }
+        if (subdirsForRoot != null) {
+          dirPaths = [
+            for (final entry in subdirsForRoot.entries)
+              if (aliasNames.contains(entry.key.toLowerCase())) entry.value,
+          ];
+        } else if (useSaf) {
+          dirPaths = await _resolveSafSubfolderUris(
+            romFolder,
+            aliasNames,
+            ignoreHiddenFiles: ignoreHiddenFiles,
+          );
+        } else {
+          dirPaths = await _resolveStandardSubfolderPaths(
+            romFolder,
+            allPossibleFolderNames,
+            ignoreHiddenFiles: ignoreHiddenFiles,
+          );
+        }
 
-          if (dirPath == null) continue;
-
+        for (final dirPath in dirPaths) {
           scanTargets.add((
             dirPath: dirPath,
             canonicalPath: await _canonicalScanPath(dirPath, useSaf: useSaf),
             useSaf: useSaf,
             isLink: !useSaf && await FileSystemEntity.isLink(dirPath),
           ));
-        } catch (e) {
-          _log.e('Error resolving folder $folderToScan in $romFolder: $e');
         }
+      } catch (e) {
+        _log.e('Error resolving system folders in $romFolder: $e');
       }
     }
 
@@ -1120,6 +1128,10 @@ class SqliteDatabaseService {
   }
 
   /// Quickly identifies existing subdirectories within multiple ROM root folders.
+  ///
+  /// Each root maps the subdirectory names, spelled as on disk, to their path
+  /// or SAF URI. Names keep their case so that "Xbox" and "xbox" on a
+  /// case-sensitive filesystem stay two entries; match them ignoring case.
   static Future<Map<String, Map<String, String>>> getExistingSubdirectories(
     List<String> romFolders,
   ) async {
@@ -1131,8 +1143,7 @@ class SqliteDatabaseService {
           final children = await SafDirectoryService.listFiles(folder);
           for (final child in children) {
             if (child['isDirectory'] == true) {
-              subdirs[child['name'].toString().toLowerCase()] = child['uri']
-                  .toString();
+              subdirs[child['name'].toString()] = child['uri'].toString();
             }
           }
         } else {
@@ -1141,7 +1152,7 @@ class SqliteDatabaseService {
             final entities = await dir.list().toList();
             for (final entity in entities) {
               if (entity is Directory) {
-                subdirs[path.basename(entity.path).toLowerCase()] = entity.path;
+                subdirs[path.basename(entity.path)] = entity.path;
               }
             }
           }
@@ -1154,29 +1165,28 @@ class SqliteDatabaseService {
     return result;
   }
 
-  /// Locates a system-specific subdirectory within a SAF root URI.
-  static Future<String?> _resolveSafSubfolderUri(
+  /// Lists every subdirectory of a SAF root URI whose name, ignoring case, is
+  /// one of [lowerNames].
+  static Future<List<String>> _resolveSafSubfolderUris(
     String romFolderUri,
-    String folderName, {
+    Set<String> lowerNames, {
     bool ignoreHiddenFiles = true,
   }) async {
     try {
       final children = await SafDirectoryService.listFiles(romFolderUri);
-      if (children.isEmpty) return null;
-      for (final child in children) {
-        if (_shouldSkipSafEntry(child, ignoreHiddenFiles: ignoreHiddenFiles)) {
-          continue;
-        }
-        if (child['isDirectory'] == true &&
-            child['name'].toString().toLowerCase() ==
-                folderName.toLowerCase()) {
-          return child['uri'].toString();
-        }
-      }
-      return null;
+      return [
+        for (final child in children)
+          if (!_shouldSkipSafEntry(
+                child,
+                ignoreHiddenFiles: ignoreHiddenFiles,
+              ) &&
+              child['isDirectory'] == true &&
+              lowerNames.contains(child['name'].toString().toLowerCase()))
+            child['uri'].toString(),
+      ];
     } catch (e) {
-      _log.e('Error resolving SAF folder $romFolderUri for $folderName: $e');
-      return null;
+      _log.e('Error resolving SAF folders in $romFolderUri: $e');
+      return const [];
     }
   }
 
@@ -1321,41 +1331,42 @@ class SqliteDatabaseService {
     return entries;
   }
 
-  /// Locates a system-specific subdirectory within a standard filesystem path.
-  static Future<String?> _resolveStandardSubfolderPath(
+  /// Lists every subdirectory of a standard filesystem path whose name,
+  /// ignoring case, is one of [folderNames].
+  static Future<List<String>> _resolveStandardSubfolderPaths(
     String romFolderPath,
-    String folderName, {
+    List<String> folderNames, {
     bool ignoreHiddenFiles = true,
   }) async {
     try {
       final rootDir = Directory(romFolderPath);
-      if (!await rootDir.exists()) return null;
+      if (!await rootDir.exists()) return const [];
+      final lowerNames = {for (final name in folderNames) name.toLowerCase()};
       try {
         final List<FileSystemEntity> children = await rootDir.list().toList();
-        for (final child in children) {
-          if (_shouldSkipStandardEntity(
-            child,
-            ignoreHiddenFiles: ignoreHiddenFiles,
-          )) {
-            continue;
-          }
-          if (child is Directory &&
-              path.basename(child.path).toLowerCase() ==
-                  folderName.toLowerCase()) {
-            return child.path;
-          }
-        }
+        return [
+          for (final child in children)
+            if (!_shouldSkipStandardEntity(
+                  child,
+                  ignoreHiddenFiles: ignoreHiddenFiles,
+                ) &&
+                child is Directory &&
+                lowerNames.contains(path.basename(child.path).toLowerCase()))
+              child.path,
+        ];
       } catch (e) {
+        // The root can't be listed: try each name as spelled instead.
         _log.e('Error listing standard directory $romFolderPath: $e');
-        final directPath = path.join(romFolderPath, folderName);
-        if (await Directory(directPath).exists()) return directPath;
+        final found = <String>[];
+        for (final name in folderNames) {
+          final directPath = path.join(romFolderPath, name);
+          if (await Directory(directPath).exists()) found.add(directPath);
+        }
+        return found;
       }
-      return null;
     } catch (e) {
-      _log.e(
-        'Error resolving standard folder $romFolderPath for $folderName: $e',
-      );
-      return null;
+      _log.e('Error resolving standard folders in $romFolderPath: $e');
+      return const [];
     }
   }
 
