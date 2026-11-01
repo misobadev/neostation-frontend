@@ -247,7 +247,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.subfolderViewAllSubtitle:
       'Applica in una volta l’opzione Mostra sottocartelle a tutti i sistemi',
   AppLocale.subfolderViewAllOverridesNotice:
-      '{count} sistema/i avevano una propria impostazione Mostra sottocartelle. Ora tutti i sistemi seguono questo interruttore; puoi comunque modificarne ognuno nelle impostazioni di quel sistema.',
+      'Sistemi che avevano una propria impostazione Mostra sottocartelle: {count}. Ora tutti i sistemi seguono questo interruttore; puoi comunque modificarne ognuno nelle impostazioni di quel sistema.',
   AppLocale.subfolderViewEnabled: 'Sottocartelle mostrate come cartelle',
   AppLocale.subfolderViewDisabled: 'Sottocartelle mescolate ai giochi',
   AppLocale.errorScanningSystem:
@@ -400,9 +400,9 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.organizeMultiDiscNoRomFoldersConfigured:
       'Nessuna cartella ROM configurata.',
   AppLocale.organizeMultiDiscSkippedSuffix:
-      ' ({count} percorso/i cartella saltato/i)',
+      ' (percorsi di cartella saltati: {count})',
   AppLocale.organizeMultiDiscDone:
-      'Fatto: {groups} set organizzato/i, {files} file spostato/i, {playlists} playlist creata/e{skipped}.',
+      'Fatto. Set organizzati: {groups}, file spostati: {files}, playlist create: {playlists}{skipped}.',
   AppLocale.organizeMultiDiscNoSetsFound:
       'Nessun set multi-disco da organizzare{skipped}.',
   AppLocale.organizeMultiDiscFailed:
@@ -422,7 +422,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.cleanOrphanedMetadataNothingFound:
       'Nessun metadato orfano trovato.',
   AppLocale.cleanOrphanedMetadataDone:
-      'Puliti {entries} voce/i di metadati e {files} file multimediali.',
+      'Pulizia completata. Voci di metadati: {entries}, file multimediali: {files}.',
   AppLocale.cleanOrphanedMetadataDelete:
       '{count} voci di metadati orfane verranno eliminate dal database e dal disco.',
   AppLocale.cleanOrphanedMetadataDeleteOne:
@@ -449,12 +449,12 @@ const Map<String, dynamic> appLocaleIt = {
       'Questa operazione percorre ogni piattaforma del tuo server RomM e collega le ROM locali riconosciute.\n\nI giochi collegati diventano idonei alla sincronizzazione dei salvataggi, che verranno quindi caricati su RomM. Su una libreria grande può richiedere diversi minuti.',
   AppLocale.rommLinkLibraryPreparing: 'Preparazione…',
   AppLocale.rommLinkLibraryProgress: '{done} di {total} — {system}',
-  AppLocale.rommLinkLibraryDone: '{count} giochi collegati',
+  AppLocale.rommLinkLibraryDone: 'Giochi collegati: {count}',
   AppLocale.rommLinkLibraryNothingToDo: 'Nulla di nuovo da collegare',
   AppLocale.rommLinkLibraryFailed: 'Collegamento non riuscito',
   AppLocale.rommLinkLibraryUnavailable: 'Non disponibile al momento',
   AppLocale.rommLinkLibraryStoppedEarly:
-      'Interrotto in anticipo — {count} giochi collegati finora',
+      'Interrotto in anticipo — giochi collegati finora: {count}',
   AppLocale.rematchAchievementsSubtitle:
       'Controlla l\'intera libreria alla ricerca di set di obiettivi, invece di un gioco alla volta',
   AppLocale.rematchAchievementsWarning:
@@ -465,11 +465,11 @@ const Map<String, dynamic> appLocaleIt = {
       'Controllo dei giochi già sottoposti ad hash...',
   AppLocale.rematchAchievementsHashing: 'Abbinamento {done} di {total}',
   AppLocale.rematchAchievementsDone:
-      'Fatto: {matched} gioco/giochi abbinati, {hashed} identificati per la prima volta.',
+      'Fatto. Giochi abbinati: {matched}, identificati per la prima volta: {hashed}.',
   AppLocale.rematchAchievementsNothingToDo:
       'Tutti i giochi supportati sono già stati controllati.',
   AppLocale.rematchAchievementsPaused:
-      'In pausa: {matched} gioco/giochi associati finora. Eseguilo di nuovo per continuare.',
+      'In pausa. Giochi abbinati finora: {matched}. Eseguilo di nuovo per continuare.',
   AppLocale.rematchAchievementsFailed:
       'Impossibile abbinare i giochi RetroAchievements: {error}',
   AppLocale.raOpenPage: 'Apri pagina',
@@ -1300,7 +1300,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.selectUserDataFolder: 'Seleziona cartella dati',
   AppLocale.folderNotEmptyTitle: 'Cartella non vuota',
   AppLocale.folderNotEmptyBody:
-      'Questa cartella contiene già {count} elemento/i. NeoStation memorizzerà qui i propri dati, insieme ai contenuti esistenti.',
+      'Questa cartella non è vuota (elementi: {count}). NeoStation memorizzerà qui i propri dati, insieme ai contenuti esistenti.',
   AppLocale.folderNotEmptyUseAnyway: 'Usa comunque',
   AppLocale.userDataFolderNotWritable:
       "Impossibile scrivere in questa cartella. Scegline un'altra o mantieni la posizione predefinita.",
@@ -1310,7 +1310,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.moveUserDataBody:
       'NeoStation sposterà i propri dati (database, media recuperati e impostazioni) dalla cartella attuale a quella nuova. I file non creati da NeoStation restano invariati.',
   AppLocale.moveUserDataDestNotEmpty:
-      'La nuova cartella contiene già {count} elemento/i. I dati di NeoStation verranno aggiunti accanto ad essi.',
+      'La nuova cartella non è vuota (elementi: {count}). I dati di NeoStation verranno aggiunti accanto ai contenuti esistenti.',
   AppLocale.moveUserDataConfirm: 'Sposta dati',
   AppLocale.migratingUserData: 'Spostamento dati',
   AppLocale.migratingUserDataComplete: 'Migrazione completata',

@@ -250,7 +250,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.subfolderViewAllSubtitle:
       'Die Einstellung „Unterordner anzeigen“ auf einmal für alle Systeme übernehmen',
   AppLocale.subfolderViewAllOverridesNotice:
-      '{count} System(e) hatten eine eigene Einstellung „Unterordner anzeigen“. Alle Systeme folgen jetzt diesem Schalter; du kannst jedes einzelne weiterhin in seinen Systemeinstellungen ändern.',
+      'Systeme, die eine eigene Einstellung „Unterordner anzeigen“ hatten: {count}. Alle Systeme folgen jetzt diesem Schalter; du kannst jedes einzelne weiterhin in seinen Systemeinstellungen ändern.',
   AppLocale.subfolderViewEnabled: 'Unterordner werden als Ordner angezeigt',
   AppLocale.subfolderViewDisabled: 'Unterordner mit Spielen vermischt',
   AppLocale.errorScanningSystem: 'Fehler beim Scannen des Systems: {error}',
@@ -403,15 +403,15 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.organizeMultiDiscNoRomFoldersConfigured:
       'Keine ROM-Ordner konfiguriert.',
   AppLocale.organizeMultiDiscSkippedSuffix:
-      ' ({count} Ordnerpfad(e) übersprungen)',
+      ' (übersprungene Ordnerpfade: {count})',
   AppLocale.organizeMultiDiscDone:
-      'Fertig: {groups} Set(s) organisiert, {files} Datei(en) verschoben, {playlists} Playlist(s) erstellt{skipped}.',
+      'Fertig. Organisierte Sets: {groups}, verschobene Dateien: {files}, erstellte Playlists: {playlists}{skipped}.',
   AppLocale.organizeMultiDiscNoSetsFound:
       'Keine Multi-Disc-Sets zum Organisieren gefunden{skipped}.',
   AppLocale.organizeMultiDiscFailed:
       'Multi-Disc-Spiele konnten nicht organisiert werden: {error}',
   AppLocale.organizeMultiDiscPartialFailure:
-      '{failed} Set(s) konnten nicht organisiert werden. {result}',
+      'Sets, die nicht organisiert werden konnten: {failed}. {result}',
   AppLocale.organizeMultiDiscWarning:
       'Dadurch werden passende ROM-Dateien in neue Spielordner verschoben und .m3u-Wiedergabelisten auf dem Speicher erstellt. Dies kann nicht automatisch rückgängig gemacht werden.',
   AppLocale.cleanOrphanedMetadata: 'Verwaiste Metadaten bereinigen',
@@ -425,7 +425,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.cleanOrphanedMetadataNothingFound:
       'Keine verwaisten Metadaten gefunden.',
   AppLocale.cleanOrphanedMetadataDone:
-      '{entries} Metadateneintrag/-einträge und {files} Mediendatei(en) bereinigt.',
+      'Bereinigt. Metadateneinträge: {entries}, Mediendateien: {files}.',
   AppLocale.cleanOrphanedMetadataDelete:
       '{count} verwaiste Metadateneinträge werden aus der Datenbank und vom Datenträger gelöscht.',
   AppLocale.cleanOrphanedMetadataDeleteOne:
@@ -452,12 +452,12 @@ const Map<String, dynamic> appLocaleDe = {
       'Dies durchsucht jede Plattform auf deinem RomM-Server und verknüpft erkannte lokale ROMs.\n\nVerknüpfte Spiele werden für die Spielstand-Synchronisierung freigegeben, ihre Spielstände werden also zu RomM hochgeladen. Bei einer großen Bibliothek kann das mehrere Minuten dauern.',
   AppLocale.rommLinkLibraryPreparing: 'Wird vorbereitet…',
   AppLocale.rommLinkLibraryProgress: '{done} von {total} — {system}',
-  AppLocale.rommLinkLibraryDone: '{count} Spiele verknüpft',
+  AppLocale.rommLinkLibraryDone: 'Verknüpfte Spiele: {count}',
   AppLocale.rommLinkLibraryNothingToDo: 'Nichts Neues zu verknüpfen',
   AppLocale.rommLinkLibraryFailed: 'Verknüpfen fehlgeschlagen',
   AppLocale.rommLinkLibraryUnavailable: 'Derzeit nicht verfügbar',
   AppLocale.rommLinkLibraryStoppedEarly:
-      'Vorzeitig beendet — bisher {count} Spiele verknüpft',
+      'Vorzeitig beendet — bisher verknüpfte Spiele: {count}',
   AppLocale.rematchAchievementsSubtitle:
       'Durchsucht die gesamte Bibliothek nach Achievement-Sets, statt Spiel für Spiel',
   AppLocale.rematchAchievementsWarning:
@@ -468,11 +468,11 @@ const Map<String, dynamic> appLocaleDe = {
       'Bereits gehashte Spiele werden geprüft ...',
   AppLocale.rematchAchievementsHashing: 'Abgleich {done} von {total}',
   AppLocale.rematchAchievementsDone:
-      'Fertig: {matched} Spiel(e) zugeordnet, {hashed} neu identifiziert.',
+      'Fertig. Zugeordnete Spiele: {matched}, neu identifiziert: {hashed}.',
   AppLocale.rematchAchievementsNothingToDo:
       'Alle unterstützten Spiele wurden bereits geprüft.',
   AppLocale.rematchAchievementsPaused:
-      'Pausiert: bisher {matched} Spiel(e) zugeordnet. Erneut starten, um fortzufahren.',
+      'Pausiert. Bisher zugeordnete Spiele: {matched}. Erneut starten, um fortzufahren.',
   AppLocale.rematchAchievementsFailed:
       'RetroAchievements-Spiele konnten nicht zugeordnet werden: {error}',
   AppLocale.raOpenPage: 'Seite öffnen',
@@ -1308,7 +1308,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.selectUserDataFolder: 'Datenordner auswählen',
   AppLocale.folderNotEmptyTitle: 'Ordner nicht leer',
   AppLocale.folderNotEmptyBody:
-      'Dieser Ordner enthält bereits {count} Element(e). NeoStation speichert seine eigenen Daten hier, zusammen mit den vorhandenen Inhalten.',
+      'Dieser Ordner ist nicht leer (Elemente: {count}). NeoStation speichert seine eigenen Daten hier, zusammen mit den vorhandenen Inhalten.',
   AppLocale.folderNotEmptyUseAnyway: 'Trotzdem verwenden',
   AppLocale.userDataFolderNotWritable:
       "In diesen Ordner kann nicht geschrieben werden. Wähle einen anderen oder behalte den Standardort.",
@@ -1318,7 +1318,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.moveUserDataBody:
       'NeoStation verschiebt seine eigenen Daten – Datenbank, gescrapte Medien und Einstellungen – vom aktuellen Ordner in den neuen. Dateien, die nicht von NeoStation erstellt wurden, bleiben unberührt.',
   AppLocale.moveUserDataDestNotEmpty:
-      'Der neue Ordner enthält bereits {count} Element(e). Die Daten von NeoStation werden daneben abgelegt.',
+      'Der neue Ordner ist nicht leer (Elemente: {count}). Die Daten von NeoStation werden daneben abgelegt.',
   AppLocale.moveUserDataConfirm: 'Daten verschieben',
   AppLocale.migratingUserData: 'Daten werden verschoben',
   AppLocale.migratingUserDataComplete: 'Migration abgeschlossen',

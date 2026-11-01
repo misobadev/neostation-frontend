@@ -247,7 +247,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.subfolderViewAllSubtitle:
       'Aplicar de una vez la opción Mostrar subcarpetas a todos los sistemas',
   AppLocale.subfolderViewAllOverridesNotice:
-      '{count} sistema(s) tenían su propia opción Mostrar subcarpetas. Ahora todos los sistemas siguen este interruptor; puedes volver a cambiar cualquiera de ellos en los ajustes de ese sistema.',
+      'Sistemas que tenían su propia opción Mostrar subcarpetas: {count}. Ahora todos los sistemas siguen este interruptor; puedes volver a cambiar cualquiera de ellos en los ajustes de ese sistema.',
   AppLocale.subfolderViewEnabled: 'Subcarpetas mostradas como carpetas',
   AppLocale.subfolderViewDisabled: 'Subcarpetas mezcladas con los juegos',
   AppLocale.errorScanningSystem: 'Error al escanear el sistema: {error}',
@@ -402,15 +402,15 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.organizeMultiDiscNoRomFoldersConfigured:
       'No hay carpetas ROM configuradas.',
   AppLocale.organizeMultiDiscSkippedSuffix:
-      ' ({count} ruta(s) de carpeta omitida(s))',
+      ' (rutas de carpeta omitidas: {count})',
   AppLocale.organizeMultiDiscDone:
-      'Listo: {groups} conjunto(s) organizados, {files} archivo(s) movido(s), {playlists} lista(s) de reproducción creada(s){skipped}.',
+      'Listo. Conjuntos organizados: {groups}, archivos movidos: {files}, listas de reproducción creadas: {playlists}{skipped}.',
   AppLocale.organizeMultiDiscNoSetsFound:
       'No se encontraron conjuntos multidisco para organizar{skipped}.',
   AppLocale.organizeMultiDiscFailed:
       'No se pudieron organizar los juegos multidisco: {error}',
   AppLocale.organizeMultiDiscPartialFailure:
-      'No se pudieron organizar {failed} conjunto(s). {result}',
+      'Conjuntos que no se pudieron organizar: {failed}. {result}',
   AppLocale.organizeMultiDiscWarning:
       'Esto moverá los archivos ROM coincidentes a nuevas carpetas de juegos y creará listas .m3u en tu almacenamiento. No se puede deshacer automáticamente.',
   AppLocale.cleanOrphanedMetadata: 'Limpiar metadata huérfana',
@@ -423,7 +423,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.cleanOrphanedMetadataNothingFound:
       'No se encontró metadata huérfana.',
   AppLocale.cleanOrphanedMetadataDone:
-      'Se limpiaron {entries} entrada(s) de metadata y {files} archivo(s) multimedia.',
+      'Limpieza completada. Entradas de metadata: {entries}, archivos multimedia: {files}.',
   AppLocale.cleanOrphanedMetadataDelete:
       'Se eliminarán {count} entradas de metadata huérfana de la base de datos y del disco.',
   AppLocale.cleanOrphanedMetadataDeleteOne:
@@ -450,12 +450,12 @@ const Map<String, dynamic> appLocaleEs = {
       'Esto recorre todas las plataformas de tu servidor RomM y vincula las ROMs locales que reconoce.\n\nLos juegos vinculados pasan a sincronizar partidas guardadas, así que sus datos se subirán a RomM. En una biblioteca grande puede tardar varios minutos.',
   AppLocale.rommLinkLibraryPreparing: 'Preparando…',
   AppLocale.rommLinkLibraryProgress: '{done} de {total} — {system}',
-  AppLocale.rommLinkLibraryDone: '{count} juegos vinculados',
+  AppLocale.rommLinkLibraryDone: 'Juegos vinculados: {count}',
   AppLocale.rommLinkLibraryNothingToDo: 'Nada nuevo que vincular',
   AppLocale.rommLinkLibraryFailed: 'Error al vincular',
   AppLocale.rommLinkLibraryUnavailable: 'No disponible ahora mismo',
   AppLocale.rommLinkLibraryStoppedEarly:
-      'Detenido antes de terminar: {count} juegos vinculados hasta ahora',
+      'Detenido antes de terminar. Juegos vinculados hasta ahora: {count}',
   AppLocale.rematchAchievementsSubtitle:
       'Revisa toda la biblioteca en busca de sets de logros, en vez de juego por juego',
   AppLocale.rematchAchievementsWarning:
@@ -466,11 +466,11 @@ const Map<String, dynamic> appLocaleEs = {
       'Comprobando los juegos que ya tienen hash...',
   AppLocale.rematchAchievementsHashing: 'Emparejando {done} de {total}',
   AppLocale.rematchAchievementsDone:
-      'Listo: {matched} juego(s) emparejado(s), {hashed} identificado(s) por primera vez.',
+      'Listo. Juegos emparejados: {matched}, identificados por primera vez: {hashed}.',
   AppLocale.rematchAchievementsNothingToDo:
       'Todos los juegos compatibles ya se han comprobado.',
   AppLocale.rematchAchievementsPaused:
-      'En pausa: {matched} juego(s) coincidentes hasta ahora. Ejecútalo de nuevo para continuar.',
+      'En pausa. Juegos emparejados hasta ahora: {matched}. Ejecútalo de nuevo para continuar.',
   AppLocale.rematchAchievementsFailed:
       'No se pudieron emparejar los juegos de RetroAchievements: {error}',
   AppLocale.raOpenPage: 'Abrir página',
@@ -1302,7 +1302,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.selectUserDataFolder: 'Seleccionar Carpeta de Datos',
   AppLocale.folderNotEmptyTitle: 'La carpeta no está vacía',
   AppLocale.folderNotEmptyBody:
-      'Esta carpeta ya contiene {count} elemento(s). NeoStation almacenará sus propios datos aquí, junto con el contenido existente.',
+      'Esta carpeta no está vacía (elementos: {count}). NeoStation almacenará sus propios datos aquí, junto con el contenido existente.',
   AppLocale.folderNotEmptyUseAnyway: 'Usar de todos modos',
   AppLocale.userDataFolderNotWritable:
       "No se puede escribir en esta carpeta. Elige otra o mantén la ubicación predeterminada.",
@@ -1312,7 +1312,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.moveUserDataBody:
       'NeoStation moverá sus propios datos (base de datos, medios extraídos y ajustes) de la carpeta actual a la nueva. Los archivos no creados por NeoStation permanecen intactos.',
   AppLocale.moveUserDataDestNotEmpty:
-      'La nueva carpeta ya contiene {count} elemento(s). Los datos de NeoStation se añadirán junto a ellos.',
+      'La nueva carpeta no está vacía (elementos: {count}). Los datos de NeoStation se añadirán junto al contenido existente.',
   AppLocale.moveUserDataConfirm: 'Mover datos',
   AppLocale.migratingUserData: 'Moviendo Datos',
   AppLocale.migratingUserDataComplete: 'Migración completada',

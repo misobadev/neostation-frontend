@@ -243,7 +243,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.subfolderViewAllSubtitle:
       'Применить настройку «Показывать подпапки» сразу ко всем системам',
   AppLocale.subfolderViewAllOverridesNotice:
-      '{count} систем(ы) имели собственную настройку «Показывать подпапки». Теперь все системы следуют этому переключателю; каждую из них по-прежнему можно изменить в её настройках.',
+      'Систем, у которых была собственная настройка «Показывать подпапки»: {count}. Теперь все системы следуют этому переключателю; каждую из них по-прежнему можно изменить в её настройках.',
   AppLocale.subfolderViewEnabled: 'Подпапки показаны как папки',
   AppLocale.subfolderViewDisabled: 'Подпапки смешаны с играми',
   AppLocale.errorScanningSystem: 'Ошибка при сканировании системы: {error}',
@@ -393,7 +393,7 @@ const Map<String, dynamic> appLocaleRu = {
       'Сканирование папок ROM на наличие многодисковых игр...',
   AppLocale.organizeMultiDiscNoRomFoldersConfigured: 'Папки ROM не настроены.',
   AppLocale.organizeMultiDiscSkippedSuffix:
-      ' ({count} путь(ей) к папкам пропущено)',
+      ' (пропущено путей к папкам: {count})',
   AppLocale.organizeMultiDiscDone:
       'Готово: организовано наборов — {groups}, перемещено файлов — {files}, создано плейлистов — {playlists}{skipped}.',
   AppLocale.organizeMultiDiscNoSetsFound:
@@ -414,7 +414,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.cleanOrphanedMetadataNothingFound:
       'Потерянные метаданные не найдены.',
   AppLocale.cleanOrphanedMetadataDone:
-      'Очищено {entries} запис(ь/ей) метаданных и {files} медиафайл(а/ов).',
+      'Очищено записей метаданных: {entries}, медиафайлов: {files}.',
   AppLocale.cleanOrphanedMetadataDelete:
       'Из базы данных и с диска будут удалены потерянные записи метаданных: {count}.',
   AppLocale.cleanOrphanedMetadataDeleteOne:
@@ -1263,7 +1263,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.selectUserDataFolder: 'Выбрать папку данных',
   AppLocale.folderNotEmptyTitle: 'Папка не пуста',
   AppLocale.folderNotEmptyBody:
-      'Эта папка уже содержит {count} элемент(ов). NeoStation будет хранить свои данные здесь, рядом с существующим содержимым.',
+      'Эта папка не пуста (элементов: {count}). NeoStation будет хранить свои данные здесь, рядом с существующим содержимым.',
   AppLocale.folderNotEmptyUseAnyway: 'Всё равно использовать',
   AppLocale.userDataFolderNotWritable:
       "Не удаётся записать в эту папку. Выберите другую или оставьте расположение по умолчанию.",
@@ -1273,7 +1273,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.moveUserDataBody:
       'NeoStation переместит свои данные (базу данных, загруженные медиа и настройки) из текущей папки в новую. Файлы, созданные не NeoStation, останутся нетронутыми.',
   AppLocale.moveUserDataDestNotEmpty:
-      'Новая папка уже содержит {count} элемент(ов). Данные NeoStation будут добавлены рядом с ними.',
+      'Новая папка не пуста (элементов: {count}). Данные NeoStation будут добавлены рядом с существующим содержимым.',
   AppLocale.moveUserDataConfirm: 'Переместить',
   AppLocale.migratingUserData: 'Перемещение данных',
   AppLocale.migratingUserDataComplete: 'Миграция завершена',

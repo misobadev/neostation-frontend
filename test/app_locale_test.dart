@@ -136,4 +136,51 @@ void main() {
       }
     }
   });
+
+  // "game(s)", "entr(y/ies)", "Datei(en)", "запис(ь/ей)", "gioco/giochi":
+  // a plural glued on in brackets or after a slash reads badly in every
+  // language and can't be right for all counts. Write around the number
+  // instead ("Games linked: {count}"). Korean particle pairs such as 을(를)
+  // are normal UI practice, so Hangul is not matched. Word edges are
+  // lookarounds, not \b, which only knows ASCII letters.
+  const letter = r'[A-Za-zÀ-ÖØ-öø-ÿĀ-žА-яЁё]';
+  const lower = r'[a-zß-öø-ÿа-яё]'; // not AM/PM or Pack(SAP)
+
+  test('no translation glues a plural ending onto a word', () {
+    final gluedPlural = RegExp(
+      '$letter\\($lower{1,3}(/$lower{1,3})?\\)' // file(s), запис(ь/ей)
+      // percorso/i, запис/ей, Metadateneintrag/-einträge; two letters before
+      // the slash so that y/o, e/ou and i/o pass
+      '|$letter{2}/(-|$lower{1,2}(?!$letter))'
+      '|(?<!$letter)($letter{3})$letter*/\\3', // gioco/giochi
+    );
+
+    final offenders = <String>[];
+    for (final entry in locales.entries) {
+      for (final key in appLocaleEn.keys) {
+        final value = entry.value[key]?.toString() ?? '';
+        final match = gluedPlural.firstMatch(value);
+        if (match != null) offenders.add('${entry.key} $key: ${match[0]}');
+      }
+    }
+    expect(offenders, isEmpty, reason: offenders.join('\n'));
+  });
+
+  // "Linked {count} games" is wrong at 1 in every language that inflects
+  // nouns for number; the count goes after a label instead.
+  test('the RomM link messages read right for a single game', () {
+    final countBeforeNoun = RegExp('\\{count\\} $letter');
+    for (final code in ['en', 'de', 'es', 'fr', 'it', 'pt', 'ru']) {
+      for (final key in [
+        AppLocale.rommLinkLibraryDone,
+        AppLocale.rommLinkLibraryStoppedEarly,
+      ]) {
+        expect(
+          locales[code]![key].toString(),
+          isNot(matches(countBeforeNoun)),
+          reason: '$key in $code',
+        );
+      }
+    }
+  });
 }

@@ -248,7 +248,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.subfolderViewAllSubtitle:
       'Aplicar de uma vez a opção Mostrar subpastas a todos os sistemas',
   AppLocale.subfolderViewAllOverridesNotice:
-      '{count} sistema(s) tinham a sua própria opção Mostrar subpastas. Agora todos os sistemas seguem este interruptor; ainda é possível alterar qualquer um deles nas definições desse sistema.',
+      'Sistemas que tinham a sua própria opção Mostrar subpastas: {count}. Agora todos os sistemas seguem este interruptor; ainda é possível alterar qualquer um deles nas definições desse sistema.',
   AppLocale.subfolderViewEnabled: 'Subpastas mostradas como pastas',
   AppLocale.subfolderViewDisabled: 'Subpastas misturadas com os jogos',
   AppLocale.errorScanningSystem: 'Erro ao varrer o sistema: {error}',
@@ -399,15 +399,15 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.organizeMultiDiscNoRomFoldersConfigured:
       'Nenhuma pasta de ROM configurada.',
   AppLocale.organizeMultiDiscSkippedSuffix:
-      ' ({count} caminho(s) de pasta ignorado(s))',
+      ' (caminhos de pasta ignorados: {count})',
   AppLocale.organizeMultiDiscDone:
-      'Concluído: {groups} conjunto(s) organizado(s), {files} arquivo(s) movido(s), {playlists} playlist(s) criada(s){skipped}.',
+      'Concluído. Conjuntos organizados: {groups}, arquivos movidos: {files}, playlists criadas: {playlists}{skipped}.',
   AppLocale.organizeMultiDiscNoSetsFound:
       'Nenhum conjunto multi-disco encontrado para organizar{skipped}.',
   AppLocale.organizeMultiDiscFailed:
       'Falha ao organizar jogos multi-disco: {error}',
   AppLocale.organizeMultiDiscPartialFailure:
-      'Não foi possível organizar {failed} conjunto(s). {result}',
+      'Conjuntos que não foi possível organizar: {failed}. {result}',
   AppLocale.organizeMultiDiscWarning:
       'Isto moverá os ficheiros ROM correspondentes para novas pastas de jogos e criará listas .m3u no armazenamento. Não pode ser desfeito automaticamente.',
   AppLocale.cleanOrphanedMetadata: 'Limpar Metadados Órfãos',
@@ -420,7 +420,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.cleanOrphanedMetadataNothingFound:
       'Não foram encontrados metadados órfãos.',
   AppLocale.cleanOrphanedMetadataDone:
-      'Limpos {entries} entrada(s) de metadados e {files} ficheiro(s) de mídia.',
+      'Limpeza concluída. Entradas de metadados: {entries}, ficheiros de mídia: {files}.',
   AppLocale.cleanOrphanedMetadataDelete:
       '{count} entradas de metadados órfãs serão eliminadas da base de dados e do disco.',
   AppLocale.cleanOrphanedMetadataDeleteOne:
@@ -447,12 +447,12 @@ const Map<String, dynamic> appLocalePt = {
       'Isto percorre todas as plataformas do seu servidor RomM e vincula as ROMs locais que reconhece.\n\nJogos vinculados passam a sincronizar saves, portanto os seus saves serão enviados para o RomM. Numa biblioteca grande isto pode demorar vários minutos.',
   AppLocale.rommLinkLibraryPreparing: 'A preparar…',
   AppLocale.rommLinkLibraryProgress: '{done} de {total} — {system}',
-  AppLocale.rommLinkLibraryDone: '{count} jogos vinculados',
+  AppLocale.rommLinkLibraryDone: 'Jogos vinculados: {count}',
   AppLocale.rommLinkLibraryNothingToDo: 'Nada de novo para vincular',
   AppLocale.rommLinkLibraryFailed: 'Falha ao vincular',
   AppLocale.rommLinkLibraryUnavailable: 'Indisponível de momento',
   AppLocale.rommLinkLibraryStoppedEarly:
-      'Interrompido antes do fim — {count} jogos vinculados até agora',
+      'Interrompido antes do fim — jogos vinculados até agora: {count}',
   AppLocale.rematchAchievementsSubtitle:
       'Verifica toda a biblioteca à procura de conjuntos de conquistas, em vez de um jogo de cada vez',
   AppLocale.rematchAchievementsWarning:
@@ -463,11 +463,11 @@ const Map<String, dynamic> appLocalePt = {
       'A verificar jogos que já têm hash...',
   AppLocale.rematchAchievementsHashing: 'A associar {done} de {total}',
   AppLocale.rematchAchievementsDone:
-      'Concluído: {matched} jogo(s) associado(s), {hashed} identificado(s) pela primeira vez.',
+      'Concluído. Jogos associados: {matched}, identificados pela primeira vez: {hashed}.',
   AppLocale.rematchAchievementsNothingToDo:
       'Todos os jogos suportados já foram verificados.',
   AppLocale.rematchAchievementsPaused:
-      'Em pausa: {matched} jogo(s) correspondidos até agora. Execute de novo para continuar.',
+      'Em pausa. Jogos associados até agora: {matched}. Execute de novo para continuar.',
   AppLocale.rematchAchievementsFailed:
       'Falha ao associar jogos do RetroAchievements: {error}',
   AppLocale.raOpenPage: 'Abrir página',
@@ -1288,7 +1288,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.selectUserDataFolder: 'Selecionar Pasta de Dados',
   AppLocale.folderNotEmptyTitle: 'Pasta não vazia',
   AppLocale.folderNotEmptyBody:
-      'Esta pasta já contém {count} item(ns). O NeoStation irá armazenar os seus próprios dados aqui, junto com o conteúdo existente.',
+      'Esta pasta não está vazia (itens: {count}). O NeoStation irá armazenar os seus próprios dados aqui, junto com o conteúdo existente.',
   AppLocale.folderNotEmptyUseAnyway: 'Usar mesmo assim',
   AppLocale.userDataFolderNotWritable:
       "Não é possível gravar nesta pasta. Escolha outra ou mantenha o local padrão.",
@@ -1298,7 +1298,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.moveUserDataBody:
       'O NeoStation moverá seus próprios dados — banco de dados, mídia obtida e configurações — da pasta atual para a nova. Arquivos não criados pelo NeoStation permanecem intactos.',
   AppLocale.moveUserDataDestNotEmpty:
-      'A nova pasta já contém {count} item(ns). Os dados do NeoStation serão adicionados junto a eles.',
+      'A nova pasta não está vazia (itens: {count}). Os dados do NeoStation serão adicionados junto ao conteúdo existente.',
   AppLocale.moveUserDataConfirm: 'Mover dados',
   AppLocale.migratingUserData: 'Movendo Dados',
   AppLocale.migratingUserDataComplete: 'Migração concluída',

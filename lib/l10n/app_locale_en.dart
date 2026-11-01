@@ -242,7 +242,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.subfolderViewAllSubtitle:
       'Apply the per-system Show Subfolders setting to every system at once',
   AppLocale.subfolderViewAllOverridesNotice:
-      '{count} system(s) had their own Show Subfolders setting. All systems now follow this switch; you can still change any of them individually in that system’s settings.',
+      'Systems that had their own Show Subfolders setting: {count}. All systems now follow this switch; you can still change any of them individually in that system’s settings.',
   AppLocale.subfolderViewEnabled: 'Subfolders shown as folders',
   AppLocale.subfolderViewDisabled: 'Subfolders mixed with games',
   AppLocale.errorScanningSystem: 'Error scanning system: {error}',
@@ -388,15 +388,15 @@ const Map<String, dynamic> appLocaleEn = {
       'Scanning ROM folders for multi-disc games...',
   AppLocale.organizeMultiDiscNoRomFoldersConfigured:
       'No ROM folders configured.',
-  AppLocale.organizeMultiDiscSkippedSuffix: ' ({count} folder path(s) skipped)',
+  AppLocale.organizeMultiDiscSkippedSuffix: ' (folder paths skipped: {count})',
   AppLocale.organizeMultiDiscDone:
-      'Done: {groups} set(s) organized, {files} file(s) moved, {playlists} playlist(s) created{skipped}.',
+      'Done. Sets organized: {groups}, files moved: {files}, playlists created: {playlists}{skipped}.',
   AppLocale.organizeMultiDiscNoSetsFound:
       'No multi-disc sets found to organize{skipped}.',
   AppLocale.organizeMultiDiscFailed:
       'Failed to organize multi-disc games: {error}',
   AppLocale.organizeMultiDiscPartialFailure:
-      '{failed} set(s) could not be organized. {result}',
+      'Sets that could not be organized: {failed}. {result}',
   AppLocale.organizeMultiDiscWarning:
       'This moves matching ROM files into new game folders and creates .m3u playlists on your storage. This cannot be undone automatically.',
   AppLocale.cleanOrphanedMetadata: 'Clean Orphaned Metadata',
@@ -408,7 +408,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.cleanOrphanedMetadataCleaningItem: 'Cleaning {filename}...',
   AppLocale.cleanOrphanedMetadataNothingFound: 'No orphaned metadata found.',
   AppLocale.cleanOrphanedMetadataDone:
-      'Cleaned {entries} metadata entr(y/ies) and {files} media file(s).',
+      'Cleaned. Metadata entries: {entries}, media files: {files}.',
   AppLocale.cleanOrphanedMetadataDelete:
       '{count} orphaned metadata entries will be deleted from the database and disk.',
   AppLocale.cleanOrphanedMetadataDeleteOne:
@@ -435,12 +435,12 @@ const Map<String, dynamic> appLocaleEn = {
       'This walks every platform on your RomM server and links local ROMs it recognises.\n\nLinked games become eligible for save sync, so their saves will begin uploading to RomM. On a large library this can take several minutes.',
   AppLocale.rommLinkLibraryPreparing: 'Preparing…',
   AppLocale.rommLinkLibraryProgress: '{done} of {total} — {system}',
-  AppLocale.rommLinkLibraryDone: 'Linked {count} games',
+  AppLocale.rommLinkLibraryDone: 'Games linked: {count}',
   AppLocale.rommLinkLibraryNothingToDo: 'Nothing new to link',
   AppLocale.rommLinkLibraryFailed: 'Linking failed',
   AppLocale.rommLinkLibraryUnavailable: 'Not available right now',
   AppLocale.rommLinkLibraryStoppedEarly:
-      'Stopped early — linked {count} games so far',
+      'Stopped early — games linked so far: {count}',
   AppLocale.rematchAchievementsSubtitle:
       'Check your whole library for achievement sets, instead of one game at a time',
   AppLocale.rematchAchievementsWarning:
@@ -451,11 +451,11 @@ const Map<String, dynamic> appLocaleEn = {
       'Looking up games that are already hashed...',
   AppLocale.rematchAchievementsHashing: 'Matching {done} of {total}',
   AppLocale.rematchAchievementsDone:
-      'Done: {matched} game(s) matched, {hashed} newly identified.',
+      'Done. Games matched: {matched}, newly identified: {hashed}.',
   AppLocale.rematchAchievementsNothingToDo:
       'Every supported game has already been checked.',
   AppLocale.rematchAchievementsPaused:
-      'Paused: {matched} game(s) matched so far. Run it again to carry on.',
+      'Paused. Games matched so far: {matched}. Run it again to carry on.',
   AppLocale.rematchAchievementsFailed:
       'Failed to match RetroAchievements games: {error}',
   AppLocale.raOpenPage: 'Open page',
@@ -1261,7 +1261,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.selectUserDataFolder: 'Select User Data Folder',
   AppLocale.folderNotEmptyTitle: 'Folder Not Empty',
   AppLocale.folderNotEmptyBody:
-      'This folder already contains {count} item(s). NeoStation will store its own data here, alongside the existing contents.',
+      'This folder isn\'t empty (items: {count}). NeoStation will store its own data here, alongside the existing contents.',
   AppLocale.folderNotEmptyUseAnyway: 'Use Anyway',
   AppLocale.userDataFolderNotWritable:
       "Can't write to this folder. Pick another one, or keep the default location.",
@@ -1271,7 +1271,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.moveUserDataBody:
       'NeoStation will move its own data — database, scraped media, and settings — from the current folder to the new one. Files not created by NeoStation are left untouched.',
   AppLocale.moveUserDataDestNotEmpty:
-      'The new folder already contains {count} item(s). NeoStation data will be added alongside them.',
+      'The new folder isn\'t empty (items: {count}). NeoStation data will be added alongside the existing contents.',
   AppLocale.moveUserDataConfirm: 'Move Data',
   AppLocale.migratingUserData: 'Moving User Data',
   AppLocale.migratingUserDataComplete: 'Migration complete',
