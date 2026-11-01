@@ -73,11 +73,7 @@ class ScreenscraperMediaDownloader {
     int? maxDailyRequests,
   }) async {
     if (medias.isEmpty) {
-      return {
-        'success': true,
-        'downloadedTypes': <String>[],
-        'cancelled': false,
-      };
+      return {'success': true, 'cancelled': false};
     }
 
     final userDataDir = await ScreenscraperMediaResolver.getMediaDirectory();
@@ -114,17 +110,12 @@ class ScreenscraperMediaDownloader {
         downloadTasks.add({
           'url': bestMedia['url'].toString(),
           'relativePath': relativePath,
-          'mediaType': mediaType,
         });
       }
     }
 
     if (downloadTasks.isEmpty) {
-      return {
-        'success': true,
-        'downloadedTypes': <String>[],
-        'cancelled': false,
-      };
+      return {'success': true, 'cancelled': false};
     }
 
     final batches = <List<Map<String, dynamic>>>[];
@@ -135,8 +126,7 @@ class ScreenscraperMediaDownloader {
       batches.add(downloadTasks.sublist(i, end));
     }
 
-    final downloadedTypes = <String>[];
-    final existingTypes = <String>[];
+    int succeeded = 0;
     bool wasCancelled = false;
 
     int completedTasks = 0;
@@ -146,38 +136,18 @@ class ScreenscraperMediaDownloader {
         break;
       }
 
-      final futures = batch.map((task) async {
-        final success = await _downloadMediaFileSmart(
-          task['url'],
-          task['relativePath'],
-          userDataDir,
-          forceOverwrite: forceOverwrite,
-          maxDailyRequests: maxDailyRequests,
-        );
-        return {
-          'mediaType': task['mediaType'],
-          'success': success,
-          'wasExisting':
-              !forceOverwrite &&
-              success &&
-              await ScreenscraperMediaResolver.checkFileExists(
-                task['relativePath'],
-                userDataDir,
-              ),
-        };
-      });
-
-      final results = await Future.wait(futures);
-
-      for (final result in results) {
-        if (result['success'] == true) {
-          if (result['wasExisting'] as bool) {
-            existingTypes.add(result['mediaType'] as String);
-          } else {
-            downloadedTypes.add(result['mediaType'] as String);
-          }
-        }
-      }
+      final results = await Future.wait(
+        batch.map(
+          (task) => _downloadMediaFileSmart(
+            task['url'],
+            task['relativePath'],
+            userDataDir,
+            forceOverwrite: forceOverwrite,
+            maxDailyRequests: maxDailyRequests,
+          ),
+        ),
+      );
+      succeeded += results.where((ok) => ok).length;
 
       completedTasks += batch.length;
       if (onProgress != null) onProgress(completedTasks / downloadTasks.length);
@@ -187,11 +157,8 @@ class ScreenscraperMediaDownloader {
       }
     }
 
-    final totalAvailable = downloadedTypes.length + existingTypes.length;
     return {
-      'success': totalAvailable == downloadTasks.length && !wasCancelled,
-      'downloadedTypes': downloadedTypes,
-      'existingTypes': existingTypes,
+      'success': succeeded == downloadTasks.length && !wasCancelled,
       'cancelled': wasCancelled,
     };
   }
