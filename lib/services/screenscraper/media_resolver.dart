@@ -1,15 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 
-import 'package:path/path.dart' as path;
 import '../config_service.dart';
 
 /// Media resolution helpers for ScreenScraper downloads.
 ///
 /// Resolves the on-disk media directory (cached), maps API media-type names to
-/// NeoStation folder names, selects the best regional/language asset from an API
-/// response, and checks whether an asset already exists locally. Extracted
-/// verbatim from [ScreenScraperService]; behaviour is unchanged. Sole owner of
+/// NeoStation folder names, and selects the best regional/language asset from
+/// an API response. Extracted verbatim from [ScreenScraperService]; behaviour is
+/// unchanged. Sole owner of
 /// the media-directory cache; performs no network I/O (the HTTP downloaders stay
 /// on the facade until the client collaborator is extracted).
 class ScreenscraperMediaResolver {
@@ -117,18 +116,5 @@ class ScreenscraperMediaResolver {
     }
 
     return bestMedia;
-  }
-
-  /// Verifies if a specific media asset exists in the local cache.
-  static Future<bool> checkFileExists(
-    String relativePath,
-    String userDataDir,
-  ) async {
-    try {
-      final fullPath = path.join(userDataDir, relativePath);
-      return await File(fullPath).exists();
-    } catch (e) {
-      return false;
-    }
   }
 }
