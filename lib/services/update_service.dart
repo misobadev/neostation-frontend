@@ -234,7 +234,7 @@ class UpdateService {
         return UpdateOutcome.downloadFailed;
       }
       if (cancelled()) {
-        await _deleteQuietly(downloadedFile);
+        await _removeDownload(downloadedFile);
         return UpdateOutcome.cancelled;
       }
 
@@ -244,7 +244,7 @@ class UpdateService {
       // a started one is left for its installer and cleaned up on a later
       // start.
       if (outcome != UpdateOutcome.installing) {
-        await _deleteQuietly(downloadedFile);
+        await _removeDownload(downloadedFile);
       }
       return outcome;
     } catch (e, stackTrace) {
@@ -253,7 +253,7 @@ class UpdateService {
         error: e,
         stackTrace: stackTrace,
       );
-      if (downloadedFile != null) await _deleteQuietly(downloadedFile);
+      if (downloadedFile != null) await _removeDownload(downloadedFile);
       return UpdateOutcome.installFailed;
     }
   }
@@ -273,11 +273,20 @@ class UpdateService {
     return started ? UpdateOutcome.installing : UpdateOutcome.installFailed;
   }
 
-  static Future<void> _deleteQuietly(File file) async {
+  /// Removes [file] and the folder [downloadUpdateFile] saved it in.
+  static Future<void> _removeDownload(File file) {
+    final folder = file.parent;
+    // Never the temporary folder itself, should a file come from elsewhere.
+    return path.basename(folder.path).startsWith(_downloadFolderPrefix)
+        ? _deleteQuietly(folder)
+        : _deleteQuietly(file);
+  }
+
+  static Future<void> _deleteQuietly(FileSystemEntity entity) async {
     try {
-      if (await file.exists()) await file.delete();
+      if (await entity.exists()) await entity.delete(recursive: true);
     } catch (e) {
-      _log.w('UpdateService: Could not remove ${file.path}: $e');
+      _log.w('UpdateService: Could not remove ${entity.path}: $e');
     }
   }
 
@@ -291,6 +300,24 @@ class UpdateService {
   @visibleForTesting
   static const downloadStallTimeout = Duration(seconds: 60);
 
+  /// Makes the download's folder private to this user, returning false if it
+  /// couldn't. Replaceable so a test can fail it.
+  @visibleForTesting
+  static Future<bool> Function(Directory folder) makePrivate =
+      defaultMakePrivate;
+
+  /// Removes everyone else's access to [folder] on Linux and macOS. Windows'
+  /// and Android's temporary folders are already the user's or the app's own.
+  @visibleForTesting
+  static Future<bool> defaultMakePrivate(Directory folder) async {
+    if (!Platform.isLinux && !Platform.isMacOS) return true;
+    final result = await Process.run('chmod', ['700', folder.path]);
+    return result.exitCode == 0;
+  }
+
+  /// The start of the name of the folder each download is saved in.
+  static const _downloadFolderPrefix = 'neostation-update-';
+
   /// How often [downloadUpdateFile] asks its `shouldCancel`, so a cancel also
   /// reaches a download that has stopped arriving.
   static const _cancelPollInterval = Duration(milliseconds: 250);
@@ -301,8 +328,9 @@ class UpdateService {
   /// body within [stallTimeout] of the last. [shouldCancel] returning true
   /// stops the download. The file must be [expectedSize] bytes when that is
   /// known (non-zero) and hash to [expectedSha256] when given; progress uses
-  /// [expectedSize] when the server sends no length. Returns null on any
-  /// failure, mismatch or cancel, with the file removed and the connection
+  /// [expectedSize] when the server sends no length. The file is saved in a
+  /// new folder of its own under the temporary folder. Returns null on any
+  /// failure, mismatch or cancel, with that folder removed and the connection
   /// closed.
   @visibleForTesting
   static Future<File?> downloadUpdateFile(
@@ -332,6 +360,7 @@ class UpdateService {
               client.close();
             }
           });
+    Directory? folder;
     try {
       final response = await client
           .send(
@@ -348,9 +377,6 @@ class UpdateService {
         return null;
       }
 
-      final tempDir = await getTemporaryDirectory();
-      final file = File(path.join(tempDir.path, fileName));
-
       final contentLength = response.contentLength ?? 0;
       if (contentLength > 0 &&
           expectedSize > 0 &&
@@ -361,6 +387,22 @@ class UpdateService {
         );
         return null;
       }
+
+      // A folder made for this download and closed to other users. On Linux
+      // the temporary folder is the shared /tmp, where anything another user
+      // puts at the release's file name first would stop the update.
+      final tempDir = await getTemporaryDirectory();
+      folder = await tempDir.createTemp(_downloadFolderPrefix);
+      if (!await makePrivate(folder)) {
+        _log.e('UpdateService: Could not make ${folder.path} private');
+        await _deleteQuietly(folder);
+        return null;
+      }
+      final file = File(path.join(folder.path, fileName));
+      // Made here, so that nothing put in the folder before it was private is
+      // written to: an existing name, even a link, fails this.
+      await file.create(exclusive: true);
+
       final totalBytes = contentLength > 0 ? contentLength : expectedSize;
       var downloadedBytes = 0;
       final digest = _DigestSink();
@@ -402,12 +444,13 @@ class UpdateService {
       }
       if (mismatch != null) {
         _log.e('UpdateService: Download doesn\'t match the release: $mismatch');
-        await _deleteQuietly(file);
+        await _deleteQuietly(folder);
         return null;
       }
       return file;
     } catch (e) {
       _log.e('UpdateService: File download failed', error: e);
+      if (folder != null) await _deleteQuietly(folder);
       return null;
     } finally {
       cancelPoll?.cancel();
@@ -600,8 +643,9 @@ rm -f "$scriptPath"
     }
   }
 
-  /// Removes app updates downloaded by an earlier run, and Windows' extracted
-  /// copy of one, from the temporary folder.
+  /// Removes app updates downloaded by an earlier run (each in its own folder,
+  /// or loose in the temporary folder from older versions), and Windows'
+  /// extracted copy of one, from the temporary folder.
   static Future<void> cleanUpDownloads() async {
     try {
       final tempDir = await getTemporaryDirectory();
@@ -612,7 +656,14 @@ rm -f "$scriptPath"
               name.toLowerCase().startsWith('neostation-') &&
               _assetPlatformMarkers.any(name.contains)) {
             await entity.delete();
-          } else if (entity is Directory && name == 'neostation_update') {
+          } else if (entity is Directory &&
+              name.startsWith(_downloadFolderPrefix)) {
+            await _removeDownloadFolder(entity);
+          } else if (Platform.isWindows &&
+              entity is Directory &&
+              name == 'neostation_update') {
+            // Only Windows' installer makes it, in a temporary folder of the
+            // user's own.
             await entity.delete(recursive: true);
           }
         } catch (e) {
@@ -622,6 +673,17 @@ rm -f "$scriptPath"
     } catch (e) {
       _log.w('UpdateService: Could not clean up old updates: $e');
     }
+  }
+
+  /// Removes a folder left by an earlier download. In a shared temporary
+  /// folder another user can make one by that name, holding links or folders
+  /// they can swap for links, so nothing in it is followed: its files and
+  /// links are removed, and a folder inside keeps it from being removed.
+  static Future<void> _removeDownloadFolder(Directory folder) async {
+    await for (final entity in folder.list(followLinks: false)) {
+      if (entity is! Directory) await entity.delete();
+    }
+    await folder.delete();
   }
 
   /// The parts of a release asset's name that say which platform it is for,

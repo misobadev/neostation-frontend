@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:neostation/services/update_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path/path.dart' as p;
 
 /// The app update was installed without checking it was the file the release
 /// lists: a captive portal's page, a proxy's error or a damaged download went
@@ -60,6 +61,7 @@ void main() {
 
   tearDown(() async {
     UpdateService.environment = () => Platform.environment;
+    UpdateService.makePrivate = UpdateService.defaultMakePrivate;
     UpdateService.debugUseHttpClient(null);
     HttpOverrides.global = previousOverrides;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -70,8 +72,6 @@ void main() {
 
   String url(String path) =>
       'http://${server.address.host}:${server.port}$path';
-
-  File downloaded() => File('${temp.path}/neostation.AppImage');
 
   group('the download is checked against the release', () {
     test('a file matching the release size and SHA-256 is kept', () async {
@@ -84,7 +84,7 @@ void main() {
       );
 
       expect(file, isNotNull);
-      expect(downloaded().existsSync(), isTrue);
+      expect(file!.existsSync(), isTrue);
     });
 
     test('a different SHA-256 fails the download and removes it', () async {
@@ -97,7 +97,7 @@ void main() {
       );
 
       expect(file, isNull);
-      expect(downloaded().existsSync(), isFalse);
+      expect(temp.listSync(), isEmpty);
     });
 
     test('a short body without a Content-Length fails the download', () async {
@@ -109,7 +109,7 @@ void main() {
       );
 
       expect(file, isNull);
-      expect(downloaded().existsSync(), isFalse);
+      expect(temp.listSync(), isEmpty);
     });
 
     test('a longer body without a Content-Length stops at the size', () async {
@@ -123,7 +123,7 @@ void main() {
       );
 
       expect(file, isNull);
-      expect(downloaded().existsSync(), isFalse);
+      expect(temp.listSync(), isEmpty);
       // Past 100% the dialogue hides Cancel and says it's installing.
       expect(progress.where((p) => p > 1.0), isEmpty);
     });
@@ -140,7 +140,7 @@ void main() {
 
       expect(file, isNull);
       expect(progress, isEmpty);
-      expect(downloaded().existsSync(), isFalse);
+      expect(temp.listSync(), isEmpty);
     });
 
     test('without a SHA-256 the right size is enough', () async {
@@ -185,7 +185,7 @@ void main() {
       );
 
       expect(outcome, UpdateOutcome.downloadFailed);
-      expect(downloaded().existsSync(), isFalse);
+      expect(temp.listSync(), isEmpty);
     });
   });
 
@@ -205,7 +205,7 @@ void main() {
     );
 
     expect(outcome, UpdateOutcome.downloadFailed);
-    expect(downloaded().existsSync(), isFalse);
+    expect(temp.listSync(), isEmpty);
   });
 
   group('the release digest', () {
@@ -300,8 +300,88 @@ void main() {
       );
 
       expect(outcome, UpdateOutcome.installFailed);
-      expect(downloaded().existsSync(), isFalse);
+      expect(temp.listSync(), isEmpty);
     }, skip: !Platform.isLinux);
+  });
+
+  // On Linux the temporary folder is the shared /tmp, and the download's name
+  // is the release asset's, which anyone can read. Whatever another user put
+  // at that name first stopped the update, every time.
+  group('the download has a folder of its own', () {
+    Future<File?> download() => UpdateService.downloadUpdateFile(
+      url('/full'),
+      'neostation.AppImage',
+      null,
+      expectedSize: body.length,
+      expectedSha256: bodySha256,
+    );
+
+    test('in a new folder that only this user can open', () async {
+      final file = await download();
+
+      expect(file, isNotNull);
+      expect(p.basename(file!.path), 'neostation.AppImage');
+      final folder = file.parent;
+      expect(folder.parent.path, temp.path);
+      expect(p.basename(folder.path), startsWith('neostation-update-'));
+      // No permissions for the group or anyone else.
+      expect(folder.statSync().mode & 0x3f, 0, reason: 'folder is open');
+    }, skip: Platform.isWindows);
+
+    test('something already at the old path does not stop it', () async {
+      Directory('${temp.path}/neostation.AppImage').createSync();
+
+      expect(await download(), isNotNull);
+    });
+
+    test('a link at the old path is left alone', () async {
+      final mine = File('${temp.path}/mine.txt')..writeAsStringSync('mine');
+      Link('${temp.path}/neostation.AppImage').createSync(mine.path);
+
+      expect(await download(), isNotNull);
+      expect(mine.readAsStringSync(), 'mine');
+    }, skip: Platform.isWindows);
+
+    test('a folder that cannot be made private fails the download', () async {
+      UpdateService.makePrivate = (_) async => false;
+
+      expect(await download(), isNull);
+      expect(temp.listSync(), isEmpty);
+    });
+
+    test('a folder that fails to be made private fails the download', () async {
+      // No chmod to run, for one.
+      UpdateService.makePrivate = (_) async =>
+          throw const ProcessException('chmod', []);
+
+      expect(await download(), isNull);
+      expect(temp.listSync(), isEmpty);
+    });
+
+    // Until it is private, someone sharing the user's group can add to it.
+    test(
+      'a link put in the folder before it was private is not written to',
+      () async {
+        final mine = File('${temp.path}/mine.txt')..writeAsStringSync('mine');
+        UpdateService.makePrivate = (folder) async {
+          Link('${folder.path}/neostation.AppImage').createSync(mine.path);
+          return UpdateService.defaultMakePrivate(folder);
+        };
+
+        expect(await download(), isNull);
+        expect(mine.readAsStringSync(), 'mine');
+        expect(temp.listSync().map((e) => p.basename(e.path)), ['mine.txt']);
+      },
+      skip: Platform.isWindows,
+    );
+
+    test('a later start removes the folder with the download', () async {
+      final file = await download();
+
+      await UpdateService.cleanUpDownloads();
+
+      expect(file!.parent.existsSync(), isFalse);
+    });
   });
 
   test('cleaning up removes earlier update downloads only', () async {
@@ -328,6 +408,14 @@ void main() {
       ..createSync(recursive: true)
       ..writeAsStringSync('x');
     Directory('${temp.path}/unrelated').createSync();
+    // Each download's own folder, and an empty one left by a failed start.
+    File('${temp.path}/neostation-update-a1b2c3/neostation.AppImage')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('x');
+    Directory('${temp.path}/neostation-update-d4e5f6').createSync();
+    File('${temp.path}/neostation-update-notes.txt').writeAsStringSync('x');
+    final link = Link('${temp.path}/neostation-update-link');
+    if (!Platform.isWindows) link.createSync('${temp.path}/unrelated');
 
     await UpdateService.cleanUpDownloads();
 
@@ -337,7 +425,45 @@ void main() {
     for (final name in others) {
       expect(File('${temp.path}/$name').existsSync(), isTrue, reason: name);
     }
-    expect(Directory('${temp.path}/neostation_update').existsSync(), isFalse);
+    // Only Windows' installer makes it, in a temporary folder of the user's own.
+    expect(
+      Directory('${temp.path}/neostation_update').existsSync(),
+      !Platform.isWindows,
+    );
     expect(Directory('${temp.path}/unrelated').existsSync(), isTrue);
+    for (final name in [
+      'neostation-update-a1b2c3',
+      'neostation-update-d4e5f6',
+    ]) {
+      expect(Directory('${temp.path}/$name').existsSync(), isFalse);
+    }
+    expect(
+      File('${temp.path}/neostation-update-notes.txt').existsSync(),
+      isTrue,
+    );
+    if (!Platform.isWindows) expect(link.existsSync(), isTrue);
   });
+
+  // In the shared /tmp anyone can make a folder by that name, and swap what
+  // is inside it for links while it is being removed.
+  test('cleaning up follows nothing in a download folder', () async {
+    final mine = Directory('${temp.path}/mine')..createSync();
+    final kept = File('${mine.path}/kept.txt')..writeAsStringSync('mine');
+    final planted = Directory('${temp.path}/neostation-update-planted')
+      ..createSync();
+    Link('${planted.path}/link').createSync(mine.path);
+    final nested = Directory('${temp.path}/neostation-update-nested');
+    Directory('${nested.path}/inner').createSync(recursive: true);
+    File('${nested.path}/inner/kept.txt').writeAsStringSync('x');
+
+    await UpdateService.cleanUpDownloads();
+
+    expect(kept.existsSync(), isTrue);
+    expect(planted.existsSync(), isFalse, reason: 'its link is removed');
+    expect(
+      File('${nested.path}/inner/kept.txt').existsSync(),
+      isTrue,
+      reason: 'a folder inside was entered',
+    );
+  }, skip: Platform.isWindows);
 }
