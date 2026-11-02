@@ -21,6 +21,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _a = 'KEYCODE_BUTTON_A';
 const _b = 'KEYCODE_BUTTON_B';
+const _up = 'KEYCODE_DPAD_UP';
+const _down = 'KEYCODE_DPAD_DOWN';
+const _left = 'KEYCODE_DPAD_LEFT';
+const _right = 'KEYCODE_DPAD_RIGHT';
 
 NeoSyncFile _save(int n) => NeoSyncFile(
   id: 'save-$n',
@@ -138,15 +142,20 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Widget app(Widget home) => MediaQuery(
+  /// The app around [home]. With [androidShortcuts] it keeps Flutter's
+  /// default shortcuts, as on Android, where the arrow keys of a TV remote or
+  /// a keyboard also reach Flutter's focus traversal.
+  Widget app(Widget home, {bool androidShortcuts = false}) => MediaQuery(
     data: const MediaQueryData(size: Size(1920, 1080)),
     child: ScreenUtilInit(
       designSize: const Size(1920, 1080),
       builder: (context, child) => MaterialApp(
         // As on desktop (see appShortcuts): the arrow keys belong to the
         // gamepad navigation, not to Flutter's focus traversal.
-        shortcuts: Map.of(WidgetsApp.defaultShortcuts)
-          ..removeWhere((_, intent) => intent is DirectionalFocusIntent),
+        shortcuts: androidShortcuts
+            ? null
+            : (Map.of(WidgetsApp.defaultShortcuts)
+                ..removeWhere((_, intent) => intent is DirectionalFocusIntent)),
         localizationsDelegates:
             FlutterLocalization.instance.localizationsDelegates,
         supportedLocales: FlutterLocalization.instance.supportedLocales,
@@ -155,7 +164,10 @@ void main() {
     ),
   );
 
-  Future<BuildContext> pumpHost(WidgetTester tester) async {
+  Future<BuildContext> pumpHost(
+    WidgetTester tester, {
+    bool androidShortcuts = false,
+  }) async {
     late BuildContext ctx;
     await tester.pumpWidget(
       app(
@@ -165,6 +177,7 @@ void main() {
             return _HostScreen(log: host);
           },
         ),
+        androidShortcuts: androidShortcuts,
       ),
     );
     await tester.pumpAndSettle();
@@ -425,6 +438,250 @@ void main() {
     expect(closes, isEmpty, reason: 'the save would have been deleted');
     expect(disable, [true]);
     expect(find.byType(DeleteCloudSaveDialog), findsOneWidget);
+  });
+
+  group('moving around the delete prompt', () {
+    late List<Object?> closes;
+    late List<bool> disable;
+
+    /// Opens the delete prompt, recording how it closed in [closes] and each
+    /// "also disable NeoSync" value it reported in [disable].
+    Future<void> openPrompt(
+      WidgetTester tester, {
+      bool androidShortcuts = false,
+    }) async {
+      final ctx = await pumpHost(tester, androidShortcuts: androidShortcuts);
+      closes = [];
+      disable = [];
+      showDialog<bool>(
+        context: ctx,
+        barrierDismissible: false,
+        builder: (_) => DeleteCloudSaveDialog(
+          file: _save(1),
+          onDisableNeoSyncChanged: disable.add,
+        ),
+      ).then(closes.add);
+      await tester.pumpAndSettle();
+    }
+
+    bool switchOn(WidgetTester tester) =>
+        tester.widget<Switch>(find.byType(Switch)).value;
+
+    /// The border of the nearest decorated box around [control].
+    Color borderAround(WidgetTester tester, Finder control) {
+      final box = find
+          .ancestor(
+            of: control,
+            matching: find.byWidgetPredicate(
+              (w) => w is Container && w.decoration is BoxDecoration,
+            ),
+          )
+          .first;
+      final decoration = tester.widget<Container>(box).decoration!;
+      return ((decoration as BoxDecoration).border! as Border).top.color;
+    }
+
+    Color primary(WidgetTester tester) =>
+        Theme.of(tester.element(find.byType(Switch))).colorScheme.primary;
+
+    Color onSurface(WidgetTester tester) =>
+        Theme.of(tester.element(find.byType(Switch))).colorScheme.onSurface;
+
+    // The prompt's controller only knew A and B, so the switch and Cancel
+    // were out of reach, and A on a switch focused some other way did nothing.
+    testWidgets('controller Up then A turns the switch on', (tester) async {
+      await openPrompt(tester);
+
+      await press(tester, _up);
+      await press(tester, _a);
+
+      expect(closes, isEmpty, reason: 'the save would have been deleted');
+      expect(switchOn(tester), isTrue);
+      expect(disable, [true]);
+      expect(find.byType(DeleteCloudSaveDialog), findsOneWidget);
+    });
+
+    testWidgets('arrow Up then Enter turns the switch on once', (tester) async {
+      await openPrompt(tester);
+
+      await pressKey(tester, LogicalKeyboardKey.arrowUp);
+      await pressKey(tester, LogicalKeyboardKey.enter);
+
+      expect(closes, isEmpty, reason: 'the save would have been deleted');
+      expect(switchOn(tester), isTrue);
+      expect(disable, [true], reason: 'Enter toggled the switch twice');
+      expect(find.byType(DeleteCloudSaveDialog), findsOneWidget);
+    });
+
+    testWidgets('controller A turns on a switch focused with Tab', (
+      tester,
+    ) async {
+      await openPrompt(tester);
+      await tabTo(tester, Switch);
+
+      await press(tester, _a);
+
+      expect(closes, isEmpty);
+      expect(switchOn(tester), isTrue);
+      expect(disable, [true]);
+    });
+
+    testWidgets('Up, Down, A deletes with the switch still off', (
+      tester,
+    ) async {
+      await openPrompt(tester);
+
+      await press(tester, _up);
+      expect(focusedOn(tester, Switch), isTrue, reason: 'Up missed the switch');
+      await press(tester, _down);
+      expect(focusedOn(tester, ElevatedButton), isTrue);
+      await press(tester, _a);
+
+      expect(closes, [true]);
+      expect(disable, [false]);
+    });
+
+    testWidgets('Left then A cancels the delete', (tester) async {
+      await openPrompt(tester);
+
+      await press(tester, _left);
+      await press(tester, _a);
+
+      expect(closes, [false], reason: 'the save would have been deleted');
+      expect(disable, isEmpty);
+    });
+
+    testWidgets('Right from Cancel then A deletes', (tester) async {
+      await openPrompt(tester);
+
+      await press(tester, _left);
+      expect(focusedOn(tester, TextButton), isTrue, reason: 'Left missed');
+      await press(tester, _right);
+      expect(focusedOn(tester, ElevatedButton), isTrue, reason: 'Right missed');
+      await press(tester, _a);
+
+      expect(closes, [true]);
+    });
+
+    testWidgets('Up from Cancel reaches the switch', (tester) async {
+      await openPrompt(tester);
+
+      await press(tester, _left);
+      await press(tester, _up);
+      await press(tester, _a);
+
+      expect(closes, isEmpty);
+      expect(switchOn(tester), isTrue);
+    });
+
+    testWidgets('Up, A, Down, A deletes and reports the switch as on', (
+      tester,
+    ) async {
+      await openPrompt(tester);
+
+      await press(tester, _up);
+      await press(tester, _a);
+      await press(tester, _down);
+      await press(tester, _a);
+
+      expect(closes, [true]);
+      // The change, then the value on confirming.
+      expect(disable, [true, true]);
+    });
+
+    // On Android a controller never turns Flutter's focus highlight on, so
+    // the prompt shows for itself where the controller is.
+    testWidgets('the switch row is highlighted only while it has focus', (
+      tester,
+    ) async {
+      await openPrompt(tester);
+      final row = find.byType(Switch);
+      expect(borderAround(tester, row), isNot(primary(tester)));
+
+      await press(tester, _up);
+      expect(borderAround(tester, row), primary(tester));
+
+      await press(tester, _down);
+      expect(borderAround(tester, row), isNot(primary(tester)));
+    });
+
+    testWidgets('the focused button is outlined', (tester) async {
+      await openPrompt(tester);
+      final delete = find.byType(ElevatedButton);
+      final cancel = find.byType(TextButton);
+      expect(borderAround(tester, delete), onSurface(tester));
+      expect(borderAround(tester, cancel), isNot(onSurface(tester)));
+
+      await press(tester, _left);
+      expect(borderAround(tester, delete), isNot(onSurface(tester)));
+      expect(borderAround(tester, cancel), onSurface(tester));
+
+      await press(tester, _up);
+      expect(borderAround(tester, delete), isNot(onSurface(tester)));
+      expect(borderAround(tester, cancel), isNot(onSurface(tester)));
+    });
+
+    // On Android an arrow key from a TV remote or a keyboard reaches Flutter's
+    // focus traversal as well, after the navigation has already moved focus,
+    // so it moved a second step: Left from Delete went on past Cancel.
+    group('with Android\'s shortcuts, an arrow key moves one step', () {
+      for (final (label, keys, expected) in [
+        (
+          'Left from Delete reaches Cancel',
+          [LogicalKeyboardKey.arrowLeft],
+          TextButton,
+        ),
+        (
+          'Left twice from Delete stays on Cancel',
+          [LogicalKeyboardKey.arrowLeft, LogicalKeyboardKey.arrowLeft],
+          TextButton,
+        ),
+        (
+          'Up from Delete reaches the switch',
+          [LogicalKeyboardKey.arrowUp],
+          Switch,
+        ),
+        (
+          'Down from the switch reaches Delete',
+          [LogicalKeyboardKey.arrowUp, LogicalKeyboardKey.arrowDown],
+          ElevatedButton,
+        ),
+        (
+          'Right from Cancel reaches Delete',
+          [LogicalKeyboardKey.arrowLeft, LogicalKeyboardKey.arrowRight],
+          ElevatedButton,
+        ),
+      ]) {
+        testWidgets(label, (tester) async {
+          await openPrompt(tester, androidShortcuts: true);
+
+          for (final key in keys) {
+            await pressKey(tester, key);
+          }
+
+          expect(focusedOn(tester, expected), isTrue);
+          expect(closes, isEmpty);
+        });
+      }
+
+      for (final (label, key) in [
+        ('Enter', LogicalKeyboardKey.enter),
+        ('Space', LogicalKeyboardKey.space),
+        ('numpad Enter', LogicalKeyboardKey.numpadEnter),
+        ('select', LogicalKeyboardKey.select),
+      ]) {
+        testWidgets('$label on the switch turns it on once', (tester) async {
+          await openPrompt(tester, androidShortcuts: true);
+          await pressKey(tester, LogicalKeyboardKey.arrowUp);
+
+          await pressKey(tester, key);
+
+          expect(closes, isEmpty, reason: 'the save would have been deleted');
+          expect(switchOn(tester), isTrue);
+          expect(disable, [true]);
+        });
+      }
+    });
   });
 
   // The switch reports each change; confirming reports its value once more,
