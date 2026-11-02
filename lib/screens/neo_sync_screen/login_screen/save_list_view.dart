@@ -115,6 +115,9 @@ class _SaveListViewState extends State<SaveListView> {
       onSelectItem: _handleSelect,
       onPreviousTab: () => AppNavigation.previousTab(),
       onNextTab: () => AppNavigation.nextTab(),
+      // L1/R1 switch the app's tabs, so the triggers turn the page.
+      onLeftTrigger: () => _changePage(forward: false),
+      onRightTrigger: () => _changePage(forward: true),
       onBack: _handleBack,
       onFavorite: () {
         if (mounted) widget.onBack();
@@ -576,6 +579,26 @@ class _SaveListViewState extends State<SaveListView> {
   void _resetSelection() {
     if (!mounted) return;
     setState(() => _selectedSaveIndex = 0);
+  }
+
+  /// Shows the previous or next page of saves (L2/R2 or the page arrows) and
+  /// highlights its first save. Not while a filter menu is open, or while a
+  /// page is still loading, so a second pull can't skip the page in between.
+  void _changePage({required bool forward}) {
+    if (_region == _SaveRegion.menu) return;
+    final neoSyncProvider = Provider.of<NeoSyncProvider>(
+      context,
+      listen: false,
+    );
+    if (neoSyncProvider.isLoadingOnlineFiles) return;
+    if (forward) {
+      if (!neoSyncProvider.hasOnlineNext) return;
+      neoSyncProvider.nextOnlinePage();
+    } else {
+      if (!neoSyncProvider.hasOnlinePrevious) return;
+      neoSyncProvider.previousOnlinePage();
+    }
+    _resetSelection();
   }
 
   void _navigateSavesUp() {
@@ -1259,18 +1282,35 @@ class _SaveListViewState extends State<SaveListView> {
   Widget _buildPagination(BuildContext context, NeoSyncProvider provider) {
     if (provider.onlineTotalPages <= 1) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final textColor = theme.colorScheme.onSurface.withValues(alpha: 0.7);
+    // No page change while one is still loading (see [_changePage]).
+    final loading = provider.isLoadingOnlineFiles;
+    final canGoBack = provider.hasOnlinePrevious && !loading;
+    final canGoOn = provider.hasOnlineNext && !loading;
+    // The trigger that turns the page that way, beside each arrow, dimmed
+    // with it when there is no page to turn to.
+    Widget trigger(String iconPath, {required bool enabled}) => SizedBox(
+      width: 14.r,
+      height: 14.r,
+      child: Image.asset(
+        iconPath,
+        color: enabled
+            ? textColor
+            : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+        colorBlendMode: BlendMode.srcIn,
+      ),
+    );
     return Padding(
       padding: EdgeInsets.only(top: 2.r),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          trigger(
+            'assets/images/gamepad/Xbox_LT_trigger.png',
+            enabled: canGoBack,
+          ),
           IconButton(
-            onPressed: provider.hasOnlinePrevious
-                ? () {
-                    provider.previousOnlinePage();
-                    _resetSelection();
-                  }
-                : null,
+            onPressed: canGoBack ? () => _changePage(forward: false) : null,
             icon: Icon(Symbols.chevron_left_rounded, size: 16.r),
             visualDensity: VisualDensity.compact,
             color: theme.colorScheme.onSurface,
@@ -1280,21 +1320,17 @@ class _SaveListViewState extends State<SaveListView> {
                 .getString(context)
                 .replaceFirst('{current}', '${provider.onlinePage}')
                 .replaceFirst('{total}', '${provider.onlineTotalPages}'),
-            style: TextStyle(
-              fontSize: 10.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
+            style: TextStyle(fontSize: 10.r, color: textColor),
           ),
           IconButton(
-            onPressed: provider.hasOnlineNext
-                ? () {
-                    provider.nextOnlinePage();
-                    _resetSelection();
-                  }
-                : null,
+            onPressed: canGoOn ? () => _changePage(forward: true) : null,
             icon: Icon(Symbols.chevron_right_rounded, size: 16.r),
             visualDensity: VisualDensity.compact,
             color: theme.colorScheme.onSurface,
+          ),
+          trigger(
+            'assets/images/gamepad/Xbox_RT_trigger.png',
+            enabled: canGoOn,
           ),
         ],
       ),
