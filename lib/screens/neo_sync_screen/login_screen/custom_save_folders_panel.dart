@@ -415,63 +415,67 @@ class _CustomSaveFoldersDialogState extends State<CustomSaveFoldersDialog> {
             ),
           ),
         ),
-        SizedBox(
-          height: (_listItemExtent * labels.length).clamp(
-            _listItemExtent,
-            _listItemExtent * 7,
-          ),
-          child: ListView.builder(
-            controller: _listScroll,
-            itemExtent: _listItemExtent,
-            itemCount: labels.length,
-            itemBuilder: (context, index) {
-              final focused = index == _listIndex;
-              final selected = index == selectedIndex;
-              return InkWell(
-                borderRadius: BorderRadius.circular(6.r),
-                onTap: () => _chooseListItem(index),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10.r),
-                  alignment: Alignment.centerLeft,
-                  decoration: BoxDecoration(
-                    color: focused
-                        ? theme.colorScheme.primary.withValues(alpha: 0.18)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6.r),
-                    border: Border.all(
+        // Up to seven rows, fewer when the dialogue has less room: on short
+        // wide screens the rows are scaled up with the width.
+        Flexible(
+          child: SizedBox(
+            height: (_listItemExtent * labels.length).clamp(
+              _listItemExtent,
+              _listItemExtent * 7,
+            ),
+            child: ListView.builder(
+              controller: _listScroll,
+              itemExtent: _listItemExtent,
+              itemCount: labels.length,
+              itemBuilder: (context, index) {
+                final focused = index == _listIndex;
+                final selected = index == selectedIndex;
+                return InkWell(
+                  borderRadius: BorderRadius.circular(6.r),
+                  onTap: () => _chooseListItem(index),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10.r),
+                    alignment: Alignment.centerLeft,
+                    decoration: BoxDecoration(
                       color: focused
-                          ? theme.colorScheme.primary
+                          ? theme.colorScheme.primary.withValues(alpha: 0.18)
                           : Colors.transparent,
-                      width: 1.5.r,
+                      borderRadius: BorderRadius.circular(6.r),
+                      border: Border.all(
+                        color: focused
+                            ? theme.colorScheme.primary
+                            : Colors.transparent,
+                        width: 1.5.r,
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          labels[index],
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12.r,
-                            fontWeight: focused
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                            color: theme.colorScheme.onSurface,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            labels[index],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.r,
+                              fontWeight: focused
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
                         ),
-                      ),
-                      if (selected)
-                        Icon(
-                          Symbols.check_rounded,
-                          size: 14.r,
-                          color: theme.colorScheme.primary,
-                        ),
-                    ],
+                        if (selected)
+                          Icon(
+                            Symbols.check_rounded,
+                            size: 14.r,
+                            color: theme.colorScheme.primary,
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ],
