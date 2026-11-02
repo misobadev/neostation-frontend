@@ -534,6 +534,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.neoSyncNotConnected: 'NeoSync: Non connesso',
   AppLocale.neoSyncUnreachable:
       'Impossibile raggiungere NeoSync. Controlla la connessione e riprova.',
+  AppLocale.neoSyncBillingUnconfirmed:
+      'NeoSync non ha confermato la modifica in tempo. Potrebbe essere stata applicata comunque, quindi controlla il tuo piano prima di riprovare.',
   AppLocale.neoSyncSynchronized: 'NeoSync: Salvataggi sincronizzati',
   AppLocale.neoSyncSavesSync:
       'I file di salvataggio verranno sincronizzati con NeoSync',

@@ -43,6 +43,18 @@ class _StallingClient extends http.BaseClient {
   }
 }
 
+/// Sends its headers, then the connection drops before the body arrives.
+class _DroppingClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async =>
+      http.StreamedResponse(
+        Stream<List<int>>.error(
+          http.ClientException('Connection closed while receiving data'),
+        ),
+        200,
+      );
+}
+
 /// Answers every request at once with [status] and [body].
 class _AnsweringClient extends http.BaseClient {
   _AnsweringClient(this.status, this.body);
@@ -175,6 +187,154 @@ void main() {
       expect(result['message'], 'Plans unavailable');
       expect(result.containsKey('isNetworkError'), isFalse);
     });
+
+    // Pressing A again while an upgrade or a cancellation was out sent it
+    // again, and one the server didn't confirm in time was reported as never
+    // having reached it, inviting a retry of a change that may have gone
+    // through.
+    Future<Map<String, dynamic>> checkout(BillingService s) =>
+        s.createCheckoutSession(
+          userId: '1',
+          planName: 'mini',
+          billingPeriod: 'monthly',
+          email: 'p@example.com',
+        );
+    Future<Map<String, dynamic>> cancel(BillingService s) =>
+        s.cancelSubscription('1');
+    final changes =
+        <String, Future<Map<String, dynamic>> Function(BillingService)>{
+          'a checkout': checkout,
+          'a cancellation': cancel,
+        };
+
+    for (final MapEntry(key: name, value: call) in changes.entries) {
+      test(
+        '$name while one is out sends nothing and says it is busy',
+        () async {
+          final client = _SilentClient();
+          final billing = BillingService(client: client, requestTimeout: limit);
+
+          final first = call(billing);
+          final second = await call(billing);
+          await pumpEventQueue();
+
+          expect(second, {'success': false, 'busy': true});
+          expect(client.sent, 1, reason: 'only the first request was sent');
+
+          await first.timeout(const Duration(seconds: 5));
+          await call(billing).timeout(const Duration(seconds: 5));
+          expect(
+            client.sent,
+            2,
+            reason: 'the next one, once it ended, is sent',
+          );
+        },
+      );
+    }
+
+    test('a cancellation while a checkout is out sends nothing', () async {
+      final client = _SilentClient();
+      final billing = BillingService(client: client, requestTimeout: limit);
+
+      final first = checkout(billing);
+      final second = await cancel(billing);
+      await pumpEventQueue();
+
+      expect(second['busy'], isTrue);
+      expect(client.sent, 1);
+      await first.timeout(const Duration(seconds: 5));
+    });
+
+    test('loading the plans neither holds up nor is held up by a '
+        'change', () async {
+      final client = _SilentClient();
+      final billing = BillingService(client: client, requestTimeout: limit);
+
+      final plans = billing.getAvailablePlans();
+      final change = checkout(billing);
+      final morePlans = billing.getAvailablePlans();
+      await pumpEventQueue();
+
+      expect(client.sent, 3);
+      final results = await Future.wait([
+        plans,
+        change,
+        morePlans,
+      ]).timeout(const Duration(seconds: 5));
+      for (final result in results) {
+        expect(result.containsKey('busy'), isFalse);
+      }
+    });
+
+    final unanswered = <String, http.Client Function()>{
+      'no answer in time': _SilentClient.new,
+      'a gateway error page': () =>
+          _AnsweringClient(502, '<html><body>Bad Gateway</body></html>'),
+      'a gateway timeout': () =>
+          _AnsweringClient(504, '{"error":"upstream timed out"}'),
+      'a connection that drops after the headers': _DroppingClient.new,
+    };
+
+    // A success the app can't read: an in-place change may have been applied.
+    // (A cancellation's success isn't read, so only a checkout has this case.)
+    test('a checkout answered with a page it can\'t read may have gone '
+        'through', () async {
+      final billing = BillingService(
+        client: _AnsweringClient(200, '<html><body>OK</body></html>'),
+        requestTimeout: limit,
+      );
+
+      final result = await billing
+          .createCheckoutSession(
+            userId: 'player',
+            planName: 'mini',
+            billingPeriod: 'monthly',
+            email: 'player@example.com',
+          )
+          .timeout(const Duration(seconds: 5));
+
+      expect(result['outcomeUnknown'], isTrue);
+    });
+
+    for (final MapEntry(key: name, value: call) in changes.entries) {
+      for (final MapEntry(key: answer, value: client) in unanswered.entries) {
+        test('$name with $answer may have gone through', () async {
+          final billing = BillingService(
+            client: client(),
+            requestTimeout: limit,
+          );
+
+          final result = await call(
+            billing,
+          ).timeout(const Duration(seconds: 5));
+
+          expect(result['success'], isFalse);
+          expect(result['outcomeUnknown'], isTrue);
+          expect(result['isNetworkError'], isTrue);
+        });
+      }
+
+      for (final (status, error) in [
+        (400, 'Invalid plan'),
+        (409, 'Subscription already changing'),
+        (500, 'Billing unavailable'),
+      ]) {
+        test('$name refused with $status is passed on, not taken for a '
+            'change that may have gone through', () async {
+          final billing = BillingService(
+            client: _AnsweringClient(status, '{"error":"$error"}'),
+            requestTimeout: limit,
+          );
+
+          final result = await call(billing);
+
+          expect(result['success'], isFalse);
+          expect(result['message'], error);
+          expect(result.containsKey('outcomeUnknown'), isFalse);
+          expect(result.containsKey('isNetworkError'), isFalse);
+        });
+      }
+    }
 
     test('requests wait 15 seconds by default', () {
       expect(BillingService.defaultRequestTimeout, const Duration(seconds: 15));

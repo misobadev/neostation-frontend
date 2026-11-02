@@ -456,6 +456,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.neoSyncSynchronizing: 'NeoSync: 同期中...',
   AppLocale.neoSyncNotConnected: 'NeoSync: 未接続',
   AppLocale.neoSyncUnreachable: 'NeoSyncに接続できませんでした。ネットワーク接続を確認して再試行してください。',
+  AppLocale.neoSyncBillingUnconfirmed:
+      'NeoSyncが変更を時間内に確認できませんでした。変更が反映されている可能性があるため、再試行する前にプランを確認してください。',
   AppLocale.neoSyncSynchronized: 'NeoSync: セーブデータ同期済み',
   AppLocale.neoSyncSavesSync: 'セーブデータはNeoSyncと同期されます',
   AppLocale.neoSyncNoSave: 'NeoSync: セーブデータが見つかりません',

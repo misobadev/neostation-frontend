@@ -535,6 +535,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.neoSyncNotConnected: 'NeoSync: No conectado',
   AppLocale.neoSyncUnreachable:
       'No se pudo conectar con NeoSync. Comprueba tu conexión e inténtalo de nuevo.',
+  AppLocale.neoSyncBillingUnconfirmed:
+      'NeoSync no confirmó el cambio a tiempo. Puede que se haya aplicado de todos modos, así que comprueba tu plan antes de volver a intentarlo.',
   AppLocale.neoSyncSynchronized: 'NeoSync: Partidas sincronizadas',
   AppLocale.neoSyncSavesSync: 'Las partidas se sincronizarán con NeoSync',
   AppLocale.neoSyncNoSave: 'NeoSync: No se encontraron partidas',
