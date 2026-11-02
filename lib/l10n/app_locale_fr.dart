@@ -253,7 +253,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.subfolderViewAllSubtitle:
       'Appliquer d’un coup l’option Afficher les sous-dossiers à tous les systèmes',
   AppLocale.subfolderViewAllOverridesNotice:
-      '{count} système(s) avaient leur propre réglage Afficher les sous-dossiers. Tous les systèmes suivent désormais cet interrupteur ; vous pouvez toujours modifier chacun d’eux dans ses propres réglages.',
+      'Systèmes qui avaient leur propre réglage Afficher les sous-dossiers : {count}. Tous les systèmes suivent désormais cet interrupteur ; vous pouvez toujours modifier chacun d’eux dans ses propres réglages.',
   AppLocale.subfolderViewEnabled: 'Sous-dossiers affichés comme dossiers',
   AppLocale.subfolderViewDisabled: 'Sous-dossiers mélangés aux jeux',
   AppLocale.errorScanningSystem:
@@ -408,15 +408,15 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.organizeMultiDiscNoRomFoldersConfigured:
       'Aucun dossier ROM configuré.',
   AppLocale.organizeMultiDiscSkippedSuffix:
-      ' ({count} chemin(s) de dossier ignoré(s))',
+      ' (chemins de dossier ignorés : {count})',
   AppLocale.organizeMultiDiscDone:
-      'Terminé : {groups} lot(s) organisé(s), {files} fichier(s) déplacé(s), {playlists} playlist(s) créée(s){skipped}.',
+      'Terminé. Lots organisés : {groups}, fichiers déplacés : {files}, playlists créées : {playlists}{skipped}.',
   AppLocale.organizeMultiDiscNoSetsFound:
       'Aucun lot multi-disques à organiser{skipped}.',
   AppLocale.organizeMultiDiscFailed:
       'Échec de l’organisation des jeux multi-disques : {error}',
   AppLocale.organizeMultiDiscPartialFailure:
-      '{failed} ensemble(s) n’ont pas pu être organisés. {result}',
+      'Lots qui n’ont pas pu être organisés : {failed}. {result}',
   AppLocale.organizeMultiDiscWarning:
       'Cette opération déplacera les ROM correspondantes dans de nouveaux dossiers de jeux et créera des listes .m3u sur votre stockage. Elle ne peut pas être annulée automatiquement.',
   AppLocale.cleanOrphanedMetadata: 'Nettoyer les métadonnées orphelines',
@@ -430,7 +430,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.cleanOrphanedMetadataNothingFound:
       'Aucune métadonnée orpheline trouvée.',
   AppLocale.cleanOrphanedMetadataDone:
-      'Nettoyé {entries} entrée(s) de métadonnées et {files} fichier(s) multimédia.',
+      'Nettoyage terminé. Entrées de métadonnées : {entries}, fichiers multimédias : {files}.',
   AppLocale.cleanOrphanedMetadataDelete:
       '{count} entrées de métadonnées orphelines seront supprimées de la base de données et du disque.',
   AppLocale.cleanOrphanedMetadataDeleteOne:
@@ -457,12 +457,12 @@ const Map<String, dynamic> appLocaleFr = {
       'Cette action parcourt chaque plateforme de votre serveur RomM et lie les ROMs locales reconnues.\n\nLes jeux liés deviennent éligibles à la synchronisation des sauvegardes, qui seront donc envoyées vers RomM. Sur une grande bibliothèque, cela peut prendre plusieurs minutes.',
   AppLocale.rommLinkLibraryPreparing: 'Préparation…',
   AppLocale.rommLinkLibraryProgress: '{done} sur {total} — {system}',
-  AppLocale.rommLinkLibraryDone: '{count} jeux liés',
+  AppLocale.rommLinkLibraryDone: 'Jeux liés : {count}',
   AppLocale.rommLinkLibraryNothingToDo: 'Rien de nouveau à lier',
   AppLocale.rommLinkLibraryFailed: 'Échec de la liaison',
   AppLocale.rommLinkLibraryUnavailable: 'Indisponible pour le moment',
   AppLocale.rommLinkLibraryStoppedEarly:
-      'Arrêté avant la fin — {count} jeux liés pour le moment',
+      'Arrêté avant la fin. Jeux liés pour le moment : {count}',
   AppLocale.rematchAchievementsSubtitle:
       'Analyse toute la bibliothèque à la recherche de sets de succès, au lieu d\'un jeu à la fois',
   AppLocale.rematchAchievementsWarning:
@@ -473,11 +473,11 @@ const Map<String, dynamic> appLocaleFr = {
       'Vérification des jeux déjà hachés...',
   AppLocale.rematchAchievementsHashing: 'Correspondance {done} sur {total}',
   AppLocale.rematchAchievementsDone:
-      'Terminé : {matched} jeu(x) associé(s), {hashed} nouvellement identifié(s).',
+      'Terminé. Jeux associés : {matched}, nouvellement identifiés : {hashed}.',
   AppLocale.rematchAchievementsNothingToDo:
       'Tous les jeux pris en charge ont déjà été vérifiés.',
   AppLocale.rematchAchievementsPaused:
-      'En pause : {matched} jeu(x) associé(s) jusqu’ici. Relancez-le pour continuer.',
+      'En pause. Jeux associés jusqu’ici : {matched}. Relancez-le pour continuer.',
   AppLocale.rematchAchievementsFailed:
       'Échec de l\'association des jeux RetroAchievements : {error}',
   AppLocale.raOpenPage: 'Ouvrir la page',
@@ -1314,7 +1314,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.selectUserDataFolder: 'Sélectionner le dossier de données',
   AppLocale.folderNotEmptyTitle: 'Dossier non vide',
   AppLocale.folderNotEmptyBody:
-      'Ce dossier contient déjà {count} élément(s). NeoStation y stockera ses propres données, aux côtés du contenu existant.',
+      'Ce dossier n’est pas vide (éléments : {count}). NeoStation y stockera ses propres données, aux côtés du contenu existant.',
   AppLocale.folderNotEmptyUseAnyway: 'Utiliser quand même',
   AppLocale.userDataFolderNotWritable:
       "Impossible d'écrire dans ce dossier. Choisissez-en un autre ou gardez l'emplacement par défaut.",
@@ -1324,7 +1324,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.moveUserDataBody:
       'NeoStation déplacera ses propres données (base de données, médias récupérés et paramètres) du dossier actuel vers le nouveau. Les fichiers non créés par NeoStation restent intacts.',
   AppLocale.moveUserDataDestNotEmpty:
-      'Le nouveau dossier contient déjà {count} élément(s). Les données de NeoStation seront ajoutées à côté.',
+      'Le nouveau dossier n’est pas vide (éléments : {count}). Les données de NeoStation seront ajoutées à côté.',
   AppLocale.moveUserDataConfirm: 'Déplacer',
   AppLocale.migratingUserData: 'Déplacement des données',
   AppLocale.migratingUserDataComplete: 'Migration terminée',
