@@ -66,6 +66,17 @@
       }
     },
     {
+      "name": "Xendroid+",
+      "unique_id": "xbox360.xendroid.compose.fork",
+      "description": "Supported extensions: iso, zar.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n xendroid.compose.fork/xendroid.compose.EmulatorHostActivity -a xendroid.intent.action.xendroid --es game_uri \"{file.uri}\""
+        }
+      }
+    },
+    {
       "name": "X360 Mobile",
       "unique_id": "xbox360.emu.x360.mobile",
       "description": "Supported extensions: iso, zar, xex.",
