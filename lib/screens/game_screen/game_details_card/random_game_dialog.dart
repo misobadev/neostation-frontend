@@ -10,6 +10,7 @@ import 'dart:io';
 import '../../../constants/system_folder_names.dart';
 import '../../../models/game_model.dart';
 import '../../../providers/file_provider.dart';
+import '../../../services/gamepad/gamepad_navigation_manager.dart';
 import '../../../utils/game_utils.dart';
 import '../../../themes/corner_radii.dart';
 import '../../../utils/gamepad_nav.dart';
@@ -61,6 +62,13 @@ class _RandomGameDialogState extends State<RandomGameDialog>
   final Random _random = Random();
   GamepadNavigation? _gamepadNav;
 
+  /// The dialogue's own navigation layer. Modal, so a games list that rebuilds
+  /// behind it (a grid or carousel whose game count changed) can't take the
+  /// controller while it is open; per instance, as
+  /// [GamepadNavigationManager.popLayer] removes the first layer with a
+  /// matching id.
+  late final String _layerId = 'random_game_dialog#${identityHashCode(this)}';
+
   @override
   void initState() {
     super.initState();
@@ -92,8 +100,16 @@ class _RandomGameDialogState extends State<RandomGameDialog>
         }
       },
     );
-    _gamepadNav?.initialize();
-    _gamepadNav?.activate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _gamepadNav?.initialize();
+      GamepadNavigationManager.pushLayer(
+        _layerId,
+        onActivate: () => _gamepadNav?.activate(),
+        onDeactivate: () => _gamepadNav?.deactivate(),
+        modal: true,
+      );
+    });
   }
 
   void _playSelected() {
@@ -125,6 +141,7 @@ class _RandomGameDialogState extends State<RandomGameDialog>
   void dispose() {
     _cycleTimer?.cancel();
     _fadeController.dispose();
+    GamepadNavigationManager.popLayer(_layerId);
     _gamepadNav?.dispose();
     super.dispose();
   }
