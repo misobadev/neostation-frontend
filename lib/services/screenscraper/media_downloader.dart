@@ -6,6 +6,7 @@ import 'region_config.dart';
 import 'rom_hasher.dart';
 import 'media_resolver.dart';
 import 'screenscraper_client.dart';
+import 'screenscraper_exceptions.dart';
 
 /// Media asset downloader for ScreenScraper.
 ///
@@ -14,7 +15,7 @@ import 'screenscraper_client.dart';
 /// media types to folders, and skipping assets already on disk. Delegates
 /// transport to [ScreenscraperClient], resolution to [ScreenscraperMediaResolver]
 /// / [ScreenscraperRegionConfig], and ROM naming to [ScreenscraperRomHasher].
-/// Extracted verbatim from [ScreenScraperService]; behaviour is unchanged.
+/// Extracted from [ScreenScraperService].
 /// Stateless — holds only the shared logger.
 class ScreenscraperMediaDownloader {
   ScreenscraperMediaDownloader._();
@@ -52,6 +53,9 @@ class ScreenscraperMediaDownloader {
         _log.e('Error downloading media (${response.statusCode}): $url');
         return false;
       }
+    } on ScreenscraperQuotaExceededException {
+      // Every later request would be refused too; the caller says why.
+      rethrow;
     } catch (e) {
       _log.e('Error downloading media: $e');
       return false;
@@ -59,6 +63,10 @@ class ScreenscraperMediaDownloader {
   }
 
   /// Downloads multiple media assets for a game, managing concurrency.
+  ///
+  /// Throws [ScreenscraperQuotaExceededException] when ScreenScraper refuses a
+  /// download because the day's quota is used up: the batch under way
+  /// finishes, and no later batch is requested.
   static Future<Map<String, dynamic>> downloadGameMedia(
     String systemFolder,
     String romName,
