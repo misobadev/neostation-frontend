@@ -1979,7 +1979,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     final platforms = _browse.platforms;
     final failure = _browse.platformsFailure;
     if (platforms.isEmpty && failure != null) {
-      throw StateError(failure.message);
+      // The failure itself, so the Tools run can say why in the app language.
+      throw failure;
     }
     if (platforms.isEmpty && _browse.isLoadingPlatforms) {
       throw StateError('the platform list is still loading');
