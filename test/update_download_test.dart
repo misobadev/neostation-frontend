@@ -96,11 +96,7 @@ void main() {
 
       expect(file, isNull);
       expect(uncaught, isEmpty, reason: 'the write error went unhandled');
-      expect(
-        File('${temp.path}/neostation.AppImage').existsSync(),
-        isFalse,
-        reason: 'the partial download was kept',
-      );
+      expect(temp.listSync(), isEmpty, reason: 'the partial download was kept');
       expect(
         progress.isEmpty ? 0.0 : progress.last,
         lessThan(1.0),
@@ -126,7 +122,7 @@ void main() {
 
     expect(file, isNull);
     expect(watch.elapsed, lessThan(const Duration(seconds: 10)));
-    expect(File('${temp.path}/neostation.AppImage').existsSync(), isFalse);
+    expect(temp.listSync(), isEmpty);
   });
 
   test('a stalled download closes its connection', () async {
@@ -223,7 +219,7 @@ void main() {
     expect(file, isNull);
     // Well inside the stall timeout: the cancel did it, not the timeout.
     expect(watch.elapsed, lessThan(const Duration(seconds: 10)));
-    expect(File('${temp.path}/neostation.AppImage').existsSync(), isFalse);
+    expect(temp.listSync(), isEmpty);
   });
 
   test('a cancel while waiting for the headers ends the download', () async {
@@ -272,7 +268,7 @@ void main() {
     );
 
     expect(outcome, UpdateOutcome.cancelled);
-    expect(File('${temp.path}/neostation.AppImage').existsSync(), isFalse);
+    expect(temp.listSync(), isEmpty);
   });
 
   test('a cancelled download is reported as cancelled, not failed', () async {
