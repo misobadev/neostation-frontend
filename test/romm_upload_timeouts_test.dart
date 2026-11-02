@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:neostation/models/romm_asset.dart';
+import 'package:neostation/models/romm_play_session.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:path/path.dart' as p;
 
@@ -19,11 +20,18 @@ import 'package:path/path.dart' as p;
 ///   operating system's own limit.
 ///
 /// A transfer now fails when it stops moving, not when it takes long.
+///
+/// Any other request (signing in, browsing, covers, deletes, play sessions)
+/// did time out, but only the caller gave up: the request kept its socket
+/// open until the server answered or closed it. It is now aborted too.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   const short = Duration(milliseconds: 150);
   const long = Duration(seconds: 10);
+
+  /// Longer than any test's own timeout, for a limit a test must not reach.
+  const never = Duration(minutes: 1);
 
   /// Whether [request] was sent abortable and its abort has fired, which is
   /// what closes the connection on a real client.
@@ -585,9 +593,337 @@ void main() {
     });
   });
 
+  // A request other than a transfer that ran out of time failed for the
+  // caller, but went on waiting on the server: its connection stayed open
+  // until the server answered or closed it.
+  group('RomM requests that run out of time', () {
+    /// A server that never answers: the request fails only once it is
+    /// aborted, and one that can't be aborted waits for ever, as a socket the
+    /// server keeps open does.
+    Future<http.StreamedResponse> neverAnswers(http.BaseRequest request) =>
+        request is http.Abortable && request.abortTrigger != null
+        ? untilAborted(request)
+        : Completer<http.StreamedResponse>().future;
+
+    /// Signed in with an API key, so nothing is sent before the request
+    /// under test. A limit left out is never reached, so a request held to
+    /// the wrong one fails its test by running out of time.
+    RommService withApiKey({Duration request = never, Duration icon = never}) =>
+        RommService(apiRequestLimit: request, iconRequestLimit: icon)
+          ..configure(serverUrl: 'http://romm.test', apiKey: 'k');
+
+    /// Signed in with a password and holding a token; limits as for
+    /// [withApiKey].
+    RommService withPassword({Duration request = never}) =>
+        RommService(apiRequestLimit: request, iconRequestLimit: never)
+          ..configure(
+            serverUrl: 'http://romm.test',
+            username: 'user',
+            password: 'secret',
+            accessToken: 'old',
+            refreshToken: 'refresh',
+          );
+
+    Matcher timedOutAs(String message) => throwsA(
+      isA<RommException>()
+          .having((e) => e.message, 'message', message)
+          .having((e) => e.kind, 'kind', RommFailure.timeout),
+    );
+
+    http.StreamedResponse answer(int status, [String body = '']) =>
+        http.StreamedResponse(Stream.value(utf8.encode(body)), status);
+
+    tearDown(() => RommService.debugUseHttpClient(null));
+
+    test('signing in with a password fails as timed out and aborts the token '
+        'request', () async {
+      final sent = <http.BaseRequest>[];
+      RommService.debugUseHttpClient(
+        MockClient.streaming((request, body) async {
+          sent.add(request);
+          await body.toBytes();
+          return neverAnswers(request);
+        }),
+      );
+      final elapsed = Stopwatch()..start();
+
+      await expectLater(
+        withPassword(request: short).authenticate(),
+        timedOutAs('Connection timed out'),
+      );
+
+      expect(elapsed.elapsed, lessThan(const Duration(seconds: 5)));
+      expect(sent, hasLength(1));
+      expect(sent.single.method, 'POST');
+      expect(sent.single.url.path, '/api/token');
+      expect(await aborted(sent.single), isTrue);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('a token refresh that runs out of time is aborted, and so is the '
+        'sign-in it falls back to', () async {
+      final sent = <http.BaseRequest>[];
+      final grants = <String?>[];
+      RommService.debugUseHttpClient(
+        MockClient.streaming((request, body) async {
+          final text = utf8.decode(await body.toBytes());
+          if (request.url.path == '/api/users/me') {
+            return answer(401);
+          }
+          sent.add(request);
+          grants.add(Uri.splitQueryString(text)['grant_type']);
+          return neverAnswers(request);
+        }),
+      );
+
+      await expectLater(
+        withPassword(request: short).verifyStoredConnection(),
+        timedOutAs('Connection timed out'),
+      );
+
+      expect(grants, ['refresh_token', 'password']);
+      expect(await aborted(sent.first), isTrue);
+      expect(await aborted(sent.last), isTrue);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('the token request still sends its form fields', () async {
+      http.BaseRequest? sent;
+      String? text;
+      RommService.debugUseHttpClient(
+        MockClient.streaming((request, body) async {
+          sent = request;
+          text = utf8.decode(await body.toBytes());
+          return answer(200, jsonEncode({'access_token': 'new'}));
+        }),
+      );
+
+      await withPassword().authenticate();
+
+      expect(
+        sent?.headers['content-type'],
+        'application/x-www-form-urlencoded',
+      );
+      expect(Uri.splitQueryString(text!), {
+        'grant_type': 'password',
+        'username': 'user',
+        'password': 'secret',
+        'scope':
+            'me.read roms.read platforms.read assets.read assets.write '
+            'collections.read firmware.read roms.user.read roms.user.write',
+      });
+    });
+
+    test(
+      'checking an API key fails as timed out and aborts the request',
+      () async {
+        http.BaseRequest? sent;
+        RommService.debugUseHttpClient(
+          MockClient.streaming((request, _) {
+            sent = request;
+            return neverAnswers(request);
+          }),
+        );
+
+        await expectLater(
+          withApiKey(request: short).authenticate(),
+          timedOutAs('Connection timed out'),
+        );
+
+        expect(sent?.url.path, '/api/users/me');
+        expect(sent?.headers['Authorization'], 'Bearer k');
+        expect(await aborted(sent), isTrue);
+      },
+      timeout: const Timeout(Duration(seconds: 15)),
+    );
+
+    test('a read fails as timed out and aborts the request', () async {
+      http.BaseRequest? sent;
+      RommService.debugUseHttpClient(
+        MockClient.streaming((request, _) {
+          sent = request;
+          return neverAnswers(request);
+        }),
+      );
+
+      await expectLater(
+        withPassword(request: short).verifyStoredConnection(),
+        timedOutAs('Request timed out'),
+      );
+
+      expect(sent?.method, 'GET');
+      expect(sent?.url.path, '/api/users/me');
+      expect(await aborted(sent), isTrue);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('a read retried after a token refresh is rebuilt, and aborted when '
+        'it runs out of time', () async {
+      final reads = <http.BaseRequest>[];
+      RommService.debugUseHttpClient(
+        MockClient.streaming((request, body) async {
+          await body.toBytes();
+          if (request.url.path == '/api/token') {
+            return answer(200, jsonEncode({'access_token': 'new'}));
+          }
+          reads.add(request);
+          if (request.headers['Authorization'] == 'Bearer old') {
+            return answer(401);
+          }
+          return neverAnswers(request);
+        }),
+      );
+
+      await expectLater(
+        withPassword(request: short).verifyStoredConnection(),
+        timedOutAs('Request timed out'),
+      );
+
+      expect(reads, hasLength(2));
+      expect(reads.first, isNot(same(reads.last)));
+      expect(reads.last.headers['Authorization'], 'Bearer new');
+      expect(await aborted(reads.last), isTrue);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('a read that answers in full completes', () async {
+      RommService.debugUseHttpClient(
+        MockClient.streaming(
+          (request, _) async => answer(200, jsonEncode({'username': 'u'})),
+        ),
+      );
+
+      final resp = withPassword().verifyStoredConnection();
+
+      await expectLater(resp, completes);
+    });
+
+    test('a cover that runs out of time is unreachable, and its request is '
+        'aborted', () async {
+      http.BaseRequest? sent;
+      RommService.debugUseHttpClient(
+        MockClient.streaming((request, _) {
+          sent = request;
+          return neverAnswers(request);
+        }),
+      );
+
+      final fetch = await withApiKey(
+        request: short,
+      ).fetchImage('/assets/romm/resources/roms/1/cover/big.png');
+
+      expect(fetch.bytes, isNull);
+      expect(fetch.miss, RommImageMiss.unreachable);
+      expect(sent?.url.path, '/assets/romm/resources/roms/1/cover/big.png');
+      expect(await aborted(sent), isTrue);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('a platform icon that runs out of time is null, and its request is '
+        'aborted', () async {
+      http.BaseRequest? sent;
+      RommService.debugUseHttpClient(
+        MockClient.streaming((request, _) {
+          sent = request;
+          return neverAnswers(request);
+        }),
+      );
+
+      final svg = await withApiKey(
+        icon: short,
+      ).fetchSvg('http://romm.test/assets/platforms/snes.svg');
+
+      expect(svg, isNull);
+      expect(await aborted(sent), isTrue);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('a platform icon that answers in full is returned', () async {
+      RommService.debugUseHttpClient(
+        MockClient.streaming(
+          (request, _) async => answer(200, '<svg viewBox="0 0 1 1"></svg>'),
+        ),
+      );
+
+      final svg = await withApiKey().fetchSvg(
+        'http://romm.test/assets/platforms/snes.svg',
+      );
+
+      expect(svg, '<svg viewBox="0 0 1 1"></svg>');
+    });
+
+    test('deleting saves fails as timed out and aborts the request', () async {
+      http.BaseRequest? sent;
+      RommService.debugUseHttpClient(
+        MockClient.streaming((request, body) async {
+          sent = request;
+          await body.toBytes();
+          return neverAnswers(request);
+        }),
+      );
+
+      await expectLater(
+        withApiKey(request: short).deleteSaves([1, 2]),
+        timedOutAs('Request timed out'),
+      );
+
+      expect(sent?.method, 'POST');
+      expect(sent?.url.path, '/api/saves/delete');
+      expect(await aborted(sent), isTrue);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('a delete that answers in full still sends its JSON body', () async {
+      http.BaseRequest? sent;
+      String? text;
+      RommService.debugUseHttpClient(
+        MockClient.streaming((request, body) async {
+          sent = request;
+          text = utf8.decode(await body.toBytes());
+          return answer(200);
+        }),
+      );
+
+      await withApiKey().deleteStates([3]);
+
+      expect(sent?.url.path, '/api/states/delete');
+      expect(sent?.headers['content-type'], 'application/json');
+      expect(sent?.headers['Authorization'], 'Bearer k');
+      expect(jsonDecode(text!), {
+        'states': [3],
+      });
+    });
+
+    test(
+      'uploading play sessions fails as timed out and aborts the request',
+      () async {
+        http.BaseRequest? sent;
+        RommService.debugUseHttpClient(
+          MockClient.streaming((request, body) async {
+            sent = request;
+            await body.toBytes();
+            return neverAnswers(request);
+          }),
+        );
+        final start = DateTime.utc(2026, 1, 1, 12);
+
+        await expectLater(
+          withApiKey(request: short).ingestPlaySessions([
+            RommPlaySession(
+              romId: 1,
+              startTime: start,
+              endTime: start.add(const Duration(minutes: 5)),
+              durationMs: 300000,
+            ),
+          ]),
+          timedOutAs('Request timed out'),
+        );
+
+        expect(sent?.method, 'POST');
+        expect(sent?.url.path, '/api/play-sessions');
+        expect(await aborted(sent), isTrue);
+      },
+      timeout: const Timeout(Duration(seconds: 15)),
+    );
+  });
+
   test('connecting to the server is limited', () {
-    // Longer than the sign-in requests' own 30 s, so signing in to an address
-    // that never answers still fails as a timeout first.
+    // Longer than RommService.apiRequestTimeout, the sign-in requests' own
+    // limit, so signing in to an address that never answers still fails as a
+    // timeout first.
     expect(RommService.connectTimeout, const Duration(seconds: 45));
     expect(
       RommService.newHttpClient().connectionTimeout,
@@ -603,5 +939,9 @@ void main() {
     expect(s.uploadResponseLimit, RommService.uploadResponseTimeout);
     expect(s.assetRequestLimit, RommService.downloadRequestTimeout);
     expect(s.assetStallLimit, RommService.downloadStallTimeout);
+    expect(RommService.apiRequestTimeout, const Duration(seconds: 30));
+    expect(RommService.iconRequestTimeout, const Duration(seconds: 15));
+    expect(s.apiRequestLimit, RommService.apiRequestTimeout);
+    expect(s.iconRequestLimit, RommService.iconRequestTimeout);
   });
 }

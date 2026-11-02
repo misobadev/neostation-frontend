@@ -149,6 +149,8 @@ class RommImageFetch {
 class RommService {
   /// The limits default to the production ones; tests pass short ones.
   RommService({
+    this.apiRequestLimit = apiRequestTimeout,
+    this.iconRequestLimit = iconRequestTimeout,
     this.uploadStallLimit = uploadStallTimeout,
     this.uploadResponseLimit = uploadResponseTimeout,
     this.assetRequestLimit = downloadRequestTimeout,
@@ -176,9 +178,10 @@ class RommService {
 
   /// How long connecting to the server may take, so an address that swallows
   /// the handshake fails in good time rather than at the system's own limit.
-  /// Longer than the 30 s limits on the sign-in requests, so signing in to an
-  /// address that never answers still fails as a timeout first, as it did
-  /// before; it is the uploads, which have no overall limit, it bounds.
+  /// Longer than [apiRequestTimeout], the limit on the sign-in requests, so
+  /// signing in to an address that never answers still fails as a timeout
+  /// first, as it did before; it is the uploads, which have no overall limit,
+  /// it bounds.
   @visibleForTesting
   static const connectTimeout = Duration(seconds: 45);
 
@@ -223,6 +226,56 @@ class RommService {
 
   static http.Client get _httpClient =>
       _httpClientOverride ?? _sharedHttpClient;
+
+  /// How long a request other than a transfer waits for its whole answer:
+  /// signing in, browsing, the save and session lists, covers, deletes and
+  /// play sessions.
+  @visibleForTesting
+  static const apiRequestTimeout = Duration(seconds: 30);
+
+  /// How long [fetchSvg] waits for a platform icon.
+  @visibleForTesting
+  static const iconRequestTimeout = Duration(seconds: 15);
+
+  /// [apiRequestTimeout] for this service's requests.
+  final Duration apiRequestLimit;
+
+  /// [iconRequestTimeout] for this service's platform icons.
+  final Duration iconRequestLimit;
+
+  /// Sends a [method] request to [uri] and reads its whole answer within
+  /// [timeout]; [body] is sent as is, [bodyFields] form-encoded. A request
+  /// that runs out of time throws [TimeoutException] and its connection is
+  /// closed: a bare timeout gives up on the answer but leaves the request
+  /// holding its socket until the server answers or closes it.
+  Future<http.Response> _send(
+    String method,
+    Uri uri, {
+    Map<String, String>? headers,
+    String? body,
+    Map<String, String>? bodyFields,
+    required Duration timeout,
+  }) async {
+    final abort = Completer<void>();
+    final request = http.AbortableRequest(
+      method,
+      uri,
+      abortTrigger: abort.future,
+    );
+    if (headers != null) request.headers.addAll(headers);
+    if (body != null) request.body = body;
+    if (bodyFields != null) request.bodyFields = bodyFields;
+    try {
+      return await _httpClient
+          .send(request)
+          .then(http.Response.fromStream)
+          .timeout(timeout);
+    } finally {
+      // Closes the connection of a request that ran out of time; one that
+      // answered in full is unaffected.
+      abort.complete();
+    }
+  }
 
   String _baseUrl = '';
 
@@ -354,9 +407,13 @@ class RommService {
   /// entered as `http://`.
   Future<http.Response> _postTokenRequest(Map<String, String> body) {
     const headers = {'Content-Type': 'application/x-www-form-urlencoded'};
-    return _httpClient
-        .post(_uri('/api/token'), headers: headers, body: body)
-        .timeout(const Duration(seconds: 30));
+    return _send(
+      'POST',
+      _uri('/api/token'),
+      headers: headers,
+      bodyFields: body,
+      timeout: apiRequestLimit,
+    );
   }
 
   /// Establishes (or confirms) a usable credential, dispatching on the mode the
@@ -379,9 +436,12 @@ class RommService {
     final session = _session;
     http.Response resp;
     try {
-      resp = await _httpClient
-          .get(_uri('/api/users/me'), headers: _authHeaders)
-          .timeout(const Duration(seconds: 30));
+      resp = await _send(
+        'GET',
+        _uri('/api/users/me'),
+        headers: _authHeaders,
+        timeout: apiRequestLimit,
+      );
     } on TimeoutException {
       throw RommException('Connection timed out', kind: RommFailure.timeout);
     } on HandshakeException {
@@ -675,12 +735,9 @@ class RommService {
 
   /// Like [_authedGet] but for a fully-built [uri] (used where query parameters
   /// are assembled via [Uri] or the asset path needs bespoke encoding).
-  Future<http.Response> _authedGetUri(
-    Uri uri, {
-    Duration timeout = const Duration(seconds: 30),
-  }) async {
+  Future<http.Response> _authedGetUri(Uri uri) async {
     final resp = await _sendWithAuthRetry<http.Response>(
-      () => _httpClient.get(uri, headers: _authHeaders).timeout(timeout),
+      () => _send('GET', uri, headers: _authHeaders, timeout: apiRequestLimit),
       statusOf: (r) => r.statusCode,
     );
     if (resp.statusCode != 200) {
@@ -1021,9 +1078,12 @@ class RommService {
       final url = pathOrUrl.startsWith('http')
           ? pathOrUrl
           : '$_baseUrl${pathOrUrl.startsWith('/') ? '' : '/'}$pathOrUrl';
-      final resp = await _httpClient
-          .get(Uri.parse(url), headers: imageHeadersFor(url))
-          .timeout(const Duration(seconds: 30));
+      final resp = await _send(
+        'GET',
+        Uri.parse(url),
+        headers: imageHeadersFor(url),
+        timeout: apiRequestLimit,
+      );
       if (resp.statusCode != 200) {
         // 404/410 are the server saying the file is not there. Anything else
         // — 5xx while it restarts, 401/403 before a token refresh, a proxy's
@@ -1263,9 +1323,12 @@ class RommService {
   /// so we inline those class styles as presentation attributes first.
   Future<String?> fetchSvg(String url) async {
     try {
-      final resp = await _httpClient
-          .get(Uri.parse(url), headers: imageHeadersFor(url))
-          .timeout(const Duration(seconds: 15));
+      final resp = await _send(
+        'GET',
+        Uri.parse(url),
+        headers: imageHeadersFor(url),
+        timeout: iconRequestLimit,
+      );
       if (resp.statusCode == 200 && resp.body.contains('<svg')) {
         return _inlineSvgClassStyles(resp.body);
       }
@@ -1997,13 +2060,13 @@ class RommService {
     if (assetIds.isEmpty) return;
     final body = jsonEncode({field: assetIds});
     final resp = await _sendWithAuthRetry<http.Response>(
-      () => _httpClient
-          .post(
-            _uri('$basePath/delete'),
-            headers: {..._authHeaders, 'Content-Type': 'application/json'},
-            body: body,
-          )
-          .timeout(const Duration(seconds: 30)),
+      () => _send(
+        'POST',
+        _uri('$basePath/delete'),
+        headers: {..._authHeaders, 'Content-Type': 'application/json'},
+        body: body,
+        timeout: apiRequestLimit,
+      ),
       statusOf: (r) => r.statusCode,
     );
     if (resp.statusCode != 200) {
@@ -2048,13 +2111,13 @@ class RommService {
     });
 
     final resp = await _sendWithAuthRetry<http.Response>(
-      () => _httpClient
-          .post(
-            _uri('/api/play-sessions'),
-            headers: {..._authHeaders, 'Content-Type': 'application/json'},
-            body: body,
-          )
-          .timeout(const Duration(seconds: 30)),
+      () => _send(
+        'POST',
+        _uri('/api/play-sessions'),
+        headers: {..._authHeaders, 'Content-Type': 'application/json'},
+        body: body,
+        timeout: apiRequestLimit,
+      ),
       statusOf: (r) => r.statusCode,
     );
 
