@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/services/screenscraper/media_downloader.dart';
 import 'package:neostation/services/screenscraper/media_resolver.dart';
+import 'package:neostation/services/screenscraper/screenscraper_exceptions.dart';
 
 import 'database_test_helper.dart';
 
@@ -52,7 +53,12 @@ void main() {
     server.listen((request) {
       final route = request.uri.path.substring(1);
       hits[route] = (hits[route] ?? 0) + 1;
-      request.response.statusCode = route == 'missing' ? 404 : 200;
+      request.response.statusCode = switch (route) {
+        'missing' => 404,
+        // ScreenScraper's answer once the day's quota is used up.
+        'quota' => 430,
+        _ => 200,
+      };
       request.response
         ..add([0x89, 0x50, 0x4e, 0x47])
         ..close();
@@ -165,4 +171,37 @@ void main() {
       expect(progress, [0.5]);
     },
   );
+
+  // Every request after the quota runs out is refused too, so the user should
+  // be told why rather than that "some media downloads failed".
+  test('the quota running out stops the downloads and is reported', () async {
+    await expectLater(
+      download([entry('ss', 'quota'), entry('fanart', 'art')], threads: 1),
+      throwsA(isA<ScreenscraperQuotaExceededException>()),
+    );
+    expect(hits, {'quota': 1}, reason: 'the next batch was still requested');
+    expect(await fanart().exists(), isFalse);
+  });
+
+  test('the rest of a batch still finishes when the quota runs out', () async {
+    await expectLater(
+      download([entry('ss', 'quota'), entry('fanart', 'art')]),
+      throwsA(isA<ScreenscraperQuotaExceededException>()),
+    );
+    expect(hits, {'quota': 1, 'art': 1});
+    expect(await fanart().exists(), isTrue);
+  });
+
+  test('a connection error still just fails that file', () async {
+    // A port nothing listens on: the connection is refused.
+    final closed = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final port = closed.port;
+    await closed.close();
+    final refused = entry('ss', 'shot')..['url'] = 'http://127.0.0.1:$port/x';
+
+    final result = await download([refused, entry('fanart', 'art')]);
+
+    expect(result, {'success': false, 'cancelled': false});
+    expect(await fanart().exists(), isTrue);
+  });
 }
