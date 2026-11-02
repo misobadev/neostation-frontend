@@ -1036,8 +1036,8 @@ extension SqliteConfigScanning on SqliteConfigProvider {
 
       // Trigger Steam scraper if it's the Steam system
       if (system.folderName == 'steam') {
-        // We don't pass 'provider' here because SqliteConfigProvider is not SqliteDatabaseProvider
-        // The service will handle UI refreshes independently if needed, or we can look into passing a callback
+        // SqliteConfigProvider is not a SqliteDatabaseProvider, so none is
+        // passed; the service refreshes through the one launch gave it.
         SteamScraperService.scrapeSteamGames();
       }
 

@@ -29,16 +29,57 @@ class SteamScraperService {
     _httpClientOverride = client;
   }
 
-  static Future<http.Response> _get(Uri url) =>
-      _httpClientOverride?.get(url) ?? http.get(url);
+  /// How long a Store request may take, and an image download (the whole
+  /// body, so longer). Without a limit a stalled request would keep its run,
+  /// and so every later run, waiting.
+  @visibleForTesting
+  static Duration requestTimeout = const Duration(seconds: 20);
+  @visibleForTesting
+  static Duration imageTimeout = const Duration(seconds: 60);
+
+  static Future<http.Response> _get(Uri url, Duration timeout) =>
+      (_httpClientOverride?.get(url) ?? http.get(url)).timeout(timeout);
+
+  /// The run in progress, if any; see [scrapeSteamGames].
+  static Future<void>? _inFlight;
+
+  /// Whether a run was asked for while one was in progress.
+  static bool _rerun = false;
+
+  /// The provider to refresh, kept from whichever caller passed one: launch
+  /// passes it, a ROM scan can't, and a scan's run still refreshes the list.
+  static SqliteDatabaseProvider? _provider;
+
+  @visibleForTesting
+  static void debugForgetProvider() => _provider = null;
 
   /// Performs a batch scraping operation for all registered Steam games.
   ///
   /// Targets entries that have a valid Steam App ID but are missing localized
   /// metadata or physical media assets on disk.
-  static Future<void> scrapeSteamGames({
-    SqliteDatabaseProvider? provider,
-  }) async {
+  ///
+  /// Launch and every ROM scan that reaches the Steam system call this without
+  /// waiting, so calls overlap. One run goes at a time: a call made during a
+  /// run gets one more run after it, which picks up games the scan added since
+  /// the first run read its list, and returns when that run is done.
+  static Future<void> scrapeSteamGames({SqliteDatabaseProvider? provider}) {
+    if (provider != null) _provider = provider;
+    final running = _inFlight;
+    if (running != null) {
+      _rerun = true;
+      return running;
+    }
+    return _inFlight = _runUntilIdle().whenComplete(() => _inFlight = null);
+  }
+
+  static Future<void> _runUntilIdle() async {
+    do {
+      _rerun = false;
+      await _scrapeOnce(provider: _provider);
+    } while (_rerun);
+  }
+
+  static Future<void> _scrapeOnce({SqliteDatabaseProvider? provider}) async {
     try {
       // 1. Resolve the logical Steam system to obtain its internal ID.
       final steamSystem = await SystemRepository.getSystemByFolderName('steam');
@@ -115,7 +156,7 @@ class SteamScraperService {
   }) async {
     try {
       final url = Uri.parse('$_steamApiUrl?appids=$appId&l=$lang');
-      final response = await _get(url);
+      final response = await _get(url, requestTimeout);
 
       if (response.statusCode != 200) {
         _log.e(
@@ -242,7 +283,7 @@ class SteamScraperService {
       if (await file.exists()) return;
 
       await file.parent.create(recursive: true);
-      final response = await _get(Uri.parse(url));
+      final response = await _get(Uri.parse(url), imageTimeout);
 
       if (response.statusCode == 200) {
         await file.writeAsBytes(response.bodyBytes);
