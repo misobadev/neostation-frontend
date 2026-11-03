@@ -551,6 +551,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.cancelSubscription: '구독 취소',
   AppLocale.cancelSubscriptionConfirm:
       '구독을 취소할까요? 현재 결제 기간이 끝날 때까지는 계속 이용할 수 있습니다.',
+  AppLocale.subscriptionCancelledKeepPlan:
+      '구독이 취소되었습니다. 현재 결제 기간이 끝날 때까지 지금 요금제를 계속 이용할 수 있습니다.',
   AppLocale.keepSubscription: '구독 유지',
   AppLocale.deleteCloudSave: '클라우드 세이브 삭제',
   AppLocale.deleteCloudSaveConfirm: '이 세이브 파일을 클라우드에서 영구 삭제할까요?',

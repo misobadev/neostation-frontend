@@ -637,6 +637,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.cancelSubscription: 'Annulla Abbonamento',
   AppLocale.cancelSubscriptionConfirm:
       'Sei sicuro di voler annullare ? Manterrai l’accesso fino alla fine del periodo.',
+  AppLocale.subscriptionCancelledKeepPlan:
+      'Il tuo abbonamento è annullato. Mantieni il piano attuale fino alla fine del periodo di fatturazione.',
   AppLocale.keepSubscription: 'Mantieni Abbonamento',
   AppLocale.deleteCloudSave: 'Elimina Salvataggio Cloud',
   AppLocale.deleteCloudSaveConfirm:

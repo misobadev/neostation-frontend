@@ -644,6 +644,8 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.cancelSubscription: 'Abonnement kündigen',
   AppLocale.cancelSubscriptionConfirm:
       'Bist du sicher, dass du kündigen möchtest? Du behältst den Zugriff bis zum Ende des Zeitraums.',
+  AppLocale.subscriptionCancelledKeepPlan:
+      'Dein Abonnement ist gekündigt. Du behältst deinen aktuellen Plan bis zum Ende des Abrechnungszeitraums.',
   AppLocale.keepSubscription: 'Abonnement behalten',
   AppLocale.deleteCloudSave: 'Cloud-Spielstand löschen',
   AppLocale.deleteCloudSaveConfirm:

@@ -24,6 +24,9 @@ import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/auth_form.dart';
 import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/plan_change_notice.dart';
+import 'package:neostation/widgets/plan_farewell_modal.dart';
+import 'package:neostation/widgets/plan_welcome_modal.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -60,7 +63,7 @@ class _SignedIn extends AuthService {
 class _Subscriber extends AuthService {
   _Subscriber(this.plan, [List<String>? log]) : log = log ?? [];
 
-  final String plan;
+  String plan;
   final List<String> log;
 
   /// The subscription status the account reports once reloaded, unless the
@@ -68,6 +71,9 @@ class _Subscriber extends AuthService {
   String? statusOnReload;
   bool reloadFails = false;
   String? status;
+
+  /// The plan the account reports once reloaded, if it changed.
+  String? planOnReload;
 
   @override
   bool get isLoggedIn => true;
@@ -91,6 +97,7 @@ class _Subscriber extends AuthService {
     log.add('profile');
     if (reloadFails) return {'success': false, 'message': 'Network error'};
     status = statusOnReload ?? status;
+    plan = planOnReload ?? plan;
     return {'success': true};
   }
 }
@@ -117,6 +124,9 @@ class _Billing extends BillingService {
   /// A change started from an earlier visit to the plans view, still out.
   bool changing = false;
 
+  /// Runs while a cancellation is out, before it is answered.
+  void Function()? whileCancelling;
+
   @override
   bool get isChangeInFlight => changing;
 
@@ -140,8 +150,56 @@ class _Billing extends BillingService {
   @override
   Future<Map<String, dynamic>> cancelSubscription(String userId) async {
     log.add('cancel');
+    whileCancelling?.call();
     return answer;
   }
+}
+
+/// Answers a sign-in as "e-mail not verified" until [verified] is set, and
+/// each verification check with [verified], writing every call to [log]. A
+/// check waits for [checkHeld] and a sign-in for [loginHeld] when set.
+class _Unverified extends AuthService {
+  _Unverified(this.log);
+
+  final List<String> log;
+  bool verified = false;
+  Completer<void>? checkHeld;
+  Completer<Map<String, dynamic>>? loginHeld;
+
+  @override
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    log.add('login');
+    final held = loginHeld;
+    if (held != null) return held.future;
+    return verified
+        ? {'success': true}
+        : {'success': false, 'emailNotVerified': true, 'message': 'x'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> resendVerificationEmail(String email) async {
+    log.add('resend');
+    return {'success': true, 'message': 'x'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> checkEmailVerificationStatus(
+    String email,
+  ) async {
+    log.add('check');
+    final held = checkHeld;
+    if (held != null) await held.future;
+    return {'success': true, 'email_verified': verified};
+  }
+}
+
+/// Offers the free plan only, which can't be bought.
+class _OnlyFree extends BillingService {
+  @override
+  Future<Map<String, dynamic>> getAvailablePlans() async => {
+    'success': true,
+    'plans': [_plan('free')],
+  };
 }
 
 /// Writes each quota and save-list request to [log], without the network.
@@ -374,10 +432,8 @@ void main() {
 
   testWidgets('the plans with NeoSync out of reach say so, in the app '
       'language', (tester) async {
-    final billing = BillingService(
-      client: _SilentClient(),
-      requestTimeout: limit,
-    );
+    final client = _SilentClient();
+    final billing = BillingService(client: client, requestTimeout: limit);
     await pump(
       tester,
       PlanSelectionView(
@@ -390,13 +446,42 @@ void main() {
       auth: _SignedIn(),
       billing: billing,
     );
+    // Nothing has failed yet, so nothing to retry.
+    expect(find.text(en(AppLocale.retry)), findsNothing);
 
     await tester.pump(limit * 2);
     await tester.pump();
 
     expect(find.text(unreachable), findsOneWidget);
     expect(find.textContaining('Network error'), findsNothing);
-    expect(find.text(en(AppLocale.retry)), findsOneWidget);
+    // The button on the page, and the footer's A.
+    expect(find.text(en(AppLocale.retry)), findsNWidgets(2));
+    expect(find.text(en(AppLocale.upgrade)), findsNothing);
+
+    // A retries, so the plans can be loaded again without touch.
+    await press(tester, LogicalKeyboardKey.enter);
+    expect(client.sent, 2);
+
+    await tester.pump(limit * 2);
+    await tester.pump();
+  });
+
+  testWidgets('a plan list with nothing to buy offers Retry', (tester) async {
+    await pump(
+      tester,
+      PlanSelectionView(
+        initialPlans: [_plan('free')],
+        onUpgrade: (_, _) async {},
+        onCancel: () async {},
+        getPlanIcon: (_) => Icons.storage,
+        onBack: () {},
+      ),
+      auth: _SignedIn(),
+      billing: _OnlyFree(),
+    );
+
+    expect(find.text(en(AppLocale.noPlansAvailable)), findsOneWidget);
+    expect(find.text(en(AppLocale.retry)), findsNWidgets(2));
   });
 
   group('the plans view', () {
@@ -661,18 +746,20 @@ void main() {
     testWidgets('a cancellation NeoSync did not confirm is not taken as done '
         'from an account that could not be reloaded', (tester) async {
       final log = <String>[];
+      final auth = _Subscriber('mini', log)..reloadFails = true;
       await openPlans(
         tester,
-        // Held from an earlier cancellation, since undone elsewhere.
-        auth: _Subscriber('mini', log)
-          ..status = 'canceling'
-          ..reloadFails = true,
-        billing: _Billing(log, const {
-          'success': false,
-          'message': 'Network error: TimeoutException',
-          'isNetworkError': true,
-          'outcomeUnknown': true,
-        }),
+        auth: auth,
+        billing:
+            _Billing(log, const {
+                'success': false,
+                'message': 'Network error: TimeoutException',
+                'isNetworkError': true,
+                'outcomeUnknown': true,
+              })
+              // Picked up from another device's cancellation while this one was
+              // out, and since undone there.
+              ..whileCancelling = () => auth.status = 'canceling',
         log: log,
       );
 
@@ -688,6 +775,350 @@ void main() {
 
       await press(tester, LogicalKeyboardKey.enter);
       await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('keeping the subscription sends nothing', (tester) async {
+      final log = <String>[];
+      await openPlans(
+        tester,
+        auth: _Subscriber('mini', log),
+        billing: _Billing(log),
+        log: log,
+      );
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(find.byType(ConfirmActionDialog), findsOneWidget);
+      await tester.tap(find.text(en(AppLocale.keepSubscription)));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(ConfirmActionDialog), findsNothing);
+      expect(log, isEmpty, reason: 'nothing changed, so nothing to reload');
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('a cancellation that went through says so, not the question', (
+      tester,
+    ) async {
+      final log = <String>[];
+      await openPlans(
+        tester,
+        auth: _Subscriber('mini', log)..statusOnReload = 'canceling',
+        billing: _Billing(log, const {'success': true}),
+        log: log,
+      );
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump();
+
+      final dialog = tester.widget<SuccessDialog>(find.byType(SuccessDialog));
+      expect(dialog.message, en(AppLocale.subscriptionCancelledKeepPlan));
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('a plan changed in place welcomes the new plan in the app '
+        'language, once', (tester) async {
+      PlanChangeNotice.debugReset();
+      addTearDown(PlanChangeNotice.debugReset);
+      final log = <String>[];
+      await openPlans(
+        tester,
+        auth: _Subscriber('free', log)..planOnReload = 'mini',
+        billing: _Billing(log, const {
+          'success': true,
+          'upgrade': true,
+          'message': 'Subscription updated to mini',
+        }),
+        log: log,
+      );
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump();
+
+      expect(log, ['checkout', 'profile']);
+      expect(find.byType(PlanWelcomeModal), findsOneWidget);
+      expect(find.text('Subscription updated to mini'), findsNothing);
+      expect(shown(), isEmpty);
+
+      await press(tester, LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('a subscription that is ending says so and offers no second '
+        'cancellation', (tester) async {
+      var cancels = 0;
+      await pump(
+        tester,
+        PlanSelectionView(
+          initialPlans: [_plan('mini'), _plan('mega')],
+          onUpgrade: (_, _) async {},
+          onCancel: () async => cancels++,
+          getPlanIcon: (_) => Icons.storage,
+          onBack: () {},
+        ),
+        auth: _Subscriber('mini')..status = 'canceling',
+        billing: _Billing(),
+      );
+
+      expect(
+        find.text(en(AppLocale.subscriptionEnding).toUpperCase()),
+        findsOneWidget,
+      );
+      expect(find.text(en(AppLocale.endSubscription)), findsNothing);
+
+      await press(tester, LogicalKeyboardKey.enter);
+      expect(cancels, 0);
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('the dashboard shows a subscription that is ending', (
+      tester,
+    ) async {
+      final log = <String>[];
+      final auth = _Subscriber('mini', log)..status = 'canceling';
+      await pump(
+        tester,
+        const NeoSyncContent(),
+        auth: auth,
+        billing: _Billing(log),
+        neoSync: NeoSyncProvider(_NeoSyncService(log))..setAuthService(auth),
+      );
+
+      expect(
+        find.text(en(AppLocale.subscriptionEnding).toUpperCase()),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 1));
+    });
+  });
+
+  // An upgrade made in the app, the notification socket and the next app
+  // resume can each notice the same plan change; each showed its own modal.
+  group('a plan change is announced', () {
+    setUp(PlanChangeNotice.debugReset);
+    tearDown(PlanChangeNotice.debugReset);
+
+    Future<BuildContext> app(WidgetTester tester) async {
+      late BuildContext context;
+      await pump(
+        tester,
+        Builder(
+          builder: (c) {
+            context = c;
+            return const SizedBox();
+          },
+        ),
+        auth: _SignedIn(),
+      );
+      return context;
+    }
+
+    Future<void> close(WidgetTester tester, BuildContext context) async {
+      Navigator.of(context).pop();
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    testWidgets('once, whichever path tells first', (tester) async {
+      final context = await app(tester);
+
+      PlanChangeNotice.show(context, account: 'a', from: 'free', to: 'mini');
+      await tester.pump();
+      expect(find.byType(PlanWelcomeModal), findsOneWidget);
+      await close(tester, context);
+
+      // The next resume sees the same change.
+      PlanChangeNotice.show(context, account: 'a', from: 'free', to: 'mini');
+      await tester.pump();
+      expect(find.byType(PlanWelcomeModal), findsNothing);
+
+      // A later change is announced again.
+      PlanChangeNotice.show(context, account: 'a', from: 'mini', to: 'mega');
+      await tester.pump();
+      expect(find.byType(PlanWelcomeModal), findsOneWidget);
+      await close(tester, context);
+    });
+
+    testWidgets('a change is announced to each account that makes it', (
+      tester,
+    ) async {
+      final context = await app(tester);
+
+      PlanChangeNotice.show(context, account: 'a', from: 'free', to: 'mini');
+      await tester.pump();
+      await close(tester, context);
+
+      // Another account signs in and makes the same change.
+      PlanChangeNotice.show(context, account: 'b', from: 'free', to: 'mini');
+      await tester.pump();
+      expect(find.byType(PlanWelcomeModal), findsOneWidget);
+      await close(tester, context);
+    });
+
+    testWidgets('a move down says goodbye to the old plan', (tester) async {
+      final context = await app(tester);
+
+      PlanChangeNotice.show(context, account: 'a', from: 'mega', to: 'mini');
+      await tester.pump();
+      expect(find.byType(PlanFarewellModal), findsOneWidget);
+      expect(
+        tester
+            .widget<PlanFarewellModal>(find.byType(PlanFarewellModal))
+            .oldPlanName,
+        'mega',
+      );
+      await close(tester, context);
+    });
+
+    testWidgets('an upgrade the socket reports without the old plan is '
+        'welcomed; a move down without it is not shown', (tester) async {
+      final context = await app(tester);
+
+      PlanChangeNotice.show(context, account: 'a', to: 'mini', upgrade: false);
+      await tester.pump();
+      expect(find.byType(PlanFarewellModal), findsNothing);
+
+      PlanChangeNotice.show(context, account: 'a', to: 'mini', upgrade: true);
+      await tester.pump();
+      expect(find.byType(PlanWelcomeModal), findsOneWidget);
+      await close(tester, context);
+    });
+  });
+
+  // After a sign-in with an unverified e-mail, the form checks every 15 s
+  // whether the e-mail has been verified and then signs in by itself. Resend
+  // started a second round of checks without stopping the first, which nothing
+  // could stop: after B it kept checking, and once the e-mail was verified it
+  // took over the login form and signed in. A check out when B was pressed
+  // did the same, and two checks could overlap and sign in twice.
+  group('the e-mail verification checks', () {
+    /// Signs in with an unverified e-mail, which opens the verification view.
+    Future<_Unverified> unverified(
+      WidgetTester tester,
+      List<String> log,
+    ) async {
+      final auth = _Unverified(log);
+      await pump(
+        tester,
+        AuthForm(onLoginSuccess: () => log.add('signed in')),
+        auth: auth,
+      );
+      await signInDetails(tester);
+      await tester.tap(loginButton());
+      await tester.pump();
+      await tester.pump();
+      expect(find.text(en(AppLocale.resendVerificationEmail)), findsOneWidget);
+      return auth;
+    }
+
+    Future<void> resend(WidgetTester tester) async {
+      await tester.tap(find.text(en(AppLocale.resendVerificationEmail)));
+      await tester.pump();
+      await tester.pump();
+    }
+
+    Future<void> back(WidgetTester tester) async {
+      await leaveField(tester);
+      await press(tester, LogicalKeyboardKey.backspace);
+      expect(find.text(en(AppLocale.login)), findsOneWidget);
+    }
+
+    /// Lets [time] pass a second at a time, so timers and delays run.
+    Future<void> wait(WidgetTester tester, Duration time) async {
+      for (var s = 0; s < time.inSeconds; s++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+    }
+
+    /// Removes the form, which stops its checks, and lets any delay run out.
+    Future<void> done(WidgetTester tester) async {
+      await tester.pumpWidget(const SizedBox());
+      await wait(tester, const Duration(seconds: 20));
+    }
+
+    testWidgets('resending twice, then B, stops the checks for good', (
+      tester,
+    ) async {
+      final log = <String>[];
+      final auth = await unverified(tester, log);
+      await resend(tester);
+      await resend(tester);
+      await back(tester);
+      log.clear();
+
+      auth.verified = true;
+      await wait(tester, const Duration(seconds: 40));
+
+      expect(log, isEmpty, reason: 'no checks, and no sign-in, after B');
+      expect(find.text(en(AppLocale.emailVerifiedSuccess)), findsNothing);
+      await done(tester);
+    });
+
+    testWidgets('a check out when B is pressed changes nothing', (
+      tester,
+    ) async {
+      final log = <String>[];
+      final auth = await unverified(tester, log);
+      await resend(tester);
+      final held = auth.checkHeld = Completer<void>();
+      await wait(tester, const Duration(seconds: 3));
+      expect(log.last, 'check');
+      await back(tester);
+      log.clear();
+
+      auth.verified = true;
+      held.complete();
+      await wait(tester, const Duration(seconds: 3));
+
+      expect(log, isEmpty, reason: 'the late answer signs nobody in');
+      expect(find.text(en(AppLocale.emailVerifiedSuccess)), findsNothing);
+      await done(tester);
+    });
+
+    testWidgets('a check still out skips the next one, so it signs in once', (
+      tester,
+    ) async {
+      final log = <String>[];
+      final auth = await unverified(tester, log);
+      await resend(tester);
+      log.clear();
+      final held = auth.checkHeld = Completer<void>();
+      // The first check at 3 s is still out when the 15 s one is due.
+      await wait(tester, const Duration(seconds: 16));
+      expect(log, ['check']);
+
+      auth.verified = true;
+      held.complete();
+      await wait(tester, const Duration(seconds: 3));
+
+      expect(log.where((call) => call == 'signed in'), hasLength(1));
+      await done(tester);
+    });
+
+    testWidgets('an answer that comes after the form has gone is dropped', (
+      tester,
+    ) async {
+      final log = <String>[];
+      final auth = _Unverified(log)
+        ..loginHeld = Completer<Map<String, dynamic>>();
+      await pump(tester, AuthForm(onLoginSuccess: () {}), auth: auth);
+      await signInDetails(tester);
+      await tester.tap(loginButton());
+      await tester.pump();
+      expect(log, ['login']);
+
+      // Another tab replaces the form while the sign-in is out.
+      await tester.pumpWidget(const SizedBox());
+      auth.loginHeld!.complete({'success': false, 'message': 'x'});
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
     });
   });
 }

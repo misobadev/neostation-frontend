@@ -527,6 +527,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.backWithB: '返回 (B)',
   AppLocale.cancelSubscription: '取消訂閱',
   AppLocale.cancelSubscriptionConfirm: '您確定要取消訂閱嗎？在目前週期結束前，您仍可繼續使用。',
+  AppLocale.subscriptionCancelledKeepPlan: '您的訂閱已取消。在目前計費週期結束前，您仍可使用目前的方案。',
   AppLocale.keepSubscription: '保持訂閱',
   AppLocale.deleteCloudSave: '刪除雲端存檔',
   AppLocale.deleteCloudSaveConfirm: '確定要從雲端永久刪除此存檔嗎？',
