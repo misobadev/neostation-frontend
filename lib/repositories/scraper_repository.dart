@@ -19,6 +19,15 @@ class MetadataTransferResult {
 class ScraperRepository {
   static final _log = LoggerService.instance;
 
+  /// `user_screenscraper_metadata.is_fully_scraped` once a game's media have
+  /// downloaded: "New content only" leaves the game alone.
+  static const int scrapedFully = 1;
+
+  /// `is_fully_scraped` for a game scraped while every media type was switched
+  /// off: "New content only" leaves it alone until a media type is switched
+  /// on, then fetches its media.
+  static const int scrapedMetadataOnly = 2;
+
   /// Returns detected systems that have a ScreenScraper ID, ordered by name.
   static Future<List<Map<String, dynamic>>> getScraperSystems() async {
     final db = await SqliteService.getDatabase();
@@ -861,16 +870,37 @@ class ScraperRepository {
     }
   }
 
-  /// Marks a game's metadata on [appSystemId] as fully scraped.
+  /// Marks a game's metadata on [appSystemId] as fully scraped, or, with
+  /// [metadataOnly], as scraped while every media type was switched off.
   static Future<void> markGameFullyScraped(
+    String appSystemId,
+    String filename, {
+    bool metadataOnly = false,
+  }) async {
+    final db = await SqliteService.getDatabase();
+    await db.update(
+      'user_screenscraper_metadata',
+      {
+        'is_fully_scraped': metadataOnly ? scrapedMetadataOnly : scrapedFully,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'app_system_id = ? AND filename = ?',
+      whereArgs: [appSystemId, filename],
+    );
+  }
+
+  /// Clears a game's finished mark on [appSystemId] while its media are
+  /// fetched again, so "New content only" retries the game if they fail.
+  /// Saving metadata clears the mark too; this is for when none is saved.
+  static Future<void> markGameUnfinished(
     String appSystemId,
     String filename,
   ) async {
     final db = await SqliteService.getDatabase();
     await db.update(
       'user_screenscraper_metadata',
-      {'is_fully_scraped': 1, 'updated_at': DateTime.now().toIso8601String()},
-      where: 'app_system_id = ? AND filename = ?',
+      {'is_fully_scraped': 0, 'updated_at': DateTime.now().toIso8601String()},
+      where: 'app_system_id = ? AND filename = ? AND is_fully_scraped != 0',
       whereArgs: [appSystemId, filename],
     );
   }
@@ -990,15 +1020,28 @@ class ScraperRepository {
 
   // ── Bulk scraping ─────────────────────────────────────────────────────────
 
+  /// The `WHERE` condition that limits a scrape to what [scrapeMode] still
+  /// has to do: for "New content only", games never scraped or not finished,
+  /// plus games scraped for metadata only once a media type is switched on.
+  static Future<String> _scrapeModeFilter(String scrapeMode) async {
+    if (scrapeMode != 'new_only') return '';
+    final mediaWanted = (await getEnabledMediaTypes()).isNotEmpty;
+    final metadataOnly = mediaWanted
+        ? ' OR usm.is_fully_scraped = $scrapedMetadataOnly'
+        : '';
+    return 'AND (usm.filename IS NULL OR usm.is_fully_scraped = 0$metadataOnly)';
+  }
+
   /// Returns the count of ROMs eligible for scraping for a given system.
   static Future<int> getRomCountForScraping(
     String appSystemId,
     String scrapeMode,
   ) async {
+    final filter = await _scrapeModeFilter(scrapeMode);
     final db = await SqliteService.getDatabase();
     final result = await db.rawQuery(
       '''SELECT COUNT(*) as count FROM user_roms ur LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-       WHERE ur.app_system_id = ? ${scrapeMode == 'new_only' ? 'AND (usm.filename IS NULL OR usm.is_fully_scraped = 0)' : ''}''',
+       WHERE ur.app_system_id = ? $filter''',
       [appSystemId],
     );
     return int.tryParse(result.first['count']?.toString() ?? '0') ?? 0;
@@ -1009,11 +1052,12 @@ class ScraperRepository {
     String appSystemId,
     String scrapeMode,
   ) async {
+    final filter = await _scrapeModeFilter(scrapeMode);
     final db = await SqliteService.getDatabase();
     return await db.rawQuery(
-      '''SELECT ur.filename, ur.rom_path, ur.title_name, usm.is_fully_scraped 
+      '''SELECT ur.filename, ur.rom_path, ur.title_name, usm.is_fully_scraped
        FROM user_roms ur LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-       WHERE ur.app_system_id = ? ${scrapeMode == 'new_only' ? 'AND (usm.filename IS NULL OR usm.is_fully_scraped = 0)' : ''}''',
+       WHERE ur.app_system_id = ? $filter''',
       [appSystemId],
     );
   }
