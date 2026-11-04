@@ -116,7 +116,10 @@ class GamepadEventTranslator {
   final Map<String, Map<GamepadInputType, Set<String>>> _pressedTriggerKeys =
       {};
 
-  /// Tracks the last active direction per key to ensure correct release detection on desktop platforms.
+  /// The last active direction per gamepad and key, so a centred hat or a
+  /// released D-pad key reports the direction it lets go of. Per gamepad: with
+  /// two pads connected, one pad's hat must not overwrite another's, or the
+  /// first pad's release is lost and its D-pad stays held.
   final Map<String, GamepadInputType> _lastDirectionByKey = {};
 
   /// Connection type metadata per gamepad (e.g., Bluetooth, USB).
@@ -128,7 +131,8 @@ class GamepadEventTranslator {
   /// Gamepad device names used for profile matching.
   final Map<String, String> _gamepadNameCache = {};
 
-  /// Tracks gamepads that emit axis_hat events to prevent duplicate D-pad inputs on Android.
+  /// Gamepads whose hat has been pressed, so the D-pad key presses Android
+  /// also sends for it can be dropped as duplicates.
   final Map<String, bool> _gamepadUsesAxisHat = {};
 
   /// Translates a raw [GamepadEvent] into a standardized [TranslatedGamepadEvent].
@@ -150,7 +154,11 @@ class GamepadEventTranslator {
       // leave repeat timers running forever if the keycode_dpad release is also filtered.
       if (_isAndroid) {
         if (key == 'axis_hat_x' || key == 'axis_hat_y') {
-          _gamepadUsesAxisHat[gamepadId] = true;
+          // Only a pressed hat counts (±1, the values read as a direction).
+          // A motion event carries every axis, so a pad whose D-pad is keys
+          // reports its absent hat at 0 on its first motion event, and marking
+          // it then would drop every press of its D-pad.
+          if (value.abs() == 1.0) _gamepadUsesAxisHat[gamepadId] = true;
         } else if (key.startsWith('keycode_dpad_') &&
             _gamepadUsesAxisHat[gamepadId] == true) {
           // value == 0.0 is ACTION_DOWN (press) — filter it to avoid duplicates.
@@ -317,7 +325,7 @@ class GamepadEventTranslator {
 
         // Clear directional tracking upon a successful release event.
         if (effectiveIsReleased) {
-          _lastDirectionByKey.remove(_directionKey(key, eventType));
+          _lastDirectionByKey.remove(_directionKey(gamepadId, key, eventType));
         }
 
         return translatedEvent;
@@ -359,7 +367,7 @@ class GamepadEventTranslator {
 
     // D-pad translation for other platforms.
     if (_isDpadEvent(key)) {
-      return _translateDpadEvent(key, value, mapping);
+      return _translateDpadEvent(key, value, mapping, gamepadId);
     }
 
     // Button translation for other platforms.
@@ -487,6 +495,7 @@ class GamepadEventTranslator {
         return GamepadInputType.buttonLT;
       case 16: // ABS_HAT0X
         return _hatDirection(
+          gamepadId,
           key,
           value,
           GamepadInputType.dpadLeft,
@@ -494,6 +503,7 @@ class GamepadEventTranslator {
         );
       case 17: // ABS_HAT0Y
         return _hatDirection(
+          gamepadId,
           key,
           value,
           GamepadInputType.dpadUp,
@@ -510,23 +520,24 @@ class GamepadEventTranslator {
   /// A hat axis's direction. Centred, it is the one being let go, so that
   /// direction's release is reported.
   GamepadInputType _hatDirection(
+    String gamepadId,
     String key,
     double value,
     GamepadInputType negative,
     GamepadInputType positive,
   ) {
-    final entry = _directionKey(key, KeyType.analog);
+    final entry = _directionKey(gamepadId, key, KeyType.analog);
     if (value < -0.5) return _lastDirectionByKey[entry] = negative;
     if (value > 0.5) return _lastDirectionByKey[entry] = positive;
     return _lastDirectionByKey[entry] ?? GamepadInputType.unknown;
   }
 
-  /// [key]'s entry in [_lastDirectionByKey]. Linux numbers buttons and axes
-  /// separately, so on an Xbox pad button 6 (Select) and axis 6 (the D-pad's
-  /// X axis) share a key: releasing Select mid-hold would forget the D-pad's
-  /// direction, and its release would never be reported.
-  String _directionKey(String key, KeyType eventType) =>
-      _isLinux && eventType == KeyType.analog ? 'axis:$key' : key;
+  /// [key]'s entry in [_lastDirectionByKey] for [gamepadId]. Linux numbers
+  /// buttons and axes separately, so on an Xbox pad button 6 (Select) and
+  /// axis 6 (the D-pad's X axis) share a key: releasing Select mid-hold would
+  /// forget the D-pad's direction, and its release would never be reported.
+  String _directionKey(String gamepadId, String key, KeyType eventType) =>
+      '$gamepadId|${_isLinux && eventType == KeyType.analog ? 'axis:$key' : key}';
 
   /// Determines if a key identifier corresponds to a D-pad (directional) input.
   bool _isDpadEvent(String key) {
@@ -571,7 +582,11 @@ class GamepadEventTranslator {
     String key,
     double value,
     GamepadMapping mapping,
+    String gamepadId,
   ) {
+    // Not a Linux key, so the event type doesn't change the entry: the
+    // clear-on-release, which passes the event's own type, finds it.
+    final entry = _directionKey(gamepadId, key, KeyType.button);
     if (_isWindows && key == 'pov') {
       // Windows uses angular values for POV in hundredths of a degree (0-36000).
       // Supports both cardinal and diagonal directions.
@@ -579,57 +594,57 @@ class GamepadEventTranslator {
           value == 36000.0 ||
           (value > 31500.0 && value < 36000.0) ||
           (value > 0.0 && value < 4500.0)) {
-        return _lastDirectionByKey[key] = GamepadInputType.dpadUp;
+        return _lastDirectionByKey[entry] = GamepadInputType.dpadUp;
       }
       if (value == 9000.0 || (value > 4500.0 && value < 13500.0)) {
-        return _lastDirectionByKey[key] = GamepadInputType.dpadRight;
+        return _lastDirectionByKey[entry] = GamepadInputType.dpadRight;
       }
       if (value == 18000.0 || (value > 13500.0 && value < 22500.0)) {
-        return _lastDirectionByKey[key] = GamepadInputType.dpadDown;
+        return _lastDirectionByKey[entry] = GamepadInputType.dpadDown;
       }
       if (value == 27000.0 || (value > 22500.0 && value < 31500.0)) {
-        return _lastDirectionByKey[key] = GamepadInputType.dpadLeft;
+        return _lastDirectionByKey[entry] = GamepadInputType.dpadLeft;
       }
 
       // -1.0 or 65535.0 typically indicate neutral (centered) position.
       if (value == -1.0 || value == 65535.0 || value < 0) {
-        return _lastDirectionByKey[key] ?? GamepadInputType.unknown;
+        return _lastDirectionByKey[entry] ?? GamepadInputType.unknown;
       }
 
-      return _lastDirectionByKey[key] ?? GamepadInputType.unknown;
+      return _lastDirectionByKey[entry] ?? GamepadInputType.unknown;
     }
 
     if (_isAndroid) {
       // Direct D-pad keycodes (used by controllers not reporting via AXIS_HAT).
       switch (key) {
         case 'keycode_dpad_up':
-          return _lastDirectionByKey[key] = GamepadInputType.dpadUp;
+          return _lastDirectionByKey[entry] = GamepadInputType.dpadUp;
         case 'keycode_dpad_down':
-          return _lastDirectionByKey[key] = GamepadInputType.dpadDown;
+          return _lastDirectionByKey[entry] = GamepadInputType.dpadDown;
         case 'keycode_dpad_left':
-          return _lastDirectionByKey[key] = GamepadInputType.dpadLeft;
+          return _lastDirectionByKey[entry] = GamepadInputType.dpadLeft;
         case 'keycode_dpad_right':
-          return _lastDirectionByKey[key] = GamepadInputType.dpadRight;
+          return _lastDirectionByKey[entry] = GamepadInputType.dpadRight;
       }
 
       // Standard Android axis-based D-pad.
       if (key == 'axis_hat_x') {
         if (value == -1.0) {
-          return _lastDirectionByKey[key] = GamepadInputType.dpadLeft;
+          return _lastDirectionByKey[entry] = GamepadInputType.dpadLeft;
         }
         if (value == 1.0) {
-          return _lastDirectionByKey[key] = GamepadInputType.dpadRight;
+          return _lastDirectionByKey[entry] = GamepadInputType.dpadRight;
         }
-        return _lastDirectionByKey[key] ?? GamepadInputType.unknown;
+        return _lastDirectionByKey[entry] ?? GamepadInputType.unknown;
       }
       if (key == 'axis_hat_y') {
         if (value == 1.0) {
-          return _lastDirectionByKey[key] = GamepadInputType.dpadUp;
+          return _lastDirectionByKey[entry] = GamepadInputType.dpadUp;
         }
         if (value == -1.0) {
-          return _lastDirectionByKey[key] = GamepadInputType.dpadDown;
+          return _lastDirectionByKey[entry] = GamepadInputType.dpadDown;
         }
-        return _lastDirectionByKey[key] ?? GamepadInputType.unknown;
+        return _lastDirectionByKey[entry] ?? GamepadInputType.unknown;
       }
     }
 
