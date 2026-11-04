@@ -59,7 +59,7 @@ class GameService {
   static final ValueNotifier<bool> deviceScreenOn = ValueNotifier<bool>(true);
 
   /// Initializes the platform-specific listener for Android game lifecycle events.
-  static void initializeAndroidGameListener() {
+  static Future<void> initializeAndroidGameListener() async {
     if (!Platform.isAndroid) return;
 
     const platform = MethodChannel('com.neogamelab.neostation/game');
@@ -95,6 +95,9 @@ class GameService {
         }
       }
     });
+    // Screen broadcasts are not sticky: startup may have missed screen-off.
+    // Seed through the same ordered event handler before audio can initialize.
+    await platform.invokeMethod<void>('syncDeviceScreenState');
   }
 
   /// Recovers playtime from a previously interrupted game session.

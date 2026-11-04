@@ -21,7 +21,13 @@ import '../models/game_model.dart';
 class MusicPlayerService extends ChangeNotifier {
   static final MusicPlayerService _instance = MusicPlayerService._internal();
   factory MusicPlayerService() => _instance;
-  MusicPlayerService._internal();
+  MusicPlayerService._internal()
+    : _deinitEngine = (() => SoLoud.instance.deinit());
+  @visibleForTesting
+  MusicPlayerService.forTesting({required VoidCallback deinitEngine})
+    : _deinitEngine = deinitEngine;
+
+  final VoidCallback _deinitEngine;
 
   final Logger _logger = Logger();
   SoLoud? _soloud;
@@ -185,18 +191,22 @@ class MusicPlayerService extends ChangeNotifier {
     // Release the shared audio engine while backgrounded. An initialized
     // SoLoud engine keeps its output device (and mixing callback) running
     // continuously, which prevents the SoC from deep-sleeping and drains the
-    // battery while the device is locked. Key off the engine's real state:
-    // SFX may hold it open even when this service was never initialized.
-    if (!SoLoud.instance.isInitialized) return;
+    // battery while the device is locked. Dart's isInitialized can be false
+    // after a failed init while the native output is still open, so always
+    // deinit, including an engine opened by SFX alone.
     _teardownEngine();
   }
 
   /// Tears down the shared SoLoud engine and records what to restore later.
   void _teardownEngine() {
-    _wasPlayingBeforePause = _isPlaying || _wasPlayingBeforeGame;
-    _resumeIndexAfterPause = _activeIndex;
+    // Hidden, paused and screen-off can all arrive for the same transition.
+    // Keep the first snapshot after playback/handles have been cleared.
+    if (!_engineTornDownByPause) {
+      _wasPlayingBeforePause = _isPlaying || _wasPlayingBeforeGame;
+      _resumeIndexAfterPause = _activeIndex;
+    }
     try {
-      SoLoud.instance.deinit();
+      _deinitEngine();
     } catch (e) {
       _logger.w("Error releasing SoLoud engine on pause: $e");
     }

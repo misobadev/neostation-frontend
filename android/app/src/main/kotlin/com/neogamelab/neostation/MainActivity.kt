@@ -275,6 +275,11 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         methodChannel?.setMethodCallHandler {
             call, result ->
             when (call.method) {
+                "syncDeviceScreenState" -> {
+                    val power = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+                    notifyFlutterScreenState(power.isInteractive)
+                    result.success(null)
+                }
                 "launchGenericIntent" -> {
                     val packageName = call.argument<String>("package")
                     val activityName = call.argument<String>("activity")

@@ -366,7 +366,7 @@ void main() async {
   // Inicializar listener de Android para tracking de tiempo de juego
   if (Platform.isAndroid) {
     try {
-      GameService.initializeAndroidGameListener();
+      await GameService.initializeAndroidGameListener();
       // Verificar si hay una sesion de juego pendiente (app fue matada)
       await GameService.checkPendingGameSession();
     } catch (e) {
@@ -487,9 +487,9 @@ void main() async {
   sfx.setVolume(sqliteConfigProvider.config.sfxVolume);
   sfx.setEnabled(sqliteConfigProvider.config.sfxEnabled);
   unawaited(
-    sfx
-        .setCustomSounds(sqliteConfigProvider.config.customSfx)
-        .then((_) => sfx.init()),
+    sfx.setCustomSounds(sqliteConfigProvider.config.customSfx).then((_) async {
+      if (sfx.isEnabled) await sfx.init();
+    }),
   );
 }
 
