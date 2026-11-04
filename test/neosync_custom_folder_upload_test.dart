@@ -19,9 +19,11 @@ import 'database_test_helper.dart';
 // it find no saves at all.
 
 /// Answers every upload with [answer], optionally after [gate] completes.
+/// [reached] completes when the first upload arrives.
 class _FakeNeoSync extends NeoSyncService {
   Map<String, dynamic> Function(File file) answer = (_) => {'success': true};
   Completer<void>? gate;
+  final reached = Completer<void>();
   final uploaded = <String>[];
 
   @override
@@ -36,6 +38,7 @@ class _FakeNeoSync extends NeoSyncService {
     String? scope,
     String? type,
   }) async {
+    if (!reached.isCompleted) reached.complete();
     if (gate != null) await gate!.future;
     final result = answer(file);
     if (result['success'] == true) uploaded.add(customFilename ?? file.path);
@@ -168,10 +171,36 @@ void main() {
     write('b.sav');
     service.gate = Completer<void>();
     final first = upload();
-    await pumpEventQueue();
+    // If the test fails, release the held upload and give it up to 5 seconds
+    // to finish before tear-down removes its folder and database.
+    addTearDown(() async {
+      if (!service.gate!.isCompleted) service.gate!.complete();
+      await first.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => CustomFolderUploadOutcome.failed,
+      );
+    });
+    // Wait until it is uploading: listing the folder is real file I/O, which
+    // a fixed number of event-loop turns doesn't always cover on a busy
+    // machine.
+    await Future.any([
+      service.reached.future,
+      first.then((outcome) {
+        if (!service.reached.isCompleted) {
+          fail('the first upload ended before reaching the server: $outcome');
+        }
+      }),
+    ]).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => fail('the first upload never reached the server'),
+    );
     expect(provider.isSyncing, isTrue);
+    expect(provider.totalFiles, 2);
 
-    expect(await upload(), CustomFolderUploadOutcome.busy);
+    expect(
+      await upload().timeout(const Duration(seconds: 5)),
+      CustomFolderUploadOutcome.busy,
+    );
     expect(provider.totalFiles, 2, reason: 'the running sync was reset');
 
     service.gate!.complete();
