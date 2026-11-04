@@ -717,6 +717,15 @@ extension NeoSyncCore on NeoSyncProvider {
     if (!system.neosync.sync) {
       return {'success': false, 'message': 'sync disabled'};
     }
+    // A newer cloud copy the upload finds is only written while no launch of
+    // this game (or, where its system's games share memory cards, of that
+    // system) has gone ahead without it. Asked when the copy is in, so a
+    // launch that started during the upload counts.
+    final sharedCardsSystem = _sharesMemoryCards(system.folderName)
+        ? system.folderName
+        : null;
+    SyncDeadline? deadline() =>
+        _launchDeadlineFor(game.romname, sharedCardsSystem);
 
     // 1. Standalone custom folder takes priority over everything else.
     final customInfo = await customFolderSyncInfo(system, file);
@@ -734,6 +743,7 @@ extension NeoSyncCore on NeoSyncProvider {
         gameHash: await _resolveGameHashForUpload(game),
         isState: false,
         type: 'custom',
+        deadline: deadline,
       );
     }
 
@@ -784,6 +794,7 @@ extension NeoSyncCore on NeoSyncProvider {
       isState: isState,
       scope: parsed?.scope,
       type: _syncTypeForFile(file, isState: isState),
+      deadline: deadline,
     );
   }
 
