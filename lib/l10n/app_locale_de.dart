@@ -458,6 +458,8 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.rommLinkLibraryUnavailable: 'Derzeit nicht verfügbar',
   AppLocale.rommLinkLibraryStoppedEarly:
       'Vorzeitig beendet — bisher verknüpfte Spiele: {count}',
+  AppLocale.rommLinkLibraryPartial:
+      'Verknüpfte Spiele: {count}. Nicht lesbare Systeme: {failed}',
   AppLocale.rematchAchievementsSubtitle:
       'Durchsucht die gesamte Bibliothek nach Achievement-Sets, statt Spiel für Spiel',
   AppLocale.rematchAchievementsWarning:

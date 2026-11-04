@@ -132,6 +132,7 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
       stoppedEarlyTemplate: AppLocale.rommLinkLibraryStoppedEarly.getString(
         context,
       ),
+      partialTemplate: AppLocale.rommLinkLibraryPartial.getString(context),
       failureTexts: {
         for (final key in rommBrowseFailureKeys) key: key.getString(context),
       },

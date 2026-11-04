@@ -387,6 +387,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.rommLinkLibraryFailed: '연결하지 못했습니다',
   AppLocale.rommLinkLibraryUnavailable: '지금은 사용할 수 없습니다',
   AppLocale.rommLinkLibraryStoppedEarly: '일찍 중단됨 — 지금까지 {count}개의 게임을 연결했습니다',
+  AppLocale.rommLinkLibraryPartial: '게임 {count}개를 연결했습니다. 읽지 못한 시스템: {failed}',
   AppLocale.rematchAchievementsSubtitle: '게임을 하나씩 열지 않고 라이브러리 전체에서 업적 세트를 찾습니다',
   AppLocale.rematchAchievementsWarning:
       '일치하지 않는 모든 ROM을 읽어 식별합니다. 라이브러리가 크면 시간이 걸릴 수 있습니다. 다시 선택하면 일시정지됩니다. 지금까지 일치한 항목은 모두 유지되며, 다시 실행하면 중단된 지점부터 이어집니다. 디스크 이미지도 읽지만 각각 일부 섹터만 읽습니다. 파일을 옮기거나 삭제하지 않습니다.',

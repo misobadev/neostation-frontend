@@ -447,6 +447,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.rommLinkLibraryUnavailable: 'Сейчас недоступно',
   AppLocale.rommLinkLibraryStoppedEarly:
       'Остановлено досрочно — связано игр: {count}',
+  AppLocale.rommLinkLibraryPartial:
+      'Связано игр: {count}. Не удалось прочитать систем: {failed}',
   AppLocale.rematchAchievementsSubtitle:
       'Проверяет всю библиотеку на наличие наборов достижений, а не по одной игре',
   AppLocale.rematchAchievementsWarning:

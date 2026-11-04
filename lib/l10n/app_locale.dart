@@ -406,6 +406,7 @@ mixin AppLocale {
 
   static const String rommLinkLibraryStoppedEarly =
       'romm_link_library_stopped_early';
+  static const String rommLinkLibraryPartial = 'romm_link_library_partial';
   static const String rematchAchievementsSubtitle =
       'rematch_achievements_subtitle';
   static const String rematchAchievementsWarning =

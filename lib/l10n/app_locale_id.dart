@@ -441,6 +441,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.rommLinkLibraryUnavailable: 'Tidak tersedia saat ini',
   AppLocale.rommLinkLibraryStoppedEarly:
       'Berhenti lebih awal — {count} gim tertaut sejauh ini',
+  AppLocale.rommLinkLibraryPartial:
+      '{count} gim tertaut. Sistem yang tidak dapat dibaca: {failed}',
   AppLocale.rematchAchievementsSubtitle:
       'Memeriksa seluruh pustaka untuk set prestasi, bukan satu game per satu',
   AppLocale.rematchAchievementsWarning:

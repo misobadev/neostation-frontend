@@ -1949,36 +1949,39 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     shouldStop: () => _disposed || !_browse.isConnected,
   );
 
-  /// The browse provider's platform list, loaded if it hasn't been yet.
+  /// The server's platform list, reloaded for this pass.
   ///
   /// Going through [RommProvider.loadPlatforms] rather than the service means
-  /// the list is shared with the browse screen (a no-op when it already
-  /// loaded it) and, more to the point, that its support classification has
-  /// run — which warms the per-platform system cache
-  /// [RommProvider.systemForPlatform] reads and lets it try each platform's
-  /// `fs_slug`. The provider swallows a failed load into
-  /// [RommProvider.platformsFailure], which is surfaced here as an error so the
-  /// pass reports it rather than reading "no platforms". Only that load's own
-  /// failure counts: [RommProvider.lastError] is shared with the other loads
-  /// and the connection, and one of those failing while the platforms were on
-  /// their way would fail the pass for a server that simply has none.
+  /// its support classification runs, which warms the per-platform system
+  /// cache [RommProvider.systemForPlatform] reads and lets it try each
+  /// platform's `fs_slug`, and the browse screen gets the fresh list too.
   ///
-  /// A load already in flight (the browse screen opened just before the pass
-  /// fired) is awaited, not raced: `loadPlatforms` returns at once while one
-  /// is running, and the pass would otherwise read an empty list and report
-  /// "0 platforms processed, complete" with nothing to say why. Should the
-  /// list still be empty and loading after that (a forced reload started
-  /// underneath us), the pass fails with that as its named reason.
+  /// The load is forced. The list the RomM tab (or the match picker, the
+  /// search filter, an earlier pass) cached for the session would let a pass
+  /// start against a server that has since gone away: every platform then
+  /// failed on its own, and the pass ended as "nothing new to link". A forced
+  /// load asks the server, and its failure — swallowed by the provider into
+  /// [RommProvider.platformsFailure] — fails the pass with its reason, cached
+  /// list or not. Only that load's own failure counts: [RommProvider.lastError]
+  /// is shared with the other loads and the connection. A failed reload keeps
+  /// the browse screen's list as it was.
+  ///
+  /// A load already in flight is awaited, not raced: `loadPlatforms` returns
+  /// at once while one is running, so the forced load would do nothing. That
+  /// holds both before the forced call and after it (the browse screen can
+  /// start a load in between). Should the list still be empty and loading
+  /// after that, the pass fails with that as its named reason.
   @visibleForTesting
   Future<List<RommPlatform>> listPlatformsForLinkPass() async {
     if (_browse.isLoadingPlatforms) {
       _log.i('RomM link pass waiting: the platform list is still loading');
       await _browse.platformsLoaded;
     }
-    await _browse.loadPlatforms();
+    await _browse.loadPlatforms(force: true);
+    if (_browse.isLoadingPlatforms) await _browse.platformsLoaded;
     final platforms = _browse.platforms;
     final failure = _browse.platformsFailure;
-    if (platforms.isEmpty && failure != null) {
+    if (failure != null) {
       // The failure itself, so the Tools run can say why in the app language.
       throw failure;
     }

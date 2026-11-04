@@ -386,6 +386,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.rommLinkLibraryUnavailable: '現在利用できません',
   AppLocale.rommLinkLibraryStoppedEarly:
       '途中で停止しました — これまでに{count}件のゲームをリンクしました',
+  AppLocale.rommLinkLibraryPartial:
+      '{count}件のゲームをリンクしました。読み込めなかったシステム: {failed}',
   AppLocale.rematchAchievementsSubtitle: 'ゲームを1本ずつ開かずに、ライブラリ全体から実績セットを探します',
   AppLocale.rematchAchievementsWarning:
       '一致していない ROM をすべて読み込んで識別します。大きなライブラリでは時間がかかることがあります。もう一度選択すると一時停止します。それまでに一致したものはすべて保持され、再実行すると中断した所から続きます。ディスクイメージも読み込みますが、各イメージの一部のセクターのみです。ファイルの移動や削除は行いません。',
