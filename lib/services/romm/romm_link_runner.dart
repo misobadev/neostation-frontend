@@ -40,6 +40,10 @@ class RommLinkStrings {
   /// because RomM went away mid-pass. `{count}` substituted.
   final String stoppedEarlyTemplate;
 
+  /// Terminal row when some systems couldn't be read (or their links saved).
+  /// `{count}` (games linked) and `{failed}` (systems) substituted.
+  final String partialTemplate;
+
   const RommLinkStrings({
     required this.title,
     required this.preparing,
@@ -49,6 +53,7 @@ class RommLinkStrings {
     required this.failed,
     required this.unavailable,
     required this.stoppedEarlyTemplate,
+    required this.partialTemplate,
     required this.failureTexts,
   });
 
@@ -62,9 +67,14 @@ class RommLinkStrings {
   String stoppedEarly(int count) =>
       stoppedEarlyTemplate.replaceFirst('{count}', '$count');
 
+  String partial(int count, int failed) => partialTemplate
+      .replaceFirst('{count}', '$count')
+      .replaceFirst('{failed}', '$failed');
+
   /// Terminal row for a pass that failed with [error]: when RomM said why (the
-  /// platform list couldn't be loaded), the sentence the browse screen shows
-  /// for it, e.g. that the server can't be reached; otherwise [failed].
+  /// platform list couldn't be loaded, or every platform's games failed), the
+  /// sentence the browse screen shows for it, e.g. that the server can't be
+  /// reached; otherwise [failed].
   String failedBecause(Object error) {
     final cause = error is RommLinkPassException ? error.cause : error;
     if (cause is! RommException) return failed;
@@ -88,7 +98,8 @@ class RommLinkStrings {
 ///
 /// Shaped after `RaLibraryMatchRunner`, which is the same thing for
 /// RetroAchievements: a library-wide matcher behind a warning dialog, with a
-/// progress row and done / nothing-to-do / failed states.
+/// progress row and done / nothing-to-do / failed states, plus a partial
+/// state for a pass some systems of which couldn't be read.
 class RommLinkRunner {
   static final _log = LoggerService.instance;
 
@@ -180,6 +191,39 @@ class RommLinkRunner {
       if (summary.stoppedEarly) {
         finish(
           strings.stoppedEarly(summary.rowsAdded),
+          GlobalNotificationType.info,
+        );
+        return summary.rowsAdded;
+      }
+
+      // Every platform the pass tried failed: RomM was never read, so neither
+      // "done" nor "nothing new" is true. Say why, as a failed platform list
+      // does.
+      final firstFailure = summary.firstFailure;
+      if (summary.platformFailures > 0 &&
+          summary.platformsProcessed == 0 &&
+          firstFailure != null) {
+        finish(
+          strings.failedBecause(firstFailure),
+          GlobalNotificationType.error,
+        );
+        return null;
+      }
+
+      // Nothing was saved, and only because saving failed: the reason is on
+      // this device, not RomM, so the plain failure text.
+      if (summary.rowsAdded == 0 &&
+          summary.rowsFailed > 0 &&
+          summary.platformFailures == 0) {
+        finish(strings.failed, GlobalNotificationType.error);
+        return null;
+      }
+
+      // Some systems couldn't be read or saved: what was linked, and how many
+      // systems were left. `info` for the same reason as a stopped pass.
+      if (summary.systemsFailed > 0) {
+        finish(
+          strings.partial(summary.rowsAdded, summary.systemsFailed),
           GlobalNotificationType.info,
         );
         return summary.rowsAdded;

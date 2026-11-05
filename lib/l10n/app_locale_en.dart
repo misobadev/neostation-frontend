@@ -441,6 +441,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.rommLinkLibraryUnavailable: 'Not available right now',
   AppLocale.rommLinkLibraryStoppedEarly:
       'Stopped early — games linked so far: {count}',
+  AppLocale.rommLinkLibraryPartial:
+      "Games linked: {count}. Systems that couldn't be read: {failed}",
   AppLocale.rematchAchievementsSubtitle:
       'Check your whole library for achievement sets, instead of one game at a time',
   AppLocale.rematchAchievementsWarning:
