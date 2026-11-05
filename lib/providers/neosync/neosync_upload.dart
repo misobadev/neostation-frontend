@@ -313,7 +313,6 @@ extension NeoSyncUpload on NeoSyncProvider {
         final errorMessage = result['message'] ?? '';
         _processedItems.add('Failed to upload: $relativePath - $errorMessage');
         if (_checkQuotaExceeded(errorMessage)) {
-          _quotaExceededActive = true;
           throw QuotaExceededException(errorMessage, _quotaExceededAttempts);
         }
       }
@@ -356,8 +355,10 @@ extension NeoSyncUpload on NeoSyncProvider {
       return CustomFolderUploadOutcome.noFolder;
     }
 
+    // Neither clears nor sets the provider-wide error: that error turns every
+    // game's NeoSync mark red, and this upload's outcome is reported to its
+    // caller instead (the folders view, or the bell for the automatic one).
     _setSyncing(true);
-    _error = null;
     _syncProgress = 0.0;
     _syncStatus = 'Uploading standalone save folder...';
     _totalFiles = 0;
@@ -404,16 +405,16 @@ extension NeoSyncUpload on NeoSyncProvider {
           ? CustomFolderUploadOutcome.failed
           : CustomFolderUploadOutcome.uploaded;
     } on QuotaExceededException catch (e) {
-      _error = 'Error uploading standalone save folder: $e';
-      _syncStatus = 'Error: $_error';
+      final message = 'Error uploading standalone save folder: $e';
+      _syncStatus = 'Error: $message';
       _processedItems.add(_syncStatus);
-      NeoSyncProvider._log.e(_error!);
+      NeoSyncProvider._log.e(message);
       return CustomFolderUploadOutcome.quotaExceeded;
     } catch (e) {
-      _error = 'Error uploading standalone save folder: $e';
-      _syncStatus = 'Error: $_error';
+      final message = 'Error uploading standalone save folder: $e';
+      _syncStatus = 'Error: $message';
       _processedItems.add(_syncStatus);
-      NeoSyncProvider._log.e(_error!);
+      NeoSyncProvider._log.e(message);
       return CustomFolderUploadOutcome.failed;
     } finally {
       _setSyncing(false);

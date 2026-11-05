@@ -14,11 +14,13 @@ import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/widgets/shimmering_logo.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:math';
 import '../../services/game_service.dart';
+import '../../utils/auto_folder_upload_notice.dart';
 import '../../utils/game_launch_utils.dart';
 import '../../services/music_player_service.dart';
 import '../../repositories/system_repository.dart';
@@ -516,7 +518,20 @@ class _SystemGamesListState extends State<SystemGamesList> {
       if (!provider.isNeoSyncAuthenticated) return;
 
       for (final entry in folders.entries) {
-        await provider.syncCustomSaveFolder(folderName, entry.key);
+        final outcome = await provider.syncCustomSaveFolder(
+          folderName,
+          entry.key,
+        );
+        // Runs in the background: the bell is where a failure shows.
+        reportAutoFolderUpload(
+          system: folderName,
+          emulatorSlug: entry.key,
+          // Two emulators' folders on one system need telling apart.
+          systemName: folders.length > 1
+              ? '${widget.system.realName} · ${path.basename(entry.value)}'
+              : widget.system.realName,
+          outcome: outcome,
+        );
       }
     } catch (e) {
       // Non-fatal: a failed auto-sync must never block the games list.
