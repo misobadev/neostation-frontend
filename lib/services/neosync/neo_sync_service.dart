@@ -5,6 +5,7 @@ import 'dart:math' show min;
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:neostation/models/neo_sync_models.dart';
+import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:crypto/crypto.dart';
@@ -217,6 +218,14 @@ class NeoSyncService extends ChangeNotifier {
   /// [systemId] and [emulatorId] are the NeoSync v2 structured metadata: they
   /// let the backend index files without parsing the cloud path. [isState] and
   /// [scope] (shared/game) describe the file kind.
+  ///
+  /// When the check finds a newer copy in the cloud, that copy is downloaded
+  /// over [file] instead (the old one kept as `<file>.neosync.bak`). A failed
+  /// download is a failure, not "in sync". [deadline] returns the deadline of
+  /// a launch the file belongs to, if one is running; it is asked once the
+  /// copy is in, and when it has passed nothing is written and the result is
+  /// a failure marked `abandoned`, so the game's emulator never has its open
+  /// save replaced.
   Future<Map<String, dynamic>> syncFile(
     File file,
     String gameName, {
@@ -227,6 +236,7 @@ class NeoSyncService extends ChangeNotifier {
     bool? isState,
     String? scope,
     String? type,
+    SyncDeadline? Function()? deadline,
   }) async {
     _isLoading = true;
     _lastError = null;
@@ -287,52 +297,72 @@ class NeoSyncService extends ChangeNotifier {
         // The cloud copy is newer: pull it over the stale local file instead of
         // reporting a false success. The exact local path is known, so no game
         // context is needed and it behaves the same on every OS.
+        //
+        // A download that fails leaves the older local file in place, which is
+        // not "in sync": it is reported as a failure, so the game or folder
+        // shows the sync didn't complete and the next pass asks again.
         final metadata = checkResult['metadata'];
         final cloudId = metadata is Map ? metadata['id']?.toString() : null;
-        if (cloudId != null && cloudId.isNotEmpty) {
-          final download = await downloadFile(cloudId);
-          if (download['success'] == true && download['data'] != null) {
-            final bytes = download['data'] as List<int>;
-            try {
-              if (await file.exists()) {
-                await file.copy('${file.path}.neosync.bak');
-              }
-            } catch (e) {
-              _log.w('Could not back up ${file.path}: $e');
-            }
-            await file.parent.create(recursive: true);
-            await file.writeAsBytes(bytes, flush: true);
-
-            int cloudTime = localModifiedAt.millisecondsSinceEpoch;
-            if (metadata is Map &&
-                metadata['file_modified_at_timestamp'] != null) {
-              final ts = metadata['file_modified_at_timestamp'];
-              if (ts is int) cloudTime = ts;
-              if (ts is String) cloudTime = int.tryParse(ts) ?? cloudTime;
-            }
-            final stat = await file.stat();
-            await SyncRepository.saveSyncState(
-              'neosync',
-              file.path,
-              stat.modified.millisecondsSinceEpoch,
-              cloudTime,
-              stat.size,
-              fileHash: metadata is Map
-                  ? metadata['file_hash']?.toString()
-                  : null,
-            );
-            return {
-              'success': true,
-              'skipped': true,
-              'downloaded': true,
-              'message': 'Remote file is newer, downloaded',
-            };
-          }
+        if (cloudId == null || cloudId.isEmpty) {
+          const error = 'NeoSync reported a newer cloud copy without its id';
+          _lastError = error;
+          return {'success': false, 'message': error};
         }
+        final download = await downloadFile(cloudId);
+        if (download['success'] != true || download['data'] == null) {
+          const error =
+              'Network error: the newer cloud copy could not be downloaded';
+          _lastError = error;
+          return {'success': false, 'message': error};
+        }
+        // Pre-launch deadline guard, as for the provider's own downloads: if
+        // the launch has stopped waiting while the file came in, the game is
+        // running on the local save. Abandon before any write, so the file
+        // the emulator has open is never replaced and nothing is recorded.
+        // Asked now, not when the sync began, so a launch that started during
+        // the download counts.
+        if (deadline?.call()?.isExpired ?? false) {
+          _log.i(
+            'Abandoning the newer cloud copy of ${file.path} '
+            '(launch deadline passed)',
+          );
+          return {
+            'success': false,
+            'abandoned': true,
+            'message': 'Launch deadline passed',
+          };
+        }
+        final bytes = download['data'] as List<int>;
+        try {
+          if (await file.exists()) {
+            await file.copy('${file.path}.neosync.bak');
+          }
+        } catch (e) {
+          _log.w('Could not back up ${file.path}: $e');
+        }
+        await file.parent.create(recursive: true);
+        await file.writeAsBytes(bytes, flush: true);
+
+        int cloudTime = localModifiedAt.millisecondsSinceEpoch;
+        if (metadata is Map && metadata['file_modified_at_timestamp'] != null) {
+          final ts = metadata['file_modified_at_timestamp'];
+          if (ts is int) cloudTime = ts;
+          if (ts is String) cloudTime = int.tryParse(ts) ?? cloudTime;
+        }
+        final stat = await file.stat();
+        await SyncRepository.saveSyncState(
+          'neosync',
+          file.path,
+          stat.modified.millisecondsSinceEpoch,
+          cloudTime,
+          stat.size,
+          fileHash: metadata is Map ? metadata['file_hash']?.toString() : null,
+        );
         return {
           'success': true,
           'skipped': true,
-          'message': 'Remote file is newer',
+          'downloaded': true,
+          'message': 'Remote file is newer, downloaded',
         };
       }
 

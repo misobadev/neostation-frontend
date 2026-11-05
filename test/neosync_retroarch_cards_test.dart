@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
+import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/repositories/neosync_save_folder_repository.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
@@ -27,6 +28,9 @@ class _FakeNeoSync extends NeoSyncService {
   List<NeoSyncFile> cloud = [];
   List<int> cloudBytes = const [];
   final uploads = <String>[];
+
+  /// What each upload's launch deadline answered when the upload was sent.
+  final deadlinesSeen = <SyncDeadline?>[];
   final downloads = <String>[];
 
   @override
@@ -50,8 +54,10 @@ class _FakeNeoSync extends NeoSyncService {
     bool? isState,
     String? scope,
     String? type,
+    SyncDeadline? Function()? deadline,
   }) async {
     uploads.add(file.path);
+    deadlinesSeen.add(deadline?.call());
     return {'success': true};
   }
 }
@@ -185,6 +191,26 @@ void main() {
           expect(Directory(p.join(saves, cloudFolder)).existsSync(), isFalse);
         });
       }
+
+      test(
+        'sent during a launch, is handed that launch\'s deadline, so a newer '
+        'cloud copy its upload finds is not written late',
+        () async {
+          card('$cloudFolder/$cardName', newer, DateTime(2026, 9, 1));
+          service.cloud = [cloudCard(cloudPath, inCloud)];
+          final deadline = SyncDeadline(const Duration(minutes: 1));
+
+          await provider.syncGameSavesBeforeLaunch(
+            _game('GameA.iso', system),
+            deadline: deadline,
+          );
+
+          expect(service.deadlinesSeen, isNotEmpty);
+          for (final seen in service.deadlinesSeen) {
+            expect(seen, same(deadline));
+          }
+        },
+      );
 
       test('in the folder its cloud path names, as the only copy, is still '
           'synced', () async {

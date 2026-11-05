@@ -263,11 +263,13 @@ extension NeoSyncUpload on NeoSyncProvider {
       // The save base name usually matches the ROM name, so find the game by
       // prefix and use its hash.
       String? gameHash;
+      String? romName;
       try {
         final fileName = path.basenameWithoutExtension(file.path);
         final row = await GameRepository.findRomForSaveName(fileName);
         if (row != null) {
           final game = _gameModelFromRomRow(row, fileName);
+          romName = game.romname;
           gameHash = await _resolveGameHashForUpload(game);
         }
       } catch (e) {
@@ -286,6 +288,16 @@ extension NeoSyncUpload on NeoSyncProvider {
         isState: isState,
         scope: null,
         type: syncType,
+        // As for a game's own upload: a newer cloud copy is only written while
+        // no launch of the save's game, or on a system whose games share
+        // memory cards (a PS2 or Dreamcast card), of that system, has gone ahead.
+        deadline: () {
+          final system = syncSystemId;
+          return (romName == null ? null : _launchDeadlines[romName]) ??
+              (_sharesMemoryCards(system)
+                  ? _launchDeadlines[NeoSyncProvider._systemLaunchKey(system!)]
+                  : null);
+        },
       );
 
       if (result['success']) {

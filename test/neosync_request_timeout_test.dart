@@ -428,6 +428,7 @@ void main() {
           downloadStall: short,
         ).syncFile(file, 'Game').timeout(const Duration(seconds: 5));
 
+        expect(result['success'], isFalse);
         expect(result['downloaded'], isNot(isTrue));
         expect(elapsed.elapsed, lessThan(long));
         expect(sent?.url.toString(), signedUrl);
