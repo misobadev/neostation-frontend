@@ -6,10 +6,50 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/steam_scraper_service.dart';
+import 'package:neostation/utils/chunked_file_writer.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'database_test_helper.dart';
+
+/// A file handle that writes [bytesBeforeFull] bytes to its real file and then
+/// fails like a disk that has filled up.
+class _FillsUpAfter implements RandomAccessFile {
+  _FillsUpAfter(this._real, this.bytesBeforeFull);
+
+  final RandomAccessFile _real;
+  final int bytesBeforeFull;
+
+  @override
+  Future<RandomAccessFile> writeFrom(
+    List<int> buffer, [
+    int start = 0,
+    int? end,
+  ]) async {
+    final part = buffer.sublist(start, end);
+    await _real.writeFrom(part.take(bytesBeforeFull).toList());
+    if (part.length > bytesBeforeFull) {
+      throw const FileSystemException(
+        'writeFrom failed',
+        '',
+        OSError('No space left on device', 28),
+      );
+    }
+    return this;
+  }
+
+  @override
+  Future<RandomAccessFile> flush() async {
+    await _real.flush();
+    return this;
+  }
+
+  @override
+  Future<void> close() => _real.close();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 /// The Steam Store scraper runs by itself at launch and after Steam scans. It
 /// must fill in what is missing without undoing metadata another source wrote:
@@ -130,6 +170,34 @@ void main() {
     expect(row['is_fully_scraped'], 1);
     for (final entry in mediaTypes.entries) {
       expect(media(entry.key, entry.value).existsSync(), isTrue);
+    }
+  });
+
+  test('an image whose write fails part-way, as on a full disk, leaves no file '
+      'and is fetched again by the next run', () async {
+    await addGame();
+    openFileForChunks = (file) async =>
+        _FillsUpAfter(await defaultOpenFileForChunks(file), 2);
+    addTearDown(() => openFileForChunks = defaultOpenFileForChunks);
+
+    await SteamScraperService.scrapeSteamGames();
+
+    for (final entry in mediaTypes.entries) {
+      final folder = Directory(p.join(mediaDir, 'steam', entry.key));
+      final left = folder.existsSync() ? folder.listSync() : const [];
+      expect(left, isEmpty, reason: '${entry.key} kept a partial file');
+    }
+
+    openFileForChunks = defaultOpenFileForChunks;
+    requests.clear();
+    await SteamScraperService.scrapeSteamGames();
+
+    for (final entry in mediaTypes.entries) {
+      expect(media(entry.key, entry.value).readAsBytesSync(), [
+        1,
+        2,
+        3,
+      ], reason: entry.key);
     }
   });
 
