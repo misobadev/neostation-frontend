@@ -14,6 +14,17 @@ data class SupportedAxis(
 class EventListener {
     companion object {
         private const val EPSILON = 0.001
+
+        // Keys left to the system: never consumed, never sent to Dart. A
+        // handheld whose volume buttons report through its controller's
+        // input device would otherwise lose them while the app is in front.
+        private val systemKeys = setOf(
+            KeyEvent.KEYCODE_VOLUME_UP,
+            KeyEvent.KEYCODE_VOLUME_DOWN,
+            KeyEvent.KEYCODE_VOLUME_MUTE,
+        )
+
+        fun isSystemKey(keyCode: Int): Boolean = keyCode in systemKeys
     }
     private val lastAxisValue = mutableMapOf<Int, Float>()
     // Reference: https://developer.android.com/reference/android/view/MotionEvent
@@ -34,6 +45,7 @@ class EventListener {
     )
 
     fun onKeyEvent(keyEvent: KeyEvent, channel: MethodChannel): Boolean {
+        if (isSystemKey(keyEvent.keyCode)) return false
         val arguments = mapOf(
             "gamepadId" to keyEvent.deviceId.toString(),
             "time" to keyEvent.eventTime,
