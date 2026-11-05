@@ -41,7 +41,8 @@ class DiscoveryCandidate {
   /// Whether this game has scraper metadata to show.
   ///
   /// Deliberately NOT `user_screenscraper_metadata.is_fully_scraped`: that flag
-  /// is only set when the *media download* step of a scrape reports success, so
+  /// is only set when the *media download* step of a scrape reports success
+  /// (or when every media type was switched off), so
   /// a fully scraped library reads as barely scraped at all (39 of 9,087 on the
   /// maintainer's device, against 8,754 games that do have metadata). What this
   /// engine actually needs to know is whether a game's blank rating means

@@ -6,8 +6,7 @@ import '../services/notification_service.dart';
 import '../services/neosync/auth_service.dart';
 import '../sync/sync_manager.dart';
 import '../sync/providers/neo_sync_adapter.dart';
-import '../widgets/plan_welcome_modal.dart';
-import '../widgets/plan_farewell_modal.dart';
+import '../widgets/plan_change_notice.dart';
 import '../services/game_service.dart';
 import '../services/music_player_service.dart';
 import '../providers/sqlite_config_provider.dart';
@@ -30,29 +29,6 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
   AppLifecycleListener? _exitListener;
 
   static final _log = LoggerService.instance;
-
-  /// Determines the level of a plan (higher number = better plan)
-  int _getPlanLevel(String planName) {
-    switch (planName.toLowerCase()) {
-      case 'free':
-        return 0;
-      case 'micro':
-        return 1;
-      case 'mini':
-        return 2;
-      case 'mega':
-        return 3;
-      case 'ultra':
-        return 4;
-      default:
-        return 0;
-    }
-  }
-
-  /// Determines whether the plan change is an upgrade or downgrade
-  bool _isUpgrade(String oldPlan, String newPlan) {
-    return _getPlanLevel(newPlan) > _getPlanLevel(oldPlan);
-  }
 
   @override
   void initState() {
@@ -267,18 +243,18 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
         if (_lastKnownPlan != null &&
             currentPlan != null &&
             _lastKnownPlan != currentPlan) {
-          final isUpgrade = _isUpgrade(_lastKnownPlan!, currentPlan);
+          // Read now: the known plan is updated below, before the delay ends.
+          final previousPlan = _lastKnownPlan!;
 
           // Delay to ensure the UI updates first
           Future.delayed(Duration(milliseconds: 1000), () {
             if (mounted) {
-              if (isUpgrade) {
-                // Show welcome modal for upgrades
-                PlanWelcomeModal.show(context, currentPlan);
-              } else {
-                // Show farewell modal for downgrades
-                PlanFarewellModal.show(context, _lastKnownPlan!, currentPlan);
-              }
+              PlanChangeNotice.show(
+                context,
+                account: currentUser?.id,
+                from: previousPlan,
+                to: currentPlan,
+              );
             }
           });
         }

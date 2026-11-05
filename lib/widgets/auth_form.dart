@@ -278,7 +278,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
           _passwordController.text.trim(),
         );
       }
-      if (generation != _requestGeneration) return;
+      if (!mounted || generation != _requestGeneration) return;
 
       setState(() {
         // A login the device could not store still works until the app closes.
@@ -309,12 +309,12 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         }
       }
     } catch (e) {
-      if (generation != _requestGeneration) return;
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _message = '${AppLocale.anErrorOccurred.getString(context)}: $e';
       });
     } finally {
-      if (generation == _requestGeneration) {
+      if (mounted && generation == _requestGeneration) {
         setState(() {
           _isLoading = false;
         });
@@ -343,7 +343,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
       final result = await authService.verifyEmail(
         _verificationTokenController.text.trim(),
       );
-      if (generation != _requestGeneration) return;
+      if (!mounted || generation != _requestGeneration) return;
 
       setState(() {
         _message = _failureText(result);
@@ -355,7 +355,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
           _emailController.text.trim(),
           _passwordController.text.trim(),
         );
-        if (generation != _requestGeneration) return;
+        if (!mounted || generation != _requestGeneration) return;
 
         if (loginResult['success']) {
           widget.onLoginSuccess();
@@ -366,12 +366,12 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         }
       }
     } catch (e) {
-      if (generation != _requestGeneration) return;
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _message = '${AppLocale.anErrorOccurred.getString(context)}: $e';
       });
     } finally {
-      if (generation == _requestGeneration) {
+      if (mounted && generation == _requestGeneration) {
         setState(() {
           _isLoading = false;
         });
@@ -400,7 +400,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
       final result = await authService.resendVerificationEmail(
         _emailController.text.trim(),
       );
-      if (generation != _requestGeneration) return;
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _message = _failureText(result);
       });
@@ -411,12 +411,12 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         _startEmailVerificationPolling();
       }
     } catch (e) {
-      if (generation != _requestGeneration) return;
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _message = '${AppLocale.anErrorOccurred.getString(context)}: $e';
       });
     } finally {
-      if (generation == _requestGeneration) {
+      if (mounted && generation == _requestGeneration) {
         setState(() {
           _isLoading = false;
         });
@@ -425,6 +425,10 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
   }
 
   void _startEmailVerificationPolling() {
+    // Resend starts the checks again; the earlier ones must stop, or nothing
+    // can stop them.
+    _pollingTimer?.cancel();
+    final generation = _requestGeneration;
     setState(() {
       _isPolling = true;
       _message = AppLocale.checkEmailVerification.getString(context);
@@ -433,30 +437,36 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
     });
 
     // Start polling every 15 seconds to avoid rate limiting
-    _pollingTimer = Timer.periodic(Duration(seconds: 15), (timer) async {
-      await _checkEmailVerificationStatus();
-    });
+    _pollingTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _checkEmailVerificationStatus(generation),
+    );
 
     // Wait 3 seconds before first check to give user time to switch to email
-    Future.delayed(Duration(seconds: 3), () {
-      if (_isPolling) {
-        _checkEmailVerificationStatus();
-      }
+    Future.delayed(const Duration(seconds: 3), () {
+      if (_isPolling) _checkEmailVerificationStatus(generation);
     });
   }
 
-  Future<void> _checkEmailVerificationStatus() async {
-    if (_pendingVerificationEmail == null) return;
+  /// Whether a verification check (and the sign-in after it) is still out.
+  bool _checkInFlight = false;
+
+  /// Checks whether the e-mail has been verified and, once it has, signs in.
+  ///
+  /// Started for [generation]: B since, or the form gone, makes it stale, and
+  /// it skips its turn while the last check is still out.
+  Future<void> _checkEmailVerificationStatus(int generation) async {
+    if (!mounted || generation != _requestGeneration || _checkInFlight) {
+      return;
+    }
+    final email = _pendingVerificationEmail;
+    if (email == null || !email.contains('@')) return;
 
     final authService = Provider.of<AuthService>(context, listen: false);
-
+    _checkInFlight = true;
     try {
-      String emailToCheck = _pendingVerificationEmail!;
-      if (!emailToCheck.contains('@')) return;
-
-      final result = await authService.checkEmailVerificationStatus(
-        emailToCheck,
-      );
+      final result = await authService.checkEmailVerificationStatus(email);
+      if (!mounted || generation != _requestGeneration) return;
 
       if (result['success'] && result['email_verified'] == true) {
         _pollingTimer?.cancel();
@@ -467,21 +477,28 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         });
 
         await Future.delayed(const Duration(seconds: 2));
-        await _performAutoLoginAfterVerification();
+        if (!mounted || generation != _requestGeneration) return;
+        await _performAutoLoginAfterVerification(email, generation);
       }
     } catch (e) {
       _log.e('Polling error: $e');
+    } finally {
+      _checkInFlight = false;
     }
   }
 
-  Future<void> _performAutoLoginAfterVerification() async {
+  Future<void> _performAutoLoginAfterVerification(
+    String email,
+    int generation,
+  ) async {
     final authService = Provider.of<AuthService>(context, listen: false);
 
     try {
       final loginResult = await authService.login(
-        _pendingVerificationEmail!,
+        email,
         _passwordController.text.trim(),
       );
+      if (!mounted || generation != _requestGeneration) return;
 
       if (loginResult['success']) {
         widget.onLoginSuccess();
@@ -504,6 +521,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         }
       }
     } catch (e) {
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _message =
             '${AppLocale.emailVerifiedLoginFailed.getString(context)}: $e';
@@ -552,7 +570,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
       final result = await authService.forgotPassword(
         _emailController.text.trim(),
       );
-      if (generation != _requestGeneration) return;
+      if (!mounted || generation != _requestGeneration) return;
 
       setState(() {
         _message = _failureText(result);
@@ -567,7 +585,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         });
       }
     } catch (e) {
-      if (generation != _requestGeneration) return;
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _message = '${AppLocale.anErrorOccurred.getString(context)}: $e';
         _isLoading = false;
@@ -605,7 +623,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         _resetTokenController.text.trim(),
         _newPasswordController.text.trim(),
       );
-      if (generation != _requestGeneration) return;
+      if (!mounted || generation != _requestGeneration) return;
 
       setState(() {
         _message = _failureText(result);
@@ -614,6 +632,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
 
       if (result['success']) {
         Future.delayed(Duration(seconds: 2), () {
+          if (!mounted || generation != _requestGeneration) return;
           setState(() {
             _showResetPassword = false;
             _showForgotPassword = false;
@@ -626,7 +645,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         });
       }
     } catch (e) {
-      if (generation != _requestGeneration) return;
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _message = '${AppLocale.anErrorOccurred.getString(context)}: $e';
         _isLoading = false;

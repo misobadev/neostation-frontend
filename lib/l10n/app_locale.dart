@@ -406,6 +406,7 @@ mixin AppLocale {
 
   static const String rommLinkLibraryStoppedEarly =
       'romm_link_library_stopped_early';
+  static const String rommLinkLibraryPartial = 'romm_link_library_partial';
   static const String rematchAchievementsSubtitle =
       'rematch_achievements_subtitle';
   static const String rematchAchievementsWarning =
@@ -601,6 +602,8 @@ mixin AppLocale {
   static const String backWithB = 'back_with_b';
   static const String cancelSubscription = 'cancel_subscription';
   static const String cancelSubscriptionConfirm = 'cancel_subscription_confirm';
+  static const String subscriptionCancelledKeepPlan =
+      'subscription_cancelled_keep_plan';
   static const String keepSubscription = 'keep_subscription';
   static const String deleteCloudSave = 'delete_cloud_save';
   static const String deleteCloudSaveConfirm = 'delete_cloud_save_confirm';

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
+import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/repositories/neosync_save_folder_repository.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
@@ -36,6 +37,7 @@ class _FakeNeoSync extends NeoSyncService {
     bool? isState,
     String? scope,
     String? type,
+    SyncDeadline? Function()? deadline,
   }) async {
     attempted.add(p.basename(file.path));
     return upload(file);

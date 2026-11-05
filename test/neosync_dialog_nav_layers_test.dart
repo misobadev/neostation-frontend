@@ -44,6 +44,15 @@ class _FakeNeoSyncService extends NeoSyncService {
   bool succeed = false;
   void Function(String fileId)? onDeleted;
 
+  /// The saves a listing answers with: the page a delete reloads.
+  List<NeoSyncFile> Function() listing = () => const [];
+
+  @override
+  Future<Map<String, dynamic>> getFiles({NeoSyncFileFilter? filter}) async {
+    final files = listing();
+    return {'success': true, 'files': files, 'total': files.length};
+  }
+
   @override
   Future<Map<String, dynamic>> deleteFile(String fileId) async {
     deleted.add(fileId);
@@ -55,7 +64,9 @@ class _FakeNeoSyncService extends NeoSyncService {
 
 /// Serves a fixed page of cloud saves.
 class _FakeNeoSync extends NeoSyncProvider {
-  _FakeNeoSync(this.service) : super(service);
+  _FakeNeoSync(this.service) : super(service) {
+    service.listing = () => saves;
+  }
 
   final _FakeNeoSyncService service;
   final List<NeoSyncFile> saves = [_save(1), _save(2), _save(3)];

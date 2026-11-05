@@ -52,8 +52,26 @@ void main() {
     });
 
     tearDown(() async {
+      UserDataLocationService.debugAfterCopy = null;
+      UserDataLocationService.debugBeforeRename = null;
       if (await tmp.exists()) await tmp.delete(recursive: true);
     });
+
+    /// Every entry under [dir], relative path → file content ('<dir>' for a
+    /// folder), to show a destination is exactly as it was.
+    Map<String, String> snapshot(Directory dir) => {
+      if (dir.existsSync())
+        for (final e in dir.listSync(recursive: true))
+          p.relative(e.path, from: dir.path): e is File
+              ? e.readAsStringSync()
+              : '<dir>',
+    };
+
+    Future<void> migrate({String? to}) => UserDataLocationService.migrateData(
+      sourceUserDataPath: esde.path,
+      sourceMediaPath: p.join(esde.path, 'media'),
+      destPath: to ?? dest.path,
+    );
 
     test('preserves foreign ES-DE data in the source folder', () async {
       await UserDataLocationService.migrateData(
@@ -354,5 +372,216 @@ void main() {
       expect(db.existsSync(), isTrue, reason: 'nothing deleted on overlap');
       expect(scrapedArt.existsSync(), isTrue, reason: 'foreign art intact');
     });
+
+    // The running app keeps writing to app.log, so a line logged while the
+    // move copied it made the source longer than its copy, and the move gave
+    // up on everything.
+    test('a log written to during the move does not stop it', () async {
+      final log = File(p.join(esde.path, 'app.log'))
+        ..writeAsStringSync('before the move\n');
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        if (p.basename(src) == 'app.log') {
+          log.writeAsStringSync('logged meanwhile\n', mode: FileMode.append);
+        }
+      };
+
+      await migrate();
+
+      expect(
+        File(p.join(dest.path, 'app.log')).readAsStringSync(),
+        startsWith('before the move'),
+      );
+      expect(File(p.join(dest.path, 'data.sqlite')).existsSync(), isTrue);
+      expect(db.existsSync(), isFalse);
+    });
+
+    test('a log that could not be copied is left where it was', () async {
+      final log = File(p.join(esde.path, 'app.log'))
+        ..writeAsStringSync('the old log\n');
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        if (p.basename(src) == 'app.log') File(copy).writeAsStringSync('');
+      };
+
+      await migrate();
+
+      expect(log.readAsStringSync(), 'the old log\n');
+      expect(File(p.join(dest.path, 'app.log')).existsSync(), isFalse);
+      expect(File(p.join(dest.path, 'data.sqlite')).existsSync(), isTrue);
+    });
+
+    test('any other file that does not copy whole stops the move', () async {
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        if (p.basename(src) == 'data.sqlite') File(copy).writeAsStringSync('');
+      };
+
+      await expectLater(migrate(), throwsA(isA<Exception>()));
+
+      expect(db.readAsStringSync(), 'db-bytes', reason: 'source kept');
+      expect(neoArt.existsSync(), isTrue);
+    });
+
+    // File.copy replaces a file already at the target, and the copies ran
+    // before the check, so a move that then gave up had already overwritten
+    // whatever the destination held under the same names, and left its own
+    // copies behind.
+    test('a move that gives up leaves the destination as it was', () async {
+      File(p.join(dest.path, 'config.json')).writeAsStringSync('THEIRS');
+      File(p.join(dest.path, 'notes.txt')).writeAsStringSync('mine');
+      File(p.join(esde.path, 'config.json')).writeAsStringSync('OURS');
+      final before = snapshot(dest);
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        if (p.basename(src) == 'data.sqlite') File(copy).writeAsStringSync('');
+      };
+
+      await expectLater(migrate(), throwsA(isA<Exception>()));
+
+      expect(snapshot(dest), before);
+    });
+
+    test('a move blocked by a folder in the way changes nothing', () async {
+      Directory(p.join(dest.path, 'data.sqlite')).createSync();
+      File(p.join(dest.path, 'config.json')).writeAsStringSync('THEIRS');
+      File(p.join(esde.path, 'config.json')).writeAsStringSync('OURS');
+      final before = snapshot(dest);
+
+      await expectLater(migrate(), throwsA(isA<Exception>()));
+
+      expect(snapshot(dest), before);
+      expect(db.existsSync(), isTrue);
+    });
+
+    test('a move into a new folder that gives up removes it', () async {
+      final fresh = p.join(tmp.path, 'not-there-yet');
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        if (p.basename(src) == 'data.sqlite') File(copy).writeAsStringSync('');
+      };
+
+      await expectLater(migrate(to: fresh), throwsA(isA<Exception>()));
+
+      expect(Directory(fresh).existsSync(), isFalse);
+    });
+
+    test('a finished move leaves nothing of its own behind', () async {
+      File(p.join(dest.path, 'config.json')).writeAsStringSync('THEIRS');
+      File(p.join(esde.path, 'config.json')).writeAsStringSync('OURS');
+
+      await migrate();
+
+      expect(
+        File(p.join(dest.path, 'config.json')).readAsStringSync(),
+        'OURS',
+        reason: 'a finished move still replaces its own files',
+      );
+      expect(
+        dest.listSync().map((e) => p.basename(e.path)),
+        isNot(contains(startsWith('.neostation-move'))),
+      );
+    });
+
+    test('a log that grew while it was copied still moves', () async {
+      File(p.join(esde.path, 'app.log')).writeAsStringSync('before\n');
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        // Lines that reached the file while the copy was reading it.
+        if (p.basename(src) == 'app.log') {
+          File(copy).writeAsStringSync('during\n', mode: FileMode.append);
+        }
+      };
+
+      await migrate();
+
+      expect(
+        File(p.join(dest.path, 'app.log')).readAsStringSync(),
+        'before\nduring\n',
+      );
+    });
+
+    test('any other file whose copy came out longer stops the move', () async {
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        if (p.basename(src) == 'data.sqlite') {
+          File(copy).writeAsStringSync('more', mode: FileMode.append);
+        }
+      };
+
+      await expectLater(migrate(), throwsA(isA<Exception>()));
+
+      expect(db.existsSync(), isTrue);
+    });
+
+    test('a file where a folder of ours goes changes nothing', () async {
+      File(p.join(dest.path, 'media')).writeAsStringSync('not a folder');
+      final before = snapshot(dest);
+
+      await expectLater(migrate(), throwsA(isA<Exception>()));
+
+      expect(snapshot(dest), before);
+      expect(neoArt.existsSync(), isTrue);
+    });
+
+    test('an empty folder inside ours still moves', () async {
+      Directory(
+        p.join(esde.path, 'media', 'nes', 'boxart'),
+      ).createSync(recursive: true);
+
+      await migrate();
+
+      expect(
+        Directory(p.join(dest.path, 'media', 'nes', 'boxart')).existsSync(),
+        isTrue,
+      );
+    });
+
+    test('an empty folder of ours blocked by a file changes nothing', () async {
+      Directory(
+        p.join(esde.path, 'media', 'nes', 'boxart'),
+      ).createSync(recursive: true);
+      File(p.join(dest.path, 'media', 'nes', 'boxart'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('in the way');
+      final before = snapshot(dest);
+
+      await expectLater(migrate(), throwsA(isA<Exception>()));
+
+      expect(snapshot(dest), before);
+    });
+
+    // A folder in the destination can be a link to another drive, which a
+    // rename can't cross; a plain copy into place still works there.
+    test('a copy that cannot be renamed into place is copied there', () async {
+      UserDataLocationService.debugBeforeRename = (copy, dest) async {
+        if (p.basename(dest) == 'data.sqlite') {
+          throw FileSystemException('Cross-device link', dest);
+        }
+      };
+
+      await migrate();
+
+      expect(
+        File(p.join(dest.path, 'data.sqlite')).readAsStringSync(),
+        'db-bytes',
+      );
+      expect(db.existsSync(), isFalse);
+      expect(
+        dest.listSync().map((e) => p.basename(e.path)),
+        isNot(contains(startsWith('.neostation-move'))),
+      );
+    });
+
+    test(
+      'a move that cannot put its copies in place keeps the source',
+      () async {
+        UserDataLocationService.debugBeforeRename = (copy, dest) async {
+          if (p.basename(dest) == 'ct.png') throw StateError('disk went away');
+        };
+
+        await expectLater(migrate(), throwsA(isA<Exception>()));
+
+        expect(db.readAsStringSync(), 'db-bytes');
+        expect(neoArt.existsSync(), isTrue);
+        expect(
+          dest.listSync().map((e) => p.basename(e.path)),
+          isNot(contains(startsWith('.neostation-move'))),
+        );
+      },
+    );
   });
 }

@@ -106,6 +106,12 @@ enum _Pending {
 /// and what an upload-capable pass left waiting to go up.
 typedef _GameSync = ({GameSyncStatus status, _Pending uploads});
 
+/// What became of one [RomMSyncProvider._download]: whether it wrote, whether
+/// it refused a state written by a different core, and whether it failed (the
+/// server's copy could not be fetched or written). A routine refusal (no
+/// target, an expired launch deadline, a newer local copy) is none of these.
+typedef _DownloadOutcome = ({bool wrote, bool coreMismatch, bool failed});
+
 /// Identifies a game in the library. Two systems can each hold a `Same.zip`.
 typedef _GameKey = ({String? system, String romname});
 
@@ -353,7 +359,9 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   ///
   /// What it reports left to upload is [_Pending.unknown] when the pass never
   /// got as far as comparing the saves (no connection, or a listing that
-  /// failed), for the caller to answer from the disk.
+  /// failed), for the caller to answer from the disk. When only one of the two
+  /// listings failed, the other kind is synced as usual and the game still
+  /// reports [GameSyncStatus.error].
   Future<_GameSync> _syncGame(
     GameModel game, {
     required bool downloadOnly,
@@ -386,26 +394,51 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
     final localFiles = syncableSaves(game, await _locateSaves(game));
 
-    final List<RommAsset> remote;
-    try {
-      // The two listings are independent GETs; fetch them concurrently so the
-      // launch-blocking sync pays one round-trip, not two serial ones.
-      final results = await Future.wait([
-        _svc.listSaves(romId: romId),
-        _svc.listStates(romId: romId),
-      ]);
-      // Collapse a slot's version history before anything looks at the listing,
-      // so the pairing loop and the remote-only pass below agree on which asset
-      // represents each local file. Conflict backups are dropped first: they
-      // must never reach the pairing loop, and filtering them here is cheaper
-      // than deduping them and discarding the survivor.
-      remote = latestPerLocalName(
-        syncableRemote([...results[0], ...results[1]]),
-      );
-    } catch (e) {
-      _log.e('RomM listSaves/listStates failed for ${game.romname}: $e');
+    // The two listings are independent GETs; fetch them concurrently so the
+    // launch-blocking sync pays one round-trip, not two serial ones. Each is
+    // also independent in failure: RomM can fail one (its states route, say)
+    // while the other answers, and the kind that listed still syncs.
+    Future<List<RommAsset>?> listed(
+      String kind,
+      Future<List<RommAsset>> Function() list,
+    ) async {
+      try {
+        return await list();
+      } catch (e) {
+        _log.e('RomM list$kind failed for ${game.romname}: $e');
+        return null;
+      }
+    }
+
+    final results = await Future.wait([
+      listed('Saves', () => _svc.listSaves(romId: romId)),
+      listed('States', () => _svc.listStates(romId: romId)),
+    ]);
+    final savesListed = results[0] != null;
+    final statesListed = results[1] != null;
+    if (!savesListed && !statesListed) {
       return (status: GameSyncStatus.error, uploads: _Pending.unknown);
     }
+    // Collapse a slot's version history before anything looks at the listing,
+    // so the pairing loop and the remote-only pass below agree on which asset
+    // represents each local file. Conflict backups are dropped first: they
+    // must never reach the pairing loop, and filtering them here is cheaper
+    // than deduping them and discarding the survivor.
+    final remote = latestPerLocalName(
+      syncableRemote([...?results[0], ...?results[1]]),
+    );
+    // Only the local files of a kind that listed are compared. With no
+    // listing, a local file would look missing on the server and take the
+    // local-only upload, which RomM applies by file name: it could replace a
+    // newer copy that nothing here has seen.
+    final partial = !savesListed || !statesListed;
+    final reconciled = partial
+        ? localFiles
+              .where(
+                (l) => l.relativePath.startsWith('states/') == statesListed,
+              )
+              .toList()
+        : localFiles;
 
     // Assets already paired with a local file. Keyed by kind *and* id: the two
     // endpoints number their rows independently, so a bare id would let a save
@@ -413,16 +446,23 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     final matchedRemote = <({bool isState, int id})>{};
     int uploaded = 0, downloaded = 0, coreMismatched = 0;
     int conflictsPreserved = 0, uploadsFailed = 0, uploadsDeferred = 0;
+    int downloadsFailed = 0;
     void countUpload(_UploadOutcome outcome) {
       if (outcome == _UploadOutcome.uploaded) uploaded++;
       if (outcome == _UploadOutcome.failed) uploadsFailed++;
     }
 
-    bool anyLocal = localFiles.isNotEmpty;
+    void countDownload(_DownloadOutcome r) {
+      if (r.wrote) downloaded++;
+      if (r.coreMismatch) coreMismatched++;
+      if (r.failed) downloadsFailed++;
+    }
+
+    bool anyLocal = reconciled.isNotEmpty;
     bool anyRemote = remote.isNotEmpty;
 
     // 1) Reconcile each local file against its remote counterpart.
-    for (final local in localFiles) {
+    for (final local in reconciled) {
       final isState = local.relativePath.startsWith('states/');
       final baseName = path.basename(local.filePath);
       RommAsset? match;
@@ -493,14 +533,14 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           await _recordSynced(local, match.updatedAtMs, pullDigest);
           continue;
         }
-        final r = await _download(
-          game,
-          match,
-          localFiles: localFiles,
-          deadline: deadline,
+        countDownload(
+          await _download(
+            game,
+            match,
+            localFiles: localFiles,
+            deadline: deadline,
+          ),
         );
-        if (r.wrote) downloaded++;
-        if (r.coreMismatch) coreMismatched++;
       } else if (localChanged && !downloadOnly) {
         // Local newer (or both changed → prefer local). The asset exists, so
         // this replaces it in place rather than creating a second one.
@@ -596,20 +636,17 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     for (final a in remote) {
       if (statusOnly || uploadOnly) break;
       if (matchedRemote.contains(a.key)) continue;
-      final r = await _download(
-        game,
-        a,
-        localFiles: localFiles,
-        deadline: deadline,
+      countDownload(
+        await _download(game, a, localFiles: localFiles, deadline: deadline),
       );
-      if (r.wrote) downloaded++;
-      if (r.coreMismatch) coreMismatched++;
     }
 
     _log.i(
       'RomM sync ${game.romname}: $uploaded up, $downloaded down '
-      '(${localFiles.length} local, ${remote.length} remote)'
+      '(${reconciled.length} local, ${remote.length} remote)'
+      '${partial ? ', ${savesListed ? 'states' : 'saves'} not listed' : ''}'
       '${uploadsFailed > 0 ? ', $uploadsFailed upload(s) failed' : ''}'
+      '${downloadsFailed > 0 ? ', $downloadsFailed download(s) failed' : ''}'
       '${uploadsDeferred > 0 ? ', $uploadsDeferred deferred' : ''}'
       '${coreMismatched > 0 ? ', $coreMismatched kept (different core)' : ''}'
       '${conflictsPreserved > 0 ? ', $conflictsPreserved conflict backup(s)' : ''}',
@@ -627,7 +664,17 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     if (uploadsFailed > 0) {
       return (status: GameSyncStatus.error, uploads: _Pending.waiting);
     }
+    // The kind that didn't list was never compared, so whether it has a save
+    // waiting is for the disk to say, as after a listing that failed outright.
+    if (partial) {
+      return (status: GameSyncStatus.error, uploads: _Pending.unknown);
+    }
     final uploads = uploadsDeferred > 0 ? _Pending.deferred : _Pending.none;
+    // A save the server has that didn't come down is as much a failed sync as
+    // one that didn't go up: the game would start on the older copy.
+    if (downloadsFailed > 0) {
+      return (status: GameSyncStatus.error, uploads: uploads);
+    }
     if (!anyLocal && !anyRemote) {
       return (status: GameSyncStatus.noSaveFound, uploads: uploads);
     }
@@ -1199,13 +1246,6 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
   }
 
-  /// Fetches [asset] and writes it to this device's local target(s).
-  ///
-  /// [coreMismatch] reports the one refusal a caller needs to distinguish from
-  /// an ordinary no-op: the transfer was declined because the remote state was
-  /// written by a different core (see the guard below). Everything else — no
-  /// target, an expired deadline, a newer local copy — is a routine `wrote:
-  /// false`.
   /// The bytes RomM holds for [asset], or null when they cannot be fetched.
   ///
   /// Both saves and states download via the asset's `download_path`; only saves
@@ -1220,7 +1260,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     return null;
   }
 
-  Future<({bool wrote, bool coreMismatch})> _download(
+  /// Fetches [asset] and writes it to this device's local target(s).
+  ///
+  /// [_DownloadOutcome.coreMismatch] reports the one refusal a caller needs to
+  /// distinguish from an ordinary no-op: the transfer was declined because the
+  /// remote state was written by a different core (see the guard below).
+  /// [_DownloadOutcome.failed] reports that the server's copy could not be
+  /// fetched or written. Everything else (no target, an expired deadline, a
+  /// newer local copy) is a routine `wrote: false`.
+  Future<_DownloadOutcome> _download(
     GameModel game,
     RommAsset asset, {
     required List<LocalSaveFile> localFiles,
@@ -1244,10 +1292,12 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       final targets = await _resolveTargets(game, relativeName);
       if (targets.isEmpty) {
         _log.w('RomM download: no local target for ${asset.fileName}');
-        return (wrote: false, coreMismatch: false);
+        return (wrote: false, coreMismatch: false, failed: false);
       }
       final bytes = await _fetchAssetBytes(asset);
-      if (bytes == null) return (wrote: false, coreMismatch: false);
+      if (bytes == null) {
+        return (wrote: false, coreMismatch: false, failed: true);
+      }
 
       // Pre-launch deadline guard: the network fetch is done, but if the
       // launch-blocking wait has already elapsed the game is running on the
@@ -1257,7 +1307,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         _log.i(
           'RomM download: abandon ${asset.fileName} (launch deadline passed)',
         );
-        return (wrote: false, coreMismatch: false);
+        return (wrote: false, coreMismatch: false, failed: false);
       }
 
       var wroteAny = false;
@@ -1316,11 +1366,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         );
         wroteAny = true;
       }
-      return (wrote: wroteAny, coreMismatch: skippedCoreMismatch);
+      return (
+        wrote: wroteAny,
+        coreMismatch: skippedCoreMismatch,
+        failed: false,
+      );
     } catch (e) {
       if (isPermissionDenied(e)) rethrow;
       _log.e('RomM download failed (${asset.fileName}): $e');
-      return (wrote: false, coreMismatch: skippedCoreMismatch);
+      return (wrote: false, coreMismatch: skippedCoreMismatch, failed: true);
     }
   }
 
@@ -1716,8 +1770,13 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           downloadOnly: false,
           uploadOnly: true,
         );
-        // A sync that could not tell leaves the pre-check's answer standing.
-        final left = sync.uploads == _Pending.unknown ? pending : sync.uploads;
+        // A sync that could not tell is answered from the disk again: one that
+        // listed only saves or only states may have sent some since the
+        // pre-check. If the disk can't say either, the pre-check's answer
+        // stands.
+        var left = sync.uploads;
+        if (left == _Pending.unknown) left = await _pendingUpload(game);
+        if (left == _Pending.unknown) left = pending;
         if (left == _Pending.waiting) {
           failed++;
         } else if (left == _Pending.deferred) {
@@ -1949,36 +2008,39 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     shouldStop: () => _disposed || !_browse.isConnected,
   );
 
-  /// The browse provider's platform list, loaded if it hasn't been yet.
+  /// The server's platform list, reloaded for this pass.
   ///
   /// Going through [RommProvider.loadPlatforms] rather than the service means
-  /// the list is shared with the browse screen (a no-op when it already
-  /// loaded it) and, more to the point, that its support classification has
-  /// run — which warms the per-platform system cache
-  /// [RommProvider.systemForPlatform] reads and lets it try each platform's
-  /// `fs_slug`. The provider swallows a failed load into
-  /// [RommProvider.platformsFailure], which is surfaced here as an error so the
-  /// pass reports it rather than reading "no platforms". Only that load's own
-  /// failure counts: [RommProvider.lastError] is shared with the other loads
-  /// and the connection, and one of those failing while the platforms were on
-  /// their way would fail the pass for a server that simply has none.
+  /// its support classification runs, which warms the per-platform system
+  /// cache [RommProvider.systemForPlatform] reads and lets it try each
+  /// platform's `fs_slug`, and the browse screen gets the fresh list too.
   ///
-  /// A load already in flight (the browse screen opened just before the pass
-  /// fired) is awaited, not raced: `loadPlatforms` returns at once while one
-  /// is running, and the pass would otherwise read an empty list and report
-  /// "0 platforms processed, complete" with nothing to say why. Should the
-  /// list still be empty and loading after that (a forced reload started
-  /// underneath us), the pass fails with that as its named reason.
+  /// The load is forced. The list the RomM tab (or the match picker, the
+  /// search filter, an earlier pass) cached for the session would let a pass
+  /// start against a server that has since gone away: every platform then
+  /// failed on its own, and the pass ended as "nothing new to link". A forced
+  /// load asks the server, and its failure — swallowed by the provider into
+  /// [RommProvider.platformsFailure] — fails the pass with its reason, cached
+  /// list or not. Only that load's own failure counts: [RommProvider.lastError]
+  /// is shared with the other loads and the connection. A failed reload keeps
+  /// the browse screen's list as it was.
+  ///
+  /// A load already in flight is awaited, not raced: `loadPlatforms` returns
+  /// at once while one is running, so the forced load would do nothing. That
+  /// holds both before the forced call and after it (the browse screen can
+  /// start a load in between). Should the list still be empty and loading
+  /// after that, the pass fails with that as its named reason.
   @visibleForTesting
   Future<List<RommPlatform>> listPlatformsForLinkPass() async {
     if (_browse.isLoadingPlatforms) {
       _log.i('RomM link pass waiting: the platform list is still loading');
       await _browse.platformsLoaded;
     }
-    await _browse.loadPlatforms();
+    await _browse.loadPlatforms(force: true);
+    if (_browse.isLoadingPlatforms) await _browse.platformsLoaded;
     final platforms = _browse.platforms;
     final failure = _browse.platformsFailure;
-    if (platforms.isEmpty && failure != null) {
+    if (failure != null) {
       // The failure itself, so the Tools run can say why in the app language.
       throw failure;
     }

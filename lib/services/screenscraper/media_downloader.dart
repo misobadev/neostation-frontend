@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/utils/atomic_file_writer.dart';
 import 'region_config.dart';
 import 'rom_hasher.dart';
 import 'media_resolver.dart';
@@ -46,8 +47,8 @@ class ScreenscraperMediaDownloader {
         maxDailyRequests: maxDailyRequests,
       );
       if (response.statusCode == 200) {
-        await file.create(recursive: true);
-        await file.writeAsBytes(response.bodyBytes);
+        // A file left half-written would count as downloaded from then on.
+        await writeFileAtomically(file, response.bodyBytes);
         return true;
       } else {
         _log.e('Error downloading media (${response.statusCode}): $url');

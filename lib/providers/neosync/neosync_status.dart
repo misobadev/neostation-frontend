@@ -178,14 +178,21 @@ extension NeoSyncStatus on NeoSyncProvider {
         _filesRemovals++;
         _markCloudListStale();
         if (_onlineTotal > 0) _onlineTotal -= 1;
-        // Step back a page when the last item of the last page was removed.
-        if (_onlineFiles.isEmpty && _onlinePage > 1) {
-          _onlinePage -= 1;
-          notify();
-          await loadOnlineFiles();
-        } else {
-          notify();
-        }
+        // Step back when this page is now past the end: its last save was the
+        // one deleted, or a page turned while the delete was on its way and
+        // the deletion left that page empty.
+        final lastPage = _onlineTotal == 0
+            ? 1
+            : (_onlineTotal - 1) ~/ NeoSyncProvider._onlinePageSize + 1;
+        if (_onlinePage > lastPage) _onlinePage = lastPage;
+        notify();
+        // Fetch the page again: the server moved every later save up one
+        // place, so dropping the row alone left the page a save short, and
+        // the one that moved up on neither this page nor the next (with 51
+        // saves, the pager went too and the 51st couldn't be reached). A
+        // reload that fails shows the list's failed-to-load state, as a page
+        // turn does; the save was still deleted.
+        await loadOnlineFiles();
         return true;
       } else {
         NeoSyncProvider._log.e(
