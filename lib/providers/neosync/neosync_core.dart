@@ -93,11 +93,10 @@ extension NeoSyncCore on NeoSyncProvider {
     // Determine the synchronization state
     final syncStatus = await _calculateGameSyncStatus(localSave, cloudSave);
 
-    // PRESERVE the quotaExceeded state if already set or if the global flag is active
+    // Keep this game's own quota mark; another game's doesn't count.
     final currentState = _gameSyncStates[game.romname];
     final finalStatus =
-        currentState?.status == neo_sync.GameSyncStatus.quotaExceeded ||
-            _quotaExceededActive
+        currentState?.status == neo_sync.GameSyncStatus.quotaExceeded
         ? neo_sync.GameSyncStatus.quotaExceeded
         : syncStatus;
 
@@ -113,7 +112,28 @@ extension NeoSyncCore on NeoSyncProvider {
 
   void setAuthService(AuthService authService) {
     _authService = authService;
+    // Called on every AuthService change. A different account, a sign-out or
+    // a new plan makes a full account's error and quota marks stale: an
+    // upgrade used to leave games red until the app restarted.
+    final user = authService.currentUser;
+    final account = user == null ? null : (user.id, user.plan);
+    if (account != _quotaAccount) {
+      _quotaAccount = account;
+      _clearQuotaState();
+    }
     notify();
+  }
+
+  /// Forgets a full account's error and every game's quota mark; each game
+  /// shows what its next sync finds.
+  void _clearQuotaState() {
+    _error = null;
+    _quotaExceededAttempts = 0;
+    _gameSyncStates.removeWhere(
+      (_, state) => state.status == neo_sync.GameSyncStatus.quotaExceeded,
+    );
+    // The bell's folder entries were about that account too.
+    clearAllAutoFolderUploadNotices();
   }
 
   bool get isNeoSyncAuthenticated {
@@ -238,7 +258,6 @@ extension NeoSyncCore on NeoSyncProvider {
   void resetQuotaExceededDialog() {
     _quotaExceededDialogShown = false;
     _quotaExceededAttempts = 0;
-    _quotaExceededActive = false; // Also reset the global flag
   }
 
   /// Shows the quota exceeded dialog
@@ -633,7 +652,7 @@ extension NeoSyncCore on NeoSyncProvider {
 
       // 3. Actualizar estado final
       neo_sync.GameSyncStatus finalStatus;
-      if (_quotaExceededActive || quotaExceededDuringProcessing) {
+      if (quotaExceededDuringProcessing) {
         finalStatus = neo_sync.GameSyncStatus.quotaExceeded;
       } else if (!allUploadsSucceeded || !allCloudDownloadsSucceeded) {
         NeoSyncProvider._log.w('Sync had errors for ${game.name}');
@@ -685,7 +704,6 @@ extension NeoSyncCore on NeoSyncProvider {
       }
       final errorMessage = result['message']?.toString() ?? '';
       if (NeoSyncProvider.isQuotaExceededMessage(errorMessage)) {
-        _quotaExceededActive = true;
         throw QuotaExceededException('Storage quota exceeded', 1);
       }
       return false;

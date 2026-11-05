@@ -457,10 +457,8 @@ void main() {
     addTearDown(adapter.dispose);
     File(p.join(folder.path, 'Zelda.sav')).writeAsBytesSync(const [1, 2, 3]);
     service.accountFull = true;
-    expect(
-      await provider.syncCustomSaveFolder('gc', 'dolphin'),
-      CustomFolderUploadOutcome.quotaExceeded,
-    );
+    // A whole sync stopped by a full account reports it.
+    await provider.autoSyncUploads();
     final syncError = provider.error;
     expect(syncError, isNotNull);
 
@@ -468,4 +466,42 @@ void main() {
 
     expect(adapter.lastError, syncError);
   });
+
+  // A standalone folder that couldn't upload used to report a sync error,
+  // which marks every game in every system red.
+  test(
+    'a failed custom folder upload is not reported as a sync error',
+    () async {
+      final adapter = NeoSyncAdapter(provider);
+      addTearDown(adapter.dispose);
+      File(p.join(folder.path, 'Zelda.sav')).writeAsBytesSync(const [1, 2, 3]);
+      service.accountFull = true;
+
+      expect(
+        await provider.syncCustomSaveFolder('gc', 'dolphin'),
+        CustomFolderUploadOutcome.quotaExceeded,
+      );
+
+      expect(adapter.lastError, isNull);
+    },
+  );
+
+  test(
+    'a custom folder upload leaves another sync\'s error in place',
+    () async {
+      File(p.join(folder.path, 'Zelda.sav')).writeAsBytesSync(const [1, 2, 3]);
+      service.accountFull = true;
+      await provider.autoSyncUploads();
+      final syncError = provider.error;
+      expect(syncError, isNotNull);
+
+      service.accountFull = false;
+      expect(
+        await provider.syncCustomSaveFolder('gc', 'dolphin'),
+        CustomFolderUploadOutcome.uploaded,
+      );
+
+      expect(provider.error, syncError);
+    },
+  );
 }
