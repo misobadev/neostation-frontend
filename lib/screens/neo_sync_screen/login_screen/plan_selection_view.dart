@@ -70,6 +70,13 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
   List<PlanInfo> get _availablePlans =>
       _plans.where((plan) => plan.name != 'free').toList();
 
+  /// Nothing to choose from: the plans failed to load, or none can be bought.
+  bool get _noPlans => _errorMessage != null || _availablePlans.isEmpty;
+
+  /// Cancelled, but still on its plan until the period ends.
+  static bool _isEnding(User? user) =>
+      user?.stripeSubscriptionStatus == 'canceling';
+
   int _planRank(String planName) {
     final name = planName.toLowerCase().trim();
     for (var i = 0; i < _planOrder.length; i++) {
@@ -100,12 +107,19 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
   /// or downgrade depending on how it compares to the user's plan. Ignored
   /// while the last one is still running.
   Future<void> _handleSelect() async {
+    // With nothing to choose from, A retries: the Retry button is touch only.
+    if (_noPlans) {
+      if (!_plansLoading) _loadPlans();
+      return;
+    }
     // A change started from an earlier visit to this view may still be out.
     if (_actionBusy || context.read<BillingService>().isChangeInFlight) return;
     final plans = _availablePlans;
-    if (plans.isEmpty || _selectedPlanIndex >= plans.length) return;
+    if (_selectedPlanIndex >= plans.length) return;
     final plan = plans[_selectedPlanIndex];
     final user = context.read<AuthService>().currentUser;
+    // Already cancelled: a second cancellation has nothing left to do.
+    if (user?.plan == plan.name && _isEnding(user)) return;
 
     setState(() => _actionBusy = true);
     try {
@@ -332,7 +346,7 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
       );
     }
 
-    if (_plans.isEmpty) {
+    if (_availablePlans.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -364,6 +378,7 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
     return PlanListView(
       plans: _availablePlans,
       currentPlan: currentUser?.plan,
+      currentPlanEnding: _isEnding(currentUser),
       selectedIndex: _selectedPlanIndex,
       getPlanIcon: widget.getPlanIcon,
       onSelectionChanged: (index) {
@@ -374,12 +389,21 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
 
   Widget _buildFooter(BuildContext context, User? user) {
     final theme = Theme.of(context);
+    final changeInFlight = context.watch<BillingService>().isChangeInFlight;
 
-    final String actionLabel;
+    // No action on a plan already cancelled: there is nothing left to end.
+    final String? actionLabel;
     final Color actionColor;
     final Color actionTextColor;
-    if (_focusedPlanIsCurrent) {
-      actionLabel = AppLocale.endSubscription.getString(context);
+    if (_noPlans) {
+      // Nothing to retry until the first load has answered.
+      actionLabel = _plansLoading ? null : AppLocale.retry.getString(context);
+      actionColor = theme.colorScheme.primary;
+      actionTextColor = theme.colorScheme.onPrimary;
+    } else if (_focusedPlanIsCurrent) {
+      actionLabel = _isEnding(user)
+          ? null
+          : AppLocale.endSubscription.getString(context);
       actionColor = theme.colorScheme.tertiaryFixed;
       actionTextColor = theme.colorScheme.onTertiaryFixed;
     } else if (_focusedPlanIsUpgrade(user?.plan)) {
@@ -395,15 +419,17 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        GamepadControl(
-          label: actionLabel,
-          iconPath: 'assets/images/gamepad/Xbox_A_button.png',
-          onTap: _handleSelect,
-          textColor: actionTextColor,
-          backgroundColor: actionColor,
-          busy: _actionBusy || context.watch<BillingService>().isChangeInFlight,
-        ),
-        SizedBox(width: 8.r),
+        if (actionLabel != null) ...[
+          GamepadControl(
+            label: actionLabel,
+            iconPath: 'assets/images/gamepad/Xbox_A_button.png',
+            onTap: _handleSelect,
+            textColor: actionTextColor,
+            backgroundColor: actionColor,
+            busy: !_noPlans && (_actionBusy || changeInFlight),
+          ),
+          SizedBox(width: 8.r),
+        ],
         NeoSyncBackButton(onTap: () => widget.onBack()),
       ],
     );
@@ -418,6 +444,9 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
 class PlanListView extends StatefulWidget {
   final List<PlanInfo> plans;
   final String? currentPlan;
+
+  /// Whether [currentPlan] is cancelled and ends with the billing period.
+  final bool currentPlanEnding;
   final int selectedIndex;
   final IconData Function(String) getPlanIcon;
   final Function(int) onSelectionChanged;
@@ -426,6 +455,7 @@ class PlanListView extends StatefulWidget {
     super.key,
     required this.plans,
     required this.currentPlan,
+    this.currentPlanEnding = false,
     required this.selectedIndex,
     required this.getPlanIcon,
     required this.onSelectionChanged,
@@ -630,7 +660,12 @@ class _PlanListViewState extends State<PlanListView>
                           borderRadius: BorderRadius.circular(5.r),
                         ),
                         child: Text(
-                          AppLocale.currentBadge.getString(context),
+                          // In capitals, like the dashboard's pill.
+                          widget.currentPlanEnding
+                              ? AppLocale.subscriptionEnding
+                                    .getString(context)
+                                    .toUpperCase()
+                              : AppLocale.currentBadge.getString(context),
                           style: TextStyle(
                             fontSize: 6.r,
                             fontWeight: FontWeight.w900,

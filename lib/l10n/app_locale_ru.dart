@@ -626,6 +626,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.cancelSubscription: 'Отменить подписку',
   AppLocale.cancelSubscriptionConfirm:
       'Вы уверены, что хотите отменить подписку?',
+  AppLocale.subscriptionCancelledKeepPlan:
+      'Подписка отменена. Текущий тариф сохранится до конца оплаченного периода.',
   AppLocale.keepSubscription: 'Сохранить подписку',
   AppLocale.deleteCloudSave: 'Удалить облачное сохранение',
   AppLocale.deleteCloudSaveConfirm:

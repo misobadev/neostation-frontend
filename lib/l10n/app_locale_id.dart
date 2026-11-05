@@ -617,6 +617,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.cancelSubscription: 'Batalkan Langganan',
   AppLocale.cancelSubscriptionConfirm:
       'Apakah Anda yakin ingin membatalkan? Anda akan tetap memiliki akses hingga akhir periode.',
+  AppLocale.subscriptionCancelledKeepPlan:
+      'Langganan Anda telah dibatalkan. Anda tetap memakai paket saat ini hingga akhir periode penagihan.',
   AppLocale.keepSubscription: 'Tetap Berlangganan',
   AppLocale.deleteCloudSave: 'Hapus Simpanan Cloud',
   AppLocale.deleteCloudSaveConfirm:

@@ -633,6 +633,8 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.cancelSubscription: 'Cancelar Assinatura',
   AppLocale.cancelSubscriptionConfirm:
       'Tem certeza que deseja cancelar? Você manterá o acesso até o fim do período.',
+  AppLocale.subscriptionCancelledKeepPlan:
+      'Sua assinatura foi cancelada. Você mantém seu plano atual até o fim do período de cobrança.',
   AppLocale.keepSubscription: 'Manter Assinatura',
   AppLocale.deleteCloudSave: 'Excluir Save na Nuvem',
   AppLocale.deleteCloudSaveConfirm:

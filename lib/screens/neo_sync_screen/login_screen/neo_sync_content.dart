@@ -21,6 +21,7 @@ import 'package:neostation/utils/neosync_failure_message.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/neo_glass.dart';
+import 'package:neostation/widgets/plan_change_notice.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/sync/providers/neo_sync_adapter.dart';
 import '../../app_screen.dart';
@@ -121,10 +122,21 @@ class NeoSyncContentState extends State<NeoSyncContent>
 
     if (result['success']) {
       if (result['upgrade'] == true) {
-        if (!mounted) return;
-        final authService = Provider.of<AuthService>(context, listen: false);
+        // Changed in place, with no checkout. NeoSync's own message is
+        // English, so the reloaded plan is announced in the app language.
+        final previousPlan = user.plan;
         await authService.getProfile();
-        if (mounted) setState(() {});
+        if (!mounted) return;
+        setState(() {});
+        final newPlan = authService.currentUser?.plan;
+        if (newPlan != null) {
+          PlanChangeNotice.show(
+            context,
+            account: user.id,
+            from: previousPlan,
+            to: newPlan,
+          );
+        }
       } else {
         final session = result['session'] as BillingSession;
         if (await canLaunchUrl(Uri.parse(session.url))) {
@@ -198,18 +210,8 @@ class NeoSyncContentState extends State<NeoSyncContent>
       icon: Symbols.cancel_rounded,
     );
 
-    if (confirmed != true) {
-      if (mounted) {
-        final neoSyncProvider = Provider.of<NeoSyncProvider>(
-          context,
-          listen: false,
-        );
-        await authService.getProfile();
-        await neoSyncProvider.loadQuota();
-        await neoSyncProvider.loadOnlineFiles();
-      }
-      return;
-    }
+    // Kept: nothing changed, so nothing needs reloading.
+    if (confirmed != true) return;
 
     final result = await billingService.cancelSubscription(user.id);
     // Another change is still out; the plans view shows it running.
@@ -246,7 +248,9 @@ class NeoSyncContentState extends State<NeoSyncContent>
           builder: (BuildContext context) {
             return SuccessDialog(
               title: AppLocale.cancelSubscription.getString(context),
-              message: AppLocale.cancelSubscriptionConfirm.getString(context),
+              message: AppLocale.subscriptionCancelledKeepPlan.getString(
+                context,
+              ),
               onClose: () => Navigator.of(context).pop(),
             );
           },
@@ -631,6 +635,18 @@ class NeoSyncContentState extends State<NeoSyncContent>
                   background: theme.colorScheme.secondary,
                   foreground: theme.colorScheme.onSecondary,
                 ),
+                // Cancelled, but still on the plan until the period ends.
+                // NeoSync's end date is only an estimate, so none is shown.
+                if (user?.stripeSubscriptionStatus == 'canceling')
+                  _buildDashboardPill(
+                    theme,
+                    icon: Symbols.schedule_rounded,
+                    label: AppLocale.subscriptionEnding
+                        .getString(context)
+                        .toUpperCase(),
+                    background: theme.colorScheme.tertiary,
+                    foreground: theme.colorScheme.onTertiary,
+                  ),
                 // No count until a listing has worked: a failed or first
                 // load has counted nothing.
                 if (!neoSyncProvider.onlineFilesLoadFailed &&

@@ -544,6 +544,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.backWithB: '戻る (B)',
   AppLocale.cancelSubscription: 'サブスクリプションをキャンセル',
   AppLocale.cancelSubscriptionConfirm: '本当にキャンセルしますか？期間終了までアクセスは維持されます。',
+  AppLocale.subscriptionCancelledKeepPlan:
+      'サブスクリプションを解約しました。請求期間の終了まで現在のプランをご利用いただけます。',
   AppLocale.keepSubscription: 'サブスクリプションを維持',
   AppLocale.deleteCloudSave: 'クラウドセーブを削除',
   AppLocale.deleteCloudSaveConfirm: 'このセーブデータをクラウドから永久に削除しますか？',
