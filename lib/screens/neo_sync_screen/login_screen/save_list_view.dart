@@ -679,7 +679,8 @@ class _SaveListViewState extends State<SaveListView> {
 
         final success = await neoSyncProvider.deleteOnlineFile(selectedFile.id);
         if (success) {
-          // The provider has already dropped the deleted save.
+          // The provider has reloaded the page: it is shorter only on the last
+          // page, and empty when the reload failed.
           final remainingFiles = neoSyncProvider.onlineFiles.length;
           if (mounted && _selectedSaveIndex >= remainingFiles) {
             setState(

@@ -84,6 +84,14 @@ class _FakeNeoSync extends NeoSyncService {
     cloud = cloud.where((f) => f.id != fileId).toList();
     return {'success': true};
   }
+
+  /// The save list's paged listing, which a delete reloads. Separate from the
+  /// game-sync listing above, so it isn't counted in [listCalls].
+  @override
+  Future<Map<String, dynamic>> getFiles({NeoSyncFileFilter? filter}) async {
+    final files = List<NeoSyncFile>.of(cloud);
+    return {'success': true, 'files': files, 'total': files.length};
+  }
 }
 
 class _SignedIn extends AuthService {
