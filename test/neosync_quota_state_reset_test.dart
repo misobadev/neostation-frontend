@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
+import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/models/user.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/utils/auto_folder_upload_notice.dart';
@@ -34,6 +35,7 @@ class _FakeNeoSync extends NeoSyncService {
     bool? isState,
     String? scope,
     String? type,
+    SyncDeadline? Function()? deadline,
   }) async => full
       ? {'success': false, 'message': 'Storage quota exceeded'}
       : {'success': true};
