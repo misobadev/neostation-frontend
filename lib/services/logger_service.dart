@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/utils/log_redaction.dart';
@@ -17,6 +19,9 @@ class LoggerService {
 
   Logger _logger;
   bool _initialized = false;
+
+  /// The file [init] opened, or null when this isolate logs to the console only.
+  String? _filePath;
 
   /// Lines logged in this isolate since [startCapture], or null when nothing
   /// is collecting.
@@ -37,6 +42,10 @@ class LoggerService {
   /// that must not lose a line in that isolate should check this and fall back
   /// to `debugPrint`.
   bool get isFileBacked => _initialized;
+
+  /// The log file this isolate writes to, or null when it isn't file-backed.
+  @visibleForTesting
+  String? get filePath => _filePath;
 
   LoggerService._internal()
     : _logger = Logger(
@@ -82,11 +91,69 @@ class LoggerService {
       );
 
       _initialized = true;
+      _filePath = logFilePath;
       i('Logger initialized with file output: $logFilePath');
     } catch (e) {
       // ignore: avoid_print
       print('Error initializing file logger: $e');
     }
+  }
+
+  /// Reopens the log file under the current user-data folder, after it moved.
+  ///
+  /// `app.log` lives in the user-data folder, and the setup wizard moves that
+  /// without a restart: without this the rest of the session went on writing
+  /// to the old folder, which a log export then missed. The new file logger
+  /// replaces the old one before the old one is closed, so nothing logged
+  /// meanwhile hits a closed logger. A logger that never opened a file (the
+  /// second screen's engine) is left as it is.
+  Future<void> reinitialize() async {
+    if (!_initialized) return;
+    try {
+      // Same folder (a move that was put back): two writers on one file would
+      // interleave, and the rotation would rename the open one.
+      if (await ConfigService.getLogFilePath() == _filePath) return;
+    } catch (e) {
+      w('Log file not moved: $e');
+      return;
+    }
+    final previous = _logger;
+    final previousPath = _filePath;
+    _initialized = false;
+    await init();
+    if (!_initialized) {
+      // The new folder couldn't take the log: keep writing where we were.
+      _logger = previous;
+      _filePath = previousPath;
+      _initialized = true;
+      return;
+    }
+    // Not awaited, and bounded: a file that never opened (the unwritable
+    // folder the wizard resets away from) never finishes flushing, and the
+    // wizard step must not wait on it.
+    unawaited(
+      previous
+          .close()
+          .timeout(const Duration(seconds: 2), onTimeout: () {})
+          .catchError((Object _) {}),
+    );
+  }
+
+  /// Puts the logger back to console-only, as before [init], for tests.
+  @visibleForTesting
+  Future<void> resetForTesting() async {
+    final previous = _logger;
+    _logger = Logger(
+      printer: RedactingPrinter(SimplePrinter(colors: true)),
+      filter: ProductionFilter(),
+      output: MultiOutput([ConsoleOutput()]),
+    );
+    _initialized = false;
+    _filePath = null;
+    await previous
+        .close()
+        .timeout(const Duration(seconds: 2), onTimeout: () {})
+        .catchError((Object _) {});
   }
 
   /// Starts collecting everything this isolate logs, on top of its normal

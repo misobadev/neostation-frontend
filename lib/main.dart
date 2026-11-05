@@ -363,6 +363,12 @@ void main() async {
     log.e('Error initializing database providers: $e');
   }
 
+  // FileProvider started before the database was open. On a fresh install
+  // that can find it briefly locked, and its system-extension lookup (or, on
+  // an earlier failure, every path) is still missing: try again now. Does
+  // nothing when it already finished.
+  await fileProvider.initialize();
+
   // Inicializar listener de Android para tracking de tiempo de juego
   if (Platform.isAndroid) {
     try {
