@@ -455,6 +455,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.rommLinkLibraryUnavailable: 'Non disponibile al momento',
   AppLocale.rommLinkLibraryStoppedEarly:
       'Interrotto in anticipo — giochi collegati finora: {count}',
+  AppLocale.rommLinkLibraryPartial:
+      'Giochi collegati: {count}. Sistemi non leggibili: {failed}',
   AppLocale.rematchAchievementsSubtitle:
       'Controlla l\'intera libreria alla ricerca di set di obiettivi, invece di un gioco alla volta',
   AppLocale.rematchAchievementsWarning:
@@ -637,6 +639,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.cancelSubscription: 'Annulla Abbonamento',
   AppLocale.cancelSubscriptionConfirm:
       'Sei sicuro di voler annullare ? Manterrai l’accesso fino alla fine del periodo.',
+  AppLocale.subscriptionCancelledKeepPlan:
+      'Il tuo abbonamento è annullato. Mantieni il piano attuale fino alla fine del periodo di fatturazione.',
   AppLocale.keepSubscription: 'Mantieni Abbonamento',
   AppLocale.deleteCloudSave: 'Elimina Salvataggio Cloud',
   AppLocale.deleteCloudSaveConfirm:

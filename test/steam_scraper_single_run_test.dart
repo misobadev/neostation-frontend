@@ -23,7 +23,13 @@ void main() {
   late dynamic db;
   late List<String> storeRequests;
   Completer<void>? holdFirst;
+  // Completes when the first Store request arrives. A run reads the games and
+  // checks their art on disk before it asks, which can take a while on a busy
+  // machine, so the tests wait for this rather than for a set number of turns.
+  late Completer<void> firstRequest;
   var neverAnswer = false;
+  // Requests [neverAnswer] left unanswered, answered when the test is over.
+  final stalled = <Completer<http.Response>>[];
   final defaultTimeout = SteamScraperService.requestTimeout;
 
   setUp(() async {
@@ -39,6 +45,7 @@ void main() {
 
     storeRequests = [];
     holdFirst = null;
+    firstRequest = Completer<void>();
     neverAnswer = false;
     SteamScraperService.debugUseHttpClient(
       MockClient((request) async {
@@ -47,7 +54,12 @@ void main() {
         }
         final appId = request.url.queryParameters['appids']!;
         storeRequests.add(appId);
-        if (neverAnswer) return Completer<http.Response>().future;
+        if (!firstRequest.isCompleted) firstRequest.complete();
+        if (neverAnswer) {
+          final reply = Completer<http.Response>();
+          stalled.add(reply);
+          return reply.future;
+        }
         final hold = holdFirst;
         if (hold != null && storeRequests.length == 1) await hold.future;
         return http.Response(
@@ -71,6 +83,17 @@ void main() {
   });
 
   tearDown(() async {
+    // A test that failed can leave its run going, with a request still held.
+    // Let it finish here, against this test's mock and database: otherwise it
+    // carries on into the next test, or asks the real Steam Store once the
+    // mock is gone.
+    if (holdFirst?.isCompleted == false) holdFirst!.complete();
+    neverAnswer = false;
+    for (final reply in stalled) {
+      if (!reply.isCompleted) reply.complete(http.Response('', 504));
+    }
+    stalled.clear();
+    await SteamScraperService.scrapeSteamGames();
     SteamScraperService.debugUseHttpClient(null);
     SteamScraperService.requestTimeout = defaultTimeout;
     SteamScraperService.debugForgetProvider();
@@ -83,6 +106,12 @@ void main() {
     'rom_path': '/roms/steam/Game $appId.steam',
     'title_id': appId,
   });
+
+  /// Waits for the first Store request, failing if none comes.
+  Future<void> untilFirstRequest() => firstRequest.future.timeout(
+    const Duration(seconds: 10),
+    onTimeout: () => fail('no Store request was made'),
+  );
 
   Future<bool> scraped(String appId) async {
     final rows = await db.rawQuery(
@@ -100,6 +129,9 @@ void main() {
 
       final launch = SteamScraperService.scrapeSteamGames();
       final scan = SteamScraperService.scrapeSteamGames();
+      await untilFirstRequest();
+      // The first request is held, so however long this waits, only a second
+      // run of its own could add one.
       await pumpEventQueue();
       expect(storeRequests, [
         '100',
@@ -117,7 +149,7 @@ void main() {
     holdFirst = Completer<void>();
 
     final launch = SteamScraperService.scrapeSteamGames();
-    await pumpEventQueue();
+    await untilFirstRequest();
     // The startup scan finds a new game while the launch run is busy.
     await addGame('200');
     final scan = SteamScraperService.scrapeSteamGames();
@@ -135,7 +167,7 @@ void main() {
 
     // The scan's run (no provider) is busy when launch asks with its list.
     final scan = SteamScraperService.scrapeSteamGames();
-    await pumpEventQueue();
+    await untilFirstRequest();
     await addGame('200');
     final launch = SteamScraperService.scrapeSteamGames(provider: list);
     holdFirst!.complete();

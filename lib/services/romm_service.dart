@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show immutable, visibleForTesting;
@@ -155,6 +156,7 @@ class RommService {
     this.uploadResponseLimit = uploadResponseTimeout,
     this.assetRequestLimit = downloadRequestTimeout,
     this.assetStallLimit = downloadStallTimeout,
+    this.listingRetryWait = listingRetryDelay,
   });
 
   static final _log = LoggerService.instance;
@@ -1625,14 +1627,46 @@ class RommService {
     return [...results[0], ...results[1]];
   }
 
+  /// How long a save or state listing waits before asking again after a
+  /// server error, before [_listingRetryJitter].
+  @visibleForTesting
+  static const listingRetryDelay = Duration(milliseconds: 500);
+
+  /// [listingRetryDelay] for this service's listings.
+  final Duration listingRetryWait;
+
+  /// Spreads the retries out by up to half the wait: when both listings fail
+  /// together, retrying them at the same instant could meet the same conflict.
+  static final _listingRetryJitter = Random();
+
+  /// Lists [basePath]'s assets, for [romId] or all of them.
+  ///
+  /// A server error (5xx) is asked about once more after [listingRetryWait]
+  /// (plus up to half again). RomM can fail one listing on a passing database
+  /// conflict that the next request doesn't meet, and a listing is a plain
+  /// GET, so asking again changes nothing on the server. Nothing else is retried: a refusal or a
+  /// missing route would answer the same, and a timeout has already used the
+  /// time a pre-launch sync has.
   Future<List<RommAsset>> _listAssets(
     String basePath, {
     int? romId,
     required bool isState,
   }) async {
-    final resp = await _authedGet(
-      romId == null ? basePath : '$basePath?rom_id=$romId',
-    );
+    final pathAndQuery = romId == null ? basePath : '$basePath?rom_id=$romId';
+    final session = _session;
+    http.Response resp;
+    try {
+      resp = await _authedGet(pathAndQuery);
+    } on RommException catch (e) {
+      final status = e.statusCode;
+      if (status == null || status < 500) rethrow;
+      _log.w('RomM $basePath answered $status; asking once more');
+      await Future<void>.delayed(
+        listingRetryWait * (1 + _listingRetryJitter.nextDouble() / 2),
+      );
+      _checkSession(session);
+      resp = await _authedGet(pathAndQuery);
+    }
     return _itemsOf(jsonDecode(resp.body))
         .whereType<Map<String, dynamic>>()
         .map((j) => RommAsset.fromJson(j, isState: isState))

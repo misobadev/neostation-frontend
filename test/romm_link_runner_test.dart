@@ -22,6 +22,7 @@ void main() {
     failed: 'Linking failed',
     unavailable: 'Not available right now',
     stoppedEarlyTemplate: 'Stopped early — linked {count} games so far',
+    partialTemplate: 'Linked {count} games; {failed} systems unread',
     failureTexts: {},
   );
 
@@ -38,6 +39,7 @@ void main() {
       failed: strings.failed,
       unavailable: strings.unavailable,
       stoppedEarlyTemplate: strings.stoppedEarlyTemplate,
+      partialTemplate: strings.partialTemplate,
       failureTexts: {
         for (final key in rommBrowseFailureKeys)
           key: AppLocale.en[key] as String,
@@ -129,6 +131,10 @@ void main() {
 
     test('done fills the count', () {
       expect(strings.done(1234), 'Linked 1234 games');
+    });
+
+    test('partial fills the count and the failed systems', () {
+      expect(strings.partial(7, 2), 'Linked 7 games; 2 systems unread');
     });
 
     test('stoppedEarly fills the count', () {

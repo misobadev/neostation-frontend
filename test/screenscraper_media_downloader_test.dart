@@ -4,8 +4,48 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/services/screenscraper/media_downloader.dart';
 import 'package:neostation/services/screenscraper/media_resolver.dart';
 import 'package:neostation/services/screenscraper/screenscraper_exceptions.dart';
+import 'package:neostation/utils/chunked_file_writer.dart';
 
 import 'database_test_helper.dart';
+
+/// A file handle that writes [bytesBeforeFull] bytes to its real file and then
+/// fails like a disk that has filled up.
+class _FillsUpAfter implements RandomAccessFile {
+  _FillsUpAfter(this._real, this.bytesBeforeFull);
+
+  final RandomAccessFile _real;
+  final int bytesBeforeFull;
+
+  @override
+  Future<RandomAccessFile> writeFrom(
+    List<int> buffer, [
+    int start = 0,
+    int? end,
+  ]) async {
+    final part = buffer.sublist(start, end);
+    await _real.writeFrom(part.take(bytesBeforeFull).toList());
+    if (part.length > bytesBeforeFull) {
+      throw const FileSystemException(
+        'writeFrom failed',
+        '',
+        OSError('No space left on device', 28),
+      );
+    }
+    return this;
+  }
+
+  @override
+  Future<RandomAccessFile> flush() async {
+    await _real.flush();
+    return this;
+  }
+
+  @override
+  Future<void> close() => _real.close();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 /// What a game's media download reports back: whether every file it wanted is
 /// now on disk, and whether it was cancelled. The scrape and the scrape session
@@ -132,6 +172,53 @@ void main() {
 
   test('a game with no media succeeds', () async {
     expect(await download([]), {'success': true, 'cancelled': false});
+  });
+
+  group('a write that fails part-way, as on a full disk', () {
+    setUp(() {
+      openFileForChunks = (file) async =>
+          _FillsUpAfter(await defaultOpenFileForChunks(file), 2);
+    });
+    tearDown(() => openFileForChunks = defaultOpenFileForChunks);
+
+    Future<List<String>> screenshotsFolder() async {
+      final dir = screenshot().parent;
+      if (!await dir.exists()) return [];
+      return [
+        for (final entry in await dir.list().toList())
+          entry.path.split(Platform.pathSeparator).last,
+      ];
+    }
+
+    test(
+      'leaves no file behind, so the next scrape fetches it again',
+      () async {
+        final result = await download([entry('ss', 'shot')]);
+
+        expect(result, {'success': false, 'cancelled': false});
+        expect(await screenshotsFolder(), isEmpty);
+
+        openFileForChunks = defaultOpenFileForChunks;
+        final retry = await download([entry('ss', 'shot')]);
+
+        expect(retry, {'success': true, 'cancelled': false});
+        expect(hits, {'shot': 2});
+        expect(await screenshot().length(), 4);
+      },
+    );
+
+    test('a forced overwrite keeps the file it would replace', () async {
+      await screenshot().create(recursive: true);
+      await screenshot().writeAsBytes([7, 7]);
+
+      final result = await download([
+        entry('ss', 'shot'),
+      ], forceOverwrite: true);
+
+      expect(result, {'success': false, 'cancelled': false});
+      expect(await screenshot().readAsBytes(), [7, 7]);
+      expect(await screenshotsFolder(), ['Game.png']);
+    });
   });
 
   test('media of no wanted type, or in an unsafe format, is skipped', () async {

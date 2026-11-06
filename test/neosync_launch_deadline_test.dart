@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:neostation/data/datasources/sqlite_service.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/sync_models.dart';
@@ -34,6 +35,15 @@ class _FakeNeoSync extends NeoSyncService {
   final uploads = <String>[];
   final downloads = <String>[];
 
+  /// The launch deadline each upload was handed, in order.
+  final uploadDeadlines = <SyncDeadline? Function()?>[];
+
+  /// What each upload's deadline answered when the upload was sent.
+  final deadlinesSeen = <SyncDeadline?>[];
+
+  /// When set, every upload waits on it.
+  Completer<void>? uploadGate;
+
   @override
   Future<Map<String, dynamic>> getAllFiles({NeoSyncFileFilter? filter}) async =>
       {'success': true, 'files': List<NeoSyncFile>.of(cloud)};
@@ -60,8 +70,12 @@ class _FakeNeoSync extends NeoSyncService {
     bool? isState,
     String? scope,
     String? type,
+    SyncDeadline? Function()? deadline,
   }) async {
     uploads.add(p.basename(file.path));
+    uploadDeadlines.add(deadline);
+    deadlinesSeen.add(deadline?.call());
+    await uploadGate?.future;
     return {'success': true};
   }
 }
@@ -147,6 +161,26 @@ void main() {
 
   Completer<void> hold(String id) => service.gates[id] = Completer<void>();
 
+  /// Waits until [name] has reached the service's upload.
+  Future<void> uploadStarted(String name) async {
+    for (var i = 0; i < 500; i++) {
+      if (service.uploads.contains(name)) return;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    fail('no upload of $name started');
+  }
+
+  /// What the deadline handed to the first upload answers, once it answers
+  /// anything (the launch registers its deadline after an await).
+  Future<SyncDeadline?> firstUploadSees() async {
+    for (var i = 0; i < 500; i++) {
+      final seen = service.uploadDeadlines.first?.call();
+      if (seen != null) return seen;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    return null;
+  }
+
   setUp(() async {
     final db = await dbHelper.setUp();
     await db.execute(
@@ -175,6 +209,8 @@ void main() {
   });
 
   tearDown(() async {
+    final uploadGate = service.uploadGate;
+    if (uploadGate != null && !uploadGate.isCompleted) uploadGate.complete();
     for (final gate in [
       ...service.gates.values,
       ...service.queued.values.expand((queue) => queue),
@@ -442,5 +478,136 @@ void main() {
 
     expect(ps2Card('Mcd002.ps2').readAsStringSync(), 'cloud Mcd002.ps2');
     expect(ps2Card('Mcd003.ps2').readAsStringSync(), 'cloud Mcd003.ps2');
+  });
+
+  group('a save sent while a launch is running is handed its deadline, so '
+      'a newer cloud copy found by the upload is not written late', () {
+    test("the launched game's own upload", () async {
+      gcSave('GameA.sav').writeAsStringSync('local only');
+      final deadline = SyncDeadline(const Duration(minutes: 1));
+
+      await provider.syncGameSavesBeforeLaunch(gameA, deadline: deadline);
+
+      expect(service.uploads, contains('GameA.sav'));
+      expect(service.deadlinesSeen, isNotEmpty);
+      for (final seen in service.deadlinesSeen) {
+        expect(seen, same(deadline));
+      }
+    });
+
+    test('an upload that started before the launch', () async {
+      // The games list syncs the highlighted game; the user launches it while
+      // that upload is still out.
+      gcSave('GameA.sav').writeAsStringSync('local only');
+      service.uploadGate = Completer<void>();
+      final highlight = provider.detectGameSaveFiles(gameA);
+      await uploadStarted('GameA.sav');
+
+      final deadline = SyncDeadline(const Duration(minutes: 1));
+      final launch = provider.syncGameSavesBeforeLaunch(
+        gameA,
+        deadline: deadline,
+      );
+
+      expect(await firstUploadSees(), same(deadline));
+      service.uploadGate!.complete();
+      await highlight;
+      await launch;
+    });
+
+    test("another game's upload is not held to it", () async {
+      gcSave('GameB.sav').writeAsStringSync('local only');
+      gcSave('GameA.sav').writeAsStringSync('local only');
+      service.uploadGate = Completer<void>();
+      final highlight = provider.detectGameSaveFiles(gameB);
+      await uploadStarted('GameB.sav');
+
+      final deadline = SyncDeadline(const Duration(minutes: 1));
+      final launch = provider.syncGameSavesBeforeLaunch(
+        gameA,
+        deadline: deadline,
+      );
+      // The launch is held on its own upload, so its deadline is registered
+      // while GameB's upload is asked.
+      await uploadStarted('GameA.sav');
+      SyncDeadline? Function()? handedTo(String name) =>
+          service.uploadDeadlines[service.uploads.indexOf(name)];
+
+      expect(handedTo('GameA.sav')?.call(), same(deadline));
+      expect(handedTo('GameB.sav')?.call(), isNull);
+      service.uploadGate!.complete();
+      await highlight;
+      await launch;
+    });
+
+    test('a shared memory card uploaded for one game, by a launch of another '
+        'game on its system', () async {
+      // Highlighting a PS2 game uploads the system's ARMSX2 card; the user then
+      // launches a different PS2 game, which plays on the same card.
+      File(p.join(ps2Folder.path, 'Mcd001.ps2')).writeAsStringSync('card');
+      // A second card, only in the cloud and held, keeps the launch running.
+      service.cloud = [
+        cloudSave('Mcd003.ps2', system: 'ps2', emulator: 'armsx2'),
+      ];
+      final held = hold('Mcd003.ps2');
+      service.uploadGate = Completer<void>();
+      final highlight = provider.detectGameSaveFiles(_game('GameP.iso', 'ps2'));
+      await uploadStarted('Mcd001.ps2');
+
+      final deadline = SyncDeadline(const Duration(minutes: 1));
+      final launch = provider.syncGameSavesBeforeLaunch(
+        _game('GameQ.iso', 'ps2'),
+        deadline: deadline,
+      );
+
+      expect(await firstUploadSees(), same(deadline));
+      service.uploadGate!.complete();
+      held.complete();
+      await highlight;
+      await launch;
+    });
+
+    test("a game's save in a standalone folder, by that game's "
+        'launch', () async {
+      await (await SqliteService.getDatabase()).execute(
+        'INSERT INTO user_roms (app_system_id, app_emulator_unique_id, '
+        'app_emulator_os_id, filename, rom_path, cloud_sync_enabled) '
+        "VALUES ('gc', 'gc.dolphin', 3, 'GameA.iso', '/roms/gc/GameA.iso', 1)",
+      );
+      gcSave('GameA.sav').writeAsStringSync('local only');
+      service.uploadGate = Completer<void>();
+      final folder = provider.syncCustomSaveFolder('gc', 'dolphin');
+      await uploadStarted('GameA.sav');
+
+      final deadline = SyncDeadline(const Duration(minutes: 1));
+      final launch = provider.syncGameSavesBeforeLaunch(
+        gameA,
+        deadline: deadline,
+      );
+
+      expect(await firstUploadSees(), same(deadline));
+      service.uploadGate!.complete();
+      await folder;
+      await launch;
+    });
+
+    test("a shared memory card in a standalone folder, by a launch on its "
+        'system', () async {
+      File(p.join(ps2Folder.path, 'Mcd001.ps2')).writeAsStringSync('card');
+      service.uploadGate = Completer<void>();
+      final folder = provider.syncCustomSaveFolder('ps2', 'armsx2');
+      await uploadStarted('Mcd001.ps2');
+
+      final deadline = SyncDeadline(const Duration(minutes: 1));
+      final launch = provider.syncGameSavesBeforeLaunch(
+        _game('GameP.iso', 'ps2'),
+        deadline: deadline,
+      );
+
+      expect(await firstUploadSees(), same(deadline));
+      service.uploadGate!.complete();
+      await folder;
+      await launch;
+    });
   });
 }

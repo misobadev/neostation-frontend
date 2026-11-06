@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
+import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/models/user.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/repositories/neosync_save_folder_repository.dart';
@@ -63,6 +64,7 @@ class _FakeNeoSync extends NeoSyncService {
     bool? isState,
     String? scope,
     String? type,
+    SyncDeadline? Function()? deadline,
   }) async {
     if (accountFull) {
       return {'success': false, 'message': 'Storage quota exceeded'};
@@ -81,6 +83,14 @@ class _FakeNeoSync extends NeoSyncService {
   Future<Map<String, dynamic>> deleteFile(String fileId) async {
     cloud = cloud.where((f) => f.id != fileId).toList();
     return {'success': true};
+  }
+
+  /// The save list's paged listing, which a delete reloads. Separate from the
+  /// game-sync listing above, so it isn't counted in [listCalls].
+  @override
+  Future<Map<String, dynamic>> getFiles({NeoSyncFileFilter? filter}) async {
+    final files = List<NeoSyncFile>.of(cloud);
+    return {'success': true, 'files': files, 'total': files.length};
   }
 }
 

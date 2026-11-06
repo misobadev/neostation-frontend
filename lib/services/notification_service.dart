@@ -5,8 +5,7 @@ import 'package:web_socket_channel/status.dart' as status;
 import 'package:neostation/models/notification_models.dart';
 import 'package:neostation/utils/app_config.dart';
 import 'package:flutter/material.dart';
-import 'package:neostation/widgets/plan_welcome_modal.dart';
-import 'package:neostation/widgets/plan_farewell_modal.dart';
+import 'package:neostation/widgets/plan_change_notice.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
@@ -127,26 +126,22 @@ class NotificationService extends ChangeNotifier {
       final context = _modalContext();
       if (context != null && context.mounted) {
         try {
-          final currentPlan = _authService.currentUser?.plan;
-
-          if (currentPlan != null) {
-            final isUpgrade =
-                notification.eventType == NotificationType.planUpgraded ||
-                (notification.data['new_plan'] != null &&
-                    notification.data['old_plan'] != null &&
-                    _isUpgrade(
-                      notification.data['old_plan'],
-                      notification.data['new_plan'],
-                    ));
-
-            if (isUpgrade) {
-              PlanWelcomeModal.show(context, currentPlan);
-            } else {
-              final oldPlan = notification.data['old_plan'];
-              if (oldPlan != null) {
-                PlanFarewellModal.show(context, oldPlan, currentPlan);
-              }
-            }
+          // The event's own plans: the profile reload it starts may not
+          // have answered yet, so the loaded plan can still be the old one.
+          final to =
+              notification.data['new_plan']?.toString() ??
+              _authService.currentUser?.plan;
+          if (to != null) {
+            PlanChangeNotice.show(
+              context,
+              account: _authService.currentUser?.id,
+              from: notification.data['old_plan']?.toString(),
+              to: to,
+              // Otherwise compared from the two plans.
+              upgrade: notification.eventType == NotificationType.planUpgraded
+                  ? true
+                  : null,
+            );
           }
         } catch (e) {
           _log.e('Error showing plan update modal: $e');
@@ -165,16 +160,6 @@ class NotificationService extends ChangeNotifier {
     } catch (e) {
       _log.e('Error refreshing data on plan update: $e');
     }
-  }
-
-  /// Determines if a plan change transition constitutes an upgrade.
-  bool _isUpgrade(String oldPlan, String newPlan) {
-    final levels = {'free': 0, 'micro': 1, 'mini': 2, 'mega': 3, 'ultra': 4};
-
-    final oldLevel = levels[oldPlan.toLowerCase()] ?? 0;
-    final newLevel = levels[newPlan.toLowerCase()] ?? 0;
-
-    return newLevel > oldLevel;
   }
 
   Future<String?> _getToken() async {

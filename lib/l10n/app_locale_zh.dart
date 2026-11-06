@@ -372,6 +372,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.rommLinkLibraryFailed: '链接失败',
   AppLocale.rommLinkLibraryUnavailable: '当前不可用',
   AppLocale.rommLinkLibraryStoppedEarly: '提前停止 — 目前已关联 {count} 个游戏',
+  AppLocale.rommLinkLibraryPartial: '已链接 {count} 个游戏。无法读取的系统：{failed}',
   AppLocale.rematchAchievementsSubtitle: '扫描整个库来查找成就集，而不是逐个打开游戏',
   AppLocale.rematchAchievementsWarning:
       '这会读取每个未匹配的 ROM 以识别它，在大型库上可能需要一些时间。再次选择即可暂停：已匹配的内容会保留，再次运行会从中断处继续。光盘镜像也会读取，但每个只读取少量扇区。不会移动或删除任何文件。',
@@ -527,6 +528,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.backWithB: '返回 (B)',
   AppLocale.cancelSubscription: '取消订阅',
   AppLocale.cancelSubscriptionConfirm: '您确定要取消订阅吗？在当前周期结束前，您仍可继续使用。',
+  AppLocale.subscriptionCancelledKeepPlan: '您的订阅已取消。在当前计费周期结束前，您仍可使用当前套餐。',
   AppLocale.keepSubscription: '保持订阅',
   AppLocale.deleteCloudSave: '删除云端存档',
   AppLocale.deleteCloudSaveConfirm: '确定要从云端永久删除此存档吗？',

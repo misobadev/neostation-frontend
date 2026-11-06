@@ -20,6 +20,7 @@ import '../services/romm_playtime_service.dart';
 import '../services/romm_service.dart';
 import '../services/storage_space_service.dart';
 import '../services/user_data_location_service.dart';
+import '../utils/atomic_file_writer.dart';
 import '../utils/log_redaction.dart';
 import '../utils/romm_local_matcher.dart';
 import 'file_provider.dart';
@@ -2654,9 +2655,8 @@ class RommProvider extends ChangeNotifier {
         indexedName,
         ext,
       );
-      final destFile = File(dest);
-      await destFile.parent.create(recursive: true);
-      await destFile.writeAsBytes(bytes);
+      // A file left half-written would count as local art from then on.
+      await writeFileAtomically(File(dest), bytes);
       for (final other in siblingExts) {
         if (other == ext) continue;
         final stale = File(

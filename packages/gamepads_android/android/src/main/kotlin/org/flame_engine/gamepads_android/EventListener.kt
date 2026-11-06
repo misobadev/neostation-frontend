@@ -15,7 +15,12 @@ class EventListener {
     companion object {
         private const val EPSILON = 0.001
     }
-    private val lastAxisValue = mutableMapOf<Int, Float>()
+    // The last value sent for each pad's axis. Keyed by pad as well as axis:
+    // every motion event re-reports all of a pad's axes, so with one entry
+    // per axis shared by every pad, another pad's report could overwrite it,
+    // and the first pad's return to rest would then be skipped as "no
+    // change", leaving its stick, trigger or hat held in the app.
+    private val lastAxisValue = mutableMapOf<Pair<Int, Int>, Float>()
     // Reference: https://developer.android.com/reference/android/view/MotionEvent
     private val supportedAxes = listOf(
         SupportedAxis(MotionEvent.AXIS_X),
@@ -68,14 +73,15 @@ class EventListener {
         val value = motionEvent.getAxisValue(axis.axisId) * multiplier
 
         // No-op if threshold is not met
-        val lastValue = lastAxisValue[axis.axisId]
+        val key = motionEvent.deviceId to axis.axisId
+        val lastValue = lastAxisValue[key]
         if (lastValue is Float) {
             if (abs(value - lastValue) < EPSILON) {
                 return true
             }
         }
         // Update last value
-        lastAxisValue[axis.axisId] = value
+        lastAxisValue[key] = value
 
         val arguments = mapOf(
             "gamepadId" to motionEvent.deviceId.toString(),

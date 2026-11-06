@@ -284,8 +284,9 @@ class DiscoveryService {
           : DateTime.tryParse(lastPlayedRaw.toString()),
       playTimeSeconds: (row['play_time'] as num?)?.toInt() ?? 0,
       // A scraped game is one with metadata to show. `is_fully_scraped` only
-      // goes up when a scrape's media step succeeds, so it is taken as
-      // sufficient evidence but never as necessary — see
+      // goes up when a scrape has finished (its media step succeeded, or every
+      // media type was off), so it is taken as sufficient evidence but never
+      // as necessary — see
       // [DiscoveryCandidate.isScraped].
       isScraped:
           _isTrue(row['is_fully_scraped']) ||

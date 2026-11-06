@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -203,6 +204,17 @@ class UserDataLocationService {
     return direct;
   }
 
+  /// Runs after each file is copied and before the copy is checked, with the
+  /// source and its copy. Replaceable so a test can do what the running app
+  /// does meanwhile, such as write to its log.
+  @visibleForTesting
+  static Future<void> Function(String src, String copy)? debugAfterCopy;
+
+  /// Runs before each checked copy is renamed into place. Replaceable so a
+  /// test can make the rename fail, as it does across drives.
+  @visibleForTesting
+  static Future<void> Function(String copy, String dest)? debugBeforeRename;
+
   /// Folders only NeoStation creates: imported colour themes and the
   /// RetroAchievements response cache. Neither name is used by ES-DE.
   static const Set<String> _ownedFolders = {'custom_themes', 'ra_cache'};
@@ -243,10 +255,18 @@ class UserDataLocationService {
   /// [_collectArtPackJobs]) are copied or deleted.
   /// Foreign files that happen to share the folder are never read or removed.
   ///
-  /// A source file is deleted ONLY after its destination copy is verified
-  /// (exists, matching length). If ANY owned file fails to copy, the whole
-  /// operation aborts and nothing is deleted — the source stays fully intact
-  /// and the error is thrown to the caller.
+  /// Everything is first copied into a staging folder inside [destPath] and
+  /// checked against the source's length taken before its copy. Only when
+  /// every copy has passed are the files renamed into place; a source file is
+  /// deleted only after that. If ANY owned file fails to copy, the whole
+  /// operation aborts: the staging folder is removed, so the destination is
+  /// left exactly as it was, nothing is deleted, and the error is thrown to
+  /// the caller. Logs are the exception: the running app keeps writing to
+  /// them, so a log copy only has to hold what the log held when its copy
+  /// started, and a log that still fails is left where it was. Should putting
+  /// the checked copies in place fail partway, the staging folder is still
+  /// removed and the source is still left intact, but the files already moved
+  /// stay in the destination.
   ///
   /// On platforms where media lives outside user-data (Linux/macOS),
   /// [sourceMediaPath] is also migrated into [destPath]/media/.
@@ -287,12 +307,13 @@ class UserDataLocationService {
     }
 
     final destDir = Directory(destPath);
-    if (!await destDir.exists()) {
-      await destDir.create(recursive: true);
-    }
+    final createdDest = !await destDir.exists();
+    if (createdDest) await destDir.create(recursive: true);
 
     // ---- Collect copy jobs from OWNED entries only ----
     final List<(String, String)> copyJobs = []; // (src, dest)
+    // Folders inside owned folders, created at the destination with the files.
+    final List<String> destSubDirs = [];
     // Owned directories whose now-empty tree we prune after deleting files.
     final List<String> ownedSourceDirs = [];
 
@@ -303,6 +324,7 @@ class UserDataLocationService {
           sourceDir: entity.path,
           destDir: path.join(destPath, name),
           jobs: copyJobs,
+          dirs: destSubDirs,
           ownedDirs: ownedSourceDirs,
         );
         continue;
@@ -315,6 +337,7 @@ class UserDataLocationService {
           sourceDir: entity.path,
           destDir: path.join(destPath, name),
           jobs: copyJobs,
+          dirs: destSubDirs,
         );
         ownedSourceDirs.add(entity.path);
       }
@@ -330,28 +353,63 @@ class UserDataLocationService {
         sourceDir: sourceMediaPath,
         destDir: destMediaPath,
         jobs: copyJobs,
+        dirs: destSubDirs,
       );
       ownedSourceDirs.add(sourceMediaPath);
     }
 
     final total = copyJobs.isEmpty ? 1 : copyJobs.length;
 
-    // ---- Copy phase (0.0 → 0.5) with per-file verification ----
+    // ---- Copy phase (0.0 → 0.5) into staging, with per-file verification ----
+    // Copying straight into place would replace same-named files already in
+    // the destination before the move knew it could finish. The staging folder
+    // is this move's own, so giving up only has to remove it.
+    final Directory staging;
+    try {
+      staging = await destDir.createTemp('.neostation-move-');
+    } catch (_) {
+      if (createdDest && await destDir.list().isEmpty) await destDir.delete();
+      rethrow;
+    }
+    Future<Never> abort(String reason) async {
+      try {
+        await staging.delete(recursive: true);
+        if (createdDest && await destDir.list().isEmpty) await destDir.delete();
+      } catch (e) {
+        _log.w('Migration: could not remove ${staging.path}: $e');
+      }
+      throw Exception('Migration aborted: $reason Source data left intact.');
+    }
+
     int copied = 0;
     final List<String> failedCopies = [];
+    final List<(String, String, String)> staged = []; // (src, copy, dest)
     for (final (src, dest) in copyJobs) {
+      final copy = path.join(staging.path, path.relative(dest, from: destPath));
+      final isLog = path.basename(src).startsWith('app.log');
       try {
-        final destFile = File(dest);
-        await destFile.parent.create(recursive: true);
-        await File(src).copy(dest);
-        // Verify the copy landed intact before it becomes eligible for delete.
+        // Measured before the copy: a file still being written to, such as
+        // the log, is longer by the time the copy has finished.
         final srcLen = await File(src).length();
-        if (!await destFile.exists() || await destFile.length() != srcLen) {
+        await Directory(path.dirname(copy)).create(recursive: true);
+        await File(src).copy(copy);
+        await debugAfterCopy?.call(src, copy);
+        final copyLen = await File(copy).length();
+        if (copyLen == srcLen || (isLog && copyLen > srcLen)) {
+          staged.add((src, copy, dest));
+        } else if (isLog) {
+          _log.w('Migration: $src did not copy whole; left where it was');
+        } else {
           failedCopies.add(src);
+          _log.e('Migration: $src copied $copyLen of $srcLen bytes');
         }
       } catch (e) {
-        failedCopies.add(src);
-        _log.e('Migration copy failed for $src: $e');
+        if (isLog) {
+          _log.w('Migration: could not copy $src; left where it was: $e');
+        } else {
+          failedCopies.add(src);
+          _log.e('Migration copy failed for $src: $e');
+        }
       }
       copied++;
       onProgress?.call(0.5 * copied / total, path.basename(src));
@@ -360,20 +418,79 @@ class UserDataLocationService {
     // SAFETY GATE: if any owned file failed to copy, delete NOTHING. The source
     // stays fully intact; the caller surfaces the error and keeps the old path.
     if (failedCopies.isNotEmpty) {
-      throw Exception(
-        'Migration aborted: ${failedCopies.length} of ${copyJobs.length} '
-        'file(s) failed to copy. Source data left intact.',
+      await abort(
+        '${failedCopies.length} of ${copyJobs.length} file(s) failed to copy.',
       );
     }
 
-    _log.i('Migration: $copied files copied to $destPath');
+    // A folder already where a file goes (or a file where a folder goes) would
+    // stop the files halfway into place: check every one before moving any.
+    final checked = <String>{};
+    Future<void> checkFolder(String dir) async {
+      // A folder seen before had its parents checked then too.
+      for (
+        var d = dir;
+        path.isWithin(destPath, d) && checked.add(d);
+        d = path.dirname(d)
+      ) {
+        if (await FileSystemEntity.isFile(d)) await abort('$d is a file.');
+      }
+    }
+
+    for (final dir in destSubDirs) {
+      await checkFolder(dir);
+    }
+    for (final (_, _, dest) in staged) {
+      if (await FileSystemEntity.isDirectory(dest)) {
+        await abort('$dest is a folder.');
+      }
+      await checkFolder(path.dirname(dest));
+    }
+
+    // ---- Commit: into place, a rename within the destination's own folder ----
+    try {
+      final made = <String>{};
+      for (final dir in destSubDirs) {
+        if (made.add(dir)) await Directory(dir).create(recursive: true);
+      }
+      for (final (_, copy, dest) in staged) {
+        final parent = path.dirname(dest);
+        if (made.add(parent)) await Directory(parent).create(recursive: true);
+        try {
+          await debugBeforeRename?.call(copy, dest);
+          await File(copy).rename(dest);
+        } on FileSystemException {
+          // A folder in the destination can be a link to another drive, which
+          // a rename can't cross: copy the file there instead.
+          final length = await File(copy).length();
+          await File(copy).copy(dest);
+          if (await File(dest).length() != length) {
+            throw FileSystemException('Copy came out short', dest);
+          }
+          await File(copy).delete();
+        }
+      }
+    } catch (e) {
+      // Nothing has been deleted from the source, so nothing is lost, but
+      // some files may already be in place.
+      _log.e('Migration: could not put the copies in place: $e');
+      await abort('could not put the copies in place ($e).');
+    }
+    try {
+      await staging.delete(recursive: true);
+    } catch (e) {
+      _log.w('Migration: could not remove ${staging.path}: $e');
+    }
+
+    _log.i('Migration: ${staged.length} files copied to $destPath');
 
     // ---- Delete phase (0.5 → 1.0) ----
-    // Delete ONLY the source files we successfully copied (all verified above).
-    // Foreign files were never added to copyJobs, so they are never deleted.
+    // Delete ONLY the source files now in place at the destination. Foreign
+    // files were never added to copyJobs, and a log that didn't copy whole
+    // was never staged, so neither is deleted.
     int deleted = 0;
-    final deleteTotal = copyJobs.isEmpty ? 1 : copyJobs.length;
-    for (final (src, _) in copyJobs) {
+    final deleteTotal = staged.isEmpty ? 1 : staged.length;
+    for (final (src, _, _) in staged) {
       try {
         await File(src).delete();
       } catch (e) {
@@ -416,6 +533,7 @@ class UserDataLocationService {
     required String sourceDir,
     required String destDir,
     required List<(String, String)> jobs,
+    required List<String> dirs,
     required List<String> ownedDirs,
   }) async {
     await for (final entity in Directory(sourceDir).list()) {
@@ -430,6 +548,7 @@ class UserDataLocationService {
           sourceDir: entity.path,
           destDir: path.join(destDir, name),
           jobs: jobs,
+          dirs: dirs,
         );
         ownedDirs.add(entity.path);
       }
@@ -445,21 +564,21 @@ class UserDataLocationService {
     }
   }
 
+  /// Adds a copy job for each file under [sourceDir], and each folder under it
+  /// to [dirs]: folders are only created at the destination once the move is
+  /// sure to finish.
   static Future<void> _collectCopyJobs({
     required String sourceDir,
     required String destDir,
     required List<(String, String)> jobs,
+    required List<String> dirs,
   }) async {
     await for (final entity in Directory(sourceDir).list(recursive: true)) {
+      final relativePath = path.relative(entity.path, from: sourceDir);
       if (entity is File) {
-        final relativePath = path.relative(entity.path, from: sourceDir);
         jobs.add((entity.path, path.join(destDir, relativePath)));
       } else if (entity is Directory) {
-        final relativePath = path.relative(entity.path, from: sourceDir);
-        final newDir = Directory(path.join(destDir, relativePath));
-        if (!await newDir.exists()) {
-          await newDir.create(recursive: true);
-        }
+        dirs.add(path.join(destDir, relativePath));
       }
     }
   }

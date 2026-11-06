@@ -8,6 +8,7 @@ import '../repositories/scraper_repository.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/providers/sqlite_database_provider.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/utils/atomic_file_writer.dart';
 
 /// Service responsible for fetching metadata and media from the Steam Store API.
 ///
@@ -286,7 +287,8 @@ class SteamScraperService {
       final response = await _get(Uri.parse(url), imageTimeout);
 
       if (response.statusCode == 200) {
-        await file.writeAsBytes(response.bodyBytes);
+        // A file left half-written would count as downloaded from then on.
+        await writeFileAtomically(file, response.bodyBytes);
       }
     } catch (e) {
       _log.e('SteamScraper: Network failure downloading $url', error: e);
