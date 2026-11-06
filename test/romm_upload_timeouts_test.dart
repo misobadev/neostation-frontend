@@ -708,7 +708,8 @@ void main() {
         'password': 'secret',
         'scope':
             'me.read roms.read platforms.read assets.read assets.write '
-            'collections.read firmware.read roms.user.read roms.user.write',
+            'collections.read firmware.read roms.user.read roms.user.write '
+            'devices.read',
       });
     });
 

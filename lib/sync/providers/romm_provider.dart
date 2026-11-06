@@ -2069,7 +2069,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   ///
   /// Never throws: a failure here must not stop the upload sweep that follows.
   Future<void> pullRecentPlaytime() async {
-    if (!_browse.isConnected || !_svc.playtimeSyncAvailable) return;
+    if (!_browse.isConnected || !_svc.playtimePullAvailable) return;
 
     final List<RommRom> recent;
     try {
