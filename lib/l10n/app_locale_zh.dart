@@ -1125,6 +1125,12 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.migratingUserData: '正在迁移数据',
   AppLocale.migratingUserDataComplete: '迁移完成',
   AppLocale.migratingUserDataError: '迁移失败',
+  AppLocale.userDataMoveBusy: 'NeoStation 正忙：正在进行扫描、刮削、同步、导入或运行工具。请在完成后再移动数据。',
+  AppLocale.userDataMoveNoSpace: '新文件夹的可用空间不足。你的数据仍在当前文件夹中。',
+  AppLocale.userDataMoveBlocked:
+      '新文件夹中有与 NeoStation 的文件或文件夹同名的项目。你的数据仍在当前文件夹中。',
+  AppLocale.userDataMoveOverlapping: '新文件夹不能位于当前文件夹内，也不能包含当前文件夹。请选择其他文件夹。',
+  AppLocale.userDataMoveFailed: '无法移动你的数据。数据仍在当前文件夹中。',
   AppLocale.migratingFiles: '正在复制 {current}/{total} 个文件...',
   AppLocale.restartRequired: '需要重启',
   AppLocale.restartRequiredBody: 'NeoStation 即将关闭，请重新打开以使用新位置。',

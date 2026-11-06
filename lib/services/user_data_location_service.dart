@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:neostation/repositories/database_file_repository.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/logger_service.dart';
@@ -11,9 +12,90 @@ import 'package:neostation/services/neo_assets_service.dart';
 import 'package:neostation/services/retro_achievements_cache.dart';
 import 'package:neostation/services/screenscraper/media_resolver.dart';
 
+/// What stopped a user-data move, for the message the user sees.
+enum UserDataMoveFailureKind {
+  /// A move, scan, scrape, sync, import or library tool is running.
+  busy,
+
+  /// The new folder's drive is full.
+  noSpace,
+
+  /// A file or folder in the new folder is where the move puts one of its own.
+  blocked,
+
+  /// One folder is inside the other.
+  overlapping,
+
+  /// NeoStation may not write to the new folder.
+  notWritable,
+
+  /// Anything else.
+  other,
+}
+
+/// Why [UserDataLocationService.migrateData] stopped. The user data is still
+/// in its current folder, and still in use.
+class UserDataMoveFailure implements Exception {
+  const UserDataMoveFailure(this.kind, this.detail);
+
+  /// The [UserDataMoveFailureKind] an error from the file system comes down to.
+  factory UserDataMoveFailure.from(Object error, {bool? windows}) =>
+      UserDataMoveFailure(kindOf(error, windows: windows), '$error');
+
+  final UserDataMoveFailureKind kind;
+
+  /// English, for the log only.
+  final String detail;
+
+  /// The [UserDataMoveFailureKind] of [error]: a file system error says
+  /// whether the drive was full or the folder is off limits; a database
+  /// copy, whether its drive was full.
+  static UserDataMoveFailureKind kindOf(Object error, {bool? windows}) {
+    if (error is UserDataMoveFailure) return error.kind;
+    if (error is DatabaseCopyFailure) {
+      return error.diskFull
+          ? UserDataMoveFailureKind.noSpace
+          : UserDataMoveFailureKind.other;
+    }
+    final code = error is FileSystemException ? error.osError?.errorCode : null;
+    if (code == null) return UserDataMoveFailureKind.other;
+    // The same numbers mean different things on Windows (5 is EIO elsewhere).
+    final (noSpace, denied) = (windows ?? Platform.isWindows)
+        ? (_windowsNoSpace, _windowsDenied)
+        : (_posixNoSpace, _posixDenied);
+    if (noSpace.contains(code)) return UserDataMoveFailureKind.noSpace;
+    if (denied.contains(code)) return UserDataMoveFailureKind.notWritable;
+    return UserDataMoveFailureKind.other;
+  }
+
+  // ENOSPC; EDQUOT on Linux and Android, then on macOS.
+  static const _posixNoSpace = {28, 122, 69};
+  // EPERM, EACCES, EROFS.
+  static const _posixDenied = {1, 13, 30};
+  // ERROR_HANDLE_DISK_FULL, ERROR_DISK_FULL.
+  static const _windowsNoSpace = {39, 112};
+  // ERROR_ACCESS_DENIED, ERROR_WRITE_PROTECT.
+  static const _windowsDenied = {5, 19};
+
+  @override
+  String toString() => 'UserDataMoveFailure(${kind.name}): $detail';
+}
+
 class UserDataLocationService {
   static const String customPathKey = 'custom_user_data_path';
   static final _log = LoggerService.instance;
+
+  /// The database's file name in the user-data folder.
+  static const String _databaseName = 'data.sqlite';
+
+  /// SQLite's own files beside the database. The move never copies them: the
+  /// database is copied whole through SQLite instead (see [migrateData]).
+  static const List<String> _databaseSidecars = ['-wal', '-shm', '-journal'];
+
+  static bool _moving = false;
+
+  /// A move is running, from any screen.
+  static bool get isMoving => _moving;
 
   static Future<String?> getCustomPath() async {
     final prefs = await SharedPreferences.getInstance();
@@ -268,13 +350,57 @@ class UserDataLocationService {
   /// removed and the source is still left intact, but the files already moved
   /// stay in the destination.
   ///
+  /// The database is the open one, which the app keeps writing to, so it is
+  /// not copied as files: [DatabaseFileRepository.snapshotTo] copies it whole,
+  /// last of all so the fewest writes come after its copy, and its `-wal`,
+  /// `-shm` and `-journal` are never copied. Stale ones in the destination
+  /// are removed as the copy goes into place, or SQLite would apply them to
+  /// it. Once everything is in place the new folder is saved as the user-data
+  /// location and the database is closed, so the next access opens the copy;
+  /// only then are the sources deleted. Writes made after the database's copy
+  /// and before it closes are not in the copy, which is why callers refuse to
+  /// move while a scan, scrape, sync or import is running.
+  ///
   /// On platforms where media lives outside user-data (Linux/macOS),
   /// [sourceMediaPath] is also migrated into [destPath]/media/.
   ///
   /// Progress is reported in two phases via [onProgress]:
   ///   - Copy phase: 0.0 → 0.5
   ///   - Delete phase: 0.5 → 1.0
+  ///
+  /// Throws a [UserDataMoveFailure], with the user data still in its current
+  /// folder and in use; [UserDataMoveFailureKind.busy] if a move is already
+  /// running.
   static Future<void> migrateData({
+    required String sourceUserDataPath,
+    required String sourceMediaPath,
+    required String destPath,
+    void Function(double progress, String currentFile)? onProgress,
+  }) async {
+    if (_moving) {
+      throw const UserDataMoveFailure(
+        UserDataMoveFailureKind.busy,
+        'Another move is running',
+      );
+    }
+    _moving = true;
+    try {
+      await _migrate(
+        sourceUserDataPath: sourceUserDataPath,
+        sourceMediaPath: sourceMediaPath,
+        destPath: destPath,
+        onProgress: onProgress,
+      );
+    } on UserDataMoveFailure {
+      rethrow;
+    } catch (e) {
+      throw UserDataMoveFailure.from(e);
+    } finally {
+      _moving = false;
+    }
+  }
+
+  static Future<void> _migrate({
     required String sourceUserDataPath,
     required String sourceMediaPath,
     required String destPath,
@@ -282,7 +408,10 @@ class UserDataLocationService {
   }) async {
     final sourceDir = Directory(sourceUserDataPath);
     if (!await sourceDir.exists()) {
-      throw Exception('Source path does not exist: $sourceUserDataPath');
+      throw UserDataMoveFailure(
+        UserDataMoveFailureKind.other,
+        'Source path does not exist: $sourceUserDataPath',
+      );
     }
 
     // Guard against source and destination being the same folder (or one
@@ -300,7 +429,8 @@ class UserDataLocationService {
     }
     if (path.isWithin(canonSource, canonDest) ||
         path.isWithin(canonDest, canonSource)) {
-      throw Exception(
+      throw UserDataMoveFailure(
+        UserDataMoveFailureKind.overlapping,
         'Cannot migrate between overlapping folders: '
         '$sourceUserDataPath <-> $destPath',
       );
@@ -316,49 +446,74 @@ class UserDataLocationService {
     final List<String> destSubDirs = [];
     // Owned directories whose now-empty tree we prune after deleting files.
     final List<String> ownedSourceDirs = [];
+    // The database's own files, copied through SQLite (see migrateData).
+    String? sourceDatabase;
+    final List<String> sourceDatabaseSidecars = [];
 
-    await for (final entity in sourceDir.list()) {
-      final name = path.basename(entity.path);
-      if (name == _artPackFolder && entity is Directory) {
-        await _collectArtPackJobs(
-          sourceDir: entity.path,
-          destDir: path.join(destPath, name),
-          jobs: copyJobs,
-          dirs: destSubDirs,
-          ownedDirs: ownedSourceDirs,
-        );
-        continue;
+    try {
+      await for (final entity in sourceDir.list()) {
+        final name = path.basename(entity.path);
+        if (entity is File && name == _databaseName) {
+          sourceDatabase = entity.path;
+          continue;
+        }
+        if (entity is File &&
+            _databaseSidecars.any(
+              (suffix) => name == '$_databaseName$suffix',
+            )) {
+          sourceDatabaseSidecars.add(entity.path);
+          continue;
+        }
+        if (name == _artPackFolder && entity is Directory) {
+          await _collectArtPackJobs(
+            sourceDir: entity.path,
+            destDir: path.join(destPath, name),
+            jobs: copyJobs,
+            dirs: destSubDirs,
+            ownedDirs: ownedSourceDirs,
+          );
+          continue;
+        }
+        if (!_isOwnedEntry(name)) continue; // leave foreign data untouched
+        if (entity is File) {
+          copyJobs.add((entity.path, path.join(destPath, name)));
+        } else if (entity is Directory) {
+          await _collectCopyJobs(
+            sourceDir: entity.path,
+            destDir: path.join(destPath, name),
+            jobs: copyJobs,
+            dirs: destSubDirs,
+          );
+          ownedSourceDirs.add(entity.path);
+        }
       }
-      if (!_isOwnedEntry(name)) continue; // leave foreign data untouched
-      if (entity is File) {
-        copyJobs.add((entity.path, path.join(destPath, name)));
-      } else if (entity is Directory) {
-        await _collectCopyJobs(
-          sourceDir: entity.path,
-          destDir: path.join(destPath, name),
-          jobs: copyJobs,
-          dirs: destSubDirs,
-        );
-        ownedSourceDirs.add(entity.path);
-      }
-    }
 
-    // If media lives outside user-data dir (Linux/macOS), also migrate it.
-    final mediaIsInsideUserData = sourceMediaPath.startsWith(
-      sourceUserDataPath,
-    );
-    if (!mediaIsInsideUserData && await Directory(sourceMediaPath).exists()) {
-      final destMediaPath = path.join(destPath, 'media');
-      await _collectCopyJobs(
-        sourceDir: sourceMediaPath,
-        destDir: destMediaPath,
-        jobs: copyJobs,
-        dirs: destSubDirs,
+      // If media lives outside user-data dir (Linux/macOS), also migrate it.
+      final mediaIsInsideUserData = sourceMediaPath.startsWith(
+        sourceUserDataPath,
       );
-      ownedSourceDirs.add(sourceMediaPath);
+      if (!mediaIsInsideUserData && await Directory(sourceMediaPath).exists()) {
+        final destMediaPath = path.join(destPath, 'media');
+        await _collectCopyJobs(
+          sourceDir: sourceMediaPath,
+          destDir: destMediaPath,
+          jobs: copyJobs,
+          dirs: destSubDirs,
+        );
+        ownedSourceDirs.add(sourceMediaPath);
+      }
+    } catch (e) {
+      // Reading the current folder failed: nothing to do with whether the new
+      // one can be written to.
+      if (createdDest && await destDir.list().isEmpty) await destDir.delete();
+      throw UserDataMoveFailure(
+        UserDataMoveFailureKind.other,
+        'Could not read $sourceUserDataPath: $e',
+      );
     }
 
-    final total = copyJobs.isEmpty ? 1 : copyJobs.length;
+    final jobCount = copyJobs.length + (sourceDatabase == null ? 0 : 1);
+    final total = jobCount == 0 ? 1 : jobCount;
 
     // ---- Copy phase (0.0 → 0.5) into staging, with per-file verification ----
     // Copying straight into place would replace same-named files already in
@@ -371,18 +526,23 @@ class UserDataLocationService {
       if (createdDest && await destDir.list().isEmpty) await destDir.delete();
       rethrow;
     }
-    Future<Never> abort(String reason) async {
+    Future<Never> abort(UserDataMoveFailureKind kind, String reason) async {
       try {
         await staging.delete(recursive: true);
         if (createdDest && await destDir.list().isEmpty) await destDir.delete();
       } catch (e) {
         _log.w('Migration: could not remove ${staging.path}: $e');
       }
-      throw Exception('Migration aborted: $reason Source data left intact.');
+      throw UserDataMoveFailure(
+        kind,
+        'Migration aborted: $reason Source data left intact.',
+      );
     }
 
     int copied = 0;
     final List<String> failedCopies = [];
+    // A full drive is worth telling apart from the other reasons a copy fails.
+    var diskFull = false;
     final List<(String, String, String)> staged = []; // (src, copy, dest)
     for (final (src, dest) in copyJobs) {
       final copy = path.join(staging.path, path.relative(dest, from: destPath));
@@ -408,6 +568,8 @@ class UserDataLocationService {
           _log.w('Migration: could not copy $src; left where it was: $e');
         } else {
           failedCopies.add(src);
+          diskFull |=
+              UserDataMoveFailure.kindOf(e) == UserDataMoveFailureKind.noSpace;
           _log.e('Migration copy failed for $src: $e');
         }
       }
@@ -415,11 +577,33 @@ class UserDataLocationService {
       onProgress?.call(0.5 * copied / total, path.basename(src));
     }
 
+    // The database last, as one consistent copy of the open database.
+    if (sourceDatabase != null) {
+      final dest = path.join(destPath, _databaseName);
+      final copy = path.join(staging.path, _databaseName);
+      try {
+        await DatabaseFileRepository.snapshotTo(
+          copy,
+          expectedFile: sourceDatabase,
+        );
+        staged.add((sourceDatabase, copy, dest));
+      } catch (e) {
+        failedCopies.add(sourceDatabase);
+        diskFull |=
+            UserDataMoveFailure.kindOf(e) == UserDataMoveFailureKind.noSpace;
+        _log.e('Migration: could not copy the database: $e');
+      }
+      onProgress?.call(0.5 * jobCount / total, _databaseName);
+    }
+
     // SAFETY GATE: if any owned file failed to copy, delete NOTHING. The source
     // stays fully intact; the caller surfaces the error and keeps the old path.
     if (failedCopies.isNotEmpty) {
       await abort(
-        '${failedCopies.length} of ${copyJobs.length} file(s) failed to copy.',
+        diskFull
+            ? UserDataMoveFailureKind.noSpace
+            : UserDataMoveFailureKind.other,
+        '${failedCopies.length} of $jobCount file(s) failed to copy.',
       );
     }
 
@@ -433,7 +617,9 @@ class UserDataLocationService {
         path.isWithin(destPath, d) && checked.add(d);
         d = path.dirname(d)
       ) {
-        if (await FileSystemEntity.isFile(d)) await abort('$d is a file.');
+        if (await FileSystemEntity.isFile(d)) {
+          await abort(UserDataMoveFailureKind.blocked, '$d is a file.');
+        }
       }
     }
 
@@ -442,7 +628,7 @@ class UserDataLocationService {
     }
     for (final (_, _, dest) in staged) {
       if (await FileSystemEntity.isDirectory(dest)) {
-        await abort('$dest is a folder.');
+        await abort(UserDataMoveFailureKind.blocked, '$dest is a folder.');
       }
       await checkFolder(path.dirname(dest));
     }
@@ -453,9 +639,17 @@ class UserDataLocationService {
       for (final dir in destSubDirs) {
         if (made.add(dir)) await Directory(dir).create(recursive: true);
       }
-      for (final (_, copy, dest) in staged) {
+      for (final (src, copy, dest) in staged) {
         final parent = path.dirname(dest);
         if (made.add(parent)) await Directory(parent).create(recursive: true);
+        if (src == sourceDatabase) {
+          // Left beside the copy, another database's WAL would be applied to
+          // it on opening, so they go before it is put in place.
+          for (final suffix in _databaseSidecars) {
+            final stale = File('$dest$suffix');
+            if (await stale.exists()) await stale.delete();
+          }
+        }
         try {
           await debugBeforeRename?.call(copy, dest);
           await File(copy).rename(dest);
@@ -474,7 +668,13 @@ class UserDataLocationService {
       // Nothing has been deleted from the source, so nothing is lost, but
       // some files may already be in place.
       _log.e('Migration: could not put the copies in place: $e');
-      await abort('could not put the copies in place ($e).');
+      final kind = UserDataMoveFailure.kindOf(e);
+      await abort(
+        kind == UserDataMoveFailureKind.noSpace
+            ? kind
+            : UserDataMoveFailureKind.other,
+        'could not put the copies in place ($e).',
+      );
     }
     try {
       await staging.delete(recursive: true);
@@ -484,15 +684,34 @@ class UserDataLocationService {
 
     _log.i('Migration: ${staged.length} files copied to $destPath');
 
+    // From here on the app uses the new folder: the next database access
+    // opens the copy, not the source about to be deleted. The move has
+    // happened, so nothing after this throws: a failure only leaves something
+    // behind in the old folder, and is logged.
+    await setCustomPath(destPath);
+    try {
+      await DatabaseFileRepository.close();
+    } catch (e) {
+      _log.w('Migration: could not close the old database: $e');
+    }
+
     // ---- Delete phase (0.5 → 1.0) ----
     // Delete ONLY the source files now in place at the destination. Foreign
     // files were never added to copyJobs, and a log that didn't copy whole
     // was never staged, so neither is deleted.
     int deleted = 0;
-    final deleteTotal = staged.isEmpty ? 1 : staged.length;
-    for (final (src, _, _) in staged) {
+    final toDelete = [
+      for (final (src, _, _) in staged) src,
+      // Only once the database itself has moved.
+      if (staged.any((job) => job.$1 == sourceDatabase))
+        ...sourceDatabaseSidecars,
+    ];
+    final deleteTotal = toDelete.isEmpty ? 1 : toDelete.length;
+    for (final src in toDelete) {
       try {
         await File(src).delete();
+      } on PathNotFoundException {
+        // Already gone: closing the database removes its -wal and -shm.
       } catch (e) {
         _log.w('Migration: could not delete migrated source file $src: $e');
       }
@@ -504,10 +723,15 @@ class UserDataLocationService {
     // non-empty here still held foreign data, so it is deliberately kept.
     for (final root in ownedSourceDirs) {
       final dir = Directory(root);
-      if (!await dir.exists()) continue;
       final subDirs = <Directory>[];
-      await for (final e in dir.list(recursive: true)) {
-        if (e is Directory) subDirs.add(e);
+      try {
+        if (!await dir.exists()) continue;
+        await for (final e in dir.list(recursive: true)) {
+          if (e is Directory) subDirs.add(e);
+        }
+      } catch (e) {
+        _log.w('Migration: could not tidy up $root: $e');
+        continue;
       }
       subDirs.add(dir);
       subDirs.sort((a, b) => b.path.length.compareTo(a.path.length));

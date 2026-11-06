@@ -1418,6 +1418,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     bool statusOnly = false,
     SyncDeadline? deadline,
   }) async {
+    // A status-only check writes nothing, so it doesn't hold up a move.
+    if (!statusOnly) _activeSyncs++;
     try {
       final sync = await _syncGame(
         game,
@@ -1436,8 +1438,20 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       return (result: SyncResult.ok(), uploads: sync.uploads);
     } catch (e) {
       return (result: _failGame(game, e), uploads: _Pending.unknown);
+    } finally {
+      if (!statusOnly) _activeSyncs--;
     }
   }
+
+  /// Per-game syncs and playtime pulls in progress.
+  int _activeSyncs = 0;
+
+  /// A save sync, the upload sweep or the playtime pull is running. Each
+  /// writes the database (sync state, playtime), so moving the user data waits
+  /// for it: anything written after the move copied the database would be
+  /// lost with the old folder. A status-only check writes nothing and doesn't
+  /// count.
+  bool get isSyncing => _activeSyncs > 0 || _sweeping.value != null;
 
   @override
   GameSyncState? getGameSyncState(String gameId) => _gameSyncStates[gameId];
@@ -2069,6 +2083,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   ///
   /// Never throws: a failure here must not stop the upload sweep that follows.
   Future<void> pullRecentPlaytime() async {
+    _activeSyncs++;
+    try {
+      await _pullRecentPlaytime();
+    } finally {
+      _activeSyncs--;
+    }
+  }
+
+  Future<void> _pullRecentPlaytime() async {
     if (!_browse.isConnected || !_svc.playtimeSyncAvailable) return;
 
     final List<RommRom> recent;

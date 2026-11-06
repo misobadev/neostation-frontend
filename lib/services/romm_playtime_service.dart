@@ -49,6 +49,35 @@ class RommPlaytimeService {
     required DateTime endTime,
     Duration? played,
   }) async {
+    _running++;
+    try {
+      return await _recordCompletedSession(
+        romname: romname,
+        systemFolder: systemFolder,
+        romPath: romPath,
+        startTime: startTime,
+        endTime: endTime,
+        played: played,
+      );
+    } finally {
+      _running--;
+    }
+  }
+
+  static int _running = 0;
+
+  /// A session is being queued or the queue flushed: both write the database
+  /// (queued sessions, the pushed-time ledger), so moving the user data waits.
+  static bool get isRunning => _running > 0;
+
+  static Future<bool> _recordCompletedSession({
+    required String romname,
+    required String systemFolder,
+    required String romPath,
+    required DateTime startTime,
+    required DateTime endTime,
+    Duration? played,
+  }) async {
     // [played] excludes time the device spent asleep inside the window, so it
     // can be shorter than endTime - startTime.
     final durationMs = (played ?? endTime.difference(startTime)).inMilliseconds;
@@ -79,6 +108,15 @@ class RommPlaytimeService {
   /// failure leaves the remaining queue intact for the next sync; only sessions
   /// the server accepted — or explicitly rejected as unfixable — are dequeued.
   static Future<int> flushQueuedSessions(RommService service) async {
+    _running++;
+    try {
+      return await _flushQueuedSessions(service);
+    } finally {
+      _running--;
+    }
+  }
+
+  static Future<int> _flushQueuedSessions(RommService service) async {
     if (!service.playtimeSyncAvailable) return 0;
 
     var pushed = 0;
