@@ -1335,6 +1335,11 @@ mixin AppLocale {
   static const String migratingUserDataComplete =
       'migrating_user_data_complete';
   static const String migratingUserDataError = 'migrating_user_data_error';
+  static const String userDataMoveBusy = 'user_data_move_busy';
+  static const String userDataMoveNoSpace = 'user_data_move_no_space';
+  static const String userDataMoveBlocked = 'user_data_move_blocked';
+  static const String userDataMoveOverlapping = 'user_data_move_overlapping';
+  static const String userDataMoveFailed = 'user_data_move_failed';
   static const String migratingFiles = 'migrating_files';
   static const String deleteGame = 'delete_game';
   static const String deleteGameConfirm = 'delete_game_confirm';

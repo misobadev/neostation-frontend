@@ -2445,6 +2445,106 @@ class SqliteService {
     }
   }
 
+  /// Writes a consistent copy of the open database to [target], a file that
+  /// must not exist yet, and checks the copy. Returns the open database's
+  /// file. Throws if that file isn't [expectedFile], and removes its copy if
+  /// the copy fails or fails its check.
+  ///
+  /// The database is open in WAL mode and other code keeps writing to it, so
+  /// copying `data.sqlite` and its `-wal` and `-shm` one after another can
+  /// catch them at different moments and produce a corrupt database.
+  /// `VACUUM INTO` reads a single snapshot instead, including what is still
+  /// only in the WAL, and writes it as one file in rollback-journal mode
+  /// (opening it re-enables WAL).
+  ///
+  /// With WAL, a separate read-only connection in a worker isolate reads, so
+  /// the UI isolate is free and its writes carry on meanwhile. Without WAL
+  /// that connection's SHARED lock would make every UI-isolate write wait in
+  /// its busy handler, so the main connection takes the copy itself; see
+  /// [readRuleLibrary] for the same choice.
+  static Future<String> snapshotTo(
+    String target, {
+    required String expectedFile,
+  }) async {
+    final db = await instance.database;
+    final databases = await db.rawQuery('PRAGMA database_list');
+    final filename =
+        databases.firstWhere((row) => row['name'] == 'main')['file'] as String;
+    // SQLite reports the path with symbolic links resolved, so compare the
+    // files themselves rather than their paths.
+    if (filename.isEmpty ||
+        !await FileSystemEntity.isFile(expectedFile) ||
+        !await FileSystemEntity.identical(filename, expectedFile)) {
+      throw StateError(
+        'The open database is "$filename", not "$expectedFile"; not copied',
+      );
+    }
+    for (final suffix in const ['', '-journal', '-wal', '-shm']) {
+      final existing = '$target$suffix';
+      if (await FileSystemEntity.type(existing) !=
+          FileSystemEntityType.notFound) {
+        throw StateError('$existing is already there; not copied');
+      }
+    }
+    final journal = (await db.rawQuery(
+      'PRAGMA journal_mode',
+    )).single.values.single;
+    try {
+      if (journal.toString().toLowerCase() == 'wal') {
+        await _vacuumIntoInBackground(filename, target);
+      } else {
+        await db.execute('VACUUM INTO ?', [target]);
+      }
+      await _quickCheckInBackground(target);
+    } catch (_) {
+      // None of these were there before, so whatever is there now is this
+      // call's own unfinished or failed copy.
+      for (final suffix in const ['', '-journal', '-wal', '-shm']) {
+        try {
+          await File('$target$suffix').delete();
+        } on FileSystemException {
+          // Not there.
+        }
+      }
+      rethrow;
+    }
+    return filename;
+  }
+
+  static Future<void> _vacuumIntoInBackground(String filename, String target) =>
+      Isolate.run(() {
+        final db = sqlite.sqlite3.open(
+          filename,
+          mode: sqlite.OpenMode.readOnly,
+        );
+        try {
+          db.execute('PRAGMA busy_timeout = 5000');
+          db.execute('VACUUM INTO ?', [target]);
+        } finally {
+          db.close();
+        }
+      });
+
+  // Separate frames, so each worker closure captures only sendable values and
+  // never the caller's native database handle.
+  static Future<void> _quickCheckInBackground(String file) =>
+      Isolate.run(() => _quickCheck(file));
+
+  static void _quickCheck(String file) {
+    final db = sqlite.sqlite3.open(file, mode: sqlite.OpenMode.readOnly);
+    try {
+      final result = [
+        for (final row in db.select('PRAGMA quick_check'))
+          row.values.single.toString(),
+      ];
+      if (result.length != 1 || result.single != 'ok') {
+        throw StateError('Copy of the database failed its check: $result');
+      }
+    } finally {
+      db.close();
+    }
+  }
+
   /// Forces database recreation by deleting the existing file (for debugging).
   Future<void> resetDatabase() async {
     await close();

@@ -1323,6 +1323,16 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.migratingUserData: 'Moviendo Datos',
   AppLocale.migratingUserDataComplete: 'Migración completada',
   AppLocale.migratingUserDataError: 'Error en la migración',
+  AppLocale.userDataMoveBusy:
+      'NeoStation está ocupado: hay un escaneo, scraping, sincronización, importación o herramienta en curso. Mueve tus datos cuando termine.',
+  AppLocale.userDataMoveNoSpace:
+      'No hay suficiente espacio libre en la nueva carpeta. Tus datos siguen en su carpeta actual.',
+  AppLocale.userDataMoveBlocked:
+      'Algo en la nueva carpeta tiene el mismo nombre que uno de los archivos o carpetas de NeoStation. Tus datos siguen en su carpeta actual.',
+  AppLocale.userDataMoveOverlapping:
+      'La nueva carpeta no puede estar dentro de la actual ni contenerla. Elige otra carpeta.',
+  AppLocale.userDataMoveFailed:
+      'No se pudieron mover tus datos. Siguen en su carpeta actual.',
   AppLocale.migratingFiles: 'Copiando {current} de {total} archivos...',
   AppLocale.restartRequired: 'Reinicio Necesario',
   AppLocale.restartRequiredBody:

@@ -54,6 +54,9 @@ class SteamScraperService {
   @visibleForTesting
   static void debugForgetProvider() => _provider = null;
 
+  /// A batch scrape is running (see [scrapeSteamGames]).
+  static bool get isRunning => _inFlight != null;
+
   /// Performs a batch scraping operation for all registered Steam games.
   ///
   /// Targets entries that have a valid Steam App ID but are missing localized
