@@ -172,7 +172,7 @@ class RommPlaytimeService {
     required String romPath,
     bool force = false,
   }) async {
-    if (!service.playtimeSyncAvailable || romPath.isEmpty) return false;
+    if (!service.playtimePullAvailable || romPath.isEmpty) return false;
 
     final ledger = await RommPlaytimeRepository.getLedger(romId);
     final lastPulled = ledger.lastPulledAt;

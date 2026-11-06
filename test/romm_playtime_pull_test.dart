@@ -8,6 +8,7 @@ import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/romm_playtime_repository.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
+import 'package:neostation/services/romm_playtime_service.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
 
@@ -43,8 +44,14 @@ class _FakeRommService extends RommService {
   bool failListing = false;
   final Set<int> failSessionsFor = {};
 
+  /// The server refused to let this connection read play sessions.
+  bool readRefused = false;
+
   @override
   bool get playtimeSyncAvailable => true;
+
+  @override
+  bool get playtimePullAvailable => !readRefused;
 
   @override
   Future<List<RommRom>> getRecentlyPlayedRoms({int limit = 25}) async {
@@ -253,6 +260,28 @@ void main() {
       await provider.pullRecentPlaytime();
 
       expect(svc.recentCalls, 0);
+    });
+
+    // RomM 5.4 refuses reads without devices.read (NEO-227); asking again for
+    // every game would only collect more 403s.
+    test('a server that refuses reads is not asked', () async {
+      await localGame('Zelda', romId: 7);
+      svc.recentlyPlayed = [_rom(7, 'Zelda')];
+      svc.sessionsByRom[7] = [_session(7, 30)];
+      svc.readRefused = true;
+
+      await provider.pullRecentPlaytime();
+      final pulled = await RommPlaytimeService.pullPlaytime(
+        svc,
+        romId: 7,
+        romPath: '/roms/snes/Zelda',
+        force: true,
+      );
+
+      expect(svc.recentCalls, 0);
+      expect(svc.sessionCalls, isEmpty);
+      expect(pulled, isFalse);
+      expect(await localPlayTime('Zelda'), 0);
     });
 
     test('a listing failure is swallowed, not thrown', () async {
