@@ -370,6 +370,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       await context.read<SqliteConfigProvider>().reinitialize();
       if (!mounted) return;
       await context.read<NeoAssetsProvider>().reinitialize();
+      await LoggerService.instance.reinitialize();
+      if (!mounted) return;
+      await context.read<FileProvider>().reinitialize();
     }
   }
 
@@ -989,6 +992,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       // System Art still shows the pack as applied.
       if (!mounted) return problem;
       await context.read<NeoAssetsProvider>().reinitialize();
+
+      // Every art lookup goes through this provider, which resolved the media
+      // folder at launch: without it the art scraped from here on lands in
+      // the new folder but isn't found until the next launch. The log file
+      // lives in the user-data folder too.
+      await LoggerService.instance.reinitialize();
+      if (!mounted) return problem;
+      await context.read<FileProvider>().reinitialize();
 
       if (mounted) setState(() => _selectedUserDataPath = selected);
     } catch (e) {
