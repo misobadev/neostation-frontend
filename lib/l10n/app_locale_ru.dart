@@ -647,6 +647,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.lastSyncedSave: 'Последнее синхронизированное сохранение',
   AppLocale.saveListMenu: 'Список Сохранений',
   AppLocale.customSaveFoldersMenu: 'Папки Сохранений Standalone',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Обновить Ваш План',
   AppLocale.customFoldersSubtitle:
       'Добавьте пользовательскую папку автономного эмулятора, чтобы его сохранения тоже синхронизировались.',

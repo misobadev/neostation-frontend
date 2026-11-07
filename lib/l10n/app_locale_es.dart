@@ -658,6 +658,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.lastSyncedSave: 'Último guardado sincronizado',
   AppLocale.saveListMenu: 'Lista de Guardados',
   AppLocale.customSaveFoldersMenu: 'Carpetas de Guardado Standalone',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Actualizar Tu Plan',
   AppLocale.customFoldersSubtitle:
       'Añade una carpeta de un emulador standalone para que sus guardados también se sincronicen.',

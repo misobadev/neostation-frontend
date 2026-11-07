@@ -665,6 +665,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.lastSyncedSave: 'Zuletzt synchronisierter Spielstand',
   AppLocale.saveListMenu: 'Speicherliste',
   AppLocale.customSaveFoldersMenu: 'Standalone-Speicherordner',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Plan aktualisieren',
   AppLocale.customFoldersSubtitle:
       'Füge einen benutzerdefinierten Ordner von einem eigenständigen Emulator hinzu, damit auch seine Spielstände synchronisiert werden.',

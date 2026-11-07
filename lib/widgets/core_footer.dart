@@ -131,6 +131,15 @@ class GamepadControl extends StatelessWidget {
   /// in flight (e.g. a download or a folder picker).
   final bool busy;
 
+  /// An icon after the button glyph, before any [label] text. An empty
+  /// [label] shows no text.
+  final IconData? trailingIcon;
+
+  /// The control's full name, for a [label] that is empty or shortened to
+  /// fit: shown as a tooltip, and read by screen readers in place of the
+  /// visible text.
+  final String? semanticLabel;
+
   const GamepadControl({
     super.key,
     this.iconPath,
@@ -141,6 +150,8 @@ class GamepadControl extends StatelessWidget {
     this.textColor,
     this.gradient,
     this.busy = false,
+    this.trailingIcon,
+    this.semanticLabel,
   });
 
   @override
@@ -152,7 +163,7 @@ class GamepadControl extends StatelessWidget {
         backgroundColor ?? theme.colorScheme.onSurface.withValues(alpha: 0.1);
     final Color contentColor = textColor ?? theme.colorScheme.onPrimary;
 
-    return Material(
+    final control = Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: busy ? null : onTap,
@@ -206,20 +217,42 @@ class GamepadControl extends StatelessWidget {
                     colorBlendMode: BlendMode.srcIn,
                   ),
                 ),
-              SizedBox(width: 4.r),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.r, // Slightly reduced so buttons fit comfortably
-                  color: contentColor,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.2.r,
+              if (trailingIcon != null) ...[
+                SizedBox(width: 2.r),
+                Icon(trailingIcon, size: 14.r, color: contentColor),
+              ],
+              if (label.isNotEmpty) ...[
+                SizedBox(width: 4.r),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize:
+                        12.r, // Slightly reduced so buttons fit comfortably
+                    color: contentColor,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2.r,
+                  ),
                 ),
-              ),
+              ],
               SizedBox(width: 4.r),
             ],
           ),
         ),
+      ),
+    );
+    final name = semanticLabel;
+    if (name == null || name.isEmpty) return control;
+    return Tooltip(
+      message: name,
+      // Named once, by the Semantics below.
+      excludeFromSemantics: true,
+      child: Semantics(
+        label: name,
+        button: true,
+        // The InkWell's own action is excluded with its semantics.
+        onTap: busy ? null : onTap,
+        excludeSemantics: true,
+        child: control,
       ),
     );
   }

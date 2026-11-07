@@ -669,6 +669,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.lastSyncedSave: 'Dernière sauvegarde synchronisée',
   AppLocale.saveListMenu: 'Liste des Sauvegardes',
   AppLocale.customSaveFoldersMenu: 'Dossiers de Sauvegarde Standalone',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Mettre à Jour Votre Plan',
   AppLocale.customFoldersSubtitle:
       'Ajoutez un dossier personnalisé depuis un émulateur autonome pour synchroniser aussi ses sauvegardes.',

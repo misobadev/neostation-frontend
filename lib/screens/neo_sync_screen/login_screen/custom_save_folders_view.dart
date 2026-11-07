@@ -37,7 +37,22 @@ import 'neo_sync_shared.dart';
 class CustomSaveFoldersView extends StatefulWidget {
   final VoidCallback onBack;
 
-  const CustomSaveFoldersView({super.key, required this.onBack});
+  /// Called once a folder is saved, in place of NeoSync's upload of it. Set
+  /// when another provider owns save sync (RomM): its folders are for that
+  /// provider, and uploading them to NeoSync would put the saves in a second
+  /// cloud the user didn't choose.
+  final Future<void> Function(
+    String system,
+    String emulatorSlug,
+    String folderPath,
+  )?
+  onConfigured;
+
+  const CustomSaveFoldersView({
+    super.key,
+    required this.onBack,
+    this.onConfigured,
+  });
 
   @override
   State<CustomSaveFoldersView> createState() => _CustomSaveFoldersViewState();
@@ -226,6 +241,13 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
         folderPath,
       );
       await _loadConfigured();
+
+      if (!mounted) return;
+      final onConfigured = widget.onConfigured;
+      if (onConfigured != null) {
+        await onConfigured(system, emulatorSlug, folderPath);
+        return;
+      }
 
       if (!mounted) return;
       final provider = context.read<NeoSyncProvider>();

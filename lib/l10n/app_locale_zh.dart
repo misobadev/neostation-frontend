@@ -543,6 +543,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.lastSyncedSave: '最后同步的存档',
   AppLocale.saveListMenu: '存档列表',
   AppLocale.customSaveFoldersMenu: '独立存档文件夹',
+  AppLocale.customSaveFoldersShort: '独立存档文件夹',
   AppLocale.updateYourPlanMenu: '更新您的套餐',
   AppLocale.customFoldersSubtitle: '添加独立模拟器的独立文件夹，以便其存档也能同步。',
   AppLocale.noCustomFoldersConfigured: '未配置独立文件夹',

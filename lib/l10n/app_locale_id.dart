@@ -638,6 +638,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.lastSyncedSave: 'Simpanan terakhir disinkronkan',
   AppLocale.saveListMenu: 'Daftar Simpanan',
   AppLocale.customSaveFoldersMenu: 'Folder Simpanan Standalone',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Perbarui Paket Anda',
   AppLocale.customFoldersSubtitle:
       'Tambahkan folder kustom dari emulator mandiri agar simpanannya juga disinkronkan.',
