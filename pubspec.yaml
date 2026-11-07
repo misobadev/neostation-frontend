@@ -12,6 +12,7 @@ workspace:
   - packages/gamepads_linux
   - packages/gamepads_platform_interface
   - packages/gamepads_windows
+  - packages/sub_screen
 
 version: 0.15.1+132
 
@@ -61,7 +62,8 @@ dependencies:
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
   logger: ^2.8.0
-  sub_screen: ^0.1.9
+  sub_screen:
+    path: packages/sub_screen
   flutter_soloud: ^4.1.7
   audio_metadata_reader: ^1.8.1
   wakelock_plus: ^1.8.0

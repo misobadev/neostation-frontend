@@ -63,7 +63,7 @@ The opt-out from our FileProvider rewrap (for emulators that need the original S
 
 **Testing embedded `assets/systems/` changes locally:** the app prefers previously downloaded systems over the bundle unless the bundle's version is higher. To force it to read your local edits, bump `latest_version` in `assets/manifest.json` above whatever value is currently there; on launch you'll see `SystemsUpdateService: bundled vX > cached "Y", clearing cache`.
 
-**Vendored packages** live in `/packages/` (`gamepads*`, `flutter_7zip`) — modified upstream libraries wired in as a pub workspace; prefer fixing there over working around them.
+**Vendored packages** live in `/packages/` (`gamepads*`, `flutter_7zip`, `sub_screen`) — modified upstream libraries wired in as a pub workspace; prefer fixing there over working around them. `sub_screen` is vendored because its upstream repository is gone; keep its `FlutterPresentation.flutterEngine` field name in sync with the reflection in `SecondaryAppsPresentation.kt`.
 
 ## Conventions
 

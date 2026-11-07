@@ -1042,14 +1042,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
-  sub_screen:
-    dependency: "direct main"
-    description:
-      name: sub_screen
-      sha256: a3d4cea7ad845a8825d990b2c66a0d8f5ea07dbd84e7c0fe32e080e17730e926
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.9"
   supercharged:
     dependency: transitive
     description:
