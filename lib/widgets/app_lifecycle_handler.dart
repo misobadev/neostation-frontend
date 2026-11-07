@@ -24,9 +24,11 @@ class AppLifecycleHandler extends StatefulWidget {
 }
 
 class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
-    with WidgetsBindingObserver, WindowListener {
+    with WidgetsBindingObserver {
   String? _lastKnownPlan;
   AppLifecycleListener? _exitListener;
+  Window? _window;
+  ListenerId? _windowListenerId;
 
   static final _log = LoggerService.instance;
 
@@ -39,7 +41,13 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
     // Windows, parking the window fires no lifecycle state at all. window_manager
     // is the only signal for it, so the off-screen handling is hung off both.
     if (_isDesktop) {
-      windowManager.addListener(this);
+      final window = WindowManager.instance.getCurrent();
+      if (window != null) {
+        _window = window;
+        _windowListenerId = window.addListener((event) {
+          if (event is WindowMinimizedEvent) _onWindowMinimize();
+        });
+      }
     }
 
     // Register exit listener to clean up native resources (SoLoud audio threads)
@@ -88,7 +96,13 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
     _exitListener?.dispose();
     GameService.onScreenStateChanged = null;
     if (_isDesktop) {
-      windowManager.removeListener(this);
+      final window = _window;
+      final listenerId = _windowListenerId;
+      if (window != null && listenerId != null) {
+        window.removeListener(listenerId);
+      }
+      _window = null;
+      _windowListenerId = null;
     }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -166,8 +180,7 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
   /// Only minimising counts. Losing focus to another window happens constantly
   /// while alt-tabbing, and re-decoding the visible artwork every time would
   /// cost more than it saves; minimising is the user actually parking the app.
-  @override
-  void onWindowMinimize() {
+  void _onWindowMinimize() {
     _releaseDecodedImages();
   }
 
