@@ -22,6 +22,7 @@ import '../utils/save_file_listing.dart';
 import '../services/config_service.dart';
 import '../services/retroarch_config_service.dart';
 import '../services/retroachievements_hash_service.dart';
+import '../utils/auto_folder_upload_notice.dart';
 
 part 'neosync/neosync_exceptions.dart';
 part 'neosync/neosync_status.dart';
@@ -162,8 +163,8 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Whether the user has already been notified of a quota issue in the current session.
   bool _quotaExceededDialogShown = false;
 
-  /// Global flag indicating that a quota limit was recently hit.
-  bool _quotaExceededActive = false;
+  /// The account (id, plan) the quota state belongs to; a change clears it.
+  (String, String)? _quotaAccount;
 
   /// Real-time synchronization state for individual games, keyed by unique ID.
   final Map<String, neo_sync.GameSyncState> _gameSyncStates = {};
@@ -314,10 +315,9 @@ class NeoSyncProvider extends ChangeNotifier {
     return false;
   }
 
-  /// Resets quota-related failure counters and status flags.
+  /// Resets the quota failure counter.
   void _resetQuotaAttempts() {
     _quotaExceededAttempts = 0;
-    _quotaExceededActive = false;
   }
 
   /// The deadline of a running launch of the game [romName] or, when
