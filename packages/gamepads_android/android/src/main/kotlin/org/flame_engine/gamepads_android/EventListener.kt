@@ -14,6 +14,17 @@ data class SupportedAxis(
 class EventListener {
     companion object {
         private const val EPSILON = 0.001
+
+        // Keys left to the system: never consumed, never sent to Dart. A
+        // handheld whose volume buttons report through its controller's
+        // input device would otherwise lose them while the app is in front.
+        private val systemKeys = setOf(
+            KeyEvent.KEYCODE_VOLUME_UP,
+            KeyEvent.KEYCODE_VOLUME_DOWN,
+            KeyEvent.KEYCODE_VOLUME_MUTE,
+        )
+
+        fun isSystemKey(keyCode: Int): Boolean = keyCode in systemKeys
     }
     // The last value sent for each pad's axis. Keyed by pad as well as axis:
     // every motion event re-reports all of a pad's axes, so with one entry
@@ -39,6 +50,7 @@ class EventListener {
     )
 
     fun onKeyEvent(keyEvent: KeyEvent, channel: MethodChannel): Boolean {
+        if (isSystemKey(keyEvent.keyCode)) return false
         val arguments = mapOf(
             "gamepadId" to keyEvent.deviceId.toString(),
             "time" to keyEvent.eventTime,
