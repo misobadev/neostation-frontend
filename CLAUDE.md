@@ -69,6 +69,8 @@ The opt-out from our FileProvider rewrap (for emulators that need the original S
 
 Beyond standard Dart/Flutter (and the items in ARCHITECTURE.md — `Color.withValues(alpha:)` not `withOpacity`, `mounted` guards after `await`, `flutter_screenutil` for all sizing, English comments): widgets `PascalCase`, variables `camelCase`, files `snake_case`. Conventional Commits (`feat:`, `fix:`, …); branches `feature/…`, `fix/…`, `refactor/…`, `docs/…`; PRs use `.github/PULL_REQUEST_TEMPLATE.md`. All user-facing UI text goes through `AppLocale` — never hardcoded strings.
 
+**Never silence analyzer or linter findings.** Do not add `// ignore:`, `// ignore_for_file:`, `// ignore_for_file: deprecated_member_use`, analyzer `errors:` overrides, or any other suppression to make `flutter analyze` pass. Fix the root cause: migrate the code to the API the finding points at (for a dependency bump, use its documented migration path or its replacement API), or pin/change the dependency if the new version cannot be adopted yet. Suppressing the diagnostic hides real problems and is not an acceptable fix.
+
 ## Commits (per AI_GUIDELINES.md)
 
 - **Never** add a DCO sign-off from an AI (no `git commit -s` / `Signed-off-by:`).

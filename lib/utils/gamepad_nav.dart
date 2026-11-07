@@ -708,13 +708,15 @@ class GamepadNavigation {
   Future<void> _toggleFullscreen() async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       if (Platform.isWindows || Platform.isMacOS) {
-        final isFullscreen = await windowManager.isFullScreen();
-        await windowManager.setFullScreen(!isFullscreen);
+        final window = WindowManager.instance.getCurrent();
+        if (window != null) {
+          final isFullscreen = window.isFullScreen;
+          window.isFullScreen = !isFullscreen;
 
-        // Allow some time for the window manager to process the state change.
-        await Future.delayed(const Duration(milliseconds: 100));
-        final newState = await windowManager.isFullScreen();
-        FullscreenNotifier().notifyFullscreenChanged(newState);
+          // Allow some time for the window manager to process the state change.
+          await Future.delayed(const Duration(milliseconds: 100));
+          FullscreenNotifier().notifyFullscreenChanged(window.isFullScreen);
+        }
       }
     }
   }
