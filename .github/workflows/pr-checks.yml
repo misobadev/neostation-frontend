@@ -102,5 +102,13 @@ jobs:
       - name: Analyze project
         run: flutter analyze
 
+      # `flutter test` builds native assets for the host. cnativeapi (through
+      # window_manager 0.6) compiles with clang against GTK 3, X11 and Xi on
+      # Linux, which the runner doesn't ship as development packages.
+      - name: Install native-asset build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libgtk-3-dev libx11-dev libxi-dev
+
       - name: Run tests
         run: flutter test
