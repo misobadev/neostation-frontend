@@ -562,6 +562,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.lastSyncedSave: '最後に同期されたセーブ',
   AppLocale.saveListMenu: 'セーブリスト',
   AppLocale.customSaveFoldersMenu: 'スタンドアロンセーブフォルダ',
+  AppLocale.customSaveFoldersShort: 'スタンドアロン',
   AppLocale.updateYourPlanMenu: 'プランを更新',
   AppLocale.customFoldersSubtitle:
       'スタンドアロンエミュレータのスタンドアロンフォルダを追加すると、そのセーブも同期されます。',

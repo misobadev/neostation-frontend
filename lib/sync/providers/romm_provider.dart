@@ -21,6 +21,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
+import 'package:neostation/models/core_emulator_model.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/romm_asset.dart';
@@ -28,13 +29,16 @@ import 'package:neostation/models/romm_platform.dart';
 import 'package:neostation/models/romm_rom.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/repositories/emulator_repository.dart';
+import 'package:neostation/repositories/neosync_save_folder_repository.dart';
 import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/services/retroarch_config_service.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
+import 'package:neostation/services/game/game_launch_service.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/utils/cloud_path_builder.dart';
 import 'package:neostation/services/romm/romm_library_linker.dart';
 import 'package:neostation/services/romm_playtime_service.dart';
 import 'package:neostation/services/romm_service.dart';
@@ -42,6 +46,7 @@ import 'package:neostation/services/romm_service.dart';
 import '../i_sync_provider.dart';
 import '../retroarch_state_signature.dart';
 import '../sync_manager.dart';
+import '../../utils/emulator_loader.dart';
 import '../../utils/safe_path.dart';
 
 /// Locates the local save/state files belonging to a game.
@@ -54,6 +59,18 @@ typedef ResolveSaveTargets =
 
 /// Enumerates the local library, for the pending-upload sweep.
 typedef ListLocalGames = Future<List<GameModel>> Function();
+
+/// The standalone save folders configured for a system (the Saves tab's
+/// Standalone save folders), by system folder name.
+typedef ListSaveFolders =
+    Future<List<String>> Function(String systemFolderName);
+
+/// Where [game]'s emulator keeps its saves, when that emulator is standalone:
+/// `standalone: false` when it is a RetroArch core or can't be told, so the
+/// usual RetroArch placement applies; `folder: null` when it is standalone
+/// and no folder is configured for it.
+typedef ResolveStandaloneSaveFolder =
+    Future<({bool standalone, String? folder})> Function(GameModel game);
 
 /// Outcome of the pre-upload check that protects a remote copy the local one is
 /// about to replace.
@@ -188,6 +205,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   final LocateGameSaves? _locateOverride;
   final ResolveSaveTargets? _resolveTargetsOverride;
   final ListLocalGames? _listGamesOverride;
+  final ListSaveFolders? _saveFoldersOverride;
+  final ResolveStandaloneSaveFolder? _standaloneFolderOverride;
 
   final Map<String, GameSyncState> _gameSyncStates = {};
 
@@ -202,12 +221,16 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     @visibleForTesting LocateGameSaves? locateSaves,
     @visibleForTesting ResolveSaveTargets? resolveTargets,
     @visibleForTesting ListLocalGames? listGames,
+    @visibleForTesting ListSaveFolders? saveFolders,
+    @visibleForTesting ResolveStandaloneSaveFolder? standaloneSaveFolder,
     @visibleForTesting bool autoSweep = true,
     @visibleForTesting RommLibraryLinker? linker,
     @visibleForTesting Duration sweepStartupDelay = _sweepStartupDelay,
   }) : _locateOverride = locateSaves,
        _resolveTargetsOverride = resolveTargets,
        _listGamesOverride = listGames,
+       _saveFoldersOverride = saveFolders,
+       _standaloneFolderOverride = standaloneSaveFolder,
        _autoSweep = autoSweep,
        _startupDelay = sweepStartupDelay {
     _linker = linker ?? _buildLinker();
@@ -246,6 +269,118 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         game,
         relativeName,
       );
+
+  Future<List<String>> _saveFolders(String systemFolderName) async {
+    final override = _saveFoldersOverride;
+    if (override != null) return override(systemFolderName);
+    final folders = await NeoSyncSaveFolderRepository.getFoldersForSystem(
+      systemFolderName,
+    );
+    return folders.values.toList();
+  }
+
+  Future<({bool standalone, String? folder})> _standaloneSaveFolder(
+    GameModel game,
+  ) async {
+    final override = _standaloneFolderOverride;
+    if (override != null) return override(game);
+    const notStandalone = (standalone: false, folder: null);
+    final folderName = game.systemFolderName;
+    if (folderName == null || folderName.isEmpty) return notStandalone;
+    final system = await SystemRepository.getSystemByFolderName(folderName);
+    if (system == null) return notStandalone;
+    // The emulator the game launches with, so the save lands where the
+    // emulator that will open it reads it.
+    final uniqueId = await GameLaunchService.resolveLaunchEmulatorId(
+      system,
+      game,
+    );
+    if (uniqueId == null) return notStandalone;
+    return standaloneSaveFolderFor(
+      uniqueId: uniqueId,
+      emulators: await loadEmulatorsForSystem(system),
+      folders: await NeoSyncSaveFolderRepository.getFoldersForSystem(
+        system.folderName,
+      ),
+    );
+  }
+
+  /// Whether the emulator [uniqueId] is standalone, and the save folder
+  /// configured for it in [folders] (by emulator unique id), if any.
+  ///
+  /// Decided as the folder picker decides it: a RetroArch core is never
+  /// standalone, even when it is flagged so, and an emulator this device
+  /// doesn't list is treated as not standalone, which keeps the RetroArch
+  /// placement used before standalone folders were known here.
+  @visibleForTesting
+  static ({bool standalone, String? folder}) standaloneSaveFolderFor({
+    required String uniqueId,
+    required List<CoreEmulatorModel> emulators,
+    required Map<String, String> folders,
+  }) {
+    const notStandalone = (standalone: false, folder: null);
+    if (CloudPathBuilder.slugFromEmulatorUniqueId(
+      uniqueId,
+    ).startsWith('retroarch.')) {
+      return notStandalone;
+    }
+    final emulator = emulators.where((e) => e.uniqueId == uniqueId).firstOrNull;
+    if (emulator == null || !emulator.isStandalone) return notStandalone;
+    final folder = folders[uniqueId];
+    return (
+      standalone: true,
+      folder: folder == null || folder.isEmpty ? null : folder,
+    );
+  }
+
+  /// Where a download of [asset] is written: null when it must not be
+  /// written at all (the reason is logged).
+  ///
+  /// A standalone emulator reads its saves from the folder configured for it,
+  /// never from RetroArch's saves folder, so its downloads go there: onto the
+  /// file they replace when that file is in a configured folder ([paired]),
+  /// or into the emulator's folder otherwise (a copy outside its folders is
+  /// never paired for such a game; see the reconcile loop in [_syncGame]). A
+  /// standalone emulator with no folder gets nothing, rather than a copy in
+  /// RetroArch's folder that no emulator opens. Everything else is placed the
+  /// RetroArch way, by [_resolveTargets].
+  ///
+  /// A file in a configured folder goes back where it came from whichever
+  /// emulator the game launches with: on a shared-card system (PS2,
+  /// Dreamcast) the card in a standalone's folder is the copy that exists.
+  Future<List<String>?> _downloadTargets(
+    GameModel game,
+    RommAsset asset, {
+    required String relativeName,
+    required String localName,
+    required _Placement placement,
+    LocalSaveFile? paired,
+  }) async {
+    if (paired != null && await placement.inSaveFolder(paired.filePath)) {
+      return [paired.filePath];
+    }
+    final standalone = await placement.standalone();
+    if (standalone.standalone) {
+      final folder = standalone.folder;
+      if (folder == null) {
+        _log.i(
+          'RomM download: ${asset.fileName} not written — ${game.romname} '
+          'launches with a standalone emulator with no save folder set',
+        );
+        return null;
+      }
+      if (asset.isState) {
+        _log.i(
+          'RomM download: ${asset.fileName} not written — a save state, and '
+          '${game.romname} launches with a standalone emulator',
+        );
+        return null;
+      }
+      final target = safeJoin(folder, localName);
+      return target == null ? const [] : [target];
+    }
+    return _resolveTargets(game, relativeName);
+  }
 
   /// The library, for the sweep. Injectable for the same reason the path
   /// resolution is: reaching the real one means seeding `user_roms` and its
@@ -393,6 +528,17 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
 
     final localFiles = syncableSaves(game, await _locateSaves(game));
+    // Where downloads go, worked out once per pass and only if one needs it:
+    // finding the game's emulator enumerates the system's emulators.
+    final placement = _Placement(
+      folders: () async {
+        final system = game.systemFolderName;
+        return system == null || system.isEmpty
+            ? const <String>[]
+            : _saveFolders(system);
+      },
+      standalone: () => _standaloneSaveFolder(game),
+    );
 
     // The two listings are independent GETs; fetch them concurrently so the
     // launch-blocking sync pays one round-trip, not two serial ones. Each is
@@ -463,6 +609,19 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
     // 1) Reconcile each local file against its remote counterpart.
     for (final local in reconciled) {
+      // A game that launches with a standalone emulator only has the copy in
+      // that emulator's folder. One elsewhere — RetroArch's, as an older
+      // version downloaded it there — is not its save: pairing it would keep
+      // fetching the server's copy into the folder and never settle, or, with
+      // the server unchanged, leave the folder without the save. Left out, the
+      // server's copy is placed like any save this device lacks.
+      // Only asked on a system with folders set, so a highlighted game's
+      // status check doesn't enumerate emulators for every RetroArch game.
+      if ((await placement.folders()).isNotEmpty &&
+          !await placement.inSaveFolder(local.filePath) &&
+          (await placement.standalone()).standalone) {
+        continue;
+      }
       final isState = local.relativePath.startsWith('states/');
       final baseName = path.basename(local.filePath);
       RommAsset? match;
@@ -538,6 +697,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
             game,
             match,
             localFiles: localFiles,
+            placement: placement,
+            paired: local,
             deadline: deadline,
           ),
         );
@@ -637,7 +798,13 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       if (statusOnly || uploadOnly) break;
       if (matchedRemote.contains(a.key)) continue;
       countDownload(
-        await _download(game, a, localFiles: localFiles, deadline: deadline),
+        await _download(
+          game,
+          a,
+          localFiles: localFiles,
+          placement: placement,
+          deadline: deadline,
+        ),
       );
     }
 
@@ -1272,6 +1439,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     GameModel game,
     RommAsset asset, {
     required List<LocalSaveFile> localFiles,
+    required _Placement placement,
+    LocalSaveFile? paired,
     SyncDeadline? deadline,
   }) async {
     var skippedCoreMismatch = false;
@@ -1289,7 +1458,17 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       final relativeName = sub.isNotEmpty
           ? '$prefix/$sub/$localName'
           : '$prefix/$localName';
-      final targets = await _resolveTargets(game, relativeName);
+      final targets = await _downloadTargets(
+        game,
+        asset,
+        relativeName: relativeName,
+        localName: localName,
+        placement: placement,
+        paired: paired,
+      );
+      if (targets == null) {
+        return (wrote: false, coreMismatch: false, failed: false);
+      }
       if (targets.isEmpty) {
         _log.w('RomM download: no local target for ${asset.fileName}');
         return (wrote: false, coreMismatch: false, failed: false);
@@ -2145,4 +2324,32 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
   @override
   Future<SyncQuota?> getQuota() async => null;
+}
+
+/// A sync pass's answers about where [RomMSyncProvider] puts a game's
+/// downloads, each looked up on first use and then reused.
+class _Placement {
+  _Placement({
+    required Future<List<String>> Function() folders,
+    required Future<({bool standalone, String? folder})> Function() standalone,
+  }) : _foldersLookup = folders,
+       _standaloneLookup = standalone;
+
+  final Future<List<String>> Function() _foldersLookup;
+  final Future<({bool standalone, String? folder})> Function()
+  _standaloneLookup;
+  Future<List<String>>? _folders;
+  Future<({bool standalone, String? folder})>? _standalone;
+
+  /// The game's system's configured standalone save folders.
+  Future<List<String>> folders() => _folders ??= _foldersLookup();
+
+  /// Whether [filePath] is inside one of [folders].
+  Future<bool> inSaveFolder(String filePath) async => (await folders()).any(
+    (root) => path.equals(root, filePath) || path.isWithin(root, filePath),
+  );
+
+  /// Whether the game launches with a standalone emulator, and its folder.
+  Future<({bool standalone, String? folder})> standalone() =>
+      _standalone ??= _standaloneLookup();
 }

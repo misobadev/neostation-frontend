@@ -658,6 +658,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.lastSyncedSave: 'Ultimo salvataggio sincronizzato',
   AppLocale.saveListMenu: 'Elenco Salvataggi',
   AppLocale.customSaveFoldersMenu: 'Cartelle di Salvataggio Standalone',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Aggiorna il Tuo Piano',
   AppLocale.customFoldersSubtitle:
       'Aggiungi una cartella personalizzata da un emulatore standalone per sincronizzare anche i suoi salvataggi.',

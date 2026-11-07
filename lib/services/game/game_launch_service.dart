@@ -116,27 +116,10 @@ class GameLaunchService {
       // distinguishes a choice the user actually made (a per-game override, or a
       // system default they set) from one we guessed for them — only the former
       // is worth failing the launch over.
-      String? preferredPlayerId = game.emulatorName;
-      bool isExplicitChoice = preferredPlayerId != null;
-      String source = isExplicitChoice ? 'per-game override' : 'none';
-
-      if (preferredPlayerId == null && system.id != null) {
-        final userDefault =
-            await EmulatorRepository.getUserDefaultEmulatorForSystem(
-              system.id!,
-            );
-        if (userDefault != null) {
-          preferredPlayerId = userDefault.uniqueId;
-          isExplicitChoice = true;
-          source = 'system default (user-selected)';
-        } else {
-          final defaultEmu = await _resolveDefaultInstalledEmulator(system);
-          if (defaultEmu != null) {
-            preferredPlayerId = defaultEmu.uniqueId;
-            source = 'auto-resolved default';
-          }
-        }
-      }
+      final preference = await _preferredEmulator(system, game);
+      String? preferredPlayerId = preference.uniqueId;
+      final bool isExplicitChoice = preference.explicit;
+      String source = preference.source;
 
       // Formats a system can launch are not interchangeable: a PS3 shortcut is
       // not an ISO, and a native port is not an emulator ROM. Pick the installed
@@ -1338,6 +1321,62 @@ class GameLaunchService {
         e.toString(),
       );
     }
+  }
+
+  /// The emulator [game] is meant to launch with, before the extension rule:
+  /// its per-game override, else the system default the user picked, else the
+  /// best installed default ([_resolveDefaultInstalledEmulator]). [explicit]
+  /// marks a choice the user made, which the launch fails on rather than
+  /// replaces.
+  static Future<({String? uniqueId, bool explicit, String source})>
+  _preferredEmulator(SystemModel system, GameModel game) async {
+    final perGame = game.emulatorName;
+    if (perGame != null) {
+      return (uniqueId: perGame, explicit: true, source: 'per-game override');
+    }
+    if (system.id == null) {
+      return (uniqueId: null, explicit: false, source: 'none');
+    }
+    final userDefault =
+        await EmulatorRepository.getUserDefaultEmulatorForSystem(system.id!);
+    if (userDefault != null) {
+      return (
+        uniqueId: userDefault.uniqueId,
+        explicit: true,
+        source: 'system default (user-selected)',
+      );
+    }
+    final defaultEmu = await _resolveDefaultInstalledEmulator(system);
+    if (defaultEmu != null) {
+      return (
+        uniqueId: defaultEmu.uniqueId,
+        explicit: false,
+        source: 'auto-resolved default',
+      );
+    }
+    return (uniqueId: null, explicit: false, source: 'none');
+  }
+
+  /// The unique id of the emulator [game] would launch with, chosen the way
+  /// [launchGame] chooses it (per-game override, system default, best installed
+  /// default, then the extension rule). Null when nothing resolves, or when no
+  /// emulator could launch the game's format.
+  ///
+  /// For code that has to act on the game's emulator without launching it,
+  /// such as placing a downloaded save where that emulator reads it.
+  static Future<String?> resolveLaunchEmulatorId(
+    SystemModel system,
+    GameModel game,
+  ) async {
+    final preference = await _preferredEmulator(system, game);
+    final resolution = await _resolveExtensionAwareEmulator(
+      system,
+      game,
+      preference.uniqueId,
+      preference.explicit,
+    );
+    if (resolution.unsupported || resolution.explicitMismatch) return null;
+    return resolution.uniqueId ?? preference.uniqueId;
   }
 
   /// Resolves which emulator to auto-select when a game has no per-game

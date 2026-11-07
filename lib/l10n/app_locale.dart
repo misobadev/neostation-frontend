@@ -622,6 +622,7 @@ mixin AppLocale {
   static const String lastSyncedSave = 'last_synced_save';
   static const String saveListMenu = 'save_list_menu';
   static const String customSaveFoldersMenu = 'custom_save_folders_menu';
+  static const String customSaveFoldersShort = 'custom_save_folders_short';
   static const String updateYourPlanMenu = 'update_your_plan_menu';
   static const String customFoldersSubtitle = 'custom_folders_subtitle';
   static const String noCustomFoldersConfigured =

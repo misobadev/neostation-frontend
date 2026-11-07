@@ -637,6 +637,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.lastSyncedSave: 'Last synced save',
   AppLocale.saveListMenu: 'Save List',
   AppLocale.customSaveFoldersMenu: 'Standalone Save Folders',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Update Your Plan',
   AppLocale.customFoldersSubtitle:
       'Add a folder from a standalone emulator so its saves are synced too.',

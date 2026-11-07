@@ -568,6 +568,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.lastSyncedSave: '마지막으로 동기화된 세이브',
   AppLocale.saveListMenu: '세이브 목록',
   AppLocale.customSaveFoldersMenu: '독립형 세이브 폴더',
+  AppLocale.customSaveFoldersShort: '독립형 폴더',
   AppLocale.updateYourPlanMenu: '요금제 업데이트',
   AppLocale.customFoldersSubtitle: '독립형 에뮬레이터의 독립형 폴더를 추가하면 해당 세이브도 동기화됩니다.',
   AppLocale.noCustomFoldersConfigured: '설정된 독립형 폴더가 없습니다',

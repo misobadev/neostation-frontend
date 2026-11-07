@@ -653,6 +653,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.lastSyncedSave: 'Último save sincronizado',
   AppLocale.saveListMenu: 'Lista de Saves',
   AppLocale.customSaveFoldersMenu: 'Pastas de Save Standalone',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Atualizar Seu Plano',
   AppLocale.customFoldersSubtitle:
       'Adicione uma pasta personalizada de um emulador standalone para que seus saves também sejam sincronizados.',

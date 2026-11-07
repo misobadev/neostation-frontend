@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/sync/providers/neo_sync_adapter.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
@@ -495,7 +496,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// Auto-syncs any configured standalone save folder for the opened system.
   ///
   /// Runs once per screen instance, only for a real system (not the "All",
-  /// "Favourites" or collection views) and only when NeoSync is authenticated.
+  /// "Favourites" or collection views) and only when NeoSync is authenticated
+  /// and is the active save provider.
   /// Each configured folder for the system is synced so its standalone
   /// emulator's saves stay current when the user enters the system.
   Future<void> _maybeSyncStandaloneFolders() async {
@@ -516,6 +518,11 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
       final provider = context.read<NeoSyncProvider>();
       if (!provider.isNeoSyncAuthenticated) return;
+      // The folders belong to whichever provider owns save sync; with RomM,
+      // uploading them to NeoSync would put the saves in a second cloud.
+      if (SyncManager.instance.activeProviderId != NeoSyncAdapter.kProviderId) {
+        return;
+      }
 
       for (final entry in folders.entries) {
         final outcome = await provider.syncCustomSaveFolder(
