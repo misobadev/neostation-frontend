@@ -25,6 +25,8 @@ import 'package:neostation/widgets/tv_directory_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
+import 'package:neostation/utils/user_data_move_busy.dart';
+import 'package:neostation/utils/user_data_move_failure_message.dart';
 import 'settings_title.dart';
 import 'widgets/settings_section_header.dart';
 import 'widgets/settings_action_button.dart';
@@ -211,6 +213,9 @@ class DirectoriesSettingsContentState
     final action = item['action'] as String;
     // Disabled ES-DE actions are inert — no toast, no sound, no work.
     if (_isEsdeDisabled(action)) return;
+    // A scan, import or second move started now would write to the data
+    // being moved after its copy was taken.
+    if (UserDataLocationService.isMoving) return;
     final configProvider = Provider.of<SqliteConfigProvider>(
       context,
       listen: false,
@@ -631,7 +636,19 @@ class DirectoriesSettingsContentState
   // User data location picker + migration
   // ---------------------------------------------------------------------------
 
+  /// Tells the user the move has to wait, if it does.
+  bool _refuseMoveWhileBusy() {
+    if (!userDataMoveBusy(context)) return false;
+    AppNotification.showNotification(
+      context,
+      AppLocale.userDataMoveBusy.getString(context),
+      type: NotificationType.error,
+    );
+    return true;
+  }
+
   Future<void> _selectUserDataLocation() async {
+    if (_refuseMoveWhileBusy()) return;
     try {
       String? selected;
 
@@ -692,6 +709,8 @@ class DirectoriesSettingsContentState
         destItemCount: entryCount,
       );
       if (!proceed || !mounted) return;
+      // Something may have started while the picker and dialogue were open.
+      if (_refuseMoveWhileBusy()) return;
 
       await _migrateUserData(sourcePath: current, destPath: selected);
     } catch (e) {
@@ -699,7 +718,8 @@ class DirectoriesSettingsContentState
       if (mounted) {
         AppNotification.showNotification(
           context,
-          '${AppLocale.migratingUserDataError.getString(context)}: $e',
+          '${AppLocale.migratingUserDataError.getString(context)}: '
+          '${AppLocale.userDataMoveFailed.getString(context)}',
           type: NotificationType.error,
         );
       }
@@ -711,7 +731,11 @@ class DirectoriesSettingsContentState
     required String destPath,
   }) async {
     if (!mounted) return;
-    String? migrationError;
+    UserDataMoveFailureKind? failure;
+    // The user can leave Settings while the move runs. The move still
+    // finishes and switches the app to the new folder, so its outcome is
+    // shown through the root navigator, which outlives this screen.
+    final navigator = Navigator.of(context, rootNavigator: true);
 
     setState(() {
       _isMigrating = true;
@@ -734,39 +758,48 @@ class DirectoriesSettingsContentState
           }
         },
       );
-      await UserDataLocationService.setCustomPath(destPath);
-      // Reinforce the SharedPreferences setup flag so that if the new path
-      // (e.g. SD card) is temporarily unavailable on next boot, the wizard
-      // is not shown again.
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(PermissionCheckWrapper.setupCompletedKey, true);
+    } on UserDataMoveFailure catch (e) {
+      failure = e.kind;
+      _log.e('Migration failed: $e');
     } catch (e) {
-      migrationError = e.toString();
+      failure = UserDataMoveFailureKind.other;
       _log.e('Migration failed: $e');
     }
 
-    if (mounted) setState(() => _isMigrating = false);
-
-    if (migrationError != null) {
-      if (mounted) {
-        AppNotification.showNotification(
-          context,
-          '${AppLocale.migratingUserDataError.getString(context)}: $migrationError',
-          type: NotificationType.error,
-        );
+    if (failure == null) {
+      // migrateData has saved the new folder as the user-data location.
+      // Reinforce the SharedPreferences setup flag so that if the new path
+      // (e.g. SD card) is temporarily unavailable on next boot, the wizard
+      // is not shown again. The data has moved either way, so a failure here
+      // must not be reported as a failed move.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(PermissionCheckWrapper.setupCompletedKey, true);
+      } catch (e) {
+        _log.w('Could not save the setup flag after the move: $e');
       }
+    }
+
+    if (mounted) setState(() => _isMigrating = false);
+    if (!navigator.mounted) return;
+
+    if (failure != null) {
+      AppNotification.showNotification(
+        navigator.context,
+        '${AppLocale.migratingUserDataError.getStringForCurrentLocale()}: '
+        '${userDataMoveFailureMessage(failure, (key) => key.getStringForCurrentLocale())}',
+        type: NotificationType.error,
+      );
       return;
     }
 
     if (mounted) setState(() => _currentUserDataPath = destPath);
 
-    if (mounted) {
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => const RestartRequiredDialog(),
-      );
-    }
+    await showDialog(
+      context: navigator.context,
+      barrierDismissible: false,
+      builder: (ctx) => const RestartRequiredDialog(),
+    );
   }
 
   // ---------------------------------------------------------------------------

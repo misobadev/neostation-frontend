@@ -1284,6 +1284,16 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.migratingUserData: 'Перемещение данных',
   AppLocale.migratingUserDataComplete: 'Миграция завершена',
   AppLocale.migratingUserDataError: 'Ошибка миграции',
+  AppLocale.userDataMoveBusy:
+      'NeoStation занят: идёт сканирование, скрапинг, синхронизация, импорт или работает инструмент. Перенесите данные, когда это закончится.',
+  AppLocale.userDataMoveNoSpace:
+      'В новой папке недостаточно свободного места. Ваши данные остались в текущей папке.',
+  AppLocale.userDataMoveBlocked:
+      'В новой папке есть что-то с тем же именем, что и у одного из файлов или папок NeoStation. Ваши данные остались в текущей папке.',
+  AppLocale.userDataMoveOverlapping:
+      'Новая папка не может находиться внутри текущей или содержать её. Выберите другую папку.',
+  AppLocale.userDataMoveFailed:
+      'Не удалось перенести данные. Они остались в текущей папке.',
   AppLocale.migratingFiles: 'Копирование {current} из {total} файлов...',
   AppLocale.restartRequired: 'Требуется перезапуск',
   AppLocale.restartRequiredBody:

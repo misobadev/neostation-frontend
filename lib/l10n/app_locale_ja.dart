@@ -1166,6 +1166,14 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.migratingUserData: 'データを移動中',
   AppLocale.migratingUserDataComplete: '移行完了',
   AppLocale.migratingUserDataError: '移行に失敗しました',
+  AppLocale.userDataMoveBusy:
+      'NeoStationは処理中です（スキャン、スクレイピング、同期、インポート、またはツールを実行中）。終了してからデータを移動してください。',
+  AppLocale.userDataMoveNoSpace: '新しいフォルダーの空き容量が足りません。データは現在のフォルダーに残っています。',
+  AppLocale.userDataMoveBlocked:
+      '新しいフォルダー内に、NeoStationのファイルまたはフォルダーと同じ名前のものがあります。データは現在のフォルダーに残っています。',
+  AppLocale.userDataMoveOverlapping:
+      '新しいフォルダーを現在のフォルダーの中に置いたり、現在のフォルダーを含んだりすることはできません。別のフォルダーを選んでください。',
+  AppLocale.userDataMoveFailed: 'データを移動できませんでした。データは現在のフォルダーに残っています。',
   AppLocale.migratingFiles: '{total}件中{current}件のファイルをコピー中...',
   AppLocale.restartRequired: '再起動が必要です',
   AppLocale.restartRequiredBody: 'NeoStationを今すぐ終了します。新しい場所を使用するには再度開いてください。',
