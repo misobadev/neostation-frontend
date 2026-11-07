@@ -159,7 +159,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
       try {
         final isFullscreen = context.read<SqliteConfigProvider>().isFullscreen;
         if (Platform.isMacOS) {
-          await windowManager.setFullScreen(isFullscreen);
+          WindowManager.instance.getCurrent()?.isFullScreen = isFullscreen;
         } else {
           FullScreenWindow.setFullScreen(isFullscreen);
         }
@@ -176,7 +176,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
       try {
         await context.read<SqliteConfigProvider>().updateIsFullscreen(value);
         if (Platform.isMacOS) {
-          await windowManager.setFullScreen(value);
+          WindowManager.instance.getCurrent()?.isFullScreen = value;
         } else {
           FullScreenWindow.setFullScreen(value);
         }

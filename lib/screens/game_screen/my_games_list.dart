@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/sync/providers/neo_sync_adapter.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
@@ -14,11 +15,13 @@ import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/widgets/shimmering_logo.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:math';
 import '../../services/game_service.dart';
+import '../../utils/auto_folder_upload_notice.dart';
 import '../../utils/game_launch_utils.dart';
 import '../../services/music_player_service.dart';
 import '../../repositories/system_repository.dart';
@@ -493,7 +496,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
   /// Auto-syncs any configured standalone save folder for the opened system.
   ///
   /// Runs once per screen instance, only for a real system (not the "All",
-  /// "Favourites" or collection views) and only when NeoSync is authenticated.
+  /// "Favourites" or collection views) and only when NeoSync is authenticated
+  /// and is the active save provider.
   /// Each configured folder for the system is synced so its standalone
   /// emulator's saves stay current when the user enters the system.
   Future<void> _maybeSyncStandaloneFolders() async {
@@ -514,9 +518,27 @@ class _SystemGamesListState extends State<SystemGamesList> {
 
       final provider = context.read<NeoSyncProvider>();
       if (!provider.isNeoSyncAuthenticated) return;
+      // The folders belong to whichever provider owns save sync; with RomM,
+      // uploading them to NeoSync would put the saves in a second cloud.
+      if (SyncManager.instance.activeProviderId != NeoSyncAdapter.kProviderId) {
+        return;
+      }
 
       for (final entry in folders.entries) {
-        await provider.syncCustomSaveFolder(folderName, entry.key);
+        final outcome = await provider.syncCustomSaveFolder(
+          folderName,
+          entry.key,
+        );
+        // Runs in the background: the bell is where a failure shows.
+        reportAutoFolderUpload(
+          system: folderName,
+          emulatorSlug: entry.key,
+          // Two emulators' folders on one system need telling apart.
+          systemName: folders.length > 1
+              ? '${widget.system.realName} · ${path.basename(entry.value)}'
+              : widget.system.realName,
+          outcome: outcome,
+        );
       }
     } catch (e) {
       // Non-fatal: a failed auto-sync must never block the games list.

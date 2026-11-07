@@ -665,6 +665,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.lastSyncedSave: 'Zuletzt synchronisierter Spielstand',
   AppLocale.saveListMenu: 'Speicherliste',
   AppLocale.customSaveFoldersMenu: 'Standalone-Speicherordner',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Plan aktualisieren',
   AppLocale.customFoldersSubtitle:
       'Füge einen benutzerdefinierten Ordner von einem eigenständigen Emulator hinzu, damit auch seine Spielstände synchronisiert werden.',
@@ -1329,6 +1330,16 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.migratingUserData: 'Daten werden verschoben',
   AppLocale.migratingUserDataComplete: 'Migration abgeschlossen',
   AppLocale.migratingUserDataError: 'Migration fehlgeschlagen',
+  AppLocale.userDataMoveBusy:
+      'NeoStation ist beschäftigt: Ein Scan, Scraping, eine Synchronisierung, ein Import oder ein Werkzeug läuft. Verschiebe deine Daten, wenn es fertig ist.',
+  AppLocale.userDataMoveNoSpace:
+      'Im neuen Ordner ist nicht genug Speicherplatz frei. Deine Daten sind weiterhin im bisherigen Ordner.',
+  AppLocale.userDataMoveBlocked:
+      'Im neuen Ordner hat etwas denselben Namen wie eine Datei oder ein Ordner von NeoStation. Deine Daten sind weiterhin im bisherigen Ordner.',
+  AppLocale.userDataMoveOverlapping:
+      'Der neue Ordner darf nicht im bisherigen liegen oder ihn enthalten. Wähle einen anderen Ordner.',
+  AppLocale.userDataMoveFailed:
+      'Deine Daten konnten nicht verschoben werden. Sie sind weiterhin im bisherigen Ordner.',
   AppLocale.migratingFiles: '{current} von {total} Dateien werden kopiert...',
   AppLocale.restartRequired: 'Neustart erforderlich',
   AppLocale.restartRequiredBody:

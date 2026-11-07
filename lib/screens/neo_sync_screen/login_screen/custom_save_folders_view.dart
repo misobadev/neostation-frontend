@@ -26,6 +26,7 @@ import 'package:neostation/themes/corner_radii.dart';
 import '../../app_screen.dart';
 import 'custom_save_folders_panel.dart';
 import 'neo_sync_shared.dart';
+import '../../../utils/auto_folder_upload_notice.dart';
 
 /// Full-screen Custom Save Folders view.
 ///
@@ -37,7 +38,22 @@ import 'neo_sync_shared.dart';
 class CustomSaveFoldersView extends StatefulWidget {
   final VoidCallback onBack;
 
-  const CustomSaveFoldersView({super.key, required this.onBack});
+  /// Called once a folder is saved, in place of NeoSync's upload of it. Set
+  /// when another provider owns save sync (RomM): its folders are for that
+  /// provider, and uploading them to NeoSync would put the saves in a second
+  /// cloud the user didn't choose.
+  final Future<void> Function(
+    String system,
+    String emulatorSlug,
+    String folderPath,
+  )?
+  onConfigured;
+
+  const CustomSaveFoldersView({
+    super.key,
+    required this.onBack,
+    this.onConfigured,
+  });
 
   @override
   State<CustomSaveFoldersView> createState() => _CustomSaveFoldersViewState();
@@ -228,6 +244,13 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
       await _loadConfigured();
 
       if (!mounted) return;
+      final onConfigured = widget.onConfigured;
+      if (onConfigured != null) {
+        await onConfigured(system, emulatorSlug, folderPath);
+        return;
+      }
+
+      if (!mounted) return;
       final provider = context.read<NeoSyncProvider>();
       if (mounted) setState(() => _syncing = true);
 
@@ -305,6 +328,8 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
               custom.NotificationType.error,
             );
           case CustomFolderUploadOutcome.uploaded:
+            // Went through: the automatic upload's failure entry is stale.
+            clearAutoFolderUploadNotice(system, emulatorSlug);
             show(
               AppLocale.customFolderUploadComplete
                   .getString(context)
@@ -313,6 +338,7 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
               custom.NotificationType.success,
             );
           case CustomFolderUploadOutcome.empty:
+            clearAutoFolderUploadNotice(system, emulatorSlug);
             // Nothing to upload: an empty folder, or one NeoStation can't list.
             // Without All files access, say how to grant it.
             final needsAllFilesAccess =

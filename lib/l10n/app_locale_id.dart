@@ -638,6 +638,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.lastSyncedSave: 'Simpanan terakhir disinkronkan',
   AppLocale.saveListMenu: 'Daftar Simpanan',
   AppLocale.customSaveFoldersMenu: 'Folder Simpanan Standalone',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Perbarui Paket Anda',
   AppLocale.customFoldersSubtitle:
       'Tambahkan folder kustom dari emulator mandiri agar simpanannya juga disinkronkan.',
@@ -1288,6 +1289,16 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.migratingUserData: 'Memindahkan Data',
   AppLocale.migratingUserDataComplete: 'Migrasi selesai',
   AppLocale.migratingUserDataError: 'Migrasi gagal',
+  AppLocale.userDataMoveBusy:
+      'NeoStation sedang sibuk: pemindaian, scraping, sinkronisasi, impor, atau alat sedang berjalan. Pindahkan data Anda setelah selesai.',
+  AppLocale.userDataMoveNoSpace:
+      'Ruang kosong di folder baru tidak cukup. Data Anda masih di folder saat ini.',
+  AppLocale.userDataMoveBlocked:
+      'Ada sesuatu di folder baru yang namanya sama dengan salah satu file atau folder NeoStation. Data Anda masih di folder saat ini.',
+  AppLocale.userDataMoveOverlapping:
+      'Folder baru tidak boleh berada di dalam folder saat ini, atau memuatnya. Pilih folder lain.',
+  AppLocale.userDataMoveFailed:
+      'Tidak dapat memindahkan data Anda. Data masih di folder saat ini.',
   AppLocale.migratingFiles: 'Menyalin {current} dari {total} file...',
   AppLocale.restartRequired: 'Restart Diperlukan',
   AppLocale.restartRequiredBody:

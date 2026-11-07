@@ -658,6 +658,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.lastSyncedSave: 'Ultimo salvataggio sincronizzato',
   AppLocale.saveListMenu: 'Elenco Salvataggi',
   AppLocale.customSaveFoldersMenu: 'Cartelle di Salvataggio Standalone',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Aggiorna il Tuo Piano',
   AppLocale.customFoldersSubtitle:
       'Aggiungi una cartella personalizzata da un emulatore standalone per sincronizzare anche i suoi salvataggi.',
@@ -1321,6 +1322,16 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.migratingUserData: 'Spostamento dati',
   AppLocale.migratingUserDataComplete: 'Migrazione completata',
   AppLocale.migratingUserDataError: 'Migrazione fallita',
+  AppLocale.userDataMoveBusy:
+      'NeoStation è occupato: è in corso una scansione, uno scraping, una sincronizzazione, un\'importazione o uno strumento. Sposta i tuoi dati quando ha finito.',
+  AppLocale.userDataMoveNoSpace:
+      'Non c\'è abbastanza spazio libero nella nuova cartella. I tuoi dati sono ancora nella cartella attuale.',
+  AppLocale.userDataMoveBlocked:
+      'Nella nuova cartella c\'è qualcosa con lo stesso nome di un file o di una cartella di NeoStation. I tuoi dati sono ancora nella cartella attuale.',
+  AppLocale.userDataMoveOverlapping:
+      'La nuova cartella non può trovarsi dentro quella attuale, né contenerla. Scegli un\'altra cartella.',
+  AppLocale.userDataMoveFailed:
+      'Impossibile spostare i tuoi dati. Sono ancora nella cartella attuale.',
   AppLocale.migratingFiles: 'Copia di {current} su {total} file...',
   AppLocale.restartRequired: 'Riavvio richiesto',
   AppLocale.restartRequiredBody:

@@ -9,10 +9,10 @@ import 'package:neostation/services/logger_service.dart';
 /// is always centered smoothly within the viewport.
 ///
 /// Cross-platform behavior:
-/// - Desktop: Utilizes [WindowListener] to handle maximization, restoration, and resizing.
+/// - Desktop: Uses window events to handle maximization, restoration, and resizing.
 /// - Mobile: Uses [WidgetsBindingObserver] to monitor orientation and screen metric changes.
 /// - Synchronization: Forces UI rebuilds when the viewport changes and re-centers the active item.
-class CenteredScrollController with WindowListener, WidgetsBindingObserver {
+class CenteredScrollController with WidgetsBindingObserver {
   /// The underlying [ScrollController] used by the ListView.
   final ScrollController scrollController;
 
@@ -40,6 +40,8 @@ class CenteredScrollController with WindowListener, WidgetsBindingObserver {
   final ValueNotifier<int> rebuildNotifier = ValueNotifier<int>(0);
 
   VoidCallback? _fullscreenListener;
+  Window? _window;
+  ListenerId? _windowListenerId;
 
   CenteredScrollController({
     ScrollController? scrollController,
@@ -75,7 +77,11 @@ class CenteredScrollController with WindowListener, WidgetsBindingObserver {
 
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       if (!Platform.isLinux) {
-        windowManager.addListener(this);
+        final window = WindowManager.instance.getCurrent();
+        if (window != null) {
+          _window = window;
+          _windowListenerId = window.addListener(_onWindowEvent);
+        }
       }
 
       _fullscreenListener = () {
@@ -99,32 +105,21 @@ class CenteredScrollController with WindowListener, WidgetsBindingObserver {
     });
   }
 
-  @override
-  void onWindowMaximize() {
-    _handleWindowStateChange();
-  }
-
-  @override
-  void onWindowUnmaximize() {
-    _handleWindowStateChange();
-  }
-
-  @override
-  void onWindowResized() {
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      _handleWindowStateChange();
-    });
-  }
-
-  @override
-  void onWindowEnterFullScreen() {
-    _handleWindowStateChange();
-  }
-
-  @override
-  void onWindowLeaveFullScreen() {
-    _handleWindowStateChange();
+  void _onWindowEvent(WindowEvent event) {
+    switch (event) {
+      case WindowMaximizedEvent() ||
+          WindowRestoredEvent() ||
+          WindowEnteredFullScreenEvent() ||
+          WindowExitedFullScreenEvent():
+        _handleWindowStateChange();
+      case WindowResizedEvent():
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+          _handleWindowStateChange();
+        });
+      default:
+        break;
+    }
   }
 
   @override
@@ -342,7 +337,13 @@ class CenteredScrollController with WindowListener, WidgetsBindingObserver {
 
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       if (!Platform.isLinux) {
-        windowManager.removeListener(this);
+        final window = _window;
+        final listenerId = _windowListenerId;
+        if (window != null && listenerId != null) {
+          window.removeListener(listenerId);
+        }
+        _window = null;
+        _windowListenerId = null;
       }
 
       if (_fullscreenListener != null) {

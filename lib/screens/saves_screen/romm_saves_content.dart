@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_locale.dart';
@@ -24,6 +26,7 @@ import '../../widgets/custom_notification.dart';
 import '../../widgets/edge_fade.dart';
 import '../../widgets/romm_sync_banner.dart' show rommFormatBytes;
 import '../app_screen.dart';
+import '../neo_sync_screen/login_screen/custom_save_folders_view.dart';
 import 'romm_save_artwork.dart';
 
 enum _FocusArea { filters, games, files }
@@ -70,6 +73,10 @@ class _RommSavesContentState extends State<RommSavesContent> {
   String? _gameKey;
   // The focused file, which a refresh can move by listing newer files.
   ({bool isState, int id})? _fileKey;
+
+  // Standalone save folders is open in place of the list (Start). It has its
+  // own navigation layer, so this screen's wakes again when it closes.
+  bool _showFolders = false;
 
   // Input reads the games several times per press, so they are regrouped only
   // when the inventory or the filter changes.
@@ -139,6 +146,7 @@ class _RommSavesContentState extends State<RommSavesContent> {
       onNextTab: AppNavigation.nextTab,
       onLeftTrigger: () => _stepFilter(-1),
       onRightTrigger: () => _stepFilter(1),
+      onSettings: _openFolders,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -302,6 +310,52 @@ class _RommSavesContentState extends State<RommSavesContent> {
     await _saves.refresh();
     if (mounted && _saves.loadError != null && _saves.assets.isNotEmpty) {
       _notify(AppLocale.failedToRefreshCloud);
+    }
+  }
+
+  /// Standalone save folders, for emulators RomM can only find saves for
+  /// through a folder the user picks. No NeoSync account is needed: the
+  /// folders belong to the save provider, which is RomM here.
+  void _openFolders() {
+    if (_showFolders) return;
+    setState(() => _showFolders = true);
+  }
+
+  void _closeFolders() {
+    if (mounted) setState(() => _showFolders = false);
+  }
+
+  /// Sends a newly configured folder's saves to RomM now, rather than at the
+  /// next game. A sweep already running may have passed this system's games,
+  /// so it is waited out and a new one started.
+  Future<void> _uploadNewFolder(String folderPath) async {
+    AppNotification.showNotification(
+      context,
+      AppLocale.uploadingCustomFolder
+          .getString(context)
+          .replaceFirst('{folder}', path.basename(folderPath)),
+      type: NotificationType.info,
+    );
+    await _whileBusy();
+    if (!mounted) return;
+    // Failures are reported by the sync provider; the saves appear in the
+    // list as they arrive.
+    await _saves.retryUploads();
+  }
+
+  /// Completes once no sync, delete or load is running.
+  Future<void> _whileBusy() async {
+    if (!_busy) return;
+    final idle = Completer<void>();
+    void check() {
+      if (!_busy && !idle.isCompleted) idle.complete();
+    }
+
+    _saves.addListener(check);
+    try {
+      await idle.future;
+    } finally {
+      _saves.removeListener(check);
     }
   }
 
@@ -533,6 +587,12 @@ class _RommSavesContentState extends State<RommSavesContent> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: _saves,
     builder: (context, _) {
+      if (_showFolders) {
+        return CustomSaveFoldersView(
+          onBack: _closeFolders,
+          onConfigured: (_, _, folder) => _uploadNewFolder(folder),
+        );
+      }
       final games = _games;
       _reconcileSelection(games);
       // The navigator owns the cursor. Otherwise an arrow key hands Flutter's
@@ -632,6 +692,22 @@ class _RommSavesContentState extends State<RommSavesContent> {
               spacing: 8.r,
               runSpacing: 6.r,
               children: [
+                // A short label: the full name doesn't fit small screens
+                // with large text, so it goes to the tooltip and screen
+                // readers. First, so the upload retry keeps the bottom-right
+                // corner.
+                GamepadControl(
+                  key: const ValueKey('save-standalone-folders'),
+                  label: AppLocale.customSaveFoldersShort.getString(context),
+                  semanticLabel: AppLocale.customSaveFoldersMenu.getString(
+                    context,
+                  ),
+                  iconPath: 'assets/images/gamepad/Xbox_Menu_button.png',
+                  trailingIcon: Symbols.folder_managed_rounded,
+                  onTap: _openFolders,
+                  textColor: scheme.onTertiaryFixed,
+                  backgroundColor: scheme.tertiaryFixed,
+                ),
                 // Only offered while a game or a file is focused, which is
                 // also when Select means Delete. Its space is kept so the rest
                 // of the row doesn't move as the cursor reaches the filters.

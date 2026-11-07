@@ -124,16 +124,18 @@ class ToggleFullscreenAction extends Action<ToggleFullscreenIntent> {
       // Notificar el cambio de fullscreen
       FullscreenNotifier().notifyFullscreenChanged(newState);
     } else if (Platform.isMacOS) {
-      final isFullscreen = await windowManager.isFullScreen();
-      LoggerService.instance.i(
-        'Toggle fullscreen (macOS): current=$isFullscreen, setting=${!isFullscreen}',
-      );
-      await windowManager.setFullScreen(!isFullscreen);
+      final window = WindowManager.instance.getCurrent();
+      if (window != null) {
+        final isFullscreen = window.isFullScreen;
+        LoggerService.instance.i(
+          'Toggle fullscreen (macOS): current=$isFullscreen, setting=${!isFullscreen}',
+        );
+        window.isFullScreen = !isFullscreen;
 
-      // Notificar el cambio de fullscreen
-      await Future.delayed(const Duration(milliseconds: 100));
-      final newState = await windowManager.isFullScreen();
-      FullscreenNotifier().notifyFullscreenChanged(newState);
+        // Notify the fullscreen change.
+        await Future.delayed(const Duration(milliseconds: 100));
+        FullscreenNotifier().notifyFullscreenChanged(window.isFullScreen);
+      }
     }
     return;
   }
@@ -227,23 +229,18 @@ void main() async {
     await FilePicker.skipEntitlementsChecks();
   }
 
-  // Inicializar window_manager para desktop con tamano minimo 640x480
+  // Initialize window_manager for desktop with a 640x480 minimum size.
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-    await windowManager.ensureInitialized();
+    final window = WindowManager.instance.getCurrent();
 
-    WindowOptions windowOptions = WindowOptions(
-      size: const Size(1280, 720),
-      alwaysOnTop: false,
-      skipTaskbar: false,
-      minimumSize: const Size(640, 480),
-    );
+    window?.minimumSize = const Size(640, 480).toNative();
+    window?.setSize(const Size(1280, 720).toNative(), false);
+    window?.isAlwaysOnTop = false;
+    window?.isVisibleInTaskbar = true;
+    window?.show();
+    window?.focus();
 
-    await windowManager.waitUntilReadyToShow(windowOptions, () async {
-      await windowManager.show();
-      await windowManager.focus();
-    });
-
-    // Cargar configuracion de fullscreen
+    // Load the fullscreen configuration.
     bool isFullscreen = true;
     try {
       final config = await ConfigRepository.getUserConfig();
@@ -258,20 +255,20 @@ void main() async {
       if (Platform.isWindows || Platform.isLinux) {
         FullScreenWindow.setFullScreen(true);
       } else if (Platform.isMacOS) {
-        await windowManager.setFullScreen(true);
+        window?.isFullScreen = true;
       }
       FullscreenNotifier().notifyFullscreenChanged(true);
     } else {
       if (Platform.isWindows || Platform.isLinux) {
         FullScreenWindow.setFullScreen(false);
       } else if (Platform.isMacOS) {
-        await windowManager.setFullScreen(false);
+        window?.isFullScreen = false;
       }
       FullscreenNotifier().notifyFullscreenChanged(false);
     }
 
-    // Gamepad input follows window focus from here on. Must come after
-    // ensureInitialized() above, which owns the channel it listens on.
+    // Gamepad input follows window focus from here on. Must come after the
+    // window has been created and shown.
     await DesktopWindowFocus.initialize();
 
     log.i('Window manager initialized');
@@ -363,10 +360,16 @@ void main() async {
     log.e('Error initializing database providers: $e');
   }
 
+  // FileProvider started before the database was open. On a fresh install
+  // that can find it briefly locked, and its system-extension lookup (or, on
+  // an earlier failure, every path) is still missing: try again now. Does
+  // nothing when it already finished.
+  await fileProvider.initialize();
+
   // Inicializar listener de Android para tracking de tiempo de juego
   if (Platform.isAndroid) {
     try {
-      GameService.initializeAndroidGameListener();
+      await GameService.initializeAndroidGameListener();
       // Verificar si hay una sesion de juego pendiente (app fue matada)
       await GameService.checkPendingGameSession();
     } catch (e) {
@@ -487,9 +490,9 @@ void main() async {
   sfx.setVolume(sqliteConfigProvider.config.sfxVolume);
   sfx.setEnabled(sqliteConfigProvider.config.sfxEnabled);
   unawaited(
-    sfx
-        .setCustomSounds(sqliteConfigProvider.config.customSfx)
-        .then((_) => sfx.init()),
+    sfx.setCustomSounds(sqliteConfigProvider.config.customSfx).then((_) async {
+      if (sfx.isEnabled) await sfx.init();
+    }),
   );
 }
 

@@ -653,6 +653,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.lastSyncedSave: 'Último save sincronizado',
   AppLocale.saveListMenu: 'Lista de Saves',
   AppLocale.customSaveFoldersMenu: 'Pastas de Save Standalone',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Atualizar Seu Plano',
   AppLocale.customFoldersSubtitle:
       'Adicione uma pasta personalizada de um emulador standalone para que seus saves também sejam sincronizados.',
@@ -1309,6 +1310,16 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.migratingUserData: 'Movendo Dados',
   AppLocale.migratingUserDataComplete: 'Migração concluída',
   AppLocale.migratingUserDataError: 'Falha na migração',
+  AppLocale.userDataMoveBusy:
+      'O NeoStation está ocupado: uma verificação, scraping, sincronização, importação ou ferramenta está em andamento. Mova seus dados quando terminar.',
+  AppLocale.userDataMoveNoSpace:
+      'Não há espaço livre suficiente na nova pasta. Seus dados continuam na pasta atual.',
+  AppLocale.userDataMoveBlocked:
+      'Algo na nova pasta tem o mesmo nome de um dos arquivos ou pastas do NeoStation. Seus dados continuam na pasta atual.',
+  AppLocale.userDataMoveOverlapping:
+      'A nova pasta não pode estar dentro da atual nem contê-la. Escolha outra pasta.',
+  AppLocale.userDataMoveFailed:
+      'Não foi possível mover seus dados. Eles continuam na pasta atual.',
   AppLocale.migratingFiles: 'Copiando {current} de {total} arquivos...',
   AppLocale.restartRequired: 'Reinicialização Necessária',
   AppLocale.restartRequiredBody:

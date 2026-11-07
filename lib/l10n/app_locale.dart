@@ -622,6 +622,7 @@ mixin AppLocale {
   static const String lastSyncedSave = 'last_synced_save';
   static const String saveListMenu = 'save_list_menu';
   static const String customSaveFoldersMenu = 'custom_save_folders_menu';
+  static const String customSaveFoldersShort = 'custom_save_folders_short';
   static const String updateYourPlanMenu = 'update_your_plan_menu';
   static const String customFoldersSubtitle = 'custom_folders_subtitle';
   static const String noCustomFoldersConfigured =
@@ -1335,6 +1336,11 @@ mixin AppLocale {
   static const String migratingUserDataComplete =
       'migrating_user_data_complete';
   static const String migratingUserDataError = 'migrating_user_data_error';
+  static const String userDataMoveBusy = 'user_data_move_busy';
+  static const String userDataMoveNoSpace = 'user_data_move_no_space';
+  static const String userDataMoveBlocked = 'user_data_move_blocked';
+  static const String userDataMoveOverlapping = 'user_data_move_overlapping';
+  static const String userDataMoveFailed = 'user_data_move_failed';
   static const String migratingFiles = 'migrating_files';
   static const String deleteGame = 'delete_game';
   static const String deleteGameConfirm = 'delete_game_confirm';

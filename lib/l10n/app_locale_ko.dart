@@ -568,6 +568,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.lastSyncedSave: '마지막으로 동기화된 세이브',
   AppLocale.saveListMenu: '세이브 목록',
   AppLocale.customSaveFoldersMenu: '독립형 세이브 폴더',
+  AppLocale.customSaveFoldersShort: '독립형 폴더',
   AppLocale.updateYourPlanMenu: '요금제 업데이트',
   AppLocale.customFoldersSubtitle: '독립형 에뮬레이터의 독립형 폴더를 추가하면 해당 세이브도 동기화됩니다.',
   AppLocale.noCustomFoldersConfigured: '설정된 독립형 폴더가 없습니다',
@@ -1176,6 +1177,14 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.migratingUserData: '사용자 데이터 이동 중',
   AppLocale.migratingUserDataComplete: '이동 완료',
   AppLocale.migratingUserDataError: '이동 실패',
+  AppLocale.userDataMoveBusy:
+      'NeoStation이 작업 중입니다: 스캔, 스크래핑, 동기화, 가져오기 또는 도구가 실행 중입니다. 끝난 후 데이터를 이동하세요.',
+  AppLocale.userDataMoveNoSpace: '새 폴더에 여유 공간이 부족합니다. 데이터는 현재 폴더에 그대로 있습니다.',
+  AppLocale.userDataMoveBlocked:
+      '새 폴더에 NeoStation의 파일이나 폴더와 이름이 같은 항목이 있습니다. 데이터는 현재 폴더에 그대로 있습니다.',
+  AppLocale.userDataMoveOverlapping:
+      '새 폴더는 현재 폴더 안에 있거나 현재 폴더를 포함할 수 없습니다. 다른 폴더를 선택하세요.',
+  AppLocale.userDataMoveFailed: '데이터를 이동하지 못했습니다. 데이터는 현재 폴더에 그대로 있습니다.',
   AppLocale.migratingFiles: '파일 {current}/{total}개 복사 중...',
   AppLocale.restartRequired: '재시작 필요',
   AppLocale.restartRequiredBody: '이제 NeoStation이 종료됩니다. 새 위치를 사용하려면 다시 열어주세요.',

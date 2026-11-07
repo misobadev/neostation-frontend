@@ -223,10 +223,31 @@ void main() {
         'message': 'Storage quota exceeded',
       };
 
-      await provider.syncCustomSaveFolder('gc', 'dolphin');
+      expect(
+        await provider.syncCustomSaveFolder('gc', 'dolphin'),
+        CustomFolderUploadOutcome.quotaExceeded,
+      );
 
       expect(service.attempted, hasLength(1));
-      expect(provider.error, contains('quota'));
+    });
+
+    // A full account used to set the provider-wide error, which turns every
+    // game's mark red, and a flag that marked every later game sync over
+    // quota until a file uploaded.
+    test('at a full account leaves other games their own state', () async {
+      write('a.sav');
+      service.upload = (_) => {
+        'success': false,
+        'message': 'Storage quota exceeded',
+      };
+      await provider.syncCustomSaveFolder('gc', 'dolphin');
+
+      expect(provider.error, isNull);
+      write('Zelda.sav');
+      service.upload = (file) => p.basename(file.path) == 'Zelda.sav'
+          ? {'success': true}
+          : {'success': false, 'message': 'Storage quota exceeded'};
+      expect(await sync(), GameSyncStatus.upToDate);
     });
   });
 

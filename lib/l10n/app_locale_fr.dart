@@ -669,6 +669,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.lastSyncedSave: 'Dernière sauvegarde synchronisée',
   AppLocale.saveListMenu: 'Liste des Sauvegardes',
   AppLocale.customSaveFoldersMenu: 'Dossiers de Sauvegarde Standalone',
+  AppLocale.customSaveFoldersShort: 'Standalone',
   AppLocale.updateYourPlanMenu: 'Mettre à Jour Votre Plan',
   AppLocale.customFoldersSubtitle:
       'Ajoutez un dossier personnalisé depuis un émulateur autonome pour synchroniser aussi ses sauvegardes.',
@@ -1333,6 +1334,16 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.migratingUserData: 'Déplacement des données',
   AppLocale.migratingUserDataComplete: 'Migration terminée',
   AppLocale.migratingUserDataError: 'Échec de la migration',
+  AppLocale.userDataMoveBusy:
+      'NeoStation est occupé : une analyse, un scraping, une synchronisation, une importation ou un outil est en cours. Déplacez vos données une fois terminé.',
+  AppLocale.userDataMoveNoSpace:
+      'Il n\'y a pas assez d\'espace libre dans le nouveau dossier. Vos données sont toujours dans leur dossier actuel.',
+  AppLocale.userDataMoveBlocked:
+      'Un élément du nouveau dossier porte le même nom qu\'un fichier ou dossier de NeoStation. Vos données sont toujours dans leur dossier actuel.',
+  AppLocale.userDataMoveOverlapping:
+      'Le nouveau dossier ne peut pas se trouver dans le dossier actuel, ni le contenir. Choisissez un autre dossier.',
+  AppLocale.userDataMoveFailed:
+      'Impossible de déplacer vos données. Elles sont toujours dans leur dossier actuel.',
   AppLocale.migratingFiles: 'Copie de {current} sur {total} fichiers...',
   AppLocale.restartRequired: 'Redémarrage requis',
   AppLocale.restartRequiredBody:

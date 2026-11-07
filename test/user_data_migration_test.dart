@@ -1,9 +1,51 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:neostation/data/datasources/sqlite_service.dart';
+import 'package:neostation/repositories/database_file_repository.dart';
 import 'package:neostation/services/credential_file_store.dart';
 import 'package:neostation/services/user_data_location_service.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqlite3/sqlite3.dart';
+
+/// Opens a database in [dir] the way the app does (WAL) and makes it the
+/// app's open database, with [rows] rows in table `t`.
+Database openAppDatabase(String dir, {int rows = 3}) {
+  final db = sqlite3.open(p.join(dir, 'data.sqlite'))
+    ..execute('PRAGMA journal_mode = WAL')
+    ..execute('CREATE TABLE t (x INTEGER)');
+  insertRows(db, rows);
+  SqliteService.setTestingDatabase(DatabaseAdapter(db));
+  return db;
+}
+
+void insertRows(Database db, int count, {int from = 0}) {
+  final insert = db.prepare('INSERT INTO t VALUES (?)');
+  db.execute('BEGIN');
+  for (var i = from; i < from + count; i++) {
+    insert.execute([i]);
+  }
+  db.execute('COMMIT');
+  insert.close();
+}
+
+/// Rows in table `t` of the database file [file], and its integrity check.
+(int, String) readDatabase(String file) {
+  final db = sqlite3.open(file, mode: OpenMode.readOnly);
+  try {
+    return (
+      db.select('SELECT count(*) AS n FROM t').single['n'] as int,
+      db.select('PRAGMA integrity_check').single.values.single.toString(),
+    );
+  } finally {
+    db.close();
+  }
+}
+
+Matcher failsWith(UserDataMoveFailureKind kind) =>
+    throwsA(isA<UserDataMoveFailure>().having((e) => e.kind, 'kind', kind));
 
 /// Regression tests for the reported data-loss bug: pointing NeoStation's
 /// user-data location at a pre-existing third-party folder (e.g. an ES-DE
@@ -19,7 +61,9 @@ void main() {
     late File scrapedArt; // foreign (ES-DE)
     late File gamelist; // foreign (ES-DE)
     late File esSystems; // foreign (ES-DE)
-    late File db; // owned (NeoStation)
+    late File db; // owned (NeoStation): the app's open database
+    late Database connection; // the app's connection to [db]
+    late File config; // owned (NeoStation): any owned file but the database
     late File neoArt; // owned (NeoStation, under media/)
 
     setUp(() async {
@@ -43,8 +87,11 @@ void main() {
       esSystems.writeAsStringSync('<systemList/>');
 
       // --- NeoStation's own data cohabiting the same folder ---
-      db = File(p.join(esde.path, 'data.sqlite'))..createSync(recursive: true);
-      db.writeAsStringSync('db-bytes');
+      SharedPreferences.setMockInitialValues({});
+      connection = openAppDatabase(esde.path);
+      db = File(p.join(esde.path, 'data.sqlite'));
+      config = File(p.join(esde.path, 'config.json'))
+        ..writeAsStringSync('config-bytes');
 
       neoArt = File(p.join(esde.path, 'media', 'snes', 'boxart', 'ct.png'))
         ..createSync(recursive: true);
@@ -54,6 +101,7 @@ void main() {
     tearDown(() async {
       UserDataLocationService.debugAfterCopy = null;
       UserDataLocationService.debugBeforeRename = null;
+      await SqliteService.closeDatabase();
       if (await tmp.exists()) await tmp.delete(recursive: true);
     });
 
@@ -151,8 +199,7 @@ void main() {
     test(
       'aborts without deleting anything if a copy fails (safety gate)',
       () async {
-        // Force a copy failure: put a DIRECTORY where the owned dest file goes,
-        // so File.copy() throws for data.sqlite.
+        // Force a failure: put a DIRECTORY where the owned dest file goes.
         Directory(p.join(dest.path, 'data.sqlite')).createSync(recursive: true);
 
         await expectLater(
@@ -161,7 +208,7 @@ void main() {
             sourceMediaPath: p.join(esde.path, 'media'),
             destPath: dest.path,
           ),
-          throwsA(isA<Exception>()),
+          failsWith(UserDataMoveFailureKind.blocked),
         );
 
         // Nothing in the source was deleted — owned or foreign.
@@ -201,9 +248,7 @@ void main() {
         nesShot.writeAsStringSync('more scraping');
 
         // NeoStation's own data written inside that same folder.
-        File(
-          p.join(downloadedMedia.path, 'data.sqlite'),
-        ).writeAsStringSync('db');
+        openAppDatabase(downloadedMedia.path);
         final neoBox = File(
           p.join(downloadedMedia.path, 'media', 'snes', 'boxart', 'ct.png'),
         )..createSync(recursive: true);
@@ -353,7 +398,7 @@ void main() {
 
       // Nothing was copied onto itself or deleted — owned AND foreign intact.
       expect(db.existsSync(), isTrue, reason: 'owned db intact');
-      expect(db.readAsStringSync(), 'db-bytes', reason: 'db not truncated');
+      expect(readDatabase(db.path), (3, 'ok'), reason: 'db not truncated');
       expect(neoArt.existsSync(), isTrue, reason: 'owned art intact');
       expect(scrapedArt.existsSync(), isTrue, reason: 'foreign art intact');
     });
@@ -367,7 +412,7 @@ void main() {
           sourceMediaPath: p.join(esde.path, 'media'),
           destPath: nested,
         ),
-        throwsA(isA<Exception>()),
+        failsWith(UserDataMoveFailureKind.overlapping),
       );
       expect(db.existsSync(), isTrue, reason: 'nothing deleted on overlap');
       expect(scrapedArt.existsSync(), isTrue, reason: 'foreign art intact');
@@ -411,12 +456,13 @@ void main() {
 
     test('any other file that does not copy whole stops the move', () async {
       UserDataLocationService.debugAfterCopy = (src, copy) async {
-        if (p.basename(src) == 'data.sqlite') File(copy).writeAsStringSync('');
+        if (p.basename(src) == 'config.json') File(copy).writeAsStringSync('');
       };
 
-      await expectLater(migrate(), throwsA(isA<Exception>()));
+      await expectLater(migrate(), failsWith(UserDataMoveFailureKind.other));
 
-      expect(db.readAsStringSync(), 'db-bytes', reason: 'source kept');
+      expect(config.readAsStringSync(), 'config-bytes', reason: 'source kept');
+      expect(readDatabase(db.path), (3, 'ok'), reason: 'source db kept');
       expect(neoArt.existsSync(), isTrue);
     });
 
@@ -430,10 +476,10 @@ void main() {
       File(p.join(esde.path, 'config.json')).writeAsStringSync('OURS');
       final before = snapshot(dest);
       UserDataLocationService.debugAfterCopy = (src, copy) async {
-        if (p.basename(src) == 'data.sqlite') File(copy).writeAsStringSync('');
+        if (p.basename(src) == 'config.json') File(copy).writeAsStringSync('');
       };
 
-      await expectLater(migrate(), throwsA(isA<Exception>()));
+      await expectLater(migrate(), failsWith(UserDataMoveFailureKind.other));
 
       expect(snapshot(dest), before);
     });
@@ -444,7 +490,7 @@ void main() {
       File(p.join(esde.path, 'config.json')).writeAsStringSync('OURS');
       final before = snapshot(dest);
 
-      await expectLater(migrate(), throwsA(isA<Exception>()));
+      await expectLater(migrate(), failsWith(UserDataMoveFailureKind.blocked));
 
       expect(snapshot(dest), before);
       expect(db.existsSync(), isTrue);
@@ -453,10 +499,13 @@ void main() {
     test('a move into a new folder that gives up removes it', () async {
       final fresh = p.join(tmp.path, 'not-there-yet');
       UserDataLocationService.debugAfterCopy = (src, copy) async {
-        if (p.basename(src) == 'data.sqlite') File(copy).writeAsStringSync('');
+        if (p.basename(src) == 'config.json') File(copy).writeAsStringSync('');
       };
 
-      await expectLater(migrate(to: fresh), throwsA(isA<Exception>()));
+      await expectLater(
+        migrate(to: fresh),
+        failsWith(UserDataMoveFailureKind.other),
+      );
 
       expect(Directory(fresh).existsSync(), isFalse);
     });
@@ -497,13 +546,14 @@ void main() {
 
     test('any other file whose copy came out longer stops the move', () async {
       UserDataLocationService.debugAfterCopy = (src, copy) async {
-        if (p.basename(src) == 'data.sqlite') {
+        if (p.basename(src) == 'config.json') {
           File(copy).writeAsStringSync('more', mode: FileMode.append);
         }
       };
 
-      await expectLater(migrate(), throwsA(isA<Exception>()));
+      await expectLater(migrate(), failsWith(UserDataMoveFailureKind.other));
 
+      expect(config.readAsStringSync(), 'config-bytes');
       expect(db.existsSync(), isTrue);
     });
 
@@ -511,7 +561,7 @@ void main() {
       File(p.join(dest.path, 'media')).writeAsStringSync('not a folder');
       final before = snapshot(dest);
 
-      await expectLater(migrate(), throwsA(isA<Exception>()));
+      await expectLater(migrate(), failsWith(UserDataMoveFailureKind.blocked));
 
       expect(snapshot(dest), before);
       expect(neoArt.existsSync(), isTrue);
@@ -539,7 +589,7 @@ void main() {
         ..writeAsStringSync('in the way');
       final before = snapshot(dest);
 
-      await expectLater(migrate(), throwsA(isA<Exception>()));
+      await expectLater(migrate(), failsWith(UserDataMoveFailureKind.blocked));
 
       expect(snapshot(dest), before);
     });
@@ -555,10 +605,7 @@ void main() {
 
       await migrate();
 
-      expect(
-        File(p.join(dest.path, 'data.sqlite')).readAsStringSync(),
-        'db-bytes',
-      );
+      expect(readDatabase(p.join(dest.path, 'data.sqlite')), (3, 'ok'));
       expect(db.existsSync(), isFalse);
       expect(
         dest.listSync().map((e) => p.basename(e.path)),
@@ -573,9 +620,9 @@ void main() {
           if (p.basename(dest) == 'ct.png') throw StateError('disk went away');
         };
 
-        await expectLater(migrate(), throwsA(isA<Exception>()));
+        await expectLater(migrate(), failsWith(UserDataMoveFailureKind.other));
 
-        expect(db.readAsStringSync(), 'db-bytes');
+        expect(readDatabase(db.path), (3, 'ok'));
         expect(neoArt.existsSync(), isTrue);
         expect(
           dest.listSync().map((e) => p.basename(e.path)),
@@ -583,5 +630,294 @@ void main() {
         );
       },
     );
+    // NEO-213: the database was copied as data.sqlite, -wal and -shm one after
+    // another while the app kept writing, so a checkpoint between the copies
+    // produced a corrupt database, and the move still reported success.
+    test('a database written to during the move arrives whole', () async {
+      var written = 3;
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        // The app writes, checkpoints and writes again while files copy.
+        insertRows(connection, 2000, from: 100);
+        connection.execute('PRAGMA wal_checkpoint(TRUNCATE)');
+        insertRows(connection, 1, from: 5000);
+        written += 2001;
+      };
+
+      await migrate();
+
+      expect(written, greaterThan(3), reason: 'the app wrote during the move');
+      final copied = p.join(dest.path, 'data.sqlite');
+      expect(readDatabase(copied), (written, 'ok'));
+    });
+
+    test('the database is copied as one file, without -wal or -shm', () async {
+      // An uncheckpointed write lives only in the source's -wal.
+      insertRows(connection, 1, from: 100);
+      final seen = <String>[];
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        seen.add(p.basename(src));
+      };
+
+      await migrate();
+
+      expect(seen, isNot(contains(startsWith('data.sqlite'))));
+      expect(readDatabase(p.join(dest.path, 'data.sqlite')), (4, 'ok'));
+      for (final suffix in ['-wal', '-shm', '-journal']) {
+        expect(
+          File(p.join(dest.path, 'data.sqlite$suffix')).existsSync(),
+          isFalse,
+          reason: 'data.sqlite$suffix copied',
+        );
+        expect(
+          File(p.join(esde.path, 'data.sqlite$suffix')).existsSync(),
+          isFalse,
+          reason: 'data.sqlite$suffix left in the old folder',
+        );
+      }
+    });
+
+    // Another database's WAL left beside the copy would be applied to it.
+    test('stale -wal, -shm and -journal in the destination go', () async {
+      for (final suffix in ['-wal', '-shm', '-journal']) {
+        File(
+          p.join(dest.path, 'data.sqlite$suffix'),
+        ).writeAsStringSync('stale');
+      }
+
+      await migrate();
+
+      for (final suffix in ['-wal', '-shm', '-journal']) {
+        expect(
+          File(p.join(dest.path, 'data.sqlite$suffix')).existsSync(),
+          isFalse,
+          reason: 'stale data.sqlite$suffix kept',
+        );
+      }
+      expect(readDatabase(p.join(dest.path, 'data.sqlite')), (3, 'ok'));
+    });
+
+    test('a move that gives up keeps stale files in the destination', () async {
+      File(p.join(dest.path, 'data.sqlite-wal')).writeAsStringSync('theirs');
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        if (p.basename(src) == 'config.json') File(copy).writeAsStringSync('');
+      };
+
+      await expectLater(migrate(), failsWith(UserDataMoveFailureKind.other));
+
+      expect(
+        File(p.join(dest.path, 'data.sqlite-wal')).readAsStringSync(),
+        'theirs',
+      );
+    });
+
+    // Writes after the copy went to the old database, deleted with the old
+    // folder, until the restart.
+    test('a finished move switches the app to the new folder', () async {
+      await migrate();
+
+      expect(await UserDataLocationService.getCustomPath(), dest.path);
+      expect(
+        await SqliteService.getActualDatabasePath(),
+        p.join(dest.path, 'data.sqlite'),
+      );
+      expect(
+        () => connection.select('SELECT 1'),
+        throwsA(anything),
+        reason: 'the old database is closed, so the next access opens the copy',
+      );
+      expect(db.existsSync(), isFalse);
+    });
+
+    test('a move that gives up leaves the app where it was', () async {
+      Directory(p.join(dest.path, 'data.sqlite')).createSync();
+
+      await expectLater(migrate(), failsWith(UserDataMoveFailureKind.blocked));
+
+      expect(await UserDataLocationService.getCustomPath(), isNull);
+      expect(connection.select('SELECT count(*) AS n FROM t').single['n'], 3);
+    });
+
+    test('a second move while one runs is refused', () async {
+      final copying = Completer<void>();
+      final release = Completer<void>();
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        if (!copying.isCompleted) copying.complete();
+        await release.future;
+      };
+
+      final first = migrate();
+      await copying.future;
+      expect(UserDataLocationService.isMoving, isTrue);
+      await expectLater(
+        migrate(to: p.join(tmp.path, 'elsewhere')),
+        failsWith(UserDataMoveFailureKind.busy),
+      );
+      expect(
+        Directory(p.join(tmp.path, 'elsewhere')).existsSync(),
+        isFalse,
+        reason: 'the refused move touched nothing',
+      );
+      release.complete();
+      await first;
+
+      expect(UserDataLocationService.isMoving, isFalse);
+      expect(readDatabase(p.join(dest.path, 'data.sqlite')), (3, 'ok'));
+    });
+
+    test('a move that fails is no longer running', () async {
+      Directory(p.join(dest.path, 'data.sqlite')).createSync();
+      await expectLater(migrate(), failsWith(UserDataMoveFailureKind.blocked));
+      expect(UserDataLocationService.isMoving, isFalse);
+    });
+
+    // NEO-214: the user saw the exception's English text; the kind picks a
+    // message in their language.
+    test('a full drive is told apart from other copy failures', () async {
+      UserDataLocationService.debugAfterCopy = (src, copy) async {
+        if (p.basename(src) == 'config.json') {
+          throw FileSystemException(
+            'Cannot copy file',
+            copy,
+            OSError('No space left on device', Platform.isWindows ? 112 : 28),
+          );
+        }
+      };
+
+      await expectLater(migrate(), failsWith(UserDataMoveFailureKind.noSpace));
+      expect(config.readAsStringSync(), 'config-bytes');
+    });
+
+    test('a folder NeoStation may not write to says so', () async {
+      final locked = Directory(p.join(tmp.path, 'locked'))..createSync();
+      Process.runSync('chmod', ['555', locked.path]);
+      addTearDown(() => Process.runSync('chmod', ['755', locked.path]));
+      // Root writes anywhere.
+      if (await UserDataLocationService.canWriteDirectory(locked.path)) {
+        markTestSkipped('running as a user who can write anywhere');
+        return;
+      }
+
+      await expectLater(
+        migrate(to: p.join(locked.path, 'user-data')),
+        failsWith(UserDataMoveFailureKind.notWritable),
+      );
+      expect(readDatabase(db.path), (3, 'ok'));
+    }, skip: Platform.isWindows ? 'POSIX permissions' : false);
+
+    // Not being able to read the current folder says nothing about the new
+    // one, which "Can't write to this folder" would blame.
+    test(
+      'an unreadable folder of ours is not blamed on the new folder',
+      () async {
+        final snes = Directory(p.join(esde.path, 'media', 'snes'));
+        Process.runSync('chmod', ['000', snes.path]);
+        addTearDown(() => Process.runSync('chmod', ['755', snes.path]));
+        // Root reads anywhere.
+        bool readable() {
+          try {
+            snes.listSync();
+            return true;
+          } on FileSystemException {
+            return false;
+          }
+        }
+
+        if (readable()) {
+          markTestSkipped('running as a user who can read anywhere');
+          return;
+        }
+        final fresh = p.join(tmp.path, 'not-there-yet');
+
+        await expectLater(
+          migrate(to: fresh),
+          failsWith(UserDataMoveFailureKind.other),
+        );
+        expect(Directory(fresh).existsSync(), isFalse, reason: 'removed');
+        expect(readDatabase(db.path), (3, 'ok'));
+      },
+      skip: Platform.isWindows ? 'POSIX permissions' : false,
+    );
+
+    test('a missing source is a failure of its own kind', () async {
+      await expectLater(
+        UserDataLocationService.migrateData(
+          sourceUserDataPath: p.join(tmp.path, 'gone'),
+          sourceMediaPath: p.join(tmp.path, 'gone', 'media'),
+          destPath: dest.path,
+        ),
+        failsWith(UserDataMoveFailureKind.other),
+      );
+    });
+  });
+
+  group('UserDataMoveFailure.kindOf', () {
+    FileSystemException fsError(int code) =>
+        FileSystemException('x', 'y', OSError('z', code));
+
+    test('reads POSIX error numbers', () {
+      for (final (code, kind) in [
+        (28, UserDataMoveFailureKind.noSpace),
+        (122, UserDataMoveFailureKind.noSpace),
+        (69, UserDataMoveFailureKind.noSpace),
+        (13, UserDataMoveFailureKind.notWritable),
+        (1, UserDataMoveFailureKind.notWritable),
+        (30, UserDataMoveFailureKind.notWritable),
+        (5, UserDataMoveFailureKind.other),
+        (2, UserDataMoveFailureKind.other),
+      ]) {
+        expect(
+          UserDataMoveFailure.kindOf(fsError(code), windows: false),
+          kind,
+          reason: 'errno $code',
+        );
+      }
+    });
+
+    test('reads Windows error codes', () {
+      for (final (code, kind) in [
+        (112, UserDataMoveFailureKind.noSpace),
+        (39, UserDataMoveFailureKind.noSpace),
+        (5, UserDataMoveFailureKind.notWritable),
+        (19, UserDataMoveFailureKind.notWritable),
+        (28, UserDataMoveFailureKind.other),
+        (13, UserDataMoveFailureKind.other),
+      ]) {
+        expect(
+          UserDataMoveFailure.kindOf(fsError(code), windows: true),
+          kind,
+          reason: 'error $code',
+        );
+      }
+    });
+
+    test('anything else is other, and a failure keeps its kind', () {
+      expect(
+        UserDataMoveFailure.kindOf(StateError('x')),
+        UserDataMoveFailureKind.other,
+      );
+      expect(
+        UserDataMoveFailure.kindOf(const FileSystemException('no OS error')),
+        UserDataMoveFailureKind.other,
+      );
+      expect(
+        UserDataMoveFailure.kindOf(
+          const UserDataMoveFailure(UserDataMoveFailureKind.blocked, 'x'),
+        ),
+        UserDataMoveFailureKind.blocked,
+      );
+    });
+
+    test('a database copy is no space only when its drive was full', () {
+      expect(
+        UserDataMoveFailure.kindOf(
+          const DatabaseCopyFailure('full', diskFull: true),
+        ),
+        UserDataMoveFailureKind.noSpace,
+      );
+      expect(
+        UserDataMoveFailure.kindOf(const DatabaseCopyFailure('locked')),
+        UserDataMoveFailureKind.other,
+      );
+    });
   });
 }

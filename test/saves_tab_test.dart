@@ -16,6 +16,8 @@ import 'package:neostation/screens/neo_sync_screen/login_screen/neo_sync_content
 import 'package:neostation/screens/romm_screen/romm_connect_content.dart';
 import 'package:neostation/screens/saves_screen/romm_save_artwork.dart';
 import 'package:neostation/screens/saves_screen/romm_saves_content.dart';
+import 'package:neostation/screens/neo_sync_screen/login_screen/custom_save_folders_panel.dart';
+import 'package:neostation/screens/neo_sync_screen/login_screen/custom_save_folders_view.dart';
 import 'package:neostation/screens/saves_screen/saves_tab.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/billing_service.dart';
@@ -663,6 +665,107 @@ void main() {
     expect(romm.calls, 1);
   });
 
+  // NEO-220 (#782): the folders were only reachable from the NeoSync
+  // dashboard, which needs a NeoSync account; RomM users couldn't set one.
+  testWidgets('Start opens Standalone save folders without a NeoSync '
+      'sign-in, and B comes back', (tester) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    expect(find.byType(CustomSaveFoldersView), findsNothing);
+
+    await press(tester, LogicalKeyboardKey.escape);
+    expect(find.byType(CustomSaveFoldersView), findsOneWidget);
+    expect(find.byType(RommSavesContent), findsOneWidget);
+    // The folders view has the controller: Y opens its configure dialogue,
+    // not the list's upload retry.
+    await press(tester, LogicalKeyboardKey.keyY);
+    expect(find.byType(CustomSaveFoldersDialog), findsOneWidget);
+    expect(romm.calls, 0);
+
+    await press(tester, LogicalKeyboardKey.backspace);
+    expect(find.byType(CustomSaveFoldersDialog), findsNothing);
+    expect(find.byType(CustomSaveFoldersView), findsOneWidget);
+    await press(tester, LogicalKeyboardKey.backspace);
+    expect(find.byType(CustomSaveFoldersView), findsNothing);
+    // The list has the controller back.
+    await press(tester, LogicalKeyboardKey.keyY);
+    expect(romm.calls, 1);
+  });
+
+  testWidgets('a folder configured there goes up to RomM, not NeoSync', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    await press(tester, LogicalKeyboardKey.escape);
+    final view = tester.widget<CustomSaveFoldersView>(
+      find.byType(CustomSaveFoldersView),
+    );
+    expect(view.onConfigured, isNotNull, reason: 'no NeoSync upload');
+
+    await view.onConfigured!('ps2', 'ps2.xyz.aethersx2', '/saves/memcards');
+    await tester.pumpAndSettle();
+
+    expect(romm.calls, 1);
+    expect(notified(), contains('Uploading saves from memcards...'));
+  });
+
+  // A sweep already running may have passed the new folder's system.
+  testWidgets('a folder configured during a sweep goes up after it', (
+    tester,
+  ) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    await press(tester, LogicalKeyboardKey.escape);
+    final view = tester.widget<CustomSaveFoldersView>(
+      find.byType(CustomSaveFoldersView),
+    );
+    final sweep = Completer<SyncResult>();
+    romm.runningSweep.value = sweep.future;
+    await tester.pump();
+
+    var done = false;
+    unawaited(
+      view.onConfigured!('ps2', 'ps2.xyz.aethersx2', '/saves/memcards').then(
+        (_) => done = true,
+      ),
+    );
+    await tester.pump();
+    expect(romm.calls, 0, reason: 'waits for the running sweep');
+    expect(done, isFalse);
+
+    sweep.complete(SyncResult.ok());
+    romm.runningSweep.value = null;
+    await tester.pumpAndSettle();
+    expect(romm.calls, 1);
+    expect(done, isTrue);
+  });
+
+  testWidgets('the footer offers Standalone save folders', (tester) async {
+    await manager.setActive('romm', persist: (_) async {});
+    await pumpTab(tester);
+    final control = find.byKey(const ValueKey('save-standalone-folders'));
+    expect(control, findsOneWidget);
+    // One word on the button; the full name is for tooltips and screen
+    // readers.
+    expect(
+      find.descendant(of: control, matching: find.text('Standalone')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: control,
+        matching: find.text('Standalone Save Folders'),
+      ),
+      findsNothing,
+    );
+    expect(find.byTooltip('Standalone Save Folders'), findsOneWidget);
+
+    await tester.tap(control);
+    await tester.pumpAndSettle();
+    expect(find.byType(CustomSaveFoldersView), findsOneWidget);
+  });
+
   testWidgets('a focused file is deleted from RomM only once confirmed', (
     tester,
   ) async {
@@ -913,6 +1016,31 @@ void main() {
     expect(row.top, greaterThanOrEqualTo(card.top));
     expect(row.bottom, lessThanOrEqualTo(card.bottom));
     expect(tester.takeException(), isNull);
+  });
+
+  test('no language makes the folders label wider than the English one', () {
+    // The test above fits the footer at 640x480 with 2x text using the English
+    // label. The test font draws every glyph one em wide, so a label with no
+    // more characters is no wider there; on a device Latin glyphs are
+    // narrower than that and CJK ones about the same.
+    final budget =
+        (AppLocale.en[AppLocale.customSaveFoldersShort] as String).length;
+    for (final (code, map) in [
+      ('de', AppLocale.de),
+      ('es', AppLocale.es),
+      ('fr', AppLocale.fr),
+      ('id', AppLocale.id),
+      ('it', AppLocale.it),
+      ('ja', AppLocale.ja),
+      ('ko', AppLocale.ko),
+      ('pt', AppLocale.pt),
+      ('ru', AppLocale.ru),
+      ('zh', AppLocale.zh),
+      ('zh_Hant', AppLocale.zhHant),
+    ]) {
+      final label = map[AppLocale.customSaveFoldersShort] as String;
+      expect(label.length, lessThanOrEqualTo(budget), reason: '$code: $label');
+    }
   });
 
   testWidgets('file rows hide the glow beneath them, as game cards do', (
