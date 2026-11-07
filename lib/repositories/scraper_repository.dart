@@ -723,6 +723,75 @@ class ScraperRepository {
     }
   }
 
+  /// Saves a ScreenScraper match for a "New content only" session without
+  /// replacing what the game already has.
+  ///
+  /// With no row this is [saveGameMetadata]. An existing row keeps every
+  /// non-empty column and only its empty ones are filled from [metadata]: the
+  /// session reaches games not yet fully scraped, and their metadata may be
+  /// the user's own (the metadata editor) or an ES-DE import, which a match
+  /// with less information would otherwise blank. Columns the match doesn't
+  /// carry (ES-DE's media subfolder, the RetroAchievements id) stay as they
+  /// are.
+  ///
+  /// The file name is matched exactly, as the session's selection and
+  /// [markGameFullyScraped] match it: a row differing only in case isn't this
+  /// game's, so the match gets a row of its own, as [saveGameMetadata] gives it.
+  ///
+  /// As with [saveGameMetadata], the game isn't finished until its media are
+  /// (`is_fully_scraped` = 0), and it no longer counts as an ES-DE import, so
+  /// an ES-DE reset keeps it.
+  static Future<bool> fillGameMetadataGaps(
+    Map<String, dynamic> metadata,
+    String appSystemId,
+  ) async {
+    try {
+      final db = await SqliteService.getDatabase();
+      final filename = metadata['filename'];
+      final existing = await db.query(
+        'user_screenscraper_metadata',
+        where: 'app_system_id = ? AND filename = ?',
+        whereArgs: [appSystemId, filename],
+        limit: 1,
+      );
+      if (existing.isEmpty) {
+        return await saveGameMetadata(metadata, appSystemId);
+      }
+
+      final row = existing.first;
+      final toWrite = <String, dynamic>{};
+      metadata.forEach((col, val) {
+        if (const {
+          'app_system_id',
+          'filename',
+          'is_fully_scraped',
+          'updated_at',
+        }.contains(col)) {
+          return;
+        }
+        if (!_isBlank(val) && _isBlank(row[col])) toWrite[col] = val;
+      });
+      toWrite['is_fully_scraped'] = 0;
+      toWrite['esde_imported'] = 0;
+      toWrite['updated_at'] = DateTime.now().toIso8601String();
+
+      await db.update(
+        'user_screenscraper_metadata',
+        toWrite,
+        where: 'app_system_id = ? AND filename = ?',
+        whereArgs: [appSystemId, filename],
+      );
+      return true;
+    } catch (e) {
+      _log.e('Error filling game metadata gaps: $e');
+      return false;
+    }
+  }
+
+  /// Null, or a string with nothing but white space.
+  static bool _isBlank(Object? value) =>
+      value == null || (value is String && value.trim().isEmpty);
+
   /// Merges ES-DE-imported metadata into `user_screenscraper_metadata`,
   /// writing only columns that are currently empty (fill-gaps precedence).
   ///
@@ -796,11 +865,7 @@ class ScraperRepository {
   }) {
     final toWrite = <String, dynamic>{};
     esde.forEach((col, val) {
-      if (val == null) return;
-      if (val is String && val.trim().isEmpty) return;
-      final cur = row?[col];
-      final curEmpty = cur == null || (cur is String && cur.trim().isEmpty);
-      if (curEmpty) toWrite[col] = val;
+      if (!_isBlank(val) && _isBlank(row?[col])) toWrite[col] = val;
     });
 
     // Media subfolder is ES-DE bookkeeping (mirrors the ROM's subfolder inside

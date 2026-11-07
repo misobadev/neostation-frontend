@@ -158,6 +158,124 @@ void main() {
       expect(rows.first['app_system_id'], 'snes');
     });
 
+    group('fillGameMetadataGaps', () {
+      Future<Map<String, Object?>> row() async {
+        final rows = await db.rawQuery(
+          "SELECT * FROM user_screenscraper_metadata WHERE app_system_id = 'snes'",
+        );
+        expect(rows, hasLength(1));
+        return Map<String, Object?>.from(rows.single as Map);
+      }
+
+      test('inserts the whole match when the game has no row', () async {
+        expect(
+          await ScraperRepository.fillGameMetadataGaps({
+            'filename': 'game.smc',
+            'real_name': 'Super Game',
+            'developer': 'Studio',
+          }, 'snes'),
+          isTrue,
+        );
+
+        final saved = await row();
+        expect(saved['real_name'], 'Super Game');
+        expect(saved['developer'], 'Studio');
+        expect(saved['is_fully_scraped'], 0);
+      });
+
+      test('keeps what the row has and fills only what it lacks', () async {
+        await db.insert('user_screenscraper_metadata', {
+          'app_system_id': 'snes',
+          'filename': 'game.smc',
+          'real_name': 'My Title',
+          'description_en': 'My notes',
+          'developer': '  ',
+          'is_fully_scraped': 0,
+        });
+
+        await ScraperRepository.fillGameMetadataGaps({
+          'filename': 'game.smc',
+          'real_name': 'Super Game',
+          'description_en': 'Their notes',
+          'developer': 'Studio',
+          'publisher': null,
+          'genre': 'Action',
+        }, 'snes');
+
+        final saved = await row();
+        expect(saved['real_name'], 'My Title');
+        expect(saved['description_en'], 'My notes');
+        // A blank field counts as empty.
+        expect(saved['developer'], 'Studio');
+        expect(saved['genre'], 'Action');
+        expect(saved['publisher'], isNull);
+      });
+
+      test('keeps ES-DE media folders and RetroAchievements ids, but no longer '
+          'counts the row as an ES-DE import', () async {
+        await db.insert('user_screenscraper_metadata', {
+          'app_system_id': 'snes',
+          'filename': 'game.smc',
+          'real_name': 'ES-DE Name',
+          'esde_media_subdir': 'sub',
+          'esde_imported': 1,
+          'id_ra': 42,
+          'is_fully_scraped': ScraperRepository.scrapedMetadataOnly,
+        });
+
+        await ScraperRepository.fillGameMetadataGaps({
+          'filename': 'game.smc',
+          'real_name': 'Super Game',
+        }, 'snes');
+
+        final saved = await row();
+        expect(saved['real_name'], 'ES-DE Name');
+        expect(saved['esde_media_subdir'], 'sub');
+        expect(saved['id_ra'], 42);
+        expect(saved['esde_imported'], 0);
+        // Not finished until its media are: a failed download leaves the game
+        // for the next run.
+        expect(saved['is_fully_scraped'], 0);
+      });
+
+      test('leaves a row whose file name differs only in case', () async {
+        // Another game on a case-sensitive file system, or a row the session
+        // doesn't count as this game's: it's matched exactly everywhere else.
+        await db.insert('user_screenscraper_metadata', {
+          'app_system_id': 'snes',
+          'filename': 'GAME.SMC',
+          'real_name': 'Other Game',
+          'is_fully_scraped': ScraperRepository.scrapedFully,
+        });
+
+        await ScraperRepository.fillGameMetadataGaps({
+          'filename': 'game.smc',
+          'real_name': 'Super Game',
+          'genre': 'Action',
+        }, 'snes');
+
+        final rows = await db.rawQuery(
+          "SELECT filename, real_name, genre, is_fully_scraped "
+          "FROM user_screenscraper_metadata WHERE app_system_id = 'snes' "
+          "ORDER BY filename",
+        );
+        expect(rows, [
+          {
+            'filename': 'GAME.SMC',
+            'real_name': 'Other Game',
+            'genre': null,
+            'is_fully_scraped': ScraperRepository.scrapedFully,
+          },
+          {
+            'filename': 'game.smc',
+            'real_name': 'Super Game',
+            'genre': 'Action',
+            'is_fully_scraped': 0,
+          },
+        ]);
+      });
+    });
+
     test('markGameFullyScraped updates flag', () async {
       await db.execute(
         "INSERT INTO user_screenscraper_metadata (filename, app_system_id, is_fully_scraped) VALUES ('game.smc', 'snes', 0)",
