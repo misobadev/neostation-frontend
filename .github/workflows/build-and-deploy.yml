@@ -11,7 +11,7 @@ env:
 
 jobs:
   lint:
-    name: Lint, Analysis & Test
+    name: Lint & Analysis
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -29,11 +29,6 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Install Linux native dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libx11-dev libxi-dev pkg-config clang cmake ninja-build
-
       # --enforce-lockfile, so a pubspec.lock resolved on a different SDK fails
       # here instead of being silently rewritten in the runner. See pr-checks.yml.
       - name: Install dependencies
@@ -45,6 +40,34 @@ jobs:
       - name: Analyze project
         run: flutter analyze
 
+  test:
+    name: Tests (shard ${{ matrix.shard }}/4)
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          channel: 'stable'
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get --enforce-lockfile
+
       # `flutter test` builds native assets for the host. cnativeapi (through
       # window_manager 0.6) compiles with clang against GTK 3, X11 and Xi on
       # Linux, which the runner doesn't ship as development packages.
@@ -54,11 +77,26 @@ jobs:
           sudo apt-get install -y clang libgtk-3-dev libx11-dev libxi-dev
 
       - name: Run tests
-        run: flutter test
+        run: |
+          flutter test --no-pub -j 4 \
+            --total-shards 4 --shard-index ${{ matrix.shard }} \
+            --file-reporter json:test-results.json
+
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.shard }}
+          path: test-results.json
+          if-no-files-found: ignore
+
+      - name: Summarize slowest suites
+        if: always()
+        run: dart tool/test_slowest.dart test-results.json
 
   build:
     name: Build ${{ matrix.target }}
-    needs: lint
+    needs: [lint, test]
     runs-on: ${{ matrix.os }}
     environment: Production
     strategy:

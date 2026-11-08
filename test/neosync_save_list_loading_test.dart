@@ -14,6 +14,8 @@ import 'package:neostation/utils/gamepad_translator.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 // While the save list loads a page (Refresh, a filter, a search, the next
 // page), a spinner takes the place of its rows, but the list still holds the
 // previous ones. A, View and the Delete button opened the prompt to delete one
@@ -74,16 +76,23 @@ void main() {
 
   // The button events below use Android's key names, so they translate the
   // same whatever the host is.
-  setUp(() => GamepadEventTranslator.debugOperatingSystem = 'android');
-  tearDown(() => GamepadEventTranslator.debugOperatingSystem = null);
+  setUp(() {
+    resetGamepadClock();
+    GamepadEventTranslator.debugOperatingSystem = 'android';
+  });
+  tearDown(() {
+    GamepadEventTranslator.debugOperatingSystem = null;
+    restoreGamepadClock();
+  });
 
   late _FakeNeoSync neoSync;
 
   /// A navigator ignores input for a moment after it activates (and repeated
   /// presses are throttled), so a test waits like a person would.
-  Future<void> settleInput(WidgetTester tester) => tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 600)),
-  );
+  Future<void> settleInput(WidgetTester tester) async {
+    advanceGamepadClock(const Duration(milliseconds: 600));
+    await tester.pump();
+  }
 
   Future<void> sendButton(WidgetTester tester, String key, double value) =>
       tester.binding.defaultBinaryMessenger.handlePlatformMessage(
@@ -118,9 +127,7 @@ void main() {
   /// Presses A again soon after the last press: past the controller's own
   /// repeat pacing, inside the list's 500 ms guard against double presses.
   Future<void> pressSoon(WidgetTester tester, String button) async {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 200)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 200));
     await sendButton(tester, button, 0); // ACTION_DOWN
     await sendButton(tester, button, 1); // ACTION_UP
     await tester.pump();
