@@ -11,6 +11,8 @@ import 'package:neostation/services/update_service.dart';
 import 'package:neostation/widgets/update_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 /// The app-update dialogue had no way out once the download started: B did
 /// nothing, so a stalled download left it stuck. On Android every failure
 /// said the permission to install unknown apps was missing, even a failed
@@ -33,7 +35,11 @@ void main() {
     );
   });
 
-  setUp(() => GlobalNotificationService().dismiss());
+  setUp(() {
+    GlobalNotificationService().dismiss();
+    resetGamepadClock();
+  });
+  tearDown(restoreGamepadClock);
 
   final info = UpdateInfo(
     currentVersion: '1.0.0',
@@ -138,10 +144,8 @@ void main() {
     );
     await tester.tap(find.text('UPDATE NOW'));
     await tester.pump();
-    // Navigation ignores keys for a moment after it activates (real time).
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 600)),
-    );
+    // Navigation ignores keys for a moment after it activates.
+    advanceGamepadClock(const Duration(milliseconds: 600));
 
     await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
     await tester.pump();
@@ -160,9 +164,7 @@ void main() {
     });
     await tester.tap(find.text('UPDATE NOW'));
     await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 600)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 600));
 
     expect(find.text('Cancel'), findsNothing);
     await tester.sendKeyEvent(LogicalKeyboardKey.backspace);

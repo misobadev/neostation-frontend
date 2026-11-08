@@ -19,6 +19,8 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 class _LibraryProvider extends CollectionsProvider {
   static int previewEvaluations = 0;
   @override
@@ -108,6 +110,8 @@ void main() {
     SfxService().setEnabled(false);
   });
   tearDownAll(() async => artworkDirectory.delete(recursive: true));
+  setUp(resetGamepadClock);
+  tearDown(restoreGamepadClock);
 
   final rules = SmartCollectionRules(
     rules: [
@@ -188,16 +192,14 @@ void main() {
   }
 
   // The navigation translator deliberately ignores input just after
-  // activation and debounces repeats, so each press waits in real time.
+  // activation and debounces repeats; advance its clock instead of waiting.
   // [settle] is off while a spinner is animating, which never settles.
   Future<void> press(
     WidgetTester tester,
     LogicalKeyboardKey key, {
     bool settle = true,
   }) async {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 250)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 250));
     await tester.sendKeyEvent(key);
     if (settle) {
       await tester.pumpAndSettle();
@@ -270,9 +272,7 @@ void main() {
       await tester.pumpAndSettle();
       // The navigation translator deliberately ignores input just after activation.
       Future<void> key(LogicalKeyboardKey key) async {
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 250)),
-        );
+        advanceGamepadClock(const Duration(milliseconds: 250));
         await tester.sendKeyEvent(key);
         await tester.pumpAndSettle();
       }
@@ -400,9 +400,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nintendo Entertainment System'));
     await tester.pumpAndSettle();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 250)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 250));
     await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
     await tester.pumpAndSettle();
     expect(find.text('1 matching game'), findsOneWidget);
@@ -479,16 +477,12 @@ void main() {
         if (save) {
           await tester.tap(find.text('Save'));
         } else {
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 250)),
-          );
+          advanceGamepadClock(const Duration(milliseconds: 250));
           await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
         }
         await tester.pump(const Duration(milliseconds: 20));
         // Inside the ~300 ms exit animation, past the 128 ms debounce.
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 150)),
-        );
+        advanceGamepadClock(const Duration(milliseconds: 150));
         await tester.sendKeyEvent(
           save ? LogicalKeyboardKey.enter : LogicalKeyboardKey.backspace,
         );
@@ -516,9 +510,7 @@ void main() {
       await press(tester, LogicalKeyboardKey.arrowDown);
     }
     expect(selected(tester, 'Add rule'), isTrue);
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 250)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 250));
     await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowDown);
     for (var i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 100));

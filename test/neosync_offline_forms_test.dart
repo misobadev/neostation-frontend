@@ -18,6 +18,9 @@ import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/billing_service.dart';
+
+import 'gamepad_test_clock.dart';
+
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/sync/sync_manager.dart';
@@ -244,9 +247,13 @@ void main() {
   });
 
   setUp(() {
+    resetGamepadClock();
     CredentialStore.debugUseBackends(secure: MemoryBackend(), file: null);
   });
-  tearDown(CredentialStore.debugReset);
+  tearDown(() {
+    CredentialStore.debugReset();
+    restoreGamepadClock();
+  });
 
   Future<void> pump(
     WidgetTester tester,
@@ -290,11 +297,11 @@ void main() {
     await tester.pump();
   }
 
-  /// Waits out the navigator's activation grace and key throttle, which drop
-  /// early input.
-  Future<void> pastGrace(WidgetTester tester) => tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 180)),
-  );
+  /// Advances past the navigator's activation grace and key throttle.
+  Future<void> pastGrace(WidgetTester tester) async {
+    advanceGamepadClock(const Duration(milliseconds: 180));
+    await tester.pump();
+  }
 
   Future<void> press(WidgetTester tester, LogicalKeyboardKey key) async {
     await pastGrace(tester);

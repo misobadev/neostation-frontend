@@ -12,6 +12,8 @@ import 'package:neostation/themes/dark_theme.dart';
 import 'package:neostation/utils/gamepad_translator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 /// The custom save folders dialogue's "Pick a system" list was a fixed seven
 /// rows tall. On short wide screens such as the AYN Thor's (about 832×468) the
 /// app's scale follows the width, and the list was taller than the dialogue
@@ -35,8 +37,14 @@ void main() {
       initLanguageCode: 'en',
     );
   });
-  setUp(() => GamepadEventTranslator.debugOperatingSystem = 'android');
-  tearDown(() => GamepadEventTranslator.debugOperatingSystem = null);
+  setUp(() {
+    resetGamepadClock();
+    GamepadEventTranslator.debugOperatingSystem = 'android';
+  });
+  tearDown(() {
+    GamepadEventTranslator.debugOperatingSystem = null;
+    restoreGamepadClock();
+  });
 
   List<SystemModel> systems(int count) => List.generate(
     count,
@@ -67,9 +75,7 @@ void main() {
   // Android reports a keycode button's press as 0 and its release as 1.
   Future<void> press(WidgetTester tester, String button) async {
     // Navigation ignores input for a moment after it activates.
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 600)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 600));
     await sendButton(tester, button, 0);
     await sendButton(tester, button, 1);
     await tester.pumpAndSettle();

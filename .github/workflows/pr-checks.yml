@@ -46,11 +46,6 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Install Linux native dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libx11-dev libxi-dev pkg-config clang cmake ninja-build
-
       # Dependabot resolves pubspec.lock on whatever Dart its own runner has,
       # which is how #338 landed a lock full of Dart 3.13 packages (meta 1.19.0,
       # vector_math 2.4.2, ...) that every checkout at the pinned 3.44.9 then
@@ -107,6 +102,38 @@ jobs:
       - name: Analyze project
         run: flutter analyze
 
+  test:
+    name: Tests (shard ${{ matrix.shard }}/4)
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      # Dependabot's lockfile is rewritten by the lint job above; check out the
+      # branch tip so every shard runs against the corrected lock.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.actor == 'dependabot[bot]' && github.head_ref || '' }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          channel: 'stable'
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get --enforce-lockfile
+
       # `flutter test` builds native assets for the host. cnativeapi (through
       # window_manager 0.6) compiles with clang against GTK 3, X11 and Xi on
       # Linux, which the runner doesn't ship as development packages.
@@ -116,4 +143,26 @@ jobs:
           sudo apt-get install -y clang libgtk-3-dev libx11-dev libxi-dev
 
       - name: Run tests
-        run: flutter test
+        run: |
+          mapfile -t files < <(
+            wc -l test/*_test.dart |
+              awk '$2 != "total"' |
+              sort -nr |
+              awk -v s="${{ matrix.shard }}" 'NR % 4 == s {print $2}'
+          )
+          echo "Shard ${{ matrix.shard }}: ${#files[@]} test files"
+          flutter test --no-pub -j 4 \
+            --file-reporter json:test-results.json \
+            "${files[@]}"
+
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.shard }}
+          path: test-results.json
+          if-no-files-found: ignore
+
+      - name: Summarize slowest suites
+        if: always()
+        run: dart tool/test_slowest.dart test-results.json

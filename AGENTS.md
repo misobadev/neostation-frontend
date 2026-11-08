@@ -32,6 +32,8 @@ flutter build apk --release   <same --dart-define flags>
 
 There is no release-keystore requirement for local work: if `android/key.properties` is absent, the Android build falls back to debug signing automatically.
 
+**Test speed.** Never burn real wall-clock time to clear `GamepadNavigation`'s activation grace or key throttle. Use `test/gamepad_test_clock.dart` (`resetGamepadClock`, `advanceGamepadClock`) so the navigator's injected clock moves forward instantly. Keep `runAsync` for real I/O only. Network/slow suites are tagged (`@Tags(['network'])`): `flutter test --exclude-tags network` gives fast local feedback. CI shards the suite (`--total-shards 4 --shard-index … -j 4`), and `dart tool/test_slowest.dart test-results.json` prints the slowest suites from the JSON reporter output.
+
 ## Cross-cutting rules (read multiple files to get right)
 
 **Layer dependency direction is strict** (see ARCHITECTURE.md): UI → providers → services → repositories → datasources. Services must NOT touch `lib/data/datasources/` directly — go through a repository. Repositories are the only layer allowed to call `SqliteService`/datasources. Cloud-save sync goes through the provider-agnostic `lib/sync/` layer (`SyncManager` + `ISyncProvider`), with NeoSync as the adapter under `sync/providers/`.

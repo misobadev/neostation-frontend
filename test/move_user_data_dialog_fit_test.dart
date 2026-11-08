@@ -12,6 +12,8 @@ import 'package:neostation/utils/gamepad_translator.dart';
 import 'package:neostation/widgets/move_user_data_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 /// The "Move user data" confirmation didn't scroll. On short wide screens such
 /// as the AYN Thor's (about 832×468) the app's scale follows the width, and
 /// with Android's long user-data paths the dialogue was taller than the
@@ -34,8 +36,14 @@ void main() {
       initLanguageCode: 'en',
     );
   });
-  setUp(() => GamepadEventTranslator.debugOperatingSystem = 'android');
-  tearDown(() => GamepadEventTranslator.debugOperatingSystem = null);
+  setUp(() {
+    resetGamepadClock();
+    GamepadEventTranslator.debugOperatingSystem = 'android';
+  });
+  tearDown(() {
+    GamepadEventTranslator.debugOperatingSystem = null;
+    restoreGamepadClock();
+  });
 
   const androidPath =
       '/storage/emulated/0/Android/data/com.neogamelab.neostation/files/'
@@ -69,9 +77,7 @@ void main() {
   // Android reports a keycode button's press as 0 and its release as 1.
   Future<void> press(WidgetTester tester, String button) async {
     // Navigation ignores input for a moment after it activates.
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 600)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 600));
     await sendButton(tester, button, 0);
     await sendButton(tester, button, 1);
     await tester.pumpAndSettle();

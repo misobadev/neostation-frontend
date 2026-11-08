@@ -16,6 +16,9 @@ import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/gamepad_translator.dart';
 import 'package:provider/provider.dart';
+
+import 'gamepad_test_clock.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 // The save list shows 50 cloud saves a page, but only touch or a mouse could
@@ -99,17 +102,24 @@ void main() {
 
   // The controller events below use Android's names, so they translate the
   // same whatever the host is.
-  setUp(() => GamepadEventTranslator.debugOperatingSystem = 'android');
-  tearDown(() => GamepadEventTranslator.debugOperatingSystem = null);
+  setUp(() {
+    resetGamepadClock();
+    GamepadEventTranslator.debugOperatingSystem = 'android';
+  });
+  tearDown(() {
+    GamepadEventTranslator.debugOperatingSystem = null;
+    restoreGamepadClock();
+  });
 
   late _PagedService service;
   late NeoSyncProvider neoSync;
 
   /// A navigator ignores input for a moment after it activates, and paces
   /// repeated presses, so a test waits like a person would.
-  Future<void> settleInput(WidgetTester tester) => tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 600)),
-  );
+  Future<void> settleInput(WidgetTester tester) async {
+    advanceGamepadClock(const Duration(milliseconds: 600));
+    await tester.pump();
+  }
 
   Future<void> send(
     WidgetTester tester,
