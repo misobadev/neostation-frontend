@@ -102,6 +102,37 @@ jobs:
       - name: Analyze project
         run: flutter analyze
 
+
+  pure-tests:
+    name: Pure Dart tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      # Dependabot's lockfile is rewritten by the lint job above.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.actor == 'dependabot[bot]' && github.head_ref || '' }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get --enforce-lockfile
+
+      # The pure tests run on the Dart VM, but the app package still has build
+      # hooks (cnativeapi) that need GTK/X11/Xi on Linux.
+      - name: Install native-asset build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libgtk-3-dev libx11-dev libxi-dev
+
+      - name: Run pure Dart tests
+        run: dart test test_pure
+
   test:
     name: Tests (shard ${{ matrix.shard }}/4)
     needs: lint
