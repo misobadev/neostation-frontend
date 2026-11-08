@@ -35,6 +35,7 @@ void main() {
 
   setUp(() {
     displayOnAnswer = true;
+    SecondaryAppsService.deviceScreenOn.value = true;
     messenger.setMockMethodCallHandler(channel, (call) async {
       if (call.method == 'isDisplayOn') return displayOnAnswer;
       return null;
@@ -48,7 +49,7 @@ void main() {
     SecondaryAppsService.listenForScreenState();
     // An engine that started while the device was already asleep must not sit
     // on the optimistic `true` default waiting for an edge that never comes.
-    await Future<void>.delayed(Duration.zero);
+    await pumpEventQueue();
     expect(SecondaryAppsService.deviceScreenOn.value, isFalse);
   });
 

@@ -78,9 +78,16 @@ jobs:
 
       - name: Run tests
         run: |
+          mapfile -t files < <(
+            wc -l test/*_test.dart |
+              awk '$2 != "total"' |
+              sort -nr |
+              awk -v s="${{ matrix.shard }}" 'NR % 4 == s {print $2}'
+          )
+          echo "Shard ${{ matrix.shard }}: ${#files[@]} test files"
           flutter test --no-pub -j 4 \
-            --total-shards 4 --shard-index ${{ matrix.shard }} \
-            --file-reporter json:test-results.json
+            --file-reporter json:test-results.json \
+            "${files[@]}"
 
       - name: Upload test timings
         if: always()
