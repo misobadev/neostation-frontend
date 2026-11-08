@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 // The NeoSync confirmation has to come before the folder is saved: once a
 // folder is configured, opening its system uploads it without asking, so a
