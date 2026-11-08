@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/services/config_service.dart';
+import 'package:neostation/utils/gamepad_nav.dart';
 
 /// Runs before every test file. On desktop the default user-data folder is a
 /// real profile (`user-data` under the working directory on Linux, the app's
@@ -13,6 +14,12 @@ import 'package:neostation/services/config_service.dart';
 /// file leaves nothing behind.
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   late Directory userData;
+  setUp(() {
+    GamepadNavigation.debugResetClock();
+  });
+  tearDown(() {
+    GamepadNavigation.debugResetClock();
+  });
   setUpAll(() {
     userData = Directory.systemTemp.createTempSync('neostation_test_');
     ConfigService.setDefaultUserDataPathForTesting(userData.path);

@@ -33,6 +33,8 @@ import 'package:neostation/widgets/core_footer.dart' show GamepadControl;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 import 'romm_save_inventory_fakes.dart'
     show InventoryConnection, InventorySync, inventoryAsset;
 
@@ -81,6 +83,7 @@ void main() {
   });
 
   setUp(() {
+    resetGamepadClock();
     // The gamepad events below use Android's key names, so they translate
     // the same whatever the host is.
     GamepadEventTranslator.debugOperatingSystem = 'android';
@@ -96,6 +99,7 @@ void main() {
   });
   tearDown(() {
     GamepadEventTranslator.debugOperatingSystem = null;
+    restoreGamepadClock();
     manager.unregister('romm');
     manager.unregister('neosync');
     romm.runningSweep.dispose();
@@ -175,11 +179,10 @@ void main() {
     }
   }
 
-  /// Waits out the navigator's activation grace, which drops early input.
+  /// Advances past the navigator's activation grace.
   Future<void> pastGrace(WidgetTester tester) async {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 180)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 180));
+    await tester.pump();
   }
 
   Future<void> press(WidgetTester tester, LogicalKeyboardKey key) async {
@@ -569,6 +572,7 @@ void main() {
 
         await pull(tester, 'axis_rtrigger', settle: false); // only saves remain
         // No frame reconciles the cursor between R2 and the next D-pad event.
+        advanceGamepadClock(const Duration(milliseconds: 200));
         await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
         expect(tester.takeException(), isNull);
         await tester.pumpAndSettle();
@@ -632,7 +636,10 @@ void main() {
       run.complete(SyncResult.ok());
       romm.runningSweep.value = null;
       await tester.idle(); // apply the empty inventory, without a frame
-      await pastGrace(tester);
+      advanceGamepadClock(const Duration(milliseconds: 180));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 180)),
+      );
       await tester.sendKeyEvent(key);
       await tester.pumpAndSettle();
       // Neither applied the focused filter nor moved along the filters.

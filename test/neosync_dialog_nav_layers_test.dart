@@ -19,6 +19,8 @@ import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 const _a = 'KEYCODE_BUTTON_A';
 const _b = 'KEYCODE_BUTTON_B';
 const _up = 'KEYCODE_DPAD_UP';
@@ -108,17 +110,22 @@ void main() {
 
   setUp(() {
     host = _HostLog();
+    resetGamepadClock();
     // The button events below use Android's key names, so they translate the
     // same whatever the host is.
     GamepadEventTranslator.debugOperatingSystem = 'android';
   });
-  tearDown(() => GamepadEventTranslator.debugOperatingSystem = null);
+  tearDown(() {
+    GamepadEventTranslator.debugOperatingSystem = null;
+    restoreGamepadClock();
+  });
 
   /// A navigator ignores input for a moment after it activates (and repeated
-  /// presses are throttled), so a test waits like a person would.
-  Future<void> settleInput(WidgetTester tester) => tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 600)),
-  );
+  /// presses are throttled); advancing its clock is enough.
+  Future<void> settleInput(WidgetTester tester) async {
+    advanceGamepadClock(const Duration(milliseconds: 600));
+    await tester.pump();
+  }
 
   Future<void> sendButton(WidgetTester tester, String key, double value) =>
       tester.binding.defaultBinaryMessenger.handlePlatformMessage(

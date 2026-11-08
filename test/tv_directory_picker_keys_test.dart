@@ -10,6 +10,8 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/widgets/tv_directory_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 /// Records the routes that leave the navigator.
 class _PopLog extends NavigatorObserver {
   final List<String> pops = [];
@@ -46,6 +48,8 @@ void main() {
       initLanguageCode: 'en',
     );
   });
+  setUp(resetGamepadClock);
+  tearDown(restoreGamepadClock);
 
   /// Lets the picker's real directory listing finish.
   Future<void> settleIo(WidgetTester tester) async {
@@ -107,6 +111,7 @@ void main() {
     await tester.pump();
     await waitFor(tester, find.text('Home'));
     // The picker ignores a select for a moment after it opens.
+    advanceGamepadClock(const Duration(milliseconds: 600));
     await tester.pump(const Duration(milliseconds: 600));
     await settleIo(tester);
   }
@@ -116,6 +121,7 @@ void main() {
     await tester.pump();
     await settleIo(tester);
     // Past the navigation's repeat throttle.
+    advanceGamepadClock(const Duration(milliseconds: 200));
     await tester.pump(const Duration(milliseconds: 200));
   }
 

@@ -21,6 +21,9 @@ import 'package:neostation/widgets/header_sort_dropdown.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+import 'support/plugin_channel_mocks.dart';
+
 /// Guards the systems grid/carousel now that they serve two callers: the
 /// systems screen (every parameter at its default) and the collections browser
 /// (its own list, its own actions, its own navigation-layer ids).
@@ -38,11 +41,7 @@ void main() {
     SfxService().setEnabled(false);
     // Stub the gamepads plugin so GamepadNavigation.initialize() finds no
     // devices instead of reaching for a real platform channel.
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('xyz.luan/gamepads'),
-          (call) async => <dynamic>[],
-        );
+    installDefaultPluginMocks();
     await FlutterLocalization.instance.ensureInitialized();
     FlutterLocalization.instance.init(
       mapLocales: [MapLocale('en', AppLocale.en)],
@@ -70,7 +69,11 @@ void main() {
     events.clear();
   }
 
-  setUp(events.clear);
+  setUp(() {
+    events.clear();
+    resetGamepadClock();
+  });
+  tearDown(restoreGamepadClock);
 
   Widget host(
     Widget child, {
@@ -118,30 +121,19 @@ void main() {
     ),
   );
 
-  /// Lets the navigator finish initializing and clears the reactivation grace
-  /// it applies after a layer becomes active, so a synthetic key press is not
-  /// swallowed.
-  ///
-  /// The grace is measured against the wall clock, not the test's fake one, so
-  /// this has to burn real time through [WidgetTester.runAsync].
+  /// Lets the navigator finish initializing and advances past the reactivation
+  /// grace it applies after a layer becomes active.
   Future<void> settleInput(WidgetTester tester) async {
     await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 250)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 250));
     await tester.pump();
   }
 
-  /// Sends one key press and lets the navigator's inter-key throttle expire.
-  ///
-  /// Both the throttle and the activation grace are measured against the wall
-  /// clock, so fake-time pumps do not clear them.
+  /// Sends one key press and advances past the navigator's inter-key throttle.
   Future<void> press(WidgetTester tester, LogicalKeyboardKey key) async {
     await tester.sendKeyEvent(key);
     await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 200)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 200));
     await tester.pump();
   }
 
