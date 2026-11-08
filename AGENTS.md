@@ -30,6 +30,8 @@ flutter run   --dart-define=SCREENSCRAPER_DEV_ID=... --dart-define=SCREENSCRAPER
 flutter build apk --release   <same --dart-define flags>
 ```
 
+Android release builds go through `build-utils/build-android.sh` (or `build-android.ps1` on Windows). They pass `--android-project-arg=force-version-code-ignoring-abi=true` so the per-ABI APKs keep the pubspec build number as `versionCode`, matching local `flutter run` installs instead of tripping Android's downgrade check. Do not remove that flag without first raising the pubspec build number above the codes already shipped.
+
 There is no release-keystore requirement for local work: if `android/key.properties` is absent, the Android build falls back to debug signing automatically.
 
 **Test speed.** Never burn real wall-clock time to clear `GamepadNavigation`'s activation grace or key throttle. Use `test/gamepad_test_clock.dart` (`resetGamepadClock`, `advanceGamepadClock`) so the navigator's injected clock moves forward instantly. Keep `runAsync` for real I/O only. Network/slow suites are tagged (`@Tags(['network'])`): `flutter test --exclude-tags network` gives fast local feedback. CI splits the test files across four shards manually (`-j 4`), and `dart tool/test_slowest.dart test-results.json` prints the slowest suites from the JSON reporter output.
