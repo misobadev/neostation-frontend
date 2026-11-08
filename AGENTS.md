@@ -34,7 +34,7 @@ There is no release-keystore requirement for local work: if `android/key.propert
 
 **Test speed.** Never burn real wall-clock time to clear `GamepadNavigation`'s activation grace or key throttle. Use `test/gamepad_test_clock.dart` (`resetGamepadClock`, `advanceGamepadClock`) so the navigator's injected clock moves forward instantly. Keep `runAsync` for real I/O only. Network/slow suites are tagged (`@Tags(['network'])`): `flutter test --exclude-tags network` gives fast local feedback. CI splits the test files across four shards manually (`-j 4`), and `dart tool/test_slowest.dart test-results.json` prints the slowest suites from the JSON reporter output.
 
-**Pure Dart tests.** Logic that does not touch Flutter lives in `test_pure/` and runs with `dart test test_pure` (no Flutter engine, no native assets, no GTK). Those files import `package:test/test.dart`, not `flutter_test`; `flutter test` only discovers `test/`. Use `dart tool/classify_pure_tests.dart` to find new candidates.
+**Pure Dart tests.** Logic that does not touch Flutter lives in `test_pure/` and runs with `dart test test_pure` (no Flutter engine). Those files import `package:test/test.dart`, not `flutter_test`; `flutter test` only discovers `test/`. On Linux the app package's build hooks still compile `cnativeapi`, so the pure job installs the same GTK/X11/Xi packages; a separate pure package is the next step to remove that dependency. Use `dart tool/classify_pure_tests.dart` to find new candidates.
 
 **Plugin channels in widget tests.** Use `test/support/plugin_channel_mocks.dart` (`installDefaultPluginMocks`) for benign plugin defaults instead of repeating `setMockMethodCallHandler`; override a channel in the test when its behaviour matters.
 
