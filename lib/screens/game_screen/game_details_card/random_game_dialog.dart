@@ -242,10 +242,7 @@ class _RandomGameDialogState extends State<RandomGameDialog>
         child: NeoGlassRim(
           cornerRadius: radii.radiusExternalRadius,
           child: Container(
-            constraints: const BoxConstraints(
-              maxWidth: 480.0,
-              maxHeight: 280.0,
-            ),
+            constraints: BoxConstraints(maxWidth: 480.r, maxHeight: 280.r),
             decoration: BoxDecoration(
               color: scheme.surface,
               borderRadius: radii.radiusExternal,
@@ -340,7 +337,7 @@ class _RandomGameDialogState extends State<RandomGameDialog>
           child: Padding(
             padding: EdgeInsets.all(10.r),
             child: SizedBox(
-              width: 230.0,
+              width: 230.r,
               child: _buildGameInfo(theme, currentGame),
             ),
           ),
@@ -605,7 +602,7 @@ class _RandomGameDialogState extends State<RandomGameDialog>
       child: NeoGlassRim(
         cornerRadius: radii.radiusExternalRadius,
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 480.0),
+          constraints: BoxConstraints(maxWidth: 480.r),
           decoration: BoxDecoration(
             color: scheme.surface,
             borderRadius: radii.radiusExternal,

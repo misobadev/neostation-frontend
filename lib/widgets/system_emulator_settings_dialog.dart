@@ -1062,7 +1062,7 @@ class _SystemEmulatorSettingsDialogState
       child: NeoGlassRim(
         cornerRadius: radii.radiusExternalRadius,
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 640.0, maxHeight: 480.0),
+          constraints: BoxConstraints(maxWidth: 640.r, maxHeight: 480.r),
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
             borderRadius: radii.radiusExternal,

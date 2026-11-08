@@ -1555,8 +1555,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final radiusPx = radii.radiusExternalRadius;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = math.min(constraints.maxWidth, 640.0);
-        final height = math.min(constraints.maxHeight, 480.0);
+        final width = math.min(constraints.maxWidth, 640.r);
+        final height = math.min(constraints.maxHeight, 480.r);
         return SizedBox(
           width: width,
           height: height,

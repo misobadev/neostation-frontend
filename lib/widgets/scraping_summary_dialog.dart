@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import '../l10n/app_locale.dart';
 import '../utils/gamepad_nav.dart';
 import '../services/game_service.dart';
 
@@ -157,13 +159,13 @@ class _ScrapingSummaryDialogState extends State<ScrapingSummaryDialog> {
                     onPressed: () => Navigator.of(context).pop(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8.r),
                       ),
                     ),
                     child: Text(
-                      'OK',
+                      AppLocale.ok.getString(context),
                       style: TextStyle(
                         fontSize: 12.r,
                         fontWeight: FontWeight.bold,
