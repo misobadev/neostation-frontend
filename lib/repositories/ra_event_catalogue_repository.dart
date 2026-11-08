@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/services.dart';
 
 class RaEventCatalogueRepository {
@@ -6,8 +7,7 @@ class RaEventCatalogueRepository {
   static Future<Map<String, dynamic>> load(int year) async =>
       Map<String, dynamic>.from(
         jsonDecode(
-              await rootBundle.loadString('assets/data/ra_events_$year.json'),
-            )
-            as Map,
+          await rootBundle.loadString('assets/data/ra_events_$year.json'),
+        ) as Map,
       );
 }

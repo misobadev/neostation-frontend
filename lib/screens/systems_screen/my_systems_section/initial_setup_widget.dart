@@ -3,6 +3,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/responsive.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
 
 /// A premium introductory widget presented when no ROM library is configured.
@@ -368,9 +369,8 @@ class _InitialSetupWidgetState extends State<InitialSetupWidget> {
                   configProvider.detectedRealSystems.length.toString(),
                 ),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.8),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.8),
             ),
           ),
           if (configProvider.config.lastScan != null) ...[
@@ -383,9 +383,8 @@ class _InitialSetupWidgetState extends State<InitialSetupWidget> {
                     _formatDateTime(configProvider.config.lastScan!),
                   ),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -398,9 +397,8 @@ class _InitialSetupWidgetState extends State<InitialSetupWidget> {
   Widget _buildHelpCard(BuildContext context) {
     return Card(
       elevation: 0,
-      color: Theme.of(
-        context,
-      ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.666),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest
+          .withValues(alpha: 0.666),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
@@ -477,9 +475,8 @@ class _InitialSetupWidgetState extends State<InitialSetupWidget> {
           Text(
             description,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.7),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.7),
             ),
           ),
         ],

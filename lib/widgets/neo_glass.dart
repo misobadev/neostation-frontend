@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
@@ -133,9 +134,8 @@ class NeoGlass extends StatelessWidget {
     // beneath it) glows with the backdrop's colours.
     final glassTint =
         tint ??
-        Theme.of(
-          context,
-        ).scaffoldBackgroundColor.withValues(alpha: effectiveOpacity);
+        Theme.of(context).scaffoldBackgroundColor
+            .withValues(alpha: effectiveOpacity);
 
     Widget surface = ColoredBox(
       color: glassTint,

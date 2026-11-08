@@ -10,9 +10,12 @@ import 'package:neostation/services/music_player_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+
 import 'dart:io';
 import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
+
 import '../../../themes/corner_radii.dart';
 import '../../../widgets/neo_glass.dart';
 import '../../../widgets/shaders/shader_gif_widget.dart';
@@ -32,14 +35,13 @@ import '../../../utils/count_label.dart';
 /// rendered by the systems widgets themselves. The collections browser uses it
 /// for exactly one entry — the trailing "New collection" card, which is an icon
 /// and a label rather than artwork plus a logo.
-typedef SystemCardOverrideBuilder =
-    Widget? Function(
-      BuildContext context,
-      int index,
-      SystemInfo info,
-      bool isSelected,
-      VoidCallback onTap,
-    );
+typedef SystemCardOverrideBuilder = Widget? Function(
+  BuildContext context,
+  int index,
+  SystemInfo info,
+  bool isSelected,
+  VoidCallback onTap,
+);
 
 /// A premium card component representing a system or a 'Recent Game' entry.
 ///
@@ -323,9 +325,8 @@ class _SystemCardState extends State<SystemCard> {
               boxShadow: widget.showShadow && !_performanceMode
                   ? [
                       BoxShadow(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.shadow.withValues(alpha: 0.1),
+                        color: Theme.of(context).colorScheme.shadow
+                            .withValues(alpha: 0.1),
                         blurRadius: 4.r,
                         offset: Offset(2.0.r, 2.0.r),
                       ),
@@ -460,9 +461,9 @@ class _SystemCardState extends State<SystemCard> {
                     widget.info.color1AsColor ??
                     Theme.of(context).colorScheme.primary,
                 borderRadius:
-                    Theme.of(
-                      context,
-                    ).extension<CornerRadii>()?.radiusInternalRadius ??
+                    Theme.of(context)
+                        .extension<CornerRadii>()
+                        ?.radiusInternalRadius ??
                     12.r,
                 opacity: 1.0,
               ),
@@ -594,9 +595,8 @@ class _SystemCardState extends State<SystemCard> {
                 Symbols.search_rounded,
                 size: box.biggest.shortestSide * 0.55,
                 weight: 600,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.9),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.9),
               ),
             ),
           ),

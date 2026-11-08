@@ -18,8 +18,8 @@ class DiscoveryService {
   const DiscoveryService({
     this.engine = const DiscoveryPickEngine(),
     this.displayNames = GameListService.listDisplayNames,
-    DateTime Function()? clock,
-  }) : _clock = clock;
+    this._clock,
+  });
 
   final DiscoveryPickEngine engine;
 

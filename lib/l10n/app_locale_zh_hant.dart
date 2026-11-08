@@ -75,8 +75,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.rommSaveFilesCount: '{count} 個存檔檔案',
   AppLocale.rommSaveStateCount: '{count} 個即時存檔',
   AppLocale.rommSaveStatesCount: '{count} 個即時存檔',
-  AppLocale.rommDeleteGameBothConfirm:
-      '{game} 的 {saves}和{states}將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
+  AppLocale.rommDeleteGameBothConfirm: '{game} 的 {saves}和{states}將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
   AppLocale.rommDeleteGameConfirm:
       '{game} 的 {files}將從你的 RomM 伺服器永久刪除。裝置上的副本會保留，仍在同步此遊戲的裝置會再次上傳其副本。',
   AppLocale.rommDeleteKeepsSaves: '此遊戲的存檔檔案會保留在 RomM 上。',
@@ -284,8 +283,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.raMatchOnStartup: '啟動時比對成就',
   AppLocale.raMatchOnStartupSubtitle:
       '在啟動掃描後比對新的 ROM。若要比對整個遊戲庫，請先在工具中執行「比對 RetroAchievements 遊戲」。',
-  AppLocale.raMatchOnStartupBacklogWarning:
-      '有 {count} 個遊戲從未檢查過。在下次啟動時全部比對可能需要幾分鐘。建議改為在工具中執行「比對 RetroAchievements 遊戲」，可以看到進度。',
+  AppLocale.raMatchOnStartupBacklogWarning: '有 {count} 個遊戲從未檢查過。在下次啟動時全部比對可能需要幾分鐘。建議改為在工具中執行「比對 RetroAchievements 遊戲」，可以看到進度。',
   AppLocale.raMatchNotificationTitle: 'RetroAchievements',
   AppLocale.raMatchProgressBusy: '正在比對 RetroAchievements...',
   AppLocale.raMatchProgressCounted: '正在比對 RetroAchievements... {done}/{total}',
@@ -363,8 +361,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.rematchAchievements: '比對 RetroAchievements 遊戲',
   AppLocale.rommLinkLibrary: '將library連結至 RomM',
   AppLocale.rommLinkLibrarySubtitle: '將本機 ROM 與你的 RomM 伺服器比對並連結',
-  AppLocale.rommLinkLibraryWarning:
-      '此操作會走訪 RomM 伺服器上的每個平台，並連結辨識到的本機 ROM。\n\n已連結的遊戲將納入存檔同步，其存檔會上傳至 RomM。library較大時可能需要幾分鐘。',
+  AppLocale.rommLinkLibraryWarning: '此操作會走訪 RomM 伺服器上的每個平台，並連結辨識到的本機 ROM。\n\n已連結的遊戲將納入存檔同步，其存檔會上傳至 RomM。library較大時可能需要幾分鐘。',
   AppLocale.rommLinkLibraryPreparing: '準備中…',
   AppLocale.rommLinkLibraryProgress: '{total} 中的 {done} — {system}',
   AppLocale.rommLinkLibraryDone: '已連結 {count} 個遊戲',
@@ -374,8 +371,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.rommLinkLibraryStoppedEarly: '提前停止 — 目前已關聯 {count} 個遊戲',
   AppLocale.rommLinkLibraryPartial: '已連結 {count} 個遊戲。無法讀取的系統：{failed}',
   AppLocale.rematchAchievementsSubtitle: '掃描整個遊戲庫尋找成就組合，不必逐一開啟遊戲',
-  AppLocale.rematchAchievementsWarning:
-      '這會讀取每個未比對的 ROM 以識別它，在大型收藏中可能需要一些時間。再次選擇即可暫停：已比對的內容會保留，再次執行會從中斷處繼續。光碟映像也會讀取，但每個只讀取少量磁區。不會移動或刪除任何檔案。',
+  AppLocale.rematchAchievementsWarning: '這會讀取每個未比對的 ROM 以識別它，在大型收藏中可能需要一些時間。再次選擇即可暫停：已比對的內容會保留，再次執行會從中斷處繼續。光碟映像也會讀取，但每個只讀取少量磁區。不會移動或刪除任何檔案。',
   AppLocale.rematchAchievementsSignedOut:
       '未登入時仍會進行比對，但需要登入 RetroAchievements 才能查看結果。',
   AppLocale.rematchAchievementsLookingUp: '正在檢查已有雜湊值的遊戲…',
@@ -875,8 +871,7 @@ const Map<String, dynamic> appLocaleZhHant = {
       '關閉從應用程式塢開啟的應用程式後返回 Now Playing 畫面，並啟用系統截圖。僅讀取前景應用程式的名稱，不會收集任何螢幕內容。',
   AppLocale.screenReturnAccessHint: '開啟 NeoStation，然後點按「允許」',
   AppLocale.screenReturnDialogTitle: '啟用畫面返回',
-  AppLocale.screenReturnDialogBody:
-      '要從應用程式塢啟動應用程式，NeoStation 需要「畫面返回」無障礙服務。它會在你關閉所開啟的應用程式後帶你回到這裡。沒有它，你可能無法返回。',
+  AppLocale.screenReturnDialogBody: '要從應用程式塢啟動應用程式，NeoStation 需要「畫面返回」無障礙服務。它會在你關閉所開啟的應用程式後帶你回到這裡。沒有它，你可能無法返回。',
   AppLocale.screenReturnDialogSteps: '在下一個畫面中，從服務清單裡找到 NeoStation 並將其開啟。',
   AppLocale.openSettings: '開啟設定',
   AppLocale.selectRomFolder: '選擇 ROM 資料夾',
@@ -1116,11 +1111,9 @@ const Map<String, dynamic> appLocaleZhHant = {
       '此資料夾已包含 {count} 個項目。NeoStation 會將自己的資料儲存在此處，與現有內容放在一起。',
   AppLocale.folderNotEmptyUseAnyway: '仍然使用',
   AppLocale.userDataFolderNotWritable: "無法寫入此資料夾。請選擇其他資料夾，或保留預設位置。",
-  AppLocale.userDataFolderGrantAllFiles:
-      "若要使用此資料夾，請在 Android 設定 → 應用程式 → 特殊應用程式存取權 → 所有檔案存取權 中允許 NeoStation，然後重新選擇。",
+  AppLocale.userDataFolderGrantAllFiles: "若要使用此資料夾，請在 Android 設定 → 應用程式 → 特殊應用程式存取權 → 所有檔案存取權 中允許 NeoStation，然後重新選擇。",
   AppLocale.moveUserDataTitle: '移動使用者資料？',
-  AppLocale.moveUserDataBody:
-      'NeoStation 會將自己的資料（資料庫、抓取的媒體和設定）從目前的資料夾移動到新的資料夾。非 NeoStation 建立的檔案不會被更動。',
+  AppLocale.moveUserDataBody: 'NeoStation 會將自己的資料（資料庫、抓取的媒體和設定）從目前的資料夾移動到新的資料夾。非 NeoStation 建立的檔案不會被更動。',
   AppLocale.moveUserDataDestNotEmpty:
       '新資料夾已包含 {count} 個項目。NeoStation 的資料將新增在它們旁邊。',
   AppLocale.moveUserDataConfirm: '移動資料',

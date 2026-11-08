@@ -538,9 +538,9 @@ void main() {
           );
         });
 
-        final result = await service(
-          client,
-        ).syncFile(file, 'Game').timeout(const Duration(seconds: 5));
+        final result = await service(client)
+            .syncFile(file, 'Game')
+            .timeout(const Duration(seconds: 5));
 
         expect(result['success'], isFalse);
         expect(result['message'], 'Storage quota exceeded');
@@ -560,9 +560,9 @@ void main() {
           );
         });
 
-        final result = await service(
-          client,
-        ).syncFile(file, 'Game').timeout(const Duration(seconds: 5));
+        final result = await service(client)
+            .syncFile(file, 'Game')
+            .timeout(const Duration(seconds: 5));
 
         expectNetworkError(result);
       });

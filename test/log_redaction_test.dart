@@ -101,19 +101,16 @@ void main() {
       expect(redacted, contains('sid=<redacted>'));
     });
 
-    test(
-      'an Authorization header still redacts the token, not just the scheme',
-      () {
-        // `authorization` is deliberately NOT in the field-name set: if it were,
-        // the JSON-field pattern would swallow only "Bearer" and leave the token.
-        // The auth-header pattern must therefore carry the whole value.
-        final redacted = redactSecrets(
-          'headers: {Authorization: Bearer abc123DEF456ghi}',
-        );
-        expect(redacted, isNot(contains('abc123DEF456ghi')));
-        expect(redacted, contains('Bearer <redacted>'));
-      },
-    );
+    test('an Authorization header still redacts the token, not just the scheme', () {
+      // `authorization` is deliberately NOT in the field-name set: if it were,
+      // the JSON-field pattern would swallow only "Bearer" and leave the token.
+      // The auth-header pattern must therefore carry the whole value.
+      final redacted = redactSecrets(
+        'headers: {Authorization: Bearer abc123DEF456ghi}',
+      );
+      expect(redacted, isNot(contains('abc123DEF456ghi')));
+      expect(redacted, contains('Bearer <redacted>'));
+    });
   });
 
   group('redactSecrets — NeoSync auth failure reaching the sign-in screen', () {

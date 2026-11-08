@@ -30,9 +30,10 @@ void main() {
     }
   }
 
-  Future<List<String>> remaining() async => (await db.rawQuery(
-    'SELECT rom_path FROM user_roms ORDER BY rom_path',
-  )).map((r) => r['rom_path'] as String).toList();
+  Future<List<String>> remaining() async =>
+      (await db.rawQuery('SELECT rom_path FROM user_roms ORDER BY rom_path'))
+          .map((r) => r['rom_path'] as String)
+          .toList();
 
   test('an underscore in the folder name is not a wildcard', () async {
     await storeRoms(['/roms/my_games/nes/A.nes', '/roms/myXgames/nes/B.nes']);

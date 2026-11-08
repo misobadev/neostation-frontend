@@ -83,9 +83,8 @@ void main() {
     });
 
     test('the fresh-install DDL already carries performance_mode', () {
-      final source = File(
-        'lib/data/datasources/sqlite_service.dart',
-      ).readAsStringSync();
+      final source = File('lib/data/datasources/sqlite_service.dart')
+          .readAsStringSync();
 
       expect(source, contains('performance_mode INTEGER DEFAULT 0'));
     });

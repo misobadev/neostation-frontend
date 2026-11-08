@@ -99,12 +99,10 @@ void main() {
 
         final saturnDir = Directory('${root.path}/saturn')
           ..createSync(recursive: true);
-        File(
-          '${saturnDir.path}/Panzer Dragoon Saga - Disk 1.cue',
-        ).writeAsStringSync('disk1');
-        File(
-          '${saturnDir.path}/Panzer Dragoon Saga - CD 2.cue',
-        ).writeAsStringSync('disk2');
+        File('${saturnDir.path}/Panzer Dragoon Saga - Disk 1.cue')
+            .writeAsStringSync('disk1');
+        File('${saturnDir.path}/Panzer Dragoon Saga - CD 2.cue')
+            .writeAsStringSync('disk2');
 
         final result = await RomFolderOrganizerService.organizeRomFolders(
           [root.path],

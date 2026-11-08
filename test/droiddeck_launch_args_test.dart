@@ -25,9 +25,9 @@ void main() {
       late Map<String, dynamic> android;
 
       setUpAll(() {
-        final json =
-            jsonDecode(File('assets/systems/$system.json').readAsStringSync())
-                as Map<String, dynamic>;
+        final json = jsonDecode(
+          File('assets/systems/$system.json').readAsStringSync(),
+        ) as Map<String, dynamic>;
         final emulator = (json['emulators'] as List)
             .cast<Map<String, dynamic>>()
             .singleWhere(

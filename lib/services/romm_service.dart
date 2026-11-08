@@ -960,9 +960,11 @@ class RommService {
     );
     return _parseBrowse(
       resp,
-      (decoded) => _itemsOf(
-        decoded,
-      ).whereType<Map<String, dynamic>>().map(RommRom.fromJson).toList(),
+      (decoded) =>
+          _itemsOf(decoded)
+              .whereType<Map<String, dynamic>>()
+              .map(RommRom.fromJson)
+              .toList(),
     );
   }
 
@@ -1022,9 +1024,10 @@ class RommService {
     return _parseBrowse(resp, (decoded) {
       // RomM may return either a bare list or a paginated `{items: [...]}`
       // object.
-      final items = _itemsOf(
-        decoded,
-      ).whereType<Map<String, dynamic>>().map(RommRom.fromJson).toList();
+      final items = _itemsOf(decoded)
+          .whereType<Map<String, dynamic>>()
+          .map(RommRom.fromJson)
+          .toList();
 
       if (decoded is! Map<String, dynamic>) {
         return RommRomPage(items: items, total: items.length);
@@ -1752,9 +1755,8 @@ class RommService {
                 ..headers.addAll(_authHeaders),
             )
             .timeout(assetRequestLimit);
-        final body = await http.ByteStream(
-          resp.stream.timeout(assetStallLimit),
-        ).toBytes();
+        final body = await http.ByteStream(resp.stream.timeout(assetStallLimit))
+            .toBytes();
         return http.Response.bytes(
           body,
           resp.statusCode,
@@ -1939,9 +1941,8 @@ class RommService {
     if (emulator != null && emulator.isNotEmpty) params['emulator'] = emulator;
     if (slot != null && slot.isNotEmpty) params['slot'] = slot;
     if (deviceId != null && deviceId.isNotEmpty) params['device_id'] = deviceId;
-    final uri = Uri.parse(
-      '$_baseUrl$basePath',
-    ).replace(queryParameters: params);
+    final uri = Uri.parse('$_baseUrl$basePath')
+        .replace(queryParameters: params);
 
     return _sendAssetFile(
       'POST',
@@ -2236,9 +2237,10 @@ class RommService {
       rethrow;
     }
 
-    return _itemsOf(
-      jsonDecode(resp.body),
-    ).whereType<Map<String, dynamic>>().map(RommPlaySession.fromJson).toList();
+    return _itemsOf(jsonDecode(resp.body))
+        .whereType<Map<String, dynamic>>()
+        .map(RommPlaySession.fromJson)
+        .toList();
   }
 
   /// Records a play-session request the server says will never work on this

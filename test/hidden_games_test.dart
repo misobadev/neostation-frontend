@@ -55,22 +55,19 @@ void main() {
       expect(games.map((g) => g.romname), contains('mario.smc'));
     });
 
-    test(
-      'drops it from the favorites list without losing the favorite',
-      () async {
-        await GameRepository.setGameHidden('snes', 'zelda.smc', true);
+    test('drops it from the favorites list without losing the favorite', () async {
+      await GameRepository.setGameHidden('snes', 'zelda.smc', true);
 
-        final favorites = await GameListService.loadGamesForSystem(
-          system('favorites', 'favorites', 'Favorites'),
-        );
-        expect(favorites, isEmpty);
+      final favorites = await GameListService.loadGamesForSystem(
+        system('favorites', 'favorites', 'Favorites'),
+      );
+      expect(favorites, isEmpty);
 
-        // The row keeps its favorite flag, so unhiding restores it as a favorite.
-        final row = await GameRepository.getSingleGame('snes', 'zelda.smc');
-        expect(row!.isFavorite, isTrue);
-        expect(row.isHidden, isTrue);
-      },
-    );
+      // The row keeps its favorite flag, so unhiding restores it as a favorite.
+      final row = await GameRepository.getSingleGame('snes', 'zelda.smc');
+      expect(row!.isFavorite, isTrue);
+      expect(row.isHidden, isTrue);
+    });
 
     test('drops it from the aggregated "all" list', () async {
       await GameRepository.setGameHidden('nes', 'metroid.nes', true);

@@ -5,12 +5,15 @@ import '../../utils/switch_title_extractor.dart';
 import 'sqlite_service.dart';
 import 'sqlite_config_service.dart';
 import '../../utils/vita_title_extractor.dart';
+
 import 'package:neostation/services/android_service.dart';
 import 'package:neostation/services/saf_directory_service.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:convert';
+
 import 'package:path/path.dart' as path;
 import 'package:flutter/foundation.dart';
 
@@ -1441,9 +1444,9 @@ class SqliteDatabaseService {
   }) async {
     final entries = <RomEntry>[];
     try {
-      final entities = await Directory(
-        pathStr,
-      ).list(recursive: recursive, followLinks: false).toList();
+      final entities = await Directory(pathStr)
+          .list(recursive: recursive, followLinks: false)
+          .toList();
       // Directory-backed formats such as macOS `.app` bundles are one entry,
       // and their contents must not be reported as separate games.
       entities.sort((a, b) => a.path.length.compareTo(b.path.length));

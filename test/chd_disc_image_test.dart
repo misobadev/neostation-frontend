@@ -128,39 +128,35 @@ void main() {
       disc.close();
     }, skip: skip);
 
-    test(
-      'skips a pregap the metadata calls virtual, because it is not',
-      () async {
-        // `PGTYPE:V...` means the pregap was absent from the *source* image, not
-        // from this one: chdman synthesises those frames, stores them as silence
-        // and counts them in FRAMES. Believing the marker reads the silence
-        // instead of the game — which is exactly how every PC Engine CD on the
-        // test device came back "not a PC Engine CD".
-        final disc = ChdDisc.open(
-          write(
-            buildChd(
-              tracks: [
-                ChdTrackSpec(type: 'AUDIO', frames: 20),
-                ChdTrackSpec(
-                  type: 'MODE1_RAW',
-                  frames: 170,
-                  pregap: 150,
-                  pregapType: 'VMODE1_RAW',
-                ),
-              ],
-              sectors: {170: dataSector(List.filled(2048, 0x33))},
-            ),
+    test('skips a pregap the metadata calls virtual, because it is not', () async {
+      // `PGTYPE:V...` means the pregap was absent from the *source* image, not
+      // from this one: chdman synthesises those frames, stores them as silence
+      // and counts them in FRAMES. Believing the marker reads the silence
+      // instead of the game — which is exactly how every PC Engine CD on the
+      // test device came back "not a PC Engine CD".
+      final disc = ChdDisc.open(
+        write(
+          buildChd(
+            tracks: [
+              ChdTrackSpec(type: 'AUDIO', frames: 20),
+              ChdTrackSpec(
+                type: 'MODE1_RAW',
+                frames: 170,
+                pregap: 150,
+                pregapType: 'VMODE1_RAW',
+              ),
+            ],
+            sectors: {170: dataSector(List.filled(2048, 0x33))},
           ),
-        );
+        ),
+      );
 
-        expect(disc.tracks[1].sectors, 20);
-        expect(disc.tracks[1].startLba, 170);
-        expect(disc.readSector(1, 0)!.first, 0x33);
+      expect(disc.tracks[1].sectors, 20);
+      expect(disc.tracks[1].startLba, 170);
+      expect(disc.readSector(1, 0)!.first, 0x33);
 
-        disc.close();
-      },
-      skip: skip,
-    );
+      disc.close();
+    }, skip: skip);
 
     test('finds the user data behind a mode 2 subheader', () async {
       // PlayStation discs are mode 2 form 1: the payload starts 24 bytes in,

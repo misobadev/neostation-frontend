@@ -356,75 +356,69 @@ void main() {
     );
   });
 
-  test(
-    'rolling days use exact elapsed boundaries and negative rules include never played',
-    () {
-      final cutoff = now.subtract(const Duration(days: 7));
-      expect(
-        matches(
-          game(last: cutoff),
-          SmartField.lastPlayed,
-          SmartOperator.withinDays,
-          7,
-        ),
-        isTrue,
-      );
-      expect(
-        matches(
-          game(last: cutoff),
-          SmartField.lastPlayed,
-          SmartOperator.notWithinDays,
-          7,
-        ),
-        isFalse,
-      );
-      expect(
-        matches(
-          game(last: cutoff.subtract(const Duration(milliseconds: 1))),
-          SmartField.lastPlayed,
-          SmartOperator.notWithinDays,
-          7,
-        ),
-        isTrue,
-      );
-      // A future date (clock skew) counts as played now: within, not outside.
-      final future = game(last: now.add(const Duration(days: 1)));
-      expect(
-        matches(future, SmartField.lastPlayed, SmartOperator.withinDays, 7),
-        isTrue,
-      );
-      expect(
-        matches(future, SmartField.lastPlayed, SmartOperator.notWithinDays, 7),
-        isFalse,
-      );
-      for (final op in [
+  test('rolling days use exact elapsed boundaries and negative rules include never played', () {
+    final cutoff = now.subtract(const Duration(days: 7));
+    expect(
+      matches(
+        game(last: cutoff),
+        SmartField.lastPlayed,
         SmartOperator.withinDays,
+        7,
+      ),
+      isTrue,
+    );
+    expect(
+      matches(
+        game(last: cutoff),
+        SmartField.lastPlayed,
         SmartOperator.notWithinDays,
-      ]) {
-        expect(
-          matches(game(), SmartField.lastPlayed, op, 7),
-          op == SmartOperator.notWithinDays,
-        );
-      }
-      final definition = SmartCollectionRules(
-        rules: [
-          SmartRule(
-            field: SmartField.lastPlayed,
-            operator: SmartOperator.withinDays,
-            value: 7,
-          ),
-        ],
-      );
+        7,
+      ),
+      isFalse,
+    );
+    expect(
+      matches(
+        game(last: cutoff.subtract(const Duration(milliseconds: 1))),
+        SmartField.lastPlayed,
+        SmartOperator.notWithinDays,
+        7,
+      ),
+      isTrue,
+    );
+    // A future date (clock skew) counts as played now: within, not outside.
+    final future = game(last: now.add(const Duration(days: 1)));
+    expect(
+      matches(future, SmartField.lastPlayed, SmartOperator.withinDays, 7),
+      isTrue,
+    );
+    expect(
+      matches(future, SmartField.lastPlayed, SmartOperator.notWithinDays, 7),
+      isFalse,
+    );
+    for (final op in [SmartOperator.withinDays, SmartOperator.notWithinDays]) {
       expect(
-        evaluator.nextBoundary([game(last: cutoff)], [definition]),
-        now.add(const Duration(milliseconds: 1)),
+        matches(game(), SmartField.lastPlayed, op, 7),
+        op == SmartOperator.notWithinDays,
       );
-      expect(
-        evaluator.nextBoundary([future], [definition]),
-        now.add(const Duration(days: 7, milliseconds: 1)),
-      );
-    },
-  );
+    }
+    final definition = SmartCollectionRules(
+      rules: [
+        SmartRule(
+          field: SmartField.lastPlayed,
+          operator: SmartOperator.withinDays,
+          value: 7,
+        ),
+      ],
+    );
+    expect(
+      evaluator.nextBoundary([game(last: cutoff)], [definition]),
+      now.add(const Duration(milliseconds: 1)),
+    );
+    expect(
+      evaluator.nextBoundary([future], [definition]),
+      now.add(const Duration(days: 7, milliseconds: 1)),
+    );
+  });
 
   test('hidden games, apps and music never match even in any mode', () {
     for (final g in [

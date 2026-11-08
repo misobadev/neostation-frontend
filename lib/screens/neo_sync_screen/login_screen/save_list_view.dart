@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -18,6 +19,7 @@ import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/widgets/custom_notification.dart' as custom;
 import 'package:neostation/widgets/core_footer.dart';
 import 'package:neostation/widgets/neo_glass.dart';
+
 import '../../app_screen.dart';
 import 'neo_sync_dialogs.dart';
 
@@ -1347,9 +1349,8 @@ class _SaveListViewState extends State<SaveListView> {
             Icon(
               Symbols.cloud_off_rounded,
               size: 48.sp,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.5),
             ),
             SizedBox(height: 8.r),
             Text(
@@ -1361,9 +1362,8 @@ class _SaveListViewState extends State<SaveListView> {
                   : AppLocale.noOnlineSavesFound.getString(context),
               style: TextStyle(
                 fontSize: 16.r,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.7),
               ),
             ),
           ],

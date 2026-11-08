@@ -1,8 +1,10 @@
 import '../../../widgets/ra_earned_badge.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
+
 import '../../../l10n/app_locale.dart';
 import '../../../models/secondary_achievement_item.dart';
 import '../../../models/secondary_display_state.dart';

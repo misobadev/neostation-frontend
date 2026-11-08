@@ -37,11 +37,10 @@ class RommSavesProvider extends ChangeNotifier {
     this._manager, {
     ValueListenable<Future<SyncResult>?>? runningSweep,
     FileProvider? fileProvider,
-    Future<String?> Function(int)? loadLocalCover,
+    this._loadLocalCover,
   }) : _session = _browse.service.session,
        _sweep = runningSweep ?? _rommSweep(_manager),
-       _files = fileProvider,
-       _loadLocalCover = loadLocalCover {
+       _files = fileProvider {
     _browse.addListener(_connectionChanged);
     _sweep?.addListener(_sweepChanged);
     // One already running when the tab opens is followed like a later one.

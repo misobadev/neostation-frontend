@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import 'screenscraper_exceptions.dart';
 import '../../utils/semaphore.dart';
 

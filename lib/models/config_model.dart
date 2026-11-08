@@ -1,7 +1,9 @@
 import 'dart:convert';
+
 import 'custom_sfx.dart';
 
 import 'package:neostation/constants/recent_card_sizes.dart';
+
 import 'emulator_model.dart';
 
 String _normalizeGameListSize(String value) =>

@@ -58,7 +58,7 @@ void main() {
       expectedFile: file,
     );
 
-    expect(source, file);
+    expect(source, File(file).resolveSymbolicLinksSync());
     expect(describe(copy), {
       'rows': 4,
       'user_version': 42,

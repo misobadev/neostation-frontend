@@ -1,4 +1,5 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -7,6 +8,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/services/game_service.dart';
+
 import '../services/systems_update_service.dart';
 import '../data/datasources/sqlite_service.dart';
 import 'custom_notification.dart';
@@ -14,12 +16,11 @@ import 'core_footer.dart';
 
 /// Signature of [SystemsUpdateService.checkAndUpdate], so tests can drive the
 /// dialog's download states without touching the network.
-typedef SystemsUpdateRunner =
-    Future<SystemsUpdateResult?> Function({
-      SystemsUpdateInfo? knownUpdate,
-      void Function(double progress, String status)? onProgress,
-      bool Function()? shouldCancel,
-    });
+typedef SystemsUpdateRunner = Future<SystemsUpdateResult?> Function({
+  SystemsUpdateInfo? knownUpdate,
+  void Function(double progress, String status)? onProgress,
+  bool Function()? shouldCancel,
+});
 
 class SystemsUpdateDialog extends StatefulWidget {
   final SystemsUpdateInfo updateInfo;

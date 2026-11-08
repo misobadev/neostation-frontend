@@ -1037,43 +1037,40 @@ void _preflightTests() {
       expect(sync.completed, 1, reason: 'the sync still ran');
     });
 
-    test(
-      'a ROM with no resolvable destination is priced, not checked',
-      () async {
-        // Platform 2 has no local system / no writable folder, so nothing can be
-        // said about where its bytes would go.
-        final all = [
-          _rom(1, sizeBytes: 1000),
-          _rom(2, sizeBytes: 4000, platformId: 2),
-        ];
-        RommBulkSyncPlan? seen;
-        final sync = RommBulkSync();
+    test('a ROM with no resolvable destination is priced, not checked', () async {
+      // Platform 2 has no local system / no writable folder, so nothing can be
+      // said about where its bytes would go.
+      final all = [
+        _rom(1, sizeBytes: 1000),
+        _rom(2, sizeBytes: 4000, platformId: 2),
+      ];
+      RommBulkSyncPlan? seen;
+      final sync = RommBulkSync();
 
-        await sync.run(
-          sourceLabel: 'Mixed',
-          fetchPage: _pagesOver(all),
-          isDownloaded: _nothingDownloaded,
-          download: (rom) async => _completed(rom),
-          destination: _volumeByPlatform({
-            1: const RommSyncDestination(volume: '/storage', freeBytes: 2000),
-          }),
-          confirm: (plan) async {
-            seen = plan;
-            return true;
-          },
-        );
+      await sync.run(
+        sourceLabel: 'Mixed',
+        fetchPage: _pagesOver(all),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+        destination: _volumeByPlatform({
+          1: const RommSyncDestination(volume: '/storage', freeBytes: 2000),
+        }),
+        confirm: (plan) async {
+          seen = plan;
+          return true;
+        },
+      );
 
-        expect(seen!.downloadBytes, 5000);
-        expect(seen!.unresolvedRoms, 1);
-        expect(seen!.volumes.single.downloadBytes, 1000);
-        expect(
-          seen!.fits,
-          isTrue,
-          reason:
-              'the 4000 that cannot be placed cannot be held against /storage',
-        );
-      },
-    );
+      expect(seen!.downloadBytes, 5000);
+      expect(seen!.unresolvedRoms, 1);
+      expect(seen!.volumes.single.downloadBytes, 1000);
+      expect(
+        seen!.fits,
+        isTrue,
+        reason:
+            'the 4000 that cannot be placed cannot be held against /storage',
+      );
+    });
 
     test('reports the shortfall when the queue does not fit', () async {
       final all = [for (var i = 0; i < 3; i++) _rom(i, sizeBytes: 1000)];
@@ -1098,58 +1095,55 @@ void _preflightTests() {
       expect(sync.declined, isTrue);
     });
 
-    test(
-      'each volume is checked against its own share, not the roomiest',
-      () async {
-        // The regression this replaced: reporting the roomiest ROM folder let a
-        // queue "fit" because *somewhere* had room. Platform 1's 3000 bytes go to
-        // a volume with 1000 free; platform 2's 1000 go to one with 500k free.
-        // The total (4000) fits in the roomiest volume, and the sync still can't
-        // run as planned.
-        final all = [
-          _rom(1, sizeBytes: 3000),
-          _rom(2, sizeBytes: 1000, platformId: 2),
-        ];
-        RommBulkSyncPlan? seen;
-        final sync = RommBulkSync();
+    test('each volume is checked against its own share, not the roomiest', () async {
+      // The regression this replaced: reporting the roomiest ROM folder let a
+      // queue "fit" because *somewhere* had room. Platform 1's 3000 bytes go to
+      // a volume with 1000 free; platform 2's 1000 go to one with 500k free.
+      // The total (4000) fits in the roomiest volume, and the sync still can't
+      // run as planned.
+      final all = [
+        _rom(1, sizeBytes: 3000),
+        _rom(2, sizeBytes: 1000, platformId: 2),
+      ];
+      RommBulkSyncPlan? seen;
+      final sync = RommBulkSync();
 
-        await sync.run(
-          sourceLabel: 'Everything',
-          fetchPage: _pagesOver(all),
-          isDownloaded: _nothingDownloaded,
-          download: (rom) async => _completed(rom),
-          destination: _volumeByPlatform({
-            1: const RommSyncDestination(volume: '/internal', freeBytes: 1000),
-            2: const RommSyncDestination(volume: '/sdcard', freeBytes: 500000),
-          }),
-          confirm: (plan) async {
-            seen = plan;
-            return false;
-          },
-        );
+      await sync.run(
+        sourceLabel: 'Everything',
+        fetchPage: _pagesOver(all),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+        destination: _volumeByPlatform({
+          1: const RommSyncDestination(volume: '/internal', freeBytes: 1000),
+          2: const RommSyncDestination(volume: '/sdcard', freeBytes: 500000),
+        }),
+        confirm: (plan) async {
+          seen = plan;
+          return false;
+        },
+      );
 
-        expect(seen!.volumes.map((v) => v.volume), ['/internal', '/sdcard']);
-        expect(seen!.volumes.first.requiredBytes, 3000);
-        expect(seen!.volumes.last.requiredBytes, 1000);
-        expect(seen!.fits, isFalse);
-        expect(
-          seen!.shortfallBytes,
-          2000,
-          reason: 'the internal volume is short',
-        );
-        expect(seen!.tightestVolume!.volume, '/internal');
-        expect(
-          seen!.freeBytes,
-          isNull,
-          reason: 'no single free-space figure answers for two volumes',
-        );
-        expect(
-          seen!.spaceUnknown,
-          isFalse,
-          reason: 'both volumes were measured — the plan just does not fit',
-        );
-      },
-    );
+      expect(seen!.volumes.map((v) => v.volume), ['/internal', '/sdcard']);
+      expect(seen!.volumes.first.requiredBytes, 3000);
+      expect(seen!.volumes.last.requiredBytes, 1000);
+      expect(seen!.fits, isFalse);
+      expect(
+        seen!.shortfallBytes,
+        2000,
+        reason: 'the internal volume is short',
+      );
+      expect(seen!.tightestVolume!.volume, '/internal');
+      expect(
+        seen!.freeBytes,
+        isNull,
+        reason: 'no single free-space figure answers for two volumes',
+      );
+      expect(
+        seen!.spaceUnknown,
+        isFalse,
+        reason: 'both volumes were measured — the plan just does not fit',
+      );
+    });
 
     test('ROMs sharing a volume are added together, not checked apart', () async {
       // Two platforms, one volume: 3000 + 3000 against 5000 free is a shortfall

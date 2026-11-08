@@ -190,9 +190,8 @@ class PlanFarewellModalState extends State<PlanFarewellModal> {
               RichText(
                 textAlign: TextAlign.center,
                 text: TextSpan(
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(fontSize: 11.sp),
+                  style: Theme.of(context).textTheme.bodyLarge
+                      ?.copyWith(fontSize: 11.sp),
                   children: [
                     TextSpan(
                       text: AppLocale.planFarewellMessagePre.getString(context),
@@ -232,17 +231,14 @@ class PlanFarewellModalState extends State<PlanFarewellModal> {
                   color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(6.w),
                   border: Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.outline.withValues(alpha: 0.2),
+                    color: Theme.of(context).colorScheme.outline
+                        .withValues(alpha: 0.2),
                   ),
                 ),
                 child: Text(
                   AppLocale.planUpgradeAnytime.getString(context),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    fontSize: 10.sp,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(fontStyle: FontStyle.italic, fontSize: 10.sp),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -279,9 +275,8 @@ class PlanFarewellModalState extends State<PlanFarewellModal> {
               Text(
                 AppLocale.pressToClose.getString(context),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.6),
                   fontSize: 9.sp,
                 ),
                 textAlign: TextAlign.center,

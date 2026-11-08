@@ -127,9 +127,9 @@ void main() {
       ScreenscraperClient.updateRequestSemaphore(5);
     });
 
-    Uri plainUri(int status) => Uri.parse(
-      'http://127.0.0.1:${plainServer.port}/status/$status',
-    ).replace(queryParameters: credentials);
+    Uri plainUri(int status) =>
+        Uri.parse('http://127.0.0.1:${plainServer.port}/status/$status')
+            .replace(queryParameters: credentials);
 
     test('rethrows the TLS failure and releases its request slot', () async {
       tlsServer = await _TlsServer.start(
@@ -147,9 +147,8 @@ void main() {
       );
       expect(tlsServer.requestCount, 0);
 
-      final followUp = await ScreenscraperClient.httpGetWithRetry(
-        plainUri(200),
-      ).timeout(const Duration(seconds: 5));
+      final followUp = await ScreenscraperClient.httpGetWithRetry(plainUri(200))
+          .timeout(const Duration(seconds: 5));
       expect(followUp.statusCode, 200);
 
       await tlsServer.close();
@@ -184,9 +183,8 @@ void main() {
     }, skip: skip);
 
     test('redacts credentials when the failure embeds the request URL', () {
-      final uri = Uri.parse(
-        'https://api.screenscraper.fr/api2/ssuserInfos.php',
-      ).replace(queryParameters: credentials);
+      final uri = Uri.parse('https://api.screenscraper.fr/api2/ssuserInfos.php')
+          .replace(queryParameters: credentials);
       final logged = redactSecrets(
         'Request failed, retrying... '
         '(${http.ClientException('Connection closed', uri)})',

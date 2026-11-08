@@ -124,24 +124,21 @@ void main() {
       },
     );
 
-    test(
-      'getUserDetectedEmulators prefers ra entry over standalone RetroArch entry',
-      () async {
-        await db.execute(
-          "INSERT INTO app_emulators (system_id, os_id, name, unique_identifier, is_standalone) VALUES ('snes', 3, 'RetroArch', 'retroarch.snes', 1)",
-        );
-        await db.execute(
-          "INSERT INTO user_emulator_config (emulator_unique_id, emulator_path) VALUES ('retroarch.snes', '/home/user/Applications/RetroArch-Linux-x86_64.AppImage')",
-        );
-        await EmulatorRepository.saveDetectedEmulatorPath(
-          emulatorName: 'RetroArch',
-          emulatorPath: '/usr/bin/retroarch',
-        );
+    test('getUserDetectedEmulators prefers ra entry over standalone RetroArch entry', () async {
+      await db.execute(
+        "INSERT INTO app_emulators (system_id, os_id, name, unique_identifier, is_standalone) VALUES ('snes', 3, 'RetroArch', 'retroarch.snes', 1)",
+      );
+      await db.execute(
+        "INSERT INTO user_emulator_config (emulator_unique_id, emulator_path) VALUES ('retroarch.snes', '/home/user/Applications/RetroArch-Linux-x86_64.AppImage')",
+      );
+      await EmulatorRepository.saveDetectedEmulatorPath(
+        emulatorName: 'RetroArch',
+        emulatorPath: '/usr/bin/retroarch',
+      );
 
-        final detected = await EmulatorRepository.getUserDetectedEmulators();
-        expect(detected['RetroArch']!.path, '/usr/bin/retroarch');
-      },
-    );
+      final detected = await EmulatorRepository.getUserDetectedEmulators();
+      expect(detected['RetroArch']!.path, '/usr/bin/retroarch');
+    });
 
     test(
       'getSystemsWithStandaloneEmulators throws when OS is missing',
@@ -156,30 +153,26 @@ void main() {
       },
     );
 
-    test(
-      'getSystemsWithStandaloneEmulators returns systems with standalone emulators',
-      () async {
-        final currentOs = Platform.operatingSystem;
-        final osRow = await db.rawQuery(
-          "SELECT id FROM app_os WHERE name = ?",
-          [currentOs],
-        );
-        final osId = int.tryParse(osRow.first['id'].toString()) ?? 1;
+    test('getSystemsWithStandaloneEmulators returns systems with standalone emulators', () async {
+      final currentOs = Platform.operatingSystem;
+      final osRow = await db.rawQuery("SELECT id FROM app_os WHERE name = ?", [
+        currentOs,
+      ]);
+      final osId = int.tryParse(osRow.first['id'].toString()) ?? 1;
 
-        await db.execute(
-          "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('psx', 'PlayStation', 'psx')",
-        );
-        await db.execute(
-          "INSERT INTO app_emulators (system_id, os_id, name, unique_identifier, is_standalone) VALUES ('psx', ?, 'DuckStation', 'duckstation.psx', 1)",
-          [osId],
-        );
+      await db.execute(
+        "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('psx', 'PlayStation', 'psx')",
+      );
+      await db.execute(
+        "INSERT INTO app_emulators (system_id, os_id, name, unique_identifier, is_standalone) VALUES ('psx', ?, 'DuckStation', 'duckstation.psx', 1)",
+        [osId],
+      );
 
-        final systems =
-            await EmulatorRepository.getSystemsWithStandaloneEmulators();
-        expect(systems.length, 1);
-        expect(systems.first['folder_name'], 'psx');
-        expect(systems.first['emulator_count'], 1);
-      },
-    );
+      final systems =
+          await EmulatorRepository.getSystemsWithStandaloneEmulators();
+      expect(systems.length, 1);
+      expect(systems.first['folder_name'], 'psx');
+      expect(systems.first['emulator_count'], 1);
+    });
   });
 }

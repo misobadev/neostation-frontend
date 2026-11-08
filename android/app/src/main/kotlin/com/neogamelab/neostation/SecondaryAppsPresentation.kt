@@ -19,7 +19,7 @@ import io.flutter.plugin.common.MethodChannel
  * The base class creates and owns the engine in a private field and its
  * show()/dismiss() rely on it, so we let [onCreate] run normally and then reach
  * that engine via reflection to attach our channel. The field name is pinned by
- * the locked `sub_screen` dependency version.
+ * our vendored copy of `sub_screen` in `packages/`.
  */
 class SecondaryAppsPresentation(
     private val activity: MainActivity,
@@ -94,7 +94,7 @@ class SecondaryAppsPresentation(
 
     // Deprecated since API 33, but Dialog still routes BACK through it and the
     // override must stay for the platforms that do.
-    @Suppress("DEPRECATION")
+    @Deprecated("Dialog still routes BACK through this override on older platforms.")
     override fun onBackPressed() {
         // Deliberately empty: BACK must never dismiss the bottom screen.
     }

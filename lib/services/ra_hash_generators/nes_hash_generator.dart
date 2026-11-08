@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:crypto/crypto.dart';
 
 /// MD5 hash generator for NES ROMs based on the RetroAchievements technical specification.

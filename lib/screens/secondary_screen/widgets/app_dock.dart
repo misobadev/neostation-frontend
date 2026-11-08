@@ -1,8 +1,10 @@
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/services/secondary_apps_service.dart';
+
 import '../../../models/config_model.dart';
 import '../../../models/secondary_display_state.dart';
 import '../now_playing_helpers.dart';

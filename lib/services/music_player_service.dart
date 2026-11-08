@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
@@ -9,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:neostation/services/saf_directory_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/chunked_file_writer.dart';
+
 import '../repositories/game_repository.dart';
 import '../models/game_model.dart';
 
@@ -24,8 +26,7 @@ class MusicPlayerService extends ChangeNotifier {
   MusicPlayerService._internal()
     : _deinitEngine = (() => SoLoud.instance.deinit());
   @visibleForTesting
-  MusicPlayerService.forTesting({required VoidCallback deinitEngine})
-    : _deinitEngine = deinitEngine;
+  MusicPlayerService.forTesting({required this._deinitEngine});
 
   final VoidCallback _deinitEngine;
 
@@ -33,7 +34,8 @@ class MusicPlayerService extends ChangeNotifier {
   SoLoud? _soloud;
   AudioSource? _currentSource;
   SoundHandle? _currentHandle;
-  AudioData? _audioData;
+  Float32List _fftSamples = Float32List(0);
+  StreamSubscription<AudioVisualizationData>? _visualizationSubscription;
   String? _tempPath;
 
   bool _isInitialized = false;
@@ -213,7 +215,9 @@ class MusicPlayerService extends ChangeNotifier {
     // The engine is gone; all handles/sources are now invalid.
     _currentHandle = null;
     _currentSource = null;
-    _audioData = null;
+    _visualizationSubscription?.cancel();
+    _visualizationSubscription = null;
+    _fftSamples = Float32List(0);
     _isPlaying = false;
     _isInitialized = false;
     _initCompleter = null;
@@ -290,10 +294,20 @@ class MusicPlayerService extends ChangeNotifier {
         await _soloud!.init();
       }
 
-      _soloud!.setVisualizationEnabled(true);
+      _soloud!.setVisualizationEnabled(
+        true,
+        windowSize: 512,
+        kind: VisualizationKind.fft,
+      );
       _soloud!.setFftSmoothing(0.8);
 
-      _audioData = AudioData(GetSamplesKind.linear);
+      await _visualizationSubscription?.cancel();
+      _visualizationSubscription = _soloud!.audioVisualizationEvents.listen((
+        data,
+      ) {
+        final fft = data.fftData;
+        if (fft != null && fft.isNotEmpty) _fftSamples = fft;
+      });
 
       _isInitialized = true;
       _startStreamTimers();
@@ -733,6 +747,7 @@ class MusicPlayerService extends ChangeNotifier {
       _currentHandle = null;
     }
     _isPlaying = false;
+    _fftSamples = Float32List(0);
     _activeTrack = null;
     _activeTitle = null;
     _activeArtist = null;
@@ -751,6 +766,7 @@ class MusicPlayerService extends ChangeNotifier {
     if (!_isInitialized || _currentHandle == null) return;
     SoLoud.instance.setPause(_currentHandle!, true);
     _isPlaying = false;
+    _fftSamples = Float32List(0);
     notifyListeners();
   }
 
@@ -788,13 +804,14 @@ class MusicPlayerService extends ChangeNotifier {
 
   /// Retrieves FFT visualization samples for the UI.
   Float32List getAudioData() {
-    if (!_isInitialized || _audioData == null) return Float32List(0);
-    _audioData!.updateSamples();
-    return _audioData!.getAudioData();
+    if (!_isInitialized) return Float32List(0);
+    return _fftSamples;
   }
 
   @override
   void dispose() {
+    _visualizationSubscription?.cancel();
+    _visualizationSubscription = null;
     if (_currentHandle != null) SoLoud.instance.stop(_currentHandle!);
     if (_currentSource != null) SoLoud.instance.disposeSource(_currentSource!);
     _isInitialized = false;

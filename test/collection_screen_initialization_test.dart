@@ -6,9 +6,8 @@ void main() {
   // The service tests cannot catch lifecycle ordering in SystemGamesList.
   // Guard the synchronous provider read before the loader's first await.
   test('collections provider is assigned before the initial games load', () {
-    final source = File(
-      'lib/screens/game_screen/my_games_list.dart',
-    ).readAsStringSync();
+    final source = File('lib/screens/game_screen/my_games_list.dart')
+        .readAsStringSync();
     final start = source.indexOf('void initState()');
     final end = source.indexOf('\n  ///', start);
     final init = source.substring(start, end);

@@ -135,9 +135,8 @@ void main() {
             ),
           ),
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: TextScaler.linear(textScale)),
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
           home: MultiProvider(
@@ -229,9 +228,8 @@ void main() {
   /// Whether the box keyed [key] wears the controller-focus glow.
   bool glows(WidgetTester tester, String key) {
     final box = find.byKey(ValueKey(key));
-    final glow = Theme.of(
-      tester.element(box),
-    ).colorScheme.primary.withValues(alpha: 0.3);
+    final glow = Theme.of(tester.element(box)).colorScheme.primary
+        .withValues(alpha: 0.3);
     final decoration =
         tester.widget<AnimatedContainer>(box).decoration! as BoxDecoration;
     return decoration.boxShadow!.any((shadow) => shadow.color == glow);

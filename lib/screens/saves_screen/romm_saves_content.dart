@@ -84,11 +84,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
 
   List<RommSaveGame> get _games {
     final assets = _saves.assets;
-    if (_grouped case (
-      final from,
-      final filter,
-      final games,
-    ) when identical(from, assets) && filter == _filter) {
+    if (_grouped case (final from, final filter, final games)
+        when identical(from, assets) && filter == _filter) {
       return games;
     }
     final games = RommSaveGame.group(assets.where(_filter.includes).toList());
@@ -1010,9 +1007,8 @@ class _RommSavesContentState extends State<RommSavesContent> {
 
   /// One icon-led line of metadata, as the RomM ROM list draws them.
   Widget _meta(IconData icon, String label, {Color? iconColor}) {
-    final muted = Theme.of(
-      context,
-    ).colorScheme.onSurface.withValues(alpha: 0.6);
+    final muted = Theme.of(context).colorScheme.onSurface
+        .withValues(alpha: 0.6);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

@@ -65,11 +65,9 @@ const Map<String, dynamic> appLocaleKo = {
       '{games}의 저장 파일을 업로드하지 못했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',
   AppLocale.rommGameListSeparator: ', ',
   AppLocale.rommGameListMore: '{games} 외 {count}개',
-  AppLocale.rommSavesHelp:
-      'RomM 저장 파일과 상태를 확인합니다. 업로드 재시도는 동기화가 활성화된 RomM 연결 로컬 게임을 확인합니다. 최신 원격 저장 파일은 게임 시작 시 다운로드됩니다.',
+  AppLocale.rommSavesHelp: 'RomM 저장 파일과 상태를 확인합니다. 업로드 재시도는 동기화가 활성화된 RomM 연결 로컬 게임을 확인합니다. 최신 원격 저장 파일은 게임 시작 시 다운로드됩니다.',
   AppLocale.rommDeleteTitle: 'RomM에서 삭제',
-  AppLocale.rommDeleteConfirm:
-      '{file} 파일이 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
+  AppLocale.rommDeleteConfirm: '{file} 파일이 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
   AppLocale.rommDeleted: 'RomM에서 삭제했습니다.',
   AppLocale.rommDeleteFailed:
       'RomM에서 삭제하지 못했습니다. 연결 및 RomM 권한을 확인한 후 다시 시도하세요.',
@@ -78,10 +76,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.rommSaveFilesCount: '세이브 파일 {count}개',
   AppLocale.rommSaveStateCount: '세이브 상태 {count}개',
   AppLocale.rommSaveStatesCount: '세이브 상태 {count}개',
-  AppLocale.rommDeleteGameBothConfirm:
-      '{game}의 {saves}와 {states}가 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
-  AppLocale.rommDeleteGameConfirm:
-      '{game}의 {files}가 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
+  AppLocale.rommDeleteGameBothConfirm: '{game}의 {saves}와 {states}가 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
+  AppLocale.rommDeleteGameConfirm: '{game}의 {files}가 RomM 서버에서 영구적으로 삭제됩니다. 기기에 있는 사본은 유지되며, 이 게임을 계속 동기화하는 기기는 사본을 다시 업로드합니다.',
   AppLocale.rommDeleteKeepsSaves: '이 게임의 세이브 파일은 RomM에 그대로 남습니다.',
   AppLocale.rommDeleteKeepsStates: '이 게임의 세이브 상태는 RomM에 그대로 남습니다.',
   AppLocale.videoPreviews: "미리보기 동영상 지연",
@@ -217,8 +213,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.subfolderViewSubtitle: '하위 폴더의 ROM을 게임 목록에 섞지 않고 탐색 가능한 폴더로 그룹화합니다',
   AppLocale.subfolderViewAll: '모든 시스템에서 하위 폴더 표시',
   AppLocale.subfolderViewAllSubtitle: '‘하위 폴더 표시’ 설정을 모든 시스템에 한 번에 적용합니다',
-  AppLocale.subfolderViewAllOverridesNotice:
-      '{count}개 시스템에 자체 ‘하위 폴더 표시’ 설정이 있었습니다. 이제 모든 시스템이 이 스위치를 따릅니다. 각 시스템 설정에서 개별적으로 다시 변경할 수 있습니다.',
+  AppLocale.subfolderViewAllOverridesNotice: '{count}개 시스템에 자체 ‘하위 폴더 표시’ 설정이 있었습니다. 이제 모든 시스템이 이 스위치를 따릅니다. 각 시스템 설정에서 개별적으로 다시 변경할 수 있습니다.',
   AppLocale.subfolderViewEnabled: '하위 폴더를 폴더로 표시합니다',
   AppLocale.subfolderViewDisabled: '하위 폴더를 게임 목록에 섞어서 표시합니다',
   AppLocale.errorScanningSystem: '시스템 검색 오류: {error}',
@@ -266,8 +261,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.secondarySectionNowPlaying: '플레이 중 패널',
   AppLocale.secondarySectionDock: '앱 Dock',
   AppLocale.screenshotAccess: '화면 복귀 & 스크린샷',
-  AppLocale.screenshotAccessSubtitle:
-      'Dock에서 실행한 앱을 닫으면 플레이 중 화면으로 돌아오며, 스크린샷 버튼으로 화면을 캡처할 수 있습니다(Android 접근성 설정이 열립니다)',
+  AppLocale.screenshotAccessSubtitle: 'Dock에서 실행한 앱을 닫으면 플레이 중 화면으로 돌아오며, 스크린샷 버튼으로 화면을 캡처할 수 있습니다(Android 접근성 설정이 열립니다)',
   AppLocale.scanOnStartupSubtitle: '앱을 시작할 때 ROM 폴더를 자동으로 검색합니다',
   AppLocale.ignoreHiddenFiles: '숨겨진 항목 무시',
   AppLocale.ignoreHiddenFilesSubtitle: 'ROM 검색 중 숨김 파일과 폴더를 제외합니다',
@@ -290,10 +284,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.showCloudSyncIcon: '클라우드 저장 아이콘',
   AppLocale.showCloudSyncIconSubtitle: '선택한 게임 옆에 클라우드 동기화 상태를 표시합니다',
   AppLocale.raMatchOnStartup: '시작할 때 업적 일치',
-  AppLocale.raMatchOnStartupSubtitle:
-      '시작 스캔 후 새 ROM을 매칭합니다. 라이브러리 전체를 매칭하려면 먼저 도구의 "RetroAchievements 게임 매칭"을(를) 실행하세요.',
-  AppLocale.raMatchOnStartupBacklogWarning:
-      '{count}개의 게임이 아직 확인되지 않았습니다. 다음 시작 시 모두 매칭하면 몇 분이 걸릴 수 있습니다. 대신 도구의 "RetroAchievements 게임 매칭"을(를) 실행하면 진행 상황을 보면서 처리할 수 있습니다.',
+  AppLocale.raMatchOnStartupSubtitle: '시작 스캔 후 새 ROM을 매칭합니다. 라이브러리 전체를 매칭하려면 먼저 도구의 "RetroAchievements 게임 매칭"을(를) 실행하세요.',
+  AppLocale.raMatchOnStartupBacklogWarning: '{count}개의 게임이 아직 확인되지 않았습니다. 다음 시작 시 모두 매칭하면 몇 분이 걸릴 수 있습니다. 대신 도구의 "RetroAchievements 게임 매칭"을(를) 실행하면 진행 상황을 보면서 처리할 수 있습니다.',
   AppLocale.raMatchNotificationTitle: 'RetroAchievements',
   AppLocale.raMatchProgressBusy: 'RetroAchievements 매칭 중...',
   AppLocale.raMatchProgressCounted: 'RetroAchievements 매칭 중... {done}/{total}',
@@ -351,8 +343,7 @@ const Map<String, dynamic> appLocaleKo = {
       '일치하는 ROM 파일을 새 게임 폴더로 옮기고 저장소에 .m3u 재생목록을 만듭니다. 이 작업은 자동으로 되돌릴 수 없습니다.',
   AppLocale.cleanOrphanedMetadata: '고아 메타데이터 정리',
   AppLocale.cleanOrphanedMetadataSubtitle: '삭제된 ROM 이 남긴 메타데이터와 미디어를 제거합니다',
-  AppLocale.cleanOrphanedMetadataWarning:
-      '라이브러리에 더 이상 없는 ROM 의 메타데이터 행과 미디어 파일을 영구적으로 삭제합니다. ES-DE 에서 가져온 항목은 삭제되지 않습니다.',
+  AppLocale.cleanOrphanedMetadataWarning: '라이브러리에 더 이상 없는 ROM 의 메타데이터 행과 미디어 파일을 영구적으로 삭제합니다. ES-DE 에서 가져온 항목은 삭제되지 않습니다.',
   AppLocale.cleanOrphanedMetadataScanning: '고아 메타데이터 정리 중...',
   AppLocale.cleanOrphanedMetadataCleaningItem: '{filename} 정리 중...',
   AppLocale.cleanOrphanedMetadataNothingFound: '고아 메타데이터를 찾을 수 없습니다.',
@@ -378,8 +369,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.rematchAchievements: 'RetroAchievements 게임 매칭',
   AppLocale.rommLinkLibrary: '라이브러리를 RomM에 연결',
   AppLocale.rommLinkLibrarySubtitle: '로컬 롬을 RomM 서버와 대조하여 연결합니다',
-  AppLocale.rommLinkLibraryWarning:
-      'RomM 서버의 모든 플랫폼을 살펴보고 인식된 로컬 롬을 연결합니다.\n\n연결된 게임은 저장 데이터 동기화 대상이 되므로 저장 데이터가 RomM으로 업로드됩니다. 라이브러리가 크면 몇 분이 걸릴 수 있습니다.',
+  AppLocale.rommLinkLibraryWarning: 'RomM 서버의 모든 플랫폼을 살펴보고 인식된 로컬 롬을 연결합니다.\n\n연결된 게임은 저장 데이터 동기화 대상이 되므로 저장 데이터가 RomM으로 업로드됩니다. 라이브러리가 크면 몇 분이 걸릴 수 있습니다.',
   AppLocale.rommLinkLibraryPreparing: '준비 중…',
   AppLocale.rommLinkLibraryProgress: '{total}개 중 {done}개 — {system}',
   AppLocale.rommLinkLibraryDone: '게임 {count}개를 연결했습니다',
@@ -389,8 +379,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.rommLinkLibraryStoppedEarly: '일찍 중단됨 — 지금까지 {count}개의 게임을 연결했습니다',
   AppLocale.rommLinkLibraryPartial: '게임 {count}개를 연결했습니다. 읽지 못한 시스템: {failed}',
   AppLocale.rematchAchievementsSubtitle: '게임을 하나씩 열지 않고 라이브러리 전체에서 업적 세트를 찾습니다',
-  AppLocale.rematchAchievementsWarning:
-      '일치하지 않는 모든 ROM을 읽어 식별합니다. 라이브러리가 크면 시간이 걸릴 수 있습니다. 다시 선택하면 일시정지됩니다. 지금까지 일치한 항목은 모두 유지되며, 다시 실행하면 중단된 지점부터 이어집니다. 디스크 이미지도 읽지만 각각 일부 섹터만 읽습니다. 파일을 옮기거나 삭제하지 않습니다.',
+  AppLocale.rematchAchievementsWarning: '일치하지 않는 모든 ROM을 읽어 식별합니다. 라이브러리가 크면 시간이 걸릴 수 있습니다. 다시 선택하면 일시정지됩니다. 지금까지 일치한 항목은 모두 유지되며, 다시 실행하면 중단된 지점부터 이어집니다. 디스크 이미지도 읽지만 각각 일부 섹터만 읽습니다. 파일을 옮기거나 삭제하지 않습니다.',
   AppLocale.rematchAchievementsSignedOut:
       '로그아웃 상태에서도 매칭은 실행되지만, 결과를 보려면 RetroAchievements에 로그인해야 합니다.',
   AppLocale.rematchAchievementsLookingUp: '이미 해시된 게임을 확인하는 중...',
@@ -457,8 +446,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.neoSyncSynchronizing: 'NeoSync: 동기화 중...',
   AppLocale.neoSyncNotConnected: 'NeoSync: 연결 안 됨',
   AppLocale.neoSyncUnreachable: 'NeoSync에 연결할 수 없습니다. 네트워크 연결을 확인하고 다시 시도하세요.',
-  AppLocale.neoSyncBillingUnconfirmed:
-      'NeoSync가 변경 사항을 제때 확인하지 못했습니다. 변경이 이미 적용되었을 수 있으니 다시 시도하기 전에 요금제를 확인하세요.',
+  AppLocale.neoSyncBillingUnconfirmed: 'NeoSync가 변경 사항을 제때 확인하지 못했습니다. 변경이 이미 적용되었을 수 있으니 다시 시도하기 전에 요금제를 확인하세요.',
   AppLocale.neoSyncSynchronized: 'NeoSync: 세이브 동기화 완료',
   AppLocale.neoSyncSavesSync: '저장 파일은 NeoSync와 동기화됩니다',
   AppLocale.neoSyncNoSave: 'NeoSync: 세이브 파일 없음',
@@ -526,8 +514,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.onlineSaves: '클라우드 세이브',
   AppLocale.noOnlineSavesFound: '클라우드 세이브가 없습니다',
   AppLocale.whatIsNeoSync: 'NeoSync Cloud란?',
-  AppLocale.neoSyncDescription:
-      'NeoSync는 NeoStation용 통합 클라우드 서비스입니다. 여러 기기에서 게임 세이브와 세이브 상태를 안전하게 동기화해 진행 상황을 보호합니다.',
+  AppLocale.neoSyncDescription: 'NeoSync는 NeoStation용 통합 클라우드 서비스입니다. 여러 기기에서 게임 세이브와 세이브 상태를 안전하게 동기화해 진행 상황을 보호합니다.',
   AppLocale.crossPlatform: '크로스 플랫폼',
   AppLocale.crossPlatformDesc:
       'NeoStation이 설치된 어느 기기에서든 마지막으로 플레이한 지점부터 이어서 할 수 있습니다.',
@@ -615,8 +602,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.preferredLanguage: '선호 언어',
   AppLocale.regionSub: '게임 정보를 가져올 때의 지역 우선순위를 설정합니다',
   AppLocale.regionPriority: '지역 우선순위',
-  AppLocale.regionPrioritySub:
-      '게임명, 출시일, 미디어를 선택할 때 우선순위가 높은 지역을 먼저 사용합니다. A로 항목을 들고, 위/아래로 이동한 뒤 B로 놓습니다.',
+  AppLocale.regionPrioritySub: '게임명, 출시일, 미디어를 선택할 때 우선순위가 높은 지역을 먼저 사용합니다. A로 항목을 들고, 위/아래로 이동한 뒤 B로 놓습니다.',
   AppLocale.regionUpdated: '지역 우선순위가 업데이트되었습니다',
   AppLocale.regionError: '지역 우선순위를 업데이트하는 중에 오류가 발생했습니다',
   AppLocale.systems: '시스템',
@@ -902,15 +888,12 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.welcomeNeoStation: 'NeoStation에 오신 것을 환영합니다!',
   AppLocale.letsGetSetup: '설정을 시작해 보세요',
   AppLocale.storagePermission: '저장소 권한',
-  AppLocale.storagePermissionDesc:
-      'NeoStation은 RetroArch 구성을 관리하고 게임 저장을 올바르게 동기화하려면 "모든 파일 액세스"가 필요합니다.\n\n다음 화면에서 이 권한을 부여해 주세요.',
+  AppLocale.storagePermissionDesc: 'NeoStation은 RetroArch 구성을 관리하고 게임 저장을 올바르게 동기화하려면 "모든 파일 액세스"가 필요합니다.\n\n다음 화면에서 이 권한을 부여해 주세요.',
   AppLocale.screenReturnAccess: '화면 복귀 권한',
-  AppLocale.screenReturnAccessDesc:
-      'Dock에서 실행한 앱을 닫으면 플레이 중 화면으로 돌아오고 시스템 스크린샷을 사용할 수 있습니다. 현재 실행 중인 앱 이름만 읽으며 화면 내용은 수집하지 않습니다.',
+  AppLocale.screenReturnAccessDesc: 'Dock에서 실행한 앱을 닫으면 플레이 중 화면으로 돌아오고 시스템 스크린샷을 사용할 수 있습니다. 현재 실행 중인 앱 이름만 읽으며 화면 내용은 수집하지 않습니다.',
   AppLocale.screenReturnAccessHint: 'NeoStation을 켠 뒤 허용을 누르세요',
   AppLocale.screenReturnDialogTitle: '화면 복귀 사용',
-  AppLocale.screenReturnDialogBody:
-      'Dock에서 앱을 실행하려면 NeoStation에 화면 복귀 접근성 서비스가 필요합니다. 실행한 앱을 닫은 뒤 이 화면으로 돌아올 수 있게 해 줍니다. 이 서비스가 없으면 돌아올 방법이 없을 수 있습니다.',
+  AppLocale.screenReturnDialogBody: 'Dock에서 앱을 실행하려면 NeoStation에 화면 복귀 접근성 서비스가 필요합니다. 실행한 앱을 닫은 뒤 이 화면으로 돌아올 수 있게 해 줍니다. 이 서비스가 없으면 돌아올 방법이 없을 수 있습니다.',
   AppLocale.screenReturnDialogSteps: '다음 화면의 서비스 목록에서 NeoStation을 찾아 켜세요.',
   AppLocale.openSettings: '설정 열기',
   AppLocale.selectRomFolder: 'ROM 폴더 선택',
@@ -1014,8 +997,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.platformNotSupported: '지원되지 않는 플랫폼',
   AppLocale.coreNotConfigured: '코어가 구성되지 않았습니다',
   AppLocale.coreNotInstalled: '코어 "{name}"이(가) 설치되지 않았습니다',
-  AppLocale.coreNotInstalledHint:
-      'RetroArch에서 코어가 설치되지 않았다고 보고합니다. Online Updater > Core Downloader에서 설치하세요.',
+  AppLocale.coreNotInstalledHint: 'RetroArch에서 코어가 설치되지 않았다고 보고합니다. Online Updater > Core Downloader에서 설치하세요.',
   AppLocale.retroArchNotFound: 'RetroArch를 찾을 수 없습니다',
   AppLocale.retroArchExecutableNotFound: 'RetroArch 실행 파일을 찾을 수 없습니다',
   AppLocale.coresDirectoryNotFound: '코어 폴더를 찾을 수 없습니다',
@@ -1128,12 +1110,10 @@ const Map<String, dynamic> appLocaleKo = {
       'ROM 폴더 {folders}에 접근할 수 없습니다. 기존 게임은 유지되었습니다. {advice}',
   AppLocale.romFoldersUnreachable:
       '다음 ROM 폴더에 접근할 수 없습니다: {folders}. 기존 게임은 유지되었습니다. {advice}',
-  AppLocale.romFolderAdvicePortal:
-      '이 경로는 데스크톱 포털의 임시 권한에서 온 것이라 다시 사용할 수 없습니다. 설정 > 폴더에서 제거한 후 폴더를 다시 추가하세요.',
+  AppLocale.romFolderAdvicePortal: '이 경로는 데스크톱 포털의 임시 권한에서 온 것이라 다시 사용할 수 없습니다. 설정 > 폴더에서 제거한 후 폴더를 다시 추가하세요.',
   AppLocale.romFolderAdviceReconnect: '드라이브를 다시 연결하거나 설정 > 폴더에서 폴더를 제거하세요.',
   AppLocale.noRomFolderTitle: 'ROM 폴더가 설정되지 않음',
-  AppLocale.noRomFolderConfigured:
-      'ROM 폴더가 설정되지 않아 스캔할 항목이 없었습니다. 기존 게임은 유지되었습니다. 설정 > 폴더에서 ROM 폴더를 다시 추가하세요.',
+  AppLocale.noRomFolderConfigured: 'ROM 폴더가 설정되지 않아 스캔할 항목이 없었습니다. 기존 게임은 유지되었습니다. 설정 > 폴더에서 ROM 폴더를 다시 추가하세요.',
   AppLocale.errorScanningRomsDetail: 'ROM 스캔 중 오류: {error}',
   AppLocale.systemsUpdateComplete: '시스템이 성공적으로 업데이트되었습니다!',
   AppLocale.systemsUpdateError: '시스템을 업데이트하지 못했습니다. 나중에 다시 시도해 주세요.',
@@ -1161,24 +1141,20 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.userDataLocationDefault: '기본 위치',
   AppLocale.selectUserDataFolder: '사용자 데이터 폴더 선택',
   AppLocale.folderNotEmptyTitle: '폴더가 비어 있지 않음',
-  AppLocale.folderNotEmptyBody:
-      '이 폴더에는 이미 {count}개의 항목이 포함되어 있습니다. NeoStation은 기존 콘텐츠와 함께 여기에 자체 데이터를 저장합니다.',
+  AppLocale.folderNotEmptyBody: '이 폴더에는 이미 {count}개의 항목이 포함되어 있습니다. NeoStation은 기존 콘텐츠와 함께 여기에 자체 데이터를 저장합니다.',
   AppLocale.folderNotEmptyUseAnyway: '그래도 사용',
   AppLocale.userDataFolderNotWritable:
       "이 폴더에 쓸 수 없습니다. 다른 폴더를 선택하거나 기본 위치를 유지하세요.",
-  AppLocale.userDataFolderGrantAllFiles:
-      "이 폴더를 사용하려면 Android 설정 → 애플리케이션 → 특별한 앱 액세스 → 모든 파일 액세스에서 NeoStation을 허용한 후 다시 선택하세요.",
+  AppLocale.userDataFolderGrantAllFiles: "이 폴더를 사용하려면 Android 설정 → 애플리케이션 → 특별한 앱 액세스 → 모든 파일 액세스에서 NeoStation을 허용한 후 다시 선택하세요.",
   AppLocale.moveUserDataTitle: '사용자 데이터를 이동하시겠습니까?',
-  AppLocale.moveUserDataBody:
-      'NeoStation은 자체 데이터(데이터베이스, 스크랩한 미디어, 설정)를 현재 폴더에서 새 폴더로 이동합니다. NeoStation에서 생성되지 않은 파일은 그대로 유지됩니다.',
+  AppLocale.moveUserDataBody: 'NeoStation은 자체 데이터(데이터베이스, 스크랩한 미디어, 설정)를 현재 폴더에서 새 폴더로 이동합니다. NeoStation에서 생성되지 않은 파일은 그대로 유지됩니다.',
   AppLocale.moveUserDataDestNotEmpty:
       '새 폴더에는 이미 {count}개의 항목이 포함되어 있습니다. NeoStation 데이터도 함께 추가됩니다.',
   AppLocale.moveUserDataConfirm: '데이터 이동',
   AppLocale.migratingUserData: '사용자 데이터 이동 중',
   AppLocale.migratingUserDataComplete: '이동 완료',
   AppLocale.migratingUserDataError: '이동 실패',
-  AppLocale.userDataMoveBusy:
-      'NeoStation이 작업 중입니다: 스캔, 스크래핑, 동기화, 가져오기 또는 도구가 실행 중입니다. 끝난 후 데이터를 이동하세요.',
+  AppLocale.userDataMoveBusy: 'NeoStation이 작업 중입니다: 스캔, 스크래핑, 동기화, 가져오기 또는 도구가 실행 중입니다. 끝난 후 데이터를 이동하세요.',
   AppLocale.userDataMoveNoSpace: '새 폴더에 여유 공간이 부족합니다. 데이터는 현재 폴더에 그대로 있습니다.',
   AppLocale.userDataMoveBlocked:
       '새 폴더에 NeoStation의 파일이나 폴더와 이름이 같은 항목이 있습니다. 데이터는 현재 폴더에 그대로 있습니다.',
@@ -1225,8 +1201,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.rommTesting: '테스트 중...',
   AppLocale.rommConnectionSuccess: '연결에 성공했습니다',
   AppLocale.rommConnectionFailed: '연결에 실패했습니다',
-  AppLocale.rommErrorTls:
-      '보안(HTTPS) 연결을 설정할 수 없습니다. RomM 서버가 HTTPS를 사용하지 않는다면 http://로 시작하는 URL을 입력하세요.',
+  AppLocale.rommErrorTls: '보안(HTTPS) 연결을 설정할 수 없습니다. RomM 서버가 HTTPS를 사용하지 않는다면 http://로 시작하는 URL을 입력하세요.',
   AppLocale.rommErrorUnreachable: 'RomM 서버에 연결할 수 없습니다: {error}',
   AppLocale.rommErrorTimeout: 'RomM 서버가 제때 응답하지 않았습니다.',
   AppLocale.rommErrorInvalidApiKey: 'API 키가 거부되었습니다.',
@@ -1441,8 +1416,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.esdeResetComplete: 'ES-DE 가져오기를 재설정했습니다',
   AppLocale.esdeImportFailed: 'ES-DE 가져오기 실패: {error}',
   AppLocale.esdeResetFailed: 'ES-DE 가져오기 재설정 실패: {error}',
-  AppLocale.esdeResetConfirmBody:
-      '가져온 모든 ES-DE 메타데이터와 미디어 링크를 제거하고, 선택한 폴더 설정을 초기화합니다. 게임과 ROM 파일에는 영향을 주지 않습니다.',
+  AppLocale.esdeResetConfirmBody: '가져온 모든 ES-DE 메타데이터와 미디어 링크를 제거하고, 선택한 폴더 설정을 초기화합니다. 게임과 ROM 파일에는 영향을 주지 않습니다.',
   AppLocale.esdeImportNotEsdeFolder: '이 폴더는 ES-DE 설치 폴더가 아닙니다(gamelists 없음)',
   AppLocale.esdeImportNothingFound: '가져올 일치하는 시스템이나 게임이 없습니다',
   AppLocale.esdeSummarySystemsMatched: '일치한 시스템',
@@ -1475,8 +1449,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.wizardSaveFailedBody:
       'NeoStation이 설정을 저장하지 못했습니다. 저장소를 사용할 수 있는지 확인한 후 다시 시도하세요.\n\n{error}',
   AppLocale.wizardRomFolderNotAdded: 'NeoStation이 이 폴더를 추가하지 못했습니다.\n\n{error}',
-  AppLocale.wizardRomFolderTemporary:
-      'NeoStation은 다시 시작한 후에는 이 폴더에 계속 접근할 수 없습니다. 홈 폴더 안이나 이동식 미디어의 폴더를 선택하세요.',
+  AppLocale.wizardRomFolderTemporary: 'NeoStation은 다시 시작한 후에는 이 폴더에 계속 접근할 수 없습니다. 홈 폴더 안이나 이동식 미디어의 폴더를 선택하세요.',
   AppLocale.wizardFolderNotUsable:
       'NeoStation이 이 폴더를 사용할 수 없습니다. 기기 저장소나 SD 카드의 폴더를 선택하세요.',
   AppLocale.wizardArtPackFailed:

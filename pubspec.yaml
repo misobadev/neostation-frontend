@@ -12,11 +12,12 @@ workspace:
   - packages/gamepads_linux
   - packages/gamepads_platform_interface
   - packages/gamepads_windows
+  - packages/sub_screen
 
 version: 0.15.1+132
 
 environment:
-  sdk: '>=3.9.2'
+  sdk: '>=3.13.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -31,19 +32,19 @@ dependencies:
   flutter_chd:
     path: packages/flutter_chd
 
-  file_picker: ^12.2.0
+  file_picker: ^13.3.2
   device_info_plus: ^13.3.0
   package_info_plus: ^10.2.2
-  google_fonts: ^8.2.1
+  google_fonts: ^9.0.0
   material_symbols_icons: ^4.2960.0
   provider: ^6.1.5+1
   battery_plus: ^7.1.2
   path: ^1.9.1
   path_provider: ^2.1.6
-  xml: ^6.6.1
+  xml: ^7.0.1
   video_player: ^2.14.1
-  fvp: ^0.39.1
-  flutter_secure_storage: ^10.3.1
+  fvp: ^0.40.0
+  flutter_secure_storage: ^11.2.0
   shared_preferences: ^2.5.6
   http: ^1.6.0
   flutter_svg: ^2.3.2
@@ -61,11 +62,12 @@ dependencies:
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
   logger: ^2.8.0
-  sub_screen: ^0.1.9
-  flutter_soloud: ^4.1.7
+  sub_screen:
+    path: packages/sub_screen
+  flutter_soloud: ^5.2.3
   audio_metadata_reader: ^1.8.1
   wakelock_plus: ^1.8.0
-  flutter_localization: ^0.4.1
+  flutter_localization: ^1.0.0
   flutter_tilt: ^4.1.0
   flutter_staggered_animations: ^1.1.1
   spring: ^2.0.2

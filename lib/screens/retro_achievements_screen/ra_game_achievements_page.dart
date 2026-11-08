@@ -11,7 +11,9 @@ import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/screens/game_screen/game_details_card/tabs/game_details_leaderboards_tab.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/widgets/ra_earned_badge.dart';
+
 import 'ra_achievement_browser.dart';
+
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';

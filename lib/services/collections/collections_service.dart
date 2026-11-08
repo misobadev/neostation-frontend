@@ -1,5 +1,6 @@
 import '../../models/smart_collection_rules.dart';
 import 'smart_collections_service.dart';
+
 import 'dart:io';
 import 'dart:math';
 
@@ -7,6 +8,7 @@ import 'package:flutter/painting.dart';
 import 'package:path/path.dart' as path;
 
 import 'package:neostation/services/logger_service.dart';
+
 import '../../models/collection_model.dart';
 import '../../models/game_model.dart';
 import '../../repositories/collection_repository.dart';

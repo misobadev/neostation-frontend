@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
+
 import '../models/rom_fingerprint.dart';
 import '../models/screenscraper_game_candidate.dart';
 import '../repositories/game_repository.dart';

@@ -1,5 +1,6 @@
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
+
 import '../../models/game_model.dart';
 import '../../models/database_game_model.dart';
 import '../../models/system_model.dart';
@@ -175,9 +176,9 @@ class GameListService {
         return [];
       }
 
-      final databaseGames = (await GameRepository.getGamesBySystem(
-        system.id!,
-      )).where((dbGame) => !dbGame.isHidden).toList();
+      final databaseGames = (await GameRepository.getGamesBySystem(system.id!))
+          .where((dbGame) => !dbGame.isHidden)
+          .toList();
       final validExtensions = await SystemRepository.getExtensionsForSystem(
         system.id!,
       );

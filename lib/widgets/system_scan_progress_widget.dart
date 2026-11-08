@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/sqlite_config_provider.dart';
 
 class SystemScanProgressWidget extends StatelessWidget {
@@ -20,9 +21,8 @@ class SystemScanProgressWidget extends StatelessWidget {
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.outline.withValues(alpha: 0.3),
+              color: Theme.of(context).colorScheme.outline
+                  .withValues(alpha: 0.3),
             ),
           ),
           child: Column(
@@ -50,9 +50,8 @@ class SystemScanProgressWidget extends StatelessWidget {
                       configProvider.scanStatus.isNotEmpty
                           ? configProvider.scanStatus
                           : AppLocale.scanningSystemsRoms.getString(context),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -61,9 +60,9 @@ class SystemScanProgressWidget extends StatelessWidget {
                 SizedBox(height: 12),
                 LinearProgressIndicator(
                   value: configProvider.scanProgress,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest,
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest,
                   valueColor: AlwaysStoppedAnimation<Color>(
                     Theme.of(context).colorScheme.primary,
                   ),
@@ -99,9 +98,9 @@ class SystemScanProgressWidget extends StatelessWidget {
               ] else if (configProvider.detectedSystems.isNotEmpty) ...[
                 SizedBox(height: 12),
                 LinearProgressIndicator(
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest,
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest,
                   valueColor: AlwaysStoppedAnimation<Color>(
                     Theme.of(context).colorScheme.primary,
                   ),

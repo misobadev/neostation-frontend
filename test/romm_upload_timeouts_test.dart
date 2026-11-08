@@ -430,18 +430,19 @@ void main() {
       'a stalled upload leaves the file closed',
       () async {
         // An open handle would keep Windows from replacing or deleting it.
-        List<String> handlesOnFile() => Directory('/proc/self/fd')
-            .listSync(followLinks: false)
-            .whereType<Link>()
-            .map((fd) {
-              try {
-                return fd.targetSync();
-              } on FileSystemException {
-                return '';
-              }
-            })
-            .where((target) => target == file.resolveSymbolicLinksSync())
-            .toList();
+        List<String> handlesOnFile() =>
+            Directory('/proc/self/fd')
+                .listSync(followLinks: false)
+                .whereType<Link>()
+                .map((fd) {
+                  try {
+                    return fd.targetSync();
+                  } on FileSystemException {
+                    return '';
+                  }
+                })
+                .where((target) => target == file.resolveSymbolicLinksSync())
+                .toList();
         final reading = Completer<void>();
         RommService.debugUseHttpClient(
           MockClient.streaming((request, body) {
@@ -451,9 +452,8 @@ void main() {
           }),
         );
 
-        final upload = service(
-          uploadStall: const Duration(milliseconds: 300),
-        ).uploadSave(1, file);
+        final upload = service(uploadStall: const Duration(milliseconds: 300))
+            .uploadSave(1, file);
         await reading.future;
         expect(handlesOnFile(), isNotEmpty, reason: 'the file is mid-read');
 
@@ -805,9 +805,8 @@ void main() {
         }),
       );
 
-      final fetch = await withApiKey(
-        request: short,
-      ).fetchImage('/assets/romm/resources/roms/1/cover/big.png');
+      final fetch = await withApiKey(request: short)
+          .fetchImage('/assets/romm/resources/roms/1/cover/big.png');
 
       expect(fetch.bytes, isNull);
       expect(fetch.miss, RommImageMiss.unreachable);
@@ -825,9 +824,8 @@ void main() {
         }),
       );
 
-      final svg = await withApiKey(
-        icon: short,
-      ).fetchSvg('http://romm.test/assets/platforms/snes.svg');
+      final svg = await withApiKey(icon: short)
+          .fetchSvg('http://romm.test/assets/platforms/snes.svg');
 
       expect(svg, isNull);
       expect(await aborted(sent), isTrue);

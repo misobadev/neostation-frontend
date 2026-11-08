@@ -105,16 +105,19 @@ void main() {
       expect(game.raNumAchievements, 42);
     });
 
-    test('a game with several registered hashes still yields one row', () async {
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash, id_ra) "
-        "VALUES ('mario.nes', '/roms/nes/mario.nes', 'nes', 'h-two', 500)",
-      );
+    test(
+      'a game with several registered hashes still yields one row',
+      () async {
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash, id_ra) "
+          "VALUES ('mario.nes', '/roms/nes/mario.nes', 'nes', 'h-two', 500)",
+        );
 
-      final games = await GameRepository.getGamesBySystem('nes');
-      expect(games, hasLength(1));
-      expect(games.first.raNumAchievements, 42);
-    });
+        final games = await GameRepository.getGamesBySystem('nes');
+        expect(games, hasLength(1));
+        expect(games.first.raNumAchievements, 42);
+      },
+    );
 
     test('an unmatched ROM has no count and keeps its console id', () async {
       await db.execute(

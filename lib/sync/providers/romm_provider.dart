@@ -54,16 +54,19 @@ typedef LocateGameSaves = Future<List<LocalSaveFile>> Function(GameModel game);
 
 /// Resolves the candidate local destination paths for a cloud file named
 /// [relativeName] (e.g. `saves/Game.srm`) belonging to a game.
-typedef ResolveSaveTargets =
-    Future<List<String>> Function(GameModel game, String relativeName);
+typedef ResolveSaveTargets = Future<List<String>> Function(
+  GameModel game,
+  String relativeName,
+);
 
 /// Enumerates the local library, for the pending-upload sweep.
 typedef ListLocalGames = Future<List<GameModel>> Function();
 
 /// The standalone save folders configured for a system (the Saves tab's
 /// Standalone save folders), by system folder name.
-typedef ListSaveFolders =
-    Future<List<String>> Function(String systemFolderName);
+typedef ListSaveFolders = Future<List<String>> Function(
+  String systemFolderName,
+);
 
 /// Where [game]'s emulator keeps its saves, when that emulator is standalone:
 /// `standalone: false` when it is a RetroArch core or can't be told, so the
@@ -223,7 +226,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     @visibleForTesting ListLocalGames? listGames,
     @visibleForTesting ListSaveFolders? saveFolders,
     @visibleForTesting ResolveStandaloneSaveFolder? standaloneSaveFolder,
-    @visibleForTesting bool autoSweep = true,
+    @visibleForTesting this._autoSweep = true,
     @visibleForTesting RommLibraryLinker? linker,
     @visibleForTesting Duration sweepStartupDelay = _sweepStartupDelay,
   }) : _locateOverride = locateSaves,
@@ -231,7 +234,6 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
        _listGamesOverride = listGames,
        _saveFoldersOverride = saveFolders,
        _standaloneFolderOverride = standaloneSaveFolder,
-       _autoSweep = autoSweep,
        _startupDelay = sweepStartupDelay {
     _linker = linker ?? _buildLinker();
     if (!_autoSweep) return;
@@ -319,9 +321,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     required Map<String, String> folders,
   }) {
     const notStandalone = (standalone: false, folder: null);
-    if (CloudPathBuilder.slugFromEmulatorUniqueId(
-      uniqueId,
-    ).startsWith('retroarch.')) {
+    if (CloudPathBuilder.slugFromEmulatorUniqueId(uniqueId)
+        .startsWith('retroarch.')) {
       return notStandalone;
     }
     final emulator = emulators.where((e) => e.uniqueId == uniqueId).firstOrNull;

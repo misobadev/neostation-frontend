@@ -36,9 +36,8 @@ RommRom _rom(
 bool _matches(String localFilename, RommRom rom) {
   final wanted = RommLocalMatcher.normalizeName(localFilename);
   if (wanted.isEmpty) return false;
-  return RommLocalMatcher.candidateNames(
-    rom,
-  ).any((c) => RommLocalMatcher.normalizeName(c) == wanted);
+  return RommLocalMatcher.candidateNames(rom)
+      .any((c) => RommLocalMatcher.normalizeName(c) == wanted);
 }
 
 void main() {

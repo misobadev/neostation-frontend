@@ -101,9 +101,9 @@ class SmartCollectionsService {
         smartPaths ??
         (await _evaluate([collection], DateTime.now())).paths[id] ??
         const <String>{};
-    final games = (await GameRepository.getGamesByRomPaths(
-      paths,
-    )).where(SmartCollectionEvaluator.isEligible).toList();
+    final games = (await GameRepository.getGamesByRomPaths(paths))
+        .where(SmartCollectionEvaluator.isEligible)
+        .toList();
     // Order by the name the list shows, which honours "prefer file name".
     final names = {
       for (final e in (await GameListService.listDisplayNames(games)).entries)
@@ -240,9 +240,9 @@ class SmartCollectionsService {
         .where((c) => !c.isSmart)
         .map((c) => c.id)
         .toSet();
-    return (await CollectionRepository.getCollectionIdsForRom(
-      romPath,
-    )).where(collections.contains).toSet();
+    return (await CollectionRepository.getCollectionIdsForRom(romPath))
+        .where(collections.contains)
+        .toSet();
   }
 }
 

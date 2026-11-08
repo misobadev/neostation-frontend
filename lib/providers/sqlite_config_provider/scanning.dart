@@ -86,9 +86,8 @@ extension SqliteConfigScanning on SqliteConfigProvider {
       try {
         await _saveOrRevert(previous);
       } catch (e) {
-        _error = _text(
-          AppLocale.romFolderAddFailed,
-        ).replaceFirst('{error}', _firstLine(e));
+        _error = _text(AppLocale.romFolderAddFailed)
+            .replaceFirst('{error}', _firstLine(e));
         SqliteConfigProvider._log.e('Error adding ROM folder: $e');
         rethrow;
       }
@@ -341,9 +340,8 @@ extension SqliteConfigScanning on SqliteConfigProvider {
           // A first run has no library to keep, so it stops here as it always
           // has, and the setup wizard names the folder.
           if (!await _hasStoredRoms()) {
-            _error = _text(
-              AppLocale.romFolderAccessDenied,
-            ).replaceFirst('{folder}', deniedRoots.first);
+            _error = _text(AppLocale.romFolderAccessDenied)
+                .replaceFirst('{folder}', deniedRoots.first);
             _setScanning(false);
             _notify();
             return;
@@ -484,9 +482,8 @@ extension SqliteConfigScanning on SqliteConfigProvider {
       _scanProgress = 0.0;
       _scanStatus = AppLocale.scanningSystemsRoms.getStringForCurrentLocale();
     } catch (e) {
-      _error = _text(
-        AppLocale.errorScanningRomsDetail,
-      ).replaceFirst('{error}', _firstLine(e));
+      _error = _text(AppLocale.errorScanningRomsDetail)
+          .replaceFirst('{error}', _firstLine(e));
       SqliteConfigProvider._log.e('Error scanning ROMs: $e');
       _setScanning(false);
       _notify();
@@ -677,9 +674,8 @@ extension SqliteConfigScanning on SqliteConfigProvider {
 
       _scanCompleted = true;
     } catch (e) {
-      _error = _text(
-        AppLocale.errorScanningRomsDetail,
-      ).replaceFirst('{error}', _firstLine(e));
+      _error = _text(AppLocale.errorScanningRomsDetail)
+          .replaceFirst('{error}', _firstLine(e));
       SqliteConfigProvider._log.e('Error scanning ROMs: $e');
     } finally {
       _setScanning(false);

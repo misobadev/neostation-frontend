@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/models/config_model.dart';
 import 'package:neostation/models/custom_sfx.dart';
@@ -324,45 +325,39 @@ void main() {
     },
   );
 
-  test(
-    'each action uses its assigned clip and volume; next event stops custom playback',
-    () async {
-      await sfx.setCustomSounds({
-        SfxAction.movement: clip,
-        SfxAction.confirm: other,
-      });
-      sfx.setVolume(0.2);
-      await sfx.playNavSound();
-      expect(audio.played.last, await files.resolve(clip));
-      await Future<void>.delayed(const Duration(milliseconds: 65));
-      await sfx.playEnterSound();
-      expect(audio.played.last, await files.resolve(other));
-      expect(audio.stopped, [1]);
-      await Future<void>.delayed(const Duration(milliseconds: 65));
-      await sfx.playBackSound();
-      expect(audio.played.last, 'assets/sounds/back.wav');
-      expect(audio.stopped, [1, 2]);
-      expect(audio.volumes, everyElement(0.2));
-    },
-  );
+  test('each action uses its assigned clip and volume; next event stops custom playback', () async {
+    await sfx.setCustomSounds({
+      SfxAction.movement: clip,
+      SfxAction.confirm: other,
+    });
+    sfx.setVolume(0.2);
+    await sfx.playNavSound();
+    expect(audio.played.last, await files.resolve(clip));
+    await Future<void>.delayed(const Duration(milliseconds: 65));
+    await sfx.playEnterSound();
+    expect(audio.played.last, await files.resolve(other));
+    expect(audio.stopped, [1]);
+    await Future<void>.delayed(const Duration(milliseconds: 65));
+    await sfx.playBackSound();
+    expect(audio.played.last, 'assets/sounds/back.wav');
+    expect(audio.stopped, [1, 2]);
+    expect(audio.volumes, everyElement(0.2));
+  });
 
-  test(
-    'disabled and dark-screen playback stay silent and duplicate calls debounce',
-    () async {
-      sfx.setEnabled(false);
-      await sfx.playNavSound();
-      expect(sfx.isInitialized, false);
-      sfx.setEnabled(true);
-      SfxService.isScreenOn = () => false;
-      await sfx.playEnterSound();
-      expect(sfx.isInitialized, false);
-      SfxService.isScreenOn = () => true;
-      await Future<void>.delayed(const Duration(milliseconds: 65));
-      await sfx.playNavSound();
-      await sfx.playNavSound();
-      expect(audio.played.length, 1);
-    },
-  );
+  test('disabled and dark-screen playback stay silent and duplicate calls debounce', () async {
+    sfx.setEnabled(false);
+    await sfx.playNavSound();
+    expect(sfx.isInitialized, false);
+    sfx.setEnabled(true);
+    SfxService.isScreenOn = () => false;
+    await sfx.playEnterSound();
+    expect(sfx.isInitialized, false);
+    SfxService.isScreenOn = () => true;
+    await Future<void>.delayed(const Duration(milliseconds: 65));
+    await sfx.playNavSound();
+    await sfx.playNavSound();
+    expect(audio.played.length, 1);
+  });
 
   test('disabled SFX does not reopen audio on resume', () async {
     audio.isInitialized = false;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'dart:io';
 
 /// Configuration settings for the NeoSync cloud synchronization service.

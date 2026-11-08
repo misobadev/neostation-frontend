@@ -9,6 +9,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/app_themes.dart';
+
 import '../../../../models/system_model.dart';
 import '../../../../models/game_model.dart';
 import '../../../../models/retro_achievements_game_info.dart';
@@ -18,6 +19,7 @@ import '../../../../widgets/neo_glass.dart';
 import '../../../../widgets/monospaced_clock.dart';
 import '../../music/music_player.dart';
 import 'scrolling_status_line.dart';
+
 import 'package:neostation/utils/ra_coverage.dart';
 
 /// A sticky footer component for the game details card that provides actionable controls and status summaries.
@@ -299,9 +301,8 @@ class GameDetailsFooter extends StatelessWidget {
                               MediaQuery(
                                 data: playTextScaler == null
                                     ? MediaQuery.of(context)
-                                    : MediaQuery.of(
-                                        context,
-                                      ).copyWith(textScaler: playTextScaler),
+                                    : MediaQuery.of(context)
+                                          .copyWith(textScaler: playTextScaler),
                                 child: SizedBox(
                                   width: playWidth,
                                   child: _buildPlayButton(
@@ -546,9 +547,9 @@ class GameDetailsFooter extends StatelessWidget {
                   // RetroAchievements game icon.
                   ClipRRect(
                     borderRadius:
-                        Theme.of(
-                          context,
-                        ).extension<CornerRadii>()?.radiusInternal ??
+                        Theme.of(context)
+                            .extension<CornerRadii>()
+                            ?.radiusInternal ??
                         BorderRadius.circular(14.r),
                     child: Container(
                       width: _pillIconSize,

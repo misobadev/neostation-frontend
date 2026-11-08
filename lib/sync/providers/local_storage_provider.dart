@@ -15,6 +15,7 @@
 library;
 
 import 'dart:io';
+
 import 'package:path/path.dart' as p;
 
 import '../i_sync_provider.dart';
@@ -28,7 +29,7 @@ class LocalStorageProvider extends ISyncProvider {
   SyncProviderStatus _status = SyncProviderStatus.disconnected;
   String? _lastError;
 
-  LocalStorageProvider({String? targetPath}) : _targetPath = targetPath;
+  LocalStorageProvider({this._targetPath});
 
   bool get _isConfigured {
     final path = _targetPath;

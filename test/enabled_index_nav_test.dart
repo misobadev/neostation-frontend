@@ -9,13 +9,10 @@ void main() {
   bool cloudSyncHidden(int idx) => idx != 0; // row 0 disabled
 
   group('previousEnabledIndex', () {
-    test(
-      'cloud sync hidden: up from playTime clamps (no wrap onto disabled)',
-      () {
-        // Regression for #217: previously spun forever clamping onto disabled 0.
-        expect(previousEnabledIndex(1, total, cloudSyncHidden), 1);
-      },
-    );
+    test('cloud sync hidden: up from playTime clamps (no wrap onto disabled)', () {
+      // Regression for #217: previously spun forever clamping onto disabled 0.
+      expect(previousEnabledIndex(1, total, cloudSyncHidden), 1);
+    });
 
     test('cloud sync hidden: up from delete lands on playTime', () {
       expect(previousEnabledIndex(2, total, cloudSyncHidden), 1);

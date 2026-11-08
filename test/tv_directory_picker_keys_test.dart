@@ -102,9 +102,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    TvDirectoryPicker.show(
-      tester.element(find.text('BENEATH')),
-    ).then(picked.add);
+    TvDirectoryPicker.show(tester.element(find.text('BENEATH')))
+        .then(picked.add);
     await tester.pump();
     await waitFor(tester, find.text('Home'));
     // The picker ignores a select for a moment after it opens.

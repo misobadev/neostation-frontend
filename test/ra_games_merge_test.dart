@@ -145,9 +145,8 @@ void main() {
         isFalse,
       );
       expect(
-        RaGamesListItem.merge(
-          progress: progressItem(highestAwardKind: ''),
-        ).highestAwardKind,
+        RaGamesListItem.merge(progress: progressItem(highestAwardKind: ''))
+            .highestAwardKind,
         isNull,
       );
     });

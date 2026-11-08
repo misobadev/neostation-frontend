@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:neostation/constants/recent_card_sizes.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -11,6 +12,7 @@ import 'package:neostation/models/system_model.dart';
 import 'package:neostation/screens/app_screen.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
+
 import '../../../utils/gamepad_nav.dart';
 import '../../../services/game_service.dart';
 import '../../../utils/game_launch_utils.dart';
@@ -20,19 +22,25 @@ import '../../../providers/sqlite_database_provider.dart';
 import '../../../providers/file_provider.dart';
 import '../../../widgets/system_scan_progress_widget.dart';
 import '../../game_screen/my_games_list.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+
 import 'grid_geometry.dart';
 import 'widgets/grid_loading_state.dart';
 import 'widgets/grid_empty_state.dart';
+
 import 'package:neostation/widgets/spring_selected_card.dart';
+
 import 'my_systems_carousel.dart';
+
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/widgets/systems_grid_footer.dart';
 import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/theme_provider.dart';
+
 import '../../collections_screen/collections_browser_screen.dart';
 import '../../search_screen/search_screen.dart';
 import '../../game_screen/android_apps/android_apps_grid.dart';
@@ -44,6 +52,7 @@ import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/system_background_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/services/secondary_achievements_controller.dart';
+
 import 'system_list_builder.dart';
 
 part 'my_systems_grid/gamepad_grid_nav.dart';
@@ -87,8 +96,7 @@ class MySystems extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop:
-          false, // Maintain application flow by preventing raw hardware back navigation.
+      canPop: false, // Maintain application flow by preventing raw hardware back navigation.
       child: Consumer2<SqliteConfigProvider, SqliteDatabaseProvider>(
         builder: (context, configProvider, dbProvider, child) {
           // PHASE 1: Blocking Initialization.
@@ -911,9 +919,8 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
         radius: Radius.circular(3.r),
       ),
     );
-    _cachedScrollBehavior = ScrollConfiguration.of(
-      context,
-    ).copyWith(scrollbars: false);
+    _cachedScrollBehavior = ScrollConfiguration.of(context)
+        .copyWith(scrollbars: false);
   }
 
   @override
@@ -1117,17 +1124,16 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
                                 vertical: 10.r,
                               ),
                               decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primary.withValues(alpha: 0.9),
+                                color: Theme.of(context).colorScheme.primary
+                                    .withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(24.r),
                               ),
                               child: Text(
                                 label,
                                 style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimary,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onPrimary,
                                   fontSize: 18.r,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 2.r,

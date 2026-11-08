@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -1090,18 +1091,16 @@ class _GamesGridState extends State<GamesGrid> {
             Icon(
               Icons.videogame_asset_rounded,
               size: 64.r,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.5),
             ),
             SizedBox(height: 16.r),
             Text(
               AppLocale.selectAGame.getString(context),
               style: TextStyle(
                 fontSize: 18.r,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -1959,9 +1958,8 @@ class _Placeholder extends StatelessWidget {
             Icon(
               Icons.videogame_asset_rounded,
               size: 32.r,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.4),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.4),
             ),
             SizedBox(height: 4.r),
             Padding(
@@ -1975,9 +1973,8 @@ class _Placeholder extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 7.r,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.5),
                 ),
               ),
             ),

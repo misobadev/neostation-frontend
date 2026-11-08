@@ -11,9 +11,8 @@ import 'package:neostation/l10n/app_locale.dart';
 /// try again.
 void main() {
   final wizard = File('lib/widgets/setup_wizard.dart').readAsStringSync();
-  final wrapper = File(
-    'lib/widgets/permission_check_wrapper.dart',
-  ).readAsStringSync();
+  final wrapper = File('lib/widgets/permission_check_wrapper.dart')
+      .readAsStringSync();
 
   // The body of a class method: from its signature to the closing brace at
   // the class member indent.

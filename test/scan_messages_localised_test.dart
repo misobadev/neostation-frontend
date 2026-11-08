@@ -180,17 +180,16 @@ void main() {
 
     await provider.scanSystems();
 
-    final prefix = text(
-      AppLocale.errorScanningRomsDetail,
-    ).split('{error}').first;
+    final prefix = text(AppLocale.errorScanningRomsDetail)
+        .split('{error}')
+        .first;
     expect(provider.error, startsWith(prefix));
     expect(provider.error, isNot(contains('\n')));
   });
 
   group('source', () {
-    final source = File(
-      'lib/providers/sqlite_config_provider/scanning.dart',
-    ).readAsStringSync();
+    final source = File('lib/providers/sqlite_config_provider/scanning.dart')
+        .readAsStringSync();
 
     test('no English message is built in the scan', () {
       final literals = RegExp(
@@ -236,9 +235,9 @@ void main() {
 
     test('a failed scan says so in the app language', () {
       expect(
-        RegExp(
-          r'_error = _text\(\s*AppLocale\.errorScanningRomsDetail,',
-        ).allMatches(source).length,
+        RegExp(r'_error = _text\(\s*AppLocale\.errorScanningRomsDetail\b')
+            .allMatches(source)
+            .length,
         2,
       );
     });

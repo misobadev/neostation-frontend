@@ -17,21 +17,18 @@ void main() {
   group('glass border width limit', () {
     test('clamps values above 2 in both JSON key forms', () {
       expect(
-        ConfigModel.fromJson(const {
-          'neoglassBorderWidth': 4,
-        }).neoglassBorderWidth,
+        ConfigModel.fromJson(const {'neoglassBorderWidth': 4})
+            .neoglassBorderWidth,
         2,
       );
       expect(
-        ConfigModel.fromJson(const {
-          'neoglass_border_width': 4,
-        }).neoglassBorderWidth,
+        ConfigModel.fromJson(const {'neoglass_border_width': 4})
+            .neoglassBorderWidth,
         2,
       );
       expect(
-        ConfigModel.fromJson(const {
-          'neoglassBorderWidth': 1,
-        }).neoglassBorderWidth,
+        ConfigModel.fromJson(const {'neoglassBorderWidth': 1})
+            .neoglassBorderWidth,
         1,
       );
     });

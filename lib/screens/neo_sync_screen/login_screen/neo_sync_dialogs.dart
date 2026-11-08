@@ -186,9 +186,8 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
             AppLocale.deleteCloudSaveConfirm.getString(context),
             style: TextStyle(
               fontSize: 12.r,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.9),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.9),
               height: 1.3,
             ),
           ),
@@ -196,14 +195,12 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
           Container(
             padding: EdgeInsets.all(8.r),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(6.r),
               border: Border.all(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outline.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.outline
+                    .withValues(alpha: 0.1),
               ),
             ),
             child: Row(
@@ -232,9 +229,8 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
                         '${widget.file.fileSizeFormatted} • ${widget.file.uploadedAt.toLocal().toString().split(' ')[0]}',
                         style: TextStyle(
                           fontSize: 9.r,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.7),
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -251,19 +247,16 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
             padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
             decoration: BoxDecoration(
               color: _switchFocus.hasFocus
-                  ? Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.12)
-                  : Theme.of(
-                      context,
-                    ).colorScheme.secondaryContainer.withValues(alpha: 0.05),
+                  ? Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.12)
+                  : Theme.of(context).colorScheme.secondaryContainer
+                        .withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(6.r),
               border: Border.all(
                 color: _switchFocus.hasFocus
                     ? Theme.of(context).colorScheme.primary
-                    : Theme.of(
-                        context,
-                      ).colorScheme.secondary.withValues(alpha: 0.2),
+                    : Theme.of(context).colorScheme.secondary
+                          .withValues(alpha: 0.2),
                 width: _switchFocus.hasFocus ? 2.r : 1.r,
               ),
             ),
@@ -284,9 +277,8 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
                       value: disableNeoSync,
                       onChanged: _setDisableNeoSync,
                       activeThumbColor: Theme.of(context).colorScheme.secondary,
-                      activeTrackColor: Theme.of(
-                        context,
-                      ).colorScheme.secondary.withValues(alpha: 0.3),
+                      activeTrackColor: Theme.of(context).colorScheme.secondary
+                          .withValues(alpha: 0.3),
                     ),
                   ),
                 ),
@@ -308,9 +300,8 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
                         AppLocale.preventsAutoSaves.getString(context),
                         style: TextStyle(
                           fontSize: 10.r,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.7),
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: 0.7),
                           height: 1.2,
                         ),
                       ),
@@ -341,18 +332,16 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
                   'assets/images/gamepad/Xbox_B_button.png',
                   width: 14.r,
                   height: 14.r,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.7),
                 ),
                 SizedBox(width: 6.r),
                 Text(
                   AppLocale.cancel.getString(context),
                   style: TextStyle(
                     fontSize: 12.r,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: Theme.of(context).colorScheme.onSurface
+                        .withValues(alpha: 0.7),
                   ),
                 ),
               ],

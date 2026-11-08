@@ -29,6 +29,11 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Install Linux native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libx11-dev libxi-dev pkg-config clang cmake ninja-build
+
       # --enforce-lockfile, so a pubspec.lock resolved on a different SDK fails
       # here instead of being silently rewritten in the runner. See pr-checks.yml.
       - name: Install dependencies

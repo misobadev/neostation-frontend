@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import '../utils/gamepad_nav.dart';
 import '../services/game_service.dart';
 
@@ -89,14 +90,12 @@ class _ScrapingSummaryDialogState extends State<ScrapingSummaryDialog> {
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(vertical: 8.h),
                 decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).scaffoldBackgroundColor.withValues(alpha: 0.2),
+                  color: Theme.of(context).scaffoldBackgroundColor
+                      .withValues(alpha: 0.2),
                   border: Border(
                     bottom: BorderSide(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.outline.withValues(alpha: 0.1),
+                      color: Theme.of(context).colorScheme.outline
+                          .withValues(alpha: 0.1),
                       width: 1.r,
                     ),
                   ),

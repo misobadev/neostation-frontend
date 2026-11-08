@@ -87,13 +87,12 @@ class MultiDiscOrganizerStrings {
 
 /// The organiser's work, as [RomFolderOrganizerService.organizeRomFolders]
 /// takes it.
-typedef MultiDiscOrganize =
-    Future<RomFolderOrganizerResult> Function(
-      List<String> romRoots, {
-      required Set<String> supportedRomExtensions,
-      Set<String>? supportedSystemFolders,
-      void Function(int completed, int total)? onProgress,
-    });
+typedef MultiDiscOrganize = Future<RomFolderOrganizerResult> Function(
+  List<String> romRoots, {
+  required Set<String> supportedRomExtensions,
+  Set<String>? supportedSystemFolders,
+  void Function(int completed, int total)? onProgress,
+});
 
 /// Runs Tools -> Organise Multi-Disc Games, and reports it through
 /// [GlobalNotificationService].

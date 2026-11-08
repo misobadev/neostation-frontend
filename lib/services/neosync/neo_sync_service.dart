@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' show min;
 import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/sync_models.dart';
@@ -13,6 +14,7 @@ import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/neosync/neosync_http.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/log_redaction.dart';
+
 import '../../repositories/sync_repository.dart';
 
 /// Service responsible for communicating with the NeoSync cloud synchronization API.

@@ -97,9 +97,8 @@ extension _Chrome on _SystemEmulatorSettingsDialogState {
                   style: TextStyle(
                     fontSize: 10.r,
                     fontWeight: FontWeight.w500,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: Theme.of(context).colorScheme.onSurface
+                        .withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -125,9 +124,8 @@ extension _Chrome on _SystemEmulatorSettingsDialogState {
                 child: Icon(
                   Symbols.close_rounded,
                   size: 18.r,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -218,9 +216,8 @@ extension _Chrome on _SystemEmulatorSettingsDialogState {
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             color: isSelected
                 ? Theme.of(context).colorScheme.secondary
-                : Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                : Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.5),
             letterSpacing: 0.5.r,
           ),
         ),

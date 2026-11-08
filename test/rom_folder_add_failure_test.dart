@@ -79,9 +79,8 @@ void main() {
   });
 
   group('source', () {
-    final scanning = File(
-      'lib/providers/sqlite_config_provider/scanning.dart',
-    ).readAsStringSync();
+    final scanning = File('lib/providers/sqlite_config_provider/scanning.dart')
+        .readAsStringSync();
     final directories = File(
       'lib/screens/settings_screen/new_settings_options/'
       'directories_settings_content.dart',

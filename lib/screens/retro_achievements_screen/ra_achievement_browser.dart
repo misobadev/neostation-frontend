@@ -1,8 +1,10 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+
 import '../../l10n/app_locale.dart';
 import '../../models/retro_achievements_game_info.dart';
 import '../../models/retro_achievement_comment.dart';
@@ -411,9 +413,9 @@ class RaAchievementBrowserState extends State<RaAchievementBrowser> {
                                           a.title,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.titleSmall,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall,
                                         ),
                                         Flexible(
                                           child: Text(

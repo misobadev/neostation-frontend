@@ -75,8 +75,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.rommSaveFilesCount: '{count} 个存档文件',
   AppLocale.rommSaveStateCount: '{count} 个即时存档',
   AppLocale.rommSaveStatesCount: '{count} 个即时存档',
-  AppLocale.rommDeleteGameBothConfirm:
-      '{game} 的 {saves}和{states}将从你的 RomM 服务器永久删除。设备上的副本会保留，仍在同步此游戏的设备会再次上传其副本。',
+  AppLocale.rommDeleteGameBothConfirm: '{game} 的 {saves}和{states}将从你的 RomM 服务器永久删除。设备上的副本会保留，仍在同步此游戏的设备会再次上传其副本。',
   AppLocale.rommDeleteGameConfirm:
       '{game} 的 {files}将从你的 RomM 服务器永久删除。设备上的副本会保留，仍在同步此游戏的设备会再次上传其副本。',
   AppLocale.rommDeleteKeepsSaves: '此游戏的存档文件会保留在 RomM 上。',
@@ -284,8 +283,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.raMatchOnStartup: '启动时匹配成就',
   AppLocale.raMatchOnStartupSubtitle:
       '在启动扫描后匹配新的 ROM。若要匹配整个游戏库，请先在工具中运行“匹配 RetroAchievements 游戏”。',
-  AppLocale.raMatchOnStartupBacklogWarning:
-      '有 {count} 个游戏从未检查过。在下次启动时全部匹配可能需要几分钟。建议改为在工具中运行“匹配 RetroAchievements 游戏”，可以看到进度。',
+  AppLocale.raMatchOnStartupBacklogWarning: '有 {count} 个游戏从未检查过。在下次启动时全部匹配可能需要几分钟。建议改为在工具中运行“匹配 RetroAchievements 游戏”，可以看到进度。',
   AppLocale.raMatchNotificationTitle: 'RetroAchievements',
   AppLocale.raMatchProgressBusy: '正在匹配 RetroAchievements...',
   AppLocale.raMatchProgressCounted: '正在匹配 RetroAchievements... {done}/{total}',
@@ -363,8 +361,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.rematchAchievements: '匹配 RetroAchievements 游戏',
   AppLocale.rommLinkLibrary: '将库链接到 RomM',
   AppLocale.rommLinkLibrarySubtitle: '将本地 ROM 与你的 RomM 服务器匹配并链接',
-  AppLocale.rommLinkLibraryWarning:
-      '此操作会遍历 RomM 服务器上的每个平台，并链接识别到的本地 ROM。\n\n已链接的游戏将纳入存档同步，其存档会上传到 RomM。库较大时可能需要几分钟。',
+  AppLocale.rommLinkLibraryWarning: '此操作会遍历 RomM 服务器上的每个平台，并链接识别到的本地 ROM。\n\n已链接的游戏将纳入存档同步，其存档会上传到 RomM。库较大时可能需要几分钟。',
   AppLocale.rommLinkLibraryPreparing: '准备中…',
   AppLocale.rommLinkLibraryProgress: '{total} 中的 {done} — {system}',
   AppLocale.rommLinkLibraryDone: '已链接 {count} 个游戏',
@@ -374,8 +371,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.rommLinkLibraryStoppedEarly: '提前停止 — 目前已关联 {count} 个游戏',
   AppLocale.rommLinkLibraryPartial: '已链接 {count} 个游戏。无法读取的系统：{failed}',
   AppLocale.rematchAchievementsSubtitle: '扫描整个库来查找成就集，而不是逐个打开游戏',
-  AppLocale.rematchAchievementsWarning:
-      '这会读取每个未匹配的 ROM 以识别它，在大型库上可能需要一些时间。再次选择即可暂停：已匹配的内容会保留，再次运行会从中断处继续。光盘镜像也会读取，但每个只读取少量扇区。不会移动或删除任何文件。',
+  AppLocale.rematchAchievementsWarning: '这会读取每个未匹配的 ROM 以识别它，在大型库上可能需要一些时间。再次选择即可暂停：已匹配的内容会保留，再次运行会从中断处继续。光盘镜像也会读取，但每个只读取少量扇区。不会移动或删除任何文件。',
   AppLocale.rematchAchievementsSignedOut:
       '未登录时也会进行匹配，但需要登录 RetroAchievements 才能查看结果。',
   AppLocale.rematchAchievementsLookingUp: '正在检查已有哈希的游戏…',

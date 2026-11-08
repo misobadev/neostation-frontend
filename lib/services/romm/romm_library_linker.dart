@@ -15,18 +15,18 @@ typedef RommPlatformLister = Future<List<RommPlatform>> Function();
 
 /// Resolves a RomM platform to the local system its ROMs belong to, or null
 /// when this build has no system for it.
-typedef RommPlatformResolver =
-    Future<SystemModel?> Function(RommPlatform platform);
+typedef RommPlatformResolver = Future<SystemModel?> Function(
+  RommPlatform platform,
+);
 
 /// One page of a platform's ROMs. Offset/limit paging only, like
 /// `RommPageFetcher`; the platform is bound per call because the pass walks
 /// several.
-typedef RommPlatformPageFetcher =
-    Future<RommRomPage> Function({
-      required int platformId,
-      required int limit,
-      required int offset,
-    });
+typedef RommPlatformPageFetcher = Future<RommRomPage> Function({
+  required int platformId,
+  required int limit,
+  required int offset,
+});
 
 /// The local library index — the scanned games table, never the disk, and
 /// only the columns the matching reads (see [RommLinkRow]).
@@ -37,8 +37,9 @@ typedef RommRomIdIndexLoader = Future<RommRomIdIndex> Function();
 
 /// Insert-if-absent for a batch of links; reports the rows actually written
 /// and whether the batch failed outright (which is not "already present").
-typedef RommMappingWriter =
-    Future<RommMappingBatchResult> Function(List<RommSaveMapEntry> entries);
+typedef RommMappingWriter = Future<RommMappingBatchResult> Function(
+  List<RommSaveMapEntry> entries,
+);
 
 /// Polled between platforms and between pages; true ends the pass.
 typedef RommStopCheck = bool Function();
@@ -281,22 +282,16 @@ class RommLibraryLinker {
   bool _running = false;
 
   RommLibraryLinker({
-    required RommPlatformLister listPlatforms,
-    required RommPlatformResolver resolveSystem,
-    required RommPlatformPageFetcher fetchPage,
-    required RommLocalLibraryLister listGames,
-    required RommRomIdIndexLoader loadRomIdIndex,
-    required RommMappingWriter putMappingsIfAbsent,
+    required this._listPlatforms,
+    required this._resolveSystem,
+    required this._fetchPage,
+    required this._listGames,
+    required this._loadRomIdIndex,
+    required this._putMappingsIfAbsent,
     RommStopCheck? shouldStop,
     DateTime Function()? clock,
     LoggerService? logger,
-  }) : _listPlatforms = listPlatforms,
-       _resolveSystem = resolveSystem,
-       _fetchPage = fetchPage,
-       _listGames = listGames,
-       _loadRomIdIndex = loadRomIdIndex,
-       _putMappingsIfAbsent = putMappingsIfAbsent,
-       _shouldStop = shouldStop ?? _neverStop,
+  }) : _shouldStop = shouldStop ?? _neverStop,
        _clock = clock ?? DateTime.now,
        _log = logger ?? _defaultLog;
 

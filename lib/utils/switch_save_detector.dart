@@ -1,8 +1,10 @@
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/saf_directory_service.dart';
 import 'package:path/path.dart' as path;
+
 import '../repositories/emulator_repository.dart';
 
 /// Service responsible for detecting Nintendo Switch save data for emulators such as Yuzu, Citron, and Eden.

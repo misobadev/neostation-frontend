@@ -58,9 +58,8 @@ Future<http.Response> readWithStallTimeout(
   if (headers != null) request.headers.addAll(headers);
   try {
     final response = await client.send(request).timeout(headerTimeout);
-    final body = await http.ByteStream(
-      response.stream.timeout(stallTimeout),
-    ).toBytes();
+    final body = await http.ByteStream(response.stream.timeout(stallTimeout))
+        .toBytes();
     return http.Response.bytes(
       body,
       response.statusCode,

@@ -89,12 +89,10 @@ void main() {
     // A game's sync before launch and after closing, and every upload of
     // RetroArch and custom save folders: all used to fail their whole listing
     // on one bad subfolder.
-    final core = File(
-      'lib/providers/neosync/neosync_core.dart',
-    ).readAsStringSync();
-    final resolver = File(
-      'lib/providers/neosync/neosync_path_resolver.dart',
-    ).readAsStringSync();
+    final core = File('lib/providers/neosync/neosync_core.dart')
+        .readAsStringSync();
+    final resolver = File('lib/providers/neosync/neosync_path_resolver.dart')
+        .readAsStringSync();
     final find = core.indexOf(
       'Future<List<LocalSaveFile>> _findGameSaveFiles(',
     );

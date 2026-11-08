@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../services/neo_assets_service.dart';
 import '../repositories/config_repository.dart';
 import '../services/logger_service.dart';

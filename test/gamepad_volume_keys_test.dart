@@ -15,9 +15,8 @@ void main() {
       'packages/gamepads_android/android/src/main/kotlin/org/flame_engine/'
       'gamepads_android';
   final listener = File('$plugin/EventListener.kt').readAsStringSync();
-  final pluginClass = File(
-    '$plugin/GamepadsAndroidPlugin.kt',
-  ).readAsStringSync();
+  final pluginClass = File('$plugin/GamepadsAndroidPlugin.kt')
+      .readAsStringSync();
   final activity = File(
     'android/app/src/main/kotlin/com/neogamelab/neostation/MainActivity.kt',
   ).readAsStringSync();
@@ -32,13 +31,13 @@ void main() {
   }
 
   test('the volume keys are the keys left to the system', () {
-    final keys = RegExp(
-      r'systemKeys\s*=\s*setOf\(([^)]*)\)',
-    ).firstMatch(listener);
+    final keys = RegExp(r'systemKeys\s*=\s*setOf\(([^)]*)\)')
+        .firstMatch(listener);
     expect(keys, isNotNull, reason: 'no systemKeys set in EventListener');
-    final names = RegExp(
-      r'KeyEvent\.(KEYCODE_\w+)',
-    ).allMatches(keys![1]!).map((m) => m[1]).toSet();
+    final names = RegExp(r'KeyEvent\.(KEYCODE_\w+)')
+        .allMatches(keys![1]!)
+        .map((m) => m[1])
+        .toSet();
     expect(names, {
       'KEYCODE_VOLUME_UP',
       'KEYCODE_VOLUME_DOWN',

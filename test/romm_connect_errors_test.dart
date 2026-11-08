@@ -158,9 +158,8 @@ void main() {
             detail: 'Connection refused',
           ),
         ),
-        text(
-          AppLocale.rommErrorUnreachable,
-        ).replaceFirst('{error}', 'Connection refused'),
+        text(AppLocale.rommErrorUnreachable)
+            .replaceFirst('{error}', 'Connection refused'),
       );
       expect(
         messageFor(
@@ -170,9 +169,8 @@ void main() {
             statusCode: 404,
           ),
         ),
-        text(
-          AppLocale.rommErrorUnexpectedStatus,
-        ).replaceFirst('{error}', '404'),
+        text(AppLocale.rommErrorUnexpectedStatus)
+            .replaceFirst('{error}', '404'),
       );
       expect(
         messageFor(
@@ -192,9 +190,8 @@ void main() {
   });
 
   test('the connect screen shows the translated message', () {
-    final source = File(
-      'lib/screens/romm_screen/romm_connect_content.dart',
-    ).readAsStringSync();
+    final source = File('lib/screens/romm_screen/romm_connect_content.dart')
+        .readAsStringSync();
     expect(source, contains('rommFailureMessage('));
   });
 

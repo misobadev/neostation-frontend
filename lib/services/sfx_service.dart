@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:flutter_soloud/flutter_soloud.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
+
 import '../models/custom_sfx.dart';
 import '../repositories/custom_sfx_repository.dart';
 
@@ -66,11 +68,7 @@ class SfxService {
     : _audio = SoLoudSfxBackend(),
       _files = CustomSfxRepository();
   @visibleForTesting
-  SfxService.forTesting({
-    required SfxAudioBackend audio,
-    required CustomSfxRepository files,
-  }) : _audio = audio,
-       _files = files;
+  SfxService.forTesting({required this._audio, required this._files});
   final SfxAudioBackend _audio;
   final CustomSfxRepository _files;
   Map<SfxAction, CustomSfx> _customSounds = const {};
@@ -261,9 +259,8 @@ class SfxService {
         // directory isn't fully ready before the first loadAsset() call.
         try {
           final tempDir = await getTemporaryDirectory();
-          await Directory(
-            '${tempDir.path}/SoLoudLoader-Temp-Files',
-          ).create(recursive: true);
+          await Directory('${tempDir.path}/SoLoudLoader-Temp-Files')
+              .create(recursive: true);
         } catch (_) {}
         if (epoch != _engineEpoch || !isScreenOn()) return;
         await _audio.init();

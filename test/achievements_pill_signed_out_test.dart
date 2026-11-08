@@ -22,7 +22,7 @@ import 'package:neostation/widgets/game_view_footer.dart';
 /// footers cannot drift. While a lookup is genuinely outstanding the pill stays
 /// and says "Loading" — only an answered zero removes it.
 class _FakeRaProvider extends RetroAchievementsProvider {
-  _FakeRaProvider({required bool connected}) : _connected = connected;
+  _FakeRaProvider({required this._connected});
 
   final bool _connected;
 

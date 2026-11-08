@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../data/datasources/sqlite_service.dart';
 import '../models/rom_fingerprint.dart';
 import '../services/credential_store.dart';
+
 import 'package:neostation/services/logger_service.dart';
 
 class MetadataTransferResult {
@@ -610,9 +611,9 @@ class ScraperRepository {
     );
     if (mapped.isEmpty) return;
 
-    final existing = (await db.query(
-      'user_screenscraper_system_config',
-    )).map((r) => r['app_system_id'].toString()).toSet();
+    final existing = (await db.query('user_screenscraper_system_config'))
+        .map((r) => r['app_system_id'].toString())
+        .toSet();
     for (final s in mapped) {
       final id = s['app_system_id'].toString();
       if (!existing.contains(id)) {

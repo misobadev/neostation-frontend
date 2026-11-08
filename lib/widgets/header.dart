@@ -3,8 +3,10 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
+
 import 'dart:async';
 import 'dart:io';
+
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/responsive.dart';
@@ -314,12 +316,12 @@ class HeaderState extends State<Header> {
                             SfxService().playNavSound();
                             widget.onSearch?.call();
                           },
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.tertiaryFixed,
-                          textColor: Theme.of(
-                            context,
-                          ).colorScheme.onTertiaryFixed,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .tertiaryFixed,
+                          textColor: Theme.of(context)
+                              .colorScheme
+                              .onTertiaryFixed,
                         ),
                       ),
                     ),
@@ -384,9 +386,9 @@ class HeaderState extends State<Header> {
                                             width: 32.r,
                                             child: Container(
                                               decoration: BoxDecoration(
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary,
                                                 borderRadius:
                                                     Theme.of(context)
                                                         .extension<
@@ -412,9 +414,8 @@ class HeaderState extends State<Header> {
                                                     navTabSpec(tab).icon,
                                                     navTabSpec(tab).labelKey
                                                         .getString(context),
-                                                    iconData: navTabSpec(
-                                                      tab,
-                                                    ).iconData,
+                                                    iconData: navTabSpec(tab)
+                                                        .iconData,
                                                     coverage:
                                                         (1.0 -
                                                                 (slot - index)
@@ -491,9 +492,9 @@ class HeaderState extends State<Header> {
                                 Text(
                                   clockText,
                                   style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface,
                                     fontSize: 12.r,
                                     fontWeight: FontWeight.w500,
                                     letterSpacing: 0.3.r,

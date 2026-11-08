@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import '../../models/secondary_display_state.dart';
 import '../../widgets/shaders/shader_gif_widget.dart';
 import '../../utils/image_utils.dart' as image_utils;
@@ -134,9 +136,8 @@ Widget buildFanartWithLogo(SecondaryDisplayStateData value) {
                       filterQuality: FilterQuality.low,
                       isAntiAlias: false,
                       cacheWidth: 640,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.shadow.withValues(alpha: 0.5),
+                      color: Theme.of(context).colorScheme.shadow
+                          .withValues(alpha: 0.5),
                       errorBuilder: (context, error, stackTrace) =>
                           const SizedBox.shrink(),
                     ),

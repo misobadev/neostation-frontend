@@ -587,29 +587,26 @@ void main() {
       );
     });
 
-    test(
-      'when the server copy already holds the bytes about to be sent',
-      () async {
-        // Two devices that made the same move. There is nothing to preserve, and
-        // the earlier content-hash gate should have skipped the push anyway.
-        final asset = svc.seedSave(
-          1,
-          'Game.srm',
-          'SHARED'.codeUnits,
-          updatedAt: DateTime.utc(2026, 1, 1),
-        );
-        await localSave().writeAsString('SHARED');
-        await provider.syncGameSavesAfterClose(game);
+    test('when the server copy already holds the bytes about to be sent', () async {
+      // Two devices that made the same move. There is nothing to preserve, and
+      // the earlier content-hash gate should have skipped the push anyway.
+      final asset = svc.seedSave(
+        1,
+        'Game.srm',
+        'SHARED'.codeUnits,
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
+      await localSave().writeAsString('SHARED');
+      await provider.syncGameSavesAfterClose(game);
 
-        svc.otherDevicePut(1, asset, 'SAME-MOVE'.codeUnits);
-        await localSave().writeAsString('SAME-MOVE');
-        await touch(localSave());
+      svc.otherDevicePut(1, asset, 'SAME-MOVE'.codeUnits);
+      await localSave().writeAsString('SAME-MOVE');
+      await touch(localSave());
 
-        await provider.syncGameSavesAfterClose(game);
+      await provider.syncGameSavesAfterClose(game);
 
-        expect(backupsIn('saves'), isEmpty);
-      },
-    );
+      expect(backupsIn('saves'), isEmpty);
+    });
   });
 
   group('failing to protect the remote copy abandons the upload', () {
