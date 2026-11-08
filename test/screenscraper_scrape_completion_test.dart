@@ -32,6 +32,8 @@ void main() {
   late List<(String, String)> gameMedia;
   // ScreenScraper's daily quota is used up before the game is looked up.
   late bool quotaUsedUp;
+  // The developer ScreenScraper names for the game, if any.
+  late String? gameDeveloper;
   late Directory media;
   HttpOverrides? previousOverrides;
 
@@ -63,6 +65,7 @@ void main() {
     mediaRequests = [];
     gameMedia = [];
     quotaUsedUp = false;
+    gameDeveloper = null;
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) {
       final path = request.uri.path;
@@ -84,6 +87,8 @@ void main() {
                   'noms': [
                     {'region': 'us', 'text': 'Game'},
                   ],
+                  if (gameDeveloper != null)
+                    'developpeur': {'text': gameDeveloper},
                   'medias': [
                     for (final (type, route) in gameMedia) entry(type, route),
                   ],
@@ -455,5 +460,104 @@ void main() {
         expect(await tester.runAsync(flag), 0);
       },
     );
+
+    group('a game with metadata of its own', () {
+      // ScreenScraper here knows the game by name ("Game"), and by developer
+      // where a test sets [gameDeveloper]: no description or anything else.
+      Future<void> existingRow(Map<String, Object?> values) =>
+          db.insert('user_screenscraper_metadata', {
+            'app_system_id': 'nes',
+            'filename': 'Game.nes',
+            'is_fully_scraped': 0,
+            ...values,
+          });
+
+      Future<Map<String, Object?>> row() async {
+        final rows = await db.query(
+          'user_screenscraper_metadata',
+          where: 'app_system_id = ? AND filename = ?',
+          whereArgs: ['nes', 'Game.nes'],
+        );
+        return Map<String, Object?>.from(rows.single);
+      }
+
+      testWidgets('keeps the edits New content only would have replaced', (
+        tester,
+      ) async {
+        gameMedia = [('ss', 'art')];
+        gameDeveloper = 'Studio';
+        await tester.runAsync(
+          () => existingRow({
+            'real_name': 'My Title',
+            'description_en': 'My notes',
+            'developer': 'Me',
+          }),
+        );
+
+        await runSession(tester);
+
+        final saved = (await tester.runAsync(row))!;
+        expect(saved['real_name'], 'My Title');
+        expect(saved['description_en'], 'My notes');
+        expect(saved['developer'], 'Me');
+        // Its media were still fetched, so the next run leaves it alone.
+        expect(saved['is_fully_scraped'], ScraperRepository.scrapedFully);
+        expect(mediaRequests, ['art']);
+      });
+
+      testWidgets('keeps an ES-DE import\'s text and media folder, and fills '
+          'what it lacks', (tester) async {
+        gameDeveloper = 'Studio';
+        await tester.runAsync(
+          () => existingRow({
+            'real_name': 'ES-DE Name',
+            'description_en': 'ES-DE notes',
+            'esde_media_subdir': 'sub',
+            'esde_imported': 1,
+          }),
+        );
+
+        await runSession(tester);
+
+        final saved = (await tester.runAsync(row))!;
+        expect(saved['real_name'], 'ES-DE Name');
+        expect(saved['description_en'], 'ES-DE notes');
+        expect(saved['esde_media_subdir'], 'sub');
+        expect(saved['developer'], 'Studio');
+      });
+
+      testWidgets('"All" still replaces it with ScreenScraper\'s', (
+        tester,
+      ) async {
+        await tester.runAsync(() async {
+          await existingRow({
+            'real_name': 'My Title',
+            'description_en': 'My notes',
+          });
+          await ScraperRepository.saveScraperConfig({'scrape_mode': 'all'});
+        });
+
+        await runSession(tester);
+
+        final saved = (await tester.runAsync(row))!;
+        expect(saved['real_name'], 'Game');
+        expect(saved['description_en'], isNull);
+      });
+    });
+
+    testWidgets('a game with no metadata gets ScreenScraper\'s', (
+      tester,
+    ) async {
+      await runSession(tester);
+
+      final rows = (await tester.runAsync(
+        () => db.query(
+          'user_screenscraper_metadata',
+          where: 'app_system_id = ? AND filename = ?',
+          whereArgs: ['nes', 'Game.nes'],
+        ),
+      ))!;
+      expect(rows.single['real_name'], 'Game');
+    });
   });
 }

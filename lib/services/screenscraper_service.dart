@@ -813,6 +813,23 @@ class ScreenScraperService {
     }
   }
 
+  /// Saves a match keeping what the game already has; see
+  /// [ScraperRepository.fillGameMetadataGaps].
+  static Future<bool> _fillGameMetadataGaps(
+    Map<String, dynamic> metadata,
+    String appSystemId,
+  ) async {
+    try {
+      return await ScraperRepository.fillGameMetadataGaps(
+        metadata,
+        appSystemId,
+      );
+    } catch (e) {
+      _log.e('Error saving metadata for ${metadata['filename']}: $e');
+      return false;
+    }
+  }
+
   /// Scrapes a single game by its filename and updates its local state.
   static Future<Map<String, dynamic>> scrapeSingleGame({
     required String appSystemId,
@@ -1452,7 +1469,18 @@ class ScreenScraperService {
             gameInfo,
             preferredLanguage: preferredLanguage,
           );
-          await _saveGameMetadata(metadata, appSystemId, isFullyScraped: false);
+          // "New content only" reaches games not yet fully scraped, whose
+          // metadata may be the user's own edits or an ES-DE import: it fills
+          // their gaps. "All" is the user asking for ScreenScraper's.
+          if (scraperConfig['scrape_mode'].toString() == 'new_only') {
+            await _fillGameMetadataGaps(metadata, appSystemId);
+          } else {
+            await _saveGameMetadata(
+              metadata,
+              appSystemId,
+              isFullyScraped: false,
+            );
+          }
         }
 
         final allowedTypes = await ScraperRepository.getEnabledMediaTypes();
