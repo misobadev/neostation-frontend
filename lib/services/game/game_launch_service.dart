@@ -645,19 +645,20 @@ class GameLaunchService {
     return null;
   }
 
-  /// Whether a desktop RetroArch core exists, or null when the answer cannot
-  /// be determined (unknown install layout), in which case launch anyway.
-  static Future<bool?> _desktopRetroArchCoreInstalled(
-    String coreName,
-    EmulatorModel? retroArch,
-  ) async {
-    if (coreName.isEmpty) return null;
-    if (path.isAbsolute(coreName)) return File(coreName).exists();
-    if (retroArch == null) return null;
-
-    final coresDir = await _getRetroArchCoresDirectory(retroArch);
-    if (!await Directory(coresDir).exists()) return null;
-    return await _getCoreFullPath(coreName) != null;
+  /// Whether a desktop RetroArch launch should stop because its core is
+  /// positively missing.
+  ///
+  /// Only an absolute core path is authoritative here. A relative name is
+  /// resolved by RetroArch from its own `libretro_directory`, which the
+  /// frontend cannot read; probing a guessed cores directory and aborting was
+  /// the 0.16.0 regression that broke working Linux installs.
+  @visibleForTesting
+  static bool desktopCoreIsPositivelyMissing({
+    required String coreArg,
+    required bool coreFileExists,
+  }) {
+    if (coreArg.isEmpty) return false;
+    return path.isAbsolute(coreArg) && !coreFileExists;
   }
 
   /// Internal logic for launching RetroArch cores on Android.
@@ -1190,19 +1191,22 @@ class GameLaunchService {
       var processExecutable = executable;
       var launchedViaOpen = false;
 
-      // Desktop RetroArch runs from the same system JSON as Android, so the
-      // missing-core guard has to exist here too; the standalone RetroArch
-      // path below only covers systems without a JSON profile.
+      // Desktop RetroArch resolves a relative `-L core_libretro.so` from its
+      // own `libretro_directory`, which the frontend cannot read. Only an
+      // absolute core path can be checked here; aborting a relative one after
+      // probing a guessed directory broke working Linux installs in 0.16.0.
       if (executable.toLowerCase().contains('retroarch')) {
         final coreArg = _retroArchCoreFromArgs(args);
         if (coreArg != null) {
-          final installed = await _desktopRetroArchCoreInstalled(
-            coreArg,
-            detected['RetroArch'],
-          );
-          if (installed == false) {
+          final coreExists = path.isAbsolute(coreArg)
+              ? await File(coreArg).exists()
+              : true; // Unknown: leave it for RetroArch to resolve.
+          if (desktopCoreIsPositivelyMissing(
+            coreArg: coreArg,
+            coreFileExists: coreExists,
+          )) {
             if (!context.mounted) return GameLaunchResult.failure('', '');
-            _log.w('[CoreCheck] RetroArch core "$coreArg" is not installed');
+            _log.w('[CoreCheck] RetroArch core "$coreArg" is missing');
             return GameLaunchResult.failure(
               AppLocale.coreNotInstalled
                   .getString(context)
