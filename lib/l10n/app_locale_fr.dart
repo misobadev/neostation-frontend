@@ -1057,6 +1057,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync : Sauvegardes locales uniquement',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync : Sauvegardes cloud uniquement',
   AppLocale.neoSyncSaveConflict: 'NeoSync : Conflit de sauvegarde détecté',
+  AppLocale.neoSyncKeptCloudCopy: "Cette sauvegarde a aussi changé sur un autre appareil. La copie de cet appareil a été envoyée, l'autre est conservée à côté sous le nom {file}.",
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync : Synchronisation cloud désactivée',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync : Quota de stockage dépassé',

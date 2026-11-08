@@ -982,6 +982,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: ローカルセーブのみ',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: クラウドセーブのみ',
   AppLocale.neoSyncSaveConflict: 'NeoSync: セーブデータの競合を検出',
+  AppLocale.neoSyncKeptCloudCopy:
+      "このセーブデータは別の端末でも変更されていました。この端末のデータをアップロードし、もう一方は {file} として隣に保存しました。",
   AppLocale.neoSyncCloudSyncDisabled: 'NeoSync: クラウド同期無効',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: ストレージ容量超過',
   AppLocale.packageNameMissing: 'パッケージ名がありません',

@@ -1093,6 +1093,7 @@ mixin AppLocale {
   static const String neoSyncLocalSavesOnly = 'neo_sync_local_saves_only';
   static const String neoSyncCloudSavesOnly = 'neo_sync_cloud_saves_only';
   static const String neoSyncSaveConflict = 'neo_sync_save_conflict';
+  static const String neoSyncKeptCloudCopy = 'neo_sync_kept_cloud_copy';
   static const String neoSyncCloudSyncDisabled = 'neo_sync_cloud_sync_disabled';
   static const String neoSyncQuotaExceeded = 'neo_sync_quota_exceeded';
   static const String packageNameMissing = 'package_name_missing';

@@ -960,6 +960,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: 仅本地存档',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: 仅云端存档',
   AppLocale.neoSyncSaveConflict: 'NeoSync: 检测到存档冲突',
+  AppLocale.neoSyncKeptCloudCopy:
+      "此存档在另一台设备上也有更改。已上传本设备的副本，另一份副本已保存在旁边，名为 {file}。",
   AppLocale.neoSyncCloudSyncDisabled: 'NeoSync: 云同步已禁用',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: 存储空间已满',
   AppLocale.packageNameMissing: '缺少包名',

@@ -553,17 +553,37 @@ extension NeoSyncCore on NeoSyncProvider {
             }
           } else {
             // Ambos existen, comparar
-            final syncStatus = await _calculateGameSyncStatus(
-              localFile,
-              cloudFile,
-            );
+            final comparison = await _compareWithCloud(localFile, cloudFile);
+            final syncStatus = comparison.status;
 
             if (syncStatus == neo_sync.GameSyncStatus.localOnly) {
               try {
-                final success = await _autoUploadLocalSave(game, localFile);
-                if (!success) {
+                // Changed on another device too: keep the cloud's copy beside
+                // this one before replacing it, and upload nothing until it
+                // has been kept.
+                final backupPath = comparison.bothChanged
+                    ? await _keepCloudCopy(localFile, cloudFile)
+                    : null;
+                if (comparison.bothChanged && backupPath == null) {
                   allUploadsSucceeded = false;
                   transferFailed = true;
+                } else {
+                  final result = await _autoUploadLocalSaveResult(
+                    game,
+                    localFile,
+                  );
+                  if (result['success'] != true) {
+                    allUploadsSucceeded = false;
+                    transferFailed = true;
+                  } else if (backupPath != null && result['skipped'] != true) {
+                    // Not when the upload found the cloud copy newer still
+                    // and took it instead: this device's copy didn't win.
+                    reportKeptCloudCopy(
+                      gameName: game.name,
+                      savePath: localFile.filePath,
+                      backupPath: backupPath,
+                    );
+                  }
                 }
               } on QuotaExceededException {
                 quotaExceededDuringProcessing = true;
@@ -684,34 +704,89 @@ extension NeoSyncCore on NeoSyncProvider {
   Future<bool> _autoUploadLocalSave(
     GameModel game,
     LocalSaveFile localSave,
+  ) async =>
+      (await _autoUploadLocalSaveResult(game, localSave))['success'] == true;
+
+  /// [_autoUploadLocalSave] with the upload's own answer, which says whether
+  /// it was `skipped` (already in sync, or the cloud copy was newer and was
+  /// downloaded instead).
+  Future<Map<String, dynamic>> _autoUploadLocalSaveResult(
+    GameModel game,
+    LocalSaveFile localSave,
   ) async {
+    const notUploaded = <String, dynamic>{'success': false};
     try {
       final file = File(localSave.filePath);
-      if (!file.existsSync()) return false;
+      if (!file.existsSync()) return notUploaded;
 
       // Obtener el sistema para resolver sus rutas JSON
       final system = await _getSystemForGame(game);
-      if (system == null) return false;
+      if (system == null) return notUploaded;
 
       // Verificar si el sistema tiene sync deshabilitado
       if (!system.neosync.sync) {
-        return false;
+        return notUploaded;
       }
 
       final result = await _uploadLocalFileForGame(game, file);
-      if (result['success']) {
-        return true;
+      if (result['success'] == true) {
+        return result;
       }
       final errorMessage = result['message']?.toString() ?? '';
       if (NeoSyncProvider.isQuotaExceededMessage(errorMessage)) {
         throw QuotaExceededException('Storage quota exceeded', 1);
       }
-      return false;
+      return notUploaded;
     } on QuotaExceededException {
       rethrow;
     } catch (e) {
       NeoSyncProvider._log.w('Error auto-uploading save for ${game.name}: $e');
-      return false;
+      return notUploaded;
+    }
+  }
+
+  /// Downloads [cloud], the cloud's copy of [local], to a file beside it (see
+  /// [cloudCopyBackupPath]) before this device's copy replaces it in the
+  /// cloud. Returns where it went, or null if it couldn't be kept.
+  ///
+  /// A copy already kept for this cloud version (same name, same size) is
+  /// reused, so a pass after a failed upload doesn't fetch it again. Not
+  /// under the name without a time or checksum: that one is the same for
+  /// every cloud version.
+  Future<String?> _keepCloudCopy(LocalSaveFile local, NeoSyncFile cloud) async {
+    try {
+      final backupPath = cloudCopyBackupPath(
+        local.filePath,
+        modifiedAt: cloud.fileModifiedAtTimestamp,
+        checksum: cloud.checksum,
+      );
+      final backup = File(backupPath);
+      if (cloud.fileSize > 0 &&
+          !backupPath.endsWith('.cloud.neosync.bak') &&
+          await backup.exists() &&
+          await backup.length() == cloud.fileSize) {
+        return backupPath;
+      }
+      final download = await _neoSyncService.downloadFile(cloud.id);
+      final data = download['data'];
+      if (download['success'] != true || data is! List<int>) {
+        NeoSyncProvider._log.w(
+          'Could not keep the cloud copy of ${local.filePath}: '
+          '${download['message']}',
+        );
+        return null;
+      }
+      await backup.writeAsBytes(data, flush: true);
+      NeoSyncProvider._log.i(
+        '${local.filePath} changed here and in the cloud: kept the cloud copy '
+        'as $backupPath',
+      );
+      return backupPath;
+    } catch (e) {
+      NeoSyncProvider._log.w(
+        'Could not keep the cloud copy of ${local.filePath}: $e',
+      );
+      return null;
     }
   }
 
@@ -1277,17 +1352,24 @@ extension NeoSyncCore on NeoSyncProvider {
   Future<neo_sync.GameSyncStatus> _calculateGameSyncStatus(
     LocalSaveFile? localSave,
     NeoSyncFile? cloudSave,
-  ) async {
+  ) async => (await _compareWithCloud(localSave, cloudSave)).status;
+
+  /// [_calculateGameSyncStatus], and whether the save changed both on this
+  /// device and in the cloud since the last sync. Then the status is still
+  /// [neo_sync.GameSyncStatus.localOnly] (this device's copy wins), but the
+  /// cloud's copy is kept before it is replaced.
+  Future<({neo_sync.GameSyncStatus status, bool bothChanged})>
+  _compareWithCloud(LocalSaveFile? localSave, NeoSyncFile? cloudSave) async {
     if (localSave == null && cloudSave == null) {
-      return neo_sync.GameSyncStatus.noSaveFound;
+      return (status: neo_sync.GameSyncStatus.noSaveFound, bothChanged: false);
     }
 
     if (localSave == null && cloudSave != null) {
-      return neo_sync.GameSyncStatus.cloudOnly;
+      return (status: neo_sync.GameSyncStatus.cloudOnly, bothChanged: false);
     }
 
     if (localSave != null && cloudSave == null) {
-      return neo_sync.GameSyncStatus.localOnly;
+      return (status: neo_sync.GameSyncStatus.localOnly, bothChanged: false);
     }
 
     // Ambos tienen saves, verificar sincronización comparando timestamps y hashes
@@ -1297,7 +1379,10 @@ extension NeoSyncCore on NeoSyncProvider {
       // Leer el archivo local para calcular hash
       final localFile = File(localSave!.filePath);
       if (!localFile.existsSync()) {
-        return neo_sync.GameSyncStatus.localOnly; // Archivo local desapareció
+        return (
+          status: neo_sync.GameSyncStatus.localOnly,
+          bothChanged: false,
+        ); // Archivo local desapareció
       }
 
       final localBytes = await localFile.readAsBytes();
@@ -1309,7 +1394,7 @@ extension NeoSyncCore on NeoSyncProvider {
 
       // 1. Si los hashes coinciden → Contenido idéntico
       if (hashesMatch) {
-        return neo_sync.GameSyncStatus.upToDate;
+        return (status: neo_sync.GameSyncStatus.upToDate, bothChanged: false);
       }
 
       // 2. Si los hashes NO coinciden (contenido diferente), evaluar el estado guardado.
@@ -1325,24 +1410,46 @@ extension NeoSyncCore on NeoSyncProvider {
         final savedLocalTime = syncState['local_modified_at'] as int;
         final savedCloudTime = syncState['cloud_updated_at'] as int;
 
-        // Tolerance of 2 seconds for local changes (FAT32/exFAT resolution)
-        final localChanged = (localTime - savedLocalTime).abs() > 2000;
+        // Changed here: the file time moved (with a tolerance of 2 seconds,
+        // for FAT32/exFAT resolution) and, when the last sync recorded a hash,
+        // the content differs from it. The time also moves when an emulator
+        // rewrites the same save, and that would make an unchanged save
+        // replace a newer cloud copy. The hash alone isn't enough: a download
+        // records the cloud list's checksum, which can be an older version's
+        // than the bytes it wrote.
+        final savedHash = syncState['file_hash'] as String?;
+        final localChanged =
+            (localTime - savedLocalTime).abs() > 2000 &&
+            (savedHash == null || savedHash.isEmpty || localHash != savedHash);
         final cloudChanged = cloudTime > savedCloudTime;
 
         if (localChanged && !cloudChanged) {
-          return neo_sync.GameSyncStatus.localOnly; // Local avanzó, subir
+          return (
+            status: neo_sync.GameSyncStatus.localOnly,
+            bothChanged: false,
+          ); // Local avanzó, subir
         } else if (!localChanged && cloudChanged) {
-          return neo_sync.GameSyncStatus.cloudOnly; // Nube avanzó, bajar
+          return (
+            status: neo_sync.GameSyncStatus.cloudOnly,
+            bothChanged: false,
+          ); // Nube avanzó, bajar
         } else if (localChanged && cloudChanged) {
-          // Ambos cambiaron - siempre preferir local (subir)
-          return neo_sync.GameSyncStatus.localOnly;
+          // Both changed: this device's copy wins, and the caller keeps the
+          // cloud's.
+          return (status: neo_sync.GameSyncStatus.localOnly, bothChanged: true);
         } else {
           // Ninguno de los dos cambió desde la última sincronización, pero los hashes son distintos.
           // Fallback a comparar timestamps crudos si no sabemos qué pasó.
           if (localTime > cloudTime) {
-            return neo_sync.GameSyncStatus.localOnly;
+            return (
+              status: neo_sync.GameSyncStatus.localOnly,
+              bothChanged: false,
+            );
           } else {
-            return neo_sync.GameSyncStatus.cloudOnly;
+            return (
+              status: neo_sync.GameSyncStatus.cloudOnly,
+              bothChanged: false,
+            );
           }
         }
       }
@@ -1353,20 +1460,26 @@ extension NeoSyncCore on NeoSyncProvider {
 
       if (timeDiff <= toleranceMs) {
         if (localTime > cloudTime) {
-          return neo_sync.GameSyncStatus.localOnly;
+          return (
+            status: neo_sync.GameSyncStatus.localOnly,
+            bothChanged: false,
+          );
         } else {
-          return neo_sync.GameSyncStatus.cloudOnly;
+          return (
+            status: neo_sync.GameSyncStatus.cloudOnly,
+            bothChanged: false,
+          );
         }
       }
 
       if (localTime > cloudTime) {
-        return neo_sync.GameSyncStatus.localOnly;
+        return (status: neo_sync.GameSyncStatus.localOnly, bothChanged: false);
       } else {
-        return neo_sync.GameSyncStatus.cloudOnly;
+        return (status: neo_sync.GameSyncStatus.cloudOnly, bothChanged: false);
       }
     } catch (e) {
       NeoSyncProvider._log.w('Error calculating sync status: $e');
-      return neo_sync.GameSyncStatus.localOnly;
+      return (status: neo_sync.GameSyncStatus.localOnly, bothChanged: false);
     }
   }
 
