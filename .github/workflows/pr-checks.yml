@@ -46,6 +46,11 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Install Linux native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libx11-dev libxi-dev pkg-config clang cmake ninja-build
+
       # Dependabot resolves pubspec.lock on whatever Dart its own runner has,
       # which is how #338 landed a lock full of Dart 3.13 packages (meta 1.19.0,
       # vector_math 2.4.2, ...) that every checkout at the pinned 3.44.9 then
