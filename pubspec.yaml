@@ -14,7 +14,7 @@ workspace:
   - packages/gamepads_windows
   - packages/sub_screen
 
-version: 0.16.0+133
+version: 0.16.1+2134
 
 environment:
   sdk: '>=3.13.0 <4.0.0'
