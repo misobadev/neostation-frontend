@@ -102,6 +102,9 @@ jobs:
       - name: Analyze project
         run: flutter analyze
 
+      - name: Run pure Dart tests
+        run: dart test test_pure
+
   test:
     name: Tests (shard ${{ matrix.shard }}/4)
     needs: lint

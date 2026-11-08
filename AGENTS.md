@@ -32,7 +32,11 @@ flutter build apk --release   <same --dart-define flags>
 
 There is no release-keystore requirement for local work: if `android/key.properties` is absent, the Android build falls back to debug signing automatically.
 
-**Test speed.** Never burn real wall-clock time to clear `GamepadNavigation`'s activation grace or key throttle. Use `test/gamepad_test_clock.dart` (`resetGamepadClock`, `advanceGamepadClock`) so the navigator's injected clock moves forward instantly. Keep `runAsync` for real I/O only. Network/slow suites are tagged (`@Tags(['network'])`): `flutter test --exclude-tags network` gives fast local feedback. CI shards the suite (`--total-shards 4 --shard-index … -j 4`), and `dart tool/test_slowest.dart test-results.json` prints the slowest suites from the JSON reporter output.
+**Test speed.** Never burn real wall-clock time to clear `GamepadNavigation`'s activation grace or key throttle. Use `test/gamepad_test_clock.dart` (`resetGamepadClock`, `advanceGamepadClock`) so the navigator's injected clock moves forward instantly. Keep `runAsync` for real I/O only. Network/slow suites are tagged (`@Tags(['network'])`): `flutter test --exclude-tags network` gives fast local feedback. CI splits the test files across four shards manually (`-j 4`), and `dart tool/test_slowest.dart test-results.json` prints the slowest suites from the JSON reporter output.
+
+**Pure Dart tests.** Logic that does not touch Flutter lives in `test_pure/` and runs with `dart test test_pure` (no Flutter engine, no native assets, no GTK). Those files import `package:test/test.dart`, not `flutter_test`; `flutter test` only discovers `test/`. Use `dart tool/classify_pure_tests.dart` to find new candidates.
+
+**Plugin channels in widget tests.** Use `test/support/plugin_channel_mocks.dart` (`installDefaultPluginMocks`) for benign plugin defaults instead of repeating `setMockMethodCallHandler`; override a channel in the test when its behaviour matters.
 
 ## Cross-cutting rules (read multiple files to get right)
 

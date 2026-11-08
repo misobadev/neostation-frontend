@@ -22,6 +22,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'gamepad_test_clock.dart';
+import 'support/plugin_channel_mocks.dart';
 
 /// Guards the systems grid/carousel now that they serve two callers: the
 /// systems screen (every parameter at its default) and the collections browser
@@ -40,11 +41,7 @@ void main() {
     SfxService().setEnabled(false);
     // Stub the gamepads plugin so GamepadNavigation.initialize() finds no
     // devices instead of reaching for a real platform channel.
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('xyz.luan/gamepads'),
-          (call) async => <dynamic>[],
-        );
+    installDefaultPluginMocks();
     await FlutterLocalization.instance.ensureInitialized();
     FlutterLocalization.instance.init(
       mapLocales: [MapLocale('en', AppLocale.en)],
