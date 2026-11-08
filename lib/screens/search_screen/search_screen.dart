@@ -2754,9 +2754,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final key = '$folder/${g.filename}';
     if (_artCache.containsKey(key)) return _artCache[key];
 
-    final resolved = GameModel.fromDatabaseModel(
-      g,
-    ).getImagePath(folder, 'box2d', context.read<FileProvider>());
+    final resolved = GameModel.fromDatabaseModel(g)
+        .getImagePath(folder, 'box2d', context.read<FileProvider>());
     final exists = resolved.isNotEmpty && File(resolved).existsSync();
     return _artCache[key] = exists ? resolved : null;
   }

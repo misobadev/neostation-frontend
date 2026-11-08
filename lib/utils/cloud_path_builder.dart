@@ -204,9 +204,8 @@ class CloudPathBuilder {
     // Strip known binary/library extensions so desktop core filenames
     // (`pcsx2_libretro.dll`, `mednafen_psx_hw_libretro.so`) collapse to the
     // same slug the runtime derives from the unique id (`retroarch.pcsx2`).
-    final extMatch = RegExp(
-      r'\.(dll|so|dylib|appimage|exe|bin)$',
-    ).firstMatch(input.toLowerCase());
+    final extMatch = RegExp(r'\.(dll|so|dylib|appimage|exe|bin)$')
+        .firstMatch(input.toLowerCase());
     if (extMatch != null) {
       input = input.substring(0, extMatch.start);
     }

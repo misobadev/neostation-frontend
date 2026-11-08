@@ -8,9 +8,9 @@ class RecentSystems extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Theme.of(
-        context,
-      ).colorScheme.surface, // Now surface = secondaryColor
+      color: Theme.of(context)
+          .colorScheme
+          .surface, // Now surface = secondaryColor
       elevation: Theme.of(context).cardTheme.elevation ?? 0,
       margin: EdgeInsets.zero,
       child: Padding(
@@ -27,9 +27,8 @@ class RecentSystems extends StatelessWidget {
               data: Theme.of(context).copyWith(
                 scaffoldBackgroundColor: Theme.of(context).colorScheme.surface,
                 dividerTheme: DividerThemeData(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(
-                    alpha: 0.1,
-                  ), // More transparent divider
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.1), // More transparent divider
                   thickness: 0.5, // Thinner lines
                 ),
               ),
@@ -81,9 +80,8 @@ DataRow recentFileDataRow(RecentFile fileInfo, BuildContext context) {
         Text(
           fileInfo.date!,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.7),
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.7),
           ),
         ),
       ),
@@ -91,9 +89,8 @@ DataRow recentFileDataRow(RecentFile fileInfo, BuildContext context) {
         Text(
           fileInfo.size!,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.7),
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.7),
           ),
         ),
       ),

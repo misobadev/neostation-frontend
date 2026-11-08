@@ -95,33 +95,36 @@ void main() {
       expect(result, isNull);
     });
 
-    test('requests recent unlocks with documented lookback parameter', () async {
-      late Uri requestedUri;
-      final client = MockClient((request) async {
-        requestedUri = request.url;
-        return http.Response(
-          '[{"Date":"2023-12-27 16:04:50","HardcoreMode":1,"AchievementID":98012,"Title":"Beginner I","Description":"Clear stages 01 - 05 in Quest.","BadgeName":"108302","Points":5,"TrueRatio":25,"Type":null,"Author":"jos","AuthorULID":"ULID","GameTitle":"Pokemon Pinball mini","GameIcon":"/Images/028399.png","GameID":14715,"ConsoleName":"Pokemon Mini","BadgeURL":"/Badge/108302.png","GameURL":"/game/14715"}]',
-          200,
+    test(
+      'requests recent unlocks with documented lookback parameter',
+      () async {
+        late Uri requestedUri;
+        final client = MockClient((request) async {
+          requestedUri = request.url;
+          return http.Response(
+            '[{"Date":"2023-12-27 16:04:50","HardcoreMode":1,"AchievementID":98012,"Title":"Beginner I","Description":"Clear stages 01 - 05 in Quest.","BadgeName":"108302","Points":5,"TrueRatio":25,"Type":null,"Author":"jos","AuthorULID":"ULID","GameTitle":"Pokemon Pinball mini","GameIcon":"/Images/028399.png","GameID":14715,"ConsoleName":"Pokemon Mini","BadgeURL":"/Badge/108302.png","GameURL":"/game/14715"}]',
+            200,
+          );
+        });
+
+        final result = await RetroAchievementsService.getUserRecentAchievements(
+          'Scott',
+          minutes: 43200,
+          apiKey: 'secret-key',
+          client: client,
         );
-      });
 
-      final result = await RetroAchievementsService.getUserRecentAchievements(
-        'Scott',
-        minutes: 43200,
-        apiKey: 'secret-key',
-        client: client,
-      );
-
-      expect(requestedUri.path, '/API/API_GetUserRecentAchievements.php');
-      expect(requestedUri.queryParameters['u'], 'Scott');
-      expect(requestedUri.queryParameters['m'], '43200');
-      expect(requestedUri.queryParameters['y'], 'secret-key');
-      // The dashboard's preview call stays byte-identical to its pre-see-all
-      // form: the pagination parameters only exist when asked for.
-      expect(requestedUri.queryParameters.containsKey('c'), isFalse);
-      expect(requestedUri.queryParameters.containsKey('o'), isFalse);
-      expect(result.single.gameId, 14715);
-    });
+        expect(requestedUri.path, '/API/API_GetUserRecentAchievements.php');
+        expect(requestedUri.queryParameters['u'], 'Scott');
+        expect(requestedUri.queryParameters['m'], '43200');
+        expect(requestedUri.queryParameters['y'], 'secret-key');
+        // The dashboard's preview call stays byte-identical to its pre-see-all
+        // form: the pagination parameters only exist when asked for.
+        expect(requestedUri.queryParameters.containsKey('c'), isFalse);
+        expect(requestedUri.queryParameters.containsKey('o'), isFalse);
+        expect(result.single.gameId, 14715);
+      },
+    );
 
     test('paginates the see-all list with count and offset', () async {
       late Uri requestedUri;

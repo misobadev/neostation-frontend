@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
+
 import '../repositories/system_repository.dart';
 import '../repositories/scraper_repository.dart';
+
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/providers/sqlite_database_provider.dart';
 import 'package:neostation/services/logger_service.dart';
@@ -185,9 +188,7 @@ class SteamScraperService {
           'real_name': gameData['name'] ?? filename,
           'developer': (gameData['developers'] as List?)?.first?.toString(),
           'publisher': (gameData['publishers'] as List?)?.first?.toString(),
-          'rating':
-              (gameData['metacritic']?['score'] as num? ?? 0) /
-              5.0, // Normalize metacritic 0-100 to 0-20 (UI maps to 0-10 star scale).
+          'rating': (gameData['metacritic']?['score'] as num? ?? 0) / 5.0, // Normalize metacritic 0-100 to 0-20 (UI maps to 0-10 star scale).
           'release_date': gameData['release_date']?['date']?.toString(),
           'genre': (gameData['genres'] as List?)?.first?['description']
               ?.toString(),

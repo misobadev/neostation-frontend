@@ -245,9 +245,8 @@ class _DiscoveryWheel extends StatelessWidget {
     if (entry == null || folder.isEmpty) return const SizedBox.shrink();
 
     final path = discoveryFirstExistingImage([
-      GameModel.fromDatabaseModel(
-        entry.game,
-      ).getImagePath(folder, 'wheels', fileProvider),
+      GameModel.fromDatabaseModel(entry.game)
+          .getImagePath(folder, 'wheels', fileProvider),
     ]);
     if (path == null) return const SizedBox.shrink();
 
@@ -331,15 +330,12 @@ class DiscoveryTileArt extends StatelessWidget {
     final path = folder.isEmpty
         ? null
         : discoveryFirstExistingImage([
-            GameModel.fromDatabaseModel(
-              entry.game,
-            ).getImagePath(folder, 'fanarts', fileProvider),
-            GameModel.fromDatabaseModel(
-              entry.game,
-            ).getImagePath(folder, 'screenshots', fileProvider),
-            GameModel.fromDatabaseModel(
-              entry.game,
-            ).getImagePath(folder, 'box2d', fileProvider),
+            GameModel.fromDatabaseModel(entry.game)
+                .getImagePath(folder, 'fanarts', fileProvider),
+            GameModel.fromDatabaseModel(entry.game)
+                .getImagePath(folder, 'screenshots', fileProvider),
+            GameModel.fromDatabaseModel(entry.game)
+                .getImagePath(folder, 'box2d', fileProvider),
           ]);
 
     if (path == null) return _placeholder(theme);

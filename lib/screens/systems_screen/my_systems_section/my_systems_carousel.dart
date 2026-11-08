@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -9,6 +10,7 @@ import 'package:neostation/models/system_model.dart';
 import 'package:neostation/screens/app_screen.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../providers/file_provider.dart';
@@ -17,20 +19,26 @@ import '../../../utils/gamepad_nav.dart';
 import '../../../services/game_service.dart';
 import '../../../utils/game_launch_utils.dart';
 import '../../../providers/system_background_provider.dart';
+
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
+
 import '../../collections_screen/collections_browser_screen.dart';
 import '../../search_screen/search_screen.dart';
 import '../../game_screen/android_apps/android_apps_grid.dart';
+
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/services/secondary_achievements_controller.dart';
+
 import '../../game_screen/my_games_list.dart';
+
 import 'package:neostation/models/secondary_display_state.dart';
 import 'package:neostation/widgets/native_carousel.dart';
+
 import 'system_list_builder.dart';
 import 'system_card.dart';
 
@@ -1035,8 +1043,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                 );
               },
               child: Focus(
-                descendantsAreFocusable:
-                    false, // Intercept native Flutter focus to use custom gamepad logic.
+                descendantsAreFocusable: false, // Intercept native Flutter focus to use custom gamepad logic.
                 skipTraversal: true,
                 child: RepaintBoundary(
                   child: NativeCarousel(
@@ -1178,9 +1185,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                             ? Colors.transparent
                             : Theme.of(context).colorScheme.surface,
                         borderRadius:
-                            Theme.of(
-                              context,
-                            ).extension<CornerRadii>()?.radiusExternal ??
+                            Theme.of(context)
+                                .extension<CornerRadii>()
+                                ?.radiusExternal ??
                             BorderRadius.circular(14.r),
                       ),
                     );

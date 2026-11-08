@@ -17,18 +17,14 @@ void main() {
 
   test('macOS .app bundles are one directory-backed game', () async {
     final app = Directory(path.join(root.path, 'Dusklight.app'));
-    await Directory(
-      path.join(app.path, 'Contents', 'MacOS'),
-    ).create(recursive: true);
-    await File(
-      path.join(app.path, 'Contents', 'MacOS', 'dusklight'),
-    ).writeAsBytes([0]);
-    await Directory(
-      path.join(app.path, 'Contents', 'Resources'),
-    ).create(recursive: true);
-    await File(
-      path.join(app.path, 'Contents', 'Resources', 'helper.exe'),
-    ).writeAsBytes([0]);
+    await Directory(path.join(app.path, 'Contents', 'MacOS'))
+        .create(recursive: true);
+    await File(path.join(app.path, 'Contents', 'MacOS', 'dusklight'))
+        .writeAsBytes([0]);
+    await Directory(path.join(app.path, 'Contents', 'Resources'))
+        .create(recursive: true);
+    await File(path.join(app.path, 'Contents', 'Resources', 'helper.exe'))
+        .writeAsBytes([0]);
 
     final entries = await SqliteDatabaseService.scanStandardPath(root.path, {
       'app',

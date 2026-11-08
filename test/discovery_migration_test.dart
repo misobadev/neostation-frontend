@@ -269,9 +269,9 @@ void main() {
         'L',
       );
       expect(
-        columnsOf(
-          'user_config',
-        ).where((c) => c == 'discovery_grid_columns').length,
+        columnsOf('user_config')
+            .where((c) => c == 'discovery_grid_columns')
+            .length,
         1,
       );
     });
@@ -287,9 +287,9 @@ void main() {
       await runV184();
 
       expect(
-        columnsOf(
-          'user_config',
-        ).where((c) => c == 'discovery_grid_columns').length,
+        columnsOf('user_config')
+            .where((c) => c == 'discovery_grid_columns')
+            .length,
         1,
       );
     });
@@ -327,9 +327,9 @@ void main() {
         'carousel',
       );
       expect(
-        columnsOf(
-          'user_config',
-        ).where((c) => c == 'discovery_view_mode').length,
+        columnsOf('user_config')
+            .where((c) => c == 'discovery_view_mode')
+            .length,
         1,
       );
     });
@@ -345,9 +345,9 @@ void main() {
       await runV185();
 
       expect(
-        columnsOf(
-          'user_config',
-        ).where((c) => c == 'discovery_view_mode').length,
+        columnsOf('user_config')
+            .where((c) => c == 'discovery_view_mode')
+            .length,
         1,
       );
     });
@@ -385,9 +385,9 @@ void main() {
         'XL',
       );
       expect(
-        columnsOf(
-          'user_config',
-        ).where((c) => c == 'android_grid_columns').length,
+        columnsOf('user_config')
+            .where((c) => c == 'android_grid_columns')
+            .length,
         1,
       );
     });
@@ -403,9 +403,9 @@ void main() {
       await runV186();
 
       expect(
-        columnsOf(
-          'user_config',
-        ).where((c) => c == 'android_grid_columns').length,
+        columnsOf('user_config')
+            .where((c) => c == 'android_grid_columns')
+            .length,
         1,
       );
     });
@@ -416,9 +416,8 @@ void main() {
     // thing a brand new database is built from. They are read from the source
     // rather than duplicated here: a copy would be one more thing to keep in
     // step, which is the very failure being guarded against.
-    final source = File(
-      'lib/data/datasources/sqlite_service.dart',
-    ).readAsStringSync();
+    final source = File('lib/data/datasources/sqlite_service.dart')
+        .readAsStringSync();
 
     String createTableDdl(String table) {
       final match = RegExp(
@@ -448,35 +447,38 @@ void main() {
       expect(freshColumns, migrated);
     });
 
-    test('the fresh-install picks table has the same key and collation', () async {
-      final fresh = sqlite3.openInMemory();
-      addTearDown(fresh.close);
-      fresh.execute(createTableDdl('user_discovery_picks'));
+    test(
+      'the fresh-install picks table has the same key and collation',
+      () async {
+        final fresh = sqlite3.openInMemory();
+        addTearDown(fresh.close);
+        fresh.execute(createTableDdl('user_discovery_picks'));
 
-      fresh.execute(
-        "INSERT INTO user_discovery_picks (week_key, slot_id, section, rom_path) "
-        "VALUES ('2026-W33', 'gotw', 'gameOfTheWeek', '/roms/Game.sfc')",
-      );
-      fresh.execute(
-        "INSERT OR REPLACE INTO user_discovery_picks (week_key, slot_id, section, rom_path) "
-        "VALUES ('2026-W33', 'gotw', 'gameOfTheWeek', '/roms/Other.sfc')",
-      );
+        fresh.execute(
+          "INSERT INTO user_discovery_picks (week_key, slot_id, section, rom_path) "
+          "VALUES ('2026-W33', 'gotw', 'gameOfTheWeek', '/roms/Game.sfc')",
+        );
+        fresh.execute(
+          "INSERT OR REPLACE INTO user_discovery_picks (week_key, slot_id, section, rom_path) "
+          "VALUES ('2026-W33', 'gotw', 'gameOfTheWeek', '/roms/Other.sfc')",
+        );
 
-      expect(
-        fresh
-            .select('SELECT COUNT(*) AS n FROM user_discovery_picks')
-            .first['n'],
-        1,
-      );
-      expect(
-        fresh
-            .select(
-              "SELECT rom_path FROM user_discovery_picks WHERE rom_path = '/ROMS/OTHER.SFC'",
-            )
-            .length,
-        1,
-      );
-    });
+        expect(
+          fresh
+              .select('SELECT COUNT(*) AS n FROM user_discovery_picks')
+              .first['n'],
+          1,
+        );
+        expect(
+          fresh
+              .select(
+                "SELECT rom_path FROM user_discovery_picks WHERE rom_path = '/ROMS/OTHER.SFC'",
+              )
+              .length,
+          1,
+        );
+      },
+    );
 
     test('a fresh user_config already carries hide_tab_discovery', () async {
       final fresh = sqlite3.openInMemory();

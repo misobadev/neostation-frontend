@@ -15,6 +15,7 @@ import 'package:neostation/services/ra_library_match_runner.dart';
 import 'package:neostation/services/retro_achievements_helper.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+
 import '../widgets/fixed_header.dart';
 import 'systems_screen/system_content.dart';
 import 'search_screen/search_screen.dart';
@@ -25,9 +26,11 @@ import 'settings_screen/new_settings_screen.dart';
 import 'saves_screen/saves_tab.dart';
 import 'romm_screen/romm_tab.dart';
 import 'game_screen/android_apps/android_apps_grid.dart';
+
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/repositories/emulator_repository.dart';
+
 import 'dart:async';
 import 'dart:io';
 
@@ -586,9 +589,8 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
 
       // The same label as the header's tab strip, translated here: the
       // second engine reads the language only when it starts.
-      final tabName = navTabSpec(
-        NavTab.values[index],
-      ).labelKey.getString(context);
+      final tabName = navTabSpec(NavTab.values[index]).labelKey
+          .getString(context);
 
       secondaryState.updateState(
         systemName: tabName,

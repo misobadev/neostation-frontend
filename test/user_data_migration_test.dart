@@ -162,9 +162,8 @@ void main() {
       // Owned files are now at the destination...
       expect(File(p.join(dest.path, 'data.sqlite')).existsSync(), isTrue);
       expect(
-        File(
-          p.join(dest.path, 'media', 'snes', 'boxart', 'ct.png'),
-        ).existsSync(),
+        File(p.join(dest.path, 'media', 'snes', 'boxart', 'ct.png'))
+            .existsSync(),
         isTrue,
       );
       // ...and removed from the source.
@@ -292,9 +291,8 @@ void main() {
       );
 
       expect(
-        File(
-          p.join(dest.path, 'custom_themes', 'mine.json'),
-        ).readAsStringSync(),
+        File(p.join(dest.path, 'custom_themes', 'mine.json'))
+            .readAsStringSync(),
         '{"name":"mine"}',
       );
       expect(
@@ -568,9 +566,8 @@ void main() {
     });
 
     test('an empty folder inside ours still moves', () async {
-      Directory(
-        p.join(esde.path, 'media', 'nes', 'boxart'),
-      ).createSync(recursive: true);
+      Directory(p.join(esde.path, 'media', 'nes', 'boxart'))
+          .createSync(recursive: true);
 
       await migrate();
 
@@ -581,9 +578,8 @@ void main() {
     });
 
     test('an empty folder of ours blocked by a file changes nothing', () async {
-      Directory(
-        p.join(esde.path, 'media', 'nes', 'boxart'),
-      ).createSync(recursive: true);
+      Directory(p.join(esde.path, 'media', 'nes', 'boxart'))
+          .createSync(recursive: true);
       File(p.join(dest.path, 'media', 'nes', 'boxart'))
         ..createSync(recursive: true)
         ..writeAsStringSync('in the way');
@@ -679,9 +675,8 @@ void main() {
     // Another database's WAL left beside the copy would be applied to it.
     test('stale -wal, -shm and -journal in the destination go', () async {
       for (final suffix in ['-wal', '-shm', '-journal']) {
-        File(
-          p.join(dest.path, 'data.sqlite$suffix'),
-        ).writeAsStringSync('stale');
+        File(p.join(dest.path, 'data.sqlite$suffix'))
+            .writeAsStringSync('stale');
       }
 
       await migrate();

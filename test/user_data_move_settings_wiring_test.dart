@@ -32,9 +32,8 @@ void main() {
     expect(second, greaterThan(body.indexOf('MoveUserDataDialog.show(')));
     expect(second, lessThan(body.indexOf('_migrateUserData(')));
     expect(
-      method(
-        'bool _refuseMoveWhileBusy(',
-      ).contains('userDataMoveBusy(context)'),
+      method('bool _refuseMoveWhileBusy(')
+          .contains('userDataMoveBusy(context)'),
       isTrue,
     );
   });

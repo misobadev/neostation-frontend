@@ -194,9 +194,8 @@ class EmulatorRow extends StatelessWidget {
                                 color: const Color(0xFFFFD700),
                                 borderRadius: BorderRadius.circular(3.r),
                                 border: Border.all(
-                                  color: const Color(
-                                    0xFF00387D,
-                                  ).withValues(alpha: 0.2),
+                                  color: const Color(0xFF00387D)
+                                      .withValues(alpha: 0.2),
                                   width: 0.5.r,
                                 ),
                               ),

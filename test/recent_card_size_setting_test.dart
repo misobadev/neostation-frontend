@@ -76,9 +76,8 @@ void main() {
       expect(fromCamel.recentCardSize, RecentCardSizes.twoByOne);
       expect(fromSnake.recentCardSize, RecentCardSizes.twoByOne);
       expect(
-        const ConfigModel(
-          recentCardSize: RecentCardSizes.twoByOne,
-        ).toJson()['recentCardSize'],
+        const ConfigModel(recentCardSize: RecentCardSizes.twoByOne)
+            .toJson()['recentCardSize'],
         RecentCardSizes.twoByOne,
       );
     });

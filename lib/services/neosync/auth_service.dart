@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:neostation/models/user.dart';
@@ -227,8 +228,7 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode == 201) {
         return {
           'success': true,
-          'message':
-              'Registration successful. Please check your email to verify your account.',
+          'message': 'Registration successful. Please check your email to verify your account.',
         };
       } else {
         return {

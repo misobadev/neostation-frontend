@@ -1,9 +1,13 @@
 import 'dart:io';
+
 import 'custom_sfx.dart';
+
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:sub_screen/shared_state_manager.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import 'secondary_achievement_item.dart';
 
 /// Data structure representing the current state of the secondary/bottom display.

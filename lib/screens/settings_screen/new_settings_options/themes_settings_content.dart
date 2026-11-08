@@ -23,6 +23,7 @@ import 'package:neostation/widgets/tv_directory_picker.dart';
 import 'package:neostation/responsive.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import 'settings_title.dart';
 import 'widgets/setting_row.dart';
 import 'widgets/setting_value_chip.dart';
@@ -432,10 +433,8 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
           // NeoGlass appearance controls (frosted-glass chrome).
           Text(
             AppLocale.neoglassGroup.getString(context),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontSize: 13.r,
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontSize: 13.r, fontWeight: FontWeight.w600),
           ),
           if (config.performanceMode) ...[
             SizedBox(height: 4.r),
@@ -443,9 +442,8 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
               AppLocale.performanceModeNeoglassDisabled.getString(context),
               style: TextStyle(
                 fontSize: 9.r,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -465,9 +463,8 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
                 AppLocale.neoglassBlurGpuWarning.getString(context),
                 style: TextStyle(
                   fontSize: 9.r,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.6),
                 ),
               ),
             ),

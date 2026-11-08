@@ -92,9 +92,8 @@ void main() {
   });
 
   test('the database can be copied but not changed', () {
-    final names = RegExp(
-      r'PROTECTED_NAMES\s*=\s*setOf\(([^)]*)\)',
-    ).firstMatch(provider);
+    final names = RegExp(r'PROTECTED_NAMES\s*=\s*setOf\(([^)]*)\)')
+        .firstMatch(provider);
     expect(names, isNotNull);
     for (final name in [
       'data.sqlite',

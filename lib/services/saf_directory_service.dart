@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import 'logger_service.dart';
 
 /// Service for managing directory and file operations via the Android
@@ -157,13 +159,15 @@ class SafDirectoryService {
     if (_fastWalkAvailable == false) return null;
 
     try {
-      final List<dynamic>? files = await platform
-          .invokeMethod('fastWalkSafTree', {
-            'uri': uri,
-            'recursive': recursive,
-            'extensions': extensions.toList(),
-            'ignoreHiddenFiles': ignoreHiddenFiles,
-          });
+      final List<dynamic>? files = await platform.invokeMethod(
+        'fastWalkSafTree',
+        {
+          'uri': uri,
+          'recursive': recursive,
+          'extensions': extensions.toList(),
+          'ignoreHiddenFiles': ignoreHiddenFiles,
+        },
+      );
 
       if (files == null) {
         _fastWalkAvailable = false;

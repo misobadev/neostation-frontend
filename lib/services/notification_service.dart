@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:neostation/models/notification_models.dart';
@@ -29,13 +30,11 @@ class NotificationService extends ChangeNotifier {
   final _log = LoggerService.instance;
 
   NotificationService({
-    required AuthService authService,
-    NeoSyncProvider? neoSyncProvider,
+    required this._authService,
+    this._neoSyncProvider,
     BuildContext? Function()? modalContext,
     @visibleForTesting WebSocketChannel Function(Uri uri)? connectChannel,
-  }) : _authService = authService,
-       _neoSyncProvider = neoSyncProvider,
-       _modalContext = modalContext ?? _noContext,
+  }) : _modalContext = modalContext ?? _noContext,
        _connectChannel = connectChannel ?? WebSocketChannel.connect {
     _authService.addListener(_onAccountChanged);
     SyncManager.instance.addListener(_onAccountChanged);

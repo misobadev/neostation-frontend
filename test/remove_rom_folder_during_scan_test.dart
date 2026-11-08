@@ -65,9 +65,10 @@ void main() {
     return root;
   }
 
-  Future<List<String>> storedRomPaths() async => (await db.rawQuery(
-    'SELECT rom_path FROM user_roms ORDER BY rom_path',
-  )).map((r) => r['rom_path'] as String).toList();
+  Future<List<String>> storedRomPaths() async =>
+      (await db.rawQuery('SELECT rom_path FROM user_roms ORDER BY rom_path'))
+          .map((r) => r['rom_path'] as String)
+          .toList();
 
   Future<int> romsUnder(Directory root) async =>
       (await storedRomPaths()).where((p) => p.startsWith(root.path)).length;

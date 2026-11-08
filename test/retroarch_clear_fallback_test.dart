@@ -60,15 +60,18 @@ void main() {
     },
   );
 
-  test('falls back to the first by name when the seed designates none', () async {
-    await db.execute(
-      "UPDATE app_emulators SET is_default_standalone = 0 WHERE system_id = 'ps2'",
-    );
+  test(
+    'falls back to the first by name when the seed designates none',
+    () async {
+      await db.execute(
+        "UPDATE app_emulators SET is_default_standalone = 0 WHERE system_id = 'ps2'",
+      );
 
-    await SqliteService.clearRetroArchDefaultsForAndroid();
+      await SqliteService.clearRetroArchDefaultsForAndroid();
 
-    expect(await defaults(), ['ps2.emucorex']);
-  });
+      expect(await defaults(), ['ps2.emucorex']);
+    },
+  );
 
   test('leaves a system the user has configured alone', () async {
     await db.execute(

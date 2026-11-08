@@ -570,11 +570,11 @@ class _TabProvider extends RetroAchievementsProvider {
   /// way the real provider's does. Everything else stays pinned per test.
   _TabProvider({
     this.items = const [],
-    bool loaded = false,
+    this._loaded = false,
     this.loading = false,
     this.hasMore = true,
     this.error,
-  }) : _loaded = loaded;
+  });
 
   List<RaGamesListItem> items;
   bool _loaded;

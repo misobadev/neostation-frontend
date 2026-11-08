@@ -233,9 +233,8 @@ void main() {
       rommRomId: 1,
     );
     tmp = await Directory.systemTemp.createTemp('romm_standalone_');
-    folder = await Directory(
-      p.join(tmp.path, 'aethersx2', 'memcards'),
-    ).create(recursive: true);
+    folder = await Directory(p.join(tmp.path, 'aethersx2', 'memcards'))
+        .create(recursive: true);
     retroArch = Directory(p.join(tmp.path, 'RetroArch', 'saves'));
     retroArchAsked.clear();
     local = [];

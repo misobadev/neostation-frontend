@@ -3,7 +3,9 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:video_player/video_player.dart';
+
 import 'dart:async';
+
 import '../../../models/system_model.dart';
 import '../../../utils/effective_system.dart';
 import '../../../models/game_model.dart';
@@ -12,21 +14,27 @@ import '../../../providers/retro_achievements_provider.dart';
 import '../../../sync/i_sync_provider.dart';
 import '../../../models/retro_achievements_game_info.dart';
 import '../../../repositories/retro_achievements_repository.dart';
+
 import 'package:neostation/services/sfx_service.dart';
+
 import 'dialogs/ra_match_picker_dialog.dart';
 import '../../../services/retro_achievements_helper.dart';
 import '../../../utils/artwork_cache.dart';
 import '../../../utils/ra_coverage.dart';
 import '../../../utils/gamepad_nav.dart';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:provider/provider.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../services/screenscraper_service.dart';
 import '../../../services/game_service.dart';
 import '../../../services/android_service.dart';
+
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+
 import '../../../models/secondary_display_state.dart';
 import 'widgets/game_details_footer.dart';
 import 'widgets/game_details_tabs_header.dart';
@@ -37,6 +45,7 @@ import 'tabs/game_details_box2d_tab.dart';
 import 'tabs/game_details_screenshot_video_tab.dart';
 import 'tabs/game_details_game_info_tab.dart';
 import 'tabs/game_details_achievements_tab.dart';
+
 import 'package:neostation/screens/retro_achievements_screen/ra_game_achievements_page.dart';
 
 /// A comprehensive details view for a selected game, providing access to metadata,

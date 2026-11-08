@@ -405,9 +405,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.2),
+                  color: Theme.of(context).colorScheme.primary
+                      .withValues(alpha: 0.2),
                   width: 1,
                 ),
                 boxShadow: [
@@ -450,9 +449,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
             Divider(
               height: 4.r,
               thickness: 1,
-              color: Theme.of(
-                context,
-              ).colorScheme.outline.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.outline
+                  .withValues(alpha: 0.1),
             ),
           );
         }
@@ -465,9 +463,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
                 fontSize: 10.r,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.r,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.5),
               ),
             ),
           ),
@@ -514,16 +511,14 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
               padding: EdgeInsets.symmetric(horizontal: 12.r),
               decoration: BoxDecoration(
                 color: isFocused
-                    ? Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.15)
+                    ? Theme.of(context).colorScheme.primary
+                          .withValues(alpha: 0.15)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(8.r),
                 border: isFocused
                     ? Border.all(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.3),
+                        color: Theme.of(context).colorScheme.primary
+                            .withValues(alpha: 0.3),
                         width: 1,
                       )
                     : null,
@@ -533,9 +528,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
                   Icon(
                     opt.icon,
                     size: 14.r,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.9),
+                    color: Theme.of(context).colorScheme.onSurface
+                        .withValues(alpha: 0.9),
                   ),
                   SizedBox(width: 8.r),
                   Expanded(
@@ -633,9 +627,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
             borderRadius: BorderRadius.circular(8.r),
             border: itemIsFocused
                 ? Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.3),
+                    color: Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.3),
                     width: 1,
                   )
                 : null,
@@ -664,9 +657,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
                     size: 14.r,
                     color: isSelected
                         ? Theme.of(context).colorScheme.secondary
-                        : Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.9),
+                        : Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: 0.9),
                   ),
                   SizedBox(width: 8.r),
                   Expanded(

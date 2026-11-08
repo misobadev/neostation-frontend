@@ -260,9 +260,8 @@ void main() {
     test('strips a "cores/" prefix before relocating', () async {
       final cores = Directory(p.join(home.path, 'cores'))
         ..createSync(recursive: true);
-      File(
-        p.join(cores.path, 'genesis_plus_gx_libretro.so'),
-      ).writeAsStringSync('');
+      File(p.join(cores.path, 'genesis_plus_gx_libretro.so'))
+          .writeAsStringSync('');
 
       expect(
         await GameLaunchService.absolutizeRetroArchCore([
@@ -328,9 +327,8 @@ void main() {
         ),
       )..createSync(recursive: true);
       // A launcher script has a sibling directory that is *not* the cores dir.
-      Directory(
-        p.join(home.path, 'Emulation/tools/launchers/cores'),
-      ).createSync(recursive: true);
+      Directory(p.join(home.path, 'Emulation/tools/launchers/cores'))
+          .createSync(recursive: true);
 
       expect(
         await LinuxEmulatorDiscovery.resolveRetroArchCoresDir(

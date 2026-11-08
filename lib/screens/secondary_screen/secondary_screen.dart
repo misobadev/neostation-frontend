@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import '../../l10n/app_locale.dart';
+import '../../themes/anta_text_theme.dart';
+
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/services/secondary_apps_service.dart';
 import 'package:video_player/video_player.dart';
+
 import '../../models/config_model.dart';
 import '../../models/secondary_achievement_item.dart';
 import '../../models/secondary_display_state.dart';
@@ -926,7 +930,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                   : theme.scaffoldBackgroundColor,
               // Match the primary app: default all text to the neostation
               // (Anta) font so the secondary display stays on-brand.
-              textTheme: GoogleFonts.antaTextTheme(theme.textTheme),
+              textTheme: antaTextTheme(theme.textTheme),
             ),
             home: Builder(
               builder: (context) {
@@ -1002,15 +1006,13 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                             if (value.gameImageBytes != null)
                                               buildBackgroundBytes(
                                                 value.gameImageBytes!,
-                                                fit: BoxFit
-                                                    .contain, // "se debe ver completo"
+                                                fit: BoxFit.contain, // "se debe ver completo"
                                               )
                                             else if (value.gameScreenshot !=
                                                 null)
                                               buildBackground(
                                                 value.gameScreenshot!,
-                                                fit: BoxFit
-                                                    .contain, // "se debe ver completo"
+                                                fit: BoxFit.contain, // "se debe ver completo"
                                               )
                                             else if (value.gameFanart != null ||
                                                 value.gameWheel != null)
@@ -1019,15 +1021,13 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                             if (value.gameImageBytes != null)
                                               buildBackgroundBytes(
                                                 value.gameImageBytes!,
-                                                fit: BoxFit
-                                                    .contain, // "se debe ver completo"
+                                                fit: BoxFit.contain, // "se debe ver completo"
                                               )
                                             else if (value.gameScreenshot !=
                                                 null)
                                               buildBackground(
                                                 value.gameScreenshot!,
-                                                fit: BoxFit
-                                                    .contain, // "se debe ver completo"
+                                                fit: BoxFit.contain, // "se debe ver completo"
                                               )
                                             else if (value.gameFanart != null ||
                                                 value.gameWheel != null)
@@ -1042,9 +1042,9 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                                     Center(
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2.r,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
                                       ),
                                     ),
                                   if (_showVideo && _videoController != null)

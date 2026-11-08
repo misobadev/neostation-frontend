@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
+
 import '../../../models/secondary_display_state.dart';
 import '../now_playing_helpers.dart';
 import '../../../l10n/app_locale.dart';

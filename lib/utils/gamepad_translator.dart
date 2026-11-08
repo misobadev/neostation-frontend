@@ -1,7 +1,9 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:gamepads/gamepads.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import 'gamepad_mapping.dart' hide GamepadConnectionType;
 
 /// Standardized gamepad input types supported by NeoStation.

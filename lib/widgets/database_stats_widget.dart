@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../../providers/sqlite_database_provider.dart';
 
 class DatabaseStatsWidget extends StatelessWidget {
@@ -50,9 +51,8 @@ class DatabaseStatsWidget extends StatelessWidget {
                   children: [
                     Text(
                       'Database Stats',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     SizedBox(height: 12),
                     _buildStatRow(
@@ -80,9 +80,8 @@ class DatabaseStatsWidget extends StatelessWidget {
                       Text(
                         'Last updated: ${_formatDateTime(dbProvider.lastUpdate!)}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.7),
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -105,9 +104,8 @@ class DatabaseStatsWidget extends StatelessWidget {
           Text(label),
           Text(
             value,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
       ),

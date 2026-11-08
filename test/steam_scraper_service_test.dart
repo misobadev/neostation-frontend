@@ -102,8 +102,7 @@ void main() {
                   ],
                   'screenshots': [
                     {
-                      'path_thumbnail':
-                          'https://shared.fastly.steamstatic.com/ss_1.600x338.jpg',
+                      'path_thumbnail': 'https://shared.fastly.steamstatic.com/ss_1.600x338.jpg',
                     },
                   ],
                 },

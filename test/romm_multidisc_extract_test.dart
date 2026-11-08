@@ -61,9 +61,8 @@ void main() {
         expect(Directory(p.join(dir.path, '.hidden')).existsSync(), isFalse);
         // Playlist sits in root and references discs by bare basename, in the
         // bundled order.
-        final playlist = File(
-          p.join(dir.path, 'Alone in the Dark.m3u'),
-        ).readAsLinesSync();
+        final playlist = File(p.join(dir.path, 'Alone in the Dark.m3u'))
+            .readAsLinesSync();
         expect(playlist, [
           'Alone in the Dark (Disc 1).chd',
           'Alone in the Dark (Disc 2).chd',
@@ -172,9 +171,8 @@ void main() {
       expect(descriptorName, 'Day of the Tentacle.scummvm');
       expect(descriptor.existsSync(), isFalse);
       expect(
-        File(
-          p.join(dir.path, 'tentacle', 'Day of the Tentacle.scummvm'),
-        ).existsSync(),
+        File(p.join(dir.path, 'tentacle', 'Day of the Tentacle.scummvm'))
+            .existsSync(),
         isTrue,
       );
     });

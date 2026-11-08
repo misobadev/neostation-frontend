@@ -1773,8 +1773,8 @@ mixin AppLocale {
 
   /// All locale maps keyed by the language codes the app registers with
   /// `FlutterLocalization` in `main.dart` (and that settings passes to
-  /// `translate`). Note `zh_Hant` is a raw code in this app, not a Flutter
-  /// script subtag, so a plain string match is enough.
+  /// `translate`). Traditional Chinese is registered as `zh` with the `Hant`
+  /// script, so it is keyed here by the app's `zh_Hant` identifier.
   ///
   /// `main.dart` currently duplicates this registry for its two `init`
   /// calls; deriving those `MapLocale` lists from this map is a known
@@ -1823,7 +1823,12 @@ mixin AppLocale {
 /// visible, greppy failure rather than a silent blank.
 extension AppLocaleContextFreeLookup on String {
   String getStringForCurrentLocale() {
-    final language = FlutterLocalization.instance.currentLocale?.languageCode;
+    final locale = FlutterLocalization.instance.currentLocale;
+    final language = locale == null
+        ? null
+        : (locale.scriptCode == 'Hant' || locale.languageCode == 'zh_Hant'
+              ? 'zh_Hant'
+              : locale.languageCode);
     final map = AppLocale._mapsByLanguageCode[language] ?? AppLocale.en;
     return (map[this] ?? AppLocale.en[this] ?? this).toString();
   }

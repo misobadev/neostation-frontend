@@ -274,9 +274,8 @@ void main() {
       expect(
         browsing(failure(RommFailure.unexpectedStatus, statusCode: 404)),
         isNot(
-          text(
-            AppLocale.rommErrorUnexpectedStatus,
-          ).replaceFirst('{error}', '404'),
+          text(AppLocale.rommErrorUnexpectedStatus)
+              .replaceFirst('{error}', '404'),
         ),
       );
       expect(

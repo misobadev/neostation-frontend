@@ -29,8 +29,8 @@ void main() {
     ).create();
     duckStationExecutable = path.join(macOsDirectory.path, 'DuckStation');
     await File(duckStationExecutable).writeAsString('executable');
-    await File(path.join(contentsDirectory.path, 'Info.plist')).writeAsString(
-      '''
+    await File(path.join(contentsDirectory.path, 'Info.plist'))
+        .writeAsString('''
 <?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0">
 <dict>
@@ -40,8 +40,7 @@ void main() {
   <string>com.github.stenzek.duckstation</string>
 </dict>
 </plist>
-''',
-    );
+''');
   });
 
   tearDown(() async {

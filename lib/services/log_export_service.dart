@@ -83,8 +83,6 @@ class LogExportService {
         mimeType: 'application/zip',
         dialogTitle: dialogTitle,
         initialDirectory: await _downloadsPath(),
-        type: FileType.custom,
-        allowedExtensions: const ['zip'],
       );
       if (uri == null) return (LogExportResult.cancelled, null);
       return (LogExportResult.saved, uri.toFilePath());

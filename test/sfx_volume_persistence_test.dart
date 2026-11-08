@@ -12,9 +12,8 @@ void main() {
 
     test('round-trips and clamps persisted values', () {
       expect(
-        ConfigModel.fromJson(
-          const ConfigModel(sfxVolume: 0.5).toJson(),
-        ).sfxVolume,
+        ConfigModel.fromJson(const ConfigModel(sfxVolume: 0.5).toJson())
+            .sfxVolume,
         0.5,
       );
       expect(ConfigModel.fromJson({'sfx_volume': 4}).sfxVolume, 0.75);

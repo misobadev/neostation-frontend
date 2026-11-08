@@ -4,6 +4,7 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/sfx_service.dart';
+
 import '../../../../providers/sqlite_config_provider.dart';
 
 /// Renders the 'Empty State' view with a clear CTA for library configuration.
@@ -51,9 +52,8 @@ class GridEmptyState extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(12.r),
               ),
               child: SizedBox(
@@ -61,9 +61,8 @@ class GridEmptyState extends StatelessWidget {
                 height: 48,
                 child: Image.asset(
                   'assets/images/icons/folder-add-bulk.png',
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -84,9 +83,8 @@ class GridEmptyState extends StatelessWidget {
                   ? AppLocale.noSystemsFoundDesc.getString(context)
                   : AppLocale.selectRomFolderDescShort.getString(context),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -98,9 +96,8 @@ class GridEmptyState extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8.r),
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.3),
+                    color: Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),

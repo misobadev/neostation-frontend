@@ -9,12 +9,11 @@ import 'package:neostation/services/logger_service.dart';
 
 /// The server search the picker runs — `RommService.getRomsPage` in the app,
 /// a fake in tests.
-typedef RommMatchSearch =
-    Future<RommRomPage> Function({
-      required String search,
-      required List<int> platformIds,
-      required int limit,
-    });
+typedef RommMatchSearch = Future<RommRomPage> Function({
+  required String search,
+  required List<int> platformIds,
+  required int limit,
+});
 
 /// Resolves a local system's real name to the RomM platform ids to scope by.
 typedef RommMatchPlatformIds = Future<List<int>> Function(String realName);
@@ -23,13 +22,12 @@ typedef RommMatchPlatformIds = Future<List<int>> Function(String realName);
 typedef RommMatchMappingReader = Future<RommSaveMapping?> Function();
 
 /// Writes the manual row — `RommSaveMapRepository.putManualMapping`.
-typedef RommMatchMappingWriter =
-    Future<bool> Function({
-      required String romname,
-      required String systemFolder,
-      required int rommRomId,
-      String? fsName,
-    });
+typedef RommMatchMappingWriter = Future<bool> Function({
+  required String romname,
+  required String systemFolder,
+  required int rommRomId,
+  String? fsName,
+});
 
 /// Drops the sync provider's cached state for one game after the row changed.
 typedef RommMatchSyncInvalidator = void Function(String romname);

@@ -77,12 +77,10 @@ void main() {
 
     // Rotating a large log onto a folder that is in the way fails the new
     // file logger's start.
-    File(
-      p.join(second.path, 'app.log'),
-    ).writeAsBytesSync(List.filled(5 * 1024 * 1024 + 1, 0x41));
-    Directory(
-      p.join(second.path, 'app.log.old', 'in-the-way'),
-    ).createSync(recursive: true);
+    File(p.join(second.path, 'app.log'))
+        .writeAsBytesSync(List.filled(5 * 1024 * 1024 + 1, 0x41));
+    Directory(p.join(second.path, 'app.log.old', 'in-the-way'))
+        .createSync(recursive: true);
     await UserDataLocationService.setCustomPath(second.path);
     await log.reinitialize();
 

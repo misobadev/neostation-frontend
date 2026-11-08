@@ -273,9 +273,9 @@ void main() {
       expect(backgroundFile('gb').existsSync(), isTrue);
       expect(backgroundFile('snes').existsSync(), isTrue);
 
-      final parts = Directory(
-        path.join(tempDir.path, 'neostation'),
-      ).listSync(recursive: true).where((e) => e.path.endsWith('.part'));
+      final parts = Directory(path.join(tempDir.path, 'neostation'))
+          .listSync(recursive: true)
+          .where((e) => e.path.endsWith('.part'));
       expect(parts, isEmpty);
     });
 

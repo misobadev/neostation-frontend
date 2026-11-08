@@ -6,6 +6,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:provider/provider.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../widgets/custom_toggle_switch.dart';

@@ -973,9 +973,8 @@ extension NeoSyncCore on NeoSyncProvider {
 
       // 4. Filtrar archivos según el sistema
       final List<LocalSaveFile> matchingFiles = [];
-      final gameRomName = _getRomNameWithoutExtension(
-        game.romname,
-      ).toLowerCase();
+      final gameRomName = _getRomNameWithoutExtension(game.romname)
+          .toLowerCase();
 
       // Identificar si es un sistema de "memory cards compartidas"
       final isSharedSystem = _sharesMemoryCards(system.folderName);
@@ -1190,9 +1189,8 @@ extension NeoSyncCore on NeoSyncProvider {
         }
       }
 
-      final gameRomName = _getRomNameWithoutExtension(
-        game.romname,
-      ).toLowerCase();
+      final gameRomName = _getRomNameWithoutExtension(game.romname)
+          .toLowerCase();
       final List<NeoSyncFile> matchingFiles = [];
 
       // Identificar si es un sistema de "memory cards compartidas"

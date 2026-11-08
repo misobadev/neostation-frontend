@@ -10,8 +10,7 @@ import '../services/logger_service.dart';
 /// `user_discovery_picks` rather than cached across weeks, so a rollover, a
 /// rescan or a re-roll from anywhere else all converge on the same answer.
 class DiscoveryProvider extends ChangeNotifier {
-  DiscoveryProvider({DiscoveryService service = const DiscoveryService()})
-    : _service = service;
+  DiscoveryProvider({this._service = const DiscoveryService()});
 
   final DiscoveryService _service;
   final _log = LoggerService.instance;

@@ -101,9 +101,8 @@ void main() {
       true,
     );
     expect(
-      ConfigModel.fromJson({
-        'ignore_articles_in_game_sort': 1,
-      }).ignoreArticlesInGameSort,
+      ConfigModel.fromJson({'ignore_articles_in_game_sort': 1})
+          .ignoreArticlesInGameSort,
       true,
     );
   });

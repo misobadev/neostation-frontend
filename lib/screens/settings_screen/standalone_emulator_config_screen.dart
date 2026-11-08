@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:file_picker/file_picker.dart';
@@ -356,9 +357,8 @@ class _StandaloneEmulatorConfigScreenState
                                       width: 48.w,
                                       height: 48.w,
                                       decoration: BoxDecoration(
-                                        color: _getStatusColor(
-                                          emulator,
-                                        ).withValues(alpha: 0.2),
+                                        color: _getStatusColor(emulator)
+                                            .withValues(alpha: 0.2),
                                         borderRadius: BorderRadius.circular(
                                           12.w,
                                         ),

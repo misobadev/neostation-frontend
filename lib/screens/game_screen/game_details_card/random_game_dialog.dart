@@ -4,9 +4,11 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/services/sfx_service.dart';
+
 import 'dart:async';
 import 'dart:math';
 import 'dart:io';
+
 import '../../../constants/system_folder_names.dart';
 import '../../../models/game_model.dart';
 import '../../../providers/file_provider.dart';
@@ -160,45 +162,46 @@ class _RandomGameDialogState extends State<RandomGameDialog>
     _selectedGame = widget.games[_finalSelectedIndex!];
     _currentIndex = _random.nextInt(widget.games.length);
 
-    _cycleTimer = Timer.periodic(const Duration(milliseconds: _baseDurationMs), (
-      timer,
-    ) {
-      if (_cycleCount >= _totalCycles) {
-        timer.cancel();
-        setState(() {
-          _currentIndex = _finalSelectedIndex!;
-          _isAnimating = false;
-          _showPlayButton = true;
-        });
-        SfxService().playEnterSound();
-        return;
-      }
-
-      // Throttled SFX: play navigation sound every 2 ticks to maintain acoustic clarity.
-      _sfxTickCount++;
-      if (_sfxTickCount % 2 == 0) {
-        SfxService().playNavSound();
-      }
-
-      setState(() {
-        if (_cycleCount >= _totalCycles - 4) {
-          // Slow-motion convergence: target-oriented selection in the final frames.
-          final dist = (_finalSelectedIndex! - _currentIndex).abs();
-          if (dist > 1) {
-            _currentIndex = _finalSelectedIndex! > _currentIndex
-                ? (_currentIndex + 1) % widget.games.length
-                : (_currentIndex - 1 + widget.games.length) %
-                      widget.games.length;
-          } else {
+    _cycleTimer = Timer.periodic(
+      const Duration(milliseconds: _baseDurationMs),
+      (timer) {
+        if (_cycleCount >= _totalCycles) {
+          timer.cancel();
+          setState(() {
             _currentIndex = _finalSelectedIndex!;
-          }
-        } else {
-          // Rapid randomization: broad selection across the full library.
-          _currentIndex = _random.nextInt(widget.games.length);
+            _isAnimating = false;
+            _showPlayButton = true;
+          });
+          SfxService().playEnterSound();
+          return;
         }
-        _cycleCount++;
-      });
-    });
+
+        // Throttled SFX: play navigation sound every 2 ticks to maintain acoustic clarity.
+        _sfxTickCount++;
+        if (_sfxTickCount % 2 == 0) {
+          SfxService().playNavSound();
+        }
+
+        setState(() {
+          if (_cycleCount >= _totalCycles - 4) {
+            // Slow-motion convergence: target-oriented selection in the final frames.
+            final dist = (_finalSelectedIndex! - _currentIndex).abs();
+            if (dist > 1) {
+              _currentIndex = _finalSelectedIndex! > _currentIndex
+                  ? (_currentIndex + 1) % widget.games.length
+                  : (_currentIndex - 1 + widget.games.length) %
+                        widget.games.length;
+            } else {
+              _currentIndex = _finalSelectedIndex!;
+            }
+          } else {
+            // Rapid randomization: broad selection across the full library.
+            _currentIndex = _random.nextInt(widget.games.length);
+          }
+          _cycleCount++;
+        });
+      },
+    );
   }
 
   /// Resolves the filesystem path for game artwork, supporting the aggregate

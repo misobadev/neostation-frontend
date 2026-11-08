@@ -35,19 +35,24 @@ import 'package:neostation/utils/desktop_window_focus.dart';
 import 'package:neostation/utils/display_metrics_log.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/themes/anta_text_theme.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/image_cache_budget.dart';
 import 'package:neostation/services/sfx_service.dart';
+
 import 'models/custom_sfx.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
 import 'dart:async';
 import 'dart:io';
+
 import 'package:fvp/fvp.dart';
 import 'package:fullscreen_window/fullscreen_window.dart';
 import 'package:window_manager/window_manager.dart';
@@ -325,7 +330,7 @@ void main() async {
       MapLocale('pt', AppLocale.pt),
       MapLocale('ru', AppLocale.ru),
       MapLocale('zh', AppLocale.zh),
-      MapLocale('zh_Hant', AppLocale.zhHant),
+      MapLocale('zh', AppLocale.zhHant, scriptCode: 'Hant'),
       MapLocale('fr', AppLocale.fr),
       MapLocale('de', AppLocale.de),
       MapLocale('it', AppLocale.it),
@@ -904,7 +909,7 @@ Future<void> subDisplay() async {
       MapLocale('pt', AppLocale.pt),
       MapLocale('ru', AppLocale.ru),
       MapLocale('zh', AppLocale.zh),
-      MapLocale('zh_Hant', AppLocale.zhHant),
+      MapLocale('zh', AppLocale.zhHant, scriptCode: 'Hant'),
       MapLocale('fr', AppLocale.fr),
       MapLocale('de', AppLocale.de),
       MapLocale('it', AppLocale.it),
@@ -980,15 +985,24 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _locale = FlutterLocalization.instance.currentLocale;
-    FlutterLocalization.instance.onTranslatedLanguage = (Locale? locale) {
-      if (mounted) setState(() => _locale = locale);
-    };
+    FlutterLocalization.instance.addListener(_handleLocaleChanged);
     // Once the main UI has painted its first frame, tell the secondary display
     // the app is ready so it can slide the app dock into place (rather than
     // showing it fully-formed while the app is still cold-starting).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.sqliteConfigProvider.markAppReady();
     });
+  }
+
+  void _handleLocaleChanged() {
+    if (!mounted) return;
+    setState(() => _locale = FlutterLocalization.instance.currentLocale);
+  }
+
+  @override
+  void dispose() {
+    FlutterLocalization.instance.removeListener(_handleLocaleChanged);
+    super.dispose();
   }
 
   @override
@@ -1116,7 +1130,7 @@ class _MyAppState extends State<MyApp> {
                         );
                       },
                       theme: themeProvider.currentTheme.copyWith(
-                        textTheme: GoogleFonts.antaTextTheme(
+                        textTheme: antaTextTheme(
                           themeProvider.currentTheme.textTheme,
                         ),
                         iconTheme: const IconThemeData(fill: 1.0),

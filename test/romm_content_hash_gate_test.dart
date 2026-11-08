@@ -489,44 +489,41 @@ void main() {
   });
 
   group('skipping never consumes a remote copy it did not look at', () {
-    test(
-      'a state another device advanced still arrives after a local skip',
-      () async {
-        // The gate's own hazard. A skip taken on the recorded hash proves only
-        // that *this* device stood still; if it banked the matched asset's stamp
-        // it would mark a remote copy seen that nothing compared or fetched, and
-        // `remoteChanged` would read false from then on. States have no server
-        // hash to check, so this is their ordinary two-device case.
-        await localState().writeAsString('STATE-A');
-        await provider.syncGameSavesAfterClose(game);
+    test('a state another device advanced still arrives after a local skip', () async {
+      // The gate's own hazard. A skip taken on the recorded hash proves only
+      // that *this* device stood still; if it banked the matched asset's stamp
+      // it would mark a remote copy seen that nothing compared or fetched, and
+      // `remoteChanged` would read false from then on. States have no server
+      // hash to check, so this is their ordinary two-device case.
+      await localState().writeAsString('STATE-A');
+      await provider.syncGameSavesAfterClose(game);
 
-        // The other device pushes a genuinely newer state.
-        svc.statesByRom[1] = [];
-        svc.seedState(
-          1,
-          'Game.state.auto',
-          'STATE-B'.codeUnits,
-          updatedAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
-        );
+      // The other device pushes a genuinely newer state.
+      svc.statesByRom[1] = [];
+      svc.seedState(
+        1,
+        'Game.state.auto',
+        'STATE-B'.codeUnits,
+        updatedAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+      );
 
-        // RetroArch rewrites the auto-state on exit; the bytes do not move.
-        await touch(localState());
-        await provider.syncGameSavesAfterClose(game);
-        expect(
-          svc.updates,
-          isEmpty,
-          reason: 'unchanged bytes must not be pushed over the newer state',
-        );
+      // RetroArch rewrites the auto-state on exit; the bytes do not move.
+      await touch(localState());
+      await provider.syncGameSavesAfterClose(game);
+      expect(
+        svc.updates,
+        isEmpty,
+        reason: 'unchanged bytes must not be pushed over the newer state',
+      );
 
-        await provider.syncGameSavesBeforeLaunch(game);
+      await provider.syncGameSavesBeforeLaunch(game);
 
-        expect(
-          await localState().readAsString(),
-          'STATE-B',
-          reason: 'the skip must leave the newer state there to be pulled',
-        );
-      },
-    );
+      expect(
+        await localState().readAsString(),
+        'STATE-B',
+        reason: 'the skip must leave the newer state there to be pulled',
+      );
+    });
 
     test('a save the server vouched for does bank its stamp', () async {
       // The other half: when [_serverHoldsSameBytes] answered, the remote copy

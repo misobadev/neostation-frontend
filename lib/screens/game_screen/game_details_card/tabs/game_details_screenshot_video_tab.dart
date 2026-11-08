@@ -1,9 +1,11 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
+
 import '../../../../providers/sqlite_config_provider.dart';
 import '../../../../services/sfx_service.dart';
 import '../../../../themes/corner_radii.dart';
@@ -169,9 +171,8 @@ class _GameDetailsScreenshotVideoTabState
                 BorderRadius.circular(14.r),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.3),
+                color: Theme.of(context).colorScheme.shadow
+                    .withValues(alpha: 0.3),
                 blurRadius: 3.r,
                 offset: Offset(3.0.r, 3.0.r),
               ),
@@ -252,9 +253,9 @@ class _GameDetailsScreenshotVideoTabState
                         child: Material(
                           color: Colors.black54,
                           borderRadius:
-                              Theme.of(
-                                context,
-                              ).extension<CornerRadii>()?.radiusExternal ??
+                              Theme.of(context)
+                                  .extension<CornerRadii>()
+                                  ?.radiusExternal ??
                               BorderRadius.circular(14.r),
                           child: InkWell(
                             onTap: () {
@@ -267,9 +268,9 @@ class _GameDetailsScreenshotVideoTabState
                             highlightColor: Colors.transparent,
                             splashColor: Colors.transparent,
                             borderRadius:
-                                Theme.of(
-                                  context,
-                                ).extension<CornerRadii>()?.radiusInternal ??
+                                Theme.of(context)
+                                    .extension<CornerRadii>()
+                                    ?.radiusInternal ??
                                 BorderRadius.circular(14.r),
                             child: Padding(
                               padding: EdgeInsets.symmetric(

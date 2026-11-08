@@ -256,11 +256,8 @@ void main() {
       await pumpEventQueue();
 
       expect(client.sent, 3);
-      final results = await Future.wait([
-        plans,
-        change,
-        morePlans,
-      ]).timeout(const Duration(seconds: 5));
+      final results = await Future.wait([plans, change, morePlans])
+          .timeout(const Duration(seconds: 5));
       for (final result in results) {
         expect(result.containsKey('busy'), isFalse);
       }
@@ -304,9 +301,8 @@ void main() {
             requestTimeout: limit,
           );
 
-          final result = await call(
-            billing,
-          ).timeout(const Duration(seconds: 5));
+          final result = await call(billing)
+              .timeout(const Duration(seconds: 5));
 
           expect(result['success'], isFalse);
           expect(result['outcomeUnknown'], isTrue);

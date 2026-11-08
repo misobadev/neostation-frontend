@@ -1,4 +1,5 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -6,17 +7,17 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+
 import '../services/update_service.dart';
 import 'custom_notification.dart';
 import 'core_footer.dart';
 
 /// Downloads and installs an app update; see [UpdateService.downloadAndInstall].
-typedef UpdateRunner =
-    Future<UpdateOutcome> Function(
-      UpdateInfo updateInfo,
-      void Function(double progress)? onProgress, {
-      bool Function()? shouldCancel,
-    });
+typedef UpdateRunner = Future<UpdateOutcome> Function(
+  UpdateInfo updateInfo,
+  void Function(double progress)? onProgress, {
+  bool Function()? shouldCancel,
+});
 
 /// Dialog to prompt user for app update with premium UI
 class UpdateDialog extends StatefulWidget {

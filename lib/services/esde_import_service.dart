@@ -448,9 +448,8 @@ class EsdeImportService {
         'genre': _text(game, 'genre'),
         'players': _text(game, 'players'),
         'rating': _parseRating(_text(game, 'rating')),
-        'release_date': _parseEsdeDateTime(
-          _text(game, 'releasedate'),
-        )?.toIso8601String(),
+        'release_date': _parseEsdeDateTime(_text(game, 'releasedate'))
+            ?.toIso8601String(),
       };
       final existingMeta = metaByName[canonicalFilename.toLowerCase()];
       final metaWrite = ScraperRepository.buildEsdeMetadataWrite(

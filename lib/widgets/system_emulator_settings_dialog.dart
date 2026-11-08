@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/app_themes.dart';
 import 'package:provider/provider.dart';
+
 import '../constants/system_folder_names.dart';
 import '../models/core_emulator_model.dart';
 import '../models/database_game_model.dart';
@@ -22,15 +24,20 @@ import '../repositories/system_repository.dart';
 import '../repositories/emulator_repository.dart';
 import '../repositories/game_repository.dart';
 import '../services/config_service.dart';
+
 import 'package:neostation/services/logger_service.dart';
+
 import '../utils/gamepad_nav.dart';
 import '../services/game_service.dart' show GamepadNavigationManager;
 import '../utils/centered_scroll_controller.dart';
 import '../utils/emulator_loader.dart';
+
 import 'package:path/path.dart' as path;
 
 import 'custom_notification.dart';
+
 import 'package:neostation/widgets/custom_toggle_switch.dart';
+
 import '../widgets/shaders/shader_gif_widget.dart';
 import '../utils/image_utils.dart';
 import '../services/permission_service.dart';

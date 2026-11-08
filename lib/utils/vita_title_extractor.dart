@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:convert';
+
 import 'package:neostation/services/logger_service.dart';
+
 import '../services/saf_directory_service.dart';
 
 /// Utility service for extracting Title IDs from `.psvita` files.

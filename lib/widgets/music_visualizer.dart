@@ -1,8 +1,11 @@
 import 'dart:math';
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+
 import '../services/music_player_service.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class MusicVisualizer extends StatefulWidget {

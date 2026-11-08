@@ -7,6 +7,7 @@ import 'package:neostation/services/credential_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_credential_backends.dart';
+
 import 'package:path/path.dart' as path;
 
 void main() {
@@ -133,32 +134,30 @@ void main() {
 
   test('sets aside a file from a newer format instead of bricking', () async {
     await store.write('ra_api_key', 'super-secret');
-    final envelope =
-        jsonDecode(await credentialFile().readAsString())
-            as Map<String, dynamic>;
+    final envelope = jsonDecode(
+      await credentialFile().readAsString(),
+    ) as Map<String, dynamic>;
     envelope['v'] = 99;
     final future = jsonEncode(envelope);
     await credentialFile().writeAsString(future);
-    final key = await File(
-      path.join(directory.path, 'credentials.key'),
-    ).readAsBytes();
+    final key = await File(path.join(directory.path, 'credentials.key'))
+        .readAsBytes();
 
     await expectSetAside(future, key: key);
   });
 
   test('sets aside a tampered payload rather than trusting it', () async {
     await store.write('ra_api_key', 'super-secret');
-    final envelope =
-        jsonDecode(await credentialFile().readAsString())
-            as Map<String, dynamic>;
+    final envelope = jsonDecode(
+      await credentialFile().readAsString(),
+    ) as Map<String, dynamic>;
     final payload = base64Decode(envelope['data'] as String);
     payload[0] ^= 0xFF;
     envelope['data'] = base64Encode(payload);
     final tampered = jsonEncode(envelope);
     await credentialFile().writeAsString(tampered);
-    final key = await File(
-      path.join(directory.path, 'credentials.key'),
-    ).readAsBytes();
+    final key = await File(path.join(directory.path, 'credentials.key'))
+        .readAsBytes();
 
     await expectSetAside(tampered, key: key);
   });

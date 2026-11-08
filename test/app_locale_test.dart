@@ -79,40 +79,37 @@ void main() {
       );
     });
 
-    test(
-      'resolves against the active language, including raw zh_Hant',
-      () async {
-        TestWidgetsFlutterBinding.ensureInitialized();
-        SharedPreferences.setMockInitialValues({});
-        await FlutterLocalization.instance.ensureInitialized();
-        // A minimal registry mirroring how main.dart registers maps: 'zh_Hant'
-        // is a raw language code, not a Flutter script subtag, so resolving it
-        // correctly is the point of this test.
-        FlutterLocalization.instance.init(
-          mapLocales: [
-            MapLocale('en', AppLocale.en),
-            MapLocale('zh', AppLocale.zh),
-            MapLocale('zh_Hant', AppLocale.zhHant),
-          ],
-          initLanguageCode: 'en',
-        );
-        addTearDown(() {
-          FlutterLocalization.instance.translate('en', save: false);
-        });
+    test('resolves against the active language, including zh_Hant', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+      await FlutterLocalization.instance.ensureInitialized();
+      // A minimal registry mirroring how main.dart registers maps:
+      // Traditional Chinese is zh with the Hant script, not a raw language
+      // code, so resolving it correctly is the point of this test.
+      FlutterLocalization.instance.init(
+        mapLocales: [
+          MapLocale('en', AppLocale.en),
+          MapLocale('zh', AppLocale.zh),
+          MapLocale('zh', AppLocale.zhHant, scriptCode: 'Hant'),
+        ],
+        initLanguageCode: 'en',
+      );
+      addTearDown(() {
+        FlutterLocalization.instance.translate('en', save: false);
+      });
 
-        FlutterLocalization.instance.translate('zh_Hant', save: false);
-        expect(
-          AppLocale.settings.getStringForCurrentLocale(),
-          appLocaleZhHant[AppLocale.settings],
-        );
+      FlutterLocalization.instance.translate('zh_Hant', save: false);
+      expect(
+        AppLocale.settings.getStringForCurrentLocale(),
+        appLocaleZhHant[AppLocale.settings],
+      );
 
-        FlutterLocalization.instance.translate('zh', save: false);
-        expect(
-          AppLocale.settings.getStringForCurrentLocale(),
-          appLocaleZh[AppLocale.settings],
-        );
-      },
-    );
+      FlutterLocalization.instance.translate('zh', save: false);
+      expect(
+        AppLocale.settings.getStringForCurrentLocale(),
+        appLocaleZh[AppLocale.settings],
+      );
+    });
   });
 
   test('every translation keeps the English {placeholders}', () {

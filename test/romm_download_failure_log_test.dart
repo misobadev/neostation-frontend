@@ -73,9 +73,8 @@ void main() {
   test('a refused download is logged with what the server answered', () async {
     serve(403, nginxForbidden);
 
-    final download = await provider(
-      system: _nes,
-    ).downloadRom(rom, romFolders: [romRoot.path]);
+    final download = await provider(system: _nes)
+        .downloadRom(rom, romFolders: [romRoot.path]);
 
     expect(download.status, RommDownloadStatus.failed);
     // nginx's own page, not RomM's: the web server couldn't read the file.
@@ -194,9 +193,8 @@ void main() {
       fsExtension: 'bin',
     );
 
-    await provider(
-      system: _nes,
-    ).downloadRom(forged, romFolders: [romRoot.path]);
+    await provider(system: _nes)
+        .downloadRom(forged, romFolders: [romRoot.path]);
 
     final failure = log.takeCapture().where(
       (l) => l.contains('download of rom 43'),
@@ -221,9 +219,8 @@ void main() {
   test('a download with no writable folder is logged', () async {
     serve(200, 'unused');
 
-    final download = await provider(
-      system: _nes,
-    ).downloadRom(rom, romFolders: const []);
+    final download = await provider(system: _nes)
+        .downloadRom(rom, romFolders: const []);
 
     expect(download.error, RommDownloadError.noWritableFolder);
     expect(logged(['42', 'Super Game.bin', 'folder', 'nes']), isTrue);
@@ -234,9 +231,8 @@ void main() {
       MockClient((request) async => throw http.ClientException('boom')),
     );
 
-    final download = await provider(
-      system: _nes,
-    ).downloadRom(rom, romFolders: [romRoot.path]);
+    final download = await provider(system: _nes)
+        .downloadRom(rom, romFolders: [romRoot.path]);
 
     expect(download.status, RommDownloadStatus.failed);
     expect(logged(['42', 'Super Game.bin', 'boom']), isTrue);

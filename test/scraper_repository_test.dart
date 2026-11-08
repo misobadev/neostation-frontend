@@ -171,49 +171,55 @@ void main() {
       expect(rows.first['is_fully_scraped'], 1);
     });
 
-    test('markGameFullyScraped leaves a same-named game on another system', () async {
-      await db.execute(
-        "INSERT INTO user_screenscraper_metadata (filename, app_system_id, is_fully_scraped) VALUES ('Tetris.zip', 'snes', 0)",
-      );
-      await db.execute(
-        "INSERT INTO user_screenscraper_metadata (filename, app_system_id, is_fully_scraped) VALUES ('Tetris.zip', 'nes', 0)",
-      );
+    test(
+      'markGameFullyScraped leaves a same-named game on another system',
+      () async {
+        await db.execute(
+          "INSERT INTO user_screenscraper_metadata (filename, app_system_id, is_fully_scraped) VALUES ('Tetris.zip', 'snes', 0)",
+        );
+        await db.execute(
+          "INSERT INTO user_screenscraper_metadata (filename, app_system_id, is_fully_scraped) VALUES ('Tetris.zip', 'nes', 0)",
+        );
 
-      await ScraperRepository.markGameFullyScraped('snes', 'Tetris.zip');
+        await ScraperRepository.markGameFullyScraped('snes', 'Tetris.zip');
 
-      final rows = await db.rawQuery(
-        "SELECT app_system_id, is_fully_scraped FROM user_screenscraper_metadata WHERE filename = 'Tetris.zip' ORDER BY app_system_id",
-      );
-      expect(rows, [
-        {'app_system_id': 'nes', 'is_fully_scraped': 0},
-        {'app_system_id': 'snes', 'is_fully_scraped': 1},
-      ]);
-    });
+        final rows = await db.rawQuery(
+          "SELECT app_system_id, is_fully_scraped FROM user_screenscraper_metadata WHERE filename = 'Tetris.zip' ORDER BY app_system_id",
+        );
+        expect(rows, [
+          {'app_system_id': 'nes', 'is_fully_scraped': 0},
+          {'app_system_id': 'snes', 'is_fully_scraped': 1},
+        ]);
+      },
+    );
 
-    test('transfers scraped metadata from a disc ROM to its playlist', () async {
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('Final Fantasy VII (Disc 1).chd', '/roms/psx/Final Fantasy VII (Disc 1).chd', 'snes')",
-      );
-      await db.execute(
-        "INSERT INTO user_screenscraper_metadata (filename, app_system_id, real_name, is_fully_scraped) VALUES ('Final Fantasy VII (Disc 1).chd', 'snes', 'Final Fantasy VII', 1)",
-      );
+    test(
+      'transfers scraped metadata from a disc ROM to its playlist',
+      () async {
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('Final Fantasy VII (Disc 1).chd', '/roms/psx/Final Fantasy VII (Disc 1).chd', 'snes')",
+        );
+        await db.execute(
+          "INSERT INTO user_screenscraper_metadata (filename, app_system_id, real_name, is_fully_scraped) VALUES ('Final Fantasy VII (Disc 1).chd', 'snes', 'Final Fantasy VII', 1)",
+        );
 
-      final transferred = await ScraperRepository.transferMetadataToPlaylist(
-        sourceRomPaths: ['/roms/psx/Final Fantasy VII (Disc 1).chd'],
-        sourceFilenames: ['Final Fantasy VII (Disc 1).chd'],
-        playlistFilename: 'Final Fantasy VII.m3u',
-      );
+        final transferred = await ScraperRepository.transferMetadataToPlaylist(
+          sourceRomPaths: ['/roms/psx/Final Fantasy VII (Disc 1).chd'],
+          sourceFilenames: ['Final Fantasy VII (Disc 1).chd'],
+          playlistFilename: 'Final Fantasy VII.m3u',
+        );
 
-      expect(transferred, isNotNull);
-      expect(transferred!.metadataTransferred, isTrue);
-      final rows = await db.rawQuery(
-        "SELECT filename, real_name, is_fully_scraped FROM user_screenscraper_metadata WHERE app_system_id = 'snes'",
-      );
-      expect(rows, hasLength(1));
-      expect(rows.first['filename'], 'Final Fantasy VII.m3u');
-      expect(rows.first['real_name'], 'Final Fantasy VII');
-      expect(rows.first['is_fully_scraped'], 1);
-    });
+        expect(transferred, isNotNull);
+        expect(transferred!.metadataTransferred, isTrue);
+        final rows = await db.rawQuery(
+          "SELECT filename, real_name, is_fully_scraped FROM user_screenscraper_metadata WHERE app_system_id = 'snes'",
+        );
+        expect(rows, hasLength(1));
+        expect(rows.first['filename'], 'Final Fantasy VII.m3u');
+        expect(rows.first['real_name'], 'Final Fantasy VII');
+        expect(rows.first['is_fully_scraped'], 1);
+      },
+    );
 
     test('does not overwrite existing playlist metadata', () async {
       await db.execute(
@@ -240,27 +246,33 @@ void main() {
       expect(playlistRows.single['real_name'], 'Playlist metadata');
     });
 
-    test('falls back to a unique source filename when its path differs', () async {
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('Evil Dead - Hail to the King (USA) (Disc 1).chd', 'content://original-uri', 'psx')",
-      );
-      await db.execute(
-        "INSERT INTO user_screenscraper_metadata (filename, app_system_id, real_name) VALUES ('Evil Dead - Hail to the King (USA) (Disc 1).chd', 'psx', 'Evil Dead: Hail to the King')",
-      );
+    test(
+      'falls back to a unique source filename when its path differs',
+      () async {
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('Evil Dead - Hail to the King (USA) (Disc 1).chd', 'content://original-uri', 'psx')",
+        );
+        await db.execute(
+          "INSERT INTO user_screenscraper_metadata (filename, app_system_id, real_name) VALUES ('Evil Dead - Hail to the King (USA) (Disc 1).chd', 'psx', 'Evil Dead: Hail to the King')",
+        );
 
-      final transferred = await ScraperRepository.transferMetadataToPlaylist(
-        sourceRomPaths: ['content://different-uri'],
-        sourceFilenames: ['Evil Dead - Hail to the King (USA) (Disc 1).chd'],
-        playlistFilename: 'Evil Dead - Hail to the King (USA).m3u',
-      );
+        final transferred = await ScraperRepository.transferMetadataToPlaylist(
+          sourceRomPaths: ['content://different-uri'],
+          sourceFilenames: ['Evil Dead - Hail to the King (USA) (Disc 1).chd'],
+          playlistFilename: 'Evil Dead - Hail to the King (USA).m3u',
+        );
 
-      expect(transferred, isNotNull);
-      expect(transferred!.metadataTransferred, isTrue);
-      final rows = await db.rawQuery(
-        "SELECT filename FROM user_screenscraper_metadata WHERE app_system_id = 'psx'",
-      );
-      expect(rows.single['filename'], 'Evil Dead - Hail to the King (USA).m3u');
-    });
+        expect(transferred, isNotNull);
+        expect(transferred!.metadataTransferred, isTrue);
+        final rows = await db.rawQuery(
+          "SELECT filename FROM user_screenscraper_metadata WHERE app_system_id = 'psx'",
+        );
+        expect(
+          rows.single['filename'],
+          'Evil Dead - Hail to the King (USA).m3u',
+        );
+      },
+    );
 
     test('does not use an ambiguous source filename fallback', () async {
       for (final system in ['snes', 'nes']) {
@@ -387,21 +399,24 @@ void main() {
       expect(games.first['filename'], 'game.steam');
     });
 
-    test('getSteamGamesWithScrapeStatus reports what other sources did', () async {
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id, title_id, ss_manual_game_id) VALUES ('Game.steam', '/roms/steam/Game.steam', 'steam', '12345', 277144)",
-      );
-      // Metadata rows elsewhere are matched without regard to case.
-      await db.execute(
-        "INSERT INTO user_screenscraper_metadata (app_system_id, filename) VALUES ('steam', 'game.steam')",
-      );
+    test(
+      'getSteamGamesWithScrapeStatus reports what other sources did',
+      () async {
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id, title_id, ss_manual_game_id) VALUES ('Game.steam', '/roms/steam/Game.steam', 'steam', '12345', 277144)",
+        );
+        // Metadata rows elsewhere are matched without regard to case.
+        await db.execute(
+          "INSERT INTO user_screenscraper_metadata (app_system_id, filename) VALUES ('steam', 'game.steam')",
+        );
 
-      final games = await ScraperRepository.getSteamGamesWithScrapeStatus(
-        'steam',
-      );
-      expect(games.single['ss_manual_game_id'], 277144);
-      expect(games.single['metadata_filename'], 'game.steam');
-    });
+        final games = await ScraperRepository.getSteamGamesWithScrapeStatus(
+          'steam',
+        );
+        expect(games.single['ss_manual_game_id'], 277144);
+        expect(games.single['metadata_filename'], 'game.steam');
+      },
+    );
 
     test('upsertSteamMetadata inserts metadata', () async {
       await ScraperRepository.upsertSteamMetadata({

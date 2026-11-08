@@ -4,6 +4,7 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/widgets/system_scan_progress_widget.dart';
+
 import '../../../../themes/corner_radii.dart';
 
 /// Renders a premium loading interface for the initial library setup.
@@ -31,9 +32,8 @@ class GridLoadingState extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(14.r),
           border: Border.all(
-            color: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.15),
+            color: Theme.of(context).colorScheme.primary
+                .withValues(alpha: 0.15),
             width: 1,
           ),
           boxShadow: [
@@ -53,15 +53,14 @@ class GridLoadingState extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary,
                 borderRadius:
-                    Theme.of(
-                      context,
-                    ).extension<CornerRadii>()?.radiusInternal ??
+                    Theme.of(context)
+                        .extension<CornerRadii>()
+                        ?.radiusInternal ??
                     BorderRadius.circular(12.r),
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.3),
+                    color: Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 2),
                   ),
@@ -86,9 +85,8 @@ class GridLoadingState extends StatelessWidget {
             Text(
               AppLocale.detectingSystems.getString(context),
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),

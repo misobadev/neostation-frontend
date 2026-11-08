@@ -57,9 +57,8 @@ void main() {
       expect(asColumn.performanceMode, isTrue);
       expect(absent.performanceMode, isFalse);
       expect(
-        ConfigModel.fromJson(
-          const ConfigModel(performanceMode: true).toJson(),
-        ).performanceMode,
+        ConfigModel.fromJson(const ConfigModel(performanceMode: true).toJson())
+            .performanceMode,
         isTrue,
       );
     });

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'dart:math' as math;
 
 /// Represents an individual floating geometric shape within the background.

@@ -25,9 +25,9 @@ void main() {
   });
 
   test('manifest lists every bundled system', () {
-    final manifest =
-        jsonDecode(File('assets/manifest.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final manifest = jsonDecode(
+      File('assets/manifest.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final bundled = Directory('assets/systems')
         .listSync()
         .whereType<File>()

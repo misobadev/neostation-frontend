@@ -142,9 +142,8 @@ void main() {
   }
 
   test('entering a system reports each folder\'s automatic upload', () {
-    final list = File(
-      'lib/screens/game_screen/my_games_list.dart',
-    ).readAsStringSync();
+    final list = File('lib/screens/game_screen/my_games_list.dart')
+        .readAsStringSync();
     final start = list.indexOf('Future<void> _maybeSyncStandaloneFolders(');
     expect(start, isNot(-1));
     final body = list.substring(start, list.indexOf('\n  }\n', start));
@@ -209,9 +208,8 @@ void main() {
   });
 
   test('two folders on one system are told apart', () {
-    final list = File(
-      'lib/screens/game_screen/my_games_list.dart',
-    ).readAsStringSync();
+    final list = File('lib/screens/game_screen/my_games_list.dart')
+        .readAsStringSync();
     expect(
       list,
       matches(

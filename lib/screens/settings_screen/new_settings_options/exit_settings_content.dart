@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import 'settings_title.dart';
 
 /// A specialized content panel for application termination and exit confirmation.
