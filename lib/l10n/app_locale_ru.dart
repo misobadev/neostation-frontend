@@ -1042,6 +1042,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: Только локальные сохранения',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Только облачные сохранения',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Конфликт сохранений',
+  AppLocale.neoSyncKeptCloudCopy: "Это сохранение изменилось и на другом устройстве. Копия с этого устройства загружена, а другая сохранена рядом как {file}.",
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync: Облачная синхронизация выключена',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Превышена квота хранилища',

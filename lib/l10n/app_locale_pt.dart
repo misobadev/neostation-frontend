@@ -1051,6 +1051,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: Apenas saves locais',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Apenas saves na nuvem',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Conflito de save detectado',
+  AppLocale.neoSyncKeptCloudCopy: "Este save também foi alterado em outro dispositivo. A cópia deste dispositivo foi enviada, e a outra foi guardada ao lado como {file}.",
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync: Sincronização em nuvem desativada',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Cota de armazenamento excedida',

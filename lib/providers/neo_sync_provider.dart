@@ -26,6 +26,8 @@ import '../services/config_service.dart';
 import '../services/retroarch_config_service.dart';
 import '../services/retroachievements_hash_service.dart';
 import '../utils/auto_folder_upload_notice.dart';
+import '../utils/cloud_copy_backup_name.dart';
+import '../utils/kept_cloud_copy_notice.dart';
 
 part 'neosync/neosync_exceptions.dart';
 part 'neosync/neosync_status.dart';

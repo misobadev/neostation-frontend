@@ -1040,6 +1040,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: Hanya simpanan lokal',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Hanya simpanan cloud',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Konflik simpanan terdeteksi',
+  AppLocale.neoSyncKeptCloudCopy: "Simpanan ini juga berubah di perangkat lain. Salinan perangkat ini diunggah, dan salinan lainnya disimpan di sebelahnya sebagai {file}.",
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync: Sinkronisasi cloud dinonaktifkan',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Kuota penyimpanan terlampaui',
