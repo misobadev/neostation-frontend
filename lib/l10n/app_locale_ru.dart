@@ -1493,6 +1493,15 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.customFolderUploadComplete: 'Пользовательская папка синхронизирована: {uploaded} загружено, {skipped} уже актуальны',
   AppLocale.customFolderUploadFailed:
       'Не удалось синхронизировать пользовательскую папку',
+  AppLocale.customFolderUploadConfirm:
+      'Файлы для загрузки в NeoSync из {folder}: {count} ({size}).',
+  AppLocale.customFolderUploadManyFiles: 'Это больше файлов, чем обычно бывает в папке сохранений. Проверьте, та ли это папка.',
+  AppLocale.customFolderUploadLargeFiles:
+      'Файлы больше 64 MB: {count}, самый большой — {size}.',
+  AppLocale.customFolderUploadOverQuota:
+      'Это больше свободного места в NeoSync ({free}).',
+  AppLocale.customFolderUploadStopped:
+      'Загрузка остановлена: загружено {uploaded}.',
   AppLocale.customSaveFoldersMigrate:
       'Мигрировать облачные сохранения на NeoSync v2',
 

@@ -1375,6 +1375,12 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.customFolderUploadComplete:
       '獨立資料夾已同步：已上傳 {uploaded} 個，{skipped} 個已是最新',
   AppLocale.customFolderUploadFailed: '獨立資料夾同步失敗',
+  AppLocale.customFolderUploadConfirm:
+      '將從 {folder} 上傳到 NeoSync 的檔案：{count} 個（{size}）。',
+  AppLocale.customFolderUploadManyFiles: '檔案數量超出存檔資料夾的常見數量。請確認資料夾是否正確。',
+  AppLocale.customFolderUploadLargeFiles: '超過 64 MB 的檔案：{count} 個，最大 {size}。',
+  AppLocale.customFolderUploadOverQuota: '超出你的 NeoSync 剩餘空間（{free}）。',
+  AppLocale.customFolderUploadStopped: '上傳已停止：已上傳 {uploaded} 個。',
   AppLocale.customSaveFoldersMigrate: '將雲端存檔遷移至 NeoSync v2',
 
   // ES-DE import

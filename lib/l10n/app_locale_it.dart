@@ -1525,6 +1525,15 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.customFolderUploadComplete: 'Cartella standalone sincronizzata: {uploaded} caricati, {skipped} già aggiornati',
   AppLocale.customFolderUploadFailed:
       'Sincronizzazione della cartella personalizzata fallita',
+  AppLocale.customFolderUploadConfirm:
+      'File da caricare su NeoSync da {folder}: {count} ({size}).',
+  AppLocale.customFolderUploadManyFiles: 'Sono più file di quanti ne contenga di solito una cartella di salvataggi. Controlla che sia la cartella giusta.',
+  AppLocale.customFolderUploadLargeFiles:
+      'File oltre 64 MB: {count}, il più grande {size}.',
+  AppLocale.customFolderUploadOverQuota:
+      'È più del tuo spazio libero su NeoSync ({free}).',
+  AppLocale.customFolderUploadStopped:
+      'Caricamento interrotto: {uploaded} caricati.',
   AppLocale.customSaveFoldersMigrate: 'Migra i salvataggi cloud a NeoSync v2',
 
   // ES-DE import

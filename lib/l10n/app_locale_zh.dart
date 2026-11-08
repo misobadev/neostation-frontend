@@ -1376,6 +1376,12 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.customFolderUploadComplete:
       '独立文件夹已同步：已上传 {uploaded} 个，{skipped} 个已是最新',
   AppLocale.customFolderUploadFailed: '独立文件夹同步失败',
+  AppLocale.customFolderUploadConfirm:
+      '将从 {folder} 上传到 NeoSync 的文件：{count} 个（{size}）。',
+  AppLocale.customFolderUploadManyFiles: '文件数量超出存档文件夹的常见数量。请确认文件夹是否正确。',
+  AppLocale.customFolderUploadLargeFiles: '超过 64 MB 的文件：{count} 个，最大 {size}。',
+  AppLocale.customFolderUploadOverQuota: '超出你的 NeoSync 剩余空间（{free}）。',
+  AppLocale.customFolderUploadStopped: '上传已停止：已上传 {uploaded} 个。',
   AppLocale.customSaveFoldersMigrate: '将云存档迁移到 NeoSync v2',
 
   // ES-DE import

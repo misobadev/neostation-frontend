@@ -1411,6 +1411,13 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.customFolderUploadComplete:
       'スタンドアロンフォルダーを同期しました：{uploaded}件アップロード、{skipped}件は既に最新',
   AppLocale.customFolderUploadFailed: 'スタンドアロンフォルダーの同期に失敗しました',
+  AppLocale.customFolderUploadConfirm:
+      '{folder} から NeoSync にアップロードするファイル：{count}件（{size}）。',
+  AppLocale.customFolderUploadManyFiles:
+      'セーブフォルダーとしてはファイルが多すぎます。正しいフォルダーか確認してください。',
+  AppLocale.customFolderUploadLargeFiles: '64 MB を超えるファイル：{count}件（最大 {size}）。',
+  AppLocale.customFolderUploadOverQuota: 'NeoSync の空き容量（{free}）を超えています。',
+  AppLocale.customFolderUploadStopped: 'アップロードを停止しました：{uploaded}件アップロード済み。',
   AppLocale.customSaveFoldersMigrate: 'クラウドセーブをNeoSync v2に移行',
 
   // ES-DE import
