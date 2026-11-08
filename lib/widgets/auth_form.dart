@@ -1024,7 +1024,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      Colors.white.withValues(alpha: 0.8),
+                      theme.colorScheme.onPrimary.withValues(alpha: 0.8),
                     ),
                   ),
                 )
