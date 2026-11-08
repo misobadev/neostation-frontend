@@ -175,6 +175,14 @@ class RommService {
   /// scope set rather than turning "no playtime sync" into "cannot log in".
   static const String _playtimeScopes = 'roms.user.read roms.user.write';
 
+  /// Needed, on top of [_playtimeScopes], to *read* play sessions from RomM
+  /// 5.4 on: since then RomM answers `GET /api/play-sessions` with a 403
+  /// unless the token has this scope or is bound to the device being read.
+  /// Requested as its own optional tier, because RomM computes a user's
+  /// scopes from their group's grants, so an account can be allowed the
+  /// playtime scopes without this one.
+  static const String _devicesReadScope = 'devices.read';
+
   /// Maximum sessions RomM accepts in one `/api/play-sessions` POST.
   static const int maxPlaySessionBatch = 100;
 
@@ -294,13 +302,26 @@ class RommService {
   bool _playtimeScopeGranted = true;
 
   /// Cleared for the rest of this connection once the server proves it has no
-  /// play-session API (404) or won't grant access to it (403 after a re-auth),
-  /// so a RomM older than the feature isn't probed on every sync.
+  /// play-session API (404) or won't take this device's sessions (a push
+  /// refused with a 403 after a re-auth), so a RomM older than the feature
+  /// isn't probed on every sync. A refused read clears only
+  /// [_playSessionsReadable].
   bool _playSessionsSupported = true;
 
   /// Whether playtime sync can be attempted against this server.
   bool get playtimeSyncAvailable =>
       _playtimeScopeGranted && _playSessionsSupported;
+
+  /// Cleared for the rest of this connection once the server refuses to let
+  /// this connection *read* play sessions (403 after a re-auth, or at once
+  /// with an API key). Pushing needs less than reading, so a refused read
+  /// stops only the pulls; see [_notePlaySessionFailure].
+  bool _playSessionsReadable = true;
+
+  /// Whether playtime recorded elsewhere can be pulled from this server.
+  /// Implies [playtimeSyncAvailable].
+  bool get playtimePullAvailable =>
+      playtimeSyncAvailable && _playSessionsReadable;
 
   /// Advanced by every [configure]. A request reads the server and credentials
   /// only when it is sent, so one begun under an earlier connection must not
@@ -372,6 +393,7 @@ class RommService {
     // instead of inheriting the previous server's verdict.
     _playtimeScopeGranted = true;
     _playSessionsSupported = true;
+    _playSessionsReadable = true;
   }
 
   static String _normalizeBaseUrl(String raw) {
@@ -512,15 +534,35 @@ class RommService {
     http.Response resp;
     bool? playtimeGranted;
     try {
-      resp = await _postTokenRequest(bodyFor('$_readScopes $_playtimeScopes'));
+      // Most scopes first, then fewer: RomM refuses the whole grant with a 403
+      // if any requested scope is outside the user's allowance, and can't say
+      // which one. Bad credentials fail every tier, so the error path below is
+      // unchanged for them.
+      resp = await _postTokenRequest(
+        bodyFor('$_readScopes $_playtimeScopes $_devicesReadScope'),
+      );
+      if (resp.statusCode == 403 && session == _session) {
+        // Without devices.read, pushes still work and so may pulls (RomM
+        // before 5.4 doesn't ask for it); a refused read says so later.
+        final playtime = await _postTokenRequest(
+          bodyFor('$_readScopes $_playtimeScopes'),
+        );
+        // Only another 403 moves on to the next tier: a server error is
+        // reported as one, not as a wrong password or a missing scope.
+        if (playtime.statusCode != 403) resp = playtime;
+        if (playtime.statusCode == 200) {
+          _log.i(
+            'RomM denied $_devicesReadScope — playtime pulls may be refused',
+          );
+        }
+      }
       if (resp.statusCode == 403 && session == _session) {
         // Either the account lacks the playtime scopes or the server predates
         // them — indistinguishable here, and both mean the same thing: keep the
-        // connection, drop playtime sync. Bad credentials fail the retry too,
-        // so the error path below is unchanged for them.
+        // connection, drop playtime sync.
         final base = await _postTokenRequest(bodyFor(_readScopes));
         if (base.statusCode == 200) playtimeGranted = false;
-        resp = base.statusCode == 200 ? base : resp;
+        resp = base;
       } else if (resp.statusCode == 200) {
         playtimeGranted = true;
       }
@@ -2156,7 +2198,7 @@ class RommService {
     );
 
     if (resp.statusCode != 200 && resp.statusCode != 201) {
-      _notePlaySessionFailure(resp.statusCode);
+      _notePlaySessionFailure(resp.statusCode, read: false);
       throw RommException(
         'Play-session upload failed (${resp.statusCode})',
         statusCode: resp.statusCode,
@@ -2188,7 +2230,9 @@ class RommService {
     try {
       resp = await _authedGetUri(uri);
     } on RommException catch (e) {
-      if (e.statusCode != null) _notePlaySessionFailure(e.statusCode!);
+      if (e.statusCode != null) {
+        _notePlaySessionFailure(e.statusCode!, read: true);
+      }
       rethrow;
     }
 
@@ -2197,14 +2241,30 @@ class RommService {
     ).whereType<Map<String, dynamic>>().map(RommPlaySession.fromJson).toList();
   }
 
-  /// Marks the play-session API unusable when the server's answer says it will
-  /// never work on this connection: `404` (endpoint absent) or a `403` that has
-  /// already survived one re-authentication, i.e. a genuine scope denial. In
-  /// API-key mode a 403 is conclusive on the first try — the key's scopes were
-  /// fixed when the user created it, so there is no re-auth that could widen
-  /// them, and this is how a key issued without `roms.user.*` quietly settles
-  /// into "everything but playtime sync" instead of erroring on every game exit.
-  void _notePlaySessionFailure(int statusCode) {
+  /// Records a play-session request the server says will never work on this
+  /// connection: `404` (endpoint absent) or a `403` that has already survived
+  /// one re-authentication, i.e. a genuine scope denial. In API-key mode a 403
+  /// is conclusive on the first try — the key's scopes were fixed when the
+  /// user created it, so there is no re-auth that could widen them.
+  ///
+  /// A 404, or a 403 on a push, stops playtime sync for the connection: this
+  /// is how a key issued without `roms.user.*` settles into "everything but
+  /// playtime sync" instead of erroring on every game exit. A 403 on a [read]
+  /// stops only the pulls: RomM 5.4 needs `devices.read` to read play sessions
+  /// but not to push them, so a key or account without it still sends this
+  /// device's playtime up.
+  void _notePlaySessionFailure(int statusCode, {required bool read}) {
+    if (statusCode == 403 && read) {
+      if (_playSessionsReadable && _playSessionsSupported) {
+        _log.w(
+          'RomM play-session read refused (403; RomM 5.4+ needs '
+          '$_devicesReadScope) — pulling playtime disabled for this '
+          'connection; pushes continue',
+        );
+      }
+      _playSessionsReadable = false;
+      return;
+    }
     if (statusCode == 404 || statusCode == 403) {
       if (_playSessionsSupported) {
         _log.w(

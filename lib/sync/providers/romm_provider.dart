@@ -2271,7 +2271,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   }
 
   Future<void> _pullRecentPlaytime() async {
-    if (!_browse.isConnected || !_svc.playtimeSyncAvailable) return;
+    if (!_browse.isConnected || !_svc.playtimePullAvailable) return;
 
     final List<RommRom> recent;
     try {
