@@ -72,7 +72,9 @@ jobs:
           - target: android
             os: ubuntu-latest
           - target: linux-x64
-            os: ubuntu-latest
+            # Pinned like linux-arm: `ubuntu-latest` moved to Ubuntu 26.04,
+            # where libgdk-pixbuf2.0-dev no longer has an install candidate.
+            os: ubuntu-24.04
           - target: linux-arm
             os: ubuntu-24.04-arm
 
