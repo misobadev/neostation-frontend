@@ -119,6 +119,17 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Whether a global synchronization task is currently active.
   bool _isSyncing = false;
 
+  /// Stop was pressed during a standalone save folder upload: it ends before
+  /// the next file. Cleared when an upload starts.
+  bool _customFolderUploadCancelled = false;
+
+  /// Stops the standalone save folder upload that is running, before its next
+  /// file; the files already sent stay uploaded. Does nothing when no upload
+  /// is running.
+  void cancelCustomFolderUpload() {
+    if (_isSyncing) _customFolderUploadCancelled = true;
+  }
+
   /// Overall progress of the current sync operation (0.0 to 1.0).
   double _syncProgress = 0.0;
 

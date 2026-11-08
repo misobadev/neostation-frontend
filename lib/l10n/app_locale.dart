@@ -1654,6 +1654,16 @@ mixin AppLocale {
   static const String customFolderUploadComplete =
       'custom_folder_upload_complete';
   static const String customFolderUploadFailed = 'custom_folder_upload_failed';
+  static const String customFolderUploadConfirm =
+      'custom_folder_upload_confirm';
+  static const String customFolderUploadManyFiles =
+      'custom_folder_upload_many_files';
+  static const String customFolderUploadLargeFiles =
+      'custom_folder_upload_large_files';
+  static const String customFolderUploadOverQuota =
+      'custom_folder_upload_over_quota';
+  static const String customFolderUploadStopped =
+      'custom_folder_upload_stopped';
   static const String customSaveFoldersMigrate = 'custom_save_folders_migrate';
   // ---------------------------------------------------------------------------
   // Discovery

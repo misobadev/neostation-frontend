@@ -1511,6 +1511,14 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.customFolderUploadComplete: 'Carpeta standalone sincronizada: {uploaded} subidos, {skipped} ya actualizados',
   AppLocale.customFolderUploadFailed:
       'Error al sincronizar la carpeta standalone',
+  AppLocale.customFolderUploadConfirm:
+      'Archivos que se subirán a NeoSync desde {folder}: {count} ({size}).',
+  AppLocale.customFolderUploadManyFiles: 'Son más archivos de los que suele tener una carpeta de guardado. Comprueba que sea la carpeta correcta.',
+  AppLocale.customFolderUploadLargeFiles:
+      'Archivos de más de 64 MB: {count}; el más grande, {size}.',
+  AppLocale.customFolderUploadOverQuota:
+      'Es más que tu espacio libre en NeoSync ({free}).',
+  AppLocale.customFolderUploadStopped: 'Subida detenida: {uploaded} subidos.',
   AppLocale.customSaveFoldersMigrate:
       'Migrar guardados de la nube a NeoSync v2',
 

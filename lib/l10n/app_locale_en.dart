@@ -1479,6 +1479,14 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.uploadingCustomFolder: 'Uploading saves from {folder}...',
   AppLocale.customFolderUploadComplete: 'Standalone folder synced: {uploaded} uploaded, {skipped} already up to date',
   AppLocale.customFolderUploadFailed: 'Failed to sync standalone folder',
+  AppLocale.customFolderUploadConfirm:
+      'Files to upload to NeoSync from {folder}: {count} ({size}).',
+  AppLocale.customFolderUploadManyFiles: 'That\'s more files than a save folder usually holds. Check it\'s the right folder.',
+  AppLocale.customFolderUploadLargeFiles:
+      'Files over 64 MB: {count}, the largest {size}.',
+  AppLocale.customFolderUploadOverQuota:
+      'That\'s more than your free NeoSync space ({free}).',
+  AppLocale.customFolderUploadStopped: 'Upload stopped: {uploaded} uploaded.',
   AppLocale.customSaveFoldersMigrate: 'Migrate cloud saves to NeoSync v2',
 
   // ES-DE import

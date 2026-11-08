@@ -1398,6 +1398,14 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.customFolderUploadComplete:
       '독립형 폴더 동기화 완료: {uploaded}개 업로드, {skipped}개는 이미 최신',
   AppLocale.customFolderUploadFailed: '독립형 폴더 동기화 실패',
+  AppLocale.customFolderUploadConfirm:
+      '{folder}에서 NeoSync로 업로드할 파일: {count}개 ({size}).',
+  AppLocale.customFolderUploadManyFiles:
+      '세이브 폴더에 보통 있는 것보다 파일이 많습니다. 올바른 폴더인지 확인하세요.',
+  AppLocale.customFolderUploadLargeFiles:
+      '64 MB를 넘는 파일: {count}개, 가장 큰 파일 {size}.',
+  AppLocale.customFolderUploadOverQuota: 'NeoSync 남은 공간({free})보다 큽니다.',
+  AppLocale.customFolderUploadStopped: '업로드 중지됨: {uploaded}개 업로드됨.',
   AppLocale.customSaveFoldersMigrate: '클라우드 저장을 NeoSync v2로 마이그레이션',
 
   // ES-DE import

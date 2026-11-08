@@ -1527,6 +1527,15 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.customFolderUploadComplete: 'Dossier standalone synchronisé : {uploaded} téléversés, {skipped} déjà à jour',
   AppLocale.customFolderUploadFailed:
       'Échec de la synchronisation du dossier personnalisé',
+  AppLocale.customFolderUploadConfirm:
+      'Fichiers à téléverser vers NeoSync depuis {folder} : {count} ({size}).',
+  AppLocale.customFolderUploadManyFiles: 'C\'est plus de fichiers qu\'un dossier de sauvegardes n\'en contient d\'habitude. Vérifiez qu\'il s\'agit du bon dossier.',
+  AppLocale.customFolderUploadLargeFiles:
+      'Fichiers de plus de 64 MB : {count}, le plus gros fait {size}.',
+  AppLocale.customFolderUploadOverQuota:
+      'C\'est plus que votre espace NeoSync libre ({free}).',
+  AppLocale.customFolderUploadStopped:
+      'Téléversement arrêté : {uploaded} téléversés.',
   AppLocale.customSaveFoldersMigrate:
       'Migrer les sauvegardes cloud vers NeoSync v2',
 

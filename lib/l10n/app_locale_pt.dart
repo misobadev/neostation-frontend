@@ -1515,6 +1515,15 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.customFolderUploadComplete: 'Pasta standalone sincronizada: {uploaded} enviados, {skipped} já atualizados',
   AppLocale.customFolderUploadFailed:
       'Falha ao sincronizar a pasta personalizada',
+  AppLocale.customFolderUploadConfirm:
+      'Arquivos a enviar para o NeoSync de {folder}: {count} ({size}).',
+  AppLocale.customFolderUploadManyFiles: 'São mais arquivos do que uma pasta de saves costuma ter. Verifique se é a pasta certa.',
+  AppLocale.customFolderUploadLargeFiles:
+      'Arquivos com mais de 64 MB: {count}, o maior com {size}.',
+  AppLocale.customFolderUploadOverQuota:
+      'É mais do que o seu espaço livre no NeoSync ({free}).',
+  AppLocale.customFolderUploadStopped:
+      'Envio interrompido: {uploaded} enviados.',
   AppLocale.customSaveFoldersMigrate: 'Migrar saves da nuvem para o NeoSync v2',
 
   // ES-DE import

@@ -60,6 +60,8 @@ void reportAutoFolderUpload({
     case CustomFolderUploadOutcome.busy:
     case CustomFolderUploadOutcome.notSignedIn:
     case CustomFolderUploadOutcome.noFolder:
+    // Stop is only offered on the folders screen, not here.
+    case CustomFolderUploadOutcome.cancelled:
       return;
   }
   bell.show(

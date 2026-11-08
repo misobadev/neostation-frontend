@@ -219,6 +219,52 @@ void main() {
     expect(service.uploaded, hasLength(1));
   });
 
+  test('Stop ends the upload before the next file and says so', () async {
+    write('a.sav');
+    write('b.sav');
+    write('c.sav');
+    service.answer = (_) {
+      // Pressed while the first file is on its way.
+      provider.cancelCustomFolderUpload();
+      return {'success': true};
+    };
+
+    expect(await upload(), CustomFolderUploadOutcome.cancelled);
+    expect(service.uploaded, hasLength(1));
+    expect(provider.uploadedFiles, 1);
+    expect(provider.isSyncing, isFalse);
+  });
+
+  test(
+    'a Stop pressed while nothing uploads does not stop the next upload',
+    () async {
+      write('a.sav');
+      write('b.sav');
+
+      provider.cancelCustomFolderUpload();
+
+      expect(await upload(), CustomFolderUploadOutcome.uploaded);
+      expect(service.uploaded, hasLength(2));
+    },
+  );
+
+  test('a stopped upload does not stop the next one', () async {
+    write('a.sav');
+    write('b.sav');
+    var stopNow = true;
+    service.answer = (_) {
+      if (stopNow) provider.cancelCustomFolderUpload();
+      return {'success': true};
+    };
+    expect(await upload(), CustomFolderUploadOutcome.cancelled);
+
+    stopNow = false;
+    service.uploaded.clear();
+
+    expect(await upload(), CustomFolderUploadOutcome.uploaded);
+    expect(service.uploaded, hasLength(2));
+  });
+
   test('an unreadable subfolder does not hide the other saves', () async {
     write('a.sav');
     write(p.join('ok', 'b.sav'));

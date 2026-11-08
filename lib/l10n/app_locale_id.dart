@@ -1504,6 +1504,15 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.uploadingCustomFolder: 'Mengunggah simpanan dari {folder}...',
   AppLocale.customFolderUploadComplete: 'Folder standalone disinkronkan: {uploaded} diunggah, {skipped} sudah terbaru',
   AppLocale.customFolderUploadFailed: 'Gagal menyinkronkan folder standalone',
+  AppLocale.customFolderUploadConfirm:
+      'File yang akan diunggah ke NeoSync dari {folder}: {count} ({size}).',
+  AppLocale.customFolderUploadManyFiles: 'Ini lebih banyak file daripada isi folder simpanan biasanya. Pastikan foldernya benar.',
+  AppLocale.customFolderUploadLargeFiles:
+      'File di atas 64 MB: {count}, yang terbesar {size}.',
+  AppLocale.customFolderUploadOverQuota:
+      'Ini melebihi ruang NeoSync Anda yang tersisa ({free}).',
+  AppLocale.customFolderUploadStopped:
+      'Unggahan dihentikan: {uploaded} diunggah.',
   AppLocale.customSaveFoldersMigrate:
       'Migrasikan penyimpanan cloud ke NeoSync v2',
 

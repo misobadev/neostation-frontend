@@ -449,6 +449,9 @@ enum CustomFolderUploadOutcome {
 
   /// The NeoSync account is out of storage.
   quotaExceeded,
+
+  /// The user pressed Stop; the files before it went up, the rest didn't.
+  cancelled,
 }
 
 /// Represents the comprehensive synchronization state of a specific game.

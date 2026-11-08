@@ -23,6 +23,7 @@ import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
+import 'package:neostation/utils/custom_folder_upload_prompt.dart';
 import 'package:neostation/themes/corner_radii.dart';
 
 import '../../app_screen.dart';
@@ -69,6 +70,9 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
   List<SystemModel> _systems = [];
   List<(String, String, String)> _configured = [];
   bool _syncing = false;
+
+  /// Counting a picked folder before asking to upload it.
+  bool _checking = false;
   int _selectedFolderIndex = 0;
 
   @override
@@ -97,6 +101,7 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
       onSelectItem: _openConfigDialog,
       onSelectButton: _handleSelectFolder,
       onFavorite: _openConfigDialog,
+      onXButton: _stopUpload,
       onSettings: () {},
     );
 
@@ -122,6 +127,7 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
   /// folder; the list is empty-only so it becomes a no-op when there is nothing
   /// configured.
   Future<void> _handleSelectFolder() async {
+    if (_checking) return;
     if (_configured.isEmpty) {
       _openConfigDialog();
       return;
@@ -238,6 +244,14 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
         return;
       }
 
+      // NeoSync uploads everything in the folder, and once it is saved,
+      // opening its system uploads it again without asking: so ask first, and
+      // save nothing if the answer is no. RomM uploads only the saves of games
+      // linked to it, so its hand-over doesn't ask.
+      if (widget.onConfigured == null && !await _confirmUpload(folderPath)) {
+        return;
+      }
+
       await NeoSyncSaveFolderRepository.saveFolder(
         system,
         emulatorSlug,
@@ -339,6 +353,13 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
                   .replaceFirst('{skipped}', '${provider.skippedFiles}'),
               custom.NotificationType.success,
             );
+          case CustomFolderUploadOutcome.cancelled:
+            show(
+              AppLocale.customFolderUploadStopped
+                  .getString(context)
+                  .replaceFirst('{uploaded}', '${provider.uploadedFiles}'),
+              custom.NotificationType.info,
+            );
           case CustomFolderUploadOutcome.empty:
             clearAutoFolderUploadNotice(system, emulatorSlug);
             // Nothing to upload: an empty folder, or one NeoStation can't list.
@@ -373,12 +394,66 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
     }
   }
 
+  /// Shows what uploading [folderPath] to NeoSync would send (file count and
+  /// size, with a warning when it doesn't look like a save folder) and asks
+  /// whether to go ahead. An empty folder doesn't ask: there's nothing to
+  /// send, and the upload reports that itself.
+  Future<bool> _confirmUpload(String folderPath) async {
+    final provider = context.read<NeoSyncProvider>();
+    // Counting a large folder, and fetching the quota, can take a while: the
+    // view takes no Configure or Remove meanwhile, or a second prompt could
+    // open alongside the first.
+    setState(() => _checking = true);
+    final SaveFolderSummary summary;
+    try {
+      summary = await summariseSaveFolderInBackground(folderPath);
+      if (!mounted || summary.files == 0) return mounted;
+      // Fresh each time: an upload since the last refresh used up space.
+      try {
+        await provider.loadQuota().timeout(const Duration(seconds: 5));
+      } catch (_) {
+        // The last known quota (or none) then decides the warning.
+      }
+      if (!mounted) return false;
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+    final quota = provider.quota;
+    final freeBytes = quota == null || quota.totalQuota <= 0
+        ? null
+        : quota.totalQuota - quota.usedQuota;
+
+    _gamepadNav.deactivate();
+    final confirmed = await ConfirmActionDialog.show(
+      context,
+      title: AppLocale.customSaveFoldersTitle.getString(context),
+      body: customFolderUploadPrompt(
+        summary: summary,
+        folderLabel: path.basename(folderPath),
+        freeBytes: freeBytes,
+        text: (key) => key.getString(context),
+      ),
+      confirmLabel: AppLocale.upload.getString(context),
+      cancelLabel: AppLocale.cancel.getString(context),
+      icon: Symbols.cloud_upload_rounded,
+    );
+    // The prompt's layer hands the controller back when it closes.
+    return confirmed;
+  }
+
+  /// Stop (X): ends the running upload before its next file.
+  void _stopUpload() {
+    if (!_syncing) return;
+    context.read<NeoSyncProvider>().cancelCustomFolderUpload();
+  }
+
   Future<void> _removeFolder(String system, String emulatorSlug) async {
     await NeoSyncSaveFolderRepository.removeFolder(system, emulatorSlug);
     await _loadConfigured();
   }
 
   Future<void> _openConfigDialog() async {
+    if (_checking) return;
     // The dialogue's own layer takes the controller from this view and hands
     // it back when it closes. It is pushed after the dialogue's first frame, so
     // let go of the controller now rather than share that frame's presses.
@@ -573,22 +648,35 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              GamepadControl(
-                label: AppLocale.customSaveFolderConfigure.getString(context),
-                iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
-                onTap: busy ? null : _openConfigDialog,
-                textColor: theme.colorScheme.onTertiaryFixed,
-                backgroundColor: theme.colorScheme.tertiaryFixed,
-              ),
-              SizedBox(width: 8.r),
-              GamepadControl(
-                label: AppLocale.delete.getString(context),
-                iconPath: 'assets/images/gamepad/Xbox_View_button.png',
-                onTap: busy ? null : () => _handleSelectFolder(),
-                textColor: theme.colorScheme.onTertiaryFixed,
-                backgroundColor: theme.colorScheme.tertiaryFixed,
-              ),
-              SizedBox(width: 8.r),
+              // While an upload runs, Configure and Delete can't be used;
+              // Stop takes their place.
+              if (busy) ...[
+                GamepadControl(
+                  label: AppLocale.stop.getString(context),
+                  iconPath: 'assets/images/gamepad/Xbox_X_button.png',
+                  onTap: _stopUpload,
+                  textColor: theme.colorScheme.onTertiaryFixed,
+                  backgroundColor: theme.colorScheme.tertiaryFixed,
+                ),
+                SizedBox(width: 8.r),
+              ] else ...[
+                GamepadControl(
+                  label: AppLocale.customSaveFolderConfigure.getString(context),
+                  iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
+                  onTap: _checking ? null : _openConfigDialog,
+                  textColor: theme.colorScheme.onTertiaryFixed,
+                  backgroundColor: theme.colorScheme.tertiaryFixed,
+                ),
+                SizedBox(width: 8.r),
+                GamepadControl(
+                  label: AppLocale.delete.getString(context),
+                  iconPath: 'assets/images/gamepad/Xbox_View_button.png',
+                  onTap: _checking ? null : () => _handleSelectFolder(),
+                  textColor: theme.colorScheme.onTertiaryFixed,
+                  backgroundColor: theme.colorScheme.tertiaryFixed,
+                ),
+                SizedBox(width: 8.r),
+              ],
               NeoSyncBackButton(onTap: () => widget.onBack()),
             ],
           ),

@@ -1524,6 +1524,14 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.customFolderUploadComplete: 'Standaloner Ordner synchronisiert: {uploaded} hochgeladen, {skipped} bereits aktuell',
   AppLocale.customFolderUploadFailed:
       'Synchronisierung des benutzerdefinierten Ordners fehlgeschlagen',
+  AppLocale.customFolderUploadConfirm: 'Dateien, die aus {folder} zu NeoSync hochgeladen werden: {count} ({size}).',
+  AppLocale.customFolderUploadManyFiles: 'Das sind mehr Dateien, als ein Speicherordner normalerweise enthält. Prüfe, ob es der richtige Ordner ist.',
+  AppLocale.customFolderUploadLargeFiles:
+      'Dateien über 64 MB: {count}, die größte {size}.',
+  AppLocale.customFolderUploadOverQuota:
+      'Das ist mehr als dein freier NeoSync-Speicher ({free}).',
+  AppLocale.customFolderUploadStopped:
+      'Hochladen gestoppt: {uploaded} hochgeladen.',
   AppLocale.customSaveFoldersMigrate:
       'Cloud-Spielstände zu NeoSync v2 migrieren',
 

@@ -340,6 +340,9 @@ extension NeoSyncUpload on NeoSyncProvider {
     // both get past the check above. Listeners hear about it once there is a
     // folder to upload.
     _isSyncing = true;
+    // A Stop from before this upload started isn't meant for it; one pressed
+    // from here on is.
+    _customFolderUploadCancelled = false;
     final String? folder;
     try {
       folder = await NeoSyncSaveFolderRepository.getFolder(
@@ -382,6 +385,13 @@ extension NeoSyncUpload on NeoSyncProvider {
       notify();
 
       for (final file in files) {
+        if (_customFolderUploadCancelled) {
+          _syncStatus =
+              'Upload stopped: $_uploadedFiles uploaded, $_skippedFiles '
+              'already synced';
+          _processedItems.add(_syncStatus);
+          return CustomFolderUploadOutcome.cancelled;
+        }
         await _processAutoUploadFile(
           file,
           folder,
