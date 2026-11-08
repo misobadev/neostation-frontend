@@ -38,11 +38,41 @@ void main() {
     );
   });
 
-  test("the screen's other actions wait while a move runs", () {
+  // NEO-228: the actions waited silently; the screen looked ready.
+  test("the screen's other actions wait while a move runs, and say why", () {
     final body = method('Future<void> _handleItemTap(');
-    final guard = body.indexOf('if (UserDataLocationService.isMoving) return;');
-    expect(guard, isNot(-1));
-    expect(guard, lessThan(body.indexOf('switch (')));
+    final guard = RegExp(
+      r'if \(UserDataLocationService\.isMoving\) \{\s*'
+      r'reportUserDataMoveRunning\(context\);\s*return;\s*\}',
+    ).firstMatch(body);
+    expect(guard, isNotNull, reason: body);
+    expect(guard!.start, lessThan(body.indexOf('switch (')));
+  });
+
+  // NEO-228: after a failed move the bell kept saying the data was being
+  // moved.
+  test('the "being moved" notice goes once the move has ended', () {
+    final body = method('Future<void> _migrateUserData(');
+    final clear = body.indexOf('clearUserDataMoveRunningNotice();');
+    expect(clear, isNot(-1));
+    expect(
+      clear,
+      greaterThan(body.indexOf('UserDataLocationService.migrateData(')),
+    );
+    expect(clear, lessThan(body.indexOf('if (!navigator.mounted) return;')));
+  });
+
+  // NEO-228: Settings rebuilds this screen whenever the user leaves it, so
+  // the bar of a move still running was gone on the way back.
+  test("the move's bar comes from the move, not from this screen", () {
+    expect(screen, contains('UserDataMoveProgressCard('));
+    for (final field in [
+      '_isMigrating',
+      '_migrationProgress',
+      '_migrationFile',
+    ]) {
+      expect(screen, isNot(contains(field)), reason: field);
+    }
   });
 
   group('_migrateUserData', () {

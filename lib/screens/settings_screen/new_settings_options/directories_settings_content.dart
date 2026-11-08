@@ -23,6 +23,7 @@ import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/permission_check_wrapper.dart';
 import 'package:neostation/widgets/restart_required_dialog.dart';
 import 'package:neostation/widgets/tv_directory_picker.dart';
+import 'package:neostation/widgets/user_data_move_progress_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
@@ -76,11 +77,6 @@ class DirectoriesSettingsContentState
   // ignored rather than opening another picker whose folder would not be
   // scanned while the first scan runs.
   bool _addingRomFolder = false;
-
-  // Migration progress state (shown inline, no dialog).
-  bool _isMigrating = false;
-  double _migrationProgress = 0.0;
-  String _migrationFile = '';
 
   // ES-DE import progress state (shown inline, no dialog).
   bool _isImporting = false;
@@ -216,8 +212,12 @@ class DirectoriesSettingsContentState
     // Disabled ES-DE actions are inert — no toast, no sound, no work.
     if (_isEsdeDisabled(action)) return;
     // A scan, import or second move started now would write to the data
-    // being moved after its copy was taken.
-    if (UserDataLocationService.isMoving) return;
+    // being moved after its copy was taken. Say so: the screen otherwise
+    // looks ready.
+    if (UserDataLocationService.isMoving) {
+      reportUserDataMoveRunning(context);
+      return;
+    }
     final configProvider = Provider.of<SqliteConfigProvider>(
       context,
       listen: false,
@@ -739,26 +739,12 @@ class DirectoriesSettingsContentState
     // shown through the root navigator, which outlives this screen.
     final navigator = Navigator.of(context, rootNavigator: true);
 
-    setState(() {
-      _isMigrating = true;
-      _migrationProgress = 0.0;
-      _migrationFile = '';
-    });
-
     try {
       final currentMediaPath = await ConfigService.getMediaPath();
       await UserDataLocationService.migrateData(
         sourceUserDataPath: sourcePath,
         sourceMediaPath: currentMediaPath,
         destPath: destPath,
-        onProgress: (p, file) {
-          if (mounted) {
-            setState(() {
-              _migrationProgress = p;
-              _migrationFile = file;
-            });
-          }
-        },
       );
     } on UserDataMoveFailure catch (e) {
       failure = e.kind;
@@ -767,6 +753,8 @@ class DirectoriesSettingsContentState
       failure = UserDataMoveFailureKind.other;
       _log.e('Migration failed: $e');
     }
+    // Taps refused during the move said it was running; it isn't any more.
+    clearUserDataMoveRunningNotice();
 
     if (failure == null) {
       // migrateData has saved the new folder as the user-data location.
@@ -782,7 +770,6 @@ class DirectoriesSettingsContentState
       }
     }
 
-    if (mounted) setState(() => _isMigrating = false);
     if (!navigator.mounted) return;
 
     if (failure != null) {
@@ -819,77 +806,6 @@ class DirectoriesSettingsContentState
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
-
-  Widget _buildMigrationProgress(ThemeData theme) {
-    if (!_isMigrating) return const SizedBox.shrink();
-    final pct = _migrationProgress;
-    final isCopying = pct < 0.5;
-    return Container(
-      margin: EdgeInsets.only(bottom: 12.r),
-      padding: EdgeInsets.all(12.r),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1.r,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                isCopying
-                    ? AppLocale.migratingUserData.getString(context)
-                    : '${AppLocale.delete.getString(context)}...',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10.r,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              Text(
-                '${(pct * 100).toInt()}%',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10.r,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8.r),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4.r),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 6.r,
-              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                theme.colorScheme.primary,
-              ),
-            ),
-          ),
-          if (_migrationFile.isNotEmpty) ...[
-            SizedBox(height: 4.r),
-            Text(
-              _migrationFile,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: 9.r,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                fontFamily: 'monospace',
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _buildScanProgress(ThemeData theme, SqliteConfigProvider provider) {
     if (!provider.isScanning) return const SizedBox.shrink();
@@ -986,7 +902,7 @@ class DirectoriesSettingsContentState
               subtitle: AppLocale.configureRomsFolder.getString(context),
             ),
             SizedBox(height: 12.r),
-            _buildMigrationProgress(theme),
+            const UserDataMoveProgressCard(),
             _buildScanProgress(theme, configProvider),
             _buildEsdeProgress(theme),
             _buildEsdeResultSummary(theme),

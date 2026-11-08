@@ -1209,6 +1209,9 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.moveUserDataDestNotEmpty: 'Новая папка не пуста (элементов: {count}). Данные NeoStation будут добавлены рядом с существующим содержимым.',
   AppLocale.moveUserDataConfirm: 'Переместить',
   AppLocale.migratingUserData: 'Перемещение данных',
+  AppLocale.userDataMoveRunning:
+      "Ваши данные перемещаются. Дождитесь завершения.",
+  AppLocale.userDataMoveRemovingOldCopy: "Удаление старой копии…",
   AppLocale.migratingUserDataComplete: 'Миграция завершена',
   AppLocale.migratingUserDataError: 'Ошибка миграции',
   AppLocale.userDataMoveBusy: 'NeoStation занят: идёт сканирование, скрапинг, синхронизация, импорт или работает инструмент. Перенесите данные, когда это закончится.',

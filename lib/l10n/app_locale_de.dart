@@ -1230,6 +1230,8 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.moveUserDataDestNotEmpty: 'Der neue Ordner ist nicht leer (Elemente: {count}). Die Daten von NeoStation werden daneben abgelegt.',
   AppLocale.moveUserDataConfirm: 'Daten verschieben',
   AppLocale.migratingUserData: 'Daten werden verschoben',
+  AppLocale.userDataMoveRunning: "Deine Daten werden verschoben. Warte, bis der Vorgang abgeschlossen ist.",
+  AppLocale.userDataMoveRemovingOldCopy: "Alte Kopie wird entfernt…",
   AppLocale.migratingUserDataComplete: 'Migration abgeschlossen',
   AppLocale.migratingUserDataError: 'Migration fehlgeschlagen',
   AppLocale.userDataMoveBusy: 'NeoStation ist beschäftigt: Ein Scan, Scraping, eine Synchronisierung, ein Import oder ein Werkzeug läuft. Verschiebe deine Daten, wenn es fertig ist.',

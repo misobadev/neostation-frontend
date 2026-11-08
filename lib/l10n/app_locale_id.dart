@@ -1216,6 +1216,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.moveUserDataDestNotEmpty: 'Folder baru sudah berisi {count} item. Data NeoStation akan ditambahkan di sampingnya.',
   AppLocale.moveUserDataConfirm: 'Pindahkan Data',
   AppLocale.migratingUserData: 'Memindahkan Data',
+  AppLocale.userDataMoveRunning:
+      "Data Anda sedang dipindahkan. Tunggu hingga selesai.",
+  AppLocale.userDataMoveRemovingOldCopy: "Menghapus salinan lama…",
   AppLocale.migratingUserDataComplete: 'Migrasi selesai',
   AppLocale.migratingUserDataError: 'Migrasi gagal',
   AppLocale.userDataMoveBusy: 'NeoStation sedang sibuk: pemindaian, scraping, sinkronisasi, impor, atau alat sedang berjalan. Pindahkan data Anda setelah selesai.',

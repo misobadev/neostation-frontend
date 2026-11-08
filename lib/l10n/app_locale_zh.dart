@@ -1122,6 +1122,8 @@ const Map<String, dynamic> appLocaleZh = {
       '新文件夹已包含 {count} 个项目。NeoStation 的数据将添加在它们旁边。',
   AppLocale.moveUserDataConfirm: '移动数据',
   AppLocale.migratingUserData: '正在迁移数据',
+  AppLocale.userDataMoveRunning: "正在移动你的数据。请等待完成。",
+  AppLocale.userDataMoveRemovingOldCopy: "正在删除旧副本…",
   AppLocale.migratingUserDataComplete: '迁移完成',
   AppLocale.migratingUserDataError: '迁移失败',
   AppLocale.userDataMoveBusy: 'NeoStation 正忙：正在进行扫描、刮削、同步、导入或运行工具。请在完成后再移动数据。',
