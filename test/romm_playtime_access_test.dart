@@ -79,14 +79,14 @@ void main() {
 
   /// Signed in with a password, holding [token]: by default one saved by an
   /// older build, which didn't ask for devices.read.
-  RommService withPassword({String token = '$base $playtime'}) =>
-      RommService()..configure(
-        serverUrl: 'http://romm.test',
-        username: 'user',
-        password: 'secret',
-        accessToken: token,
-        refreshToken: 'refresh',
-      );
+  RommService withPassword({String token = '$base $playtime'}) => RommService()
+    ..configure(
+      serverUrl: 'http://romm.test',
+      username: 'user',
+      password: 'secret',
+      accessToken: token,
+      refreshToken: 'refresh',
+    );
 
   RommService withApiKey() =>
       RommService()..configure(serverUrl: 'http://romm.test', apiKey: 'key');
