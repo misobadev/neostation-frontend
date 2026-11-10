@@ -39,6 +39,8 @@ import '../utils/nav_tabs.dart';
 import '../services/saf_directory_service.dart';
 import '../services/saf_grant_service.dart';
 
+import '../utils/user_data_move_guard.dart';
+
 part 'sqlite_config_provider/mutators.dart';
 part 'sqlite_config_provider/scanning.dart';
 part 'sqlite_config_provider/secondary_display.dart';

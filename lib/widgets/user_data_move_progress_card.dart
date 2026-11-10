@@ -6,6 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../l10n/app_locale.dart';
 import '../services/global_notification_service.dart';
 import '../services/user_data_location_service.dart';
+import '../utils/user_data_move_guard.dart';
 import 'custom_notification.dart';
 
 /// The bar of a running user-data move, from [progress] (by default the move
@@ -98,8 +99,6 @@ class UserDataMoveProgressCard extends StatelessWidget {
   }
 }
 
-const String _moveRunningNoticeId = 'user_data_move_running';
-
 /// Says, in the notification bell, that an action can't run because the user
 /// data is being moved. One entry, however often it is tried. An information
 /// entry, not an error: nothing failed, the action has to wait.
@@ -107,11 +106,11 @@ void reportUserDataMoveRunning(BuildContext context) {
   AppNotification.showNotification(
     context,
     AppLocale.userDataMoveRunning.getString(context),
-    notificationId: _moveRunningNoticeId,
+    notificationId: userDataMoveRunningNoticeId,
   );
 }
 
 /// Takes the [reportUserDataMoveRunning] entry away: the move has ended. Needs
 /// no context, so the screen that started the move may already be gone.
 void clearUserDataMoveRunningNotice() =>
-    GlobalNotificationService().dismiss(_moveRunningNoticeId);
+    GlobalNotificationService().dismiss(userDataMoveRunningNoticeId);

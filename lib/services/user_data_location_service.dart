@@ -98,6 +98,10 @@ class UserDataLocationService {
   /// A move is running, from any screen.
   static bool get isMoving => _moving;
 
+  /// Makes [isMoving] report a move without running one.
+  @visibleForTesting
+  static set debugMoving(bool moving) => _moving = moving;
+
   /// How far the running move has got, or null when none runs. Set and
   /// cleared with [isMoving]: Settings rebuilds Directories whenever the user
   /// leaves it and comes back, so the progress is kept with the move, not with
@@ -591,24 +595,11 @@ class UserDataLocationService {
       onProgress?.call(0.5 * copied / total, path.basename(src));
     }
 
-    // The database last, as one consistent copy of the open database.
-    if (sourceDatabase != null) {
-      final dest = path.join(destPath, _databaseName);
-      final copy = path.join(staging.path, _databaseName);
-      try {
-        await DatabaseFileRepository.snapshotTo(
-          copy,
-          expectedFile: sourceDatabase,
-        );
-        staged.add((sourceDatabase, copy, dest));
-      } catch (e) {
-        failedCopies.add(sourceDatabase);
-        diskFull |=
-            UserDataMoveFailure.kindOf(e) == UserDataMoveFailureKind.noSpace;
-        _log.e('Migration: could not copy the database: $e');
-      }
-      onProgress?.call(0.5 * jobCount / total, _databaseName);
-    }
+    // The database is copied last of all, once every other file is in place:
+    // see the commit below.
+    final databaseDest = sourceDatabase == null
+        ? null
+        : path.join(destPath, _databaseName);
 
     // SAFETY GATE: if any owned file failed to copy, delete NOTHING. The source
     // stays fully intact; the caller surfaces the error and keeps the old path.
@@ -640,49 +631,89 @@ class UserDataLocationService {
     for (final dir in destSubDirs) {
       await checkFolder(dir);
     }
-    for (final (_, _, dest) in staged) {
+    for (final dest in [
+      for (final (_, _, dest) in staged) dest,
+      ?databaseDest,
+    ]) {
       if (await FileSystemEntity.isDirectory(dest)) {
         await abort(UserDataMoveFailureKind.blocked, '$dest is a folder.');
       }
       await checkFolder(path.dirname(dest));
     }
 
+    // A rename within the destination's own folder, or a copy where a folder
+    // there is a link to another drive, which a rename can't cross.
+    Future<void> putInPlace(String copy, String dest) async {
+      try {
+        await debugBeforeRename?.call(copy, dest);
+        await File(copy).rename(dest);
+      } on FileSystemException {
+        final length = await File(copy).length();
+        await File(copy).copy(dest);
+        if (await File(dest).length() != length) {
+          throw FileSystemException('Copy came out short', dest);
+        }
+        await File(copy).delete();
+      }
+    }
+
+    // Files the commit put where nothing was before: taken away again if the
+    // database then fails to copy, so a full drive gets its space back.
+    final placedNew = <String>[];
+    // Folders the commit made, to go with them once empty.
+    final madeDirs = <String>[];
+    Future<void> makeDir(String dir) async {
+      for (
+        var d = dir;
+        path.isWithin(destPath, d) && !await Directory(d).exists();
+        d = path.dirname(d)
+      ) {
+        madeDirs.add(d);
+      }
+      await Directory(dir).create(recursive: true);
+    }
+
+    Future<void> takeBackPlaced() async {
+      for (final file in placedNew) {
+        try {
+          await File(file).delete();
+        } on PathNotFoundException {
+          // Never got there.
+        } catch (e) {
+          _log.w('Migration: could not remove $file: $e');
+        }
+      }
+      // Deepest first; one that isn't empty stays.
+      for (final dir
+          in madeDirs.toSet().toList()
+            ..sort((a, b) => b.length.compareTo(a.length))) {
+        try {
+          await Directory(dir).delete();
+        } catch (_) {
+          // Not empty, or already gone.
+        }
+      }
+    }
+
     // ---- Commit: into place, a rename within the destination's own folder ----
     try {
       final made = <String>{};
       for (final dir in destSubDirs) {
-        if (made.add(dir)) await Directory(dir).create(recursive: true);
+        if (made.add(dir)) await makeDir(dir);
       }
-      for (final (src, copy, dest) in staged) {
+      for (final (_, copy, dest) in staged) {
         final parent = path.dirname(dest);
-        if (made.add(parent)) await Directory(parent).create(recursive: true);
-        if (src == sourceDatabase) {
-          // Left beside the copy, another database's WAL would be applied to
-          // it on opening, so they go before it is put in place.
-          for (final suffix in _databaseSidecars) {
-            final stale = File('$dest$suffix');
-            if (await stale.exists()) await stale.delete();
-          }
-        }
-        try {
-          await debugBeforeRename?.call(copy, dest);
-          await File(copy).rename(dest);
-        } on FileSystemException {
-          // A folder in the destination can be a link to another drive, which
-          // a rename can't cross: copy the file there instead.
-          final length = await File(copy).length();
-          await File(copy).copy(dest);
-          if (await File(dest).length() != length) {
-            throw FileSystemException('Copy came out short', dest);
-          }
-          await File(copy).delete();
-        }
+        if (made.add(parent)) await makeDir(parent);
+        // Recorded first, so a copy that fails part-way goes too.
+        if (!await File(dest).exists()) placedNew.add(dest);
+        await putInPlace(copy, dest);
       }
     } catch (e) {
       // Nothing has been deleted from the source, so nothing is lost, but
       // some files may already be in place.
       _log.e('Migration: could not put the copies in place: $e');
       final kind = UserDataMoveFailure.kindOf(e);
+      await takeBackPlaced();
       await abort(
         kind == UserDataMoveFailureKind.noSpace
             ? kind
@@ -690,23 +721,84 @@ class UserDataLocationService {
         'could not put the copies in place ($e).',
       );
     }
+    // The database last, as one consistent copy of the open database, while
+    // every other access to it waits: whatever the app writes from here on
+    // lands in the copy, once the switch below has opened it.
+    final database = sourceDatabase;
     try {
-      await staging.delete(recursive: true);
-    } catch (e) {
-      _log.w('Migration: could not remove ${staging.path}: $e');
+      await DatabaseFileRepository.withAccessHeld(() async {
+        if (database != null && databaseDest != null) {
+          final copy = path.join(staging.path, _databaseName);
+          try {
+            await DatabaseFileRepository.snapshotTo(
+              copy,
+              expectedFile: database,
+            );
+          } catch (e) {
+            _log.e('Migration: could not copy the database: $e');
+            await takeBackPlaced();
+            await abort(
+              UserDataMoveFailure.kindOf(e) == UserDataMoveFailureKind.noSpace
+                  ? UserDataMoveFailureKind.noSpace
+                  : UserDataMoveFailureKind.other,
+              'could not copy the database ($e).',
+            );
+          }
+          onProgress?.call(0.5 * jobCount / total, _databaseName);
+          try {
+            // Left beside the copy, another database's WAL would be applied to
+            // it on opening, so they go before it is put in place.
+            for (final suffix in _databaseSidecars) {
+              final stale = File('$databaseDest$suffix');
+              if (await stale.exists()) await stale.delete();
+            }
+            if (!await File(databaseDest).exists()) {
+              placedNew.add(databaseDest);
+            }
+            await putInPlace(copy, databaseDest);
+          } catch (e) {
+            _log.e('Migration: could not put the database in place: $e');
+            await takeBackPlaced();
+            await abort(
+              UserDataMoveFailure.kindOf(e) == UserDataMoveFailureKind.noSpace
+                  ? UserDataMoveFailureKind.noSpace
+                  : UserDataMoveFailureKind.other,
+              'could not put the database in place ($e).',
+            );
+          }
+          staged.add((database, copy, databaseDest));
+        }
+
+        _log.i('Migration: ${staged.length} files copied to $destPath');
+
+        // From here on the app uses the new folder: the next database access
+        // opens the copy, not the source about to be deleted. The move has
+        // happened, so nothing after this throws: a failure only leaves
+        // something behind in the old folder, and is logged.
+        await setCustomPath(destPath);
+        try {
+          await DatabaseFileRepository.close();
+        } catch (e) {
+          _log.w('Migration: could not close the old database: $e');
+        }
+      });
+    } finally {
+      // Outside the hold, which every database access waits for: emptying
+      // the staging folder can take a while.
+      try {
+        // Gone already when the move gave up.
+        if (await staging.exists()) await staging.delete(recursive: true);
+      } catch (e) {
+        _log.w('Migration: could not remove ${staging.path}: $e');
+      }
     }
 
-    _log.i('Migration: ${staged.length} files copied to $destPath');
-
-    // From here on the app uses the new folder: the next database access
-    // opens the copy, not the source about to be deleted. The move has
-    // happened, so nothing after this throws: a failure only leaves something
-    // behind in the old folder, and is logged.
-    await setCustomPath(destPath);
+    // The log too: the old one is deleted below, with everything this move
+    // logs from here on, and any failure in it.
     try {
-      await DatabaseFileRepository.close();
+      await LoggerService.instance.reinitialize();
     } catch (e) {
-      _log.w('Migration: could not close the old database: $e');
+      _log.w('Migration: the log stays in the old folder: $e');
     }
 
     // ---- Delete phase (0.5 → 1.0) ----

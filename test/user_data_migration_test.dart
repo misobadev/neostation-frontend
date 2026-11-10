@@ -53,6 +53,10 @@ Matcher failsWith(UserDataMoveFailureKind kind) =>
 /// must NOT destroy the foreign data. `migrateData` may only ever touch
 /// NeoStation-owned entries.
 void main() {
+  // A write let through after a move opens the moved database, as the app
+  // would, which reads the schema from the app's assets.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('UserDataLocationService.migrateData', () {
     late Directory tmp;
     late Directory esde; // source == NeoStation user-data pointed at ES-DE
@@ -730,6 +734,97 @@ void main() {
 
       expect(await UserDataLocationService.getCustomPath(), isNull);
       expect(connection.select('SELECT count(*) AS n FROM t').single['n'], 3);
+      expect(
+        File(p.join(dest.path, 'config.json')).existsSync(),
+        isFalse,
+        reason: 'the clash was found before anything was put in place',
+      );
+    });
+
+    // NEO-236: the database was copied before the other files were put in
+    // place, and the app kept writing to it until it was closed, so whatever
+    // was written in between went to the old folder and was deleted with it.
+    group('writes made while the move finishes', () {
+      Future<void> write(int value) async {
+        final db = await SqliteService.getDatabase();
+        await db.execute('INSERT INTO t VALUES (?)', [value]);
+      }
+
+      test('the database is put in place after every other file', () async {
+        final order = <String>[];
+        UserDataLocationService.debugBeforeRename = (copy, target) async {
+          order.add(p.basename(target));
+        };
+
+        await migrate();
+
+        expect(order, contains('config.json'));
+        expect(order.last, 'data.sqlite');
+      });
+
+      test('one made while the other files are put in place is kept', () async {
+        final writes = <Future<void>>[];
+        UserDataLocationService.debugBeforeRename = (copy, target) async {
+          if (p.basename(target) == 'config.json') writes.add(write(9000));
+        };
+
+        await migrate();
+        await Future.wait(writes);
+
+        expect(writes, hasLength(1));
+        expect(readDatabase(p.join(dest.path, 'data.sqlite')), (4, 'ok'));
+      });
+
+      test('one made while the database itself is put in place lands in the '
+          'new database', () async {
+        final writes = <Future<void>>[];
+        UserDataLocationService.debugBeforeRename = (copy, target) async {
+          // Started by other code, as a timer or a tap would: not from the
+          // move's own work, which goes ahead during the hold.
+          if (p.basename(target) == 'data.sqlite') {
+            Zone.root.run(() => writes.add(write(9001)));
+          }
+        };
+
+        await migrate();
+        await Future.wait(writes);
+
+        expect(writes, hasLength(1));
+        expect(readDatabase(p.join(dest.path, 'data.sqlite')), (4, 'ok'));
+        expect(
+          db.existsSync(),
+          isFalse,
+          reason: 'the old database was deleted',
+        );
+      });
+
+      test('a database that fails to copy after the other files are in place '
+          'leaves the app where it was', () async {
+        UserDataLocationService.debugBeforeRename = (copy, target) async {
+          // Something already where the database's copy goes makes the copy
+          // refuse.
+          if (p.basename(target) == 'config.json') {
+            File(p.join(p.dirname(copy), 'data.sqlite')).writeAsStringSync('');
+          }
+        };
+
+        await expectLater(migrate(), failsWith(UserDataMoveFailureKind.other));
+
+        expect(await UserDataLocationService.getCustomPath(), isNull);
+        expect(readDatabase(db.path), (3, 'ok'));
+        expect(connection.select('SELECT count(*) AS n FROM t').single['n'], 3);
+        expect(config.readAsStringSync(), 'config-bytes');
+        expect(
+          File(p.join(dest.path, 'config.json')).existsSync(),
+          isFalse,
+          reason: 'the copies put in place were taken away again',
+        );
+        expect(
+          Directory(p.join(dest.path, 'media')).existsSync(),
+          isFalse,
+          reason: 'and the folders made for them',
+        );
+      });
     });
 
     test('a second move while one runs is refused', () async {

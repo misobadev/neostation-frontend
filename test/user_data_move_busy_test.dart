@@ -9,6 +9,7 @@ import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/providers/scraping_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/services/esde_import_service.dart';
+import 'package:neostation/services/game/game_session_manager.dart';
 import 'package:neostation/services/library_file_tool_lock.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/romm_playtime_service.dart';
@@ -27,6 +28,14 @@ class _HeldRommService extends RommService {
   @override
   Future<List<RommRom>> getRecentlyPlayedRoms({int limit = 25}) =>
       recent.future;
+}
+
+/// A RomM browse provider with a download (or the scan after it) under way.
+class _Downloading extends RommProvider {
+  bool underway = true;
+
+  @override
+  bool get hasDownloadsUnderway => underway;
 }
 
 class _NoPlaytime extends RommService {
@@ -50,14 +59,17 @@ class _ConnectedBrowse extends RommProvider {
 void main() {
   tearDown(LibraryFileToolLock.debugReset);
 
-  Future<BuildContext> pumpProviders(WidgetTester tester) async {
+  Future<BuildContext> pumpProviders(
+    WidgetTester tester, {
+    RommProvider? romm,
+  }) async {
     late BuildContext context;
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => SqliteConfigProvider()),
           ChangeNotifierProvider(create: (_) => ScrapingProvider()),
-          ChangeNotifierProvider(create: (_) => RommProvider()),
+          ChangeNotifierProvider(create: (_) => romm ?? RommProvider()),
           ChangeNotifierProvider(
             create: (_) => NeoSyncProvider(NeoSyncService()),
           ),
@@ -105,6 +117,40 @@ void main() {
 
     svc.recent.complete(const []);
     await tester.runAsync(() => pull);
+    expect(userDataMoveBusy(context), isFalse);
+  });
+
+  // NEO-236: a single RomM download, and the scan that indexes it, write the
+  // library at any moment.
+  testWidgets('a RomM download under way: the move waits', (tester) async {
+    final romm = _Downloading();
+    final context = await pumpProviders(tester, romm: romm);
+
+    expect(userDataMoveBusy(context), isTrue);
+
+    romm.underway = false;
+    expect(userDataMoveBusy(context), isFalse);
+  });
+
+  test('a scan due after a download counts as under way', () {
+    final romm = RommProvider();
+    addTearDown(romm.dispose);
+    expect(romm.hasDownloadsUnderway, isFalse);
+
+    romm.debugScheduleSettle();
+
+    expect(romm.hasDownloadsUnderway, isTrue);
+  });
+
+  // NEO-236: a running game saves its play time every few seconds.
+  testWidgets('a game launching or running: the move waits', (tester) async {
+    final context = await pumpProviders(tester);
+    addTearDown(GameSessionManager.clearLaunchPending);
+
+    GameSessionManager.beginLaunchPending();
+    expect(userDataMoveBusy(context), isTrue);
+
+    GameSessionManager.clearLaunchPending();
     expect(userDataMoveBusy(context), isFalse);
   });
 

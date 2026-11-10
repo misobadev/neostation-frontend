@@ -240,6 +240,10 @@ extension SqliteConfigScanning on SqliteConfigProvider {
   /// ROM file scanning. Supports special handling for Android-specific
   /// virtual systems (e.g., 'Android Apps').
   Future<void> scanSystems({bool waitForAndroidStorage = false}) async {
+    // Refused during a user-data move: a scan keeps the database open across
+    // the move's switch, so its writes would go to the old one.
+    if (refuseWhileUserDataMoves()) return;
+
     // Allow scanning even if there are no folders (to clean systems or inject Android Apps)
     // if (_config.romFolders.isEmpty) return;
 
@@ -1209,6 +1213,10 @@ extension SqliteConfigScanning on SqliteConfigProvider {
 
   /// Manually triggers a re-scan for a specific system's ROMs.
   Future<void> rescanSystem(SystemModel system) async {
+    // Refused during a user-data move: a scan keeps the database open across
+    // the move's switch, so its writes would go to the old one.
+    if (refuseWhileUserDataMoves()) return;
+
     if (_config.romFolders.isEmpty) return;
 
     _scanStarted();
@@ -1244,6 +1252,17 @@ extension SqliteConfigScanning on SqliteConfigProvider {
 
   /// Performs a background scan for a system without blocking UI notifications.
   Future<ScanSummary> rescanSystemSilent(SystemModel system) async {
+    // Refused during a user-data move: a scan keeps the database open across
+    // the move's switch, so its writes would go to the old one.
+    if (refuseWhileUserDataMoves()) {
+      return ScanSummary(
+        added: 0,
+        removed: 0,
+        total: 0,
+        systemName: system.realName,
+      );
+    }
+
     if (_config.romFolders.isEmpty) {
       return ScanSummary(
         added: 0,

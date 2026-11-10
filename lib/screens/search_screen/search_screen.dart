@@ -40,6 +40,7 @@ import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/screens/game_screen/game_settings_dialog/romm_match_picker_dialog.dart';
 import 'package:neostation/screens/game_screen/my_games_list.dart';
+import 'package:neostation/utils/user_data_move_guard.dart';
 
 /// Opens [SearchScreen], then the game list for a result picked with "Go to
 /// game".
@@ -1421,6 +1422,10 @@ class _SearchScreenState extends State<SearchScreen> {
     if (!mounted) return;
 
     final game = GameModel.fromDatabaseModel(dbGame);
+
+    // Refused during a user-data move: a zipped game unpacks into the user
+    // data's temp folder, which the move is copying.
+    if (refuseWhileUserDataMoves()) return;
 
     _gamepadNav.deactivate();
     GamepadNavigationManager.rememberFocusOwner('search_screen');

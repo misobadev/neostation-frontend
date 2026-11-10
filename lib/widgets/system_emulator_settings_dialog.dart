@@ -42,6 +42,7 @@ import '../widgets/shaders/shader_gif_widget.dart';
 import '../utils/image_utils.dart';
 import '../services/permission_service.dart';
 import '../widgets/tv_directory_picker.dart';
+import '../utils/user_data_move_guard.dart';
 
 part 'system_emulator_settings_dialog/gamepad_nav.dart';
 part 'system_emulator_settings_dialog/row_builders.dart';
@@ -197,6 +198,9 @@ class _SystemEmulatorSettingsDialogState
       final systemToScan = widget.system.copyWith(recursiveScan: value);
 
       if (!mounted) return;
+      // Refused during a user-data move (the setting is saved and applies at
+      // the next scan): an empty result would read as "no changes found".
+      if (refuseWhileUserDataMoves()) return;
 
       // Perform silent scan via provider
       final summary = await context
