@@ -28,6 +28,8 @@ import 'settings_title.dart';
 import 'widgets/setting_row.dart';
 import 'widgets/setting_value_chip.dart';
 
+import 'package:neostation/utils/user_data_move_guard.dart';
+
 /// A specialized content panel for selecting application color themes and visual themes.
 ///
 /// Implements a responsive grid layout with hardware-mapped gamepad navigation
@@ -299,6 +301,9 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
   /// Opens a file picker, imports the selected daisyUI theme JSON, and applies
   /// it. Surfaces success/failure via [AppNotification].
   Future<void> _importTheme() async {
+    // Refused during a user-data move: the theme would stay in the old folder.
+    if (refuseWhileUserDataMoves()) return;
+
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final pickerTitle = AppLocale.importTheme.getString(context);
     try {

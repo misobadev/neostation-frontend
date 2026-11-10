@@ -72,6 +72,7 @@ import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 
 import '../../themes/corner_radii.dart';
+import '../../utils/user_data_move_guard.dart';
 
 part 'my_games_list/gamepad_nav.dart';
 part 'my_games_list/context_menu.dart';
@@ -2252,6 +2253,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
     final game = _selectedGame;
     if (game == null || _isScrapingSelectedGame) return;
     if (_isFolderEntry(game)) return;
+    // Refused during a user-data move: new art would stay in the old folder.
+    if (refuseWhileUserDataMoves()) return;
 
     // The ScreenScraper platform id is looked up from the app system id, so
     // this has to be the game's *own* system. An aggregate view's id either has
