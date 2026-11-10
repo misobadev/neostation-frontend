@@ -47,6 +47,7 @@ import '../i_sync_provider.dart';
 import '../retroarch_state_signature.dart';
 import '../sync_manager.dart';
 import '../../utils/emulator_loader.dart';
+import '../../utils/kept_cloud_copy_notice.dart';
 import '../../utils/safe_path.dart';
 
 /// Locates the local save/state files belonging to a game.
@@ -665,9 +666,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       // dead for those users rather than merely occasionally stale.
       //
       // Attempting the pull is safe because it is not the decision that
-      // overwrites anything: [_download]'s per-target mtime guard refuses to
-      // write over a local file newer than the remote, so a genuinely-ahead
-      // local save survives and simply uploads on the next upload-capable pass.
+      // overwrites anything: [_download]'s per-target guard refuses to write
+      // over a local file newer than the remote whose bytes changed since the
+      // last sync, so a genuinely-ahead local save survives and simply uploads
+      // on the next upload-capable pass.
       // What changes is only the case where the server copy is strictly newer
       // than the local one, which is exactly the other device's session.
       //
@@ -762,12 +764,14 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         // over it is what destroyed another device's state on `main`. The
         // outcome still prefers local — the session that just ended wins — but
         // the copy it replaces is kept first.
+        String? keptCopy;
         if (remoteChanged) {
           final guard = await _guardDivergedRemote(
             match,
             local,
             recordedHash: recorded?['file_hash'] as String?,
             pushDigest: pushDigest,
+            onPreserved: (backup) => keptCopy = backup,
           );
           if (guard == _RemoteGuard.unreadable) {
             // Nothing recorded: the file stays pending and the next pass asks
@@ -782,15 +786,24 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           }
           if (guard == _RemoteGuard.preserved) conflictsPreserved++;
         }
-        countUpload(
-          await _upload(
-            romId,
-            local,
-            isState,
-            existing: match,
-            digest: pushDigest,
-          ),
+        final outcome = await _upload(
+          romId,
+          local,
+          isState,
+          existing: match,
+          digest: pushDigest,
         );
+        countUpload(outcome);
+        // Only once this device's copy has replaced the other on the server:
+        // until then the kept copy is not yet the only one left.
+        final kept = keptCopy;
+        if (kept != null && outcome == _UploadOutcome.uploaded) {
+          reportKeptCloudCopy(
+            gameName: game.name,
+            savePath: local.filePath,
+            backupPath: kept,
+          );
+        }
       }
     }
 
@@ -1163,6 +1176,22 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
   }
 
+  /// Whether the file at [filePath] still holds the bytes recorded at its
+  /// last sync, so only its time moved: an emulator that rewrites the same
+  /// save on exit makes it look newer than the server's copy without changing
+  /// anything in it. False when nothing was recorded, or on any doubt.
+  static Future<bool> _unchangedSinceLastSync(String filePath) async {
+    try {
+      final recorded = await SyncRepository.getSyncState(kProviderId, filePath);
+      final hash = recorded?['file_hash'] as String?;
+      if (hash == null || hash.isEmpty) return false;
+      return await _md5OfFile(filePath) == hash;
+    } catch (e) {
+      _log.w('RomM: could not compare $filePath with its last sync: $e');
+      return false;
+    }
+  }
+
   /// Whether RomM's own `content_hash` for [asset] provably describes the same
   /// bytes as [digest], an [_md5OfFile] of [local].
   ///
@@ -1255,11 +1284,14 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// post-close pass reaches here — the sweep bails on `uploadOnly &&
   /// remoteChanged` before this point and the pre-launch pass never takes the
   /// upload branch — so there is no launch deadline to spend it against.
+  ///
+  /// [onPreserved] gets the kept copy's path when it is written.
   Future<_RemoteGuard> _guardDivergedRemote(
     RommAsset match,
     LocalSaveFile local, {
     required String? recordedHash,
     required String? pushDigest,
+    void Function(String backupPath)? onPreserved,
   }) async {
     // Cheap path: RomM's own hash can rule divergence out without a transfer,
     // but only where it is an MD5 of the stored bytes. States have none and a
@@ -1304,6 +1336,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         'changed since the last sync — kept the remote copy as '
         '${path.basename(backup.path)} before uploading the local one',
       );
+      onPreserved?.call(backup.path);
       return _RemoteGuard.preserved;
     } catch (e) {
       _log.e(
@@ -1494,12 +1527,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       for (final target in targets) {
         final f = File(target);
         // Per-target guard (mirrors NeoSync): never overwrite a copy that is
-        // newer than the remote asset. resolveLocalTargetPaths can return
+        // newer than the remote asset, unless its bytes are still the ones
+        // recorded at the last sync (only its time moved, as when an emulator
+        // rewrites the same save on exit). resolveLocalTargetPaths can return
         // several folders and the higher-level decision only inspected one, so
         // a different folder may hold newer local progress we must not clobber.
         if (await f.exists()) {
           final localMs = (await f.stat()).modified.millisecondsSinceEpoch;
-          if (localMs > asset.updatedAtMs + _mtimeToleranceMs) {
+          if (localMs > asset.updatedAtMs + _mtimeToleranceMs &&
+              !await _unchangedSinceLastSync(target)) {
             _log.i('RomM download: skip $target (local newer than remote)');
             continue;
           }
