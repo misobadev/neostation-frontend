@@ -63,6 +63,7 @@ import '../../providers/system_background_provider.dart';
 import '../../models/secondary_display_state.dart';
 import '../../widgets/context_menu/game_context_menu.dart';
 import '../../widgets/letter_indicator.dart';
+import '../../widgets/game_fanart_background.dart';
 import '../../constants/system_folder_names.dart';
 import '../search_screen/search_screen.dart';
 import '../../utils/artwork_cache.dart';
@@ -1702,64 +1703,16 @@ class _SystemGamesListState extends State<SystemGamesList> {
     GameModel game, {
     required int artworkVersion,
   }) {
-    final imageSystemFolder =
-        game.systemFolderName ?? widget.system.primaryFolderName;
-
-    final fanartPath = game.getImagePath(
-      imageSystemFolder,
-      'fanarts',
-      _fileProvider,
-    );
-
-    final performanceMode = context.performanceMode;
-    final child = Builder(
-      key: ValueKey(
-        'list_fanart_${game.romPath ?? game.romname}_v$artworkVersion',
-      ),
-      builder: (context) {
-        final file = File(fanartPath);
-        if (file.existsSync()) {
-          return Image.file(
-            file,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-            cacheWidth: performanceCacheWidth(
-              1920,
-              performanceMode: performanceMode,
-            ),
-            errorBuilder: (_, _, _) => const SizedBox.shrink(),
-          );
-        }
-        return const SizedBox.shrink();
-      },
-    );
-
-    if (performanceMode) return child;
-
-    return AnimatedSwitcher(
+    return GameFanartBackground(
+      game: _isFolderEntry(game) ? null : game,
+      systemFolder: game.systemFolderName ?? widget.system.primaryFolderName,
+      fileProvider: _fileProvider,
+      artworkVersion: artworkVersion,
+      performanceMode: context.performanceMode,
       duration: const Duration(milliseconds: 512),
       switchInCurve: Curves.easeOutExpo,
       switchOutCurve: Curves.easeInCubic,
-      layoutBuilder: (currentChild, previousChildren) {
-        return Stack(
-          fit: StackFit.expand,
-          alignment: Alignment.center,
-          children: [...previousChildren, ?currentChild],
-        );
-      },
-      transitionBuilder: (child, animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 1.0, end: 1.1).animate(
-              CurvedAnimation(parent: animation, curve: Curves.easeOut),
-            ),
-            child: child,
-          ),
-        );
-      },
-      child: child,
+      zoom: true,
     );
   }
 
