@@ -12,6 +12,7 @@ import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/repositories/sync_repository.dart';
+import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
@@ -49,6 +50,10 @@ class _FakeRommService extends RommService {
   /// Makes every asset read fail, modelling a server that is reachable enough
   /// to list but not to fetch from.
   bool failDownloads = false;
+
+  /// Makes every update of an existing asset fail, as a dropped connection
+  /// would.
+  bool failUpdates = false;
 
   int _nextAssetId = 1;
   int _stampSeq = 0;
@@ -191,6 +196,7 @@ class _FakeRommService extends RommService {
     File file, {
     required bool isState,
   }) async {
+    if (failUpdates) throw const SocketException('server unreachable');
     for (final entry in byRom.entries) {
       final i = entry.value.indexWhere((a) => a.id == assetId);
       if (i < 0) continue;
@@ -606,6 +612,53 @@ void main() {
       await provider.syncGameSavesAfterClose(game);
 
       expect(backupsIn('saves'), isEmpty);
+    });
+  });
+
+  // NEO-231: the other device's copy was kept beside the save, but only the
+  // log said so; nobody knew it was there to get back.
+  group('a kept copy is reported', () {
+    final bell = GlobalNotificationService();
+    setUp(bell.dismiss);
+    tearDown(bell.dismiss);
+
+    Future<RommAsset> bothChanged() async {
+      final asset = svc.seedSave(
+        1,
+        'Game.srm',
+        'SHARED'.codeUnits,
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
+      await localSave().writeAsString('SHARED');
+      await provider.syncGameSavesAfterClose(game);
+      svc.otherDevicePut(1, asset, 'REMOTE-PROGRESS'.codeUnits);
+      await localSave().writeAsString('LOCAL-PROGRESS');
+      await touch(localSave());
+      return asset;
+    }
+
+    test(
+      'in the bell, naming the copy, once this device\'s save is up',
+      () async {
+        await bothChanged();
+
+        await provider.syncGameSavesAfterClose(game);
+
+        final backup = backupsIn('saves').single;
+        final entry = bell.notifier.value.single;
+        expect(entry.title, game.name);
+        expect(entry.message, contains(p.basename(backup.path)));
+      },
+    );
+
+    test('not when this device\'s save then fails to upload', () async {
+      await bothChanged();
+      svc.failUpdates = true;
+
+      await provider.syncGameSavesAfterClose(game);
+
+      expect(backupsIn('saves'), hasLength(1), reason: 'still kept');
+      expect(bell.notifier.value, isEmpty);
     });
   });
 
