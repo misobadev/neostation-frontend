@@ -759,6 +759,110 @@ void main() {
       expect(readDatabase(p.join(dest.path, 'data.sqlite')), (3, 'ok'));
     });
 
+    // NEO-228: Settings rebuilds Directories whenever the user leaves it and
+    // comes back, so a move's progress is kept with the move, not the screen.
+    group('progress', () {
+      Completer<void> holdAfterFirstCopy(Completer<void> copying) {
+        final release = Completer<void>();
+        // A failed check must not leave the move held: later tests would find
+        // it still running.
+        addTearDown(() {
+          if (!release.isCompleted) release.complete();
+        });
+        UserDataLocationService.debugAfterCopy = (src, copy) async {
+          if (!copying.isCompleted) copying.complete();
+          await release.future;
+        };
+        return release;
+      }
+
+      test('is there while the move runs and gone when it ends', () async {
+        expect(UserDataLocationService.progress.value, isNull);
+        final seen = <UserDataMoveProgress>[];
+        void record() {
+          final now = UserDataLocationService.progress.value;
+          if (now != null) seen.add(now);
+        }
+
+        UserDataLocationService.progress.addListener(record);
+        addTearDown(
+          () => UserDataLocationService.progress.removeListener(record),
+        );
+        final copying = Completer<void>();
+        final release = holdAfterFirstCopy(copying);
+
+        final move = migrate();
+        await copying.future;
+        final during = UserDataLocationService.progress.value;
+        expect(during, isNotNull);
+        expect(during!.fraction, lessThanOrEqualTo(0.5));
+        release.complete();
+        await move;
+
+        expect(UserDataLocationService.progress.value, isNull);
+        expect(
+          seen.where((s) => s.fraction > 0.5),
+          isNotEmpty,
+          reason: 'removing the old copy is reported too',
+        );
+        expect(seen.where((s) => s.file.isNotEmpty), isNotEmpty);
+      });
+
+      test("matches what the move reports to its caller", () async {
+        final caller = <(double, String)>[];
+        final kept = <(double, String)>[];
+        void record() {
+          final now = UserDataLocationService.progress.value;
+          if (now != null) kept.add((now.fraction, now.file));
+        }
+
+        UserDataLocationService.progress.addListener(record);
+        addTearDown(
+          () => UserDataLocationService.progress.removeListener(record),
+        );
+
+        await UserDataLocationService.migrateData(
+          sourceUserDataPath: esde.path,
+          sourceMediaPath: p.join(esde.path, 'media'),
+          destPath: dest.path,
+          onProgress: (fraction, file) => caller.add((fraction, file)),
+        );
+
+        expect(caller, isNotEmpty);
+        // The first entry is the move starting, before any file.
+        expect(kept.first, (0.0, ''));
+        expect(kept.skip(1), caller);
+      });
+
+      test('is gone after a move that fails', () async {
+        Directory(p.join(dest.path, 'data.sqlite')).createSync();
+
+        await expectLater(
+          migrate(),
+          failsWith(UserDataMoveFailureKind.blocked),
+        );
+
+        expect(UserDataLocationService.progress.value, isNull);
+      });
+
+      test('a second move refused meanwhile leaves the first one\'s', () async {
+        final copying = Completer<void>();
+        final release = holdAfterFirstCopy(copying);
+        final first = migrate();
+        await copying.future;
+
+        await expectLater(
+          migrate(to: p.join(tmp.path, 'elsewhere')),
+          failsWith(UserDataMoveFailureKind.busy),
+        );
+
+        expect(UserDataLocationService.progress.value, isNotNull);
+        release.complete();
+        await first;
+        expect(UserDataLocationService.progress.value, isNull);
+      });
+    });
+
     test('a move that fails is no longer running', () async {
       Directory(p.join(dest.path, 'data.sqlite')).createSync();
       await expectLater(migrate(), failsWith(UserDataMoveFailureKind.blocked));

@@ -1219,6 +1219,9 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.moveUserDataDestNotEmpty: 'La nueva carpeta no está vacía (elementos: {count}). Los datos de NeoStation se añadirán junto al contenido existente.',
   AppLocale.moveUserDataConfirm: 'Mover datos',
   AppLocale.migratingUserData: 'Moviendo Datos',
+  AppLocale.userDataMoveRunning:
+      "Tus datos se están moviendo. Espera a que termine.",
+  AppLocale.userDataMoveRemovingOldCopy: "Eliminando la copia antigua…",
   AppLocale.migratingUserDataComplete: 'Migración completada',
   AppLocale.migratingUserDataError: 'Error en la migración',
   AppLocale.userDataMoveBusy: 'NeoStation está ocupado: hay un escaneo, scraping, sincronización, importación o herramienta en curso. Mueve tus datos cuando termine.',

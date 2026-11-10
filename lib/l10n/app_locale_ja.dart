@@ -1148,6 +1148,8 @@ const Map<String, dynamic> appLocaleJa = {
       '新しいフォルダには既に {count} 個の項目があります。NeoStation のデータはそれらと一緒に追加されます。',
   AppLocale.moveUserDataConfirm: 'データを移動',
   AppLocale.migratingUserData: 'データを移動中',
+  AppLocale.userDataMoveRunning: "データを移動しています。完了するまでお待ちください。",
+  AppLocale.userDataMoveRemovingOldCopy: "古いコピーを削除しています…",
   AppLocale.migratingUserDataComplete: '移行完了',
   AppLocale.migratingUserDataError: '移行に失敗しました',
   AppLocale.userDataMoveBusy:

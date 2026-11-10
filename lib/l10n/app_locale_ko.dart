@@ -1154,6 +1154,8 @@ const Map<String, dynamic> appLocaleKo = {
       '새 폴더에는 이미 {count}개의 항목이 포함되어 있습니다. NeoStation 데이터도 함께 추가됩니다.',
   AppLocale.moveUserDataConfirm: '데이터 이동',
   AppLocale.migratingUserData: '사용자 데이터 이동 중',
+  AppLocale.userDataMoveRunning: "데이터를 이동하는 중입니다. 완료될 때까지 기다려 주세요.",
+  AppLocale.userDataMoveRemovingOldCopy: "이전 사본을 삭제하는 중…",
   AppLocale.migratingUserDataComplete: '이동 완료',
   AppLocale.migratingUserDataError: '이동 실패',
   AppLocale.userDataMoveBusy: 'NeoStation이 작업 중입니다: 스캔, 스크래핑, 동기화, 가져오기 또는 도구가 실행 중입니다. 끝난 후 데이터를 이동하세요.',

@@ -1120,6 +1120,8 @@ const Map<String, dynamic> appLocaleZhHant = {
       '新資料夾已包含 {count} 個項目。NeoStation 的資料將新增在它們旁邊。',
   AppLocale.moveUserDataConfirm: '移動資料',
   AppLocale.migratingUserData: '正在遷移資料',
+  AppLocale.userDataMoveRunning: "正在移動你的資料。請等待完成。",
+  AppLocale.userDataMoveRemovingOldCopy: "正在刪除舊副本…",
   AppLocale.migratingUserDataComplete: '遷移完成',
   AppLocale.migratingUserDataError: '遷移失敗',
   AppLocale.userDataMoveBusy: 'NeoStation 正忙：正在進行掃描、刮削、同步、匯入或執行工具。請在完成後再移動資料。',

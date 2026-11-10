@@ -98,6 +98,14 @@ class UserDataLocationService {
   /// A move is running, from any screen.
   static bool get isMoving => _moving;
 
+  /// How far the running move has got, or null when none runs. Set and
+  /// cleared with [isMoving]: Settings rebuilds Directories whenever the user
+  /// leaves it and comes back, so the progress is kept with the move, not with
+  /// the screen that started it.
+  static final ValueNotifier<UserDataMoveProgress?> progress = ValueNotifier(
+    null,
+  );
+
   static Future<String?> getCustomPath() async {
     final prefs = await SharedPreferences.getInstance();
     final value = prefs.getString(customPathKey);
@@ -385,12 +393,16 @@ class UserDataLocationService {
       );
     }
     _moving = true;
+    progress.value = const UserDataMoveProgress(0, '');
     try {
       await _migrate(
         sourceUserDataPath: sourceUserDataPath,
         sourceMediaPath: sourceMediaPath,
         destPath: destPath,
-        onProgress: onProgress,
+        onProgress: (fraction, file) {
+          progress.value = UserDataMoveProgress(fraction, file);
+          onProgress?.call(fraction, file);
+        },
       );
     } on UserDataMoveFailure {
       rethrow;
@@ -398,6 +410,7 @@ class UserDataLocationService {
       throw UserDataMoveFailure.from(e);
     } finally {
       _moving = false;
+      progress.value = null;
     }
   }
 
@@ -807,4 +820,24 @@ class UserDataLocationService {
       }
     }
   }
+}
+
+/// A point in a user-data move: [fraction] from 0 to 1 (copying up to 0.5,
+/// then removing the old copy) and the file it is on ([file], empty between
+/// files).
+@immutable
+class UserDataMoveProgress {
+  const UserDataMoveProgress(this.fraction, this.file);
+
+  final double fraction;
+  final String file;
+
+  @override
+  bool operator ==(Object other) =>
+      other is UserDataMoveProgress &&
+      other.fraction == fraction &&
+      other.file == file;
+
+  @override
+  int get hashCode => Object.hash(fraction, file);
 }

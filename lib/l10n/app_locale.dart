@@ -1334,6 +1334,9 @@ mixin AppLocale {
       'move_user_data_dest_not_empty';
   static const String moveUserDataConfirm = 'move_user_data_confirm';
   static const String migratingUserData = 'migrating_user_data';
+  static const String userDataMoveRunning = 'user_data_move_running';
+  static const String userDataMoveRemovingOldCopy =
+      'user_data_move_removing_old_copy';
   static const String migratingUserDataComplete =
       'migrating_user_data_complete';
   static const String migratingUserDataError = 'migrating_user_data_error';
