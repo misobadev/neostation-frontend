@@ -81,6 +81,20 @@ class LoggerService {
         }
       }
 
+      // FileOutput opens the file in the background (`openWrite`) and nothing
+      // waits for it, so without this the file appeared some time after init
+      // returned: a log export straight after a user-data move could find no
+      // `app.log` in the new folder. Creating an existing file is a no-op, so
+      // appending to it is unaffected.
+      try {
+        await logFile.create();
+      } on FileSystemException catch (_) {
+        // Best effort: a folder that refuses the file keeps the behaviour it
+        // had before, where init still succeeds and only the background open
+        // fails. [reinitialize] relies on that to move the log out of an
+        // unwritable folder once the setup wizard resets away from it.
+      }
+
       _logger = Logger(
         level: Level.info,
         printer: RedactingPrinter(SimplePrinter(colors: true)),

@@ -225,6 +225,24 @@ class NeoAssetsPackFile {
 
   /// Whether this file is a system background.
   bool get isBackground => kind == 'background';
+
+  /// The name the file is cached under: [fileName]'s stem with the extension
+  /// of the object [url] actually serves.
+  ///
+  /// The catalog can report a `file_name` whose extension no longer matches
+  /// the stored object: packs uploaded as PNG are converted to WebP on the
+  /// backend but keep the upload's `file_name` (`snes.png` served from
+  /// `.../snes.webp`). Saved under that name, the art is invisible to
+  /// [NeoAssetsService.resolveBackgroundPathSync], which looks the system up
+  /// by extension. A URL with no extension leaves [fileName] as it is.
+  String get localFileName {
+    final served = path.extension(Uri.tryParse(url)?.path ?? '');
+    if (served.isEmpty) return fileName;
+    return '${path.withoutExtension(fileName)}$served';
+  }
+
+  /// Whether [fileName]'s extension disagrees with the object served at [url].
+  bool get hasMismatchedExtension => localFileName != fileName;
 }
 
 /// A fully-resolved system art pack (metadata + files) ready to download.
@@ -560,15 +578,28 @@ class NeoAssetsService {
 
   /// Downloads every file of [files] into the pack's cache folder.
   ///
-  /// Backgrounds land under `<cache>/<folder>/backgrounds/<file_name>` so the
+  /// Backgrounds land under `<cache>/<folder>/backgrounds/<name>` so the
   /// existing background resolvers keep working; other kinds land at the pack
-  /// root. Returns how many files were cached, so the caller can decide whether
-  /// the pack is usable.
+  /// root. `<name>` is [NeoAssetsPackFile.localFileName], so the extension on
+  /// disk is the served object's even when the catalog's `file_name` says
+  /// otherwise. Returns how many files were cached, so the caller can decide
+  /// whether the pack is usable.
   static Future<int> downloadPack(
     String folder,
     List<NeoAssetsPackFile> files, {
     void Function(int done, int total)? onProgress,
   }) async {
+    final mismatched = files.where((f) => f.hasMismatchedExtension).toList();
+    if (mismatched.isNotEmpty) {
+      final sample = mismatched.first;
+      _log.w(
+        'NeoAssets: pack $folder reports ${mismatched.length} file name(s) '
+        'whose extension differs from the served object (e.g. '
+        '${sample.fileName} served as ${sample.localFileName}); caching under '
+        'the served extension',
+      );
+    }
+
     final total = files.length;
     int done = 0;
     int cached = 0;
@@ -602,9 +633,9 @@ class NeoAssetsService {
     if (!isSafeFileName(folder)) return null;
     final packDir = path.join(await _cacheDir(), folder);
     if (file.isBackground) {
-      return safeJoin(path.join(packDir, 'backgrounds'), file.fileName);
+      return safeJoin(path.join(packDir, 'backgrounds'), file.localFileName);
     }
-    return safeJoin(packDir, file.fileName);
+    return safeJoin(packDir, file.localFileName);
   }
 
   /// Downloads a remote asset to the local filesystem.
@@ -688,9 +719,25 @@ class NeoAssetsService {
     return path.join(dir, themeFolder, 'backgrounds', '$systemFolderName.$ext');
   }
 
-  /// Resolves the cached background path checking both .webp and .gif formats.
-  /// Returns the path to the existing file, preferring .webp over .gif.
-  /// If neither exists, returns the .webp path as default.
+  /// Background formats a pack may ship, in lookup order.
+  ///
+  /// Packs ship `.webp` (and `.gif` for animated art). `.png`, `.jpg` and
+  /// `.jpeg` come last for packs cached before [downloadPack] took the
+  /// extension from the served object: those landed under the catalog's
+  /// `file_name` (`snes.png` holding WebP bytes). Flutter decodes by content,
+  /// so such a file displays fine once it is found. The extra lookups cost a
+  /// stat only for a system the pack has no art for.
+  static const List<String> _backgroundExtensions = [
+    'webp',
+    'gif',
+    'png',
+    'jpg',
+    'jpeg',
+  ];
+
+  /// Resolves the cached background path, checking each of
+  /// [_backgroundExtensions] in order and returning the first that exists.
+  /// If none exists, returns the .webp path as default.
   static String? resolveBackgroundPathSync(
     String themeFolder,
     String systemFolderName,
@@ -698,23 +745,12 @@ class NeoAssetsService {
     final dir = _cachedThemeDir;
     if (dir == null) return null;
 
-    final webpPath = path.join(
-      dir,
-      themeFolder,
-      'backgrounds',
-      '$systemFolderName.webp',
-    );
-    if (File(webpPath).existsSync()) return webpPath;
-
-    final gifPath = path.join(
-      dir,
-      themeFolder,
-      'backgrounds',
-      '$systemFolderName.gif',
-    );
-    if (File(gifPath).existsSync()) return gifPath;
-
-    return webpPath;
+    final base = path.join(dir, themeFolder, 'backgrounds', systemFolderName);
+    for (final ext in _backgroundExtensions) {
+      final candidate = '$base.$ext';
+      if (File(candidate).existsSync()) return candidate;
+    }
+    return '$base.webp';
   }
 
   /// Returns the local cache path for a specific background.
