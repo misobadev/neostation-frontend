@@ -57,7 +57,7 @@ dependencies:
   window_manager: ^0.6.0
   permission_handler: ^12.0.3
   pointycastle: ^4.0.0
-  sqlite3: ^3.8.0
+  sqlite3: ^3.9.1
   fullscreen_window: ^1.2.1
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
