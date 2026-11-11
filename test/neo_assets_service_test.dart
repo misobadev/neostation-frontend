@@ -296,6 +296,62 @@ void main() {
       expect(backgroundFile('gb').existsSync(), isTrue);
       expect(backgroundFile('snes').existsSync(), isFalse);
     });
+
+    // The catalog's iiSU-Dark pack reports `file_name: snes.png` while serving
+    // `.../snes.webp` (image/webp): the backend converted the upload but kept
+    // its name. Saved as `snes.png`, no system card ever found the art.
+    test('saves a file under the served extension, not file_name', () async {
+      useClient((_) async => http.Response.bytes([1, 2, 3], 200));
+
+      final cached = await NeoAssetsService.downloadPack('neostation', [
+        const NeoAssetsPackFile(
+          kind: 'background',
+          systemId: 'snes',
+          fileName: 'snes.png',
+          url: 'https://cdn.neoassets.dev/packs/neostation/backgrounds/snes.webp',
+          size: 1056893,
+          mime: 'image/webp',
+        ),
+      ]);
+
+      expect(cached, 1);
+      expect(backgroundFile('snes').existsSync(), isTrue);
+      expect(
+        File(path.join(tempDir.path, 'neostation', 'backgrounds', 'snes.png'))
+            .existsSync(),
+        isFalse,
+      );
+    });
+  });
+
+  group('localFileName', () {
+    NeoAssetsPackFile served(String fileName, String url) => NeoAssetsPackFile(
+      kind: 'background',
+      systemId: 'snes',
+      fileName: fileName,
+      url: url,
+      size: 0,
+      mime: '',
+    );
+
+    test('keeps a file_name that matches the served object', () {
+      final file = served('snes.webp', 'https://cdn.x/b/snes.webp');
+      expect(file.localFileName, 'snes.webp');
+      expect(file.hasMismatchedExtension, isFalse);
+    });
+
+    test('takes the extension from the url, ignoring a query', () {
+      final file = served('snes.png', 'https://cdn.x/b/snes.webp?v=2');
+      expect(file.localFileName, 'snes.webp');
+      expect(file.hasMismatchedExtension, isTrue);
+    });
+
+    test('keeps file_name when the url has no extension', () {
+      expect(
+        served('snes.png', 'https://cdn.x/b/snes').localFileName,
+        'snes.png',
+      );
+    });
   });
 
   // Pack folders and file names come from the catalog, so a malicious or
@@ -386,8 +442,9 @@ void main() {
       Directory(backgrounds).createSync(recursive: true);
     });
 
-    // Packs ship whatever format their author exported: iiSU-Dark is all
-    // `.png`, and reading only `.webp`/`.gif` left every system on it blank.
+    // Packs downloaded before the fix to downloadPack sit on disk as `.png`
+    // (iiSU-Dark's catalog names WebP files `<sys>.png`), and reading only
+    // `.webp`/`.gif` left every system on them blank.
     for (final ext in ['webp', 'gif', 'png', 'jpg', 'jpeg']) {
       test('finds a .$ext background', () {
         final file = File(path.join(backgrounds, 'gb.$ext'))
