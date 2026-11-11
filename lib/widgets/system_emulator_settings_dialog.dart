@@ -379,21 +379,6 @@ class _SystemEmulatorSettingsDialogState
   String? get _hiddenScopeSystemId =>
       _isVirtualLibrarySystem ? null : _system.id;
 
-  /// Whether a game of this system can be hidden in the first place.
-  ///
-  /// The Android system is browsed through [AndroidAppsGrid], a separate screen
-  /// that binds no settings action, so an installed app has no "Hide Game" row
-  /// to reach — a Hidden tab there could only ever be empty. Everything else
-  /// (music included) goes through the games list, where START opens the game
-  /// settings dialog.
-  bool get _systemSupportsHiding => _system.folderName != 'android';
-
-  /// Whether the Hidden tab is offered. Kept visible whenever games *are*
-  /// hidden even if the system can't hide them, so a row can never end up with
-  /// no way back — and so this starts working on its own if hiding is later
-  /// wired into the Android apps grid.
-  bool get _showHiddenTab => _systemSupportsHiding || _hiddenGames.isNotEmpty;
-
   /// Tab indices this system offers, in strip order. Single source of truth for
   /// the strip, the LB/RB cycle and the body switch.
   List<int> get _availableTabs => [
@@ -404,7 +389,9 @@ class _SystemEmulatorSettingsDialogState
         _system.folderName != 'android')
       1,
     2,
-    if (_showHiddenTab) 3,
+    // Every system can hide: games from the game settings dialog, installed
+    // apps from the Android board's options panel.
+    3,
   ];
 
   /// Rows in the Hidden tab: one per hidden game, plus a final "unhide all"
@@ -426,9 +413,6 @@ class _SystemEmulatorSettingsDialogState
         if (_hiddenIndex >= _totalHiddenItems) {
           _hiddenIndex = _totalHiddenItems > 0 ? _totalHiddenItems - 1 : 0;
         }
-        // Restoring the last hidden game of a system that can't hide any takes
-        // the tab away underneath the user; step back to one that still exists.
-        if (_currentTab == 3 && !_showHiddenTab) _currentTab = 2;
       });
     } catch (e) {
       _log.e('Error loading hidden games: $e');
@@ -1093,7 +1077,7 @@ class _SystemEmulatorSettingsDialogState
                             : _errorMessage != null
                             ? _buildErrorState()
                             : _buildEmulatorsTab())
-                      : _currentTab == 2 || !_showHiddenTab
+                      : _currentTab == 2
                       ? _buildAppearanceTab()
                       : _buildHiddenGamesTab(),
                 ),
