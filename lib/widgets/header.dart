@@ -15,6 +15,7 @@ import 'package:neostation/themes/app_themes.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
+import 'package:neostation/services/game_service.dart';
 import 'package:neostation/widgets/header_discovery_reroll.dart';
 import 'package:neostation/widgets/bumper_glyph.dart';
 import 'package:neostation/widgets/core_footer.dart';
@@ -45,7 +46,7 @@ class Header extends StatefulWidget {
   HeaderState createState() => HeaderState();
 }
 
-class HeaderState extends State<Header> {
+class HeaderState extends State<Header> with WidgetsBindingObserver {
   final Battery _battery = Battery();
   int _batteryLevel = 100;
   BatteryState? _batteryState;
@@ -53,6 +54,10 @@ class HeaderState extends State<Header> {
   bool _isTelevision = false;
   DateTime _now = DateTime.now();
   Timer? _timeUpdateTimer;
+
+  /// False while an emulator owns the foreground; a screen-on edge behind it
+  /// must not restart the ticker.
+  bool _appActive = true;
   late final List<FocusNode> _tabFocusNodes;
 
   /// First slot shown when the tab strip has more visible tabs than it has
@@ -64,14 +69,14 @@ class HeaderState extends State<Header> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    GameService.deviceScreenOn.addListener(_onDeviceScreenPowerChanged);
     _tabFocusNodes = List.generate(
       NavTab.values.length,
       (_) => FocusNode(skipTraversal: true),
     );
-    _getBatteryLevel();
     _listenToBatteryState();
-    _updateTime();
-    _startTimeUpdateTimer();
+    _refreshTimeAndBattery();
     if (Platform.isAndroid) {
       PermissionService.isTelevision().then((isTV) {
         if (mounted && isTV) setState(() => _isTelevision = true);
@@ -81,12 +86,51 @@ class HeaderState extends State<Header> {
 
   @override
   void dispose() {
+    GameService.deviceScreenOn.removeListener(_onDeviceScreenPowerChanged);
+    WidgetsBinding.instance.removeObserver(this);
     _timeUpdateTimer?.cancel();
     _batteryStateSubscription?.cancel();
     for (final node in _tabFocusNodes) {
       node.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Covers desktop suspend and emulator return. On Android the HOME
+      // activity never resumes on unlock — the screen edge below handles it.
+      _appActive = true;
+      _refreshTimeAndBattery();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _appActive = false;
+      _stopTimeUpdateTimer();
+    }
+  }
+
+  /// Re-reads clock and charge and realigns the ticker. Android holds timers
+  /// while asleep and the HOME activity is not paused on lock, so without this
+  /// the header can show pre-lock values long after unlock.
+  void _refreshTimeAndBattery() {
+    _updateTime();
+    _startTimeUpdateTimer();
+  }
+
+  /// Refreshes on wake and stops the ticker while the screen is off.
+  void _onDeviceScreenPowerChanged() {
+    if (!GameService.deviceScreenOn.value) {
+      _stopTimeUpdateTimer();
+    } else if (_appActive) {
+      _refreshTimeAndBattery();
+    }
+  }
+
+  void _stopTimeUpdateTimer() {
+    _timeUpdateTimer?.cancel();
+    _timeUpdateTimer = null;
   }
 
   /// Subscribes to real-time battery state changes (charging/discharging/full).
@@ -98,7 +142,7 @@ class HeaderState extends State<Header> {
         if (mounted) {
           setState(() => _batteryState = state);
         }
-      });
+      }, onError: (_) {});
     } catch (_) {
       // Some platforms don't expose battery state; ignore silently.
     }
@@ -115,23 +159,24 @@ class HeaderState extends State<Header> {
   }
 
   void _startTimeUpdateTimer() {
+    _timeUpdateTimer?.cancel();
+
     // Calculate how many seconds remain until the next minute
     final now = DateTime.now();
     final secondsUntilNextMinute = 60 - now.second;
 
     // Create initial timer that fires at the start of the next minute
-    Future.delayed(Duration(seconds: secondsUntilNextMinute), () {
-      if (mounted) {
-        _updateTime();
-        // Then create a periodic timer every 60 seconds
-        _timeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
-          if (mounted) {
-            _updateTime();
-          } else {
-            timer.cancel();
-          }
-        });
-      }
+    _timeUpdateTimer = Timer(Duration(seconds: secondsUntilNextMinute), () {
+      if (!mounted) return;
+      _updateTime();
+      // Then create a periodic timer every 60 seconds
+      _timeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+        if (mounted) {
+          _updateTime();
+        } else {
+          timer.cancel();
+        }
+      });
     });
   }
 

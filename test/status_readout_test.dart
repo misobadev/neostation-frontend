@@ -4,18 +4,28 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/providers/sqlite_config_provider.dart';
+import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/screens/secondary_screen/widgets/status_readout.dart';
+import 'package:neostation/services/game_service.dart';
 import 'package:neostation/services/secondary_apps_service.dart';
 import 'package:neostation/themes/app_themes.dart';
+import 'package:neostation/widgets/header.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Covers the secondary display's corner clock + battery readout.
+import 'database_test_helper.dart';
+
+/// Covers the clock + battery readouts on the primary header and the secondary
+/// display's Now Playing panel.
 ///
 /// The bottom screen runs in its own Flutter engine, spawned by `sub_screen`
 /// rather than by the activity that registers the app's plugins — so the one
-/// thing this widget must never do is fail loudly when `battery_plus` isn't
+/// thing its readout must never do is fail loudly when `battery_plus` isn't
 /// reachable. These pin that fallback (clock alone, no wrong number) alongside
-/// the two clock formats and the low-battery colouring.
+/// the two clock formats and the low-battery colouring. The header cases cover
+/// waking from sleep, when Android's held timers and missing `resumed` event
+/// would otherwise leave stale values on screen.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -38,11 +48,13 @@ void main() {
   setUp(() {
     levelReads = 0;
     SecondaryAppsService.deviceScreenOn.value = true;
+    GameService.deviceScreenOn.value = true;
   });
 
   tearDown(() {
     messenger.setMockMethodCallHandler(channel, null);
     SecondaryAppsService.deviceScreenOn.value = true;
+    GameService.deviceScreenOn.value = true;
   });
 
   /// Answers `getBatteryLevel` with [level], or throws the way an unregistered
@@ -176,5 +188,101 @@ void main() {
 
     await tester.pump(const Duration(minutes: 2));
     expect(levelReads, greaterThan(2));
+  });
+
+  group('primary header', () {
+    final dbHelper = DatabaseTestHelper();
+
+    setUp(() async {
+      await dbHelper.setUp();
+      levelReads = 0;
+    });
+
+    tearDown(() async {
+      await dbHelper.tearDown();
+    });
+
+    Future<void> pumpHeader(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1280, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final themeProvider = (await tester.runAsync(ThemeProvider.create))!;
+      addTearDown(themeProvider.dispose);
+
+      await tester.pumpWidget(
+        ScreenUtilInit(
+          designSize: const Size(640, 480),
+          builder: (context, _) => MultiProvider(
+            providers: [
+              ChangeNotifierProvider(create: (_) => SqliteConfigProvider()),
+              ChangeNotifierProvider.value(value: themeProvider),
+            ],
+            child: MaterialApp(
+              localizationsDelegates:
+                  FlutterLocalization.instance.localizationsDelegates,
+              supportedLocales: FlutterLocalization.instance.supportedLocales,
+              locale: const Locale('en'),
+              home: Scaffold(
+                body: Header(selectedTabIndex: 0, onTabSelected: (_) {}),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('refreshes the clock and battery immediately on wake', (
+      tester,
+    ) async {
+      mockBattery(41);
+
+      await pumpHeader(tester);
+      expect(levelReads, 1);
+      expect(find.text('41%'), findsOneWidget);
+
+      // Locked: stop polling while there is no screen to draw to.
+      GameService.deviceScreenOn.value = false;
+      await tester.pump(const Duration(minutes: 3));
+      expect(levelReads, 1);
+
+      // Unlocked: re-read immediately, not on the old minute schedule.
+      mockBattery(88);
+      GameService.deviceScreenOn.value = true;
+      await tester.pump();
+      await tester.pump();
+
+      expect(levelReads, 2);
+      expect(find.text('88%'), findsOneWidget);
+
+      // Ticking resumes on the usual cadence after the catch-up.
+      await tester.pump(const Duration(minutes: 2));
+      expect(levelReads, greaterThan(2));
+    });
+
+    testWidgets('refreshes on resume after an emulator owned the foreground', (
+      tester,
+    ) async {
+      mockBattery(55);
+
+      await pumpHeader(tester);
+      expect(levelReads, 1);
+
+      // A launched emulator pauses NeoStation; its ticker stops.
+      final header = tester.state<HeaderState>(find.byType(Header));
+      header.didChangeAppLifecycleState(AppLifecycleState.paused);
+      await tester.pump(const Duration(minutes: 3));
+      expect(levelReads, 1);
+
+      // Return shows current values immediately.
+      mockBattery(66);
+      header.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump();
+
+      expect(levelReads, 2);
+      expect(find.text('66%'), findsOneWidget);
+    });
   });
 }
