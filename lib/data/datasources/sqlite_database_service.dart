@@ -1021,7 +1021,7 @@ class SqliteDatabaseService {
   }
 
   /// Performs a specialized scan of installed Android applications.
-  static Future<List<DatabaseGameModel>> _performAndroidSystemScan(
+  static Future<void> _performAndroidSystemScan(
     SystemModel system,
     String folderName,
   ) async {
@@ -1029,36 +1029,50 @@ class SqliteDatabaseService {
       final installedApps = await AndroidService.getInstalledApps(
         includeSystemApps: true,
       );
-      final List<DatabaseGameModel> scannedGames = [];
-
-      for (var app in installedApps) {
-        final String packageName = app['package'];
-        scannedGames.add(
-          DatabaseGameModel(
-            filename: packageName,
-            romPath: packageName,
-            realName: app['name'],
-            emulatorName: 'Android',
-            systemFolderName: folderName,
-            descriptions: {'en': 'Android Application'},
-          ),
-        );
-      }
-
-      await _cleanupOrphanedRomsOptimized(
-        system.id!,
-        scannedGames.map((g) => g.romPath).toSet(),
-      );
-      await _batchInsertAndroidApps(
-        system.folderName,
-        scannedGames,
-        system.id!,
-      );
-      return scannedGames;
+      await syncInstalledApps(system, folderName, installedApps);
     } catch (e) {
       _log.e('Error scanning Android apps: $e');
-      return [];
     }
+  }
+
+  /// Makes the stored Android apps match [installedApps], the package listing
+  /// from [AndroidService.getInstalledApps]: new packages are added, packages
+  /// no longer installed are removed, and existing rows keep their hidden
+  /// flag, favorite and play time.
+  ///
+  /// An empty listing changes nothing. The service answers a failed platform
+  /// call with an empty list, and a device always has launcher apps, so an
+  /// empty listing means the query failed; syncing it would delete every app
+  /// along with what the user set on it. Returns whether the rows were synced.
+  @visibleForTesting
+  static Future<bool> syncInstalledApps(
+    SystemModel system,
+    String folderName,
+    List<Map<String, dynamic>> installedApps,
+  ) async {
+    if (installedApps.isEmpty) {
+      _log.w('Android app scan returned no apps; keeping the stored list');
+      return false;
+    }
+
+    final scannedGames = [
+      for (final app in installedApps)
+        DatabaseGameModel(
+          filename: app['package'],
+          romPath: app['package'],
+          realName: app['name'],
+          emulatorName: 'Android',
+          systemFolderName: folderName,
+          descriptions: {'en': 'Android Application'},
+        ),
+    ];
+
+    await _cleanupOrphanedRomsOptimized(
+      system.id!,
+      scannedGames.map((g) => g.romPath).toSet(),
+    );
+    await _batchInsertAndroidApps(folderName, scannedGames, system.id!);
+    return true;
   }
 
   /// High-performance batch operation for registering Android applications

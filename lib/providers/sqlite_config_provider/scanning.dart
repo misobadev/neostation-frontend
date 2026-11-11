@@ -1225,6 +1225,35 @@ extension SqliteConfigScanning on SqliteConfigProvider {
     }
   }
 
+  /// Re-reads the installed Android apps into the library, so an app installed
+  /// or removed since the last ROM scan shows up the next time the Android
+  /// board opens.
+  ///
+  /// Quiet by design: unlike [rescanSystem] it shows no scan progress, and it
+  /// runs without ROM folders, since apps don't live in them. Skipped while any
+  /// scan runs, this one included: a full scan re-reads the apps anyway, and
+  /// the board opening twice in a row needs only one query. Returns whether
+  /// the apps were re-read, so the caller knows to reload its list.
+  Future<bool> refreshAndroidApps() async {
+    if (!Platform.isAndroid) return false;
+    if (_scansIdle != null || _isScanningRoms) return false;
+    final system = _detectedSystems
+        .where((s) => s.folderName == SystemFolderNames.android)
+        .firstOrNull;
+    if (system == null) return false;
+
+    _scanStarted();
+    try {
+      await _scanSystemRoms(system);
+      return true;
+    } catch (e) {
+      SqliteConfigProvider._log.e('Error refreshing Android apps: $e');
+      return false;
+    } finally {
+      _scanEnded();
+    }
+  }
+
   /// Synchronizes the internal permission state with the Android OS.
   Future<void> refreshAllFilesAccess() async {
     if (!Platform.isAndroid) return;

@@ -1589,6 +1589,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.gameUnhidden: '{name} dipulihkan',
   AppLocale.allGamesUnhidden: 'Semua game tersembunyi telah dipulihkan',
   AppLocale.hiddenGames: 'Tersembunyi',
+  AppLocale.hideApp: 'Sembunyikan Aplikasi',
+  AppLocale.hiddenAppsGroup: 'Aplikasi Tersembunyi',
+  AppLocale.allAppsUnhidden: 'Semua aplikasi tersembunyi telah dipulihkan',
   AppLocale.noHiddenGames: 'Tidak ada game tersembunyi',
   AppLocale.noHiddenGamesSubtitle:
       'Sembunyikan game dari pengaturannya dan game itu akan muncul di sini.',
