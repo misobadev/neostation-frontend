@@ -24,9 +24,9 @@ extension NeoSyncDownload on NeoSyncProvider {
         throw Exception('Failed to fetch cloud files: ${result['message']}');
       }
 
-      final cloudFiles = _dedupeCloudFiles(
-        result['files'] as List<NeoSyncFile>,
-      );
+      final cloudFiles = _dedupeCloudFiles(result['files'] as List<NeoSyncFile>)
+          .where((file) => !_isKeptCopyInCloud(file))
+          .toList();
       if (cloudFiles.isEmpty) {
         _syncStatus = 'No cloud files found';
         _processedItems.add('No cloud files found for auto-sync');

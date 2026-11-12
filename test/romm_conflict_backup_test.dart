@@ -15,6 +15,8 @@ import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
+import 'package:neostation/sync/kept_save_copies.dart';
+import 'package:neostation/sync/sync_manager.dart';
 
 import 'database_test_helper.dart';
 
@@ -719,6 +721,149 @@ void main() {
         reason: 'uploading the copy kept as the loser would undo the point',
       );
       expect(svc.savesByRom[1], hasLength(1));
+    });
+  });
+
+  // The app can now put a kept conflict copy back as the save. A copy renamed
+  // over the save keeps its old modified time, and RomM takes a save as changed
+  // here only when its time moved past the one recorded, so the next pull
+  // replaced it with the server's. A restore writes the bytes instead.
+  group('a conflict copy put back as the save', () {
+    late RomMSyncProvider listed;
+
+    setUp(() {
+      // As NeoSync's listing finds saves: kept copies are never among them.
+      listed = RomMSyncProvider(
+        browse,
+        NeoSyncProvider(NeoSyncService()),
+        locateSaves: (g) async => [
+          for (final f in await paths.locate(g))
+            if (!isKeptCopyPath(f.filePath)) f,
+        ],
+        resolveTargets: paths.resolveTargets,
+        listGames: () async => [game],
+        autoSweep: false,
+      );
+    });
+
+    Future<RommAsset> conflictKept() async {
+      final asset = svc.seedSave(
+        1,
+        'Game.srm',
+        'SHARED'.codeUnits,
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
+      await localSave().writeAsString('SHARED');
+      await localSave().setLastModified(
+        DateTime.now().subtract(const Duration(minutes: 20)),
+      );
+      await listed.syncGameSavesAfterClose(game);
+      svc.otherDevicePut(1, asset, 'REMOTE-PROGRESS'.codeUnits);
+      await localSave().writeAsString('LOCAL-PROGRESS');
+      await localSave().setLastModified(
+        DateTime.now().subtract(const Duration(minutes: 10)),
+      );
+      await listed.syncGameSavesAfterClose(game);
+      // Kept a while before the last sync recorded the save.
+      await backupsIn('saves').single.setLastModified(
+        DateTime.now().subtract(const Duration(minutes: 30)),
+      );
+      return asset;
+    }
+
+    test('is kept through the next launch and then uploaded', () async {
+      final asset = await conflictKept();
+      final restored = await restoreKeptCopy(backupsIn('saves').single.path);
+      expect(await localSave().readAsString(), 'REMOTE-PROGRESS');
+      svc.downloads.clear();
+      svc.updates.clear();
+
+      await listed.syncGameSavesBeforeLaunch(game);
+      expect(svc.downloads, isEmpty);
+      expect(await localSave().readAsString(), 'REMOTE-PROGRESS');
+
+      await listed.syncGameSavesAfterClose(game);
+      expect(svc.updates, [asset.id]);
+      expect(
+        String.fromCharCodes(svc.contentByPath[asset.downloadPath!]!),
+        'REMOTE-PROGRESS',
+      );
+      // The save it replaced stays beside it, and never goes up.
+      expect(
+        await File(restored.replacedCopyPath!).readAsString(),
+        'LOCAL-PROGRESS',
+      );
+      expect(svc.creates, isEmpty);
+    });
+
+    test('cannot be put back while RomM syncs', () async {
+      SyncManager.instance.register(listed);
+      addTearDown(
+        () => SyncManager.instance.unregister(RomMSyncProvider.kProviderId),
+      );
+      final kept = KeptSaveCopies(
+        NeoSyncProvider(NeoSyncService()),
+        activeProviderId: () => RomMSyncProvider.kProviderId,
+        gameRunning: () => false,
+      );
+      expect(kept.whyNotNow(game), isNull);
+
+      final sync = listed.syncGameSavesAfterClose(game);
+      expect(kept.whyNotNow(game), KeptCopyRefusal.syncing);
+      await sync;
+      expect(kept.whyNotNow(game), isNull);
+    });
+
+    void keepOlderCopies() {
+      final saves = p.join(tempDir.path, 'saves');
+      Directory(saves).createSync(recursive: true);
+      for (var i = 1; i <= 3; i++) {
+        // Kept while the clock was ahead: a new copy's time is older.
+        final at = DateTime.utc(2030, 1, i);
+        File(p.join(saves, p.basename(replacedCopyPath(localSave().path, at))))
+          ..writeAsBytesSync([i])
+          ..setLastModifiedSync(at);
+      }
+    }
+
+    List<FileSystemEntity> copiesInSaves() =>
+        Directory(p.join(tempDir.path, 'saves'))
+            .listSync()
+            .where((e) => isKeptCopyPath(e.path))
+            .toList();
+
+    test('a sync that keeps a copy leaves at most three, that one '
+        'included', () async {
+      keepOlderCopies();
+
+      await conflictKept();
+
+      expect(copiesInSaves(), hasLength(3));
+      expect(backupsIn('saves'), hasLength(1));
+    });
+
+    test('a pass that keeps no copy leaves the copies alone', () async {
+      await conflictKept();
+      keepOlderCopies();
+
+      await listed.syncGameSavesBeforeLaunch(game);
+      await listed.syncGameSavesAfterClose(game);
+
+      expect(copiesInSaves(), hasLength(4));
+    });
+
+    test('is uploaded by the connect sweep too', () async {
+      final asset = await conflictKept();
+      await restoreKeptCopy(backupsIn('saves').single.path);
+      svc.updates.clear();
+
+      await listed.retryPendingUploads();
+
+      expect(svc.updates, [asset.id]);
+      expect(
+        String.fromCharCodes(svc.contentByPath[asset.downloadPath!]!),
+        'REMOTE-PROGRESS',
+      );
     });
   });
 }

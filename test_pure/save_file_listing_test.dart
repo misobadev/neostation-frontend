@@ -76,6 +76,17 @@ void main() {
     expect(relative(await listSaveFilePaths([root.path])), ['a.sav']);
   });
 
+  // RomM keeps the server's copy as `<save>.romm-conflict-<time>`. After a
+  // switch from RomM to NeoSync, NeoSync took these for saves of the game and
+  // uploaded them, custom-folder uploads included.
+  test('RomM conflict copies are never listed', () async {
+    write('a.sav');
+    write('a.sav.romm-conflict-2026-11-06_18-32-44');
+    write(p.join('slot1', 'B.SRM.ROMM-CONFLICT-2026-11-06_18-32-44'));
+
+    expect(relative(await listSaveFilePaths([root.path])), ['a.sav']);
+  });
+
   test('files over the size limit are left out', () async {
     write('small.sav', 10);
     write('big.sav', 11);

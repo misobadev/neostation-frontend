@@ -14,11 +14,13 @@ import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/screens/game_screen/game_settings_dialog/romm_match_picker_dialog.dart';
+import 'package:neostation/screens/saves_screen/kept_copies_view.dart';
 import 'package:neostation/utils/enabled_index_nav.dart';
 import 'package:neostation/screens/settings_screen/new_settings_options/widgets/setting_row.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/sync/i_sync_provider.dart';
+import 'package:neostation/sync/kept_save_copies.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/utils/game_utils.dart';
@@ -29,10 +31,10 @@ import 'package:neostation/widgets/custom_toggle_switch.dart';
 import 'package:neostation/widgets/delete_game_dialog.dart';
 import 'package:provider/provider.dart';
 
-/// Manage tab for [GameSettingsDialog]: cloud sync, grid size/style,
-/// play-time reset, hiding the game, permanent game deletion, and the game's
-/// RomM link (state line, link picker, unlink). View mode is selected from the
-/// game view itself (X button), not here.
+/// Manage tab for [GameSettingsDialog]: cloud sync, the game's kept save
+/// copies, grid size/style, play-time reset, hiding the game, permanent game
+/// deletion, and the game's RomM link (state line, link picker, unlink). View
+/// mode is selected from the game view itself (X button), not here.
 class GameSettingsManageTab extends StatefulWidget {
   final GameModel game;
   final SystemModel system;
@@ -70,6 +72,10 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
   bool _isDeleting = false;
   bool _isUnlinkingRomm = false;
 
+  /// How many kept copies of the game's saves the active save provider has,
+  /// or null until they have been counted.
+  int? _keptCopies;
+
   /// Whether RomM is connected, read from the provider on every build; the
   /// link row is only enabled (and reachable) while it is.
   bool _rommConnected = false;
@@ -90,14 +96,25 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
   // Navigation layout. Indices are fixed so focus doesn't jump around when
   // cloud sync visibility or the grid options change.
   int get _cloudSyncIdx => 0;
-  int get _playTimeIdx => 1;
-  int get _hideIdx => 2;
-  int get _deleteIdx => 3;
-  int get _linkRommIdx => 4;
-  int get _unlinkRommIdx => 5;
-  int get _totalItems => 6;
+  int get _keptCopiesIdx => 1;
+  int get _playTimeIdx => 2;
+  int get _hideIdx => 3;
+  int get _deleteIdx => 4;
+  int get _linkRommIdx => 5;
+  int get _unlinkRommIdx => 6;
+  int get _totalItems => 7;
 
   bool get _showCloudSync => widget.syncProvider?.isAuthenticated == true;
+
+  /// The kept-copies row is shown for the providers that keep copies (NeoSync
+  /// and RomM), and reachable once there is a copy to open.
+  bool get _showKeptCopies =>
+      keptCopySourcesFor(SyncManager.instance.activeProviderId).isNotEmpty;
+  bool get _hasKeptCopies => _showKeptCopies && (_keptCopies ?? 0) > 0;
+
+  /// The game as the save lookup needs it, with its system's folder.
+  GameModel get _gameWithSystem =>
+      widget.game.copyWith(systemFolderName: _targetSystemFolder);
 
   String get _targetSystemFolder =>
       widget.isAllMode && widget.game.systemFolderName != null
@@ -110,6 +127,7 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
     _cloudSyncEnabled = widget.game.cloudSyncEnabled ?? true;
     _selectedIndex = _showCloudSync ? _cloudSyncIdx : _playTimeIdx;
     _loadRommLink();
+    _countKeptCopies();
   }
 
   @override
@@ -121,6 +139,7 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
   /// Returns whether [idx] can receive focus in the current state.
   bool _isEnabledIndex(int idx) {
     if (idx == _cloudSyncIdx && !_showCloudSync) return false;
+    if (idx == _keptCopiesIdx && !_hasKeptCopies) return false;
     if (idx == _linkRommIdx && !_rommConnected) return false;
     if (idx == _unlinkRommIdx && _rommMapping == null) return false;
     return idx >= 0 && idx < _totalItems;
@@ -159,6 +178,8 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
     final idx = _selectedIndex;
     if (_showCloudSync && idx == _cloudSyncIdx) {
       if (!_isUpdatingCloudSync) _toggleCloudSync(!_cloudSyncEnabled);
+    } else if (idx == _keptCopiesIdx) {
+      if (_hasKeptCopies) _openKeptCopies();
     } else if (idx == _playTimeIdx) {
       if ((widget.game.playTime ?? 0) > 0 && !_isResettingPlayTime) {
         _confirmResetPlayTime();
@@ -227,6 +248,28 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
     } finally {
       if (mounted) setState(() => _isUpdatingCloudSync = false);
     }
+  }
+
+  // ── Kept copies ─────────────────────────────────────────────────────────
+
+  Future<void> _countKeptCopies() async {
+    if (!_showKeptCopies) return;
+    int count;
+    try {
+      final groups = await KeptSaveCopies(context.read<NeoSyncProvider>())
+          .forGame(_gameWithSystem, compareWithSave: false);
+      count = groups.fold(0, (sum, group) => sum + group.copies.length);
+    } catch (e) {
+      _log.e('Counting kept save copies failed: $e');
+      count = 0;
+    }
+    if (mounted) setState(() => _keptCopies = count);
+  }
+
+  Future<void> _openKeptCopies() async {
+    SfxService().playNavSound();
+    await KeptCopiesView.showForGame(context, _gameWithSystem);
+    if (mounted) await _countKeptCopies();
   }
 
   // ── Play time ───────────────────────────────────────────────────────────
@@ -636,6 +679,40 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
           else
             SizedBox.shrink(key: _itemKey(_cloudSyncIdx)),
           SizedBox(height: _showCloudSync ? 12.r : 0.r),
+
+          // The game's kept save copies: greyed and skipped by the D-pad
+          // while there are none.
+          if (_showKeptCopies) ...[
+            GestureDetector(
+              onTap: () {
+                if (!_hasKeptCopies) return;
+                setState(() => _selectedIndex = _keptCopiesIdx);
+                _openKeptCopies();
+              },
+              child: Opacity(
+                opacity: _hasKeptCopies ? 1.0 : 0.5,
+                child: SettingRow(
+                  key: _itemKey(_keptCopiesIdx),
+                  focused: _selectedIndex == _keptCopiesIdx,
+                  title: AppLocale.keptCopiesTitle.getString(context),
+                  subtitle: _hasKeptCopies
+                      ? AppLocale.keptCopiesCount
+                            .getString(context)
+                            .replaceFirst('{count}', '$_keptCopies')
+                      : AppLocale.keptCopiesNone.getString(context),
+                  trailing: _actionChip(
+                    theme,
+                    AppLocale.manage.getString(context),
+                    color: scheme.primary,
+                    enabled: _hasKeptCopies,
+                    focused: _selectedIndex == _keptCopiesIdx,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 12.r),
+          ] else
+            SizedBox.shrink(key: _itemKey(_keptCopiesIdx)),
 
           // Play-time reset.
           GestureDetector(
