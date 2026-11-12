@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
@@ -176,14 +177,69 @@ class UserDataLocationService {
     try {
       final dir = Directory(dirPath);
       if (!await dir.exists()) await dir.create(recursive: true);
-      final probe = File(path.join(dirPath, '.neostation_write_probe'));
-      await probe.writeAsString('ok', flush: true);
+      // A new file under a name nobody can predict, created exclusively, so
+      // a link planted in the folder in advance is never written through.
+      final suffix = Random.secure().nextInt(1 << 32).toRadixString(16);
+      final probe = File(path.join(dirPath, '.neostation_write_probe_$suffix'));
+      await probe.create(exclusive: true);
+      Object? writeFailure;
+      try {
+        await probe.writeAsString('ok', flush: true);
+      } catch (e) {
+        writeFailure = e;
+      }
+      // Removed even when the write failed (a full disk), or every try would
+      // leave another one behind. A folder where it can't be deleted isn't
+      // usable either: SQLite deletes its journal files.
       await probe.delete();
+      if (writeFailure != null) throw writeFailure;
       return true;
     } catch (e) {
       _log.w('canWriteDirectory: $dirPath is not writable: $e');
       return false;
     }
+  }
+
+  /// Whether NeoStation can keep its user data in [dirPath], tried before a
+  /// move is offered so a folder it can't write is turned down
+  /// straight away instead of after the move has been confirmed.
+  ///
+  /// The same probe as [canWriteDirectory], which has to create a missing
+  /// folder to write in it; any folders it created are removed again, so a
+  /// pick that goes no further leaves the disk as it was, and the move still
+  /// creates (and on failure removes) the destination itself.
+  static Future<bool> canUseAsUserDataFolder(String dirPath) async {
+    // One path for the walk and the probe, so they look at the same folders.
+    final target = path.normalize(path.absolute(dirPath));
+    // The folders the probe will create, deepest first.
+    final created = <Directory>[];
+    try {
+      var dir = Directory(target);
+      while (!await dir.exists()) {
+        created.add(dir);
+        final parent = dir.parent;
+        if (parent.path == dir.path) break;
+        dir = parent;
+      }
+    } on FileSystemException catch (e) {
+      // A folder on the way can't be searched, so nothing can be kept there.
+      _log.w('canUseAsUserDataFolder: $target can\'t be reached: $e');
+      return false;
+    }
+
+    final writable = await canWriteDirectory(target);
+
+    for (final folder in created) {
+      try {
+        // The probe may have stopped before creating the deeper ones.
+        if (!await folder.exists()) continue;
+        // Not recursive: only an empty folder the probe made is removed.
+        await folder.delete();
+      } on FileSystemException {
+        break;
+      }
+    }
+    return writable;
   }
 
   /// Converts an Android SAF tree URI (content://com.android.externalstorage...)

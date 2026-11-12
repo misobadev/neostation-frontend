@@ -1113,6 +1113,7 @@ const Map<String, dynamic> appLocaleZh = {
       '此文件夹已包含 {count} 个项目。NeoStation 会将自己的数据存储在此处，与现有内容放在一起。',
   AppLocale.folderNotEmptyUseAnyway: '仍然使用',
   AppLocale.userDataFolderNotWritable: "无法写入此文件夹。请选择其他文件夹，或保留默认位置。",
+  AppLocale.userDataFolderCantWrite: '无法写入此文件夹。请选择其他文件夹。',
   AppLocale.userDataFolderGrantAllFiles:
       "要使用此文件夹，请在 Android 设置 → 应用 → 特殊应用权限 → 所有文件访问权限 中允许 NeoStation，然后重新选择。",
   AppLocale.moveUserDataTitle: '移动用户数据？',

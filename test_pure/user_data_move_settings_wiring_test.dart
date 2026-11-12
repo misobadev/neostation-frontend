@@ -38,6 +38,66 @@ void main() {
     );
   });
 
+  // NEO-68: a folder NeoStation can't write was only found out after the
+  // move had been confirmed and its progress shown.
+  test('the picked folder is tried before the move is offered', () {
+    final body = method('Future<void> _selectUserDataLocation(');
+    final probe = body.indexOf(
+      'UserDataLocationService.canUseAsUserDataFolder(selected)',
+    );
+    expect(probe, isNot(-1));
+    // After every picker, and after "same folder" is ruled out...
+    expect(probe, greaterThan(body.lastIndexOf('TvDirectoryPicker')));
+    expect(probe, greaterThan(body.indexOf('selected == current')));
+    // ...and before anything is counted, asked or moved.
+    expect(probe, lessThan(body.indexOf('countDirectoryEntries(')));
+    expect(probe, lessThan(body.indexOf('MoveUserDataDialog.show(')));
+    final refusal = body.substring(
+      probe,
+      body.indexOf('countDirectoryEntries('),
+    );
+    expect(refusal, contains('userDataFolderNotWritableMessage('));
+    expect(refusal, contains('suggestAllFilesAccess:'));
+    expect(refusal, contains('return;'));
+  });
+
+  // A folder from a provider the app can't reach (Drive, Downloads) did
+  // nothing at all; the wizard says why for the same pick.
+  test('a picked folder the app can\'t use says so', () {
+    final body = method('Future<void> _selectUserDataLocation(');
+    // Set only when the system picker returned a folder nothing resolved;
+    // a cancelled picker says nothing.
+    expect(
+      body,
+      matches(
+        RegExp(r'safUriToRealPath\(uriStr\);\s*unusable = selected == null;'),
+      ),
+    );
+    final message = RegExp(
+      r'if \(unusable\) \{\s*AppNotification\.showNotification\(\s*'
+      r'context,\s*AppLocale\.wizardFolderNotUsable',
+    ).firstMatch(body);
+    expect(message, isNotNull, reason: body);
+    expect(message!.start, lessThan(body.indexOf('selected == current')));
+  });
+
+  test('a failed move suggests All files access on Android', () {
+    final body = method('Future<void> _migrateUserData(');
+    expect(
+      body,
+      matches(
+        RegExp(
+          r'failure == UserDataMoveFailureKind\.notWritable &&\s*'
+          r'await _shouldSuggestAllFilesAccess\(\)',
+        ),
+      ),
+    );
+    expect(body, contains('suggestAllFilesAccess: suggestAllFilesAccess'));
+    final check = method('Future<bool> _shouldSuggestAllFilesAccess(');
+    expect(check, contains('if (!Platform.isAndroid) return false;'));
+    expect(check, contains('!await PermissionService.hasAllFilesAccess()'));
+  });
+
   // NEO-228: the actions waited silently; the screen looked ready.
   test("the screen's other actions wait while a move runs, and say why", () {
     final body = method('Future<void> _handleItemTap(');

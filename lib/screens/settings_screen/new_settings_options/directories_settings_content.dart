@@ -653,6 +653,9 @@ class DirectoriesSettingsContentState
     if (_refuseMoveWhileBusy()) return;
     try {
       String? selected;
+      // A folder was picked but the app can't reach it (another provider,
+      // such as Drive), as opposed to the picker being cancelled.
+      var unusable = false;
 
       if (Platform.isAndroid) {
         final isTV = await PermissionService.isTelevision();
@@ -674,6 +677,7 @@ class DirectoriesSettingsContentState
                     hasAllFilesAccess: hasFiles,
                   ) ??
                   UserDataLocationService.safUriToRealPath(uriStr);
+              unusable = selected == null;
             }
           } on PlatformException catch (e) {
             if (e.code == 'PICKER_FAILED' && mounted) {
@@ -689,13 +693,41 @@ class DirectoriesSettingsContentState
         );
       }
 
-      if (selected == null || !mounted) return;
+      if (!mounted) return;
+      if (selected == null) {
+        if (unusable) {
+          AppNotification.showNotification(
+            context,
+            AppLocale.wizardFolderNotUsable.getString(context),
+            type: NotificationType.error,
+          );
+        }
+        return;
+      }
       if (selected.endsWith(Platform.pathSeparator)) {
         selected = selected.substring(0, selected.length - 1);
       }
 
       final current = _currentUserDataPath;
       if (current == null || selected == current) return;
+
+      // Tried before the move is offered: a folder NeoStation can't write
+      // was otherwise only found out once the move had been confirmed and
+      // its progress shown.
+      if (!await UserDataLocationService.canUseAsUserDataFolder(selected)) {
+        final suggestAllFilesAccess = await _shouldSuggestAllFilesAccess();
+        if (!mounted) return;
+        AppNotification.showNotification(
+          context,
+          userDataFolderNotWritableMessage(
+            (key) => key.getString(context),
+            suggestAllFilesAccess: suggestAllFilesAccess,
+          ),
+          type: NotificationType.error,
+        );
+        return;
+      }
+      if (!mounted) return;
 
       // Relocating actually MOVES data (copy + delete of NeoStation's own
       // files), so confirm the source → destination move explicitly, noting
@@ -725,6 +757,18 @@ class DirectoriesSettingsContentState
           type: NotificationType.error,
         );
       }
+    }
+  }
+
+  /// Whether a folder NeoStation can't write might become usable with All
+  /// files access: on Android, when the app doesn't have it.
+  Future<bool> _shouldSuggestAllFilesAccess() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return !await PermissionService.hasAllFilesAccess();
+    } catch (e) {
+      _log.w('Could not check All files access: $e');
+      return false;
     }
   }
 
@@ -770,13 +814,16 @@ class DirectoriesSettingsContentState
       }
     }
 
+    final suggestAllFilesAccess =
+        failure == UserDataMoveFailureKind.notWritable &&
+        await _shouldSuggestAllFilesAccess();
     if (!navigator.mounted) return;
 
     if (failure != null) {
       AppNotification.showNotification(
         navigator.context,
         '${AppLocale.migratingUserDataError.getStringForCurrentLocale()}: '
-        '${userDataMoveFailureMessage(failure, (key) => key.getStringForCurrentLocale())}',
+        '${userDataMoveFailureMessage(failure, (key) => key.getStringForCurrentLocale(), suggestAllFilesAccess: suggestAllFilesAccess)}',
         type: NotificationType.error,
       );
       return;
