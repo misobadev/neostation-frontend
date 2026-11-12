@@ -50,7 +50,10 @@ class RomEntry {
   /// Base name of the file with extension.
   final String filename;
 
-  /// File size in bytes.
+  /// File size in bytes, where the walk that found the file gets it for free
+  /// (the SAF walks). The desktop walk leaves it at 0: reading it costs a
+  /// `stat` per file, a network round trip each on a mapped share, and nothing
+  /// on desktop reads it.
   final int size;
 
   RomEntry({required this.path, required this.filename, this.size = 0});
@@ -1478,13 +1481,7 @@ class SqliteDatabaseService {
           continue;
         }
         if (entity is File && matches) {
-          entries.add(
-            RomEntry(
-              path: entity.path,
-              filename: filename,
-              size: await entity.length(),
-            ),
-          );
+          entries.add(RomEntry(path: entity.path, filename: filename));
         }
       }
     } catch (e) {

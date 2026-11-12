@@ -47,16 +47,17 @@ void main() {
   }
 
   group('scanStandardPath', () {
-    test('returns matching files with their sizes', () async {
+    test('returns matching files', () async {
       final entries = await walk(recursive: false);
+      // The extension match is case-insensitive.
       expect(entries.map((e) => e.filename), [
         'Sonic.md',
         'Streets of Rage.MD',
       ]);
-      // The size survives the isolate hop, and the extension match is
-      // case-insensitive.
-      expect(entries.map((e) => e.size), [12, 34]);
       expect(entries.first.path, '${root.path}/Sonic.md');
+      // The desktop walk doesn't stat files: a stat per file is a round trip
+      // each on a network share, and nothing on desktop reads the size.
+      expect(entries.map((e) => e.size), [0, 0]);
     });
 
     test('skips extensions the system does not claim', () async {
