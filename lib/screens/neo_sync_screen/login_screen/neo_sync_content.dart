@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import 'package:neostation/screens/saves_screen/kept_copies_view.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/services/sfx_service.dart';
@@ -35,7 +36,7 @@ import 'plan_selection_view.dart';
 import 'neo_sync_dialogs.dart';
 
 /// Active section of the NeoSync tab.
-enum NeoSyncSection { dashboard, saveList, customFolders, plans }
+enum NeoSyncSection { dashboard, saveList, keptCopies, customFolders, plans }
 
 /// Main NeoSync content shell.
 ///
@@ -295,6 +296,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
 
   static const List<NeoSyncSection> _menuSections = [
     NeoSyncSection.saveList,
+    NeoSyncSection.keptCopies,
     NeoSyncSection.customFolders,
     NeoSyncSection.plans,
   ];
@@ -471,6 +473,10 @@ class NeoSyncContentState extends State<NeoSyncContent>
     switch (_section) {
       case NeoSyncSection.saveList:
         return SaveListView(
+          onBack: () => _goToSection(NeoSyncSection.dashboard),
+        );
+      case NeoSyncSection.keptCopies:
+        return KeptCopiesView(
           onBack: () => _goToSection(NeoSyncSection.dashboard),
         );
       case NeoSyncSection.customFolders:
@@ -907,6 +913,11 @@ class NeoSyncContentState extends State<NeoSyncContent>
         icon: Symbols.cloud_rounded,
         title: AppLocale.saveListMenu.getString(context),
         subtitle: AppLocale.onlineSaves.getString(context),
+      ),
+      _MenuEntry(
+        icon: Symbols.history_rounded,
+        title: AppLocale.keptCopiesTitle.getString(context),
+        subtitle: AppLocale.keptCopiesSubtitle.getString(context),
       ),
       _MenuEntry(
         icon: Symbols.folder_special_rounded,

@@ -11,6 +11,7 @@ import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
+import 'package:neostation/utils/kept_save_copy.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -273,6 +274,74 @@ void main() {
       expect(service.events, ['download cloud-zelda', 'upload Zelda.sav']);
       expect(backups(), [backupName]);
     });
+
+    // NEO-234: copies piled up, some holding the save's own bytes.
+    test(
+      "keeps no copy when the cloud copy holds this device's bytes",
+      () async {
+        service.download = {'success': true, 'data': localBytes};
+
+        expect(await sync(), GameSyncStatus.upToDate);
+
+        expect(backups(), isEmpty);
+        expect(service.events, contains('upload Zelda.sav'));
+        expect(bell.notifier.value, isEmpty);
+      },
+    );
+
+    test("when the upload took the cloud copy instead, the copy now holding "
+        "the save's bytes goes", () async {
+      // What the service does when the server's copy is newer: this device's
+      // save is kept as the before-download copy and the cloud's written over
+      // it.
+      service.upload = (file) {
+        file.copySync('${file.path}.neosync.bak');
+        file
+          ..writeAsBytesSync(cloudBytes)
+          ..setLastModifiedSync(DateTime.now().add(const Duration(minutes: 1)));
+        return {'success': true, 'skipped': true, 'downloaded': true};
+      };
+
+      await sync();
+
+      expect(backups(), ['Zelda.sav.neosync.bak']);
+      expect(
+        File(p.join(folder.path, 'Zelda.sav.neosync.bak')).readAsBytesSync(),
+        localBytes,
+      );
+    });
+
+    test('a sync that keeps no copy leaves the copies alone', () async {
+      for (var i = 1; i <= 4; i++) {
+        final at = DateTime.utc(2026, 10, i);
+        File(p.join(folder.path, p.basename(replacedCopyPath(save.path, at))))
+          ..writeAsBytesSync([i])
+          ..setLastModifiedSync(at);
+      }
+      service.download = {'success': true, 'data': localBytes};
+
+      await sync();
+
+      expect(backups(), hasLength(4));
+    });
+
+    test(
+      'a sync leaves at most three copies, keeping the one it just kept',
+      () async {
+        for (var i = 1; i <= 4; i++) {
+          // Kept while the clock was ahead: the new copy's time is older.
+          final at = DateTime.utc(2030, 1, i);
+          File(p.join(folder.path, p.basename(replacedCopyPath(save.path, at))))
+            ..writeAsBytesSync([i])
+            ..setLastModifiedSync(at);
+        }
+
+        await sync();
+
+        expect(backups(), hasLength(3));
+        expect(backups(), contains(backupName));
+      },
+    );
 
     test('says nothing when the upload found the cloud newer and took it '
         'instead', () async {
