@@ -30,6 +30,9 @@ const String _safPermissionNotificationId = 'rom-folders-saf-permission';
 const String _storageAccessRequiredNotificationId =
     'rom-storage-access-required';
 
+/// How many systems a desktop scan walks at once.
+const int _desktopScanConcurrency = 6;
+
 /// [key] in the app language. The provider has no BuildContext, so its
 /// messages use the context-free lookup, as the scan status does.
 String _text(String key) => key.getStringForCurrentLocale();
@@ -818,50 +821,60 @@ extension SqliteConfigScanning on SqliteConfigProvider {
             _config.romFolders,
           );
 
-      const batchSize = 1; // Process 1 system at a time for better granularity
-
       // The scan has two phases:
       // Phase 1: Scan ROMs (95% of progress: 0.0 - 0.95)
       // Phase 2: Update DB (5% of progress: 0.95 - 1.0)
       const scanPhaseWeight = 0.95;
 
-      for (int i = 0; i < systemsToScan.length; i += batchSize) {
-        final endIndex = (i + batchSize < systemsToScan.length)
-            ? i + batchSize
-            : systemsToScan.length;
+      // Several systems are walked at once on desktop. A system's walk is
+      // nearly all waiting on the filesystem (on its own isolate), and on a
+      // network share most of that wait is round-trip latency rather than
+      // throughput, so overlapping systems hides much of that wait. Each worker takes the next system when its current one
+      // finishes, so one large system doesn't hold the others back. Android
+      // stays at one: its walks go through the SAF platform channel, which is
+      // served on the main thread.
+      final concurrency = Platform.isAndroid ? 1 : _desktopScanConcurrency;
+      final running = <SystemModel>[];
+      var next = 0;
 
-        final batch = systemsToScan.sublist(i, endIndex);
-
-        // Update progress state
-        _scanStatus = '${batch.map((s) => s.realName).join(', ')}...';
+      void showRunning() {
+        if (running.isEmpty) return;
+        _scanStatus = '${running.map((s) => s.realName).join(', ')}...';
         _notify();
+      }
 
-        // Process batch in parallel
-        await Future.wait(
-          batch.map(
-            (system) => _scanSystemRoms(system, rootFoldersMap: rootFoldersMap),
-          ),
-        );
+      Future<void> worker() async {
+        while (next < systemsToScan.length) {
+          final system = systemsToScan[next++];
+          running.add(system);
+          showRunning();
 
-        // Update progress of the scanning phase (0.0 - 0.95)
-        _scannedSystemsCount += batch.length;
-        final scanPhaseProgress = _scannedSystemsCount / _totalSystemsToScan;
-        _scanProgress = (scanPhaseProgress * scanPhaseWeight).clamp(
-          0.0,
-          scanPhaseWeight,
-        );
+          await _scanSystemRoms(system, rootFoldersMap: rootFoldersMap);
 
-        _notify();
+          running.remove(system);
+          // Update progress of the scanning phase (0.0 - 0.95)
+          _scannedSystemsCount++;
+          final scanPhaseProgress = _scannedSystemsCount / _totalSystemsToScan;
+          _scanProgress = (scanPhaseProgress * scanPhaseWeight).clamp(
+            0.0,
+            scanPhaseWeight,
+          );
+          showRunning();
+          _notify();
 
-        // Yield to the event loop so the progress UI can paint between systems.
-        // This used to be a fixed 100 ms sleep, which cost 3.3 s (65% of the
-        // whole scan) across 37 systems while throttling nothing — the loop is
-        // already await-serialized. A zero-duration yield keeps the paint
-        // opportunity at no measurable cost.
-        if (endIndex < _detectedSystems.length) {
+          // Yield to the event loop so the progress UI can paint between
+          // systems. This used to be a fixed 100 ms sleep, which cost 3.3 s
+          // (65% of the whole scan) across 37 systems while throttling
+          // nothing. A zero-duration yield keeps the paint opportunity at no
+          // measurable cost.
           await Future<void>.delayed(Duration.zero);
         }
       }
+
+      await Future.wait([
+        for (var i = 0; i < concurrency && i < systemsToScan.length; i++)
+          worker(),
+      ]);
 
       // Phase 2: Update the systems list (0.95 - 1.0)
       _scanStatus = AppLocale.updatingSystemsList.getStringForCurrentLocale();
