@@ -14,8 +14,9 @@ String cloudCopyBackupPath(
   required int? modifiedAt,
   String? checksum,
 }) {
-  // The latest time a DateTime can hold, in milliseconds since the epoch.
-  const latest = 8640000000000000;
+  // The end of year 9999 UTC: later years have five digits, which the copy's
+  // name can't be read back from.
+  const latest = 253402300799999;
   final String tag;
   if (modifiedAt != null && modifiedAt > 0 && modifiedAt <= latest) {
     final t = DateTime.fromMillisecondsSinceEpoch(modifiedAt, isUtc: true);

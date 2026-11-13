@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 
 import 'dart:io';
 import 'dart:isolate';
@@ -28,6 +29,8 @@ import '../services/retroachievements_hash_service.dart';
 import '../utils/auto_folder_upload_notice.dart';
 import '../utils/cloud_copy_backup_name.dart';
 import '../utils/kept_cloud_copy_notice.dart';
+import '../utils/kept_save_copy.dart';
+import '../utils/save_changed_here.dart';
 
 part 'neosync/neosync_exceptions.dart';
 part 'neosync/neosync_status.dart';
@@ -273,6 +276,19 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Retrieves the current sync state for a specific game.
   neo_sync.GameSyncState? getGameSyncState(String gameId) =>
       _gameSyncStates[gameId];
+
+  /// Whether [file] is a kept copy of a save rather than a save: RomM's
+  /// conflict copies, which earlier builds uploaded as saves. The save
+  /// listing leaves them out on this device, so taken for saves they would
+  /// be downloaded again on every sync.
+  bool _isKeptCopyInCloud(NeoSyncFile file) =>
+      isKeptCopyPath(file.fileName) || isKeptCopyPath(file.filePath);
+
+  /// Whether any game's own sync is under way (the one that runs when a game
+  /// is highlighted, before it launches and after it closes).
+  bool get isAnyGameSyncing => _gameSyncStates.values.any(
+    (state) => state.status == neo_sync.GameSyncStatus.syncing,
+  );
 
   /// Returns the list of local save files detected for a specific game.
   List<LocalSaveFile> getGameLocalSaves(String gameId) =>

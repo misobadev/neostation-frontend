@@ -1051,7 +1051,35 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: Apenas saves locais',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Apenas saves na nuvem',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Conflito de save detectado',
+  AppLocale.neoSyncNewerCloudCopy: 'A nuvem tinha uma cópia mais recente deste save, então ela foi baixada. A cópia deste dispositivo está no Histórico de saves, de onde você pode restaurá-la.',
   AppLocale.neoSyncKeptCloudCopy: "Este save também foi alterado em outro dispositivo. A cópia deste dispositivo foi enviada, e a outra foi guardada ao lado como {file}.",
+  AppLocale.keptCopiesTitle: 'Histórico de saves',
+  AppLocale.keptCopiesSubtitle:
+      'Versões anteriores dos seus saves, de sincronizações e restaurações',
+  AppLocale.keptCopiesCount: 'Versões: {count}',
+  AppLocale.keptCopiesNone: 'Nenhum histórico de saves',
+  AppLocale.keptCopyFromOtherDevice: 'De outro dispositivo',
+  AppLocale.keptCopyBeforeDownload: 'Este dispositivo, antes de um download',
+  AppLocale.keptCopyFromServer: 'Do servidor, antes de um envio',
+  AppLocale.keptCopyReplaced: 'Substituída por uma restauração',
+  AppLocale.keptCopyCurrentSave: 'Save atual: {size}, {date}',
+  AppLocale.keptCopyNoCurrentSave: 'Nenhum save atual',
+  AppLocale.keptCopySameAsSave: 'Igual ao save atual',
+  AppLocale.keptCopyRestore: 'Restaurar',
+  AppLocale.keptCopyRestoreTitle: 'Restaurar esta versão?',
+  AppLocale.keptCopyRestoreBody: 'Ela substitui {file}. O save atual é adicionado ao histórico, então você pode desfazer isso aqui. Feche o jogo primeiro se ele ainda estiver aberto.',
+  AppLocale.keptCopySharedCard:
+      'Este cartão de memória contém os saves de todos os jogos que o usam.',
+  AppLocale.keptCopyRestored:
+      'Versão restaurada. A próxima sincronização vai enviá-la.',
+  AppLocale.keptCopyRestoreFailed: 'Não foi possível restaurar a versão.',
+  AppLocale.keptCopyDeleteTitle: 'Excluir esta versão?',
+  AppLocale.keptCopyDeleteBody:
+      '{file} será excluído. Isso não pode ser desfeito.',
+  AppLocale.keptCopyDeleteFailed: 'Não foi possível excluir a versão.',
+  AppLocale.keptCopyCloseGame: 'Feche o jogo primeiro e tente novamente.',
+  AppLocale.keptCopyWaitForSync:
+      'Aguarde a sincronização dos saves terminar e tente novamente.',
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync: Sincronização em nuvem desativada',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Cota de armazenamento excedida',
