@@ -1115,6 +1115,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.userDataFolderNotWritable: "無法寫入此資料夾。請選擇其他資料夾，或保留預設位置。",
   AppLocale.userDataFolderCantWrite: '無法寫入此資料夾。請選擇其他資料夾。',
   AppLocale.userDataFolderGrantAllFiles: "若要使用此資料夾，請在 Android 設定 → 應用程式 → 特殊應用程式存取權 → 所有檔案存取權 中允許 NeoStation，然後重新選擇。",
+  AppLocale.userDataMoveToCardAppFolder: 'NeoStation 無法寫入你在這張 SD 卡上選擇的資料夾，因此會把資料保存在卡上它自己的資料夾中。解除安裝 NeoStation 時，Android 會刪除該資料夾。',
   AppLocale.moveUserDataTitle: '移動使用者資料？',
   AppLocale.moveUserDataBody: 'NeoStation 會將自己的資料（資料庫、抓取的媒體和設定）從目前的資料夾移動到新的資料夾。非 NeoStation 建立的檔案不會被更動。',
   AppLocale.moveUserDataDestNotEmpty:

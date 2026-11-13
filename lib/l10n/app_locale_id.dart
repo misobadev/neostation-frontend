@@ -1213,6 +1213,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.userDataFolderCantWrite:
       'Tidak dapat menulis ke folder ini. Pilih folder lain.',
   AppLocale.userDataFolderGrantAllFiles: "Untuk memakai folder ini, izinkan akses semua file untuk NeoStation di Setelan Android → Aplikasi → Akses aplikasi khusus → Akses semua file, lalu pilih lagi.",
+  AppLocale.userDataMoveToCardAppFolder: 'NeoStation tidak bisa menulis ke folder yang Anda pilih di kartu SD ini, jadi datanya akan disimpan di folder miliknya sendiri di kartu itu. Android menghapus folder itu saat NeoStation dihapus instalasinya.',
   AppLocale.moveUserDataTitle: 'Pindahkan Data Pengguna?',
   AppLocale.moveUserDataBody: 'NeoStation akan memindahkan datanya sendiri — basis data, media hasil scrape, dan pengaturan — dari folder saat ini ke folder baru. Berkas yang tidak dibuat oleh NeoStation tidak akan diubah.',
   AppLocale.moveUserDataDestNotEmpty: 'Folder baru sudah berisi {count} item. Data NeoStation akan ditambahkan di sampingnya.',

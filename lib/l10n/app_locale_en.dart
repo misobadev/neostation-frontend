@@ -1206,6 +1206,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.userDataFolderCantWrite:
       "Can't write to this folder. Pick another one.",
   AppLocale.userDataFolderGrantAllFiles: "To use this folder, allow All files access for NeoStation in Android Settings → Apps → Special app access → All files access, then pick it again.",
+  AppLocale.userDataMoveToCardAppFolder: "NeoStation can't write to the folder you picked on this SD card, so it will keep its data in its own folder on the card. Android deletes that folder when NeoStation is uninstalled.",
   AppLocale.moveUserDataTitle: 'Move User Data?',
   AppLocale.moveUserDataBody: 'NeoStation will move its own data — database, scraped media, and settings — from the current folder to the new one. Files not created by NeoStation are left untouched.',
   AppLocale.moveUserDataDestNotEmpty: 'The new folder isn\'t empty (items: {count}). NeoStation data will be added alongside the existing contents.',

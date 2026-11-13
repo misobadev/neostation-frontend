@@ -1206,6 +1206,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.userDataFolderCantWrite:
       'Не удаётся записать в эту папку. Выберите другую.',
   AppLocale.userDataFolderGrantAllFiles: "Чтобы использовать эту папку, разрешите NeoStation доступ ко всем файлам в настройках Android → Приложения → Специальный доступ → Доступ ко всем файлам, затем выберите её снова.",
+  AppLocale.userDataMoveToCardAppFolder: 'NeoStation не может записывать в выбранную папку на этой SD-карте, поэтому сохранит данные в своей папке на карте. Android удаляет эту папку при удалении NeoStation.',
   AppLocale.moveUserDataTitle: 'Переместить данные пользователя?',
   AppLocale.moveUserDataBody: 'NeoStation переместит свои данные (базу данных, загруженные медиа и настройки) из текущей папки в новую. Файлы, созданные не NeoStation, останутся нетронутыми.',
   AppLocale.moveUserDataDestNotEmpty: 'Новая папка не пуста (элементов: {count}). Данные NeoStation будут добавлены рядом с существующим содержимым.',

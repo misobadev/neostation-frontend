@@ -1327,6 +1327,8 @@ mixin AppLocale {
   static const String userDataFolderNotWritable =
       'user_data_folder_not_writable';
   static const String userDataFolderCantWrite = 'user_data_folder_cant_write';
+  static const String userDataMoveToCardAppFolder =
+      'user_data_move_to_card_app_folder';
   static const String userDataFolderGrantAllFiles =
       'user_data_folder_grant_all_files';
   static const String moveUserDataTitle = 'move_user_data_title';

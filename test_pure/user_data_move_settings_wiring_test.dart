@@ -42,13 +42,18 @@ void main() {
   // move had been confirmed and its progress shown.
   test('the picked folder is tried before the move is offered', () {
     final body = method('Future<void> _selectUserDataLocation(');
-    final probe = body.indexOf(
-      'UserDataLocationService.canUseAsUserDataFolder(selected)',
-    );
+    final probe = body.indexOf('chooseUserDataFolder(');
     expect(probe, isNot(-1));
+    expect(
+      body.substring(probe),
+      contains('canUse: UserDataLocationService.canUseAsUserDataFolder'),
+    );
     // After every picker, and after "same folder" is ruled out...
     expect(probe, greaterThan(body.lastIndexOf('TvDirectoryPicker')));
-    expect(probe, greaterThan(body.indexOf('selected == current')));
+    expect(
+      probe,
+      greaterThan(body.indexOf('final current = _currentUserDataPath')),
+    );
     // ...and before anything is counted, asked or moved.
     expect(probe, lessThan(body.indexOf('countDirectoryEntries(')));
     expect(probe, lessThan(body.indexOf('MoveUserDataDialog.show(')));
@@ -78,7 +83,59 @@ void main() {
       r'context,\s*AppLocale\.wizardFolderNotUsable',
     ).firstMatch(body);
     expect(message, isNotNull, reason: body);
-    expect(message!.start, lessThan(body.indexOf('selected == current')));
+    expect(message!.start, lessThan(body.indexOf('chooseUserDataFolder(')));
+  });
+
+  // NEO-240: without All files access, with an SD card in, every pick was
+  // swapped for NeoStation's own folder on the first card, internal storage
+  // and other apps' folders included, and the dialogue didn't say so.
+  test('the folder picked is the one tried, never swapped silently', () {
+    final body = method('Future<void> _selectUserDataLocation(');
+    expect(body, isNot(contains('resolveAndroidUserDataPath')));
+    expect(
+      body,
+      matches(
+        RegExp(
+          r'selected = UserDataLocationService\.safUriToRealPath\(uriStr\);',
+        ),
+      ),
+    );
+    final service = File('lib/services/user_data_location_service.dart')
+        .readAsStringSync();
+    expect(service, isNot(contains('resolveAndroidUserDataPath')));
+  });
+
+  // What is decided is tested in user_data_folder_choice_test.dart; this
+  // checks Settings acts on every outcome.
+  test('a folder other than the one picked comes with a notice, and every '
+      'outcome is acted on', () {
+    final body = method('Future<void> _selectUserDataLocation(');
+    final decision = body.substring(
+      body.indexOf('chooseUserDataFolder('),
+      body.indexOf('countDirectoryEntries('),
+    );
+    expect(
+      decision,
+      contains('appDirs: UserDataLocationService.appStorageFolders'),
+    );
+    String outcome(String name) {
+      final start = decision.indexOf('case $name(');
+      expect(start, isNot(-1), reason: name);
+      final next = decision.indexOf('case ', start + 1);
+      return decision.substring(start, next == -1 ? decision.length : next);
+    }
+
+    expect(outcome('SameUserDataFolder'), contains('return;'));
+    expect(outcome('PickedUserDataFolder'), contains('selected = path;'));
+    final card = outcome('CardUserDataFolder');
+    expect(card, contains('selected = path;'));
+    expect(card, contains('notice = AppLocale.userDataMoveToCardAppFolder'));
+    final refused = outcome('UnwritableUserDataFolder');
+    expect(refused, contains('userDataFolderNotWritableMessage('));
+    expect(refused, contains('return;'));
+    // The dialogue names why the folder isn't the one picked.
+    final show = body.substring(body.indexOf('MoveUserDataDialog.show('));
+    expect(show.substring(0, show.indexOf(');')), contains('notice: notice'));
   });
 
   test('a failed move suggests All files access on Android', () {

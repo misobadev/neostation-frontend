@@ -1225,6 +1225,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.userDataFolderCantWrite:
       'Não é possível gravar nesta pasta. Escolha outra.',
   AppLocale.userDataFolderGrantAllFiles: "Para usar esta pasta, permita o acesso a todos os arquivos para o NeoStation em Configurações do Android → Apps → Acesso especial a apps → Acesso a todos os arquivos e selecione-a novamente.",
+  AppLocale.userDataMoveToCardAppFolder: 'O NeoStation não consegue gravar na pasta escolhida neste cartão SD, então vai guardar os dados na própria pasta dele no cartão. O Android apaga essa pasta quando o NeoStation é desinstalado.',
   AppLocale.moveUserDataTitle: 'Mover dados do usuário?',
   AppLocale.moveUserDataBody: 'O NeoStation moverá seus próprios dados — banco de dados, mídia obtida e configurações — da pasta atual para a nova. Arquivos não criados pelo NeoStation permanecem intactos.',
   AppLocale.moveUserDataDestNotEmpty: 'A nova pasta não está vazia (itens: {count}). Os dados do NeoStation serão adicionados junto ao conteúdo existente.',
