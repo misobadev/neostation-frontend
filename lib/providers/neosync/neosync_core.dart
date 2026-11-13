@@ -442,8 +442,8 @@ extension NeoSyncCore on NeoSyncProvider {
 
       // Buscar TODOS los archivos de save locales para este juego (saves y states)
       final localSaveFiles = await _findGameSaveFiles(game);
-      // The cloud copies this pass keeps, by save; see the tidy below.
-      final keptThisPass = <String, String>{};
+      // The copies this pass keeps, by save; see the tidy below.
+      final keptThisPass = <String, Set<String>>{};
 
       // Si no hay archivos locales, verificar si hay archivos en la nube para descargar
       if (localSaveFiles.isEmpty) {
@@ -568,7 +568,7 @@ extension NeoSyncCore on NeoSyncProvider {
                     : (ok: true, keptPath: null);
                 final backupPath = kept.keptPath;
                 if (backupPath != null) {
-                  keptThisPass[localFile.filePath] = backupPath;
+                  keptThisPass[localFile.filePath] = {backupPath};
                 }
                 if (!kept.ok) {
                   allUploadsSucceeded = false;
@@ -577,7 +577,14 @@ extension NeoSyncCore on NeoSyncProvider {
                   final result = await _autoUploadLocalSaveResult(
                     game,
                     localFile,
+                    alsoKept: {?backupPath},
                   );
+                  // This device's save too, when the cloud copy proved newer
+                  // still and was downloaded over it.
+                  final keptLocal = result['keptLocalPath'];
+                  if (backupPath != null && keptLocal is String) {
+                    keptThisPass[localFile.filePath]!.add(keptLocal);
+                  }
                   if (result['success'] != true) {
                     allUploadsSucceeded = false;
                     transferFailed = true;
@@ -676,14 +683,16 @@ extension NeoSyncCore on NeoSyncProvider {
         }
       }
 
-      // A save this pass kept a cloud copy of now has one more copy; at most
-      // a few stay. Only those saves: the rest have no new copy, and a shared
-      // card another game's pass has claimed may be mid-download.
-      for (final MapEntry(key: save, value: copy) in keptThisPass.entries) {
+      // A save this pass kept a cloud copy of now has one or two more copies
+      // (this device's too, if the cloud copy then proved newer still), all
+      // kept; at most a few stay. Only those saves: the rest have no new
+      // copy, and a shared card another game's pass has claimed may be
+      // mid-download.
+      for (final MapEntry(key: save, value: copies) in keptThisPass.entries) {
         await tidyKeptCopies(
           save,
           sources: neoSyncKeptCopySources,
-          justKept: {copy},
+          justKept: copies,
         );
       }
 
@@ -727,10 +736,14 @@ extension NeoSyncCore on NeoSyncProvider {
   /// [_autoUploadLocalSave] with the upload's own answer, which says whether
   /// it was `skipped` (already in sync, or the cloud copy was newer and was
   /// downloaded instead).
+  ///
+  /// [alsoKept] names copies of the save this pass kept just before (the
+  /// other device's), which the tidy after a newer cloud copy keeps too.
   Future<Map<String, dynamic>> _autoUploadLocalSaveResult(
     GameModel game,
-    LocalSaveFile localSave,
-  ) async {
+    LocalSaveFile localSave, {
+    Set<String> alsoKept = const {},
+  }) async {
     const notUploaded = <String, dynamic>{'success': false};
     try {
       final file = File(localSave.filePath);
@@ -745,7 +758,11 @@ extension NeoSyncCore on NeoSyncProvider {
         return notUploaded;
       }
 
-      final result = await _uploadLocalFileForGame(game, file);
+      final result = await _uploadLocalFileForGame(
+        game,
+        file,
+        alsoKept: alsoKept,
+      );
       if (result['success'] == true) {
         return result;
       }
@@ -784,6 +801,17 @@ extension NeoSyncCore on NeoSyncProvider {
         checksum: cloud.checksum,
       );
       final backup = File(backupPath);
+      // The name is predictable (the cloud copy's time), so a link someone
+      // planted there would be written through, or taken for a copy already
+      // kept: refused, and nothing is uploaded over the cloud copy.
+      if (await FileSystemEntity.type(backupPath, followLinks: false) ==
+          FileSystemEntityType.link) {
+        NeoSyncProvider._log.w(
+          'Not keeping the cloud copy of ${local.filePath}: $backupPath is a '
+          'link',
+        );
+        return failed;
+      }
       if (cloud.fileSize > 0 &&
           !backupPath.endsWith('.cloud.neosync.bak') &&
           await backup.exists() &&
@@ -845,8 +873,9 @@ extension NeoSyncCore on NeoSyncProvider {
   /// folder and no RetroArch core can be resolved, the upload is skipped.
   Future<Map<String, dynamic>> _uploadLocalFileForGame(
     GameModel game,
-    File file,
-  ) async {
+    File file, {
+    Set<String> alsoKept = const {},
+  }) async {
     final system = await _getSystemForGame(game);
     if (system == null) {
       return {'success': false, 'message': 'system not found'};
@@ -871,16 +900,21 @@ extension NeoSyncCore on NeoSyncProvider {
         'Upload: ${file.path} -> custom folder '
         '(${customInfo.systemFolderName}/${customInfo.emulatorUniqueId})',
       );
-      return _neoSyncService.syncFile(
-        file,
+      return _afterNewerCloudCopy(
+        await _neoSyncService.syncFile(
+          file,
+          game.name,
+          customFilename: customInfo.relativePath,
+          systemId: customInfo.systemFolderName,
+          emulatorId: customInfo.emulatorUniqueId,
+          gameHash: await _resolveGameHashForUpload(game),
+          isState: false,
+          type: 'custom',
+          deadline: deadline,
+        ),
         game.name,
-        customFilename: customInfo.relativePath,
-        systemId: customInfo.systemFolderName,
-        emulatorId: customInfo.emulatorUniqueId,
-        gameHash: await _resolveGameHashForUpload(game),
-        isState: false,
-        type: 'custom',
-        deadline: deadline,
+        file.path,
+        alsoKept: alsoKept,
       );
     }
 
@@ -921,18 +955,49 @@ extension NeoSyncCore on NeoSyncProvider {
         parsed?.emulatorSlug ??
         await _resolveRetroArchEmulatorSlug(file, basePath) ??
         _retroArchCoreSlugFromGame(game);
-    return _neoSyncService.syncFile(
-      file,
+    return _afterNewerCloudCopy(
+      await _neoSyncService.syncFile(
+        file,
+        game.name,
+        customFilename: relativePath,
+        systemId: parsed?.system ?? game.systemFolderName,
+        emulatorId: emulatorId,
+        gameHash: await _resolveGameHashForUpload(game),
+        isState: isState,
+        scope: parsed?.scope,
+        type: _syncTypeForFile(file, isState: isState),
+        deadline: deadline,
+      ),
       game.name,
-      customFilename: relativePath,
-      systemId: parsed?.system ?? game.systemFolderName,
-      emulatorId: emulatorId,
-      gameHash: await _resolveGameHashForUpload(game),
-      isState: isState,
-      scope: parsed?.scope,
-      type: _syncTypeForFile(file, isState: isState),
-      deadline: deadline,
+      file.path,
+      alsoKept: alsoKept,
     );
+  }
+
+  /// After an upload of the save at [savePath] whose cloud copy turned out
+  /// newer and was downloaded over it instead: this device's save was kept
+  /// as its own copy ([NeoSyncService.syncFile]'s `keptLocalPath`). The
+  /// save's copies are tidied with that one kept, and the bell says what
+  /// happened. Returns [result].
+  ///
+  /// [alsoKept] are other copies of the save just kept (the other device's,
+  /// by the same pass), kept by that tidy too.
+  Future<Map<String, dynamic>> _afterNewerCloudCopy(
+    Map<String, dynamic> result,
+    String gameName,
+    String savePath, {
+    Set<String> alsoKept = const {},
+  }) async {
+    final kept = result['keptLocalPath'];
+    if (result['downloaded'] == true && kept is String) {
+      await tidyKeptCopies(
+        savePath,
+        sources: neoSyncKeptCopySources,
+        justKept: {kept, ...alsoKept},
+      );
+      reportNewerCloudCopy(gameName: gameName, savePath: savePath);
+    }
+    return result;
   }
 
   /// Descarga automáticamente un save de la nube
@@ -1299,6 +1364,41 @@ extension NeoSyncCore on NeoSyncProvider {
     localTargetCloudFile(game, relativeName),
   );
 
+  /// Every save in the cloud for this account: the list fetched within the
+  /// last [NeoSyncProvider._cloudListMaxAge], or a fresh one. Null when it
+  /// can't be fetched.
+  Future<List<NeoSyncFile>?> _cloudFileList() async {
+    final account = _authService?.currentUser?.id;
+    final fetchedAt = _filesFetchedAt;
+    final fresh =
+        fetchedAt != null &&
+        _filesAccountId == account &&
+        _now().difference(fetchedAt) < NeoSyncProvider._cloudListMaxAge;
+    var cloudFiles = _files;
+    if (!fresh) {
+      // A list asked for before a save was deleted may still have it in, so
+      // it's asked for once more; should a delete overtake that one too,
+      // it's used for this sync only. A list that is kept counts as fresh
+      // only if asked for since the last "stale" mark.
+      for (var attempt = 1; attempt <= 2; attempt++) {
+        final generation = _filesGeneration;
+        final removals = _filesRemovals;
+        final result = await _neoSyncService.getAllFiles();
+        if (result['success'] != true) return null;
+        cloudFiles = result['files'];
+        if (removals == _filesRemovals) {
+          _files = cloudFiles;
+          if (generation == _filesGeneration) {
+            _filesFetchedAt = _now();
+            _filesAccountId = account;
+          }
+          break;
+        }
+      }
+    }
+    return cloudFiles;
+  }
+
   /// Obtiene TODOS los archivos de guardado de la nube para un juego específico
   ///
   /// Returns null when the cloud list can't be fetched.
@@ -1311,36 +1411,8 @@ extension NeoSyncCore on NeoSyncProvider {
       // Verificar si el sistema tiene sync deshabilitado
       if (!system.neosync.sync) return [];
 
-      // 2. Fetch the cloud list unless a recent one for this account is
-      // held.
-      final account = _authService?.currentUser?.id;
-      final fetchedAt = _filesFetchedAt;
-      final fresh =
-          fetchedAt != null &&
-          _filesAccountId == account &&
-          _now().difference(fetchedAt) < NeoSyncProvider._cloudListMaxAge;
-      var cloudFiles = _files;
-      if (!fresh) {
-        // A list asked for before a save was deleted may still have it in, so
-        // it's asked for once more; should a delete overtake that one too,
-        // it's used for this sync only. A list that is kept counts as fresh
-        // only if asked for since the last "stale" mark.
-        for (var attempt = 1; attempt <= 2; attempt++) {
-          final generation = _filesGeneration;
-          final removals = _filesRemovals;
-          final result = await _neoSyncService.getAllFiles();
-          if (result['success'] != true) return null;
-          cloudFiles = result['files'];
-          if (removals == _filesRemovals) {
-            _files = cloudFiles;
-            if (generation == _filesGeneration) {
-              _filesFetchedAt = _now();
-              _filesAccountId = account;
-            }
-            break;
-          }
-        }
-      }
+      final cloudFiles = await _cloudFileList();
+      if (cloudFiles == null) return null;
 
       final gameRomName = _getRomNameWithoutExtension(game.romname)
           .toLowerCase();
@@ -1489,17 +1561,14 @@ extension NeoSyncCore on NeoSyncProvider {
         final savedLocalTime = syncState['local_modified_at'] as int;
         final savedCloudTime = syncState['cloud_updated_at'] as int;
 
-        // Changed here: the file time moved (with a tolerance of 2 seconds,
-        // for FAT32/exFAT resolution) and, when the last sync recorded a hash,
-        // the content differs from it. The time also moves when an emulator
-        // rewrites the same save, and that would make an unchanged save
-        // replace a newer cloud copy. The hash alone isn't enough: a download
-        // records the cloud list's checksum, which can be an older version's
-        // than the bytes it wrote.
-        final savedHash = syncState['file_hash'] as String?;
-        final localChanged =
-            (localTime - savedLocalTime).abs() > 2000 &&
-            (savedHash == null || savedHash.isEmpty || localHash != savedHash);
+        // See [saveChangedHere]: an emulator rewriting the same save moves
+        // its time without changing it.
+        final localChanged = saveChangedHere(
+          localTime: localTime,
+          localHash: localHash,
+          savedTime: savedLocalTime,
+          savedHash: syncState['file_hash'] as String?,
+        );
         final cloudChanged = cloudTime > savedCloudTime;
 
         if (localChanged && !cloudChanged) {

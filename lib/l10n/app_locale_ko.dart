@@ -985,6 +985,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: 로컬 세이브만 있음',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: 클라우드 세이브만 있음',
   AppLocale.neoSyncSaveConflict: 'NeoSync: 세이브 충돌 감지',
+  AppLocale.neoSyncNewerCloudCopy: '클라우드에 이 세이브의 더 최신 사본이 있어 다운로드했습니다. 이 기기의 사본은 세이브 기록에 보관되어 있으며 거기에서 복원할 수 있습니다.',
   AppLocale.neoSyncKeptCloudCopy:
       "이 세이브는 다른 기기에서도 변경되었습니다. 이 기기의 사본을 업로드했으며, 다른 사본은 옆에 {file}(으)로 보관했습니다.",
   AppLocale.keptCopiesTitle: '세이브 기록',

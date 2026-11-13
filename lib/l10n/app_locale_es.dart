@@ -1045,6 +1045,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: Solo partidas locales',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Solo partidas en la nube',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Conflicto de guardado detectado',
+  AppLocale.neoSyncNewerCloudCopy: 'La nube tenía una copia más reciente de esta partida, así que se descargó. La copia de este dispositivo está en el Historial de partidas, desde donde puedes restaurarla.',
   AppLocale.neoSyncKeptCloudCopy: "Esta partida también cambió en otro dispositivo. Se subió la copia de este dispositivo y la otra se guarda al lado como {file}.",
   AppLocale.keptCopiesTitle: 'Historial de partidas',
   AppLocale.keptCopiesSubtitle: 'Versiones anteriores de tus partidas, de sincronizaciones y restauraciones',

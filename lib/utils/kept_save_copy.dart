@@ -9,8 +9,10 @@ enum KeptCopySource {
   /// device as well as this one (`<save>.cloud-<time>.neosync.bak`).
   otherDevice,
 
-  /// NeoSync: this device's save, kept before a download replaced it
-  /// (`<save>.neosync.bak`; one slot, overwritten by the next download).
+  /// NeoSync: this device's save, kept before a download replaced it: in one
+  /// slot that the next download overwrites (`<save>.neosync.bak`), or, when
+  /// it had changed here too and the cloud's copy was newer, as its own dated
+  /// copy (`<save>.local-<time>.neosync.bak`; see [keepLocalCopy]).
   beforeDownload,
 
   /// RomM: the server's copy, kept when the save had changed on the server as
@@ -26,8 +28,9 @@ enum KeptCopySource {
 /// and, when the name holds one, a time ([stampedAt]).
 ///
 /// For [KeptCopySource.otherDevice] the time is when the copy was saved on the
-/// other device; for [KeptCopySource.serverConflict] and
-/// [KeptCopySource.replaced], when it was kept.
+/// other device; for [KeptCopySource.serverConflict],
+/// [KeptCopySource.replaced] and a dated [KeptCopySource.beforeDownload] copy,
+/// when it was kept.
 class KeptCopyName {
   const KeptCopyName({
     required this.savePath,
@@ -53,6 +56,10 @@ final _otherDevice = RegExp(
 );
 final _replaced = RegExp(
   r'^(.+)\.replaced-(\d{8}-\d{6})(?:-\d+)?\.neosync\.bak$',
+  caseSensitive: false,
+);
+final _localBeforeDownload = RegExp(
+  r'^(.+)\.local-(\d{8}-\d{6})(?:-\d+)?\.neosync\.bak$',
   caseSensitive: false,
 );
 final _beforeDownload = RegExp(r'^(.+)\.neosync\.bak$', caseSensitive: false);
@@ -110,6 +117,14 @@ KeptCopyName? _parseKeptCopyName(String path) {
       stampedAt: _utcStamp(m.group(2)),
     );
   }
+  m = _localBeforeDownload.firstMatch(name);
+  if (m != null) {
+    return KeptCopyName(
+      savePath: save(m.group(1)!),
+      source: KeptCopySource.beforeDownload,
+      stampedAt: _utcStamp(m.group(2)),
+    );
+  }
   m = _beforeDownload.firstMatch(name);
   if (m != null) {
     return KeptCopyName(
@@ -155,14 +170,66 @@ DateTime? _utcStamp(String? stamp) {
 /// Where the save at [savePath] is kept when a restore replaces it at [at]:
 /// `<save>.replaced-<UTC time>.neosync.bak`, with `-<attempt>` before the
 /// ending from the second attempt on, for when that name is taken.
-String replacedCopyPath(String savePath, DateTime at, {int attempt = 1}) {
+String replacedCopyPath(String savePath, DateTime at, {int attempt = 1}) =>
+    '$savePath.replaced-${_stampFor(at, attempt)}$keptCopyEnding';
+
+/// Where [keepLocalCopy] keeps this device's save at [savePath], kept at
+/// [at]: `<save>.local-<UTC yyyyMMdd-HHmmss>[-attempt].neosync.bak`.
+String localCopyPath(String savePath, DateTime at, {int attempt = 1}) =>
+    '$savePath.local-${_stampFor(at, attempt)}$keptCopyEnding';
+
+String _stampFor(DateTime at, int attempt) {
   final t = at.toUtc();
   String two(int n) => n.toString().padLeft(2, '0');
-  final stamp =
-      '${t.year.toString().padLeft(4, '0')}${two(t.month)}${two(t.day)}'
-      '-${two(t.hour)}${two(t.minute)}${two(t.second)}';
   final suffix = attempt > 1 ? '-$attempt' : '';
-  return '$savePath.replaced-$stamp$suffix$keptCopyEnding';
+  return '${t.year.toString().padLeft(4, '0')}${two(t.month)}${two(t.day)}'
+      '-${two(t.hour)}${two(t.minute)}${two(t.second)}$suffix';
+}
+
+/// Keeps a copy of this device's save at [savePath] before a newer cloud copy
+/// is written over it, and returns where ([localCopyPath], at [now]): its own
+/// file, listed in Save history, which no later download overwrites, unlike
+/// the single before-download slot.
+///
+/// The copy is created exclusively, so a name that is taken, even by a link,
+/// is passed over rather than written through. A copy cut short is removed,
+/// and the error rethrown: the caller then writes nothing over the save.
+Future<String> keepLocalCopy(
+  String savePath, {
+  DateTime? now,
+  List<int>? bytes,
+}) async {
+  final content = bytes ?? await File(savePath).readAsBytes();
+  final at = now ?? DateTime.now();
+  final path = await _createExclusively(
+    (attempt) => localCopyPath(savePath, at, attempt: attempt),
+  );
+  try {
+    await File(path).writeAsBytes(content, flush: true);
+  } catch (_) {
+    await _deleteQuietly(File(path));
+    rethrow;
+  }
+  return path;
+}
+
+/// Creates the first of [pathFor]'s names (attempt 1, 2, ...) that isn't
+/// taken, exclusively, and returns it: a name that is taken, even by a link
+/// that points nowhere, is passed over rather than written through. Any other
+/// failure (a read-only folder, a full disk) is rethrown at once.
+Future<String> _createExclusively(String Function(int attempt) pathFor) async {
+  for (var attempt = 1; ; attempt++) {
+    final path = pathFor(attempt);
+    try {
+      await File(path).create(exclusive: true);
+      return path;
+    } on FileSystemException {
+      final taken =
+          await FileSystemEntity.type(path, followLinks: false) !=
+          FileSystemEntityType.notFound;
+      if (!taken || attempt >= 100) rethrow;
+    }
+  }
 }
 
 /// One kept copy, as the list of copies shows it.
@@ -381,8 +448,9 @@ const int maxKeptCopiesPerSave = 3;
 ///   the save is replaced, by a download or a restore under way;
 /// * of copies holding the same bytes, all but the most recently kept;
 /// * beyond [limit], the copies kept least recently. The before-download copy
-///   ([KeptCopySource.beforeDownload]) is one slot that each download
-///   overwrites, so it can't pile up and isn't counted.
+///   (the undated [KeptCopySource.beforeDownload] copy) is one slot that each
+///   download overwrites, so it can't pile up and isn't counted; dated ones
+///   count.
 ///
 /// "Kept most recently" goes by each copy's file time, when it was written
 /// beside the save, not by the time in its name: a cloud copy of an old save
@@ -413,6 +481,7 @@ Future<List<String>> tidyKeptCopies(
           DateTime modified,
           int size,
           bool justKept,
+          bool slot,
         })
       >[];
   Future<void> consider(String path) async {
@@ -434,6 +503,11 @@ Future<List<String>> tidyKeptCopies(
         modified: stat.modified,
         size: stat.size,
         justKept: protected.contains(p.normalize(path)),
+        // The single before-download slot, which each download overwrites;
+        // a dated copy of this device's save counts like any other.
+        slot:
+            name.source == KeptCopySource.beforeDownload &&
+            name.stampedAt == null,
       ));
     } on FileSystemException {
       return;
@@ -492,10 +566,10 @@ Future<List<String>> tidyKeptCopies(
         digest == saveDigest &&
         copy.modified.isBefore(saveStat!.modified);
     final duplicate = digest != null && !seen.add(digest);
-    final slot = copy.source != KeptCopySource.beforeDownload;
-    final overLimit = slot && counted >= limit;
+    final counts = !copy.slot;
+    final overLimit = counts && counted >= limit;
     if (!heldBySave && !duplicate && !overLimit) {
-      if (slot) counted++;
+      if (counts) counted++;
       continue;
     }
     try {
@@ -503,7 +577,7 @@ Future<List<String>> tidyKeptCopies(
       removed.add(copy.path);
     } on FileSystemException {
       // Left for the next tidy.
-      if (slot) counted++;
+      if (counts) counted++;
     }
   }
   return removed;
@@ -567,23 +641,9 @@ Future<KeptCopyRestore> restoreKeptCopy(
   String? replacedPath;
   if (saveBytes != null) {
     final at = now ?? DateTime.now();
-    var attempt = 1;
-    // Created exclusively, so a name that is taken, even by a link that points
-    // nowhere, is passed over rather than written through.
-    while (true) {
-      replacedPath = replacedCopyPath(name.savePath, at, attempt: attempt++);
-      try {
-        await File(replacedPath).create(exclusive: true);
-        break;
-      } on FileSystemException {
-        // Only a name that is taken is worth another attempt; anything else
-        // (a read-only folder, a full disk) fails the restore now.
-        final taken =
-            await FileSystemEntity.type(replacedPath, followLinks: false) !=
-            FileSystemEntityType.notFound;
-        if (!taken || attempt > 100) rethrow;
-      }
-    }
+    replacedPath = await _createExclusively(
+      (attempt) => replacedCopyPath(name.savePath, at, attempt: attempt),
+    );
     try {
       await write(File(replacedPath), saveBytes);
     } catch (_) {

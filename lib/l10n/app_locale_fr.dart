@@ -1057,6 +1057,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync : Sauvegardes locales uniquement',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync : Sauvegardes cloud uniquement',
   AppLocale.neoSyncSaveConflict: 'NeoSync : Conflit de sauvegarde détecté',
+  AppLocale.neoSyncNewerCloudCopy: "Le cloud avait une copie plus récente de cette sauvegarde : elle a donc été téléchargée. La copie de cet appareil est conservée dans l'Historique des sauvegardes, d'où vous pouvez la restaurer.",
   AppLocale.neoSyncKeptCloudCopy: "Cette sauvegarde a aussi changé sur un autre appareil. La copie de cet appareil a été envoyée, l'autre est conservée à côté sous le nom {file}.",
   AppLocale.keptCopiesTitle: 'Historique des sauvegardes',
   AppLocale.keptCopiesSubtitle: 'Versions précédentes de vos sauvegardes, issues des synchronisations et des restaurations',

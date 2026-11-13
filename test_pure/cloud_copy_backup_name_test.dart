@@ -69,6 +69,22 @@ void main() {
     );
   });
 
+  // A five-digit year makes a name the copy can't be read back from.
+  test('a time after year 9999 is no time', () {
+    expect(
+      cloudCopyBackupPath(
+        '/saves/Zelda.sav',
+        modifiedAt: 253402300800000,
+        checksum: 'ab',
+      ),
+      '/saves/Zelda.sav.cloud-ab.neosync.bak',
+    );
+    expect(
+      cloudCopyBackupPath('/saves/Zelda.sav', modifiedAt: 253402300799000),
+      '/saves/Zelda.sav.cloud-99991231-235959.neosync.bak',
+    );
+  });
+
   test('a time out of range is no time', () {
     expect(
       cloudCopyBackupPath(

@@ -1042,6 +1042,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: Только локальные сохранения',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Только облачные сохранения',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Конфликт сохранений',
+  AppLocale.neoSyncNewerCloudCopy: 'В облаке была более новая копия этого сохранения, поэтому она скачана. Копия с этого устройства хранится в Истории сохранений, откуда её можно восстановить.',
   AppLocale.neoSyncKeptCloudCopy: "Это сохранение изменилось и на другом устройстве. Копия с этого устройства загружена, а другая сохранена рядом как {file}.",
   AppLocale.keptCopiesTitle: 'История сохранений',
   AppLocale.keptCopiesSubtitle:

@@ -960,6 +960,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: 僅本機存檔',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: 僅雲端存檔',
   AppLocale.neoSyncSaveConflict: 'NeoSync: 偵測到存檔衝突',
+  AppLocale.neoSyncNewerCloudCopy: '雲端有此存檔較新的副本，因此已下載。此裝置上的副本保存在存檔歷史中，可在那裡還原。',
   AppLocale.neoSyncKeptCloudCopy:
       "此存檔在另一台裝置上也有變更。已上傳本裝置的副本，另一份副本已保存在旁邊，名為 {file}。",
   AppLocale.keptCopiesTitle: '存檔歷史',

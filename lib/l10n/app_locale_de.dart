@@ -1054,6 +1054,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: Nur lokale Spielstände',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Nur Cloud-Spielstände',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Spielstand-Konflikt erkannt',
+  AppLocale.neoSyncNewerCloudCopy: 'In der Cloud gab es eine neuere Kopie dieses Spielstands, deshalb wurde sie heruntergeladen. Die Kopie dieses Geräts liegt im Spielstand-Verlauf und kann dort wiederhergestellt werden.',
   AppLocale.neoSyncKeptCloudCopy: "Dieser Spielstand wurde auch auf einem anderen Gerät geändert. Die Kopie dieses Geräts wurde hochgeladen, die andere liegt daneben als {file}.",
   AppLocale.keptCopiesTitle: 'Spielstand-Verlauf',
   AppLocale.keptCopiesSubtitle: 'Frühere Versionen deiner Spielstände, aus Synchronisierungen und Wiederherstellungen',

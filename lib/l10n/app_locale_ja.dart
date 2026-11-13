@@ -982,6 +982,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: ローカルセーブのみ',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: クラウドセーブのみ',
   AppLocale.neoSyncSaveConflict: 'NeoSync: セーブデータの競合を検出',
+  AppLocale.neoSyncNewerCloudCopy: 'クラウドにこのセーブデータのより新しいコピーがあったため、ダウンロードしました。この端末のコピーはセーブ履歴に保管されており、そこから復元できます。',
   AppLocale.neoSyncKeptCloudCopy:
       "このセーブデータは別の端末でも変更されていました。この端末のデータをアップロードし、もう一方は {file} として隣に保存しました。",
   AppLocale.keptCopiesTitle: 'セーブ履歴',

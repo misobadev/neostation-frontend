@@ -1034,6 +1034,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.neoSyncLocalSavesOnly: 'NeoSync: Local saves only',
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Cloud saves only',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Save conflict detected',
+  AppLocale.neoSyncNewerCloudCopy: "The cloud had a newer copy of this save, so it was downloaded. This device's copy is kept in Save history, where it can be restored.",
   AppLocale.neoSyncKeptCloudCopy: "This save also changed on another device. This device's copy was uploaded, and the other one is kept beside it as {file}.",
   AppLocale.keptCopiesTitle: 'Save history',
   AppLocale.keptCopiesSubtitle:
