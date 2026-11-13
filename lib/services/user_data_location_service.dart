@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
@@ -176,14 +177,69 @@ class UserDataLocationService {
     try {
       final dir = Directory(dirPath);
       if (!await dir.exists()) await dir.create(recursive: true);
-      final probe = File(path.join(dirPath, '.neostation_write_probe'));
-      await probe.writeAsString('ok', flush: true);
+      // A new file under a name nobody can predict, created exclusively, so
+      // a link planted in the folder in advance is never written through.
+      final suffix = Random.secure().nextInt(1 << 32).toRadixString(16);
+      final probe = File(path.join(dirPath, '.neostation_write_probe_$suffix'));
+      await probe.create(exclusive: true);
+      Object? writeFailure;
+      try {
+        await probe.writeAsString('ok', flush: true);
+      } catch (e) {
+        writeFailure = e;
+      }
+      // Removed even when the write failed (a full disk), or every try would
+      // leave another one behind. A folder where it can't be deleted isn't
+      // usable either: SQLite deletes its journal files.
       await probe.delete();
+      if (writeFailure != null) throw writeFailure;
       return true;
     } catch (e) {
       _log.w('canWriteDirectory: $dirPath is not writable: $e');
       return false;
     }
+  }
+
+  /// Whether NeoStation can keep its user data in [dirPath], tried before a
+  /// move is offered so a folder it can't write is turned down
+  /// straight away instead of after the move has been confirmed.
+  ///
+  /// The same probe as [canWriteDirectory], which has to create a missing
+  /// folder to write in it; any folders it created are removed again, so a
+  /// pick that goes no further leaves the disk as it was, and the move still
+  /// creates (and on failure removes) the destination itself.
+  static Future<bool> canUseAsUserDataFolder(String dirPath) async {
+    // One path for the walk and the probe, so they look at the same folders.
+    final target = path.normalize(path.absolute(dirPath));
+    // The folders the probe will create, deepest first.
+    final created = <Directory>[];
+    try {
+      var dir = Directory(target);
+      while (!await dir.exists()) {
+        created.add(dir);
+        final parent = dir.parent;
+        if (parent.path == dir.path) break;
+        dir = parent;
+      }
+    } on FileSystemException catch (e) {
+      // A folder on the way can't be searched, so nothing can be kept there.
+      _log.w('canUseAsUserDataFolder: $target can\'t be reached: $e');
+      return false;
+    }
+
+    final writable = await canWriteDirectory(target);
+
+    for (final folder in created) {
+      try {
+        // The probe may have stopped before creating the deeper ones.
+        if (!await folder.exists()) continue;
+        // Not recursive: only an empty folder the probe made is removed.
+        await folder.delete();
+      } on FileSystemException {
+        break;
+      }
+    }
+    return writable;
   }
 
   /// Converts an Android SAF tree URI (content://com.android.externalstorage...)
@@ -201,7 +257,9 @@ class UserDataLocationService {
       final treeIndex = segments.indexOf('tree');
       if (treeIndex < 0 || treeIndex + 1 >= segments.length) return null;
 
-      final docId = Uri.decodeComponent(segments[treeIndex + 1]);
+      // Already decoded: decoding again changed or refused folder names that
+      // hold a '%'.
+      final docId = segments[treeIndex + 1];
       final colonIndex = docId.indexOf(':');
       if (colonIndex < 0) return null;
 
@@ -218,81 +276,20 @@ class UserDataLocationService {
     }
   }
 
-  /// Resolves the best accessible user-data path for a given Android SAF URI.
-  ///
-  /// If MANAGE_EXTERNAL_STORAGE is granted, returns the user's exact chosen
-  /// real filesystem path (same access model as ROM folders).
-  ///
-  /// If MANAGE_EXTERNAL_STORAGE is NOT granted (common on Android 15+ devices
-  /// where it must be explicitly enabled in Settings → Special App Access),
-  /// real filesystem paths outside Android/data/pkg/ become inaccessible
-  /// after a restart. In that case this method falls back to the app-specific
-  /// external storage directory for the selected volume, which is always
-  /// accessible without any special permission on any Android version.
-  static Future<String?> resolveAndroidUserDataPath(
-    String safUri, {
-    required bool hasAllFilesAccess,
-  }) async {
-    final direct = safUriToRealPath(safUri);
-
-    if (hasAllFilesAccess) {
-      // MANAGE_EXTERNAL_STORAGE granted — user's chosen path is fully accessible.
-      if (direct != null) {
-        _log.i('UserDataLocationService: direct path → $direct');
-      }
-      return direct;
-    }
-
-    // No MANAGE_EXTERNAL_STORAGE: fall back to app-specific external dir so
-    // the path remains accessible after restart without special permissions.
-    // Identify SD card dirs by absence of "/emulated/" (primary storage).
+  /// NeoStation's external storage folders, one per volume, for finding its
+  /// own folder on an SD card (see `userDataFolderOnSameCard`). Empty where
+  /// there are none, as on the desktop, or when they can't be read.
+  static Future<List<String>> appStorageFolders() async {
+    if (!Platform.isAndroid) return const [];
     try {
-      final externalDirs = await getExternalStorageDirectories();
-      final sdDirs = externalDirs
-          ?.where((d) => !d.path.contains('/emulated/'))
-          .toList();
-
-      if (sdDirs != null && sdDirs.isNotEmpty) {
-        // Extract volume ID from SAF URI for best match.
-        String? volume;
-        try {
-          final uri = Uri.parse(safUri);
-          if (uri.host == 'com.android.externalstorage.documents') {
-            final segments = uri.pathSegments;
-            final treeIndex = segments.indexOf('tree');
-            if (treeIndex >= 0 && treeIndex + 1 < segments.length) {
-              final docId = Uri.decodeComponent(segments[treeIndex + 1]);
-              final idx = docId.indexOf(':');
-              if (idx >= 0) volume = docId.substring(0, idx);
-            }
-          }
-        } catch (_) {}
-
-        final best = volume != null
-            ? sdDirs.firstWhere(
-                (d) => d.path.contains(volume!),
-                orElse: () => sdDirs.first,
-              )
-            : sdDirs.first;
-
-        final resolved = path.join(best.path, 'user-data');
-        _log.i(
-          'UserDataLocationService: no MANAGE_EXTERNAL_STORAGE → '
-          'app-specific fallback: $resolved',
-        );
-        return resolved;
-      }
+      final dirs = await getExternalStorageDirectories();
+      return [for (final dir in dirs ?? const <Directory>[]) dir.path];
     } catch (e) {
       _log.w(
         'UserDataLocationService: getExternalStorageDirectories error: $e',
       );
+      return const [];
     }
-
-    // Last resort: try direct path anyway.
-    if (direct != null) {
-      _log.i('UserDataLocationService: last-resort direct → $direct');
-    }
-    return direct;
   }
 
   /// Runs after each file is copied and before the copy is checked, with the
@@ -429,9 +426,9 @@ class UserDataLocationService {
     }
 
     // Guard against source and destination being the same folder (or one
-    // nested in the other). The caller only compares raw strings, so a
-    // normalization difference — trailing slash, a SAF-resolved path vs the
-    // stored path — slips through. Without this, each owned file would be
+    // nested in the other). A caller's own comparison can miss what
+    // canonicalising catches — letter case on Windows, a SAF-resolved path
+    // vs the stored path — so it is checked here too. Without this, each owned file would be
     // copied onto itself (truncating it) and then deleted. canonicalize()
     // normalizes '.', '..' and separators (it does not resolve symlinks).
     final canonSource = path.canonicalize(sourceUserDataPath);

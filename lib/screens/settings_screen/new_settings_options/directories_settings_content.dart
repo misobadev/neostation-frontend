@@ -26,6 +26,7 @@ import 'package:neostation/widgets/tv_directory_picker.dart';
 import 'package:neostation/widgets/user_data_move_progress_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:neostation/utils/user_data_folder_choice.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/user_data_move_busy.dart';
 import 'package:neostation/utils/user_data_move_failure_message.dart';
@@ -653,6 +654,9 @@ class DirectoriesSettingsContentState
     if (_refuseMoveWhileBusy()) return;
     try {
       String? selected;
+      // A folder was picked but the app can't reach it (another provider,
+      // such as Drive), as opposed to the picker being cancelled.
+      var unusable = false;
 
       if (Platform.isAndroid) {
         final isTV = await PermissionService.isTelevision();
@@ -660,20 +664,15 @@ class DirectoriesSettingsContentState
         if (isTV) {
           selected = await TvDirectoryPicker.show(context);
         } else {
-          // Regular Android: SAF picker → resolve to accessible path.
-          // On Android 15+, SD card volumes require app-specific external
-          // storage dirs; resolveAndroidUserDataPath handles this automatically.
+          // Regular Android: the system picker. The folder picked is the one
+          // tried: whether NeoStation can write it is found out below, never
+          // assumed from the permission.
           try {
             final uri = await PermissionService.requestFolderAccess();
             if (uri != null) {
               final uriStr = uri.toString();
-              final hasFiles = await PermissionService.hasAllFilesAccess();
-              selected =
-                  await UserDataLocationService.resolveAndroidUserDataPath(
-                    uriStr,
-                    hasAllFilesAccess: hasFiles,
-                  ) ??
-                  UserDataLocationService.safUriToRealPath(uriStr);
+              selected = UserDataLocationService.safUriToRealPath(uriStr);
+              unusable = selected == null;
             }
           } on PlatformException catch (e) {
             if (e.code == 'PICKER_FAILED' && mounted) {
@@ -689,13 +688,59 @@ class DirectoriesSettingsContentState
         );
       }
 
-      if (selected == null || !mounted) return;
+      if (!mounted) return;
+      if (selected == null) {
+        if (unusable) {
+          AppNotification.showNotification(
+            context,
+            AppLocale.wizardFolderNotUsable.getString(context),
+            type: NotificationType.error,
+          );
+        }
+        return;
+      }
       if (selected.endsWith(Platform.pathSeparator)) {
         selected = selected.substring(0, selected.length - 1);
       }
 
       final current = _currentUserDataPath;
-      if (current == null || selected == current) return;
+      if (current == null) return;
+
+      // Tried before the move is offered: a folder NeoStation can't write
+      // was otherwise only found out once the move had been confirmed and
+      // its progress shown. On an SD card, NeoStation's own folder there is
+      // offered instead of a folder it can't write, and the dialogue says
+      // so; nothing else is ever swapped for the folder picked.
+      String? notice;
+      switch (await chooseUserDataFolder(
+        picked: selected,
+        current: current,
+        canUse: UserDataLocationService.canUseAsUserDataFolder,
+        appDirs: UserDataLocationService.appStorageFolders,
+      )) {
+        case SameUserDataFolder():
+          return;
+        case PickedUserDataFolder(:final path):
+          selected = path;
+        case CardUserDataFolder(:final path):
+          _log.i('User data: $selected can\'t be written; offering $path');
+          selected = path;
+          if (!mounted) return;
+          notice = AppLocale.userDataMoveToCardAppFolder.getString(context);
+        case UnwritableUserDataFolder():
+          final suggestAllFilesAccess = await _shouldSuggestAllFilesAccess();
+          if (!mounted) return;
+          AppNotification.showNotification(
+            context,
+            userDataFolderNotWritableMessage(
+              (key) => key.getString(context),
+              suggestAllFilesAccess: suggestAllFilesAccess,
+            ),
+            type: NotificationType.error,
+          );
+          return;
+      }
+      if (!mounted) return;
 
       // Relocating actually MOVES data (copy + delete of NeoStation's own
       // files), so confirm the source → destination move explicitly, noting
@@ -709,6 +754,7 @@ class DirectoriesSettingsContentState
         fromPath: current,
         toPath: selected,
         destItemCount: entryCount,
+        notice: notice,
       );
       if (!proceed || !mounted) return;
       // Something may have started while the picker and dialogue were open.
@@ -725,6 +771,18 @@ class DirectoriesSettingsContentState
           type: NotificationType.error,
         );
       }
+    }
+  }
+
+  /// Whether a folder NeoStation can't write might become usable with All
+  /// files access: on Android, when the app doesn't have it.
+  Future<bool> _shouldSuggestAllFilesAccess() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return !await PermissionService.hasAllFilesAccess();
+    } catch (e) {
+      _log.w('Could not check All files access: $e');
+      return false;
     }
   }
 
@@ -770,13 +828,16 @@ class DirectoriesSettingsContentState
       }
     }
 
+    final suggestAllFilesAccess =
+        failure == UserDataMoveFailureKind.notWritable &&
+        await _shouldSuggestAllFilesAccess();
     if (!navigator.mounted) return;
 
     if (failure != null) {
       AppNotification.showNotification(
         navigator.context,
         '${AppLocale.migratingUserDataError.getStringForCurrentLocale()}: '
-        '${userDataMoveFailureMessage(failure, (key) => key.getStringForCurrentLocale())}',
+        '${userDataMoveFailureMessage(failure, (key) => key.getStringForCurrentLocale(), suggestAllFilesAccess: suggestAllFilesAccess)}',
         type: NotificationType.error,
       );
       return;

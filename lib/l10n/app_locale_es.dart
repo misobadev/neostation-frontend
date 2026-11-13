@@ -1213,7 +1213,10 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.folderNotEmptyBody: 'Esta carpeta no está vacía (elementos: {count}). NeoStation almacenará sus propios datos aquí, junto con el contenido existente.',
   AppLocale.folderNotEmptyUseAnyway: 'Usar de todos modos',
   AppLocale.userDataFolderNotWritable: "No se puede escribir en esta carpeta. Elige otra o mantén la ubicación predeterminada.",
+  AppLocale.userDataFolderCantWrite:
+      'No se puede escribir en esta carpeta. Elige otra.',
   AppLocale.userDataFolderGrantAllFiles: "Para usar esta carpeta, permite el acceso a todos los archivos para NeoStation en Ajustes de Android → Aplicaciones → Acceso especial de aplicaciones → Acceso a todos los archivos y vuelve a elegirla.",
+  AppLocale.userDataMoveToCardAppFolder: 'NeoStation no puede escribir en la carpeta elegida de esta tarjeta SD, así que guardará sus datos en su propia carpeta de la tarjeta. Android borra esa carpeta al desinstalar NeoStation.',
   AppLocale.moveUserDataTitle: '¿Mover datos de usuario?',
   AppLocale.moveUserDataBody: 'NeoStation moverá sus propios datos (base de datos, medios extraídos y ajustes) de la carpeta actual a la nueva. Los archivos no creados por NeoStation permanecen intactos.',
   AppLocale.moveUserDataDestNotEmpty: 'La nueva carpeta no está vacía (elementos: {count}). Los datos de NeoStation se añadirán junto al contenido existente.',
