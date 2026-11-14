@@ -11,7 +11,9 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/system_model.dart';
 import 'package:neostation/providers/file_provider.dart';
+import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/game_repository.dart';
+import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/repositories/scraper_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/screens/game_screen/my_games_carousel.dart';
@@ -21,6 +23,7 @@ import 'package:neostation/services/screenscraper_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/artwork_cache.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:provider/provider.dart';
 
 /// Sub-tabs inside the Scrapping tab of [GameSettingsDialog].
 enum _ScrappingSubTab { data, media }
@@ -60,17 +63,18 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
   _ScrappingSubTab _currentSubTab = _ScrappingSubTab.data;
 
   // ── Navigation entries (per sub-tab) ────────────────────────────────────
-  // Data tab: rescrape, identify, title, developer, publisher, genre,
-  // 6 descriptions, save.
+  // Data tab: rescrape, identify, rescrape from RomM, title, developer,
+  // publisher, genre, 6 descriptions, save.
   static const int _idxRescrape = 0;
   static const int _idxIdentify = 1;
-  static const int _idxTitle = 2;
-  static const int _idxDeveloper = 3;
-  static const int _idxPublisher = 4;
-  static const int _idxGenre = 5;
-  static const int _idxDescStart = 6;
-  static const int _idxSave = 12;
-  static const int _totalDataItems = 13;
+  static const int _idxRommRescrape = 2;
+  static const int _idxTitle = 3;
+  static const int _idxDeveloper = 4;
+  static const int _idxPublisher = 5;
+  static const int _idxGenre = 6;
+  static const int _idxDescStart = 7;
+  static const int _idxSave = 13;
+  static const int _totalDataItems = 14;
 
   // Media tab: screenshot, wheel, fanart, boxart.
   static const int _idxImageStart = 0;
@@ -97,6 +101,14 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
   // Async state
   bool _isScraping = false;
   double _scrapeProgress = 0;
+  bool _isRommScraping = false;
+
+  /// Whether the game is linked to a RomM entry; null until read.
+  bool? _rommLinked;
+
+  /// A scrape of either kind is running: both write this game's metadata row
+  /// and art, so only one runs at a time, and nothing else edits them meanwhile.
+  bool get _busy => _isScraping || _isRommScraping;
   bool _isSaving = false;
   int _thumbsVersion = 0;
 
@@ -126,10 +138,25 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
       ? widget.game.systemFolderName!
       : widget.system.primaryFolderName;
 
+  /// The folder RomM links are keyed by, as the Manage tab reads them.
+  String get _rommLinkFolder =>
+      widget.isAllMode && widget.game.systemFolderName != null
+      ? widget.game.systemFolderName!
+      : widget.system.folderName;
+
   @override
   void initState() {
     super.initState();
     _loadMetadata();
+    _loadRommLink();
+  }
+
+  Future<void> _loadRommLink() async {
+    final mapping = await RommSaveMapRepository.getMapping(
+      widget.game.romname,
+      _rommLinkFolder,
+    );
+    if (mounted) setState(() => _rommLinked = mapping != null);
   }
 
   @override
@@ -160,29 +187,32 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
       );
     }
     if (!mounted) return;
+    // With a row, its own values: the game passed in is a snapshot from
+    // when the dialog opened, and after a rescrape its stale values would be
+    // shown, and saved back, for columns the new data left empty.
+    String field(String column, String snapshot) =>
+        row == null ? snapshot : (row[column] as String?) ?? '';
     setState(() {
       _titleController.text =
           (row?['real_name'] as String?) ??
           (widget.game.name.isNotEmpty ? widget.game.name : '');
-      _developerController.text =
-          (row?['developer'] as String?) ?? widget.game.developer;
-      _publisherController.text =
-          (row?['publisher'] as String?) ?? widget.game.publisher;
-      _genreController.text = (row?['genre'] as String?) ?? widget.game.genre;
+      _developerController.text = field('developer', widget.game.developer);
+      _publisherController.text = field('publisher', widget.game.publisher);
+      _genreController.text = field('genre', widget.game.genre);
       for (final lang in _descLanguages) {
         // Exact-language values only — getDescriptionForLanguage would leak
         // the EN fallback into other languages' fields.
-        _descControllers[lang]!.text =
-            (row?['description_$lang'] as String?) ??
-            widget.game.descriptions?[lang] ??
-            '';
+        _descControllers[lang]!.text = field(
+          'description_$lang',
+          widget.game.descriptions?[lang] ?? '',
+        );
       }
     });
   }
 
   Future<void> _saveMetadata() async {
     final systemId = _systemId;
-    if (systemId == null || _isSaving) return;
+    if (systemId == null || _isSaving || _busy) return;
     setState(() => _isSaving = true);
 
     String? nullable(String text) {
@@ -197,6 +227,9 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
       'genre': nullable(_genreController.text),
       for (final lang in _descLanguages)
         'description_$lang': nullable(_descControllers[lang]!.text),
+      // Edited here, no longer ES-DE's row: resetting an ES-DE import deletes
+      // those, which would take the edits with it.
+      'esde_imported': 0,
     };
 
     final ok = await ScraperRepository.updateGameMetadata(
@@ -257,7 +290,7 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
   /// With [identifyAs], the ROM is first pointed at that ScreenScraper game
   /// (Identify…) and scraped from it.
   Future<void> _forceRescrape({int? identifyAs}) async {
-    if (_isScraping) return;
+    if (_busy) return;
     final romPath = widget.game.romPath;
     if (romPath == null) return;
 
@@ -335,12 +368,109 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
     }
   }
 
+  /// Why Rescrape from RomM can't run now (an AppLocale key), or null when it
+  /// can: RomM must be connected and the game linked to a RomM entry.
+  String? _rommRescrapeBlocker(bool connected) {
+    if (!connected) return AppLocale.rommNotConnected;
+    if (_rommLinked != true) return AppLocale.rommLinkStateNotLinked;
+    return null;
+  }
+
+  /// Rescrape from RomM: replaces this game's info and art with its linked
+  /// RomM entry's, as Force Rescrape does with ScreenScraper's.
+  Future<void> _rescrapeFromRomm() async {
+    if (_busy || _isSaving) return;
+    final romm = context.read<RommProvider>();
+    setState(() => _isRommScraping = true);
+    try {
+      // The link can change in the Manage tab of this same dialog, and is
+      // read asynchronously on open: ask again before saying it isn't there.
+      if (_rommLinked != true) await _loadRommLink();
+      if (!mounted) return;
+      final blocker = _rommRescrapeBlocker(romm.isConnected);
+      if (blocker != null) {
+        AppNotification.showNotification(
+          context,
+          blocker.getString(context),
+          type: NotificationType.info,
+        );
+        return;
+      }
+
+      // Resolve the real system (not the favorites/all virtual one).
+      SystemModel targetSystem = widget.system;
+      if (widget.isAllMode && widget.game.systemFolderName != null) {
+        final original = await SystemRepository.getSystemByFolderName(
+          widget.game.systemFolderName!,
+        );
+        if (original != null) targetSystem = original;
+      }
+
+      final outcome = await romm.rescrapeFromRomm(
+        widget.game,
+        targetSystem,
+        widget.fileProvider,
+      );
+      final done = outcome == RommRescrapeOutcome.done;
+      // Unlinked in the Manage tab meanwhile.
+      if (outcome == RommRescrapeOutcome.notLinked) _rommLinked = false;
+
+      if (done) {
+        // Bust cached artwork so the fresh media shows up everywhere.
+        await evictScrapedArtwork(_artworkPaths());
+        GamesGrid.evictArtworkCaches(_artworkPaths());
+        GamesCarousel.evictArtworkCaches(_artworkPaths());
+      }
+      if (mounted) {
+        final (message, type) = switch (outcome) {
+          RommRescrapeOutcome.done => (
+            AppLocale.scrapeSuccessful,
+            NotificationType.success,
+          ),
+          RommRescrapeOutcome.notConnected => (
+            AppLocale.rommNotConnected,
+            NotificationType.info,
+          ),
+          RommRescrapeOutcome.notLinked => (
+            AppLocale.rommLinkStateNotLinked,
+            NotificationType.info,
+          ),
+          RommRescrapeOutcome.failed => (
+            AppLocale.scrapeErrorGame,
+            NotificationType.error,
+          ),
+        };
+        AppNotification.showNotification(
+          context,
+          message.getString(context),
+          type: type,
+        );
+        // Shows what the row holds now, whatever the outcome.
+        await _loadMetadata();
+        if (done && mounted) setState(() => _thumbsVersion++);
+      }
+      // The game list refreshes even if this dialog was closed meanwhile.
+      if (done) widget.onGameUpdated?.call();
+    } catch (e) {
+      _log.e('Rescrape from RomM failed: $e');
+      if (mounted) {
+        AppNotification.showNotification(
+          context,
+          AppLocale.scrapeErrorGame.getString(context),
+          type: NotificationType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRommScraping = false);
+    }
+  }
+
   /// Identify…: lets the user search ScreenScraper for this game and point it
   /// at the right one, then scrapes it like Force Rescrape.
   Future<void> _identify() async {
     final romPath = widget.game.romPath;
     final systemId = _systemId;
-    if (_isScraping || romPath == null || romPath.isEmpty || systemId == null) {
+    if (_busy || romPath == null || romPath.isEmpty || systemId == null) {
       return;
     }
 
@@ -381,6 +511,7 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
       : widget.game.getImagePath(_folder, type, widget.fileProvider);
 
   Future<void> _replaceImage(String type) async {
+    if (_busy) return;
     final result = await FilePicker.pickFile(type: FileType.image);
     final srcPath = result?.path;
     if (srcPath == null || !mounted) return;
@@ -497,6 +628,8 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
         _forceRescrape();
       } else if (idx == _idxIdentify) {
         _identify();
+      } else if (idx == _idxRommRescrape) {
+        _rescrapeFromRomm();
       } else if (idx >= _idxTitle && idx < _idxSave) {
         _focusFieldAt(idx);
       } else if (idx == _idxSave) {
@@ -653,6 +786,29 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
               SfxService().playNavSound();
               setState(() => _selectedIndex = _idxIdentify);
               _identify();
+            },
+          ),
+
+          // Rescrape from RomM.
+          Builder(
+            builder: (context) {
+              final blocker = _rommRescrapeBlocker(
+                context.select<RommProvider, bool>((p) => p.isConnected),
+              );
+              return _NavRow(
+                key: _itemKey(_idxRommRescrape),
+                isSelected: _selectedIndex == _idxRommRescrape,
+                icon: Symbols.cloud_download_rounded,
+                label: AppLocale.rescrapeFromRomm.getString(context),
+                subtitle: _isRommScraping
+                    ? '${AppLocale.scraping.getString(context)}…'
+                    : (blocker ?? AppLocale.rescrape).getString(context),
+                onTap: () {
+                  SfxService().playNavSound();
+                  setState(() => _selectedIndex = _idxRommRescrape);
+                  _rescrapeFromRomm();
+                },
+              );
             },
           ),
 

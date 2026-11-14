@@ -850,6 +850,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.gameInfo: 'Info Game',
   AppLocale.manage: 'Kelola',
   AppLocale.forceRescrape: 'Paksa Rescrape',
+  AppLocale.rescrapeFromRomm: 'Rescrape dari RomM',
   AppLocale.scrapingData: 'Data Scraping',
   AppLocale.scrapingMedia: 'Media Scraping',
   AppLocale.gameTitle: 'Judul',

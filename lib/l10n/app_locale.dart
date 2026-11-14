@@ -812,6 +812,7 @@ mixin AppLocale {
   static const String gameInfo = 'game_info';
   static const String manage = 'manage';
   static const String forceRescrape = 'force_rescrape';
+  static const String rescrapeFromRomm = 'rescrape_from_romm';
   static const String gameTitle = 'game_title';
   static const String publisher = 'publisher';
   static const String genre = 'genre';
