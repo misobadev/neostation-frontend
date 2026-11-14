@@ -1203,6 +1203,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.folderNotEmptyBody: 'Эта папка не пуста (элементов: {count}). NeoStation будет хранить свои данные здесь, рядом с существующим содержимым.',
   AppLocale.folderNotEmptyUseAnyway: 'Всё равно использовать',
   AppLocale.userDataFolderNotWritable: "Не удаётся записать в эту папку. Выберите другую или оставьте расположение по умолчанию.",
+  AppLocale.userDataFolderCantWrite:
+      'Не удаётся записать в эту папку. Выберите другую.',
   AppLocale.userDataFolderGrantAllFiles: "Чтобы использовать эту папку, разрешите NeoStation доступ ко всем файлам в настройках Android → Приложения → Специальный доступ → Доступ ко всем файлам, затем выберите её снова.",
   AppLocale.moveUserDataTitle: 'Переместить данные пользователя?',
   AppLocale.moveUserDataBody: 'NeoStation переместит свои данные (базу данных, загруженные медиа и настройки) из текущей папки в новую. Файлы, созданные не NeoStation, останутся нетронутыми.',
