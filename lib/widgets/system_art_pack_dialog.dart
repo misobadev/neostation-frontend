@@ -15,6 +15,7 @@ import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/system_art_pack_tile.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:neostation/utils/user_data_move_guard.dart';
 
 /// Full detail of a system art pack: artwork, description and the gamepad
 /// actions to apply it (A) or open the author's support page (X).
@@ -77,6 +78,9 @@ class _SystemArtPackDialogState extends State<SystemArtPackDialog> {
   }
 
   Future<void> _apply() async {
+    // Refused during a user-data move: the pack would stay in the old folder.
+    if (refuseWhileUserDataMoves()) return;
+
     if (_applying) return;
     final neoAssets = context.read<NeoAssetsProvider>();
 

@@ -54,6 +54,7 @@ import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/services/secondary_achievements_controller.dart';
 
 import 'system_list_builder.dart';
+import '../../../utils/user_data_move_guard.dart';
 
 part 'my_systems_grid/gamepad_grid_nav.dart';
 part 'my_systems_grid/theme_background.dart';
@@ -389,6 +390,13 @@ class MySystems extends StatelessWidget {
             type: NotificationType.error,
           );
         }
+        MySystems.isNavigating = false;
+        return;
+      }
+
+      // Refused during a user-data move: a zipped game unpacks into the user
+      // data's temp folder, which the move is copying.
+      if (refuseWhileUserDataMoves()) {
         MySystems.isNavigating = false;
         return;
       }

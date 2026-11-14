@@ -309,6 +309,19 @@ class RommProvider extends ChangeNotifier {
   RommService get service => _service;
   RommDownload? downloadFor(int romId) => _downloads[romId];
 
+  /// Arms the scan that follows a finished download, as a download would.
+  @visibleForTesting
+  void debugScheduleSettle() => _scheduleSettle();
+
+  /// A ROM is downloading, or downloaded ROMs are waiting for (or in) the
+  /// scan that adds them to the library: either writes the library soon.
+  bool get hasDownloadsUnderway =>
+      _downloads.values.any(
+        (download) => download.status == RommDownloadStatus.downloading,
+      ) ||
+      (_settleTimer?.isActive ?? false) ||
+      _settling;
+
   /// Ids transferring right now — at most one per worker, however many ROMs
   /// have been downloaded this session.
   ///
@@ -361,6 +374,13 @@ class RommProvider extends ChangeNotifier {
   Future<void> _runSettle() async {
     final handler = onDownloadsSettled;
     if (handler == null) return;
+    // The scan that adds the downloads refuses while the user data moves:
+    // keep them queued for after the move rather than dropping them.
+    if (UserDataLocationService.isMoving) {
+      _settleTimer?.cancel();
+      _settleTimer = Timer(_settleDebounce, _runSettle);
+      return;
+    }
     // Serialize: if a settle is already scanning, wait for it to finish so a
     // long batch never overlaps scans — completions accumulate and get picked
     // up by the next run. Re-arm on the plain debounce rather than through

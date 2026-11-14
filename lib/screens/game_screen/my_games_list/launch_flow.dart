@@ -188,6 +188,10 @@ extension _LaunchFlow on _SystemGamesListState {
       return;
     }
 
+    // Refused during a user-data move: a zipped game unpacks into the user
+    // data's temp folder, which the move is copying.
+    if (refuseWhileUserDataMoves()) return;
+
     rebuild(() => _isGameLaunching = true);
 
     // Resolve targeted hardware system for the launch.
