@@ -125,6 +125,10 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.startupStorageUnavailable: 'NeoStation tidak dapat mengakses folder tempat data Anda disimpan. Pastikan kartu SD atau drive terpasang.',
   AppLocale.startupStorageRetry: 'Coba lagi',
   AppLocale.startupStorageUseDefault: 'Lanjutkan tanpa itu',
+  AppLocale.startupStorageFolderMissing: 'NeoStation tidak menemukan folder tempat data Anda disimpan. Folder itu mungkin telah dipindahkan, diganti namanya, atau dihapus, atau drive tempatnya berada tidak terpasang.',
+  AppLocale.startupStorageStartEmpty: 'Mulai dengan folder kosong',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation tidak dapat membuat folder di sana.',
   AppLocale.startupLoading:
       'Menyiapkan NeoStation. Menunggu penyimpanan dan layanan...',
 

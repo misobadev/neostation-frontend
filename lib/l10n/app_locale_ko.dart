@@ -123,6 +123,9 @@ const Map<String, dynamic> appLocaleKo = {
       'NeoStation이 데이터가 저장된 폴더에 접근하지 못했습니다. SD 카드나 드라이브가 연결되어 있는지 확인하세요.',
   AppLocale.startupStorageRetry: '다시 시도',
   AppLocale.startupStorageUseDefault: '이대로 계속',
+  AppLocale.startupStorageFolderMissing: 'NeoStation이 데이터가 저장된 폴더를 찾지 못했습니다. 이동되었거나 이름이 바뀌었거나 삭제되었을 수 있으며, 폴더가 있는 드라이브가 연결되어 있지 않을 수도 있습니다.',
+  AppLocale.startupStorageStartEmpty: '빈 폴더로 시작',
+  AppLocale.startupStorageCreateFailed: 'NeoStation이 그 위치에 폴더를 만들지 못했습니다.',
   AppLocale.startupLoading: 'NeoStation을 준비 중입니다. 저장소와 서비스를 기다리고 있습니다…',
 
   AppLocale.play: '플레이',

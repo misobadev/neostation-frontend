@@ -101,6 +101,11 @@ mixin AppLocale {
   static const String startupStorageUnavailable = 'startup_storage_unavailable';
   static const String startupStorageRetry = 'startup_storage_retry';
   static const String startupStorageUseDefault = 'startup_storage_use_default';
+  static const String startupStorageFolderMissing =
+      'startup_storage_folder_missing';
+  static const String startupStorageStartEmpty = 'startup_storage_start_empty';
+  static const String startupStorageCreateFailed =
+      'startup_storage_create_failed';
 
   // ---------------------------------------------------------------------------
   // Game / Playback

@@ -122,6 +122,10 @@ const Map<String, dynamic> appLocaleZhHant = {
       'NeoStation 無法存取儲存資料的資料夾。請確認 SD 卡或儲存裝置已連接。',
   AppLocale.startupStorageRetry: '重試',
   AppLocale.startupStorageUseDefault: '繼續（不使用）',
+  AppLocale.startupStorageFolderMissing:
+      'NeoStation 找不到儲存資料的資料夾。它可能已被移動、重新命名或刪除，或者它所在的儲存裝置未連接。',
+  AppLocale.startupStorageStartEmpty: '使用空資料夾開始',
+  AppLocale.startupStorageCreateFailed: 'NeoStation 無法在該位置建立資料夾。',
   AppLocale.startupLoading: '正在準備 NeoStation，等待儲存空間與服務就緒…',
 
   AppLocale.play: '開始遊戲',

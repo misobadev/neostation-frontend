@@ -124,6 +124,10 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.startupStorageUnavailable: 'NeoStation не удалось получить доступ к папке с вашими данными. Убедитесь, что SD-карта или накопитель подключены.',
   AppLocale.startupStorageRetry: 'Повторить',
   AppLocale.startupStorageUseDefault: 'Продолжить без неё',
+  AppLocale.startupStorageFolderMissing: 'NeoStation не удалось найти папку с вашими данными. Возможно, её переместили, переименовали или удалили, или накопитель, на котором она находится, не подключён.',
+  AppLocale.startupStorageStartEmpty: 'Начать с пустой папки',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation не удалось создать там папку.',
   AppLocale.startupLoading:
       'Подготовка NeoStation. Ожидание хранилища и служб...',
 

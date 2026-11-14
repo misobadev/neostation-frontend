@@ -127,6 +127,10 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.startupStorageUnavailable: 'NeoStation n\'a pas pu accéder au dossier où vos données sont enregistrées. Vérifiez que la carte SD ou le lecteur est connecté.',
   AppLocale.startupStorageRetry: 'Réessayer',
   AppLocale.startupStorageUseDefault: 'Continuer sans',
+  AppLocale.startupStorageFolderMissing: 'NeoStation n\'a pas trouvé le dossier où vos données sont enregistrées. Il a peut-être été déplacé, renommé ou supprimé, ou le lecteur où il se trouve n\'est pas connecté.',
+  AppLocale.startupStorageStartEmpty: 'Commencer avec un dossier vide',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation n\'a pas pu créer le dossier à cet endroit.',
   AppLocale.startupLoading:
       'Préparation de NeoStation. En attente du stockage et des services…',
 

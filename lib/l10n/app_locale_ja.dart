@@ -121,6 +121,9 @@ const Map<String, dynamic> appLocaleJa = {
       'NeoStation はデータの保存先フォルダーにアクセスできませんでした。SD カードまたはドライブが接続されているか確認してください。',
   AppLocale.startupStorageRetry: '再試行',
   AppLocale.startupStorageUseDefault: 'このまま続行',
+  AppLocale.startupStorageFolderMissing: 'NeoStation はデータの保存先フォルダーを見つけられませんでした。移動、名前の変更、削除のいずれかが行われたか、フォルダーのあるドライブが接続されていない可能性があります。',
+  AppLocale.startupStorageStartEmpty: '空のフォルダーで始める',
+  AppLocale.startupStorageCreateFailed: 'NeoStation はそこにフォルダーを作成できませんでした。',
   AppLocale.startupLoading: 'NeoStation を準備中です。ストレージとサービスを待機しています…',
 
   AppLocale.play: 'プレイ',

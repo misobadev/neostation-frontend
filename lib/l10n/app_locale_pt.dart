@@ -128,6 +128,10 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.startupStorageUnavailable: 'O NeoStation não conseguiu acessar a pasta onde seus dados estão guardados. Verifique se o cartão SD ou a unidade está conectado.',
   AppLocale.startupStorageRetry: 'Tentar novamente',
   AppLocale.startupStorageUseDefault: 'Continuar sem ela',
+  AppLocale.startupStorageFolderMissing: 'O NeoStation não encontrou a pasta onde seus dados estão guardados. Ela pode ter sido movida, renomeada ou excluída, ou a unidade onde ela está pode não estar conectada.',
+  AppLocale.startupStorageStartEmpty: 'Começar com uma pasta vazia',
+  AppLocale.startupStorageCreateFailed:
+      'O NeoStation não conseguiu criar a pasta ali.',
   AppLocale.startupLoading: 'Preparando o NeoStation. A aguardar pelo armazenamento e pelos serviços...',
 
   AppLocale.play: 'Jogar',

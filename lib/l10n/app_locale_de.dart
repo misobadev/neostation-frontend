@@ -126,6 +126,10 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.startupStorageUnavailable: 'NeoStation konnte den Ordner mit deinen Daten nicht erreichen. Prüfe, ob die SD-Karte oder das Laufwerk angeschlossen ist.',
   AppLocale.startupStorageRetry: 'Erneut versuchen',
   AppLocale.startupStorageUseDefault: 'Ohne fortfahren',
+  AppLocale.startupStorageFolderMissing: 'NeoStation hat den Ordner mit deinen Daten nicht gefunden. Er wurde vielleicht verschoben, umbenannt oder gelöscht, oder das Laufwerk, auf dem er liegt, ist nicht angeschlossen.',
+  AppLocale.startupStorageStartEmpty: 'Mit leerem Ordner beginnen',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation konnte den Ordner dort nicht erstellen.',
   AppLocale.startupLoading:
       'NeoStation wird vorbereitet. Warte auf Speicher und Dienste…',
 
