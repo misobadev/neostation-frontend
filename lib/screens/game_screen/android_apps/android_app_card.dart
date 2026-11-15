@@ -21,12 +21,20 @@ class AndroidAppCard extends StatefulWidget {
     super.key,
     required this.app,
     required this.isSelected,
+    this.isGame = false,
     required this.onTap,
+    this.onLongPress,
   });
 
   final GameModel app;
   final bool isSelected;
+
+  /// Marked as a game during this visit; shown with a badge.
+  final bool isGame;
   final VoidCallback onTap;
+
+  /// Touch route to the Y action (mark or unmark as a game).
+  final VoidCallback? onLongPress;
 
   @override
   State<AndroidAppCard> createState() => _AndroidAppCardState();
@@ -133,6 +141,7 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
                   }
                   widget.onTap();
                 },
+                onLongPress: widget.onLongPress,
                 canRequestFocus: false,
                 focusColor: Colors.transparent,
                 hoverColor: Colors.transparent,
@@ -176,6 +185,14 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
                                           iconSize: iconSize,
                                         ),
                                       ),
+                                      // Marks an app filed under Android
+                                      // Games during this visit.
+                                      if (widget.isGame)
+                                        Positioned(
+                                          top: 6.r,
+                                          right: 6.r,
+                                          child: _buildGameBadge(scheme),
+                                        ),
                                     ],
                                   );
                                 },
@@ -218,6 +235,21 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildGameBadge(ColorScheme scheme) {
+    return Container(
+      padding: EdgeInsets.all(3.r),
+      decoration: BoxDecoration(
+        color: scheme.secondary,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Symbols.sports_esports_rounded,
+        size: 12.r,
+        color: scheme.onSecondary,
       ),
     );
   }

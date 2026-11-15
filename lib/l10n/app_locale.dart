@@ -233,10 +233,6 @@ mixin AppLocale {
   static const String androidSystemSettingsSubtitle =
       'android_system_settings_subtitle';
   static const String androidApps = 'android_apps';
-  static const String androidAppLayout = 'android_app_layout';
-  static const String androidAppLayoutSubtitle = 'android_app_layout_subtitle';
-  static const String androidAppLayoutSystem = 'android_app_layout_system';
-  static const String androidAppLayoutTab = 'android_app_layout_tab';
   static const String scanOnStartup = 'scan_on_startup';
   static const String scanOnStartupSubtitle = 'scan_on_startup_subtitle';
   static const String performanceMode = 'performance_mode';
@@ -1021,6 +1017,8 @@ mixin AppLocale {
   static const String hintSelect = 'hint_select';
   static const String hintSettings = 'hint_settings';
   static const String hintBack = 'hint_back';
+  static const String androidGameHint = 'androidGameHint';
+  static const String androidGameMarkApp = 'androidGameMarkApp';
   static const String hintPlay = 'hint_play';
   static const String hintFavorite = 'hint_favorite';
   static const String hintRandom = 'hint_random';
