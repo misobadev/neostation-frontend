@@ -5,8 +5,22 @@ import 'package:archive/archive_io.dart';
 import 'package:flutter_7zip/flutter_7zip.dart' as f7z;
 import 'package:path/path.dart' as p;
 
+import '../utils/log_redaction.dart';
 import '../utils/safe_path.dart';
 import 'logger_service.dart';
+import 'storage_space_service.dart';
+
+/// An archive refused for safety, not because it is damaged: unsafe or
+/// duplicate entry paths, links, too many entries, more data than the disk
+/// can hold, or a file that belongs to another game. Unlike a damaged
+/// download it is deleted rather than kept for extracting by hand.
+class RommUnsafeArchiveException implements Exception {
+  final String message;
+  const RommUnsafeArchiveException(this.message);
+
+  @override
+  String toString() => 'RommUnsafeArchiveException: $message';
+}
 
 /// Installs downloaded ZIP/7z game archives while retaining companion files.
 ///
@@ -83,17 +97,33 @@ class RommArchiveService {
     bool scummVm = false,
     bool reuseExistingDirectory = false,
     String? playlistName,
+    String? replaceRoot,
+    Set<String> replaceable = const {},
   }) async {
     final ext = p.extension(archivePath).toLowerCase();
     if (scummVm) {
       return prepareScummVmDownload(
         archivePath,
         systemDir,
-        reuseExistingDirectory: reuseExistingDirectory,
+        replaceRoot: replaceRoot,
       );
     }
     final folderName = gameFolderName(gameName);
     if (!isSafeFileName(folderName)) return null;
+    // The game folder itself is never followed through a link: one the user
+    // keeps there (to another drive, say) is not the server's to write into.
+    if (!reuseExistingDirectory &&
+        await FileSystemEntity.type(
+              p.join(systemDir, folderName),
+              followLinks: false,
+            ) ==
+            FileSystemEntityType.link) {
+      LoggerService.instance.w(
+        'RomM: refusing to install into a linked folder '
+        '${oneLine(p.join(systemDir, folderName))}',
+      );
+      return null;
+    }
     final exts = extensions
         .map((ext) => ext.toLowerCase().replaceFirst(RegExp(r'^\.'), ''))
         .toSet();
@@ -112,6 +142,10 @@ class RommArchiveService {
       singleFileDir: systemDir,
       forceExtract: forceExtract,
       gameName: folderName,
+      // A re-download may replace its own bundle folder; anything else only
+      // the files recorded for this ROM.
+      replaceRoot: replaceRoot,
+      replaceable: replaceable,
       playlistBaseName:
           playlistName != null && p.extension(playlistName) == '.m3u'
           ? p.basenameWithoutExtension(playlistName)
@@ -122,34 +156,50 @@ class RommArchiveService {
   static Future<String?> prepareScummVmDownload(
     String downloadPath,
     String destDir, {
-    bool reuseExistingDirectory = false,
+    String? replaceRoot,
   }) async {
     final ext = p.extension(downloadPath).toLowerCase();
     if ({'.zip', '.7z', '.rar'}.contains(ext)) {
-      // A known target folder must not become target/target on re-download.
       final result = await prepareDownload(
         downloadPath,
-        reuseExistingDirectory ? p.dirname(destDir) : destDir,
+        destDir,
         {'scummvm'},
         scummVm: true,
+        replaceRoot: replaceRoot,
       );
-      if (result != null) return result;
-    } else if (ext == '.scummvm') {
+      // ScummVM never scans an archive, so keeping one "as-is" would report
+      // a download that can't be played as a success (the bug #635 fixed).
+      return result;
+    }
+    if (ext == '.scummvm') {
       final id = (await File(
         downloadPath,
       ).readAsString()).replaceFirst(RegExp(r'^\uFEFF'), '').trim();
       if (RegExp(r'^[A-Za-z0-9_][A-Za-z0-9_-]*$').hasMatch(id)) {
-        final root = reuseExistingDirectory ? p.dirname(destDir) : destDir;
+        final root = destDir;
         final target = p.join(root, id, p.basename(downloadPath));
         await _checkTarget(root, target, downloadPath);
+        if (await File(target).exists() &&
+            !_mayReplace(target, replaceRoot, const {})) {
+          LoggerService.instance.w(
+            'RomM: refusing to replace another game\'s ${oneLine(target)}',
+          );
+          return null;
+        }
         await File(target).parent.create(recursive: true);
         await File(downloadPath).rename(target);
         return p.basename(target);
       }
     }
-    // Descriptor-less ScummVM downloads historically remain usable as-is.
+    // A single file the system scans directly (`.scummvm`, `.dpt`) stays
+    // usable as it is; anything else would be a game ScummVM can't see.
+    if (!{'.scummvm', '.dpt'}.contains(ext)) return null;
     final target = p.join(destDir, p.basename(downloadPath));
     if (!p.equals(target, downloadPath)) {
+      if (await File(target).exists() &&
+          !_mayReplace(target, replaceRoot, const {})) {
+        return null;
+      }
       await File(downloadPath).rename(target);
     }
     return p.basename(downloadPath);
@@ -169,6 +219,8 @@ class RommArchiveService {
     bool forceExtract = false,
     String? gameName,
     String? playlistBaseName,
+    String? replaceRoot,
+    Set<String> replaceable = const {},
   }) async {
     final exts = extensions
         .map((ext) => ext.toLowerCase().replaceFirst(RegExp(r'^\.'), ''))
@@ -179,10 +231,16 @@ class RommArchiveService {
     }
     if (!_Reader.formats.contains(format)) {
       LoggerService.instance.w(
-        'RomM: cannot extract .$format downloads; kept $archivePath',
+        'RomM: cannot extract .$format downloads; kept ${oneLine(archivePath)}',
       );
       return null;
     }
+    // Measured here: the platform channel behind it only works on the main
+    // isolate. Unknown free space (null) applies no limit, like everywhere
+    // else in the app.
+    final freeBytes = await StorageSpaceService.freeSpaceBytes(
+      p.dirname(archivePath),
+    );
     try {
       // Decoding large/solid archives must not block gamepad input or progress UI.
       return await Isolate.run(
@@ -194,11 +252,27 @@ class RommArchiveService {
           singleFileDir,
           gameName,
           playlistBaseName,
+          freeBytes,
+          replaceRoot,
+          replaceable,
         ),
       );
+    } on RommUnsafeArchiveException catch (e) {
+      // Kept, it would sit in the library "to extract by hand", which is the
+      // one thing nobody should do with it.
+      LoggerService.instance.w(
+        'RomM: refused ${oneLine(p.basename(archivePath))}: ${e.message}; '
+        'the download was deleted',
+      );
+      try {
+        await File(archivePath).delete();
+      } catch (_) {
+        // The caller's download folder is removed anyway.
+      }
+      return null;
     } catch (e, st) {
       LoggerService.instance.e(
-        'RomM archive extraction failed for $archivePath',
+        'RomM archive extraction failed for ${oneLine(archivePath)}',
         error: e,
         stackTrace: st,
       );
@@ -214,6 +288,9 @@ class RommArchiveService {
     String? singleFileDir,
     String? gameName,
     String? playlistBaseName,
+    int? freeBytes,
+    String? replaceRoot,
+    Set<String> replaceable,
   ) async {
     final archive = _Reader.open(archivePath);
     Directory? staging;
@@ -221,17 +298,35 @@ class RommArchiveService {
     try {
       // Check the raw entry list: a later duplicate would overwrite an
       // earlier file, and a link entry could point outside the game folder.
+      final entries = archive.entries;
+      if (entries.length > maxEntries) {
+        throw const RommUnsafeArchiveException('too many entries');
+      }
       final seen = <String>{};
       final files = <_Entry>[];
-      for (final (index, raw) in archive.entries.indexed) {
+      var declaredBytes = 0;
+      for (final (index, raw) in entries.indexed) {
         final path = _normalizeEntryPath(raw.name);
         if (raw.isLink ||
             path == null ||
             safeJoin(destDir, path) == null ||
             !seen.add(path.toLowerCase())) {
-          throw const FormatException('Unsafe or duplicate archive entry');
+          throw const RommUnsafeArchiveException(
+            'unsafe or duplicate archive entry',
+          );
         }
-        if (!raw.isDirectory) files.add(_Entry(path, index));
+        if (!raw.isDirectory) {
+          files.add(_Entry(path, index));
+          declaredBytes += raw.size;
+        }
+      }
+      // Checked before anything is decoded: an archive whose contents can't
+      // fit on the disk would only fill it. The archive itself is removed
+      // after the install, so free space is what the contents can use.
+      if (freeBytes != null && declaredBytes > freeBytes) {
+        throw const RommUnsafeArchiveException(
+          'its contents are larger than the free space',
+        );
       }
       final playable = files.where((entry) {
         final ext = _ext(entry.path);
@@ -365,7 +460,14 @@ class RommArchiveService {
         await File(stagedPlaylist).writeAsString(playlist!, flush: true);
         stagedOutputs[playlistPath] = stagedPlaylist;
       }
-      await _install(stagedOutputs, staging.path, destDir, archivePath);
+      await _install(
+        stagedOutputs,
+        staging.path,
+        destDir,
+        archivePath,
+        replaceRoot: replaceRoot,
+        replaceable: replaceable,
+      );
       return indexedName;
     } finally {
       if (!closed) archive.close();
@@ -528,8 +630,21 @@ class RommArchiveService {
     Map<String, String> outputs,
     String staging,
     String root,
-    String archivePath,
-  ) async {
+    String archivePath, {
+    String? replaceRoot,
+    Set<String> replaceable = const {},
+  }) async {
+    // Checked for every file before anything moves: a server-chosen name must
+    // not replace another game's files, whose backups would only live in
+    // staging and be deleted with it.
+    for (final target in outputs.keys) {
+      if (await File(target).exists() &&
+          !_mayReplace(target, replaceRoot, replaceable)) {
+        throw const RommUnsafeArchiveException(
+          'it would replace a file that belongs to another game',
+        );
+      }
+    }
     final backups = <String, String>{};
     final installed = <String>[];
     final createdDirs = <String>[];
@@ -556,20 +671,64 @@ class RommArchiveService {
         await File(output.value).rename(output.key);
         installed.add(output.key);
       }
-      await File(archivePath).delete();
     } catch (_) {
+      // Each step is attempted on its own: one file that can't be put back
+      // must not stop the rest of the backups being restored before the
+      // caller deletes staging (and the backups inside it).
+      Future<void> attempt(Future<void> Function() step) async {
+        try {
+          await step();
+        } catch (e) {
+          LoggerService.instance.w('RomM: install rollback step failed: $e');
+        }
+      }
+
       for (final path in installed.reversed) {
-        await File(path).delete();
+        await attempt(() => File(path).delete());
       }
       for (final backup in backups.entries) {
-        await File(backup.value).rename(backup.key);
+        try {
+          await File(backup.value).rename(backup.key);
+        } catch (e) {
+          // Staging is about to be deleted, so park the original beside its
+          // old place rather than lose it.
+          LoggerService.instance.w('RomM: could not restore a backup: $e');
+          await attempt(
+            () => File(backup.value).rename('${backup.key}.romm-backup'),
+          );
+        }
       }
       for (final path in createdDirs.reversed) {
-        await Directory(path).delete();
+        await attempt(() => Directory(path).delete());
       }
       rethrow;
     }
+    // The game is installed. Removing the archive is cleanup: a locked file
+    // (Windows antivirus, say) must not roll back a complete install. The
+    // caller's download folder sweep retries it.
+    try {
+      await File(archivePath).delete();
+    } catch (e) {
+      LoggerService.instance.w(
+        'RomM: could not remove the installed archive: $e',
+      );
+    }
   }
+
+  /// Most entries an archive may hold. Real games, even ScummVM ones with
+  /// every data file loose, stay far below this; a bomb of tiny files does not.
+  static const maxEntries = 20000;
+
+  /// Whether an existing file at [target] may be replaced: anything inside
+  /// [replaceRoot] (this ROM's own bundle folder, on a re-download), or a
+  /// path in [replaceable] (the files recorded for this ROM).
+  static bool _mayReplace(
+    String target,
+    String? replaceRoot,
+    Set<String> replaceable,
+  ) =>
+      (replaceRoot != null && p.isWithin(replaceRoot, target)) ||
+      replaceable.any((path) => p.equals(path, target));
 
   static Future<void> _checkTarget(
     String root,
@@ -618,7 +777,7 @@ class _Entry {
 abstract class _Reader {
   static const formats = {'zip', '7z'};
 
-  List<({String name, bool isDirectory, bool isLink})> get entries;
+  List<({String name, bool isDirectory, bool isLink, int size})> get entries;
 
   /// Writes entry [index] to [outputPath], failing on a checksum mismatch.
   Future<void> extract(int index, String outputPath);
@@ -659,14 +818,16 @@ class _ZipReader implements _Reader {
   }
 
   @override
-  List<({String name, bool isDirectory, bool isLink})> get entries => [
-    for (final file in _files)
-      (
-        name: file.name,
-        isDirectory: !file.isFile && !file.isSymbolicLink,
-        isLink: file.isSymbolicLink,
-      ),
-  ];
+  List<({String name, bool isDirectory, bool isLink, int size})> get entries =>
+      [
+        for (final file in _files)
+          (
+            name: file.name,
+            isDirectory: !file.isFile && !file.isSymbolicLink,
+            isLink: file.isSymbolicLink,
+            size: file.size,
+          ),
+      ];
 
   @override
   Future<void> extract(int index, String outputPath) async {
@@ -687,7 +848,7 @@ class _ZipReader implements _Reader {
       crc = getCrc32(chunk, crc);
     }
     if (crc != (file.crc32 ?? crc) || crc != _centralCrcs[index]) {
-      throw FormatException('CRC mismatch for ${file.name}');
+      throw FormatException('CRC mismatch for ${oneLine(file.name)}');
     }
   }
 
@@ -704,13 +865,19 @@ class _SevenZipReader implements _Reader {
   _SevenZipReader(String path) : _archive = f7z.SZArchive.open(path);
 
   @override
-  List<({String name, bool isDirectory, bool isLink})> get entries => [
-    for (var i = 0; i < _archive.numFiles; i++)
-      (() {
-        final file = _archive.getFile(i);
-        return (name: file.name, isDirectory: file.isDirectory, isLink: false);
-      })(),
-  ];
+  List<({String name, bool isDirectory, bool isLink, int size})> get entries =>
+      [
+        for (var i = 0; i < _archive.numFiles; i++)
+          (() {
+            final file = _archive.getFile(i);
+            return (
+              name: file.name,
+              isDirectory: file.isDirectory,
+              isLink: false,
+              size: file.size,
+            );
+          })(),
+      ];
 
   @override
   Future<void> extract(int index, String outputPath) async =>

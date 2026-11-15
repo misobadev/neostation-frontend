@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
@@ -98,6 +99,11 @@ void main() {
           isMultiFile: true,
           reuseExistingDirectory: true,
           playlistName: 'Old.m3u',
+          // The provider passes the recorded playlist and the discs it lists.
+          replaceable: {
+            for (final name in ['Old.m3u', 'Disc 1.chd', 'Disc 2.chd'])
+              p.join(dir.path, name),
+          },
         ),
         'Old.m3u',
       );
@@ -106,6 +112,67 @@ void main() {
       expect(File(p.join(dir.path, 'Disc 1.chd')).readAsBytesSync(), [1]);
     },
   );
+
+  test(
+    "an install into the system folder never replaces another game's file",
+    () async {
+      // A server-chosen name that collides with a file this ROM never
+      // recorded: the other game's file must survive, and the archive is
+      // deleted rather than kept for extracting by hand.
+      final other = File(p.join(dir.path, 'Disc 1.chd'))..writeAsBytesSync([9]);
+      final path = zip({
+        'Disc 1.chd': [1],
+        'Disc 2.chd': [2],
+      });
+      expect(
+        await RommArchiveService.prepareGameDownload(
+          path,
+          dir.path,
+          'Game',
+          {'m3u', 'chd'},
+          isMultiFile: true,
+          reuseExistingDirectory: true,
+          playlistName: 'Old.m3u',
+        ),
+        isNull,
+      );
+      expect(other.readAsBytesSync(), [9]);
+      expect(File(p.join(dir.path, 'Disc 2.chd')).existsSync(), isFalse);
+      expect(File(path).existsSync(), isFalse);
+    },
+  );
+
+  test('an archive with too many entries is refused and deleted', () async {
+    final path = zip({
+      for (var i = 0; i <= RommArchiveService.maxEntries; i++) 'f$i.iso': [],
+    });
+    expect(
+      await RommArchiveService.prepareDownload(path, dir.path, {'iso'}),
+      isNull,
+    );
+    expect(File(path).existsSync(), isFalse);
+    expect(File(p.join(dir.path, 'f0.iso')).existsSync(), isFalse);
+  });
+
+  test('a game folder that is a link is not installed into', () async {
+    final elsewhere = await Directory(p.join(dir.path, 'elsewhere')).create();
+    final systemDir = await Directory(p.join(dir.path, 'psx')).create();
+    Link(p.join(systemDir.path, 'Game')).createSync(elsewhere.path);
+    final path = zip({
+      'Game/Disc 1.chd': [1],
+      'Game/Disc 2.chd': [2],
+    });
+    expect(
+      await RommArchiveService.prepareGameDownload(
+        path,
+        systemDir.path,
+        'Game',
+        {'m3u', 'chd'},
+      ),
+      isNull,
+    );
+    expect(elsewhere.listSync(), isEmpty);
+  });
 
   test(
     're-download into a bundle does not nest the game folder twice',
@@ -345,7 +412,12 @@ void main() {
         'blocked/data.bin': [3],
       });
       expect(
-        await RommArchiveService.prepareDownload(path, dir.path, {'iso'}),
+        await RommArchiveService.prepareDownload(
+          path,
+          dir.path,
+          {'iso'},
+          replaceable: {existing.path},
+        ),
         isNull,
       );
       expect(existing.readAsBytesSync(), [9]);
@@ -356,7 +428,7 @@ void main() {
   );
 
   test(
-    'ScummVM descriptor-less ZIP keeps the previous fallback behavior',
+    'ScummVM descriptor-less ZIP fails, since ScummVM never scans a zip',
     () async {
       final path = zip({
         'LOOM.000': [1],
@@ -365,12 +437,27 @@ void main() {
         await RommArchiveService.prepareGameDownload(path, dir.path, 'Game', {
           'scummvm',
         }, scummVm: true),
-        'Game.zip',
+        isNull,
       );
+      // Damaged or incomplete, not unsafe: the caller keeps it.
       expect(File(path).existsSync(), isTrue);
       expect(File(p.join(dir.path, 'LOOM.000')).existsSync(), isFalse);
     },
   );
+
+  for (final ext in ['scummvm', 'dpt']) {
+    test('a single .$ext ScummVM file is still kept as it is', () async {
+      final path = p.join(dir.path, 'dl', 'Game.$ext');
+      File(path)
+        ..createSync(recursive: true)
+        ..writeAsStringSync('not an id!');
+      expect(
+        await RommArchiveService.prepareScummVmDownload(path, dir.path),
+        'Game.$ext',
+      );
+      expect(File(p.join(dir.path, 'Game.$ext')).existsSync(), isTrue);
+    });
+  }
   group('provider download lifecycle', () {
     final helper = DatabaseTestHelper();
     late _DiscProvider provider;
@@ -383,9 +470,13 @@ void main() {
     setUp(() async {
       final db = await helper.setUp();
       await db.execute(SqliteMigrations.createAppRommRomMapTableSql);
-      for (final ext in ['m3u', 'chd']) {
+      for (final (system, ext) in [
+        ('psx', 'm3u'),
+        ('psx', 'chd'),
+        ('scummvm', 'scummvm'),
+      ]) {
         await db.execute('INSERT INTO app_system_extensions VALUES (?, ?)', [
-          'psx',
+          system,
           ext,
         ]);
       }
@@ -432,11 +523,11 @@ void main() {
           expect(File(p.join(systemDir.path, 'Old.chd')).readAsBytesSync(), [
             9,
           ]);
-          // The download is kept beside the library rather than thrown away,
-          // retries do not pile up copies, and no staging folder is left.
+          // An archive refused as unsafe is deleted rather than kept for
+          // extracting by hand, and no staging folder is left.
           expect(
             systemDir.listSync().map((entry) => p.basename(entry.path)).toSet(),
-            {'Game.m3u', 'Old.chd', 'Game.zip'},
+            {'Game.m3u', 'Old.chd'},
           );
         }
       },
@@ -452,6 +543,14 @@ void main() {
         File(p.join(systemDir.path, '.romm_download_7', 'part'))
           ..createSync(recursive: true)
           ..writeAsBytesSync([8]);
+        // Older builds recorded the raw file as this ROM's download.
+        await RommSaveMapRepository.putMapping(
+          romname: 'Game',
+          systemFolder: 'psx',
+          rommRomId: 42,
+          source: RommLinkSource.download,
+          fsName: 'Game',
+        );
         serve({
           'Game/Disc 1.chd': [1],
           'Game/Disc 2.chd': [2],
@@ -473,17 +572,111 @@ void main() {
     test('a failed install puts a stale raw download back', () async {
       final systemDir = await Directory(p.join(dir.path, 'psx')).create();
       File(p.join(systemDir.path, 'Game')).writeAsBytesSync([9]);
-      serve({
-        'Disc 1.chd': [1],
-        '../escape.chd': [2],
-      });
+      await RommSaveMapRepository.putMapping(
+        romname: 'Game',
+        systemFolder: 'psx',
+        rommRomId: 42,
+        source: RommLinkSource.download,
+        fsName: 'Game',
+      );
+      // A damaged archive (bad central-directory CRCs) fails the install
+      // after the stale file was moved aside.
+      RommService.debugUseHttpClient(
+        MockClient((_) async {
+          final path = zip({
+            'Game/Disc 1.chd': [1],
+            'Game/Disc 2.chd': [2, 3],
+          }, name: 'corrupt.zip');
+          final data = File(path).readAsBytesSync();
+          File(path).deleteSync();
+          for (var i = 0; i < data.length - 20; i++) {
+            if (data[i] == 0x50 &&
+                data[i + 1] == 0x4b &&
+                data[i + 2] == 0x01 &&
+                data[i + 3] == 0x02) {
+              data[i + 16] ^= 0xff;
+            }
+          }
+          return http.Response.bytes(data, 200);
+        }),
+      );
       final result = await provider.downloadRom(rom, romFolders: [dir.path]);
       expect(result.status, RommDownloadStatus.failed);
       expect(File(p.join(systemDir.path, 'Game')).readAsBytesSync(), [9]);
       expect(
         systemDir.listSync().map((entry) => p.basename(entry.path)).toSet(),
         {'Game', 'Game.zip'},
+        reason: 'a damaged (not unsafe) archive is kept beside the library',
       );
+    });
+
+    test("a root file the save map doesn't record is never replaced", () async {
+      // Same name as the ROM, but not this ROM's download (a user's own file,
+      // a save): the bundle can't take its place, and the file survives.
+      final systemDir = await Directory(p.join(dir.path, 'psx')).create();
+      final own = File(p.join(systemDir.path, 'Game'))..writeAsBytesSync([9]);
+      serve({
+        'Game/Disc 1.chd': [1],
+        'Game/Disc 2.chd': [2],
+      });
+      final result = await provider.downloadRom(rom, romFolders: [dir.path]);
+      expect(result.status, RommDownloadStatus.failed);
+      expect(own.readAsBytesSync(), [9]);
+    });
+
+    test(
+      'a failed archive kept in the library is not badged as downloaded',
+      () async {
+        final systemDir = await Directory(p.join(dir.path, 'psx')).create();
+        File(p.join(systemDir.path, 'Game.zip')).writeAsBytesSync([1]);
+        final zipped = RommRom.fromJson({
+          'id': 43,
+          'fs_name': 'Game.zip',
+          'platform_slug': 'psx',
+        });
+        expect(await provider.isDownloaded(zipped, [dir.path]), isFalse);
+        expect(await provider.findLocalCopy(zipped, [dir.path]), isNull);
+      },
+    );
+
+    test(
+      'a second press shares the running download and its outcome',
+      () async {
+        final gate = Completer<void>();
+        final path = zip({
+          'Game/Disc 1.chd': [1],
+          'Game/Disc 2.chd': [2],
+        });
+        final bytes = File(path).readAsBytesSync();
+        File(path).deleteSync();
+        var requests = 0;
+        RommService.debugUseHttpClient(
+          MockClient((_) async {
+            requests++;
+            await gate.future;
+            return http.Response.bytes(bytes, 200);
+          }),
+        );
+        final first = provider.downloadRom(rom, romFolders: [dir.path]);
+        final second = provider.downloadRom(rom, romFolders: [dir.path]);
+        gate.complete();
+        final results = await Future.wait([first, second]);
+        expect(results[0].status, RommDownloadStatus.completed);
+        expect(results[1].status, RommDownloadStatus.completed);
+        expect(requests, 1);
+      },
+    );
+
+    test('a download that cannot set up its folder still finishes', () async {
+      final systemDir = await Directory(p.join(dir.path, 'psx')).create();
+      // A file where the download folder goes makes creating it throw.
+      File(p.join(systemDir.path, '.romm_download_42')).writeAsBytesSync([1]);
+      serve({
+        'Game/Disc 1.chd': [1],
+      });
+      final result = await provider.downloadRom(rom, romFolders: [dir.path]);
+      expect(result.status, RommDownloadStatus.failed);
+      expect(provider.downloadFor(42)?.status, RommDownloadStatus.failed);
     });
 
     test(

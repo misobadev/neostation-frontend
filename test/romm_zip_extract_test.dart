@@ -114,7 +114,8 @@ void main() {
       }, playlistBaseName: 'Game.zip'),
       isNull,
     );
-    expect(File(zip).existsSync(), isTrue);
+    // Refused as unsafe, so it is deleted rather than kept to extract by hand.
+    expect(File(zip).existsSync(), isFalse);
     expect(File(p.join(dir.path, 'Game.iso')).existsSync(), isFalse);
   });
 }

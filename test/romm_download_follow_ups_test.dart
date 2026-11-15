@@ -378,6 +378,12 @@ void main() {
     );
 
     test('a refreshed token whose save failed is saved next time', () async {
+      // The system launches .bin, so the second download recognises the
+      // first one's file as this ROM's and may replace it.
+      await db.execute(
+        "INSERT INTO app_system_extensions (system_id, extension) "
+        "VALUES ('sys-nes', 'bin')",
+      );
       final provider = _TestProvider(_nes);
       addTearDown(provider.dispose);
       provider.service.configure(
@@ -423,33 +429,43 @@ void main() {
       expect(row['access_token'], 'new');
     });
 
-    test('a ScummVM archive with no descriptor is kept, as before', () async {
-      // RommArchiveService keeps a descriptor-less ScummVM download as it
-      // landed rather than failing it.
-      const game = RommRom(
-        id: 42,
-        name: 'Game',
-        platformId: 7,
-        platformSlug: 'scummvm',
-        fsName: 'Game.zip',
-        fsNameNoExt: 'Game',
-        fsExtension: 'zip',
-      );
-      serveBytes(
-        _zip({
-          'Game/data.bin': [1, 2, 3],
-        }),
-      );
-      final romm = provider(_scummvm);
+    test(
+      'a ScummVM archive with no descriptor fails and is not badged',
+      () async {
+        // ScummVM never scans a zip, so completing here would report a game
+        // that can't be played (the bug #635 fixed).
+        const game = RommRom(
+          id: 42,
+          name: 'Game',
+          platformId: 7,
+          platformSlug: 'scummvm',
+          fsName: 'Game.zip',
+          fsNameNoExt: 'Game',
+          fsExtension: 'zip',
+        );
+        serveBytes(
+          _zip({
+            'Game/data.bin': [1, 2, 3],
+          }),
+        );
+        final romm = provider(_scummvm);
 
-      final download = await romm.downloadRom(game, romFolders: [romRoot.path]);
+        final download = await romm.downloadRom(
+          game,
+          romFolders: [romRoot.path],
+        );
 
-      expect(download.status, RommDownloadStatus.completed);
-      expect(
-        File(p.join(romRoot.path, 'scummvm', 'Game.zip')).existsSync(),
-        isTrue,
-      );
-    });
+        expect(download.status, RommDownloadStatus.failed);
+        expect(download.error, RommDownloadError.extraction);
+        expect(romm.downloadedSystems, isEmpty);
+        // Kept for extracting by hand, but not counted as the game.
+        expect(
+          File(p.join(romRoot.path, 'scummvm', 'Game.zip')).existsSync(),
+          isTrue,
+        );
+        expect(await romm.isDownloaded(game, [romRoot.path]), isFalse);
+      },
+    );
 
     test('a single ScummVM file it cannot use is kept, as before', () async {
       // The system scans `.scummvm` files in its root, so one with an id the

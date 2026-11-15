@@ -1352,6 +1352,15 @@ class RommProvider extends ChangeNotifier {
     }.toList();
   }
 
+  /// Lower-cased extensions without their leading dot.
+  static Set<String> _normalizeExtensions(Iterable<String> extensions) =>
+      extensions
+          .map((e) => e.toLowerCase().replaceFirst(RegExp(r'^\.'), ''))
+          .toSet();
+
+  static String _extensionOf(String name) =>
+      p.extension(name).toLowerCase().replaceFirst('.', '');
+
   /// Finds a local copy across system aliases, preferring root files and the
   /// predictable bundle folder before searching older arbitrary layouts.
   Future<RommLocalCopy?> _existingRomFile(
@@ -1373,12 +1382,20 @@ class RommProvider extends ChangeNotifier {
     if (recorded != null && !candidates.contains(recorded)) {
       candidates.add(recorded);
     }
+    // A root file only counts as the game when the system launches its
+    // format. Otherwise a `Game.zip` kept after a failed install showed as
+    // downloaded, got linked, and was skipped by bulk sync forever.
+    final claimed = _normalizeExtensions(
+      await SystemRepository.getExtensionsForSystem(system.id ?? ''),
+    );
+    bool launchable(String name) => claimed.contains(_extensionOf(name));
     for (final folder in romFolders) {
       final base = _folderToRealBase(folder);
       if (base == null) continue;
       for (final name in _systemFolderNames(system)) {
         final dir = p.join(base, name);
         for (final candidate in candidates) {
+          if (!launchable(candidate)) continue;
           final file = File(p.join(dir, candidate));
           if (await file.exists()) {
             return RommLocalCopy(
@@ -1411,7 +1428,10 @@ class RommProvider extends ChangeNotifier {
         // that keeps a moved or deleted download from costing a walk of the
         // whole system folder on every badge probe.
         if (system.folderName == 'scummvm') {
-          final nested = await _findNamedFileRecursively(dir, candidates);
+          final nested = await _findNamedFileRecursively(
+            dir,
+            candidates.where(launchable).toList(),
+          );
           if (nested != null) {
             return RommLocalCopy(
               system: system,
@@ -1422,7 +1442,10 @@ class RommProvider extends ChangeNotifier {
           }
         } else if (recorded != null && isSafeFileName(bundleName)) {
           final bundleDir = p.join(dir, bundleName);
-          final nested = await _findNamedFileRecursively(bundleDir, candidates);
+          final nested = await _findNamedFileRecursively(
+            bundleDir,
+            candidates.where(launchable).toList(),
+          );
           if (nested != null) {
             return RommLocalCopy(
               system: system,
@@ -1431,6 +1454,7 @@ class RommProvider extends ChangeNotifier {
               directory: bundleDir,
               systemDirectory: dir,
               filename: p.basename(nested.path),
+              path: nested.path,
             );
           }
         }
@@ -1520,7 +1544,7 @@ class RommProvider extends ChangeNotifier {
     // a small price next to a wrong row that nothing repairs.
     final cached = _localCopyByRomId[rom.id];
     if (cached != null) {
-      if (await File(p.join(cached.directory, cached.filename)).exists()) {
+      if (await File(cached.path).exists()) {
         return cached;
       }
       _localCopyByRomId.remove(rom.id);
@@ -1732,16 +1756,52 @@ class RommProvider extends ChangeNotifier {
     RommRom rom, {
     required List<String> romFolders,
     FileProvider? fileProvider,
-  }) async {
-    // The download folder is per ROM, so one ROM downloads once at a time.
-    final active = _downloads[rom.id];
-    if (active != null && active.status == RommDownloadStatus.downloading) {
-      return active;
-    }
+  }) {
+    // The download folder is per ROM, so one ROM downloads once at a time. A
+    // second press shares the running download's future, so it resolves with
+    // the real outcome instead of a tracker that still says "downloading"
+    // (which Search showed as failed and bulk sync counted as a failure).
+    final running = _inFlightDownloads[rom.id];
+    if (running != null) return running;
     final tracker = RommDownload(romId: rom.id);
-    final logName = oneLine(rom.fsName);
     _downloads[rom.id] = tracker;
     _notifyDownloadState();
+    final future =
+        _downloadRom(
+          rom,
+          tracker,
+          romFolders: romFolders,
+          fileProvider: fileProvider,
+        ).catchError((Object e, StackTrace st) {
+          // Anything that escaped the steps below (an unwritable ROM folder,
+          // a revoked "All files access") must still end the download, or the
+          // tracker stays "downloading" until the app restarts.
+          _log.e(
+            'RomM: download of rom ${rom.id} (${oneLine(rom.fsName)}) failed',
+            error: e,
+            stackTrace: st,
+          );
+          tracker
+            ..status = RommDownloadStatus.failed
+            ..error = RommDownloadError.noWritableFolder
+            ..errorDetail = oneLine('$e');
+          _notifyDownloadState();
+          return tracker;
+        });
+    _inFlightDownloads[rom.id] = future;
+    return future.whenComplete(() => _inFlightDownloads.remove(rom.id));
+  }
+
+  /// The download each ROM id has running, shared by repeat presses.
+  final Map<int, Future<RommDownload>> _inFlightDownloads = {};
+
+  Future<RommDownload> _downloadRom(
+    RommRom rom,
+    RommDownload tracker, {
+    required List<String> romFolders,
+    FileProvider? fileProvider,
+  }) async {
+    final logName = oneLine(rom.fsName);
 
     final system = await resolveSystem(rom);
     if (system == null) {
@@ -1814,24 +1874,47 @@ class RommProvider extends ChangeNotifier {
         existing != null &&
         !scummVm &&
         (!rootCopy || p.extension(existing.filename).toLowerCase() == '.m3u');
-    // A root file no system extension claims is an unextracted download left
-    // by older builds (an extensionless `switch/Game Name`). It would block
-    // the `switch/Game Name/` folder, so it is replaced rather than reused.
-    final staleRaw =
-        existing != null &&
-            !scummVm &&
-            rootCopy &&
-            !reuseExistingDirectory &&
-            !extensions
-                .map((e) => e.toLowerCase().replaceFirst(RegExp(r'^\.'), ''))
-                .contains(
-                  p
-                      .extension(existing.filename)
-                      .toLowerCase()
-                      .replaceFirst('.', ''),
-                )
-        ? p.join(existing.directory, existing.filename)
+    // A root file no system extension claims can be an unextracted download
+    // left by older builds (an extensionless `switch/Game Name`). It would
+    // block the `switch/Game Name/` folder, so it is replaced rather than
+    // reused. Only the file the save map records for this ROM qualifies: a
+    // name match alone could be the user's own file, such as a `Game.srm`.
+    final recordedName = await RommSaveMapRepository.getIndexedNameForRomId(
+      rom.id,
+      system.folderName,
+    );
+    final staleCandidate =
+        !scummVm &&
+            recordedName != null &&
+            isSafeFileName(recordedName) &&
+            !_normalizeExtensions(
+              extensions,
+            ).contains(_extensionOf(recordedName))
+        ? p.join(destDir, recordedName)
         : null;
+    final staleRaw =
+        staleCandidate != null &&
+            await FileSystemEntity.type(staleCandidate, followLinks: false) ==
+                FileSystemEntityType.file
+        ? staleCandidate
+        : null;
+    // What this download may replace: the copy found for this ROM (and the
+    // discs its playlist lists) and, for a game kept in its own folder, that
+    // folder. Anything else a server-chosen name collides with is another
+    // game's, and the install refuses it.
+    final replaceRoot = existing != null && !rootCopy
+        ? existing.directory
+        : null;
+    final replaceable = <String>{
+      if (existing != null) existing.path,
+      // The root file an earlier download of this ROM recorded, even in a
+      // format the badge probe no longer counts as the game.
+      if (recordedName != null && isSafeFileName(recordedName))
+        p.join(destDir, recordedName),
+      if (existing != null &&
+          p.extension(existing.filename).toLowerCase() == '.m3u')
+        ...await _playlistEntries(existing.path),
+    };
     // Downloads never overwrite library files before extraction is verified.
     // The folder is named per ROM so a retry after a crash replaces the
     // leftovers instead of leaving another multi-GB folder behind.
@@ -1920,6 +2003,8 @@ class RommProvider extends ChangeNotifier {
           playlistName: existing?.filename,
           isMultiFile: isArchive,
           scummVm: scummVm,
+          replaceRoot: replaceRoot,
+          replaceable: replaceable,
         );
         if (extractedName == null) {
           _log.w(
@@ -1937,7 +2022,14 @@ class RommProvider extends ChangeNotifier {
         }
         indexedName = extractedName;
       } else {
-        await File(destPath).rename(p.join(destDir, indexedName));
+        final target = p.join(destDir, indexedName);
+        if (await File(target).exists() &&
+            !replaceable.any((path) => p.equals(path, target))) {
+          throw const RommUnsafeArchiveException(
+            'it would replace a file that belongs to another game',
+          );
+        }
+        await File(destPath).rename(target);
       }
     } catch (e) {
       _log.e('RomM: installing rom ${rom.id} ($logName) failed', error: e);
@@ -2182,6 +2274,22 @@ class RommProvider extends ChangeNotifier {
 
   /// Mapping rows per transaction in [_writeBulkLinks].
   static const int _linkWriteChunk = 200;
+
+  /// The files the playlist at [path] lists, resolved against its folder.
+  /// Absolute and escaping lines are left out: they are not this game's to
+  /// replace.
+  static Future<List<String>> _playlistEntries(String path) async {
+    try {
+      final dir = p.dirname(path);
+      return [
+        for (final raw in await File(path).readAsLines())
+          if (raw.trim().isNotEmpty && !raw.trim().startsWith('#'))
+            safeJoin(dir, raw.trim()),
+      ].whereType<String>().toList();
+    } catch (_) {
+      return const [];
+    }
+  }
 
   /// After a failed install, keeps the downloaded archive in the ROM folder
   /// (so a multi-GB download is not lost and can be extracted by hand) and
@@ -2681,12 +2789,18 @@ class RommLocalCopy {
   /// `user_roms.filename` — `Game.sfc`, or the `.m3u` of a multi-disc game.
   final String filename;
 
+  /// Full path of the file. Usually [filename] in [directory], but a file
+  /// nested inside a bundle's subfolder keeps [directory] at the bundle root.
+  String get path => _path ?? p.join(directory, filename);
+  final String? _path;
+
   const RommLocalCopy({
     required this.system,
     required this.directory,
     this.systemDirectory,
     required this.filename,
-  });
+    String? path,
+  }) : _path = path;
 
   /// [filename] with its extension stripped: the `GameModel.romname` the sync
   /// layer keys a game's cached state by (same rule as `DatabaseGameModel`).
