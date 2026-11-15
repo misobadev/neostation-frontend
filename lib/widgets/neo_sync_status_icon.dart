@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../constants/system_folder_names.dart';
 import '../models/game_model.dart';
 import '../models/neo_sync_models.dart';
 import '../models/system_model.dart';
@@ -90,7 +91,7 @@ class NeoSyncStatusIcon extends StatefulWidget {
     required ISyncProvider syncProvider,
   }) {
     if (!system.neosync.sync) return false;
-    if (system.folderName == 'android') return false;
+    if (SystemFolderNames.isAndroidApps(system.folderName)) return false;
     if (!syncProvider.isAuthenticated) return false;
     if (system.screenscraperId == null || system.screenscraperId == 0) {
       return false;

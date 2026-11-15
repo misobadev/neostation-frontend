@@ -21,11 +21,15 @@ class AndroidAppCard extends StatefulWidget {
     super.key,
     required this.app,
     required this.isSelected,
+    this.isGame = false,
     required this.onTap,
   });
 
   final GameModel app;
   final bool isSelected;
+
+  /// Marked as a game during this visit; shown with a badge.
+  final bool isGame;
   final VoidCallback onTap;
 
   @override
@@ -176,6 +180,14 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
                                           iconSize: iconSize,
                                         ),
                                       ),
+                                      // Marks an app filed under Android
+                                      // Games during this visit.
+                                      if (widget.isGame)
+                                        Positioned(
+                                          top: 6.r,
+                                          right: 6.r,
+                                          child: _buildGameBadge(scheme),
+                                        ),
                                     ],
                                   );
                                 },
@@ -218,6 +230,21 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildGameBadge(ColorScheme scheme) {
+    return Container(
+      padding: EdgeInsets.all(3.r),
+      decoration: BoxDecoration(
+        color: scheme.secondary,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Symbols.sports_esports_rounded,
+        size: 12.r,
+        color: scheme.onSecondary,
       ),
     );
   }

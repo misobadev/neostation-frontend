@@ -22,6 +22,7 @@ import '../data/datasources/sqlite_database_service.dart';
 import '../repositories/system_repository.dart';
 import '../repositories/config_repository.dart';
 import '../repositories/game_repository.dart';
+import '../services/android_games_service.dart';
 import '../services/permission_service.dart';
 import '../services/steam_scraper_service.dart';
 import '../services/systems_update_service.dart';

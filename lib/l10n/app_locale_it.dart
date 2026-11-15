@@ -257,11 +257,6 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.androidSystemSettingsSubtitle:
       'Apri le impostazioni di sistema Android',
   AppLocale.androidApps: 'App Android',
-  AppLocale.androidAppLayout: 'Layout delle app Android',
-  AppLocale.androidAppLayoutSubtitle:
-      'Scegli dove visualizzare le app Android installate',
-  AppLocale.androidAppLayoutSystem: 'Sistema',
-  AppLocale.androidAppLayoutTab: 'Scheda',
   AppLocale.scanOnStartup: 'Scansiona cartelle all’avvio',
   AppLocale.performanceMode: 'Modalità prestazioni',
   AppLocale.performanceModeSubtitle: "Riduce effetti visivi e animazioni per mantenere l'app fluida su hardware modesto",
@@ -745,6 +740,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.hintSelect: 'Seleziona',
   AppLocale.hintSettings: 'Impostazioni',
   AppLocale.hintBack: 'Indietro',
+  AppLocale.androidGameMarkApp: 'Segna come app',
+  AppLocale.androidGameHint: 'Gioco',
   AppLocale.hintPlay: 'Gioca',
   AppLocale.hintFavorite: 'Preferito',
   AppLocale.hintRandom: 'Casuale',

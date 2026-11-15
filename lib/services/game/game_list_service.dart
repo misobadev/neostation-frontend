@@ -164,7 +164,7 @@ class GameListService {
             .where(
               (dbGame) =>
                   !dbGame.isHidden &&
-                  dbGame.systemFolderName != 'android' &&
+                  !SystemFolderNames.isAndroidApps(dbGame.systemFolderName) &&
                   dbGame.systemFolderName != 'music',
             )
             .toList();

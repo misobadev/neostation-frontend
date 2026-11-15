@@ -648,6 +648,8 @@ class SqliteMigrations {
         // Backfill for installs that reached v165 without this PR’s v164.
         await _migrateToVersion164(db);
         break;
+      // 167 was reserved for smart collections, which moved to 170; it stays
+      // empty. 168 is main's custom navigation sounds backfill.
       case 168:
         await _migrateToVersion168(db);
         break;
@@ -701,6 +703,9 @@ class SqliteMigrations {
         break;
       case 188:
         await _migrateToVersion188(db);
+        break;
+      case 189:
+        await _migrateToVersion189(db);
         break;
       default:
         _log.w('No migration defined for version $version');
@@ -7650,6 +7655,50 @@ class SqliteMigrations {
       _log.i('Migration v188 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v188: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v189: the "Android Games" virtual system.
+  ///
+  /// Adds `user_roms.is_android_game`, the user's own choice of which
+  /// installed apps are games (0/1, default 0: nothing is classified
+  /// automatically), and registers the `android_games` system. The system owns
+  /// no rows: its games are the `android` system's rows with the flag set.
+  ///
+  /// Test devices that ran this branch at v169/v171 skipped main's v170, so it
+  /// is re-run first. Every step is guarded, so a device that skipped a
+  /// neighbouring slot, or re-runs this, ends in the same state.
+  static Future<void> _migrateToVersion189(Database db) async {
+    _log.i('Migration v189: Adding Android Games system');
+    try {
+      await _migrateToVersion170(db);
+
+      final columns = db
+          .select('PRAGMA table_info(user_roms)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isNotEmpty && !columns.contains('is_android_game')) {
+        db.execute(
+          'ALTER TABLE user_roms ADD COLUMN is_android_game INTEGER DEFAULT 0',
+        );
+      }
+
+      final tables = db
+          .select("SELECT name FROM sqlite_master WHERE type = 'table'")
+          .map((r) => r['name'].toString())
+          .toSet();
+      if (tables.contains('app_systems')) {
+        db.execute('''
+          INSERT OR IGNORE INTO app_systems (id, screenscraper_id, ra_id, real_name, folder_name, launch_date, description)
+          VALUES ('android_games', 135, 0, 'Android Games', 'android_games', '2008-09-23',
+                  'Installed Android games, launched directly.')
+        ''');
+      }
+      _log.i('Migration v189 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v189: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

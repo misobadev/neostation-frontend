@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:neostation/services/logger_service.dart';
 
+import '../../constants/system_folder_names.dart';
 import '../../models/game_model.dart';
 import '../../models/system_model.dart';
 import '../../models/emulator_model.dart';
@@ -71,7 +72,8 @@ class GameLaunchService {
     GameModel game,
   ) async {
     try {
-      if (Platform.isAndroid && (system.folderName == 'android')) {
+      if (Platform.isAndroid &&
+          SystemFolderNames.isAndroidApps(system.folderName)) {
         if (game.romPath == null) {
           return GameLaunchResult.failure(
             AppLocale.packageNameMissing.getString(context),

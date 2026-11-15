@@ -115,6 +115,10 @@ extension _ContextMenu on _SystemGamesListState {
       canScrape: canScrape,
       canIdentify: canScrape && (game.romPath?.isNotEmpty ?? false),
       createTargetLabel: AppLocale.newCollection.getString(context),
+      // Android Games only: sends the app back to the Android tab.
+      canMarkAsApp:
+          widget.system.folderName == SystemFolderNames.androidGames &&
+          (game.romPath?.isNotEmpty ?? false),
     );
 
     _deferFavoriteReseat = false;
@@ -127,6 +131,9 @@ extension _ContextMenu on _SystemGamesListState {
         _scrapeSelectedGame();
       case GameOptionsAction.identify:
         await _identifySelectedGame();
+      case GameOptionsAction.markAsApp:
+        // The game leaves this list, so the reload below seats the rest.
+        if (await _markSelectedAsApp(game)) reloadWhenClosed = true;
       case GameOptionsAction.search:
         await _openSearchFromMenu();
       case GameOptionsAction.random:
@@ -190,6 +197,23 @@ extension _ContextMenu on _SystemGamesListState {
       }
     }
     return false;
+  }
+
+  /// Sends [game] back to the Android tab, reporting whether it left this
+  /// list. The systems list follows, since the Games card disappears with its
+  /// last game.
+  Future<bool> _markSelectedAsApp(GameModel game) async {
+    final packageName = game.romPath;
+    if (packageName == null) return false;
+    final config = context.read<SqliteConfigProvider>();
+    try {
+      await AndroidGamesService.setIsGame(packageName, false);
+      await config.refreshAndroidGamesSystem();
+      return true;
+    } catch (e) {
+      _SystemGamesListState._log.e('Mark as app failed: $e');
+      return false;
+    }
   }
 
   /// Applies a favourite change chosen in the checklist, reporting whether it
