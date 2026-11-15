@@ -39,6 +39,7 @@ import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/services/game/game_launch_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/cloud_path_builder.dart';
+import 'package:neostation/utils/kept_save_copy.dart';
 import 'package:neostation/services/romm/romm_library_linker.dart';
 import 'package:neostation/services/romm_playtime_service.dart';
 import 'package:neostation/services/romm_service.dart';
@@ -594,6 +595,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     final matchedRemote = <({bool isState, int id})>{};
     int uploaded = 0, downloaded = 0, coreMismatched = 0;
     int conflictsPreserved = 0, uploadsFailed = 0, uploadsDeferred = 0;
+    // The conflict copies this pass keeps, by save; see the tidy below.
+    final keptThisPass = <String, String>{};
     int downloadsFailed = 0;
     void countUpload(_UploadOutcome outcome) {
       if (outcome == _UploadOutcome.uploaded) uploaded++;
@@ -771,7 +774,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
             local,
             recordedHash: recorded?['file_hash'] as String?,
             pushDigest: pushDigest,
-            onPreserved: (backup) => keptCopy = backup,
+            onKept: (copy) {
+              keptThisPass[local.filePath] = copy;
+              keptCopy = copy;
+            },
           );
           if (guard == _RemoteGuard.unreadable) {
             // Nothing recorded: the file stays pending and the next pass asks
@@ -832,6 +838,17 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       '${coreMismatched > 0 ? ', $coreMismatched kept (different core)' : ''}'
       '${conflictsPreserved > 0 ? ', $conflictsPreserved conflict backup(s)' : ''}',
     );
+
+    // A save this pass kept a conflict copy of now has one more copy; at most
+    // a few stay. Only the post-close pass keeps any, so the pre-launch pass
+    // reads nothing here.
+    for (final MapEntry(key: save, value: copy) in keptThisPass.entries) {
+      await tidyKeptCopies(
+        save,
+        sources: rommKeptCopySources,
+        justKept: {copy},
+      );
+    }
 
     // Playtime rides along with the upload-capable passes only. The pre-launch
     // pass is on the launch's critical path and playtime changes nothing about
@@ -1285,13 +1302,13 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// remoteChanged` before this point and the pre-launch pass never takes the
   /// upload branch — so there is no launch deadline to spend it against.
   ///
-  /// [onPreserved] gets the kept copy's path when it is written.
+  /// [onKept] gets the kept copy's path when it is written.
   Future<_RemoteGuard> _guardDivergedRemote(
     RommAsset match,
     LocalSaveFile local, {
     required String? recordedHash,
     required String? pushDigest,
-    void Function(String backupPath)? onPreserved,
+    void Function(String copyPath)? onKept,
   }) async {
     // Cheap path: RomM's own hash can rule divergence out without a transfer,
     // but only where it is an MD5 of the stored bytes. States have none and a
@@ -1325,23 +1342,32 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       return _RemoteGuard.clear;
     }
 
+    final backup = File(
+      '${local.filePath}$conflictBackupMarker${_backupStamp()}',
+    );
+    var created = false;
     try {
-      final backup = File(
-        '${local.filePath}$conflictBackupMarker${_backupStamp()}',
-      );
       await backup.parent.create(recursive: true);
+      // Only a file this guard creates is removed should the write fail.
+      created = !await backup.exists();
       await backup.writeAsBytes(bytes, flush: true);
       _log.w(
         'RomM conflict: ${path.basename(local.filePath)} and the server both '
         'changed since the last sync — kept the remote copy as '
         '${path.basename(backup.path)} before uploading the local one',
       );
-      onPreserved?.call(backup.path);
+      onKept?.call(backup.path);
       return _RemoteGuard.preserved;
     } catch (e) {
       _log.e(
         'RomM conflict guard: cannot write backup for ${local.filePath}: $e',
       );
+      // Cut short, it would be listed as a copy to restore.
+      try {
+        if (created) await backup.delete();
+      } on FileSystemException {
+        // Nothing more to undo.
+      }
       return _RemoteGuard.unreadable;
     }
   }

@@ -352,8 +352,13 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     } catch (e) {
       _log.e('Wizard: user-data path check failed: $e');
     }
-    final p = await ConfigService.getUserDataPath();
-    if (mounted) setState(() => _selectedUserDataPath = p);
+    try {
+      final p = await ConfigService.getUserDataPath();
+      if (mounted) setState(() => _selectedUserDataPath = p);
+    } catch (e) {
+      // The folder went missing after the startup check: nothing to show.
+      _log.e('Wizard: user-data path unavailable: $e');
+    }
   }
 
   Future<void> _resetUnwritableUserDataPath() async {
