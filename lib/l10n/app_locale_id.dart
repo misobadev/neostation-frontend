@@ -125,6 +125,10 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.startupStorageUnavailable: 'NeoStation tidak dapat mengakses folder tempat data Anda disimpan. Pastikan kartu SD atau drive terpasang.',
   AppLocale.startupStorageRetry: 'Coba lagi',
   AppLocale.startupStorageUseDefault: 'Lanjutkan tanpa itu',
+  AppLocale.startupStorageFolderMissing: 'NeoStation tidak menemukan folder tempat data Anda disimpan. Folder itu mungkin telah dipindahkan, diganti namanya, atau dihapus, atau drive tempatnya berada tidak terpasang.',
+  AppLocale.startupStorageStartEmpty: 'Mulai dengan folder kosong',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation tidak dapat membuat folder di sana.',
   AppLocale.startupLoading:
       'Menyiapkan NeoStation. Menunggu penyimpanan dan layanan...',
 
@@ -1041,6 +1045,33 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Hanya simpanan cloud',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Konflik simpanan terdeteksi',
   AppLocale.neoSyncKeptCloudCopy: "Simpanan ini juga berubah di perangkat lain. Salinan perangkat ini diunggah, dan salinan lainnya disimpan di sebelahnya sebagai {file}.",
+  AppLocale.keptCopiesTitle: 'Riwayat simpanan',
+  AppLocale.keptCopiesSubtitle:
+      'Versi sebelumnya dari simpanan Anda, dari sinkronisasi dan pemulihan',
+  AppLocale.keptCopiesCount: 'Versi: {count}',
+  AppLocale.keptCopiesNone: 'Tidak ada riwayat simpanan',
+  AppLocale.keptCopyFromOtherDevice: 'Dari perangkat lain',
+  AppLocale.keptCopyBeforeDownload: 'Perangkat ini, sebelum unduhan',
+  AppLocale.keptCopyFromServer: 'Dari server, sebelum unggahan',
+  AppLocale.keptCopyReplaced: 'Diganti oleh pemulihan',
+  AppLocale.keptCopyCurrentSave: 'Simpanan saat ini: {size}, {date}',
+  AppLocale.keptCopyNoCurrentSave: 'Tidak ada simpanan saat ini',
+  AppLocale.keptCopySameAsSave: 'Sama dengan simpanan saat ini',
+  AppLocale.keptCopyRestore: 'Pulihkan',
+  AppLocale.keptCopyRestoreTitle: 'Pulihkan versi ini?',
+  AppLocale.keptCopyRestoreBody: 'Versi ini menggantikan {file}. Simpanan saat ini ditambahkan ke riwayat, jadi Anda bisa membatalkannya di sini. Tutup game terlebih dahulu jika masih berjalan.',
+  AppLocale.keptCopySharedCard:
+      'Kartu memori ini berisi simpanan semua game yang menggunakannya.',
+  AppLocale.keptCopyRestored:
+      'Versi dipulihkan. Sinkronisasi berikutnya akan mengunggahnya.',
+  AppLocale.keptCopyRestoreFailed: 'Tidak dapat memulihkan versi.',
+  AppLocale.keptCopyDeleteTitle: 'Hapus versi ini?',
+  AppLocale.keptCopyDeleteBody:
+      '{file} akan dihapus. Tindakan ini tidak dapat dibatalkan.',
+  AppLocale.keptCopyDeleteFailed: 'Tidak dapat menghapus versi.',
+  AppLocale.keptCopyCloseGame: 'Tutup game terlebih dahulu, lalu coba lagi.',
+  AppLocale.keptCopyWaitForSync:
+      'Tunggu hingga sinkronisasi simpanan selesai, lalu coba lagi.',
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync: Sinkronisasi cloud dinonaktifkan',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Kuota penyimpanan terlampaui',

@@ -57,6 +57,25 @@ void main() {
     }
   });
 
+  test('Systems ScreenScraper lists apart keep their own platform id', () {
+    // Watara Supervision had Satellaview's id and WonderSwan Color had the
+    // original WonderSwan's, so their games were looked up on the wrong
+    // platform.
+    final expected = <String, int>{
+      'wsv.json': 207,
+      'satellaview.json': 107,
+      'ws.json': 45,
+      'wsc.json': 46,
+    };
+    for (final entry in expected.entries) {
+      expect(
+        screenScraperId(entry.key),
+        entry.value,
+        reason: '${entry.key} must use ScreenScraper platform ${entry.value}.',
+      );
+    }
+  });
+
   test("Android apps scrape as ScreenScraper's Android platform", () {
     // The systems sync writes this id over the stored one on every launch,
     // so a null here undid the 63 an early migration set, and an Android app

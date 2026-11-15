@@ -124,6 +124,10 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.startupStorageUnavailable: 'NeoStation не удалось получить доступ к папке с вашими данными. Убедитесь, что SD-карта или накопитель подключены.',
   AppLocale.startupStorageRetry: 'Повторить',
   AppLocale.startupStorageUseDefault: 'Продолжить без неё',
+  AppLocale.startupStorageFolderMissing: 'NeoStation не удалось найти папку с вашими данными. Возможно, её переместили, переименовали или удалили, или накопитель, на котором она находится, не подключён.',
+  AppLocale.startupStorageStartEmpty: 'Начать с пустой папки',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation не удалось создать там папку.',
   AppLocale.startupLoading:
       'Подготовка NeoStation. Ожидание хранилища и служб...',
 
@@ -1043,6 +1047,33 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Только облачные сохранения',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Конфликт сохранений',
   AppLocale.neoSyncKeptCloudCopy: "Это сохранение изменилось и на другом устройстве. Копия с этого устройства загружена, а другая сохранена рядом как {file}.",
+  AppLocale.keptCopiesTitle: 'История сохранений',
+  AppLocale.keptCopiesSubtitle:
+      'Предыдущие версии ваших сохранений после синхронизаций и восстановлений',
+  AppLocale.keptCopiesCount: 'Версий: {count}',
+  AppLocale.keptCopiesNone: 'История сохранений пуста',
+  AppLocale.keptCopyFromOtherDevice: 'С другого устройства',
+  AppLocale.keptCopyBeforeDownload: 'Это устройство, до скачивания',
+  AppLocale.keptCopyFromServer: 'С сервера, до выгрузки',
+  AppLocale.keptCopyReplaced: 'Заменена при восстановлении',
+  AppLocale.keptCopyCurrentSave: 'Текущее сохранение: {size}, {date}',
+  AppLocale.keptCopyNoCurrentSave: 'Нет текущего сохранения',
+  AppLocale.keptCopySameAsSave: 'Совпадает с текущим сохранением',
+  AppLocale.keptCopyRestore: 'Восстановить',
+  AppLocale.keptCopyRestoreTitle: 'Восстановить эту версию?',
+  AppLocale.keptCopyRestoreBody: 'Она заменит {file}. Текущее сохранение будет добавлено в историю, поэтому это можно отменить здесь. Сначала закройте игру, если она ещё запущена.',
+  AppLocale.keptCopySharedCard: 'На этой карте памяти хранятся сохранения всех игр, которые её используют.',
+  AppLocale.keptCopyRestored:
+      'Версия восстановлена. Следующая синхронизация выгрузит её.',
+  AppLocale.keptCopyRestoreFailed: 'Не удалось восстановить версию.',
+  AppLocale.keptCopyDeleteTitle: 'Удалить эту версию?',
+  AppLocale.keptCopyDeleteBody:
+      '{file} будет удалён. Это действие нельзя отменить.',
+  AppLocale.keptCopyDeleteFailed: 'Не удалось удалить версию.',
+  AppLocale.keptCopyCloseGame:
+      'Сначала закройте игру, затем повторите попытку.',
+  AppLocale.keptCopyWaitForSync:
+      'Дождитесь окончания синхронизации сохранений, затем повторите попытку.',
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync: Облачная синхронизация выключена',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Превышена квота хранилища',

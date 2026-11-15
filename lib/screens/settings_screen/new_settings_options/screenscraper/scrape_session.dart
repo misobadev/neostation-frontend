@@ -8,6 +8,7 @@ import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/screenscraper_service.dart';
 import 'package:neostation/services/screenscraper/screenscraper_exceptions.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/utils/user_data_move_guard.dart';
 
 final _log = LoggerService.instance;
 
@@ -22,6 +23,12 @@ Future<void> startScrapeSession(
   BuildContext context, {
   VoidCallback? onFinished,
 }) async {
+  // Refused during a user-data move: scraped art would stay in the old folder.
+  if (refuseWhileUserDataMoves()) {
+    onFinished?.call();
+    return;
+  }
+
   final scrapingProvider = context.read<ScrapingProvider>();
   const notificationId = 'scraping_progress';
 

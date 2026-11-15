@@ -48,6 +48,8 @@ import 'tabs/game_details_achievements_tab.dart';
 
 import 'package:neostation/screens/retro_achievements_screen/ra_game_achievements_page.dart';
 
+import '../../../utils/user_data_move_guard.dart';
+
 /// A comprehensive details view for a selected game, providing access to metadata,
 /// achievements, system settings, and cloud synchronization status.
 ///
@@ -1578,6 +1580,8 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
   /// Orchestrates a metadata acquisition process via ScreenScraperService.
   Future<void> _startSingleGameScrape({bool forceOverwrite = true}) async {
     if (_isScrapingGame) return;
+    // Refused during a user-data move: new art would stay in the old folder.
+    if (refuseWhileUserDataMoves()) return;
 
     // Safety: Pause video previews to avoid resource contention or audio leaks during scraping.
     if (widget.videoController != null) {

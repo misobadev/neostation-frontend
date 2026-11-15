@@ -126,6 +126,10 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.startupStorageUnavailable: 'NeoStation could not reach the folder where your data is stored. Check that the SD card or drive is connected.',
   AppLocale.startupStorageRetry: 'Retry',
   AppLocale.startupStorageUseDefault: 'Continue without it',
+  AppLocale.startupStorageFolderMissing: 'NeoStation could not find the folder where your data is stored. It may have been moved, renamed or deleted, or the drive it is on may not be connected.',
+  AppLocale.startupStorageStartEmpty: 'Start with an empty folder',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation could not create the folder there.',
   AppLocale.startupLoading:
       'Preparing NeoStation. Waiting for storage and services...',
 
@@ -1035,6 +1039,32 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Cloud saves only',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Save conflict detected',
   AppLocale.neoSyncKeptCloudCopy: "This save also changed on another device. This device's copy was uploaded, and the other one is kept beside it as {file}.",
+  AppLocale.keptCopiesTitle: 'Save history',
+  AppLocale.keptCopiesSubtitle:
+      'Earlier versions of your saves, from syncs and restores',
+  AppLocale.keptCopiesCount: 'Versions: {count}',
+  AppLocale.keptCopiesNone: 'No save history',
+  AppLocale.keptCopyFromOtherDevice: 'From another device',
+  AppLocale.keptCopyBeforeDownload: 'This device, before a download',
+  AppLocale.keptCopyFromServer: 'From the server, before an upload',
+  AppLocale.keptCopyReplaced: 'Replaced by a restore',
+  AppLocale.keptCopyCurrentSave: 'Current save: {size}, {date}',
+  AppLocale.keptCopyNoCurrentSave: 'No current save',
+  AppLocale.keptCopySameAsSave: 'Same as the current save',
+  AppLocale.keptCopyRestore: 'Restore',
+  AppLocale.keptCopyRestoreTitle: 'Restore this version?',
+  AppLocale.keptCopyRestoreBody: 'This replaces {file}. The current save is added to the history, so you can undo this here. Close the game first if it is still running.',
+  AppLocale.keptCopySharedCard:
+      'This memory card holds the saves of every game that uses it.',
+  AppLocale.keptCopyRestored: 'Version restored. The next sync uploads it.',
+  AppLocale.keptCopyRestoreFailed: "Couldn't restore the version.",
+  AppLocale.keptCopyDeleteTitle: 'Delete this version?',
+  AppLocale.keptCopyDeleteBody:
+      '{file} will be deleted. This cannot be undone.',
+  AppLocale.keptCopyDeleteFailed: "Couldn't delete the version.",
+  AppLocale.keptCopyCloseGame: 'Close the game first, then try again.',
+  AppLocale.keptCopyWaitForSync:
+      'Wait until the save sync has finished, then try again.',
   AppLocale.neoSyncCloudSyncDisabled: 'NeoSync: Cloud sync disabled',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Storage quota exceeded',
   AppLocale.packageNameMissing: 'Package name is missing',

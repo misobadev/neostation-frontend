@@ -127,6 +127,10 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.startupStorageUnavailable: 'NeoStation n\'a pas pu accéder au dossier où vos données sont enregistrées. Vérifiez que la carte SD ou le lecteur est connecté.',
   AppLocale.startupStorageRetry: 'Réessayer',
   AppLocale.startupStorageUseDefault: 'Continuer sans',
+  AppLocale.startupStorageFolderMissing: 'NeoStation n\'a pas trouvé le dossier où vos données sont enregistrées. Il a peut-être été déplacé, renommé ou supprimé, ou le lecteur où il se trouve n\'est pas connecté.',
+  AppLocale.startupStorageStartEmpty: 'Commencer avec un dossier vide',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation n\'a pas pu créer le dossier à cet endroit.',
   AppLocale.startupLoading:
       'Préparation de NeoStation. En attente du stockage et des services…',
 
@@ -1058,6 +1062,31 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync : Sauvegardes cloud uniquement',
   AppLocale.neoSyncSaveConflict: 'NeoSync : Conflit de sauvegarde détecté',
   AppLocale.neoSyncKeptCloudCopy: "Cette sauvegarde a aussi changé sur un autre appareil. La copie de cet appareil a été envoyée, l'autre est conservée à côté sous le nom {file}.",
+  AppLocale.keptCopiesTitle: 'Historique des sauvegardes',
+  AppLocale.keptCopiesSubtitle: 'Versions précédentes de vos sauvegardes, issues des synchronisations et des restaurations',
+  AppLocale.keptCopiesCount: 'Versions : {count}',
+  AppLocale.keptCopiesNone: 'Aucun historique de sauvegarde',
+  AppLocale.keptCopyFromOtherDevice: "D'un autre appareil",
+  AppLocale.keptCopyBeforeDownload: 'Cet appareil, avant un téléchargement',
+  AppLocale.keptCopyFromServer: 'Du serveur, avant un envoi',
+  AppLocale.keptCopyReplaced: 'Remplacée par une restauration',
+  AppLocale.keptCopyCurrentSave: 'Sauvegarde actuelle : {size}, {date}',
+  AppLocale.keptCopyNoCurrentSave: 'Aucune sauvegarde actuelle',
+  AppLocale.keptCopySameAsSave: 'Identique à la sauvegarde actuelle',
+  AppLocale.keptCopyRestore: 'Restaurer',
+  AppLocale.keptCopyRestoreTitle: 'Restaurer cette version ?',
+  AppLocale.keptCopyRestoreBody: "Elle remplace {file}. La sauvegarde actuelle est ajoutée à l'historique, vous pouvez donc annuler ici. Fermez d'abord le jeu s'il est encore ouvert.",
+  AppLocale.keptCopySharedCard: "Cette carte mémoire contient les sauvegardes de tous les jeux qui l'utilisent.",
+  AppLocale.keptCopyRestored:
+      "Version restaurée. La prochaine synchronisation l'enverra.",
+  AppLocale.keptCopyRestoreFailed: 'Impossible de restaurer la version.',
+  AppLocale.keptCopyDeleteTitle: 'Supprimer cette version ?',
+  AppLocale.keptCopyDeleteBody:
+      '{file} sera supprimé. Cette action est irréversible.',
+  AppLocale.keptCopyDeleteFailed: 'Impossible de supprimer la version.',
+  AppLocale.keptCopyCloseGame: "Fermez d'abord le jeu, puis réessayez.",
+  AppLocale.keptCopyWaitForSync:
+      'Attendez la fin de la synchronisation des sauvegardes, puis réessayez.',
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync : Synchronisation cloud désactivée',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync : Quota de stockage dépassé',
