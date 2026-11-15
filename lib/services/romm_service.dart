@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show immutable, visibleForTesting;
@@ -149,10 +150,13 @@ class RommImageFetch {
 class RommService {
   /// The limits default to the production ones; tests pass short ones.
   RommService({
+    this.apiRequestLimit = apiRequestTimeout,
+    this.iconRequestLimit = iconRequestTimeout,
     this.uploadStallLimit = uploadStallTimeout,
     this.uploadResponseLimit = uploadResponseTimeout,
     this.assetRequestLimit = downloadRequestTimeout,
     this.assetStallLimit = downloadStallTimeout,
+    this.listingRetryWait = listingRetryDelay,
   });
 
   static final _log = LoggerService.instance;
@@ -171,14 +175,23 @@ class RommService {
   /// scope set rather than turning "no playtime sync" into "cannot log in".
   static const String _playtimeScopes = 'roms.user.read roms.user.write';
 
+  /// Needed, on top of [_playtimeScopes], to *read* play sessions from RomM
+  /// 5.4 on: since then RomM answers `GET /api/play-sessions` with a 403
+  /// unless the token has this scope or is bound to the device being read.
+  /// Requested as its own optional tier, because RomM computes a user's
+  /// scopes from their group's grants, so an account can be allowed the
+  /// playtime scopes without this one.
+  static const String _devicesReadScope = 'devices.read';
+
   /// Maximum sessions RomM accepts in one `/api/play-sessions` POST.
   static const int maxPlaySessionBatch = 100;
 
   /// How long connecting to the server may take, so an address that swallows
   /// the handshake fails in good time rather than at the system's own limit.
-  /// Longer than the 30 s limits on the sign-in requests, so signing in to an
-  /// address that never answers still fails as a timeout first, as it did
-  /// before; it is the uploads, which have no overall limit, it bounds.
+  /// Longer than [apiRequestTimeout], the limit on the sign-in requests, so
+  /// signing in to an address that never answers still fails as a timeout
+  /// first, as it did before; it is the uploads, which have no overall limit,
+  /// it bounds.
   @visibleForTesting
   static const connectTimeout = Duration(seconds: 45);
 
@@ -224,6 +237,56 @@ class RommService {
   static http.Client get _httpClient =>
       _httpClientOverride ?? _sharedHttpClient;
 
+  /// How long a request other than a transfer waits for its whole answer:
+  /// signing in, browsing, the save and session lists, covers, deletes and
+  /// play sessions.
+  @visibleForTesting
+  static const apiRequestTimeout = Duration(seconds: 30);
+
+  /// How long [fetchSvg] waits for a platform icon.
+  @visibleForTesting
+  static const iconRequestTimeout = Duration(seconds: 15);
+
+  /// [apiRequestTimeout] for this service's requests.
+  final Duration apiRequestLimit;
+
+  /// [iconRequestTimeout] for this service's platform icons.
+  final Duration iconRequestLimit;
+
+  /// Sends a [method] request to [uri] and reads its whole answer within
+  /// [timeout]; [body] is sent as is, [bodyFields] form-encoded. A request
+  /// that runs out of time throws [TimeoutException] and its connection is
+  /// closed: a bare timeout gives up on the answer but leaves the request
+  /// holding its socket until the server answers or closes it.
+  Future<http.Response> _send(
+    String method,
+    Uri uri, {
+    Map<String, String>? headers,
+    String? body,
+    Map<String, String>? bodyFields,
+    required Duration timeout,
+  }) async {
+    final abort = Completer<void>();
+    final request = http.AbortableRequest(
+      method,
+      uri,
+      abortTrigger: abort.future,
+    );
+    if (headers != null) request.headers.addAll(headers);
+    if (body != null) request.body = body;
+    if (bodyFields != null) request.bodyFields = bodyFields;
+    try {
+      return await _httpClient
+          .send(request)
+          .then(http.Response.fromStream)
+          .timeout(timeout);
+    } finally {
+      // Closes the connection of a request that ran out of time; one that
+      // answered in full is unaffected.
+      abort.complete();
+    }
+  }
+
   String _baseUrl = '';
 
   String _username = '';
@@ -239,13 +302,26 @@ class RommService {
   bool _playtimeScopeGranted = true;
 
   /// Cleared for the rest of this connection once the server proves it has no
-  /// play-session API (404) or won't grant access to it (403 after a re-auth),
-  /// so a RomM older than the feature isn't probed on every sync.
+  /// play-session API (404) or won't take this device's sessions (a push
+  /// refused with a 403 after a re-auth), so a RomM older than the feature
+  /// isn't probed on every sync. A refused read clears only
+  /// [_playSessionsReadable].
   bool _playSessionsSupported = true;
 
   /// Whether playtime sync can be attempted against this server.
   bool get playtimeSyncAvailable =>
       _playtimeScopeGranted && _playSessionsSupported;
+
+  /// Cleared for the rest of this connection once the server refuses to let
+  /// this connection *read* play sessions (403 after a re-auth, or at once
+  /// with an API key). Pushing needs less than reading, so a refused read
+  /// stops only the pulls; see [_notePlaySessionFailure].
+  bool _playSessionsReadable = true;
+
+  /// Whether playtime recorded elsewhere can be pulled from this server.
+  /// Implies [playtimeSyncAvailable].
+  bool get playtimePullAvailable =>
+      playtimeSyncAvailable && _playSessionsReadable;
 
   /// Advanced by every [configure]. A request reads the server and credentials
   /// only when it is sent, so one begun under an earlier connection must not
@@ -317,6 +393,7 @@ class RommService {
     // instead of inheriting the previous server's verdict.
     _playtimeScopeGranted = true;
     _playSessionsSupported = true;
+    _playSessionsReadable = true;
   }
 
   static String _normalizeBaseUrl(String raw) {
@@ -354,9 +431,13 @@ class RommService {
   /// entered as `http://`.
   Future<http.Response> _postTokenRequest(Map<String, String> body) {
     const headers = {'Content-Type': 'application/x-www-form-urlencoded'};
-    return _httpClient
-        .post(_uri('/api/token'), headers: headers, body: body)
-        .timeout(const Duration(seconds: 30));
+    return _send(
+      'POST',
+      _uri('/api/token'),
+      headers: headers,
+      bodyFields: body,
+      timeout: apiRequestLimit,
+    );
   }
 
   /// Establishes (or confirms) a usable credential, dispatching on the mode the
@@ -379,9 +460,12 @@ class RommService {
     final session = _session;
     http.Response resp;
     try {
-      resp = await _httpClient
-          .get(_uri('/api/users/me'), headers: _authHeaders)
-          .timeout(const Duration(seconds: 30));
+      resp = await _send(
+        'GET',
+        _uri('/api/users/me'),
+        headers: _authHeaders,
+        timeout: apiRequestLimit,
+      );
     } on TimeoutException {
       throw RommException('Connection timed out', kind: RommFailure.timeout);
     } on HandshakeException {
@@ -450,15 +534,35 @@ class RommService {
     http.Response resp;
     bool? playtimeGranted;
     try {
-      resp = await _postTokenRequest(bodyFor('$_readScopes $_playtimeScopes'));
+      // Most scopes first, then fewer: RomM refuses the whole grant with a 403
+      // if any requested scope is outside the user's allowance, and can't say
+      // which one. Bad credentials fail every tier, so the error path below is
+      // unchanged for them.
+      resp = await _postTokenRequest(
+        bodyFor('$_readScopes $_playtimeScopes $_devicesReadScope'),
+      );
+      if (resp.statusCode == 403 && session == _session) {
+        // Without devices.read, pushes still work and so may pulls (RomM
+        // before 5.4 doesn't ask for it); a refused read says so later.
+        final playtime = await _postTokenRequest(
+          bodyFor('$_readScopes $_playtimeScopes'),
+        );
+        // Only another 403 moves on to the next tier: a server error is
+        // reported as one, not as a wrong password or a missing scope.
+        if (playtime.statusCode != 403) resp = playtime;
+        if (playtime.statusCode == 200) {
+          _log.i(
+            'RomM denied $_devicesReadScope — playtime pulls may be refused',
+          );
+        }
+      }
       if (resp.statusCode == 403 && session == _session) {
         // Either the account lacks the playtime scopes or the server predates
         // them — indistinguishable here, and both mean the same thing: keep the
-        // connection, drop playtime sync. Bad credentials fail the retry too,
-        // so the error path below is unchanged for them.
+        // connection, drop playtime sync.
         final base = await _postTokenRequest(bodyFor(_readScopes));
         if (base.statusCode == 200) playtimeGranted = false;
-        resp = base.statusCode == 200 ? base : resp;
+        resp = base;
       } else if (resp.statusCode == 200) {
         playtimeGranted = true;
       }
@@ -675,12 +779,9 @@ class RommService {
 
   /// Like [_authedGet] but for a fully-built [uri] (used where query parameters
   /// are assembled via [Uri] or the asset path needs bespoke encoding).
-  Future<http.Response> _authedGetUri(
-    Uri uri, {
-    Duration timeout = const Duration(seconds: 30),
-  }) async {
+  Future<http.Response> _authedGetUri(Uri uri) async {
     final resp = await _sendWithAuthRetry<http.Response>(
-      () => _httpClient.get(uri, headers: _authHeaders).timeout(timeout),
+      () => _send('GET', uri, headers: _authHeaders, timeout: apiRequestLimit),
       statusOf: (r) => r.statusCode,
     );
     if (resp.statusCode != 200) {
@@ -859,9 +960,11 @@ class RommService {
     );
     return _parseBrowse(
       resp,
-      (decoded) => _itemsOf(
-        decoded,
-      ).whereType<Map<String, dynamic>>().map(RommRom.fromJson).toList(),
+      (decoded) =>
+          _itemsOf(decoded)
+              .whereType<Map<String, dynamic>>()
+              .map(RommRom.fromJson)
+              .toList(),
     );
   }
 
@@ -921,9 +1024,10 @@ class RommService {
     return _parseBrowse(resp, (decoded) {
       // RomM may return either a bare list or a paginated `{items: [...]}`
       // object.
-      final items = _itemsOf(
-        decoded,
-      ).whereType<Map<String, dynamic>>().map(RommRom.fromJson).toList();
+      final items = _itemsOf(decoded)
+          .whereType<Map<String, dynamic>>()
+          .map(RommRom.fromJson)
+          .toList();
 
       if (decoded is! Map<String, dynamic>) {
         return RommRomPage(items: items, total: items.length);
@@ -1021,9 +1125,12 @@ class RommService {
       final url = pathOrUrl.startsWith('http')
           ? pathOrUrl
           : '$_baseUrl${pathOrUrl.startsWith('/') ? '' : '/'}$pathOrUrl';
-      final resp = await _httpClient
-          .get(Uri.parse(url), headers: imageHeadersFor(url))
-          .timeout(const Duration(seconds: 30));
+      final resp = await _send(
+        'GET',
+        Uri.parse(url),
+        headers: imageHeadersFor(url),
+        timeout: apiRequestLimit,
+      );
       if (resp.statusCode != 200) {
         // 404/410 are the server saying the file is not there. Anything else
         // — 5xx while it restarts, 401/403 before a token refresh, a proxy's
@@ -1263,9 +1370,12 @@ class RommService {
   /// so we inline those class styles as presentation attributes first.
   Future<String?> fetchSvg(String url) async {
     try {
-      final resp = await _httpClient
-          .get(Uri.parse(url), headers: imageHeadersFor(url))
-          .timeout(const Duration(seconds: 15));
+      final resp = await _send(
+        'GET',
+        Uri.parse(url),
+        headers: imageHeadersFor(url),
+        timeout: iconRequestLimit,
+      );
       if (resp.statusCode == 200 && resp.body.contains('<svg')) {
         return _inlineSvgClassStyles(resp.body);
       }
@@ -1562,14 +1672,46 @@ class RommService {
     return [...results[0], ...results[1]];
   }
 
+  /// How long a save or state listing waits before asking again after a
+  /// server error, before [_listingRetryJitter].
+  @visibleForTesting
+  static const listingRetryDelay = Duration(milliseconds: 500);
+
+  /// [listingRetryDelay] for this service's listings.
+  final Duration listingRetryWait;
+
+  /// Spreads the retries out by up to half the wait: when both listings fail
+  /// together, retrying them at the same instant could meet the same conflict.
+  static final _listingRetryJitter = Random();
+
+  /// Lists [basePath]'s assets, for [romId] or all of them.
+  ///
+  /// A server error (5xx) is asked about once more after [listingRetryWait]
+  /// (plus up to half again). RomM can fail one listing on a passing database
+  /// conflict that the next request doesn't meet, and a listing is a plain
+  /// GET, so asking again changes nothing on the server. Nothing else is retried: a refusal or a
+  /// missing route would answer the same, and a timeout has already used the
+  /// time a pre-launch sync has.
   Future<List<RommAsset>> _listAssets(
     String basePath, {
     int? romId,
     required bool isState,
   }) async {
-    final resp = await _authedGet(
-      romId == null ? basePath : '$basePath?rom_id=$romId',
-    );
+    final pathAndQuery = romId == null ? basePath : '$basePath?rom_id=$romId';
+    final session = _session;
+    http.Response resp;
+    try {
+      resp = await _authedGet(pathAndQuery);
+    } on RommException catch (e) {
+      final status = e.statusCode;
+      if (status == null || status < 500) rethrow;
+      _log.w('RomM $basePath answered $status; asking once more');
+      await Future<void>.delayed(
+        listingRetryWait * (1 + _listingRetryJitter.nextDouble() / 2),
+      );
+      _checkSession(session);
+      resp = await _authedGet(pathAndQuery);
+    }
     return _itemsOf(jsonDecode(resp.body))
         .whereType<Map<String, dynamic>>()
         .map((j) => RommAsset.fromJson(j, isState: isState))
@@ -1613,9 +1755,8 @@ class RommService {
                 ..headers.addAll(_authHeaders),
             )
             .timeout(assetRequestLimit);
-        final body = await http.ByteStream(
-          resp.stream.timeout(assetStallLimit),
-        ).toBytes();
+        final body = await http.ByteStream(resp.stream.timeout(assetStallLimit))
+            .toBytes();
         return http.Response.bytes(
           body,
           resp.statusCode,
@@ -1800,9 +1941,8 @@ class RommService {
     if (emulator != null && emulator.isNotEmpty) params['emulator'] = emulator;
     if (slot != null && slot.isNotEmpty) params['slot'] = slot;
     if (deviceId != null && deviceId.isNotEmpty) params['device_id'] = deviceId;
-    final uri = Uri.parse(
-      '$_baseUrl$basePath',
-    ).replace(queryParameters: params);
+    final uri = Uri.parse('$_baseUrl$basePath')
+        .replace(queryParameters: params);
 
     return _sendAssetFile(
       'POST',
@@ -1997,13 +2137,13 @@ class RommService {
     if (assetIds.isEmpty) return;
     final body = jsonEncode({field: assetIds});
     final resp = await _sendWithAuthRetry<http.Response>(
-      () => _httpClient
-          .post(
-            _uri('$basePath/delete'),
-            headers: {..._authHeaders, 'Content-Type': 'application/json'},
-            body: body,
-          )
-          .timeout(const Duration(seconds: 30)),
+      () => _send(
+        'POST',
+        _uri('$basePath/delete'),
+        headers: {..._authHeaders, 'Content-Type': 'application/json'},
+        body: body,
+        timeout: apiRequestLimit,
+      ),
       statusOf: (r) => r.statusCode,
     );
     if (resp.statusCode != 200) {
@@ -2048,18 +2188,18 @@ class RommService {
     });
 
     final resp = await _sendWithAuthRetry<http.Response>(
-      () => _httpClient
-          .post(
-            _uri('/api/play-sessions'),
-            headers: {..._authHeaders, 'Content-Type': 'application/json'},
-            body: body,
-          )
-          .timeout(const Duration(seconds: 30)),
+      () => _send(
+        'POST',
+        _uri('/api/play-sessions'),
+        headers: {..._authHeaders, 'Content-Type': 'application/json'},
+        body: body,
+        timeout: apiRequestLimit,
+      ),
       statusOf: (r) => r.statusCode,
     );
 
     if (resp.statusCode != 200 && resp.statusCode != 201) {
-      _notePlaySessionFailure(resp.statusCode);
+      _notePlaySessionFailure(resp.statusCode, read: false);
       throw RommException(
         'Play-session upload failed (${resp.statusCode})',
         statusCode: resp.statusCode,
@@ -2091,23 +2231,42 @@ class RommService {
     try {
       resp = await _authedGetUri(uri);
     } on RommException catch (e) {
-      if (e.statusCode != null) _notePlaySessionFailure(e.statusCode!);
+      if (e.statusCode != null) {
+        _notePlaySessionFailure(e.statusCode!, read: true);
+      }
       rethrow;
     }
 
-    return _itemsOf(
-      jsonDecode(resp.body),
-    ).whereType<Map<String, dynamic>>().map(RommPlaySession.fromJson).toList();
+    return _itemsOf(jsonDecode(resp.body))
+        .whereType<Map<String, dynamic>>()
+        .map(RommPlaySession.fromJson)
+        .toList();
   }
 
-  /// Marks the play-session API unusable when the server's answer says it will
-  /// never work on this connection: `404` (endpoint absent) or a `403` that has
-  /// already survived one re-authentication, i.e. a genuine scope denial. In
-  /// API-key mode a 403 is conclusive on the first try — the key's scopes were
-  /// fixed when the user created it, so there is no re-auth that could widen
-  /// them, and this is how a key issued without `roms.user.*` quietly settles
-  /// into "everything but playtime sync" instead of erroring on every game exit.
-  void _notePlaySessionFailure(int statusCode) {
+  /// Records a play-session request the server says will never work on this
+  /// connection: `404` (endpoint absent) or a `403` that has already survived
+  /// one re-authentication, i.e. a genuine scope denial. In API-key mode a 403
+  /// is conclusive on the first try — the key's scopes were fixed when the
+  /// user created it, so there is no re-auth that could widen them.
+  ///
+  /// A 404, or a 403 on a push, stops playtime sync for the connection: this
+  /// is how a key issued without `roms.user.*` settles into "everything but
+  /// playtime sync" instead of erroring on every game exit. A 403 on a [read]
+  /// stops only the pulls: RomM 5.4 needs `devices.read` to read play sessions
+  /// but not to push them, so a key or account without it still sends this
+  /// device's playtime up.
+  void _notePlaySessionFailure(int statusCode, {required bool read}) {
+    if (statusCode == 403 && read) {
+      if (_playSessionsReadable && _playSessionsSupported) {
+        _log.w(
+          'RomM play-session read refused (403; RomM 5.4+ needs '
+          '$_devicesReadScope) — pulling playtime disabled for this '
+          'connection; pushes continue',
+        );
+      }
+      _playSessionsReadable = false;
+      return;
+    }
     if (statusCode == 404 || statusCode == 403) {
       if (_playSessionsSupported) {
         _log.w(

@@ -78,9 +78,8 @@ class QuotaExceededDialog extends StatelessWidget {
             // Quota information
             Text(
               AppLocale.currentStorageUsage.getString(context),
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
 
@@ -94,9 +93,9 @@ class QuotaExceededDialog extends StatelessWidget {
                 children: [
                   LinearProgressIndicator(
                     value: quota.usagePercentage / 100,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
                     valueColor: AlwaysStoppedAnimation<Color>(
                       quota.usagePercentage >= 100 ? Colors.red : Colors.orange,
                     ),
@@ -147,9 +146,8 @@ class QuotaExceededDialog extends StatelessWidget {
             // Recommended solutions
             Text(
               AppLocale.recommendedSolutions.getString(context),
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
 

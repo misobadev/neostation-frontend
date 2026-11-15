@@ -1,0 +1,11 @@
+# Tags used by the Flutter test suite.
+#
+# `flutter test --exclude-tags network` runs the fast, hermetic suites while
+# iterating locally. CI still runs every tag, split across shards.
+tags:
+  network:
+    skip: false
+  slow:
+    skip: false
+  assets:
+    skip: false

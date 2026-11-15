@@ -98,9 +98,8 @@ class ProfileWidgetState extends State<ProfileWidget> {
                   Text(
                     user.email,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.7),
+                      color: Theme.of(context).colorScheme.onSurface
+                          .withValues(alpha: 0.7),
                     ),
                   ),
                   SizedBox(height: 8.0),

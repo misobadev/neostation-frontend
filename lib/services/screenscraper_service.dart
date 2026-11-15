@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
+
 import '../models/rom_fingerprint.dart';
 import '../models/screenscraper_game_candidate.dart';
 import '../repositories/game_repository.dart';
@@ -151,6 +153,13 @@ class ScreenScraperService {
         response.statusCode,
         response.body,
         endpoint: 'ssuserInfos.php',
+      );
+    } on ScreenscraperQuotaExceededException {
+      // The client throws on HTTP 430 rather than returning the response, so
+      // the status never reaches failureForStatus.
+      _log.w('ScreenScraper refused the sign-in check: daily quota reached');
+      return const ScreenScraperAuthResult.failure(
+        ScreenScraperAuthFailure.quotaExceeded,
       );
     } catch (e) {
       _log.e('Error verifying credentials: $e');
@@ -806,6 +815,23 @@ class ScreenScraperService {
     }
   }
 
+  /// Saves a match keeping what the game already has; see
+  /// [ScraperRepository.fillGameMetadataGaps].
+  static Future<bool> _fillGameMetadataGaps(
+    Map<String, dynamic> metadata,
+    String appSystemId,
+  ) async {
+    try {
+      return await ScraperRepository.fillGameMetadataGaps(
+        metadata,
+        appSystemId,
+      );
+    } catch (e) {
+      _log.e('Error saving metadata for ${metadata['filename']}: $e');
+      return false;
+    }
+  }
+
   /// Scrapes a single game by its filename and updates its local state.
   static Future<Map<String, dynamic>> scrapeSingleGame({
     required String appSystemId,
@@ -865,15 +891,18 @@ class ScreenScraperService {
       final credentials = await getSavedCredentials();
       final preferredLanguage = credentials?['preferred_language'] ?? 'en';
       final scraperConfig = await getScraperConfig();
+      final scrapeMetadata = scraperConfig['scrape_metadata'] as bool? ?? true;
 
-      if (scraperConfig['scrape_metadata'] as bool? ?? true) {
+      if (scrapeMetadata) {
         final metadata = await _mapGameInfoToMetadata(
           romName,
           romPath,
           gameInfo,
           preferredLanguage: preferredLanguage,
         );
-        await _saveGameMetadata(metadata, appSystemId, isFullyScraped: true);
+        // Not finished until its media are in, as in a session: a game whose
+        // media fail stays for "New content only" to fetch them.
+        await _saveGameMetadata(metadata, appSystemId, isFullyScraped: false);
       }
 
       onProgress?.call(AppLocale.downloadingImages, 0.2);
@@ -881,7 +910,19 @@ class ScreenScraperService {
       final allowedMediaTypes = await ScraperRepository.getEnabledMediaTypes();
 
       if (allowedMediaTypes.isEmpty) {
+        // Nothing to fetch; with metadata off too, nothing was scraped.
+        if (scrapeMetadata) {
+          await ScraperRepository.markGameFullyScraped(
+            appSystemId,
+            romName,
+            metadataOnly: true,
+          );
+        }
         return {'success': true, 'message': AppLocale.scrapeSuccessful};
+      }
+
+      if (!scrapeMetadata) {
+        await ScraperRepository.markGameUnfinished(appSystemId, romName);
       }
 
       final medias = gameInfo['medias'] as List<dynamic>? ?? [];
@@ -899,6 +940,10 @@ class ScreenScraperService {
             onProgress: (p) =>
                 onProgress?.call(AppLocale.downloadingImages, 0.2 + (p * 0.8)),
           );
+
+      if (downloadResult['success'] == true) {
+        await ScraperRepository.markGameFullyScraped(appSystemId, romName);
+      }
 
       return {
         'success': downloadResult['success'] == true,
@@ -1054,6 +1099,13 @@ class ScreenScraperService {
       romName: romName,
       systemFolder: systemFolder,
     );
+    // Its media are gone now, whatever the scrape does next: if it fails,
+    // "New content only" has to fetch them again.
+    try {
+      await ScraperRepository.markGameUnfinished(appSystemId, romName);
+    } catch (e) {
+      _log.e('Error clearing the scraped mark for $romName: $e');
+    }
     return scrapeSingleGame(
       appSystemId: appSystemId,
       romName: romName,
@@ -1410,19 +1462,35 @@ class ScreenScraperService {
       );
 
       if (gameInfo != null) {
-        if (scraperConfig['scrape_metadata'] as bool? ?? true) {
+        final scrapeMetadata =
+            scraperConfig['scrape_metadata'] as bool? ?? true;
+        if (scrapeMetadata) {
           final metadata = await _mapGameInfoToMetadata(
             filename,
             romPath,
             gameInfo,
             preferredLanguage: preferredLanguage,
           );
-          await _saveGameMetadata(metadata, appSystemId, isFullyScraped: false);
+          // "New content only" reaches games not yet fully scraped, whose
+          // metadata may be the user's own edits or an ES-DE import: it fills
+          // their gaps. "All" is the user asking for ScreenScraper's.
+          if (scraperConfig['scrape_mode'].toString() == 'new_only') {
+            await _fillGameMetadataGaps(metadata, appSystemId);
+          } else {
+            await _saveGameMetadata(
+              metadata,
+              appSystemId,
+              isFullyScraped: false,
+            );
+          }
         }
 
         final allowedTypes = await ScraperRepository.getEnabledMediaTypes();
 
         if (allowedTypes.isNotEmpty) {
+          if (!scrapeMetadata) {
+            await ScraperRepository.markGameUnfinished(appSystemId, filename);
+          }
           scrapingProvider.updateThreadProgress(
             threadId: threadId,
             gameName: filename,
@@ -1452,8 +1520,16 @@ class ScreenScraperService {
             };
           }
           if (res['success'] == true) {
-            await ScraperRepository.markGameFullyScraped(filename);
+            await ScraperRepository.markGameFullyScraped(appSystemId, filename);
           }
+        } else if (scrapeMetadata) {
+          // With every media type off there's nothing left to fetch, so
+          // "New content only" leaves the game until media are switched on.
+          await ScraperRepository.markGameFullyScraped(
+            appSystemId,
+            filename,
+            metadataOnly: true,
+          );
         }
 
         scrapingProvider.updateThreadProgress(

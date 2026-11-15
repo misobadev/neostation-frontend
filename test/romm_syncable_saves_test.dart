@@ -71,11 +71,13 @@ void main() {
   group('longer-named titles', () {
     test("a shorter title does not claim a longer title's saves", () {
       // The exact pair observed on the device.
-      final kept =
-          RomMSyncProvider.syncableSaves(game('Extra Mario Bros..zip'), [
-            file('/s/Extra Mario Bros..state'),
-            file('/s/Extra Mario Bros. [Hacks].state'),
-          ]);
+      final kept = RomMSyncProvider.syncableSaves(
+        game('Extra Mario Bros..zip'),
+        [
+          file('/s/Extra Mario Bros..state'),
+          file('/s/Extra Mario Bros. [Hacks].state'),
+        ],
+      );
 
       expect(namesOf(kept), ['Extra Mario Bros..state']);
     });

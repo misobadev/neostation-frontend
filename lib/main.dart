@@ -1,9 +1,13 @@
+import 'package:neostation/widgets/west_button_glyph.dart';
+import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/utils/user_data_startup_check.dart';
 import 'package:neostation/providers/menu_app_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/providers/sqlite_database_provider.dart';
 import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/scraping_provider.dart';
+import 'package:neostation/providers/discovery_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
@@ -34,19 +38,24 @@ import 'package:neostation/utils/desktop_window_focus.dart';
 import 'package:neostation/utils/display_metrics_log.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/themes/anta_text_theme.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/image_cache_budget.dart';
 import 'package:neostation/services/sfx_service.dart';
+
 import 'models/custom_sfx.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
 import 'dart:async';
 import 'dart:io';
+
 import 'package:fvp/fvp.dart';
 import 'package:fullscreen_window/fullscreen_window.dart';
 import 'package:window_manager/window_manager.dart';
@@ -123,16 +132,18 @@ class ToggleFullscreenAction extends Action<ToggleFullscreenIntent> {
       // Notificar el cambio de fullscreen
       FullscreenNotifier().notifyFullscreenChanged(newState);
     } else if (Platform.isMacOS) {
-      final isFullscreen = await windowManager.isFullScreen();
-      LoggerService.instance.i(
-        'Toggle fullscreen (macOS): current=$isFullscreen, setting=${!isFullscreen}',
-      );
-      await windowManager.setFullScreen(!isFullscreen);
+      final window = WindowManager.instance.getCurrent();
+      if (window != null) {
+        final isFullscreen = window.isFullScreen;
+        LoggerService.instance.i(
+          'Toggle fullscreen (macOS): current=$isFullscreen, setting=${!isFullscreen}',
+        );
+        window.isFullScreen = !isFullscreen;
 
-      // Notificar el cambio de fullscreen
-      await Future.delayed(const Duration(milliseconds: 100));
-      final newState = await windowManager.isFullScreen();
-      FullscreenNotifier().notifyFullscreenChanged(newState);
+        // Notify the fullscreen change.
+        await Future.delayed(const Duration(milliseconds: 100));
+        FullscreenNotifier().notifyFullscreenChanged(window.isFullScreen);
+      }
     }
     return;
   }
@@ -204,19 +215,24 @@ void main() async {
   runApp(const StartupLoadingApp());
   await WidgetsBinding.instance.endOfFrame;
 
+  // Resolve the user-data location before anything reads it, so the cold-boot
+  // wait happens once (behind the loading screen) rather than once per caller,
+  // and a folder that is missing is reported, on every platform, before
+  // anything (app.log first of all) could create it empty.
+  final storageNotes = await _awaitUserDataStorage();
+
+  // After the check: app.log lives in the user-data folder, and a logger
+  // opened before it was usable stayed off the file for the whole session.
   final log = LoggerService.instance;
   await log.init();
   log.i('Starting NeoStation...');
+  for (final note in storageNotes) {
+    log.w(note);
+  }
 
   // After log.init(): this used to run before it, so the budget it picked was
   // never visible in app.log.
   await _configureImageCache();
-
-  // Resolve the user-data location before anything reads it, so the cold-boot
-  // wait happens once (behind the loading screen) rather than once per caller.
-  if (Platform.isAndroid) {
-    await _awaitUserDataStorage();
-  }
 
   // The App Sandbox is disabled on macOS (see Release.entitlements), so the
   // `files.user-selected.*` entitlements are gone. file_picker_darwin still
@@ -226,23 +242,18 @@ void main() async {
     await FilePicker.skipEntitlementsChecks();
   }
 
-  // Inicializar window_manager para desktop con tamano minimo 640x480
+  // Initialize window_manager for desktop with a 640x480 minimum size.
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-    await windowManager.ensureInitialized();
+    final window = WindowManager.instance.getCurrent();
 
-    WindowOptions windowOptions = WindowOptions(
-      size: const Size(1280, 720),
-      alwaysOnTop: false,
-      skipTaskbar: false,
-      minimumSize: const Size(640, 480),
-    );
+    window?.minimumSize = const Size(640, 480).toNative();
+    window?.setSize(const Size(1280, 720).toNative(), false);
+    window?.isAlwaysOnTop = false;
+    window?.isVisibleInTaskbar = true;
+    window?.show();
+    window?.focus();
 
-    await windowManager.waitUntilReadyToShow(windowOptions, () async {
-      await windowManager.show();
-      await windowManager.focus();
-    });
-
-    // Cargar configuracion de fullscreen
+    // Load the fullscreen configuration.
     bool isFullscreen = true;
     try {
       final config = await ConfigRepository.getUserConfig();
@@ -257,20 +268,20 @@ void main() async {
       if (Platform.isWindows || Platform.isLinux) {
         FullScreenWindow.setFullScreen(true);
       } else if (Platform.isMacOS) {
-        await windowManager.setFullScreen(true);
+        window?.isFullScreen = true;
       }
       FullscreenNotifier().notifyFullscreenChanged(true);
     } else {
       if (Platform.isWindows || Platform.isLinux) {
         FullScreenWindow.setFullScreen(false);
       } else if (Platform.isMacOS) {
-        await windowManager.setFullScreen(false);
+        window?.isFullScreen = false;
       }
       FullscreenNotifier().notifyFullscreenChanged(false);
     }
 
-    // Gamepad input follows window focus from here on. Must come after
-    // ensureInitialized() above, which owns the channel it listens on.
+    // Gamepad input follows window focus from here on. Must come after the
+    // window has been created and shown.
     await DesktopWindowFocus.initialize();
 
     log.i('Window manager initialized');
@@ -327,7 +338,7 @@ void main() async {
       MapLocale('pt', AppLocale.pt),
       MapLocale('ru', AppLocale.ru),
       MapLocale('zh', AppLocale.zh),
-      MapLocale('zh_Hant', AppLocale.zhHant),
+      MapLocale('zh', AppLocale.zhHant, scriptCode: 'Hant'),
       MapLocale('fr', AppLocale.fr),
       MapLocale('de', AppLocale.de),
       MapLocale('it', AppLocale.it),
@@ -362,10 +373,16 @@ void main() async {
     log.e('Error initializing database providers: $e');
   }
 
+  // FileProvider started before the database was open. On a fresh install
+  // that can find it briefly locked, and its system-extension lookup (or, on
+  // an earlier failure, every path) is still missing: try again now. Does
+  // nothing when it already finished.
+  await fileProvider.initialize();
+
   // Inicializar listener de Android para tracking de tiempo de juego
   if (Platform.isAndroid) {
     try {
-      GameService.initializeAndroidGameListener();
+      await GameService.initializeAndroidGameListener();
       // Verificar si hay una sesion de juego pendiente (app fue matada)
       await GameService.checkPendingGameSession();
     } catch (e) {
@@ -486,9 +503,9 @@ void main() async {
   sfx.setVolume(sqliteConfigProvider.config.sfxVolume);
   sfx.setEnabled(sqliteConfigProvider.config.sfxEnabled);
   unawaited(
-    sfx
-        .setCustomSounds(sqliteConfigProvider.config.customSfx)
-        .then((_) => sfx.init()),
+    sfx.setCustomSounds(sqliteConfigProvider.config.customSfx).then((_) async {
+      if (sfx.isEnabled) await sfx.init();
+    }),
   );
 }
 
@@ -554,9 +571,10 @@ class _StartupScaffold extends StatefulWidget {
   /// screen keeps the static logo (a shine would imply progress).
   final bool animatedLogo;
 
-  /// Raw key handler used by the error screen. The gamepad navigation manager
-  /// is not running this early, so gamepad buttons are read straight from the
-  /// key events instead.
+  /// Raw key handler used by the error screen, for keyboard keys and remote
+  /// buttons. Gamepads reach it through its own [GamepadNavigation] instead:
+  /// on Android and desktop alike a gamepad's buttons never arrive as key
+  /// events.
   final KeyEventResult Function(KeyEvent)? onKeyEvent;
 
   @override
@@ -608,29 +626,35 @@ class _StartupScaffoldState extends State<_StartupScaffold> {
           child: widget.animatedLogo
               ? SplashStatusLayout(children: children)
               : Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32 * scale),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          'assets/images/logo_transparent.png',
-                          width: 112 * scale,
-                          height: 112 * scale,
-                        ),
-                        SizedBox(height: 24 * scale),
-                        Text(
-                          'NeoStation',
-                          style: TextStyle(
-                            color: _colors.foreground,
-                            fontSize: 28 * textScale,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.2,
+                  // Scaled down, never up, when the screen is too short for
+                  // it: on a handheld (the AYN Thor is 832x468) the logo,
+                  // message and buttons overflowed the bottom.
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Padding(
+                      padding: EdgeInsets.all(32 * scale),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Image.asset(
+                            'assets/images/logo_transparent.png',
+                            width: 112 * scale,
+                            height: 112 * scale,
                           ),
-                        ),
-                        SizedBox(height: 24 * scale),
-                        ...children,
-                      ],
+                          SizedBox(height: 24 * scale),
+                          Text(
+                            'NeoStation',
+                            style: TextStyle(
+                              color: _colors.foreground,
+                              fontSize: 28 * textScale,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          SizedBox(height: 24 * scale),
+                          ...children,
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -705,34 +729,106 @@ class _StartupLoadingAppState extends State<StartupLoadingApp> {
   }
 }
 
-/// Shown when the configured user-data volume never appeared. Without this the
-/// failure was swallowed by the catch-alls in `main()` and the app booted onto
-/// an empty database, looking freshly installed.
-class StartupStorageErrorApp extends StatelessWidget {
+/// Shown when the configured user-data folder can't be used: its drive never
+/// appeared, or the folder was moved, renamed or deleted. Without this the
+/// failure was swallowed by the catch-alls in `main()` (or an empty folder was
+/// created in its place) and the app booted onto an empty database, looking
+/// freshly installed.
+///
+/// The buttons are fixed to A (Retry), B (Continue without it) and the West
+/// face button (Start with an empty folder), each shown with its glyph, and
+/// take no focus: A on a focused "Start with an empty folder" used to Retry.
+class StartupStorageErrorApp extends StatefulWidget {
   const StartupStorageErrorApp({
     super.key,
     required this.storagePath,
     required this.onRetry,
     required this.onUseDefault,
+    this.problem = UserDataProblem.volumeMissing,
+    this.onStartEmpty,
+    this.createFailed = false,
   });
 
   final String? storagePath;
   final VoidCallback onRetry;
   final VoidCallback onUseDefault;
 
+  /// What is missing: the drive, or the folder on it.
+  final UserDataProblem problem;
+
+  /// Creates the missing folder, empty. Offered only for a missing folder: on
+  /// a drive that isn't there it would create a lookalike path.
+  final VoidCallback? onStartEmpty;
+
+  /// The last "Start with an empty folder" could not create the folder.
+  final bool createFailed;
+
+  @override
+  State<StartupStorageErrorApp> createState() => _StartupStorageErrorAppState();
+}
+
+class _StartupStorageErrorAppState extends State<StartupStorageErrorApp> {
+  late final GamepadNavigation _gamepad;
+
+  /// UI sounds are off while this screen is up: the user's sound setting is
+  /// in the database, which isn't open yet.
+  late final bool _sfxWasEnabled;
+
+  VoidCallback? get _startEmpty =>
+      widget.problem == UserDataProblem.folderMissing
+      ? widget.onStartEmpty
+      : null;
+
+  @override
+  void initState() {
+    super.initState();
+    _sfxWasEnabled = SfxService().isEnabled;
+    SfxService().setEnabled(false);
+    // Gamepads reach the app through the gamepads plugin, not as key events,
+    // on Android as on desktop. Enter, Backspace and Escape come through here
+    // too.
+    _gamepad = GamepadNavigation(
+      onSelectItem: () => widget.onRetry(),
+      onBack: () => widget.onUseDefault(),
+      // Start, Escape and a TV remote's menu button, the remote's only way
+      // to continue (MainActivity keeps Back from the app).
+      onSettings: () => widget.onUseDefault(),
+      onWestButton: () => _startEmpty?.call(),
+      playSelectSound: false,
+      allowRepeat: false,
+    );
+    _gamepad.initialize();
+    _gamepad.activate();
+  }
+
+  @override
+  void dispose() {
+    _gamepad.dispose();
+    SfxService().setEnabled(_sfxWasEnabled);
+    super.dispose();
+  }
+
+  /// Keys [GamepadNavigation] doesn't act on here: keys from devices Android
+  /// doesn't class as gamepads (a TV remote's centre button arrives as
+  /// select), and from a keyboard Space and X.
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.gameButtonA ||
-        key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.select ||
         key == LogicalKeyboardKey.space) {
-      onRetry();
+      widget.onRetry();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.gameButtonB ||
-        key == LogicalKeyboardKey.escape) {
-      onUseDefault();
+    if (key == LogicalKeyboardKey.gameButtonB) {
+      widget.onUseDefault();
+      return KeyEventResult.handled;
+    }
+    final startEmpty = _startEmpty;
+    if (startEmpty != null &&
+        (key == LogicalKeyboardKey.gameButtonX ||
+            key == LogicalKeyboardKey.keyX)) {
+      startEmpty();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -740,11 +836,23 @@ class StartupStorageErrorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final startEmpty = _startEmpty;
     return _StartupScaffold(
       onKeyEvent: _handleKey,
       childrenBuilder: (context, colors) {
         final scale = SplashStatusLayout.scaleOf(context);
         final textScale = SplashStatusLayout.textScaleOf(context);
+        Widget glyph(String asset) =>
+            Image.asset(asset, width: 20 * textScale, height: 20 * textScale);
+        Widget label(Widget icon, String key) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            icon,
+            SizedBox(width: 8 * scale),
+            Text(_startupString(key)),
+          ],
+        );
+        final storagePath = widget.storagePath;
         return [
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: 520 * scale),
@@ -752,17 +860,21 @@ class StartupStorageErrorApp extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _startupString(AppLocale.startupStorageUnavailable),
+                  _startupString(
+                    widget.problem == UserDataProblem.folderMissing
+                        ? AppLocale.startupStorageFolderMissing
+                        : AppLocale.startupStorageUnavailable,
+                  ),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: colors.foreground.withValues(alpha: 0.8),
                     fontSize: 16 * textScale,
                   ),
                 ),
-                if (storagePath != null && storagePath!.isNotEmpty) ...[
+                if (storagePath != null && storagePath.isNotEmpty) ...[
                   SizedBox(height: 12 * scale),
                   Text(
-                    storagePath!,
+                    storagePath,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: colors.foreground.withValues(alpha: 0.55),
@@ -770,24 +882,52 @@ class StartupStorageErrorApp extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (widget.createFailed) ...[
+                  SizedBox(height: 12 * scale),
+                  Text(
+                    _startupString(AppLocale.startupStorageCreateFailed),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 14 * textScale,
+                    ),
+                  ),
+                ],
                 SizedBox(height: 24 * scale),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ElevatedButton(
-                      onPressed: onRetry,
-                      child: Text(
-                        _startupString(AppLocale.startupStorageRetry),
+                // No focus: the buttons answer to their own controller
+                // buttons, and touch or a mouse still press them.
+                ExcludeFocus(
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 16 * scale,
+                    runSpacing: 8 * scale,
+                    children: [
+                      ElevatedButton(
+                        onPressed: widget.onRetry,
+                        child: label(
+                          glyph('assets/images/gamepad/Xbox_A_button.png'),
+                          AppLocale.startupStorageRetry,
+                        ),
                       ),
-                    ),
-                    SizedBox(width: 16 * scale),
-                    TextButton(
-                      onPressed: onUseDefault,
-                      child: Text(
-                        _startupString(AppLocale.startupStorageUseDefault),
+                      TextButton(
+                        onPressed: widget.onUseDefault,
+                        child: label(
+                          glyph('assets/images/gamepad/Xbox_B_button.png'),
+                          AppLocale.startupStorageUseDefault,
+                        ),
                       ),
-                    ),
-                  ],
+                      if (startEmpty != null)
+                        TextButton(
+                          onPressed: startEmpty,
+                          child: label(
+                            WestButtonGlyph(
+                              builder: (context, asset) => glyph(asset),
+                            ),
+                            AppLocale.startupStorageStartEmpty,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -805,13 +945,25 @@ class StartupStorageErrorApp extends StatelessWidget {
 /// one could serially block for the full cold-boot timeout. Doing it here means
 /// the wait happens exactly once and its failure is visible to the user
 /// instead of being degraded into an empty library by downstream catch-alls.
-Future<void> _awaitUserDataStorage() async {
+///
+/// Runs before the log file opens (the log lives in the user-data folder), so
+/// it returns what it has to say for [LoggerService] to record once it has.
+Future<List<String>> _awaitUserDataStorage() async {
+  final notes = <String>[];
+  var createFailed = false;
   while (!await ConfigService.ensureUserDataStorageReady()) {
     final decision = Completer<void>();
     var useDefault = false;
+    var startEmpty = false;
+    final problem =
+        ConfigService.userDataProblem ?? UserDataProblem.volumeMissing;
+    final path = ConfigService.unavailableStoragePath;
+    notes.add('User-data folder unusable at startup (${problem.name}): $path');
     runApp(
       StartupStorageErrorApp(
-        storagePath: ConfigService.unavailableStoragePath,
+        storagePath: path,
+        problem: problem,
+        createFailed: createFailed,
         onRetry: () {
           ConfigService.resetStorageAvailability();
           if (!decision.isCompleted) decision.complete();
@@ -820,15 +972,36 @@ Future<void> _awaitUserDataStorage() async {
           useDefault = true;
           if (!decision.isCompleted) decision.complete();
         },
+        onStartEmpty: () {
+          startEmpty = true;
+          if (!decision.isCompleted) decision.complete();
+        },
       ),
     );
     await decision.future;
     runApp(const StartupLoadingApp());
+    createFailed = false;
     if (useDefault) {
-      ConfigService.continueWithDefaultUserDataPath();
-      return;
+      notes.add('Continuing without it: the default folder, this session only');
+      await ConfigService.continueWithDefaultUserDataPath();
+      return notes;
+    }
+    if (startEmpty && problem == UserDataProblem.folderMissing) {
+      try {
+        await ConfigService.createMissingUserDataFolder();
+        notes.add('Started with an empty folder at $path');
+      } catch (e) {
+        // Shown again with a line saying so, as the next check still finds
+        // it missing.
+        notes.add('Could not create the user-data folder: $e');
+        createFailed = true;
+        ConfigService.resetStorageAvailability();
+      }
+    } else {
+      notes.add('Retrying');
     }
   }
+  return notes;
 }
 
 @pragma('vm:entry-point')
@@ -900,7 +1073,7 @@ Future<void> subDisplay() async {
       MapLocale('pt', AppLocale.pt),
       MapLocale('ru', AppLocale.ru),
       MapLocale('zh', AppLocale.zh),
-      MapLocale('zh_Hant', AppLocale.zhHant),
+      MapLocale('zh', AppLocale.zhHant, scriptCode: 'Hant'),
       MapLocale('fr', AppLocale.fr),
       MapLocale('de', AppLocale.de),
       MapLocale('it', AppLocale.it),
@@ -976,15 +1149,24 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _locale = FlutterLocalization.instance.currentLocale;
-    FlutterLocalization.instance.onTranslatedLanguage = (Locale? locale) {
-      if (mounted) setState(() => _locale = locale);
-    };
+    FlutterLocalization.instance.addListener(_handleLocaleChanged);
     // Once the main UI has painted its first frame, tell the secondary display
     // the app is ready so it can slide the app dock into place (rather than
     // showing it fully-formed while the app is still cold-starting).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.sqliteConfigProvider.markAppReady();
     });
+  }
+
+  void _handleLocaleChanged() {
+    if (!mounted) return;
+    setState(() => _locale = FlutterLocalization.instance.currentLocale);
+  }
+
+  @override
+  void dispose() {
+    FlutterLocalization.instance.removeListener(_handleLocaleChanged);
+    super.dispose();
   }
 
   @override
@@ -1022,6 +1204,9 @@ class _MyAppState extends State<MyApp> {
         ),
         ChangeNotifierProvider.value(value: widget.rommProvider),
         ChangeNotifierProvider(create: (context) => SystemBackgroundProvider()),
+        // Lazy: the board is a full library scan, and it must not run at
+        // startup for the many users who never open the tab.
+        ChangeNotifierProvider(create: (context) => DiscoveryProvider()),
         ChangeNotifierProvider(
           // Eager: the systems carousel/grid paints the Collections card's game
           // count on the first frame it builds, and that card is on the very
@@ -1109,7 +1294,7 @@ class _MyAppState extends State<MyApp> {
                         );
                       },
                       theme: themeProvider.currentTheme.copyWith(
-                        textTheme: GoogleFonts.antaTextTheme(
+                        textTheme: antaTextTheme(
                           themeProvider.currentTheme.textTheme,
                         ),
                         iconTheme: const IconThemeData(fill: 1.0),

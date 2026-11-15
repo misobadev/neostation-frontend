@@ -1,15 +1,18 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../services/music_player_service.dart';
 import '../../../utils/game_utils.dart';
 import '../../../widgets/marquee_text.dart';
 import '../../../widgets/music_visualizer.dart';
+
 import 'package:neostation/l10n/app_locale.dart';
 
 /// A specialized media player component designed for high-fidelity audio playback and visualization.
@@ -46,9 +49,8 @@ class _MusicPlayerState extends State<MusicPlayer> {
           color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
-            color: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.25),
+            color: Theme.of(context).colorScheme.primary
+                .withValues(alpha: 0.25),
             width: 1.2.r,
           ),
         ),
@@ -86,9 +88,8 @@ class _MusicPlayerState extends State<MusicPlayer> {
                               vertical: 2.r,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).scaffoldBackgroundColor.withValues(alpha: 0.5),
+                              color: Theme.of(context).scaffoldBackgroundColor
+                                  .withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(12.r),
                               boxShadow: [
                                 BoxShadow(
@@ -106,8 +107,7 @@ class _MusicPlayerState extends State<MusicPlayer> {
                                 // Action: Termination / Navigation Back (B Button).
                                 if (widget.onBack != null) ...[
                                   _GamepadActionBtn(
-                                    gamepadIcon:
-                                        'assets/images/gamepad/Xbox_B_button.png',
+                                    gamepadIcon: 'assets/images/gamepad/Xbox_B_button.png',
                                     label: AppLocale.back.getString(context),
                                     onTap: () {
                                       SfxService().playBackSound();
@@ -121,8 +121,7 @@ class _MusicPlayerState extends State<MusicPlayer> {
 
                                 // Action: Shuffle / Random Playback (View Button).
                                 _GamepadActionBtn(
-                                  gamepadIcon:
-                                      'assets/images/gamepad/Xbox_View_button.png',
+                                  gamepadIcon: 'assets/images/gamepad/Xbox_View_button.png',
                                   symbol: isShuffle
                                       ? Symbols.shuffle_on_rounded
                                       : Symbols.shuffle_rounded,
@@ -274,14 +273,12 @@ class _MusicPlayerState extends State<MusicPlayer> {
                           width: 56.r,
                           height: 56.r,
                           decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.1),
+                            color: Theme.of(context).colorScheme.primary
+                                .withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8.r),
                             border: Border.all(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.2),
+                              color: Theme.of(context).colorScheme.primary
+                                  .withValues(alpha: 0.2),
                               width: 1.0,
                             ),
                           ),
@@ -302,9 +299,9 @@ class _MusicPlayerState extends State<MusicPlayer> {
                                   )
                                 : Icon(
                                     Symbols.music_note_rounded,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
                                     size: 20.r,
                                   ),
                           ),
@@ -432,13 +429,11 @@ class _SeekBarState extends State<_SeekBar> {
             thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5.r),
             overlayShape: RoundSliderOverlayShape(overlayRadius: 10.r),
             activeTrackColor: Theme.of(context).colorScheme.primary,
-            inactiveTrackColor: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.15),
+            inactiveTrackColor: Theme.of(context).colorScheme.primary
+                .withValues(alpha: 0.15),
             thumbColor: Theme.of(context).colorScheme.primary,
-            overlayColor: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.15),
+            overlayColor: Theme.of(context).colorScheme.primary
+                .withValues(alpha: 0.15),
           ),
           child: SizedBox(
             height: 24.r,
@@ -517,9 +512,8 @@ class _GamepadActionBtn extends StatelessWidget {
               vertical: isLarge ? 6.r : 4.r,
             ),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).scaffoldBackgroundColor.withValues(alpha: 0.5),
+              color: Theme.of(context).scaffoldBackgroundColor
+                  .withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(8.r),
               border: Border.all(
                 color: onSurface.withValues(alpha: 0.4),

@@ -202,9 +202,12 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       }
     }
 
-    if (isDreamcast && file.path.toLowerCase().contains('vmu_save')) {
-      // Force structure: saves/dc/filename.bin
-      return 'saves/dc/${path.basename(file.path)}';
+    if (isDreamcast) {
+      final card = CloudPathBuilder.sharedCardPath(
+        'dc',
+        path.basename(file.path),
+      );
+      if (card != null) return card;
     }
 
     // Special handling for NetherSX2 on Android
@@ -214,6 +217,7 @@ extension NeoSyncPathResolver on NeoSyncProvider {
 
     // Special handling for PS2 (RetroArch/PCSX2)
     // Force structure: saves/PS2/filename.ps2 to match standard convention
+    // (a game's sync matches the card by the same path).
     bool isPS2 = game.systemFolderName == 'ps2';
     if (!isPS2) {
       try {
@@ -226,8 +230,12 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       }
     }
 
-    if (isPS2 && file.path.toLowerCase().endsWith('.ps2')) {
-      return 'saves/PS2/${path.basename(file.path)}';
+    if (isPS2) {
+      final card = CloudPathBuilder.sharedCardPath(
+        'ps2',
+        path.basename(file.path),
+      );
+      if (card != null) return card;
     }
 
     return _calculateRelativePath(file, basePath, isState: isState);
@@ -731,21 +739,26 @@ extension NeoSyncPathResolver on NeoSyncProvider {
   /// Gets all save files recursively from a directory.
   ///
   /// NeoSync backup copies (`*.neosync.bak`) are excluded so the recovery
-  /// safety net is never itself uploaded or synced.
+  /// safety net is never itself uploaded or synced. A subfolder that can't be
+  /// read is skipped; the rest of the folder is still listed.
   Future<List<File>> _getSaveFiles(String directoryPath) async {
-    final dir = Directory(directoryPath);
-    if (!await dir.exists()) return [];
-
+    final skipped = <String>[];
     try {
-      return await dir
-          .list(recursive: true)
-          .where((entity) => entity is File)
-          .cast<File>()
-          .where((file) => !file.path.toLowerCase().endsWith('.neosync.bak'))
-          .toList();
+      final paths = await listSaveFilePaths([directoryPath], skipped: skipped);
+      return paths.map(File.new).toList();
     } catch (e) {
       NeoSyncProvider._log.e('Error listing save files in $directoryPath: $e');
       return [];
+    } finally {
+      _logUnreadable(skipped);
+    }
+  }
+
+  void _logUnreadable(List<String> folders) {
+    for (final folder in folders) {
+      NeoSyncProvider._log.w(
+        'Save listing skipped an unreadable folder: $folder',
+      );
     }
   }
 }

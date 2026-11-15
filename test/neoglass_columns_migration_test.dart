@@ -30,6 +30,7 @@ void main() {
   });
 
   Future<void> runV157() => SqliteMigrations.migrateToVersion(db, 157);
+  Future<void> runV188() => SqliteMigrations.migrateToVersion(db, 188);
 
   List<String> configColumns() => db
       .select('PRAGMA table_info(user_config)')
@@ -120,6 +121,64 @@ void main() {
       expect(configColumns(), contains('neoglass_blur'));
       expect(configColumns(), contains('neoglass_transparency'));
       expect(configColumns(), contains('neoglass_border_width'));
+    });
+  });
+
+  group('migration v188', () {
+    test('lowers a stored border above the new maximum', () async {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN neoglass_border_width REAL DEFAULT 2',
+      );
+      db.execute(
+        'INSERT INTO user_config (id, neoglass_border_width) VALUES (1, 4)',
+      );
+
+      await runV188();
+
+      expect(
+        db
+            .select('SELECT neoglass_border_width FROM user_config')
+            .first['neoglass_border_width'],
+        2,
+      );
+    });
+
+    test('keeps values inside the new range', () async {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN neoglass_border_width REAL DEFAULT 2',
+      );
+      db.execute(
+        'INSERT INTO user_config (id, neoglass_border_width) VALUES (1, 1)',
+      );
+
+      await runV188();
+
+      expect(
+        db
+            .select('SELECT neoglass_border_width FROM user_config')
+            .first['neoglass_border_width'],
+        1,
+      );
+    });
+
+    test('is safe when the column is absent or the migration reruns', () async {
+      await runV188();
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN neoglass_border_width REAL DEFAULT 2',
+      );
+      db.execute(
+        'INSERT INTO user_config (id, neoglass_border_width) VALUES (1, 2)',
+      );
+
+      await runV188();
+      await runV188();
+
+      expect(
+        db
+            .select('SELECT neoglass_border_width FROM user_config')
+            .first['neoglass_border_width'],
+        2,
+      );
     });
   });
 }

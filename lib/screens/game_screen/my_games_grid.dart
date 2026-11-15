@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/models/game_model.dart';
@@ -23,6 +25,8 @@ import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/widgets/game_view_footer.dart';
+import 'package:neostation/widgets/spring_selected_card.dart';
+import 'package:neostation/utils/performance_mode.dart';
 import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/models/retro_achievements_game_info.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
@@ -140,6 +144,8 @@ class _GamesGridState extends State<GamesGrid> {
   late GamepadNavigation _gamepadNav;
   final ScrollController _scrollController = ScrollController();
   int _selectedIndex = 0;
+  int? _previousSelectedIndex;
+  late int _lastRenderedSelectedIndex;
   int _crossAxisCount = 5;
   bool _isNavigatingFast = false;
 
@@ -177,9 +183,6 @@ class _GamesGridState extends State<GamesGrid> {
   static const Duration _chromeSettleDelay = Duration(milliseconds: 160);
   String? _chromeSig;
   Widget? _chromeFooter;
-
-  // Preview-video existence per resolved media path — see _hasVideoFor.
-  final Map<String, bool> _videoExistsCache = {};
 
   // Memoized grid rows. buildRow→_buildCard is a pure function of layout
   // (`_layoutGen`), `targetWidth`, `theme`, and per-card favorite/scrape state —
@@ -234,6 +237,9 @@ class _GamesGridState extends State<GamesGrid> {
   // cheap per-frame arithmetic instead of re-measuring every card each frame.
   List<double> _cardHOverW = [];
   bool _needsMeasure = true;
+
+  /// Set from the config in build; disables decorative effects at render time.
+  bool _performanceMode = false;
 
   // Image dimension cache
   static final Map<String, Size?> _imageSizeCache = {};
@@ -323,24 +329,6 @@ class _GamesGridState extends State<GamesGrid> {
     return widget.system.primaryFolderName;
   }
 
-  /// Whether the game has a preview video, so the footer knows whether a mute
-  /// control is worth showing.
-  ///
-  /// Scraped media lives on the plain filesystem (unlike SAF ROM paths), so a
-  /// sync stat is safe, and this only runs when the selection settles — not
-  /// per frame. Memoized because a back-and-forth between two games would
-  /// otherwise re-stat both every time.
-  bool _hasVideoFor(GameModel game) {
-    final videoPath = game.getVideoPath(
-      _folderForGame(game),
-      widget.fileProvider,
-    );
-    return _videoExistsCache.putIfAbsent(
-      videoPath,
-      () => File(videoPath).existsSync(),
-    );
-  }
-
   String _box2dPath(int index) {
     final game = widget.games[index];
     return game.getImagePath(
@@ -401,6 +389,9 @@ class _GamesGridState extends State<GamesGrid> {
   /// `_cardWidth * _heightRatioFor(i)`.
   double _heightRatioFor(int index) {
     if (_isFanart) return 1.0;
+    // Header reads are the expensive part of this lookup; performance mode
+    // uses the square fallback rather than opening every box-art file.
+    if (_performanceMode) return 1.0;
 
     // Folder tiles are always square (no box art to measure).
     if (index < widget.folderCount) return 1.0;
@@ -436,6 +427,11 @@ class _GamesGridState extends State<GamesGrid> {
     final n = widget.games.length;
     _cardHOverW = List<double>.filled(n, 1.0);
     _loadedDims.clear();
+    if (_performanceMode) {
+      _loadedDims.addAll(List<int>.generate(n, (i) => i));
+      _needsMeasure = false;
+      return;
+    }
     if (!_isFanart) {
       for (int i = 0; i < n; i++) {
         _cardHOverW[i] = _heightRatioFor(i);
@@ -553,7 +549,7 @@ class _GamesGridState extends State<GamesGrid> {
 
   // Lazy dimension loading for newly visible cards
   void _ensureDims(int index) {
-    if (_isFanart) return;
+    if (_isFanart || _performanceMode) return;
     if (_loadedDims.contains(index)) return;
     final path = _box2dPath(index);
     final hadBefore = _imageSizeCache.containsKey(path);
@@ -579,6 +575,7 @@ class _GamesGridState extends State<GamesGrid> {
       (widget.games.length - 1).clamp(0, 999999),
     );
     _settledIndex = _selectedIndex;
+    _lastRenderedSelectedIndex = _selectedIndex;
     _updateCrossAxisCount();
     _initializeGamepad();
 
@@ -728,7 +725,6 @@ class _GamesGridState extends State<GamesGrid> {
     // whether the footer's mute pill applies. Drop the stat cache and the
     // chrome signature so the footer is rebuilt against the new media.
     if (widget.artworkVersion != oldWidget.artworkVersion) {
-      _videoExistsCache.clear();
       _chromeSig = null;
     }
     if (widget.selectedIndex != oldWidget.selectedIndex) {
@@ -1075,6 +1071,14 @@ class _GamesGridState extends State<GamesGrid> {
     _showAchievementsBadge = context.select<SqliteConfigProvider, bool>(
       (p) => p.config.showAchievementsBadge,
     );
+    final performanceMode = context.select<SqliteConfigProvider, bool>(
+      (p) => p.config.performanceMode,
+    );
+    if (performanceMode != _performanceMode) {
+      _performanceMode = performanceMode;
+      // Turning it off must re-read the box-art ratios the mode skipped.
+      _needsMeasure = true;
+    }
     _collections = SystemFolderNames.isCollection(widget.system.folderName)
         ? null
         : context.watch<CollectionsProvider>();
@@ -1087,23 +1091,26 @@ class _GamesGridState extends State<GamesGrid> {
             Icon(
               Icons.videogame_asset_rounded,
               size: 64.r,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.5),
             ),
             SizedBox(height: 16.r),
             Text(
               AppLocale.selectAGame.getString(context),
               style: TextStyle(
                 fontSize: 18.r,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.7),
               ),
             ),
           ],
         ),
       );
+    }
+
+    if (_lastRenderedSelectedIndex != _selectedIndex) {
+      _previousSelectedIndex = _lastRenderedSelectedIndex;
+      _lastRenderedSelectedIndex = _selectedIndex;
     }
 
     _buildSettledChrome();
@@ -1169,10 +1176,13 @@ class _GamesGridState extends State<GamesGrid> {
                     // with the selection), so we skip the cache for just that
                     // row; every other row stays cached and the fast-scroll perf
                     // is preserved.
-                    final hasSelection =
-                        _selectedIndex >= row.startIndex &&
-                        _selectedIndex < row.startIndex + row.count;
-                    if (!hasSelection) {
+                    bool rowContains(int? index) =>
+                        index != null &&
+                        index >= row.startIndex &&
+                        index < row.startIndex + row.count;
+                    final hasSelection = rowContains(_selectedIndex);
+                    final hasSettling = rowContains(_previousSelectedIndex);
+                    if (!hasSelection && !hasSettling) {
                       final cached = _rowCache[rowIndex];
                       if (cached != null) return cached;
                     }
@@ -1212,6 +1222,31 @@ class _GamesGridState extends State<GamesGrid> {
                           ],
                         );
                       }
+                      final identity = idx < widget.folderCount
+                          ? 'folder_$idx'
+                          : widget.games[idx].romname;
+                      cell = SpringSelectedCard(
+                        key: ValueKey('spring_game_$identity'),
+                        selected: idx == _selectedIndex,
+                        previouslySelected: idx == _previousSelectedIndex,
+                        animate: !_performanceMode,
+                        child: cell,
+                      );
+                      if (!_performanceMode) {
+                        cell = AnimationConfiguration.staggeredGrid(
+                          position: idx,
+                          columnCount: _cols,
+                          duration: const Duration(milliseconds: 320),
+                          delay: const Duration(milliseconds: 24),
+                          child: FadeInAnimation(
+                            duration: const Duration(milliseconds: 320),
+                            child: SlideAnimation(
+                              verticalOffset: 14.r,
+                              child: ScaleAnimation(scale: 0.98, child: cell),
+                            ),
+                          ),
+                        );
+                      }
                       cards.add(
                         SizedBox(
                           width: rect.width,
@@ -1227,7 +1262,9 @@ class _GamesGridState extends State<GamesGrid> {
                         children: _interleaveSpacing(cards, _spX),
                       ),
                     );
-                    if (!hasSelection) _rowCache[rowIndex] = built;
+                    if (!hasSelection && !hasSettling) {
+                      _rowCache[rowIndex] = built;
+                    }
                     return built;
                   }
 
@@ -1239,37 +1276,39 @@ class _GamesGridState extends State<GamesGrid> {
                     behavior: HitTestBehavior.translucent,
                     child: Stack(
                       children: [
-                        CustomScrollView(
-                          controller: _scrollController,
-                          slivers: [
-                            SliverPadding(
-                              padding: EdgeInsets.only(
-                                top: 12,
-                                bottom: 80,
-                                left: 16,
-                                right: 16,
+                        AnimationLimiter(
+                          child: CustomScrollView(
+                            controller: _scrollController,
+                            slivers: [
+                              SliverPadding(
+                                padding: EdgeInsets.only(
+                                  top: 12,
+                                  bottom: 80,
+                                  left: 16,
+                                  right: 16,
+                                ),
+                                // Exact per-row extents (known from
+                                // _positionCards) let the sliver compute exact
+                                // absolute offsets and maxScrollExtent for the
+                                // WHOLE list without building rows — no lazy
+                                // estimate, so model-based centring
+                                // (_centerTargetFor) always lands. This is what
+                                // fixes the "selection off-screen after resize /
+                                // fast-scroll" divergence while keeping lazy row
+                                // rendering.
+                                sliver: SliverVariedExtentList.builder(
+                                  itemCount: _rows.length,
+                                  itemExtentBuilder: (index, _) {
+                                    if (index < 0 || index >= _rows.length) {
+                                      return 0;
+                                    }
+                                    return _rows[index].height + _spY;
+                                  },
+                                  itemBuilder: buildRow,
+                                ),
                               ),
-                              // Exact per-row extents (known from
-                              // _positionCards) let the sliver compute exact
-                              // absolute offsets and maxScrollExtent for the
-                              // WHOLE list without building rows — no lazy
-                              // estimate, so model-based centring
-                              // (_centerTargetFor) always lands. This is what
-                              // fixes the "selection off-screen after resize /
-                              // fast-scroll" divergence while keeping lazy row
-                              // rendering.
-                              sliver: SliverVariedExtentList.builder(
-                                itemCount: _rows.length,
-                                itemExtentBuilder: (index, _) {
-                                  if (index < 0 || index >= _rows.length) {
-                                    return 0;
-                                  }
-                                  return _rows[index].height + _spY;
-                                },
-                                itemBuilder: buildRow,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         // Selection cursor is drawn in-cell (see buildRow).
                         ValueListenableBuilder<String?>(
@@ -1346,8 +1385,7 @@ class _GamesGridState extends State<GamesGrid> {
     // this view is open — a lid opening is exactly that.
     final sig =
         '$_settledIndex|${settledGame.romname}|${settledGame.isFavorite}'
-        '|$hasRa|$loadingRa|${identityHashCode(_currentGameInfo)}'
-        '|${widget.isSecondaryScreenActive}';
+        '|$hasRa|$loadingRa|${identityHashCode(_currentGameInfo)}';
     if (sig == _chromeSig && _chromeFooter != null) {
       return;
     }
@@ -1359,8 +1397,6 @@ class _GamesGridState extends State<GamesGrid> {
       isLoadingAchievements: loadingRa,
       currentGameInfo: settled ? _currentGameInfo : null,
       onShowAchievements: _showAchievementsDialog,
-      onToggleMute: widget.isSecondaryScreenActive ? null : _toggleVideoMute,
-      hasVideo: !isFolder && _hasVideoFor(settledGame),
       isFolder: isFolder,
       // The game's own system, so the cloud mark reflects the game rather than
       // the placeholder an aggregate view is browsing under.
@@ -1449,20 +1485,16 @@ class _GamesGridState extends State<GamesGrid> {
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 2.r,
-                    offset: Offset(2.r, 2.r),
-                  ),
-                ],
               ),
               clipBehavior: Clip.antiAlias,
               child: _GameCardImage(
                 key: ValueKey('img_${game.romname}_${widget.artworkVersion}'),
                 box2dPath: box2dPath,
                 game: game,
-                targetWidth: targetWidth,
+                targetWidth: performanceCacheWidth(
+                  targetWidth,
+                  performanceMode: _performanceMode,
+                ),
               ),
             ),
             if (game.isFavorite == true)
@@ -1586,16 +1618,7 @@ class _GamesGridState extends State<GamesGrid> {
       child: RepaintBoundary(
         child: Container(
           clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12.r),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 2.r,
-                offset: Offset(2.r, 2.r),
-              ),
-            ],
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12.r)),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12.r),
             child: Stack(
@@ -1606,7 +1629,10 @@ class _GamesGridState extends State<GamesGrid> {
                     File(bgPath),
                     key: ValueKey('fanart_bg_${game.romname}'),
                     fit: BoxFit.cover,
-                    cacheWidth: 388,
+                    cacheWidth: performanceCacheWidth(
+                      388,
+                      performanceMode: _performanceMode,
+                    ),
                     errorBuilder: (ctx, e, s) =>
                         _buildFallbackCard(game, theme),
                   )
@@ -1641,7 +1667,10 @@ class _GamesGridState extends State<GamesGrid> {
                         File(wheelsPath),
                         key: ValueKey('wheel_${game.romname}'),
                         fit: BoxFit.contain,
-                        cacheWidth: 388,
+                        cacheWidth: performanceCacheWidth(
+                          388,
+                          performanceMode: _performanceMode,
+                        ),
                         errorBuilder: (ctx, e, s) => const SizedBox.shrink(),
                       ),
                     ),
@@ -1759,6 +1788,10 @@ class _GamesGridState extends State<GamesGrid> {
         file,
         fit: BoxFit.cover,
         gaplessPlayback: true,
+        cacheWidth: performanceCacheWidth(
+          512,
+          performanceMode: _performanceMode,
+        ),
         errorBuilder: (_, _, _) => const SizedBox.shrink(),
       ),
     );
@@ -1925,9 +1958,8 @@ class _Placeholder extends StatelessWidget {
             Icon(
               Icons.videogame_asset_rounded,
               size: 32.r,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.4),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.4),
             ),
             SizedBox(height: 4.r),
             Padding(
@@ -1941,9 +1973,8 @@ class _Placeholder extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 7.r,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.5),
                 ),
               ),
             ),

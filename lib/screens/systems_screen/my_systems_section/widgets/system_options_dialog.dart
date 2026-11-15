@@ -11,6 +11,7 @@ import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 
 /// Actions the Options dialog can hand back to the systems screen.
@@ -443,9 +444,8 @@ class _SystemOptionsDialogState extends State<SystemOptionsDialog> {
     _clampCurrent(rows);
 
     final theme = Theme.of(context);
-    final radii =
-        theme.extension<CornerRadii>()?.radiusExternal ??
-        BorderRadius.circular(16.r);
+    final cornerRadii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final radii = cornerRadii.radiusExternal;
     final screen = MediaQuery.sizeOf(context);
     final panelWidth = screen.width * 0.34;
     final maxPanelHeight = screen.height * 0.82;
@@ -464,56 +464,66 @@ class _SystemOptionsDialogState extends State<SystemOptionsDialog> {
               width: panelWidth,
               child: Material(
                 color: Colors.transparent,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: radii,
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                child: NeoGlassRim(
+                  cornerRadius: cornerRadii.radiusExternalRadius,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: radii,
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.shadow.withValues(
+                            alpha: 0.5,
+                          ),
+                          blurRadius: 24.r,
+                          offset: Offset(8.r, 0),
+                        ),
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.colorScheme.shadow.withValues(alpha: 0.5),
-                        blurRadius: 24.r,
-                        offset: Offset(8.r, 0),
-                      ),
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildHeader(context),
-                      Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: theme.colorScheme.outline.withValues(
-                          alpha: 0.25,
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildHeader(context),
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: theme.colorScheme.outline.withValues(
+                            alpha: 0.25,
+                          ),
                         ),
-                      ),
-                      Flexible(
-                        fit: FlexFit.loose,
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(12.r, 10.r, 12.r, 12.r),
-                          child: _menu == _OptionsMenu.main
-                              ? _buildRootBody(context, rows)
-                              : _buildSubmenuBody(
-                                  context,
-                                  config,
-                                  entries,
-                                  rows,
-                                ),
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              12.r,
+                              10.r,
+                              12.r,
+                              12.r,
+                            ),
+                            child: _menu == _OptionsMenu.main
+                                ? _buildRootBody(context, rows)
+                                : _buildSubmenuBody(
+                                    context,
+                                    config,
+                                    entries,
+                                    rows,
+                                  ),
+                          ),
                         ),
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: theme.colorScheme.outline.withValues(
-                          alpha: 0.25,
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: theme.colorScheme.outline.withValues(
+                            alpha: 0.25,
+                          ),
                         ),
-                      ),
-                      _buildFooter(context),
-                    ],
+                        _buildFooter(context),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -680,95 +690,111 @@ class _SystemOptionsDialogState extends State<SystemOptionsDialog> {
     final theme = Theme.of(context);
     final focused = _submenuIndex == rowIndex;
     final accent = theme.colorScheme.primary;
-    final radius =
-        theme.extension<CornerRadii>()?.radiusInternal ??
-        BorderRadius.circular(8.r);
+    final cornerRadii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final radius = cornerRadii.radiusInternal;
     const sizes = ['S', 'M', 'L', 'XL'];
     final selected = sizes.indexOf(config.systemGridColumns);
+    final focusedBackground = theme.colorScheme.onSurface;
+    final focusedForeground = theme.colorScheme.surface;
 
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 2.r),
-      child: Material(
-        color: focused ? accent.withValues(alpha: 0.14) : Colors.transparent,
-        borderRadius: radius,
-        child: InkWell(
-          key: _keyFor('card_size'),
-          onTap: () => _focusRow(rowIndex),
-          onHover: (hovering) {
-            if (hovering) _focusRow(rowIndex);
-          },
-          focusColor: Colors.transparent,
-          hoverColor: Colors.transparent,
-          splashColor: Colors.transparent,
-          highlightColor: Colors.transparent,
-          borderRadius: radius,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 5.r),
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              border: focused
-                  ? Border.all(color: accent.withValues(alpha: 0.45), width: 1)
-                  : Border.all(color: Colors.transparent, width: 1),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Symbols.crop_free_rounded,
-                  size: 17.r,
-                  color: focused
-                      ? accent
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+      padding: EdgeInsets.symmetric(vertical: 5.r),
+      child: NeoGlassRim(
+        cornerRadius: cornerRadii.radiusInternalRadius,
+        child: Material(
+          color: focused
+              ? focusedBackground
+              : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.16,
                 ),
-                SizedBox(width: 9.r),
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: sizes.asMap().entries.map((entry) {
-                      final isSelected = entry.key == selected;
-                      return InkWell(
-                        onTap: () {
-                          _focusRow(rowIndex);
-                          context
-                              .read<SqliteConfigProvider>()
-                              .updateSystemGridColumns(entry.value);
-                          SfxService().playNavSound();
-                        },
-                        focusColor: Colors.transparent,
-                        hoverColor: Colors.transparent,
-                        splashColor: Colors.transparent,
-                        highlightColor: Colors.transparent,
-                        borderRadius:
-                            theme.extension<CornerRadii>()?.radiusInternal ??
-                            BorderRadius.circular(4.r),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 7.r,
-                            vertical: 3.r,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected ? accent : Colors.transparent,
-                            borderRadius:
-                                theme
-                                    .extension<CornerRadii>()
-                                    ?.radiusInternal ??
-                                BorderRadius.circular(4.r),
-                          ),
-                          child: Text(
-                            entry.value,
-                            style: TextStyle(
-                              fontSize: 10.r,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected
-                                  ? theme.colorScheme.onPrimary
-                                  : theme.colorScheme.onSurface,
+          borderRadius: radius,
+          child: InkWell(
+            key: _keyFor('card_size'),
+            onTap: () => _focusRow(rowIndex),
+            onHover: (hovering) {
+              if (hovering) _focusRow(rowIndex);
+            },
+            focusColor: Colors.transparent,
+            hoverColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            borderRadius: radius,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 5.r),
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                border: Border.all(color: Colors.transparent, width: 1),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Symbols.crop_free_rounded,
+                    size: 17.r,
+                    color: focused
+                        ? focusedForeground
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  SizedBox(width: 9.r),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: sizes.asMap().entries.map((entry) {
+                        final isSelected = entry.key == selected;
+                        return InkWell(
+                          onTap: () {
+                            _focusRow(rowIndex);
+                            context
+                                .read<SqliteConfigProvider>()
+                                .updateSystemGridColumns(entry.value);
+                            SfxService().playNavSound();
+                          },
+                          focusColor: Colors.transparent,
+                          hoverColor: Colors.transparent,
+                          splashColor: Colors.transparent,
+                          highlightColor: Colors.transparent,
+                          borderRadius:
+                              theme.extension<CornerRadii>()?.radiusInternal ??
+                              BorderRadius.circular(4.r),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 7.r,
+                              vertical: 3.r,
+                            ),
+                            decoration: BoxDecoration(
+                              color: focused
+                                  ? (isSelected
+                                        ? focusedForeground
+                                        : Colors.transparent)
+                                  : (isSelected ? accent : Colors.transparent),
+                              borderRadius:
+                                  theme
+                                      .extension<CornerRadii>()
+                                      ?.radiusInternal ??
+                                  BorderRadius.circular(4.r),
+                            ),
+                            child: Text(
+                              entry.value,
+                              style: TextStyle(
+                                fontSize: 10.r,
+                                fontWeight: FontWeight.w700,
+                                color: focused
+                                    ? (isSelected
+                                          ? focusedBackground
+                                          : focusedForeground.withValues(
+                                              alpha: 0.65,
+                                            ))
+                                    : (isSelected
+                                          ? theme.colorScheme.onPrimary
+                                          : theme.colorScheme.onSurface),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }).toList(),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -817,97 +843,115 @@ class _SystemOptionsDialogState extends State<SystemOptionsDialog> {
   }) {
     final theme = Theme.of(context);
     final accent = theme.colorScheme.primary;
-    final radius =
-        theme.extension<CornerRadii>()?.radiusInternal ??
-        BorderRadius.circular(8.r);
+    final cornerRadii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final radius = cornerRadii.radiusInternal;
+    final focusedBackground = theme.colorScheme.onSurface;
+    final focusedForeground = theme.colorScheme.surface;
+    final mutedSelection = Color.alphaBlend(
+      theme.colorScheme.onSurface.withValues(alpha: 0.18),
+      theme.colorScheme.surface,
+    );
 
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 2.r),
-      child: Material(
-        color: focused ? accent.withValues(alpha: 0.14) : Colors.transparent,
-        borderRadius: radius,
-        child: InkWell(
-          key: _keyFor(row.id),
-          onTap: onTap,
-          onHover: (hovering) {
-            if (hovering) onHover();
-          },
-          focusColor: Colors.transparent,
-          hoverColor: Colors.transparent,
-          splashColor: Colors.transparent,
-          highlightColor: Colors.transparent,
+      padding: EdgeInsets.symmetric(vertical: 5.r),
+      child: NeoGlassRim(
+        cornerRadius: cornerRadii.radiusInternalRadius,
+        child: Material(
+          color: focused
+              ? focusedBackground
+              : (row.selected
+                    ? mutedSelection
+                    : theme.colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.16,
+                      )),
           borderRadius: radius,
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 10.r,
-              vertical: row.description == null ? 8.r : 7.r,
-            ),
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              border: focused
-                  ? Border.all(color: accent.withValues(alpha: 0.45), width: 1)
-                  : Border.all(color: Colors.transparent, width: 1),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  row.icon,
-                  size: 17.r,
-                  color: focused
-                      ? accent
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                SizedBox(width: 9.r),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        row.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.r,
-                          fontWeight: row.selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: row.selected
-                              ? accent
-                              : theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      if (row.description != null) ...[
-                        SizedBox(height: 1.r),
+          child: InkWell(
+            key: _keyFor(row.id),
+            onTap: onTap,
+            onHover: (hovering) {
+              if (hovering) onHover();
+            },
+            focusColor: Colors.transparent,
+            hoverColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            borderRadius: radius,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: 10.r,
+                vertical: row.description == null ? 8.r : 7.r,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                border: Border.all(color: Colors.transparent, width: 1),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    row.icon,
+                    size: 17.r,
+                    color: focused
+                        ? focusedForeground
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  SizedBox(width: 9.r),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         Text(
-                          row.description!,
+                          row.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          softWrap: false,
                           style: TextStyle(
-                            fontSize: 9.r,
-                            height: 1.25,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.5,
-                            ),
+                            fontSize: 12.r,
+                            fontWeight: row.selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: focused
+                                ? focusedForeground
+                                : theme.colorScheme.onSurface,
                           ),
                         ),
+                        if (row.description != null) ...[
+                          SizedBox(height: 1.r),
+                          Text(
+                            row.description!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                            style: TextStyle(
+                              fontSize: 9.r,
+                              height: 1.25,
+                              color: focused
+                                  ? focusedForeground.withValues(alpha: 0.6)
+                                  : theme.colorScheme.onSurface.withValues(
+                                      alpha: 0.5,
+                                    ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                SizedBox(width: 4.r),
-                if (row.action)
-                  Icon(
-                    Symbols.chevron_right_rounded,
-                    size: 16.r,
-                    color: focused
-                        ? accent
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.35),
-                  )
-                else if (row.selected)
-                  Icon(Symbols.check_rounded, size: 16.r, color: accent),
-              ],
+                  SizedBox(width: 4.r),
+                  if (row.action)
+                    Icon(
+                      Symbols.chevron_right_rounded,
+                      size: 16.r,
+                      color: focused
+                          ? focusedForeground.withValues(alpha: 0.7)
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                    )
+                  else if (row.selected)
+                    Icon(
+                      Symbols.check_rounded,
+                      size: 16.r,
+                      color: focused ? focusedForeground : accent,
+                    ),
+                ],
+              ),
             ),
           ),
         ),

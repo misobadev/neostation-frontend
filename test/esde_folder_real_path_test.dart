@@ -161,6 +161,25 @@ void main() {
       );
     });
 
+    // The picker's answer is decoded once; decoding it again changed or
+    // refused folder names holding a '%'.
+    test("a folder whose name holds a '%'", () {
+      expect(
+        UserDataLocationService.safUriToRealPath(
+          'content://com.android.externalstorage.documents/tree/'
+          '3734-3464%3A100%25%20Games',
+        ),
+        '/storage/3734-3464/100% Games',
+      );
+      expect(
+        UserDataLocationService.safUriToRealPath(
+          'content://com.android.externalstorage.documents/tree/'
+          'primary%3Aa%2541b',
+        ),
+        '/storage/emulated/0/a%41b',
+      );
+    });
+
     test("another provider's folder has none", () {
       expect(
         UserDataLocationService.safUriToRealPath(

@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
+
 import '../models/smart_collection_rules.dart';
 import '../models/database_game_model.dart';
 import '../services/collections/smart_collections_service.dart';
@@ -24,16 +26,14 @@ import '../services/collections/collections_service.dart';
 /// shares the SQLite file and nothing in memory, so a process-wide cache would
 /// go stale the moment either engine wrote (CLAUDE.md, dual-display devices).
 class CollectionsProvider extends ChangeNotifier with WidgetsBindingObserver {
-  /// [isBusy] reports a long-running writer (a scrape) whose notifications
+  /// [_isBusy] reports a long-running writer (a scrape) whose notifications
   /// would otherwise each trigger a library re-evaluation; while it is true
   /// refreshes are throttled to [_busyRefreshInterval] instead of 300 ms.
   CollectionsProvider({
-    List<ChangeNotifier> sources = const [],
-    bool Function()? isBusy,
+    this._sources = const [],
+    this._isBusy,
     Future<CollectionsSnapshot> Function()? readSnapshot,
-  }) : _sources = sources,
-       _isBusy = isBusy,
-       _snapshotReader = readSnapshot {
+  }) : _snapshotReader = readSnapshot {
     WidgetsBinding.instance.addObserver(this);
     for (final source in _sources) {
       source.addListener(_scheduleRefresh);

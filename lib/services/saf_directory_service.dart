@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import 'logger_service.dart';
 
 /// Service for managing directory and file operations via the Android
@@ -19,30 +21,6 @@ class SafDirectoryService {
   static const platform = MethodChannel('com.neogamelab.neostation/game');
 
   static final _log = LoggerService.instance;
-
-  /// Initiates the SAF directory picker intent.
-  ///
-  /// Returns a persistent 'content://' URI if successful, or null if cancelled.
-  static Future<String?> requestDirectoryAccess() async {
-    if (!Platform.isAndroid) {
-      return null;
-    }
-
-    try {
-      final String? directoryUri = await platform.invokeMethod(
-        'openDirectoryPicker',
-      );
-
-      if (directoryUri != null) {
-        _log.i('SAF directory URI obtained: $directoryUri');
-      }
-
-      return directoryUri;
-    } on PlatformException catch (e) {
-      _log.e('Error opening SAF directory picker: ${e.message}');
-      return null;
-    }
-  }
 
   /// Checks if the application currently holds persistent permission for a given URI.
   static Future<bool> hasPermission(String uri) async {
@@ -84,25 +62,6 @@ class SafDirectoryService {
     } on MissingPluginException catch (e) {
       _log.e('Releasing a SAF permission is unavailable: $e');
       return false;
-    }
-  }
-
-  /// Attempts to resolve a 'content://' URI into a standard filesystem path.
-  ///
-  /// Note: This is only possible for certain providers and may return null.
-  static Future<String?> uriToPath(String uri) async {
-    if (!Platform.isAndroid) {
-      return null;
-    }
-
-    try {
-      final String? path = await platform.invokeMethod('uriToPath', {
-        'uri': uri,
-      });
-      return path;
-    } on PlatformException catch (e) {
-      _log.e('Error converting SAF URI to path: ${e.message}');
-      return null;
     }
   }
 
@@ -200,13 +159,15 @@ class SafDirectoryService {
     if (_fastWalkAvailable == false) return null;
 
     try {
-      final List<dynamic>? files = await platform
-          .invokeMethod('fastWalkSafTree', {
-            'uri': uri,
-            'recursive': recursive,
-            'extensions': extensions.toList(),
-            'ignoreHiddenFiles': ignoreHiddenFiles,
-          });
+      final List<dynamic>? files = await platform.invokeMethod(
+        'fastWalkSafTree',
+        {
+          'uri': uri,
+          'recursive': recursive,
+          'extensions': extensions.toList(),
+          'ignoreHiddenFiles': ignoreHiddenFiles,
+        },
+      );
 
       if (files == null) {
         _fastWalkAvailable = false;

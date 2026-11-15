@@ -169,9 +169,8 @@ void main() {
   ) async {
     await pumpHeader(tester, current: DetailTab.gameInfo);
 
-    final scheme = Theme.of(
-      tester.element(find.byType(GameDetailsTabsHeader)),
-    ).colorScheme;
+    final scheme = Theme.of(tester.element(find.byType(GameDetailsTabsHeader)))
+        .colorScheme;
 
     final current = tester.widget<Icon>(find.byIcon(Symbols.info_rounded));
     final other = tester.widget<Icon>(

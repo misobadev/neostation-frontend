@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gamepads/gamepads.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/sfx_service.dart';
+
 import '../responsive.dart';
 import 'desktop_window_focus.dart';
 import 'gamepad_translator.dart';
@@ -126,6 +128,15 @@ class GamepadNavigation {
   final bool Function()? canHandleInput;
 
   static final _log = LoggerService.instance;
+
+  /// Clock used for input pacing. Tests replace it with a controllable clock.
+  static DateTime Function() _now = DateTime.now;
+
+  @visibleForTesting
+  static void debugSetClock(DateTime Function() now) => _now = now;
+
+  @visibleForTesting
+  static void debugResetClock() => _now = DateTime.now;
 
   /// When true, all raw input events are logged for diagnostic purposes.
   static bool _debugLogging = false;
@@ -535,7 +546,7 @@ class GamepadNavigation {
 
     // Start grace period only on true transitions to prevent discarding mid-flight release events.
     if (wasInactive) {
-      _activationTime = DateTime.now();
+      _activationTime = _now();
       // Clear any stale repeat timers that may have survived a prior deactivation.
       cancelAllRepeatTimers();
       // Drop remembered button states: a button held while this layer was
@@ -575,7 +586,7 @@ class GamepadNavigation {
 
   /// Whether a Select+face-button chord should register right now: Select is
   /// still reported down, or it pulsed within the chord window.
-  bool _isSelectChordActive() => _selectTap.isChordActive(DateTime.now());
+  bool _isSelectChordActive() => _selectTap.isChordActive(_now());
 
   /// Maps a face button to its Select-modifier combo callback, if any.
   VoidCallback? _selectModifierFor(GamepadInputType inputType) {
@@ -708,13 +719,15 @@ class GamepadNavigation {
   Future<void> _toggleFullscreen() async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       if (Platform.isWindows || Platform.isMacOS) {
-        final isFullscreen = await windowManager.isFullScreen();
-        await windowManager.setFullScreen(!isFullscreen);
+        final window = WindowManager.instance.getCurrent();
+        if (window != null) {
+          final isFullscreen = window.isFullScreen;
+          window.isFullScreen = !isFullscreen;
 
-        // Allow some time for the window manager to process the state change.
-        await Future.delayed(const Duration(milliseconds: 100));
-        final newState = await windowManager.isFullScreen();
-        FullscreenNotifier().notifyFullscreenChanged(newState);
+          // Allow some time for the window manager to process the state change.
+          await Future.delayed(const Duration(milliseconds: 100));
+          FullscreenNotifier().notifyFullscreenChanged(window.isFullScreen);
+        }
       }
     }
   }
@@ -753,7 +766,7 @@ class GamepadNavigation {
         );
       }
 
-      final now = DateTime.now();
+      final now = _now();
 
       // Select (View) chord modifier on Android: read the RAW key directly.
       // This controller auto-repeats ACTION_DOWN (value 0.0) while the button is
@@ -938,7 +951,7 @@ class GamepadNavigation {
     // action on release (see [_onSelectUp]). Some controllers only reliably report one edge
     // of this button, so the timestamp is stamped on BOTH press and release.
     if (event.inputType == GamepadInputType.buttonSelect) {
-      final now = DateTime.now();
+      final now = _now();
       if (event.isPressed) {
         _onSelectDown(now);
       } else if (event.isReleased) {
@@ -1178,7 +1191,7 @@ class GamepadNavigation {
         event.logicalKey == LogicalKeyboardKey.keyE;
     if (!isTabKey &&
         _activationTime != null &&
-        DateTime.now().difference(_activationTime!).inMilliseconds <
+        _now().difference(_activationTime!).inMilliseconds <
             _reactivationGraceMs) {
       return false;
     }
@@ -1213,7 +1226,7 @@ class GamepadNavigation {
       return false;
     }
 
-    final now = DateTime.now();
+    final now = _now();
 
     // Keyboard throttling for directional and basic action keys.
     if (isKeyDown &&
@@ -1412,7 +1425,7 @@ class GamepadNavigation {
   void _startRepeatTimer(dynamic key, Function action) {
     _repeatTimers[key]?.cancel();
 
-    final heldSince = DateTime.now();
+    final heldSince = _now();
     final bool canLetterJump =
         onLetterJump != null && _isLetterJumpKey(key) != null;
     final bool forward = _isLetterJumpKey(key) ?? false;
@@ -1428,7 +1441,7 @@ class GamepadNavigation {
           return;
         }
 
-        final held = DateTime.now().difference(heldSince);
+        final held = _now().difference(heldSince);
         if (canLetterJump &&
             held >= _letterJumpAfter &&
             onLetterJump!(forward)) {
@@ -1528,7 +1541,7 @@ class GamepadNavigation {
     _shoulderHoldInput = event.inputType;
     _shoulderHoldRawKey = event.originalKey.toLowerCase();
     _shoulderHoldGamepadId = event.gamepadId;
-    _shoulderHoldStartedAt = DateTime.now();
+    _shoulderHoldStartedAt = _now();
 
     void schedule(Duration delay) {
       _shoulderHoldTimer = Timer(delay, () {
@@ -1536,8 +1549,7 @@ class GamepadNavigation {
         final input = _shoulderHoldInput;
         if (startedAt == null || input == null) return;
 
-        if (DateTime.now().difference(startedAt).inMilliseconds >
-            _shoulderHoldMaxMs) {
+        if (_now().difference(startedAt).inMilliseconds > _shoulderHoldMaxMs) {
           _stopShoulderHold();
           return;
         }

@@ -401,15 +401,13 @@ class _NotificationsDropdownMenuState
         return Material(
           color: Theme.of(context).colorScheme.surface,
           elevation: 6,
-          shadowColor: Theme.of(
-            context,
-          ).colorScheme.shadow.withValues(alpha: 0.3),
+          shadowColor: Theme.of(context).colorScheme.shadow
+              .withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
             borderRadius: CornerRadii.of(context).radiusExternal,
             side: BorderSide(
-              color: Theme.of(
-                context,
-              ).colorScheme.outline.withValues(alpha: 0.3),
+              color: Theme.of(context).colorScheme.outline
+                  .withValues(alpha: 0.3),
             ),
           ),
           clipBehavior: Clip.antiAlias,
@@ -460,9 +458,8 @@ class _NotificationsDropdownMenuState
                                   ? Theme.of(context).colorScheme.primary
                                         .withValues(alpha: 0.15)
                                   : Colors.transparent,
-                              borderRadius: CornerRadii.of(
-                                context,
-                              ).radiusInternal,
+                              borderRadius: CornerRadii.of(context)
+                                  .radiusInternal,
                             ),
                             child: Text(
                               AppLocale.clearAll.getString(context),
@@ -484,9 +481,8 @@ class _NotificationsDropdownMenuState
                       child: Text(
                         AppLocale.noActiveNotifications.getString(context),
                         style: TextStyle(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.6),
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: 0.6),
                           fontSize: 11.r,
                         ),
                       ),
@@ -501,9 +497,8 @@ class _NotificationsDropdownMenuState
                       itemCount: notifications.length,
                       separatorBuilder: (_, _) => Divider(
                         height: 1.r,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.outline.withValues(alpha: 0.2),
+                        color: Theme.of(context).colorScheme.outline
+                            .withValues(alpha: 0.2),
                       ),
                       itemBuilder: (context, index) {
                         final data = notifications[index];
@@ -597,9 +592,8 @@ class _NotificationDropdownItem extends StatelessWidget {
                   Text(
                     data.message,
                     style: TextStyle(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.8),
+                      color: Theme.of(context).colorScheme.onSurface
+                          .withValues(alpha: 0.8),
                       fontSize: 10.r,
                     ),
                     // Enough room for a message that names a path and then says
@@ -628,9 +622,8 @@ class _NotificationDropdownItem extends StatelessWidget {
               onTap: () => GlobalNotificationService().dismiss(data.id),
               child: Icon(
                 Symbols.close_rounded,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.5),
                 size: 14.r,
               ),
             ),

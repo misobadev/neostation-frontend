@@ -178,9 +178,8 @@ class PlanWelcomeModalState extends State<PlanWelcomeModal> {
               RichText(
                 textAlign: TextAlign.center,
                 text: TextSpan(
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(fontSize: 11.sp),
+                  style: Theme.of(context).textTheme.bodyLarge
+                      ?.copyWith(fontSize: 11.sp),
                   children: [
                     TextSpan(
                       text: AppLocale.planWelcomeMessagePre.getString(context),
@@ -231,9 +230,8 @@ class PlanWelcomeModalState extends State<PlanWelcomeModal> {
               Text(
                 AppLocale.pressToClose.getString(context),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.6),
                   fontSize: 9.sp,
                 ),
                 textAlign: TextAlign.center,

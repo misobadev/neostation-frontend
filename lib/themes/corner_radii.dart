@@ -18,10 +18,9 @@ class CornerRadii extends ThemeExtension<CornerRadii> {
   final double _radiusInternal;
 
   const CornerRadii({
-    required double radiusExternal,
-    required double radiusInternal,
-  }) : _radiusExternal = radiusExternal,
-       _radiusInternal = radiusInternal;
+    required this._radiusExternal,
+    required this._radiusInternal,
+  });
 
   /// Sharp corners (no radius). Useful for themes like Cyberpunk.
   factory CornerRadii.zero() {

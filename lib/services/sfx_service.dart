@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:flutter_soloud/flutter_soloud.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
+
 import '../models/custom_sfx.dart';
 import '../repositories/custom_sfx_repository.dart';
 
@@ -12,6 +14,7 @@ import '../repositories/custom_sfx_repository.dart';
 abstract class SfxAudioBackend {
   bool get isInitialized;
   Future<void> init();
+  void deinit();
   Future<Object> loadAsset(String path);
   Future<Object> loadFile(String path);
   Duration length(Object source);
@@ -25,6 +28,8 @@ class SoLoudSfxBackend implements SfxAudioBackend {
   bool get isInitialized => SoLoud.instance.isInitialized;
   @override
   Future<void> init() => SoLoud.instance.init();
+  @override
+  void deinit() => SoLoud.instance.deinit();
   @override
   Future<Object> loadAsset(String path) => SoLoud.instance.loadAsset(path);
   @override
@@ -63,11 +68,7 @@ class SfxService {
     : _audio = SoLoudSfxBackend(),
       _files = CustomSfxRepository();
   @visibleForTesting
-  SfxService.forTesting({
-    required SfxAudioBackend audio,
-    required CustomSfxRepository files,
-  }) : _audio = audio,
-       _files = files;
+  SfxService.forTesting({required this._audio, required this._files});
   final SfxAudioBackend _audio;
   final CustomSfxRepository _files;
   Map<SfxAction, CustomSfx> _customSounds = const {};
@@ -258,10 +259,10 @@ class SfxService {
         // directory isn't fully ready before the first loadAsset() call.
         try {
           final tempDir = await getTemporaryDirectory();
-          await Directory(
-            '${tempDir.path}/SoLoudLoader-Temp-Files',
-          ).create(recursive: true);
+          await Directory('${tempDir.path}/SoLoudLoader-Temp-Files')
+              .create(recursive: true);
         } catch (_) {}
+        if (epoch != _engineEpoch || !isScreenOn()) return;
         await _audio.init();
       }
 
@@ -314,6 +315,17 @@ class SfxService {
       // Playback remains optional when the native engine is unavailable.
       if (!completer.isCompleted) completer.complete();
     } finally {
+      // Screen-off may arrive before async init finishes, when appPaused()
+      // still sees an uninitialized engine. A failed init can also leave the
+      // native output open while Dart reports isInitialized == false.
+      if (!isScreenOn()) {
+        try {
+          _audio.deinit();
+        } catch (e) {
+          _log.w('[SfxService] Error releasing audio engine: $e');
+        }
+        handleEngineTornDown();
+      }
       if (!completer.isCompleted) completer.complete();
       if (epoch == _engineEpoch) _isInitializing = false;
     }
@@ -340,7 +352,7 @@ class SfxService {
 
   /// Reopens the engine (if needed) and reloads SFX assets after a tear-down.
   Future<void> reinitializeAfterEngineRestart() async {
-    if (_isInitialized) return;
+    if (!_enabled || _isInitialized) return;
     await init();
   }
 

@@ -251,11 +251,8 @@ If you discover a security vulnerability, please follow the instructions in [`SE
 ### Official Co-Maintainers
 
 - **@androosio**
-
-### Official Community Manager
-
 - **@ItsRetroPup**
-  - Ko-fi: https://ko-fi.com/retropup84752
+- **@Codegnosis**
 
 These co-maintainers and collaborators work very hard to make NeoStation what it is today.
 

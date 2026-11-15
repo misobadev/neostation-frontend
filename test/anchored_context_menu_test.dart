@@ -8,6 +8,8 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/widgets/context_menu/anchored_context_menu.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 /// Covers the generic anchored context menu: what it renders, what it returns,
 /// how the submenu level behaves, and the viewport flip that keeps the panel
 /// on screen on the narrowest supported target (the Steam Deck's 1280x800).
@@ -31,6 +33,8 @@ void main() {
       initLanguageCode: 'en',
     );
   });
+  setUp(resetGamepadClock);
+  tearDown(restoreGamepadClock);
 
   const items = <ContextMenuItem>[
     ContextMenuItem(id: 'settings', label: 'Settings'),
@@ -62,13 +66,10 @@ void main() {
     ),
   );
 
-  /// Waits out [GamepadNavigation]'s post-activation grace window, which drops
-  /// every key event for 150 real milliseconds after a layer is activated. Fake
-  /// time does not move it, so the wait has to be a real one.
+  /// Advances past [GamepadNavigation]'s post-activation grace window, which
+  /// drops every key event for 150 ms after a layer is activated.
   Future<void> settleNavGrace(WidgetTester tester) async {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 200)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
   }
 
@@ -181,9 +182,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
     await tester.pump(const Duration(milliseconds: 10));
     // Past the action debounce, but the fade-out has not finished.
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 150)),
-    );
+    advanceGamepadClock(const Duration(milliseconds: 150));
     await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
     await tester.pumpAndSettle();
 

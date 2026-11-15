@@ -3,13 +3,17 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
+
 import 'dart:io';
 import 'dart:async';
+
 import '../sync/i_sync_provider.dart';
 import '../providers/file_provider.dart';
 import '../models/system_model.dart';
 import '../models/game_model.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import '../services/game_service.dart';
 import '../services/game_launch_manager.dart';
 import '../services/logger_service.dart';
@@ -282,9 +286,8 @@ class _GameLaunchDialogState extends State<GameLaunchDialog> {
                             return Icon(
                               Symbols.videogame_asset_rounded,
                               size: 40.r,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surface.withValues(alpha: 0.5),
+                              color: Theme.of(context).colorScheme.surface
+                                  .withValues(alpha: 0.5),
                             );
                           },
                         ),

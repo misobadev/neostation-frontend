@@ -13,6 +13,7 @@ import 'package:neostation/data/datasources/sqlite_service.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import 'settings_title.dart';
 
 class AboutSettingsContent extends StatefulWidget {
@@ -346,10 +347,7 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
               ? theme.colorScheme.onSurface
               : theme.colorScheme.surface.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: isFocused ? theme.colorScheme.primary : Colors.transparent,
-            width: 2,
-          ),
+          border: Border.all(color: Colors.transparent, width: 2),
         ),
         child: Row(
           children: [

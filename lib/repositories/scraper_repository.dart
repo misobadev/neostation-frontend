@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../data/datasources/sqlite_service.dart';
 import '../models/rom_fingerprint.dart';
 import '../services/credential_store.dart';
+
 import 'package:neostation/services/logger_service.dart';
 
 class MetadataTransferResult {
@@ -18,6 +19,15 @@ class MetadataTransferResult {
 /// Repository for ScreenScraper system configuration data access.
 class ScraperRepository {
   static final _log = LoggerService.instance;
+
+  /// `user_screenscraper_metadata.is_fully_scraped` once a game's media have
+  /// downloaded: "New content only" leaves the game alone.
+  static const int scrapedFully = 1;
+
+  /// `is_fully_scraped` for a game scraped while every media type was switched
+  /// off: "New content only" leaves it alone until a media type is switched
+  /// on, then fetches its media.
+  static const int scrapedMetadataOnly = 2;
 
   /// Returns detected systems that have a ScreenScraper ID, ordered by name.
   static Future<List<Map<String, dynamic>>> getScraperSystems() async {
@@ -601,9 +611,9 @@ class ScraperRepository {
     );
     if (mapped.isEmpty) return;
 
-    final existing = (await db.query(
-      'user_screenscraper_system_config',
-    )).map((r) => r['app_system_id'].toString()).toSet();
+    final existing = (await db.query('user_screenscraper_system_config'))
+        .map((r) => r['app_system_id'].toString())
+        .toSet();
     for (final s in mapped) {
       final id = s['app_system_id'].toString();
       if (!existing.contains(id)) {
@@ -714,6 +724,75 @@ class ScraperRepository {
     }
   }
 
+  /// Saves a ScreenScraper match for a "New content only" session without
+  /// replacing what the game already has.
+  ///
+  /// With no row this is [saveGameMetadata]. An existing row keeps every
+  /// non-empty column and only its empty ones are filled from [metadata]: the
+  /// session reaches games not yet fully scraped, and their metadata may be
+  /// the user's own (the metadata editor) or an ES-DE import, which a match
+  /// with less information would otherwise blank. Columns the match doesn't
+  /// carry (ES-DE's media subfolder, the RetroAchievements id) stay as they
+  /// are.
+  ///
+  /// The file name is matched exactly, as the session's selection and
+  /// [markGameFullyScraped] match it: a row differing only in case isn't this
+  /// game's, so the match gets a row of its own, as [saveGameMetadata] gives it.
+  ///
+  /// As with [saveGameMetadata], the game isn't finished until its media are
+  /// (`is_fully_scraped` = 0), and it no longer counts as an ES-DE import, so
+  /// an ES-DE reset keeps it.
+  static Future<bool> fillGameMetadataGaps(
+    Map<String, dynamic> metadata,
+    String appSystemId,
+  ) async {
+    try {
+      final db = await SqliteService.getDatabase();
+      final filename = metadata['filename'];
+      final existing = await db.query(
+        'user_screenscraper_metadata',
+        where: 'app_system_id = ? AND filename = ?',
+        whereArgs: [appSystemId, filename],
+        limit: 1,
+      );
+      if (existing.isEmpty) {
+        return await saveGameMetadata(metadata, appSystemId);
+      }
+
+      final row = existing.first;
+      final toWrite = <String, dynamic>{};
+      metadata.forEach((col, val) {
+        if (const {
+          'app_system_id',
+          'filename',
+          'is_fully_scraped',
+          'updated_at',
+        }.contains(col)) {
+          return;
+        }
+        if (!_isBlank(val) && _isBlank(row[col])) toWrite[col] = val;
+      });
+      toWrite['is_fully_scraped'] = 0;
+      toWrite['esde_imported'] = 0;
+      toWrite['updated_at'] = DateTime.now().toIso8601String();
+
+      await db.update(
+        'user_screenscraper_metadata',
+        toWrite,
+        where: 'app_system_id = ? AND filename = ?',
+        whereArgs: [appSystemId, filename],
+      );
+      return true;
+    } catch (e) {
+      _log.e('Error filling game metadata gaps: $e');
+      return false;
+    }
+  }
+
+  /// Null, or a string with nothing but white space.
+  static bool _isBlank(Object? value) =>
+      value == null || (value is String && value.trim().isEmpty);
+
   /// Merges ES-DE-imported metadata into `user_screenscraper_metadata`,
   /// writing only columns that are currently empty (fill-gaps precedence).
   ///
@@ -787,11 +866,7 @@ class ScraperRepository {
   }) {
     final toWrite = <String, dynamic>{};
     esde.forEach((col, val) {
-      if (val == null) return;
-      if (val is String && val.trim().isEmpty) return;
-      final cur = row?[col];
-      final curEmpty = cur == null || (cur is String && cur.trim().isEmpty);
-      if (curEmpty) toWrite[col] = val;
+      if (!_isBlank(val) && _isBlank(row?[col])) toWrite[col] = val;
     });
 
     // Media subfolder is ES-DE bookkeeping (mirrors the ROM's subfolder inside
@@ -861,14 +936,38 @@ class ScraperRepository {
     }
   }
 
-  /// Marks a game's metadata as fully scraped.
-  static Future<void> markGameFullyScraped(String filename) async {
+  /// Marks a game's metadata on [appSystemId] as fully scraped, or, with
+  /// [metadataOnly], as scraped while every media type was switched off.
+  static Future<void> markGameFullyScraped(
+    String appSystemId,
+    String filename, {
+    bool metadataOnly = false,
+  }) async {
     final db = await SqliteService.getDatabase();
     await db.update(
       'user_screenscraper_metadata',
-      {'is_fully_scraped': 1, 'updated_at': DateTime.now().toIso8601String()},
-      where: 'filename = ?',
-      whereArgs: [filename],
+      {
+        'is_fully_scraped': metadataOnly ? scrapedMetadataOnly : scrapedFully,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'app_system_id = ? AND filename = ?',
+      whereArgs: [appSystemId, filename],
+    );
+  }
+
+  /// Clears a game's finished mark on [appSystemId] while its media are
+  /// fetched again, so "New content only" retries the game if they fail.
+  /// Saving metadata clears the mark too; this is for when none is saved.
+  static Future<void> markGameUnfinished(
+    String appSystemId,
+    String filename,
+  ) async {
+    final db = await SqliteService.getDatabase();
+    await db.update(
+      'user_screenscraper_metadata',
+      {'is_fully_scraped': 0, 'updated_at': DateTime.now().toIso8601String()},
+      where: 'app_system_id = ? AND filename = ? AND is_fully_scraped != 0',
+      whereArgs: [appSystemId, filename],
     );
   }
 
@@ -987,15 +1086,28 @@ class ScraperRepository {
 
   // ── Bulk scraping ─────────────────────────────────────────────────────────
 
+  /// The `WHERE` condition that limits a scrape to what [scrapeMode] still
+  /// has to do: for "New content only", games never scraped or not finished,
+  /// plus games scraped for metadata only once a media type is switched on.
+  static Future<String> _scrapeModeFilter(String scrapeMode) async {
+    if (scrapeMode != 'new_only') return '';
+    final mediaWanted = (await getEnabledMediaTypes()).isNotEmpty;
+    final metadataOnly = mediaWanted
+        ? ' OR usm.is_fully_scraped = $scrapedMetadataOnly'
+        : '';
+    return 'AND (usm.filename IS NULL OR usm.is_fully_scraped = 0$metadataOnly)';
+  }
+
   /// Returns the count of ROMs eligible for scraping for a given system.
   static Future<int> getRomCountForScraping(
     String appSystemId,
     String scrapeMode,
   ) async {
+    final filter = await _scrapeModeFilter(scrapeMode);
     final db = await SqliteService.getDatabase();
     final result = await db.rawQuery(
-      '''SELECT COUNT(*) as count FROM user_roms ur LEFT JOIN user_screenscraper_metadata usm ON ur.filename = usm.filename 
-       WHERE ur.app_system_id = ? ${scrapeMode == 'new_only' ? 'AND (usm.filename IS NULL OR usm.is_fully_scraped = 0)' : ''}''',
+      '''SELECT COUNT(*) as count FROM user_roms ur LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
+       WHERE ur.app_system_id = ? $filter''',
       [appSystemId],
     );
     return int.tryParse(result.first['count']?.toString() ?? '0') ?? 0;
@@ -1006,11 +1118,12 @@ class ScraperRepository {
     String appSystemId,
     String scrapeMode,
   ) async {
+    final filter = await _scrapeModeFilter(scrapeMode);
     final db = await SqliteService.getDatabase();
     return await db.rawQuery(
-      '''SELECT ur.filename, ur.rom_path, ur.title_name, usm.is_fully_scraped 
-       FROM user_roms ur LEFT JOIN user_screenscraper_metadata usm ON ur.filename = usm.filename 
-       WHERE ur.app_system_id = ? ${scrapeMode == 'new_only' ? 'AND (usm.filename IS NULL OR usm.is_fully_scraped = 0)' : ''}''',
+      '''SELECT ur.filename, ur.rom_path, ur.title_name, usm.is_fully_scraped
+       FROM user_roms ur LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
+       WHERE ur.app_system_id = ? $filter''',
       [appSystemId],
     );
   }
@@ -1023,10 +1136,12 @@ class ScraperRepository {
     final db = await SqliteService.getDatabase();
     return await db.rawQuery(
       '''
-      SELECT ur.filename, ur.rom_path, ur.title_id, usm.is_fully_scraped
+      SELECT ur.filename, ur.rom_path, ur.title_id, ur.ss_manual_game_id,
+        usm.filename AS metadata_filename
       FROM user_roms ur
       LEFT JOIN user_screenscraper_metadata usm 
-        ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
+        ON ur.app_system_id = usm.app_system_id
+        AND ur.filename = usm.filename COLLATE NOCASE
       WHERE ur.app_system_id = ? 
         AND ur.title_id IS NOT NULL
       ''',

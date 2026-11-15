@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -22,7 +23,9 @@ import 'package:neostation/providers/collections_provider.dart';
 import 'package:neostation/widgets/achievements_badge.dart';
 import 'package:neostation/widgets/collection_badge.dart';
 import 'package:neostation/widgets/native_carousel.dart';
+import 'package:neostation/utils/performance_mode.dart';
 import 'package:neostation/widgets/game_view_footer.dart';
+import 'package:neostation/widgets/game_fanart_background.dart';
 import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/models/retro_achievements_game_info.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
@@ -144,6 +147,9 @@ class _GamesCarouselState extends State<GamesCarousel> {
   // Set from the config this view already watches in build(); the card builders
   // below read it rather than looking the provider up per card.
   bool _showAchievementsBadge = false;
+
+  /// Set from the config in build; disables decorative effects at render time.
+  bool _performanceMode = false;
 
   /// ROM paths filed in at least one collection, read once per build.
   ///
@@ -594,8 +600,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
     // this view is open — a lid opening is exactly that.
     final sig =
         '$_settledIndex|${settledGame.romname}|${settledGame.isFavorite}'
-        '|$hasRa|$loadingRa|${identityHashCode(_currentGameInfo)}'
-        '|${widget.isSecondaryScreenActive}';
+        '|$hasRa|$loadingRa|${identityHashCode(_currentGameInfo)}';
     if (sig == _chromeSig && _chromeFooter != null) {
       return;
     }
@@ -607,8 +612,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
       isLoadingAchievements: loadingRa,
       currentGameInfo: settled ? _currentGameInfo : null,
       onShowAchievements: _showAchievementsDialog,
-      onToggleMute: widget.isSecondaryScreenActive ? null : _toggleVideoMute,
-      hasVideo: !isFolder && _hasVideoFor(settledGame),
       isFolder: isFolder,
       // The game's own system, so the cloud mark reflects the game rather than
       // the placeholder an aggregate view is browsing under.
@@ -737,7 +740,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
   }
 
   void _updateBackground() {
-    if (!mounted || widget.games.isEmpty) return;
+    if (_performanceMode || !mounted || widget.games.isEmpty) return;
     if (_currentIndex < 0 || _currentIndex >= widget.games.length) return;
     if (_lastBgIndex == _currentIndex) return;
     _lastBgIndex = _currentIndex;
@@ -847,23 +850,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
     return widget.system.primaryFolderName;
   }
 
-  /// Whether the game has a preview video, so the footer knows whether a mute
-  /// control is worth showing.
-  ///
-  /// Scraped media lives on the plain filesystem (unlike SAF ROM paths), so a
-  /// sync stat is safe, and this only runs when the selection settles — not
-  /// per frame. Cached alongside the background lookups.
-  bool _hasVideoFor(GameModel game) {
-    final videoPath = game.getVideoPath(
-      _folderForGame(game),
-      widget.fileProvider,
-    );
-    return _fileExistsCache.putIfAbsent(
-      videoPath,
-      () => File(videoPath).existsSync(),
-    );
-  }
-
   String _resolveImagePath(GameModel game, String imageType) {
     final path = game.getImagePath(
       _folderForGame(game),
@@ -894,13 +880,15 @@ class _GamesCarouselState extends State<GamesCarousel> {
       margin: EdgeInsets.all(5.r),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 8.r,
-            offset: Offset(2.r, 2.r),
-          ),
-        ],
+        boxShadow: _performanceMode
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 8.r,
+                  offset: Offset(2.r, 2.r),
+                ),
+              ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24.r),
@@ -912,7 +900,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
                 File(bgPath),
                 key: ValueKey(bgPath),
                 fit: BoxFit.cover,
-                cacheWidth: 1024,
+                cacheWidth: performanceCacheWidth(
+                  1024,
+                  performanceMode: _performanceMode,
+                ),
                 errorBuilder: (ctx, e, s) => _buildFallbackCard(game, theme),
               )
             else
@@ -1047,13 +1038,15 @@ class _GamesCarouselState extends State<GamesCarousel> {
       margin: EdgeInsets.all(5.r),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 8.r,
-            offset: Offset(2.r, 2.r),
-          ),
-        ],
+        boxShadow: _performanceMode
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 8.r,
+                  offset: Offset(2.r, 2.r),
+                ),
+              ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24.r),
@@ -1138,6 +1131,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
           file,
           fit: BoxFit.cover,
           gaplessPlayback: true,
+          cacheWidth: performanceCacheWidth(
+            512,
+            performanceMode: _performanceMode,
+          ),
           errorBuilder: (_, _, _) => const SizedBox.shrink(),
         ),
       ),
@@ -1209,7 +1206,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
           key: ValueKey(wheelPath),
           fit: BoxFit.contain,
           filterQuality: FilterQuality.medium,
-          cacheWidth: 512,
+          cacheWidth: performanceCacheWidth(
+            512,
+            performanceMode: _performanceMode,
+          ),
           errorBuilder: (ctx, e, s) => const SizedBox.shrink(),
         ),
       );
@@ -1295,13 +1295,17 @@ class _GamesCarouselState extends State<GamesCarousel> {
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8.r),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isSelected ? 0.6 : 0.3),
-                  blurRadius: isSelected ? 12.r : 6.r,
-                  offset: Offset(2.r, 2.r),
-                ),
-              ],
+              boxShadow: _performanceMode
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: isSelected ? 0.6 : 0.3,
+                        ),
+                        blurRadius: isSelected ? 12.r : 6.r,
+                        offset: Offset(2.r, 2.r),
+                      ),
+                    ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8.r),
@@ -1312,7 +1316,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
                     File(boxPath),
                     key: ValueKey(boxPath),
                     fit: BoxFit.cover,
-                    cacheWidth: 1024,
+                    cacheWidth: performanceCacheWidth(
+                      1024,
+                      performanceMode: _performanceMode,
+                    ),
                     errorBuilder: (ctx, e, s) => _buildBoxFallback(game, theme),
                   ),
                   if (game.isFavorite == true)
@@ -1369,6 +1376,35 @@ class _GamesCarouselState extends State<GamesCarousel> {
     return _buildFallbackCard(game, theme);
   }
 
+  /// Renders the settled game's fanart over the theme background.
+  /// Missing fanart has no screenshot or system-logo fallback.
+  Widget _buildFanartBackground() {
+    final index = _settledIndex.clamp(0, widget.games.length - 1);
+    final game = widget.games[index];
+
+    return IgnorePointer(
+      child: RepaintBoundary(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
+            // Blend with the theme background so light themes stay light.
+            Opacity(
+              opacity: 0.20,
+              child: GameFanartBackground(
+                game: _isFolderIndex(index) ? null : game,
+                systemFolder: _folderForGame(game),
+                fileProvider: widget.fileProvider,
+                artworkVersion: widget.artworkVersion,
+                performanceMode: _performanceMode,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.games.isEmpty) {
@@ -1383,6 +1419,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
     final config = context.watch<SqliteConfigProvider>().config;
     final isFanart = config.gameCarouselCardStyle != 'box';
     _showAchievementsBadge = config.showAchievementsBadge;
+    _performanceMode = config.performanceMode;
     _collections = SystemFolderNames.isCollection(widget.system.folderName)
         ? null
         : context.watch<CollectionsProvider>();
@@ -1408,6 +1445,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
 
     return Stack(
       children: [
+        Positioned.fill(child: _buildFanartBackground()),
         Column(
           children: [
             // #188 layout: drop the top spacer so the carousel gets the full
@@ -1427,6 +1465,16 @@ class _GamesCarouselState extends State<GamesCarousel> {
                   // boundary. Stepping past either end continues from the
                   // other.
                   wrap: true,
+                  performanceMode: _performanceMode,
+                  depth: _performanceMode
+                      ? const CarouselDepth(
+                          minScale: 1,
+                          opacityBase: 1,
+                          opacityFalloff: 0,
+                          minOpacity: 1,
+                          edgePull: 0,
+                        )
+                      : const CarouselDepth(),
                   itemBuilder: (context, index) {
                     final isCentred = index == _currentIndex;
                     if (index < widget.folderCount) {

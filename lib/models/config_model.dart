@@ -1,11 +1,33 @@
 import 'dart:convert';
+
 import 'custom_sfx.dart';
 
 import 'package:neostation/constants/recent_card_sizes.dart';
+
 import 'emulator_model.dart';
 
 String _normalizeGameListSize(String value) =>
     const {'S', 'M', 'L', 'XL'}.contains(value) ? value : 'S';
+
+bool _parseBool(Object? value) {
+  if (value is bool) return value;
+  final text = value?.toString().toLowerCase();
+  return text == '1' || text == 'true';
+}
+
+/// Reads the preview delay from the new integer key, falling back to the old
+/// on/off boolean from builds before the setting became a delay.
+int _parseVideoPreviewDelay(Map<String, dynamic> json) {
+  final raw = json['videoPreviewDelay'] ?? json['video_preview_delay'];
+  if (raw != null) {
+    final parsed = int.tryParse(raw.toString());
+    if (parsed != null) return parsed.clamp(-1, 5);
+  }
+
+  final legacy = json['videoPreviews'] ?? json['video_previews'];
+  if (legacy == null) return 2;
+  return [false, 0, '0', 'false'].contains(legacy) ? -1 : 2;
+}
 
 /// Represents the global application configuration and user preferences.
 class ConfigModel {
@@ -13,6 +35,12 @@ class ConfigModel {
   /// The dock always persists this many slots so assignments in higher slots
   /// survive when the user shrinks the visible count ([dockSlotCount]).
   static const int dockMaxSlots = 5;
+
+  /// Normalizes a persisted grid size, defaulting to M.
+  static String normalizeGridColumns(Object? value) {
+    final size = value?.toString() ?? 'M';
+    return const {'S', 'M', 'L', 'XL'}.contains(size) ? size : 'M';
+  }
 
   /// Smallest and largest number of dock slots the user may choose to show.
   static const int dockMinSlotCount = 0;
@@ -76,6 +104,10 @@ class ConfigModel {
 
   /// Ignore leading English articles when ordering game titles.
   final bool ignoreArticlesInGameSort;
+
+  /// Preview video delay in seconds: -1 disables previews, 0 plays as soon as
+  /// the decoder is ready, and 1..5 holds the screenshot for that long.
+  final int videoPreviewDelay;
 
   /// Whether the initial onboarding/setup process has been finished.
   final bool setupCompleted;
@@ -153,6 +185,9 @@ class ConfigModel {
 
   final bool androidAppsAsTab;
 
+  /// Whether the Discovery navigation tab is hidden. See [hideTabSync].
+  final bool hideTabDiscovery;
+
   /// Seconds of inactivity before the secondary "Now Playing" panel dims, or `0`
   /// to never dim. Only meaningful when a secondary display is active.
   final int nowPlayingDimDelay;
@@ -173,6 +208,11 @@ class ConfigModel {
   /// Whether the secondary "Now Playing" app dock is shown at all.
   final bool dockEnabled;
 
+  /// Whether the secondary display hides the system logo while browsing,
+  /// showing only the background art (no logo or system name). Separate from
+  /// [hideSystemLogos], which only affects the main screen's system cards.
+  final bool secondaryHideSystemLogo;
+
   /// How many dock slots are visible, from [dockMinSlotCount] to
   /// [dockMaxSlotCount]. Slots beyond this stay persisted but hidden.
   final int dockSlotCount;
@@ -188,6 +228,17 @@ class ConfigModel {
 
   /// Preferred grid column density for the systems grid ('S', 'M', 'L', 'XL').
   final String systemGridColumns;
+
+  /// Preferred grid column density for the Discovery board ('S', 'M', 'L',
+  /// 'XL'). Discovery uses the same scale as the systems grid.
+  final String discoveryGridColumns;
+
+  /// Discovery layout: `'grid'` or `'carousel'`.
+  final String discoveryViewMode;
+
+  /// Preferred grid column density for the Android apps board ('S', 'M', 'L',
+  /// 'XL').
+  final String androidGridColumns;
 
   /// Preferred grid column density for the games grid ('S', 'M', 'L', 'XL').
   final String gameGridColumns;
@@ -243,6 +294,13 @@ class ConfigModel {
   /// footer and becomes a 1:1 tile.
   final bool hideSystemLogos;
 
+  /// Whether the app trades visual effects for speed on modest hardware.
+  ///
+  /// This is a render-time override, not a change to the user's saved visual
+  /// preferences: turning it off restores their theme, glass, animation and
+  /// image-quality choices untouched.
+  final bool performanceMode;
+
   /// Gaussian blur sigma of the frosted-glass chrome (NeoGlass), clamped to
   /// 0–2. `0` (the default) disables the blur entirely (flat translucent
   /// panel, cheapest). Higher values are only smooth on a powerful GPU.
@@ -272,6 +330,7 @@ class ConfigModel {
     this.scanOnStartup = true,
     this.ignoreHiddenFiles = true,
     this.ignoreArticlesInGameSort = false,
+    this.videoPreviewDelay = 2,
     this.setupCompleted = false,
     this.hideBottomScreen = false,
     this.videoSound = false,
@@ -293,10 +352,14 @@ class ConfigModel {
     this.hideTabRomm = false,
     this.hideSearchCard = true,
     this.androidAppsAsTab = false,
+    this.hideTabDiscovery = false,
     this.activeSyncProvider = 'neosync',
     this.autoUpdateApp = true,
     this.autoUpdateSystems = true,
     this.systemGridColumns = 'M',
+    this.discoveryGridColumns = 'M',
+    this.discoveryViewMode = 'grid',
+    this.androidGridColumns = 'M',
     this.gameGridColumns = 'M',
     this.gameListSize = 'S',
     this.gameCarouselCardStyle = 'fanart',
@@ -305,6 +368,7 @@ class ConfigModel {
     this.fanartDimLevel = 25,
     this.dockApps = const ['', '', '', '', ''],
     this.dockEnabled = true,
+    this.secondaryHideSystemLogo = false,
     this.dockSlotCount = 3,
     this.esdeFolderPath = '',
     this.showAchievementsBadge = false,
@@ -312,6 +376,7 @@ class ConfigModel {
     this.raMatchOnStartup = false,
     this.subfolderViewAll = false,
     this.hideSystemLogos = false,
+    this.performanceMode = false,
     this.neoglassBlur = 0,
     this.neoglassTransparency = 10,
     this.neoglassBorderWidth = 2,
@@ -408,6 +473,7 @@ class ConfigModel {
         json['ignoreArticlesInGameSort'] ??
             json['ignore_articles_in_game_sort'],
       ),
+      videoPreviewDelay: _parseVideoPreviewDelay(json),
       collectionSortBy:
           (json['collectionSortBy'] ?? json['collection_sort_by'] ?? 'name')
               .toString(),
@@ -463,6 +529,12 @@ class ConfigModel {
               '1' ||
           (json['androidAppsAsTab'] ?? false).toString().toLowerCase() ==
               'true',
+      hideTabDiscovery:
+          (json['hideTabDiscovery'] ?? json['hide_tab_discovery'] ?? 0)
+                  .toString() ==
+              '1' ||
+          (json['hideTabDiscovery'] ?? false).toString().toLowerCase() ==
+              'true',
       activeSyncProvider:
           (json['activeSyncProvider'] ??
                   json['active_sync_provider'] ??
@@ -481,6 +553,18 @@ class ConfigModel {
       systemGridColumns:
           (json['systemGridColumns'] ?? json['system_grid_columns'] ?? 'M')
               .toString(),
+      discoveryGridColumns: normalizeGridColumns(
+        json['discoveryGridColumns'] ?? json['discovery_grid_columns'],
+      ),
+      discoveryViewMode:
+          (json['discoveryViewMode'] ?? json['discovery_view_mode'] ?? 'grid')
+                  .toString() ==
+              'carousel'
+          ? 'carousel'
+          : 'grid',
+      androidGridColumns: normalizeGridColumns(
+        json['androidGridColumns'] ?? json['android_grid_columns'],
+      ),
       gameGridColumns:
           (json['gameGridColumns'] ?? json['game_grid_columns'] ?? 'M')
               .toString(),
@@ -514,6 +598,15 @@ class ConfigModel {
       dockEnabled:
           (json['dockEnabled'] ?? true).toString().toLowerCase() == 'true' ||
           (json['dock_enabled'] ?? 1).toString() == '1',
+      // Absent => 0 => logo shown (the default).
+      secondaryHideSystemLogo:
+          (json['secondaryHideSystemLogo'] ??
+                      json['secondary_hide_system_logo'] ??
+                      0)
+                  .toString() ==
+              '1' ||
+          (json['secondaryHideSystemLogo'] ?? false).toString().toLowerCase() ==
+              'true',
       dockSlotCount:
           (int.tryParse(
                     (json['dockSlotCount'] ?? json['dock_slot_count'] ?? 3)
@@ -561,6 +654,10 @@ class ConfigModel {
                   .toString() ==
               '1' ||
           (json['hideSystemLogos'] ?? false).toString().toLowerCase() == 'true',
+      // Absent => 0 => off: upgrades keep the existing visual behaviour.
+      performanceMode: _parseBool(
+        json['performanceMode'] ?? json['performance_mode'],
+      ),
       // Absent => 0 => blur off (the default). The frosted blur is only smooth
       // on a powerful GPU, so it starts disabled.
       neoglassBlur:
@@ -583,7 +680,7 @@ class ConfigModel {
                         .toString(),
                   ) ??
                   2)
-              .clamp(0.0, 8.0),
+              .clamp(0.0, 2.0),
     );
   }
 
@@ -627,6 +724,8 @@ class ConfigModel {
       'scanOnStartup': scanOnStartup,
       'ignoreHiddenFiles': ignoreHiddenFiles,
       'ignoreArticlesInGameSort': ignoreArticlesInGameSort,
+      'videoPreviewDelay': videoPreviewDelay,
+      'videoPreviews': videoPreviewDelay >= 0,
       'setupCompleted': setupCompleted,
       'hideBottomScreen': hideBottomScreen,
       'videoSound': videoSound,
@@ -648,10 +747,14 @@ class ConfigModel {
       'hideTabRomm': hideTabRomm,
       'hideSearchCard': hideSearchCard,
       'androidAppsAsTab': androidAppsAsTab,
+      'hideTabDiscovery': hideTabDiscovery,
       'activeSyncProvider': activeSyncProvider,
       'autoUpdateApp': autoUpdateApp,
       'autoUpdateSystems': autoUpdateSystems,
       'systemGridColumns': systemGridColumns,
+      'discoveryGridColumns': discoveryGridColumns,
+      'discoveryViewMode': discoveryViewMode,
+      'androidGridColumns': androidGridColumns,
       'gameGridColumns': gameGridColumns,
       'gameListSize': gameListSize,
       'gameCarouselCardStyle': gameCarouselCardStyle,
@@ -660,6 +763,7 @@ class ConfigModel {
       'fanartDimLevel': fanartDimLevel,
       'dockApps': dockApps,
       'dockEnabled': dockEnabled,
+      'secondaryHideSystemLogo': secondaryHideSystemLogo,
       'dockSlotCount': dockSlotCount,
       'esdeFolderPath': esdeFolderPath,
       'showAchievementsBadge': showAchievementsBadge,
@@ -667,6 +771,7 @@ class ConfigModel {
       'raMatchOnStartup': raMatchOnStartup,
       'subfolderViewAll': subfolderViewAll,
       'hideSystemLogos': hideSystemLogos,
+      'performanceMode': performanceMode,
       'neoglassBlur': neoglassBlur,
       'neoglassTransparency': neoglassTransparency,
       'neoglassBorderWidth': neoglassBorderWidth,
@@ -687,6 +792,7 @@ class ConfigModel {
     bool? scanOnStartup,
     bool? ignoreHiddenFiles,
     bool? ignoreArticlesInGameSort,
+    int? videoPreviewDelay,
     bool? setupCompleted,
     bool? hideBottomScreen,
     bool? videoSound,
@@ -708,10 +814,14 @@ class ConfigModel {
     bool? hideTabRomm,
     bool? hideSearchCard,
     bool? androidAppsAsTab,
+    bool? hideTabDiscovery,
     String? activeSyncProvider,
     bool? autoUpdateApp,
     bool? autoUpdateSystems,
     String? systemGridColumns,
+    String? discoveryGridColumns,
+    String? discoveryViewMode,
+    String? androidGridColumns,
     String? gameGridColumns,
     String? gameListSize,
     String? gameCarouselCardStyle,
@@ -720,6 +830,7 @@ class ConfigModel {
     int? fanartDimLevel,
     List<String>? dockApps,
     bool? dockEnabled,
+    bool? secondaryHideSystemLogo,
     int? dockSlotCount,
     String? esdeFolderPath,
     bool? showAchievementsBadge,
@@ -727,6 +838,7 @@ class ConfigModel {
     bool? raMatchOnStartup,
     bool? subfolderViewAll,
     bool? hideSystemLogos,
+    bool? performanceMode,
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
@@ -745,6 +857,7 @@ class ConfigModel {
       ignoreHiddenFiles: ignoreHiddenFiles ?? this.ignoreHiddenFiles,
       ignoreArticlesInGameSort:
           ignoreArticlesInGameSort ?? this.ignoreArticlesInGameSort,
+      videoPreviewDelay: videoPreviewDelay ?? this.videoPreviewDelay,
       setupCompleted: setupCompleted ?? this.setupCompleted,
       hideBottomScreen: hideBottomScreen ?? this.hideBottomScreen,
       videoSound: videoSound ?? this.videoSound,
@@ -766,10 +879,14 @@ class ConfigModel {
       hideTabRomm: hideTabRomm ?? this.hideTabRomm,
       hideSearchCard: hideSearchCard ?? this.hideSearchCard,
       androidAppsAsTab: androidAppsAsTab ?? this.androidAppsAsTab,
+      hideTabDiscovery: hideTabDiscovery ?? this.hideTabDiscovery,
       activeSyncProvider: activeSyncProvider ?? this.activeSyncProvider,
       autoUpdateApp: autoUpdateApp ?? this.autoUpdateApp,
       autoUpdateSystems: autoUpdateSystems ?? this.autoUpdateSystems,
       systemGridColumns: systemGridColumns ?? this.systemGridColumns,
+      discoveryGridColumns: discoveryGridColumns ?? this.discoveryGridColumns,
+      discoveryViewMode: discoveryViewMode ?? this.discoveryViewMode,
+      androidGridColumns: androidGridColumns ?? this.androidGridColumns,
       gameGridColumns: gameGridColumns ?? this.gameGridColumns,
       gameListSize: gameListSize ?? this.gameListSize,
       gameCarouselCardStyle:
@@ -779,6 +896,8 @@ class ConfigModel {
       fanartDimLevel: fanartDimLevel ?? this.fanartDimLevel,
       dockApps: dockApps ?? this.dockApps,
       dockEnabled: dockEnabled ?? this.dockEnabled,
+      secondaryHideSystemLogo:
+          secondaryHideSystemLogo ?? this.secondaryHideSystemLogo,
       dockSlotCount: dockSlotCount ?? this.dockSlotCount,
       esdeFolderPath: esdeFolderPath ?? this.esdeFolderPath,
       showAchievementsBadge:
@@ -787,6 +906,7 @@ class ConfigModel {
       raMatchOnStartup: raMatchOnStartup ?? this.raMatchOnStartup,
       subfolderViewAll: subfolderViewAll ?? this.subfolderViewAll,
       hideSystemLogos: hideSystemLogos ?? this.hideSystemLogos,
+      performanceMode: performanceMode ?? this.performanceMode,
       neoglassBlur: neoglassBlur ?? this.neoglassBlur,
       neoglassTransparency: neoglassTransparency ?? this.neoglassTransparency,
       neoglassBorderWidth: neoglassBorderWidth ?? this.neoglassBorderWidth,

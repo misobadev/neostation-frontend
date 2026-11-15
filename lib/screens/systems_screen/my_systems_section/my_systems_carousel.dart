@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -9,6 +10,7 @@ import 'package:neostation/models/system_model.dart';
 import 'package:neostation/screens/app_screen.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../providers/file_provider.dart';
@@ -17,22 +19,29 @@ import '../../../utils/gamepad_nav.dart';
 import '../../../services/game_service.dart';
 import '../../../utils/game_launch_utils.dart';
 import '../../../providers/system_background_provider.dart';
+
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
+
 import '../../collections_screen/collections_browser_screen.dart';
 import '../../search_screen/search_screen.dart';
 import '../../game_screen/android_apps/android_apps_grid.dart';
+
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/services/secondary_achievements_controller.dart';
+
 import '../../game_screen/my_games_list.dart';
+
 import 'package:neostation/models/secondary_display_state.dart';
 import 'package:neostation/widgets/native_carousel.dart';
+
 import 'system_list_builder.dart';
 import 'system_card.dart';
+import '../../../utils/user_data_move_guard.dart';
 
 /// Navigation-layer id the systems screen's own carousel registers under.
 ///
@@ -225,6 +234,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   /// Tracks the last index for which _updateBackground was scheduled, to avoid
   /// firing redundant postFrameCallbacks on every build.
   int _lastBackgroundBuildIndex = -1;
+
+  /// Set from the config in build; disables decorative effects at render time.
+  bool _performanceMode = false;
 
   /// Cached systems list and indicator-label widths from the last build.
   /// The continuous scroll handler (fired every frame while swiping) reads
@@ -455,6 +467,13 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           );
           _gamepadNav.activate();
         }
+        return;
+      }
+
+      // Refused during a user-data move: a zipped game unpacks into the user
+      // data's temp folder, which the move is copying.
+      if (refuseWhileUserDataMoves()) {
+        if (mounted) _gamepadNav.activate();
         return;
       }
 
@@ -837,7 +856,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
   /// Logic to update the global system background provider on selection change.
   void _updateBackground(SystemInfo system) {
-    if (!mounted || !widget.enableDynamicBackground) return;
+    if (!mounted || !widget.enableDynamicBackground || _performanceMode) return;
 
     final displayFolderName = system.primaryFolderName;
     final customBgPath = system.customBackgroundPath;
@@ -933,6 +952,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
     final allSystems = _getSystemsList();
+    _performanceMode = context.select<SqliteConfigProvider, bool>(
+      (p) => p.config.performanceMode,
+    );
     // When the logo footer is hidden the card is square, so the carousel drops
     // its reserved footer height and uses square pages.
     final hideSystemLogos = widget.hideSystemLogos;
@@ -1029,8 +1051,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                 );
               },
               child: Focus(
-                descendantsAreFocusable:
-                    false, // Intercept native Flutter focus to use custom gamepad logic.
+                descendantsAreFocusable: false, // Intercept native Flutter focus to use custom gamepad logic.
                 skipTraversal: true,
                 child: RepaintBoundary(
                   child: NativeCarousel(
@@ -1045,13 +1066,22 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                     // edge, leaving a ~16px sliver. Floor the scale, lift
                     // the fade, and pull the outer pair back toward the
                     // pack so the row visibly continues past both edges.
-                    depth: const CarouselDepth(
-                      minScale: 0.7,
-                      opacityBase: 0.75,
-                      opacityFalloff: 0.55,
-                      minOpacity: 0.3,
-                      edgePull: 0.15,
-                    ),
+                    performanceMode: _performanceMode,
+                    depth: _performanceMode
+                        ? const CarouselDepth(
+                            minScale: 1,
+                            opacityBase: 1,
+                            opacityFalloff: 0,
+                            minOpacity: 1,
+                            edgePull: 0,
+                          )
+                        : const CarouselDepth(
+                            minScale: 0.7,
+                            opacityBase: 0.75,
+                            opacityFalloff: 0.55,
+                            minOpacity: 0.3,
+                            edgePull: 0.15,
+                          ),
                     itemBuilder: (context, index) {
                       final system = allSystems[index];
                       final isSelected = index == _currentIndex;
@@ -1163,9 +1193,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                             ? Colors.transparent
                             : Theme.of(context).colorScheme.surface,
                         borderRadius:
-                            Theme.of(
-                              context,
-                            ).extension<CornerRadii>()?.radiusExternal ??
+                            Theme.of(context)
+                                .extension<CornerRadii>()
+                                ?.radiusExternal ??
                             BorderRadius.circular(14.r),
                       ),
                     );

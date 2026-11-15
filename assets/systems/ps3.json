@@ -53,9 +53,10 @@
     {
       "name": "Standalone ARMSX3 ISO",
       "unique_id": "ps3.com.armsx3",
-      "description": "Supported extensions: iso, folder.",
+      "description": "Supported extensions: iso, chd, folder.",
       "extensions": [
         "iso",
+        "chd",
         "folder"
       ],
       "is_retroachievements_compatible": false,
@@ -96,9 +97,10 @@
     {
       "name": "Standalone ARMSX3 (Play Store)",
       "unique_id": "ps3.com.armsx3.play",
-      "description": "Supported extensions: iso, folder.",
+      "description": "Supported extensions: iso, chd, folder.",
       "extensions": [
         "iso",
+        "chd",
         "folder"
       ],
       "is_retroachievements_compatible": false,

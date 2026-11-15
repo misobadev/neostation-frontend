@@ -77,8 +77,10 @@ class ContextMenuItem {
 /// that failed never leaves the menu claiming it succeeded. The menu is
 /// optimistic on purpose: a checkbox that waited for a database round trip
 /// would lag every press.
-typedef ContextMenuToggle =
-    Future<bool> Function(String id, {required bool checked});
+typedef ContextMenuToggle = Future<bool> Function(
+  String id, {
+  required bool checked,
+});
 
 /// Which edge of the anchor the panel hangs off.
 enum ContextMenuAlignment {

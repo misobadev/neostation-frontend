@@ -10,14 +10,14 @@ import 'package:neostation/themes/corner_radii.dart';
 
 import '../widgets/panel_gate_highlight.dart';
 
-typedef RaLoadGameLeaderboards =
-    Future<RaGameLeaderboardsPage> Function(int gameId);
-typedef RaLoadLeaderboardEntries =
-    Future<RaLeaderboardEntriesPage> Function(
-      int leaderboardId, {
-      required int count,
-      required int offset,
-    });
+typedef RaLoadGameLeaderboards = Future<RaGameLeaderboardsPage> Function(
+  int gameId,
+);
+typedef RaLoadLeaderboardEntries = Future<RaLeaderboardEntriesPage> Function(
+  int leaderboardId, {
+  required int count,
+  required int offset,
+});
 typedef RaLoadUserGameLeaderboards =
     Future<RaUserGameLeaderboardsPage> Function(int gameId);
 
@@ -330,9 +330,8 @@ class GameDetailsLeaderboardsTabState
               context,
               isActive: _isPanelActive,
               resting: BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.25),
+                color: Theme.of(context).colorScheme.shadow
+                    .withValues(alpha: 0.25),
                 blurRadius: 2.r,
                 offset: Offset(2.r, 2.r),
               ),

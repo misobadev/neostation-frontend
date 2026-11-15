@@ -298,3 +298,6 @@ ROMs/
 
 # Native build scratch from the vendored packages (never committed)
 .cxx/
+
+# Local test timing reports
+test-results*.json

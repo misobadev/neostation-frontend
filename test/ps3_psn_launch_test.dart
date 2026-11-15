@@ -120,32 +120,29 @@ void main() {
     });
   }
 
-  test(
-    'folder existence is opt-in; normal ROM and missing-file checks are retained',
-    () async {
-      expect(
-        await GameRepository.launchPathExists(psn.path, allowDirectory: true),
-        isTrue,
-      );
-      expect(
-        await GameRepository.launchPathExists(
-          psn.uri.toString(),
-          allowDirectory: true,
-        ),
-        isTrue,
-      );
-      expect(await GameRepository.launchPathExists(psn.path), isFalse);
-      expect(await GameRepository.launchPathExists(iso.path), isTrue);
-      expect(
-        await GameRepository.launchPathExists(
-          '${root.path}/missing.ps3',
-          allowDirectory: true,
-        ),
-        isFalse,
-      );
-      expect(await GameRepository.launchPathExists(null), isFalse);
-    },
-  );
+  test('folder existence is opt-in; normal ROM and missing-file checks are retained', () async {
+    expect(
+      await GameRepository.launchPathExists(psn.path, allowDirectory: true),
+      isTrue,
+    );
+    expect(
+      await GameRepository.launchPathExists(
+        psn.uri.toString(),
+        allowDirectory: true,
+      ),
+      isTrue,
+    );
+    expect(await GameRepository.launchPathExists(psn.path), isFalse);
+    expect(await GameRepository.launchPathExists(iso.path), isTrue);
+    expect(
+      await GameRepository.launchPathExists(
+        '${root.path}/missing.ps3',
+        allowDirectory: true,
+      ),
+      isFalse,
+    );
+    expect(await GameRepository.launchPathExists(null), isFalse);
+  });
 
   group('Android SAF SD-card paths', () {
     const tree =
@@ -192,23 +189,20 @@ void main() {
           });
     });
 
-    test(
-      'disc and PSN folders preserve their encoded URIs and hide internal assets',
-      () async {
-        final entries = await SqliteDatabaseService.scanPs3Path(
-          systemRoot,
-          {'iso'},
-          true,
-          useSaf: true,
-        );
-        expect(entries.map((entry) => entry.path).toSet(), {folder, disc});
-        expect(entries.map((entry) => entry.filename).toSet(), {
-          'NPEB00913.ps3',
-          'Old Disc.ps3',
-        });
-        expect(listed, isNot(contains('$folder%2FTROPDIR')));
-      },
-    );
+    test('disc and PSN folders preserve their encoded URIs and hide internal assets', () async {
+      final entries = await SqliteDatabaseService.scanPs3Path(
+        systemRoot,
+        {'iso'},
+        true,
+        useSaf: true,
+      );
+      expect(entries.map((entry) => entry.path).toSet(), {folder, disc});
+      expect(entries.map((entry) => entry.filename).toSet(), {
+        'NPEB00913.ps3',
+        'Old Disc.ps3',
+      });
+      expect(listed, isNot(contains('$folder%2FTROPDIR')));
+    });
 
     test('a directly selected SAF game folder has its real basename', () async {
       final entries = await SqliteDatabaseService.scanPs3Path(

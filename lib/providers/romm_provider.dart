@@ -4,10 +4,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import '../models/game_model.dart';
 import '../models/romm_collection.dart';
 import '../models/romm_platform.dart';
 import '../models/romm_rom.dart';
 import '../models/system_model.dart';
+import '../repositories/game_repository.dart';
 import '../repositories/romm_repository.dart';
 import '../repositories/romm_save_map_repository.dart';
 import '../repositories/retro_achievements_repository.dart';
@@ -19,6 +21,7 @@ import '../services/romm_service.dart';
 import '../services/romm_archive_service.dart';
 import '../services/storage_space_service.dart';
 import '../services/user_data_location_service.dart';
+import '../utils/atomic_file_writer.dart';
 import '../utils/log_redaction.dart';
 import '../utils/romm_local_matcher.dart';
 import 'file_provider.dart';
@@ -313,6 +316,19 @@ class RommProvider extends ChangeNotifier {
   RommService get service => _service;
   RommDownload? downloadFor(int romId) => _downloads[romId];
 
+  /// Arms the scan that follows a finished download, as a download would.
+  @visibleForTesting
+  void debugScheduleSettle() => _scheduleSettle();
+
+  /// A ROM is downloading, or downloaded ROMs are waiting for (or in) the
+  /// scan that adds them to the library: either writes the library soon.
+  bool get hasDownloadsUnderway =>
+      _downloads.values.any(
+        (download) => download.status == RommDownloadStatus.downloading,
+      ) ||
+      (_settleTimer?.isActive ?? false) ||
+      _settling;
+
   /// Ids transferring right now — at most one per worker, however many ROMs
   /// have been downloaded this session.
   ///
@@ -365,6 +381,13 @@ class RommProvider extends ChangeNotifier {
   Future<void> _runSettle() async {
     final handler = onDownloadsSettled;
     if (handler == null) return;
+    // The scan that adds the downloads refuses while the user data moves:
+    // keep them queued for after the move rather than dropping them.
+    if (UserDataLocationService.isMoving) {
+      _settleTimer?.cancel();
+      _settleTimer = Timer(_settleDebounce, _runSettle);
+      return;
+    }
     // Serialize: if a settle is already scanning, wait for it to finish so a
     // long batch never overlaps scans — completions accumulate and get picked
     // up by the next run. Re-arm on the plain debounce rather than through
@@ -1637,6 +1660,158 @@ class RommProvider extends ChangeNotifier {
     return true;
   }
 
+  /// Rescrape from RomM: puts the info and art RomM has for [game] — a game
+  /// already on the device and linked to a RomM entry — in place of the
+  /// game's own, and leaves everything RomM lacks as it was. Linking alone
+  /// imports nothing, by design, so without a ScreenScraper account this is
+  /// the only way a game found on disk gets RomM's data.
+  ///
+  /// Unlike a download's import it never blanks a column (only the ones RomM
+  /// has are updated, and the row's scrape state is kept) and never puts a
+  /// stand-in in place of art (no cover as the fanart, no marquee as the
+  /// wheel): each kind of art is replaced only by RomM's own of that kind. An
+  /// entry RomM never identified, carrying no info and no art, changes
+  /// nothing and is a failure.
+  ///
+  /// [system] is the game's own system (not a virtual "All"/collection one).
+  Future<RommRescrapeOutcome> rescrapeFromRomm(
+    GameModel game,
+    SystemModel system,
+    FileProvider fileProvider,
+  ) async {
+    if (!isConnected) return RommRescrapeOutcome.notConnected;
+    final mapping = await RommSaveMapRepository.getMapping(
+      game.romname,
+      system.folderName,
+    );
+    if (mapping == null) return RommRescrapeOutcome.notLinked;
+
+    final systemId = system.id;
+    final romPath = game.romPath;
+    if (systemId == null || romPath == null || romPath.isEmpty) {
+      return RommRescrapeOutcome.failed;
+    }
+    // Keyed as the library joins it: some callers (Discovery, the systems
+    // list) hand over the extension-stripped name.
+    final indexedName = await GameRepository.indexedFilename(systemId, romPath);
+    if (indexedName == null) {
+      _log.w('RomM rescrape: no library row for ${oneLine(romPath)}');
+      return RommRescrapeOutcome.failed;
+    }
+
+    try {
+      final rom = await service.getRom(mapping.rommRomId);
+      final detail = await service.getRomDetail(rom.id);
+      if (detail == null) return RommRescrapeOutcome.failed;
+      // An entry RomM never matched to a metadata provider has a name made
+      // from its file and default values: nothing worth putting in place of
+      // the game's own.
+      if (!_rommIdentified(detail)) {
+        _log.i(
+          'RomM rescrape: entry ${rom.id} is not identified; '
+          '${oneLine(indexedName)} left as it was',
+        );
+        return RommRescrapeOutcome.failed;
+      }
+
+      var wrote = false;
+      final info = _rommInfoFields(detail);
+      if (info.isNotEmpty) {
+        final updated = await ScraperRepository.updateGameMetadata(
+          systemId,
+          indexedName,
+          {
+            'real_name': rom.name,
+            ...info,
+            // No longer ES-DE's row: resetting an ES-DE import deletes
+            // those, which would take RomM's info with it.
+            'esde_imported': 0,
+          },
+        );
+        if (!updated) return RommRescrapeOutcome.failed;
+        wrote = true;
+      }
+
+      final ss =
+          (detail['ss_metadata'] as Map?)?.cast<String, dynamic>() ?? const {};
+      final screenshots =
+          (detail['merged_screenshots'] as List?)
+              ?.whereType<String>()
+              .toList() ??
+          const <String>[];
+      final videoPath =
+          _rommResourcePath(ss['video_path']) ??
+          _rommResourcePath(detail['path_video']);
+      final art = <(String, List<String?>)>[
+        (
+          'box2d',
+          [
+            detail['path_cover_large']?.toString(),
+            detail['path_cover_small']?.toString(),
+            service.coverUrl(rom),
+          ],
+        ),
+        ('fanarts', [_rommResourcePath(ss['fanart_path'])]),
+        ('wheels', [_rommResourcePath(ss['logo_path'])]),
+        ('screenshots', [if (screenshots.isNotEmpty) screenshots.first]),
+      ];
+      for (final (folder, sources) in art) {
+        if (await _saveRommMedia(
+          sources,
+          folder,
+          system,
+          indexedName,
+          fileProvider,
+        )) {
+          wrote = true;
+          // The grid lays a card out by the box art's stored proportions:
+          // cleared, it measures the new cover.
+          if (folder == 'box2d') {
+            await GameRepository.updateBox2dAspectRatio(
+              systemId,
+              indexedName,
+              '',
+            );
+          }
+        }
+      }
+      if (videoPath != null &&
+          await _saveRommMedia(
+            [videoPath],
+            'videos',
+            system,
+            indexedName,
+            fileProvider,
+            forcedExt: videoPath.toLowerCase().contains('.webm')
+                ? 'webm'
+                : 'mp4',
+            siblingExts: const ['mp4', 'webm'],
+            accept: _looksLikeVideo,
+          )) {
+        wrote = true;
+      }
+
+      if (!wrote) {
+        _log.i(
+          'RomM rescrape: entry ${rom.id} has no info or art for '
+          '${oneLine(indexedName)}',
+        );
+        return RommRescrapeOutcome.failed;
+      }
+      _log.i(
+        'RomM rescrape: ${system.folderName}/${oneLine(indexedName)} '
+        'from ${rom.id}',
+      );
+      return RommRescrapeOutcome.done;
+    } catch (e) {
+      _log.w('RomM rescrape: entry ${mapping.rommRomId} failed: $e');
+      return RommRescrapeOutcome.failed;
+    } finally {
+      // As after a download: a token refreshed on the way is kept.
+      await _persistRefreshedTokens();
+    }
+  }
+
   /// True when a file named after [rom] already exists in a configured folder.
   Future<bool> isDownloaded(RommRom rom, List<String> romFolders) async {
     final system = await resolveSystem(rom);
@@ -2376,45 +2551,13 @@ class RommProvider extends ChangeNotifier {
     bool importMedia = true,
   }) async {
     try {
-      final detail = await _service.getRomDetail(rom.id);
+      final detail = await service.getRomDetail(rom.id);
       if (detail == null) return;
-      final md =
-          (detail['metadatum'] as Map?)?.cast<String, dynamic>() ?? const {};
-
       final metadata = <String, dynamic>{
         'filename': indexedName,
         'real_name': rom.name,
+        ..._rommInfoFields(detail),
       };
-      final summary = detail['summary']?.toString();
-      if (summary != null && summary.isNotEmpty) {
-        metadata['description_en'] = summary;
-      }
-      final genres = (md['genres'] as List?)?.whereType<String>().toList();
-      if (genres != null && genres.isNotEmpty) {
-        metadata['genre'] = genres.join(', ');
-      }
-      // RomM has a flat company list (no dev/publisher split).
-      final companies = (md['companies'] as List?)
-          ?.whereType<String>()
-          .toList();
-      if (companies != null && companies.isNotEmpty) {
-        metadata['developer'] = companies.join(', ');
-      }
-      final players = md['player_count']?.toString();
-      if (players != null && players.isNotEmpty) {
-        metadata['players'] = players;
-      }
-      final frd = md['first_release_date'];
-      if (frd is num) {
-        final dt = DateTime.fromMillisecondsSinceEpoch(
-          frd.toInt(),
-          isUtc: true,
-        );
-        final y = dt.year.toString().padLeft(4, '0');
-        final m = dt.month.toString().padLeft(2, '0');
-        final d = dt.day.toString().padLeft(2, '0');
-        metadata['release_date'] = '$y-$m-$d';
-      }
 
       // app_system_id is a FK to app_systems(id); skip rather than silently
       // fail the insert if the resolved system somehow has no id.
@@ -2451,7 +2594,7 @@ class RommProvider extends ChangeNotifier {
       final coverSources = <String?>[
         detail['path_cover_large']?.toString(),
         detail['path_cover_small']?.toString(),
-        _service.coverUrl(rom),
+        service.coverUrl(rom),
       ];
       await _saveRommMedia(
         coverSources,
@@ -2529,6 +2672,85 @@ class RommProvider extends ChangeNotifier {
     }
   }
 
+  /// The metadata providers a RomM entry can be matched to; any id set means
+  /// RomM identified the game.
+  static const _rommProviderIds = [
+    'igdb_id',
+    'moby_id',
+    'ss_id',
+    'ra_id',
+    'launchbox_id',
+    'hasheous_id',
+    'tgdb_id',
+    'flashpoint_id',
+    'hltb_id',
+    'gamelist_id',
+  ];
+
+  /// Whether RomM matched entry [detail] to a game. Its own flag decides when
+  /// it sends one (some provider ids, such as TheGamesDB's, are set without
+  /// RomM counting the game as identified); an older server without the flag
+  /// is judged by the metadata provider ids.
+  static bool _rommIdentified(Map<String, dynamic> detail) {
+    final flag = detail['is_identified'];
+    if (flag is bool) return flag;
+    return _rommProviderIds.any((key) {
+      final id = detail[key];
+      return id != null && id.toString().isNotEmpty && id.toString() != '0';
+    });
+  }
+
+  /// The game info RomM's entry [detail] carries, as metadata columns:
+  /// English description, genre, developer (RomM has one company list, no
+  /// developer/publisher split), players and release date. Only what it has.
+  static Map<String, dynamic> _rommInfoFields(Map<String, dynamic> detail) {
+    final md =
+        (detail['metadatum'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final fields = <String, dynamic>{};
+    final summary = detail['summary']?.toString();
+    if (summary != null && summary.isNotEmpty) {
+      fields['description_en'] = summary;
+    }
+    final genres = (md['genres'] as List?)?.whereType<String>().toList();
+    if (genres != null && genres.isNotEmpty) {
+      fields['genre'] = genres.join(', ');
+    }
+    final companies = (md['companies'] as List?)?.whereType<String>().toList();
+    if (companies != null && companies.isNotEmpty) {
+      fields['developer'] = companies.join(', ');
+    }
+    final players = md['player_count']?.toString();
+    if (players != null && players.isNotEmpty) {
+      fields['players'] = players;
+    }
+    final frd = md['first_release_date'];
+    if (frd is num) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(frd.toInt(), isUtc: true);
+      final y = dt.year.toString().padLeft(4, '0');
+      final m = dt.month.toString().padLeft(2, '0');
+      final d = dt.day.toString().padLeft(2, '0');
+      fields['release_date'] = '$y-$m-$d';
+    }
+    return fields;
+  }
+
+  /// Whether [bytes] start like an MP4 (`ftyp` box) or WebM/Matroska (EBML)
+  /// file — not, say, the HTML page RomM answers a missing resource with.
+  static bool _looksLikeVideo(Uint8List bytes) {
+    if (bytes.length >= 8 &&
+        bytes[4] == 0x66 && // f
+        bytes[5] == 0x74 && // t
+        bytes[6] == 0x79 && // y
+        bytes[7] == 0x70) {
+      return true;
+    }
+    return bytes.length >= 4 &&
+        bytes[0] == 0x1A &&
+        bytes[1] == 0x45 &&
+        bytes[2] == 0xDF &&
+        bytes[3] == 0xA3;
+  }
+
   /// Resolves a RomM `ss_metadata` `*_path` value to a server path fetchable by
   /// [RommService.fetchImageBytes]. Those values are relative to
   /// `/assets/romm/resources/`; the bare path (e.g. `roms/36/3625/fanart.png`)
@@ -2601,7 +2823,10 @@ class RommProvider extends ChangeNotifier {
   /// Failures are contained here rather than at the call site: the media types
   /// are independent, and a single unwritable folder or dead URL must not cost
   /// the caller every type queued behind it.
-  Future<void> _saveRommMedia(
+  ///
+  /// Returns whether a file was written. [accept], when given, must pass the
+  /// fetched bytes too (art is already content-checked by the fetch).
+  Future<bool> _saveRommMedia(
     List<String?> sources,
     String folder,
     SystemModel system,
@@ -2609,20 +2834,25 @@ class RommProvider extends ChangeNotifier {
     FileProvider fileProvider, {
     String? forcedExt,
     List<String> siblingExts = const ['png', 'jpg', 'webp'],
+    bool Function(Uint8List bytes)? accept,
   }) async {
     try {
       Uint8List? bytes;
       for (final source in sources) {
         if (source == null || source.isEmpty) continue;
         // A video's bytes are not an image, so only art is content-checked.
-        bytes = await _service.fetchImageBytes(
+        bytes = await service.fetchImageBytes(
           source,
           requireImage: forcedExt == null,
         );
-        if (bytes != null && bytes.isNotEmpty) break;
+        if (bytes != null &&
+            bytes.isNotEmpty &&
+            (accept == null || accept(bytes))) {
+          break;
+        }
         bytes = null;
       }
-      if (bytes == null) return;
+      if (bytes == null) return false;
 
       final ext = forcedExt ?? _mediaExtensionFor(bytes);
       final dest = fileProvider.getMediaPath(
@@ -2631,9 +2861,8 @@ class RommProvider extends ChangeNotifier {
         indexedName,
         ext,
       );
-      final destFile = File(dest);
-      await destFile.parent.create(recursive: true);
-      await destFile.writeAsBytes(bytes);
+      // A file left half-written would count as local art from then on.
+      await writeFileAtomically(File(dest), bytes);
       for (final other in siblingExts) {
         if (other == ext) continue;
         final stale = File(
@@ -2646,8 +2875,10 @@ class RommProvider extends ChangeNotifier {
         );
         if (await stale.exists()) await stale.delete();
       }
+      return true;
     } catch (e) {
       _log.e('RomM media import failed for $folder/$indexedName: $e');
+      return false;
     }
   }
 
@@ -2769,6 +3000,22 @@ class RommProvider extends ChangeNotifier {
       _log.w('RomM RA progression fetch failed (non-fatal): $e');
     }
   }
+}
+
+/// What [RommProvider.rescrapeFromRomm] did.
+enum RommRescrapeOutcome {
+  /// RomM's info and art replaced the game's.
+  done,
+
+  /// Not connected to a RomM server: nothing was asked.
+  notConnected,
+
+  /// The game isn't linked to a RomM entry: nothing was asked.
+  notLinked,
+
+  /// RomM's entry couldn't be read, or the import failed; the game keeps what
+  /// it had where nothing was written.
+  failed,
 }
 
 /// An already-downloaded copy of a RomM ROM, as [RommProvider.findLocalCopy]

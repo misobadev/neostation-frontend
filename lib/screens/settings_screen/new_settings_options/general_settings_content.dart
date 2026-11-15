@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -13,6 +14,7 @@ import 'package:fullscreen_window/fullscreen_window.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/nav_tabs.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../repositories/retro_achievements_repository.dart';
 import '../../../repositories/system_repository.dart';
@@ -75,6 +77,9 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     SfxService.maxVolume,
   ];
 
+  /// Off, then the available preview-video delays in seconds.
+  static const List<int> _videoPreviewDelayCycle = [-1, 0, 1, 2, 3, 4, 5];
+
   @override
   void initState() {
     super.initState();
@@ -87,7 +92,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
 
     // Pre-allocate keys for maximum theoretical setting items (the fixed rows
     // plus one per navigation tab that can be toggled).
-    for (int i = 0; i < 19 + NavTab.values.length; i++) {
+    for (int i = 0; i < 20 + NavTab.values.length; i++) {
       _itemKeys.add(GlobalKey());
     }
   }
@@ -156,7 +161,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
       try {
         final isFullscreen = context.read<SqliteConfigProvider>().isFullscreen;
         if (Platform.isMacOS) {
-          await windowManager.setFullScreen(isFullscreen);
+          WindowManager.instance.getCurrent()?.isFullScreen = isFullscreen;
         } else {
           FullScreenWindow.setFullScreen(isFullscreen);
         }
@@ -173,7 +178,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
       try {
         await context.read<SqliteConfigProvider>().updateIsFullscreen(value);
         if (Platform.isMacOS) {
-          await windowManager.setFullScreen(value);
+          WindowManager.instance.getCurrent()?.isFullScreen = value;
         } else {
           FullScreenWindow.setFullScreen(value);
         }
@@ -257,6 +262,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     count++; // Custom sounds
     count++; // 12-Hour Clock
     count++; // Ignore leading articles in game sorting
+    count++; // Play preview videos
     count++; // Show subfolders (every system)
     count++; // Cloud-save mark in the game views
     count++; // Achievement badges on game tiles
@@ -447,6 +453,13 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     }
     currentItemIndex++;
 
+    // Protocol: Preview video delay.
+    if (index == currentItemIndex) {
+      _cycleVideoPreviewDelay(configProvider);
+      return;
+    }
+    currentItemIndex++;
+
     // Protocol: Show subfolders, applied to every system.
     if (index == currentItemIndex) {
       _setSubfolderViewAll(!configProvider.config.subfolderViewAll);
@@ -585,6 +598,25 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     };
   }
 
+  /// Advances the preview delay through Off, 0 s, 1 s ... 5 s and persists it.
+  void _cycleVideoPreviewDelay(SqliteConfigProvider provider) {
+    final current = provider.config.videoPreviewDelay;
+    final index = _videoPreviewDelayCycle.indexOf(current);
+    final next =
+        _videoPreviewDelayCycle[(index < 0
+            ? 0
+            : (index + 1) % _videoPreviewDelayCycle.length)];
+    provider.updateVideoPreviewDelay(next);
+  }
+
+  /// Human label for the current preview delay.
+  String _videoPreviewDelayLabel(BuildContext context, int seconds) {
+    if (seconds < 0) {
+      return AppLocale.videoPreviewsOff.getString(context);
+    }
+    return '$seconds ${AppLocale.secondsShort.getString(context)}';
+  }
+
   /// Synchronizes the scroll viewport with the currently focused setting item.
   void scrollToIndex(int index) {
     _scroller.ensureVisibleIndex(
@@ -628,13 +660,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                       title: AppLocale.androidSystemSettings.getString(context),
                       subtitle: AppLocale.androidSystemSettingsSubtitle
                           .getString(context),
-                      trailing: Icon(
-                        Symbols.open_in_new_rounded,
-                        size: 18.r,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
-                      ),
+                      trailing: Icon(Symbols.open_in_new_rounded, size: 18.r),
                     );
                   }(),
                   SizedBox(height: 12.r),
@@ -881,6 +907,28 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                           .read<SqliteConfigProvider>()
                           .updateIgnoreArticlesInGameSort(value),
                       activeColor: theme.colorScheme.primary,
+                    ),
+                  );
+                }(),
+
+                SizedBox(height: 12.r),
+                () {
+                  final index = currentItemIdx++;
+                  return SettingRow(
+                    key: _itemKeys[index],
+                    onTap: () => selectItem(index),
+                    focused:
+                        widget.isContentFocused &&
+                        widget.selectedContentIndex == index,
+                    title: AppLocale.videoPreviews.getString(context),
+                    subtitle: AppLocale.videoPreviewsSubtitle.getString(
+                      context,
+                    ),
+                    trailing: SettingValueChip(
+                      text: _videoPreviewDelayLabel(
+                        context,
+                        config.videoPreviewDelay,
+                      ),
                     ),
                   );
                 }(),

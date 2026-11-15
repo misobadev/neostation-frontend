@@ -369,9 +369,8 @@ class RomFolderOrganizerService {
       }
 
       final playlistLines = movedDiscPaths.map(path.basename).toList();
-      await File(
-        playlistTargetPath,
-      ).writeAsString('${playlistLines.join('\n')}\n');
+      await File(playlistTargetPath)
+          .writeAsString('${playlistLines.join('\n')}\n');
       final metadataTransfer =
           await ScraperRepository.transferMetadataToPlaylist(
             sourceRomPaths: sourceDiscPaths,

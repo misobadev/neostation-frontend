@@ -54,6 +54,30 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Updates the preferred grid column density for the Discovery board.
+  Future<void> updateDiscoveryGridColumns(String discoveryGridColumns) async {
+    final previous = _config;
+    _config = _config.copyWith(discoveryGridColumns: discoveryGridColumns);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
+  /// Updates the Discovery board layout ('grid' or 'carousel').
+  Future<void> updateDiscoveryViewMode(String discoveryViewMode) async {
+    final previous = _config;
+    _config = _config.copyWith(discoveryViewMode: discoveryViewMode);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
+  /// Updates the preferred grid column density for the Android apps board.
+  Future<void> updateAndroidGridColumns(String androidGridColumns) async {
+    final previous = _config;
+    _config = _config.copyWith(androidGridColumns: androidGridColumns);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
   /// Updates the preferred grid column density for the games grid.
   Future<void> updateGameGridColumns(String gameGridColumns) async {
     final previous = _config;
@@ -249,12 +273,39 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Trades visual effects for speed on modest hardware.
+  ///
+  /// This only overrides rendering; it does not overwrite the user's saved
+  /// NeoGlass, theme, animation or image-quality preferences.
+  Future<void> updatePerformanceMode(bool value) async {
+    if (_config.performanceMode == value) return;
+    final previous = _config;
+    _config = _config.copyWith(performanceMode: value);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
   /// Updates article handling for game title sorting.
   Future<void> updateIgnoreArticlesInGameSort(bool value) async {
     if (_config.ignoreArticlesInGameSort == value) return;
     final previous = _config;
     _config = _config.copyWith(ignoreArticlesInGameSort: value);
     await _saveOrRevert(previous);
+    _notify();
+  }
+
+  /// Updates the preview video delay in seconds.
+  ///
+  /// -1 disables previews, 0 starts as soon as the decoder is ready, and 1..5
+  /// holds the screenshot for that long. Pushed to the secondary display when
+  /// it is connected.
+  Future<void> updateVideoPreviewDelay(int seconds) async {
+    final value = seconds.clamp(-1, 5);
+    if (_config.videoPreviewDelay == value) return;
+    final previous = _config;
+    _config = _config.copyWith(videoPreviewDelay: value);
+    await _saveOrRevert(previous);
+    _secondaryDisplayState?.updateState(videoPreviewDelay: value);
     _notify();
   }
 
@@ -456,6 +507,17 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Shows or hides the system logo on the secondary display while browsing.
+  /// Persists and pushes the value to the secondary display.
+  Future<void> updateSecondaryHideSystemLogo(bool value) async {
+    if (_config.secondaryHideSystemLogo == value) return;
+    final previous = _config;
+    _config = _config.copyWith(secondaryHideSystemLogo: value);
+    await _saveOrRevert(previous);
+    _secondaryDisplayState?.updateState(hideSystemLogo: value);
+    _notify();
+  }
+
   /// Sets how many secondary dock slots are visible, clamped to
   /// [ConfigModel.dockMinSlotCount]–[ConfigModel.dockMaxSlotCount]. Persists and
   /// pushes the value to the secondary display.
@@ -573,7 +635,7 @@ extension SqliteConfigMutators on SqliteConfigProvider {
 
   /// Sets the frosted-glass rim stroke width, clamped to a sane range.
   Future<void> updateNeoglassBorderWidth(double value) async {
-    final clamped = value.clamp(0.0, 8.0).toDouble();
+    final clamped = value.clamp(0.0, 2.0).toDouble();
     if (_config.neoglassBorderWidth == clamped) return;
     final previous = _config;
     _config = _config.copyWith(neoglassBorderWidth: clamped);

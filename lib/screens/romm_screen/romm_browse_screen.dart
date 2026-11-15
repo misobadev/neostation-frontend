@@ -91,12 +91,11 @@ enum _SourceCard { collections, platforms }
 
 /// Signature shared by the four [GridNavUtils] directional helpers, so the
 /// active top-level card grid can be moved with any of them.
-typedef _GridNavFn =
-    int Function({
-      required int currentIndex,
-      required int crossAxisCount,
-      required int maxItems,
-    });
+typedef _GridNavFn = int Function({
+  required int currentIndex,
+  required int crossAxisCount,
+  required int maxItems,
+});
 
 class _RommBrowseScreenState extends State<RommBrowseScreen> {
   // The intermediate source menu sits ahead of the platform/collection lists.

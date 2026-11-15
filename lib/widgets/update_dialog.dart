@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -7,15 +7,28 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+
 import '../services/update_service.dart';
 import 'custom_notification.dart';
 import 'core_footer.dart';
+
+/// Downloads and installs an app update; see [UpdateService.downloadAndInstall].
+typedef UpdateRunner = Future<UpdateOutcome> Function(
+  UpdateInfo updateInfo,
+  void Function(double progress)? onProgress, {
+  bool Function()? shouldCancel,
+});
 
 /// Dialog to prompt user for app update with premium UI
 class UpdateDialog extends StatefulWidget {
   final UpdateInfo updateInfo;
 
-  const UpdateDialog({super.key, required this.updateInfo});
+  /// Overrides the download call. Defaults to the real service; exists so the
+  /// download, cancel and failure states can be tested.
+  @visibleForTesting
+  final UpdateRunner? runner;
+
+  const UpdateDialog({super.key, required this.updateInfo, this.runner});
 
   @override
   State<UpdateDialog> createState() => _UpdateDialogState();
@@ -23,6 +36,7 @@ class UpdateDialog extends StatefulWidget {
 
 class _UpdateDialogState extends State<UpdateDialog> {
   bool _isDownloading = false;
+  bool _cancelRequested = false;
   double _downloadProgress = 0.0;
   late final GamepadNavigation _gamepadNav;
 
@@ -50,6 +64,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
   @override
   void dispose() {
+    // A download still running when the dialogue goes away has no one left
+    // to finish it for.
+    _cancelRequested = true;
     _cleanupGamepad();
     super.dispose();
   }
@@ -59,10 +76,21 @@ class _UpdateDialogState extends State<UpdateDialog> {
     _gamepadNav.dispose();
   }
 
+  /// B while downloading asks the download to stop; [_startUpdate] closes the
+  /// dialogue once it has.
   void _closeDialog() {
-    if (_isDownloading) return;
+    if (_isDownloading) {
+      _requestCancel();
+      return;
+    }
     _cleanupGamepad();
     Navigator.of(context).pop(false);
+  }
+
+  void _requestCancel() {
+    // Once downloaded, the installer is starting and can't be called back.
+    if (_cancelRequested || _downloadProgress >= 1.0) return;
+    setState(() => _cancelRequested = true);
   }
 
   @override
@@ -233,7 +261,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  _downloadProgress >= 1.0
+                                  _cancelRequested
+                                      ? AppLocale.systemsUpdateCancelling
+                                            .getString(context)
+                                      : _downloadProgress >= 1.0
                                       ? AppLocale.updatePreparingInstall
                                             .getString(context)
                                       : AppLocale.updateDownloading.getString(
@@ -252,6 +283,17 @@ class _UpdateDialogState extends State<UpdateDialog> {
                                 ),
                               ],
                             ),
+                            if (_downloadProgress < 1.0) ...[
+                              SizedBox(height: 12.r),
+                              GamepadControl(
+                                iconPath:
+                                    'assets/images/gamepad/Xbox_B_button.png',
+                                label: AppLocale.cancel.getString(context),
+                                onTap: _cancelRequested ? null : _requestCancel,
+                                backgroundColor: theme.colorScheme.tertiary,
+                                textColor: theme.colorScheme.onTertiary,
+                              ),
+                            ],
                           ],
                         ),
                       ] else ...[
@@ -265,7 +307,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                                 label: AppLocale.updateLater.getString(context),
                                 onTap: () => Navigator.of(context).pop(false),
                                 backgroundColor: theme.colorScheme.tertiary,
-                                textColor: theme.colorScheme.onSurface,
+                                textColor: theme.colorScheme.onTertiary,
                               ),
                             ),
                             SizedBox(width: 8.r),
@@ -297,32 +339,41 @@ class _UpdateDialogState extends State<UpdateDialog> {
   Future<void> _startUpdate() async {
     setState(() {
       _isDownloading = true;
+      _cancelRequested = false;
       _downloadProgress = 0.0;
     });
 
-    final success = await UpdateService.downloadAndInstall(widget.updateInfo, (
-      progress,
-    ) {
+    final run = widget.runner ?? UpdateService.downloadAndInstall;
+    final outcome = await run(widget.updateInfo, (progress) {
       if (mounted) setState(() => _downloadProgress = progress);
-    });
+    }, shouldCancel: () => _cancelRequested);
 
     if (!mounted) return;
 
-    if (success) {
-      Navigator.of(context).pop(true);
-    } else {
-      setState(() {
-        _isDownloading = false;
-        _downloadProgress = 0.0;
-      });
-      AppNotification.showNotification(
-        context,
-        Platform.isAndroid
-            ? AppLocale.updateErrorAndroid.getString(context)
-            : AppLocale.updateErrorDesktop.getString(context),
-        type: NotificationType.error,
-        title: AppLocale.updateDialogError.getString(context),
-      );
+    switch (outcome) {
+      case UpdateOutcome.installing:
+        Navigator.of(context).pop(true);
+      case UpdateOutcome.cancelled:
+        // A cancel is the user's choice, not a failure: close quietly.
+        _cleanupGamepad();
+        Navigator.of(context).pop(false);
+      case UpdateOutcome.downloadFailed:
+      case UpdateOutcome.installFailed:
+      case UpdateOutcome.installPermissionDenied:
+        setState(() {
+          _isDownloading = false;
+          _cancelRequested = false;
+          _downloadProgress = 0.0;
+        });
+        AppNotification.showNotification(
+          context,
+          // Only a missing install permission is about the permission.
+          outcome == UpdateOutcome.installPermissionDenied
+              ? AppLocale.updateErrorAndroid.getString(context)
+              : AppLocale.updateErrorDesktop.getString(context),
+          type: NotificationType.error,
+          title: AppLocale.updateDialogError.getString(context),
+        );
     }
   }
 }

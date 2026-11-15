@@ -21,12 +21,16 @@ import 'package:neostation/services/metadata_cleanup_service.dart';
 import 'package:neostation/services/retro_achievements_helper.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/count_label.dart';
+import 'package:neostation/utils/romm_failure_message.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/info_dialog.dart';
+
 import 'settings_title.dart';
 import 'widgets/settings_card_row.dart';
 import 'widgets/settings_action_button.dart';
+
+import 'package:neostation/utils/user_data_move_guard.dart';
 
 class ToolsSettingsContent extends StatefulWidget {
   final bool isContentFocused;
@@ -115,6 +119,8 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
   /// the dialog is where the save-sync consequence is stated before any row is
   /// written.
   Future<void> _linkRommLibrary() async {
+    if (refuseWhileUserDataMoves()) return;
+
     // The runner owns "is it running", not this widget: leaving Tools disposes
     // the screen while the pass carries on, so a local flag would read idle on
     // the way back and start a second walk of the same server.
@@ -131,6 +137,10 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
       stoppedEarlyTemplate: AppLocale.rommLinkLibraryStoppedEarly.getString(
         context,
       ),
+      partialTemplate: AppLocale.rommLinkLibraryPartial.getString(context),
+      failureTexts: {
+        for (final key in rommBrowseFailureKeys) key: key.getString(context),
+      },
     );
 
     final confirmed = await ConfirmActionDialog.show(
@@ -181,6 +191,8 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
   );
 
   Future<void> _organizeMultiDiscGames() async {
+    if (refuseWhileUserDataMoves()) return;
+
     // The runner owns "is it running", not this widget: leaving Tools disposes
     // the screen while the moves carry on, so a local flag would read idle on
     // the way back and start a second run. A press while this or the orphan
@@ -264,6 +276,8 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
   );
 
   Future<void> _cleanOrphanedMetadata() async {
+    if (refuseWhileUserDataMoves()) return;
+
     // As for the organiser: the runner owns "is it running". The check comes
     // before the analysis, which would otherwise read a set the organiser has
     // moved but not yet rescanned as orphaned.
@@ -367,6 +381,8 @@ class ToolsSettingsContentState extends State<ToolsSettingsContent> {
   /// ROMs that have never been hashed at all. Selecting the row again while it
   /// runs stops it after the current ROM.
   Future<void> _rematchAchievements() async {
+    if (refuseWhileUserDataMoves()) return;
+
     // The service owns "is it running", not this widget: leaving Tools disposes
     // the screen while the pass carries on, so a local flag reads idle on the
     // way back and would start a second run over the same ROMs.

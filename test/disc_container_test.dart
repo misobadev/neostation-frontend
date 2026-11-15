@@ -170,9 +170,8 @@ FILE game.bin BINARY
 
     test('probes a flat 2048-byte image', () async {
       final path = '${temp.path}/game.iso';
-      await File(
-        path,
-      ).writeAsBytes(buildImage(sectorSize: 2048, dataOffset: 0));
+      await File(path)
+          .writeAsBytes(buildImage(sectorSize: 2048, dataOffset: 0));
 
       final image = await BinaryDiscImage.openImage(path);
 
@@ -188,9 +187,8 @@ FILE game.bin BINARY
       // The same content in a raw container must read back identically — this
       // is the difference between reading a sector and reading its sync header.
       final path = '${temp.path}/game.bin';
-      await File(
-        path,
-      ).writeAsBytes(buildImage(sectorSize: 2352, dataOffset: 24));
+      await File(path)
+          .writeAsBytes(buildImage(sectorSize: 2352, dataOffset: 24));
 
       final image = await BinaryDiscImage.openImage(path);
 
@@ -201,9 +199,8 @@ FILE game.bin BINARY
     });
 
     test('opens the binary a cue sheet names', () async {
-      await File(
-        '${temp.path}/game.bin',
-      ).writeAsBytes(buildImage(sectorSize: 2352, dataOffset: 24));
+      await File('${temp.path}/game.bin')
+          .writeAsBytes(buildImage(sectorSize: 2352, dataOffset: 24));
       final cuePath = '${temp.path}/game.cue';
       await File(cuePath).writeAsString(
         'FILE "game.bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n',
@@ -219,9 +216,8 @@ FILE game.bin BINARY
     });
 
     test('gives a second data track its own disc-absolute start', () async {
-      await File(
-        '${temp.path}/pce.bin',
-      ).writeAsBytes(buildImage(sectorSize: 2352, dataOffset: 16));
+      await File('${temp.path}/pce.bin')
+          .writeAsBytes(buildImage(sectorSize: 2352, dataOffset: 16));
       final cuePath = '${temp.path}/pce.cue';
       await File(cuePath).writeAsString(
         'FILE "pce.bin" BINARY\n'
@@ -244,9 +240,8 @@ FILE game.bin BINARY
     test('recovers when the sheet names a binary that was renamed', () async {
       // Cue sheets that were renamed with their binary keep pointing at the
       // old name; two of them exist in this library.
-      await File(
-        '${temp.path}/Game (USA).bin',
-      ).writeAsBytes(buildImage(sectorSize: 2048, dataOffset: 0));
+      await File('${temp.path}/Game (USA).bin')
+          .writeAsBytes(buildImage(sectorSize: 2048, dataOffset: 0));
       final cuePath = '${temp.path}/Game (USA).cue';
       await File(cuePath).writeAsString(
         'FILE "Game (Europe).bin" BINARY\n  TRACK 01 MODE1/2048\n'
@@ -371,9 +366,8 @@ INDEX 1=10
       });
 
       test('lays the table of contents over the .img', () async {
-        await File(
-          '${temp.path}/game.img',
-        ).writeAsBytes(buildImage(sectorSize: 2352, dataOffset: 16));
+        await File('${temp.path}/game.img')
+            .writeAsBytes(buildImage(sectorSize: 2352, dataOffset: 16));
         final ccdPath = '${temp.path}/game.ccd';
         await File(ccdPath).writeAsString(pceDescriptor);
 
@@ -400,13 +394,11 @@ INDEX 1=10
         // The `.mds` is a binary table of contents this does not read: the
         // `.mdf` beside it is a raw image whose first track starts at its
         // first sector.
-        await File(
-          '${temp.path}/game.mdf',
-        ).writeAsBytes(buildImage(sectorSize: 2352, dataOffset: 24));
+        await File('${temp.path}/game.mdf')
+            .writeAsBytes(buildImage(sectorSize: 2352, dataOffset: 24));
         final mdsPath = '${temp.path}/game.mds';
-        await File(
-          mdsPath,
-        ).writeAsBytes(Uint8List.fromList('MEDIA '.codeUnits));
+        await File(mdsPath)
+            .writeAsBytes(Uint8List.fromList('MEDIA '.codeUnits));
 
         final image = await BinaryDiscImage.openMds(mdsPath);
 

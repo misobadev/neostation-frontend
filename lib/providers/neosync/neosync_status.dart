@@ -1,33 +1,40 @@
 part of '../neo_sync_provider.dart';
 
 extension NeoSyncStatus on NeoSyncProvider {
-  /// Loads the list of cloud files
+  /// Loads the list of cloud files.
+  ///
+  /// A failure is only logged, like [loadQuota]'s: listing is not a sync, so it
+  /// neither sets nor clears [error], which the games' NeoSync marks read as a
+  /// failed sync. Nothing shows this load, so it leaves [isLoadingOnlineFiles]
+  /// to the online save list's own loads.
   Future<bool> loadFiles() async {
     if (!isNeoSyncAuthenticated) return false;
 
-    _isLoadingOnlineFiles = true;
-    _error = null;
-    notify();
-
     try {
+      final account = _authService?.currentUser?.id;
+      final generation = _filesGeneration;
+      final removals = _filesRemovals;
       final result = await _neoSyncService.getAllFiles();
 
       if (result['success']) {
-        _files = result['files'];
+        // A list asked for before a save was deleted may still have it in, so
+        // it's dropped; the trimmed one is kept.
+        if (removals == _filesRemovals) {
+          _files = result['files'];
+          if (generation == _filesGeneration) {
+            _filesFetchedAt = _now();
+            _filesAccountId = account;
+          }
+        }
         notify();
         return true;
       } else {
-        _error = result['message'];
-        notify();
+        NeoSyncProvider._log.e('Failed to load files: ${result['message']}');
         return false;
       }
     } catch (e) {
-      _error = 'Error loading files: $e';
-      notify();
+      NeoSyncProvider._log.e('Error loading files: $e');
       return false;
-    } finally {
-      _isLoadingOnlineFiles = false;
-      notify();
     }
   }
 
@@ -73,8 +80,13 @@ extension NeoSyncStatus on NeoSyncProvider {
   }
 
   /// Loads the online file page described by the current filter and page.
-  Future<void> loadOnlineFiles() async {
+  ///
+  /// Returns false only when this load failed (recorded in
+  /// [onlineFilesLoadFailed]); a load overtaken by a newer one reports no
+  /// failure.
+  Future<bool> loadOnlineFiles() async {
     _isLoadingOnlineFiles = true;
+    _onlineFilesLoadFailed = false;
     notify();
 
     final generation = ++_onlineLoadGeneration;
@@ -86,7 +98,7 @@ extension NeoSyncStatus on NeoSyncProvider {
           offset: (_onlinePage - 1) * NeoSyncProvider._onlinePageSize,
         ),
       );
-      if (generation != _onlineLoadGeneration) return;
+      if (generation != _onlineLoadGeneration) return true;
       if (result['success']) {
         _onlineFiles = result['files'] as List<NeoSyncFile>;
         _onlineTotal = result['total'] as int;
@@ -101,18 +113,23 @@ extension NeoSyncStatus on NeoSyncProvider {
                 ?.map((e) => e.toString())
                 .toList() ??
             const <String>[];
+        return true;
       } else {
         NeoSyncProvider._log.e(
           'Failed to load online files: ${result['message']}',
         );
         _onlineFiles = [];
         _onlineTotal = 0;
+        _onlineFilesLoadFailed = true;
+        return false;
       }
     } catch (e) {
-      if (generation != _onlineLoadGeneration) return;
+      if (generation != _onlineLoadGeneration) return true;
       NeoSyncProvider._log.e('Error loading online files: $e');
       _onlineFiles = [];
       _onlineTotal = 0;
+      _onlineFilesLoadFailed = true;
+      return false;
     } finally {
       if (generation == _onlineLoadGeneration) {
         _isLoadingOnlineFiles = false;
@@ -154,17 +171,28 @@ extension NeoSyncStatus on NeoSyncProvider {
     try {
       final result = await _neoSyncService.deleteFile(fileId);
       if (result['success']) {
-        // Remove the file from the local list
+        // Remove the file from the local lists
         _onlineFiles.removeWhere((file) => file.id == fileId);
+        _files = _files.where((file) => file.id != fileId).toList();
+        // A listing under way may still have the file in it.
+        _filesRemovals++;
+        _markCloudListStale();
         if (_onlineTotal > 0) _onlineTotal -= 1;
-        // Step back a page when the last item of the last page was removed.
-        if (_onlineFiles.isEmpty && _onlinePage > 1) {
-          _onlinePage -= 1;
-          notify();
-          await loadOnlineFiles();
-        } else {
-          notify();
-        }
+        // Step back when this page is now past the end: its last save was the
+        // one deleted, or a page turned while the delete was on its way and
+        // the deletion left that page empty.
+        final lastPage = _onlineTotal == 0
+            ? 1
+            : (_onlineTotal - 1) ~/ NeoSyncProvider._onlinePageSize + 1;
+        if (_onlinePage > lastPage) _onlinePage = lastPage;
+        notify();
+        // Fetch the page again: the server moved every later save up one
+        // place, so dropping the row alone left the page a save short, and
+        // the one that moved up on neither this page nor the next (with 51
+        // saves, the pager went too and the 51st couldn't be reached). A
+        // reload that fails shows the list's failed-to-load state, as a page
+        // turn does; the save was still deleted.
+        await loadOnlineFiles();
         return true;
       } else {
         NeoSyncProvider._log.e(

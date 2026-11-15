@@ -27,11 +27,13 @@ if (Test-Path "$projectRoot\$EnvFile") {
 # sets abiFilters, which is what drops the plugin natives Gradle packages for
 # every ABI.
 #
-# Removing --split-per-abi later is not free: Flutter rewrites versionCode to
-# abi*1000+build (127 ships as 1127/2127), so a universal build after this one
-# must jump the pubspec build number above the highest shipped code, or Android
-# refuses the install as a downgrade.
-flutter build apk --release --split-per-abi --target-platform android-arm64,android-arm $envArg
+# force-version-code-ignoring-abi keeps versionCode at the pubspec build number
+# for both APKs instead of Flutter's abi*1000+build override. Local `flutter run`
+# builds are universal and use the raw number too, so CI and local installs
+# share a versionCode and never trip Android's downgrade check. Safe because
+# APKs ship through GitHub releases, not Play multi-APK.
+flutter build apk --release --split-per-abi --target-platform android-arm64,android-arm `
+    --android-project-arg=force-version-code-ignoring-abi=true $envArg
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error during build" -ForegroundColor Red

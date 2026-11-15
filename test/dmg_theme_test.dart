@@ -30,9 +30,8 @@ void main() {
     });
 
     test('honours the 2rem radius-box/radius-field effects', () {
-      final radii = AppThemes.getThemeDataByName(
-        'dmg',
-      ).extension<CornerRadii>()!;
+      final radii = AppThemes.getThemeDataByName('dmg')
+          .extension<CornerRadii>()!;
       expect(radii.radiusExternalRaw, 32.0);
       expect(radii.radiusInternalRaw, 32.0);
     });

@@ -138,14 +138,14 @@ void main() {
     ]) {
       test('$path passes the app language', () {
         final source = read(path);
-        final calls = RegExp(
-          r'(formatClockTime|widestClockText)\(',
-        ).allMatches(source).length;
+        final calls = RegExp(r'(formatClockTime|widestClockText)\(')
+            .allMatches(source)
+            .length;
         expect(calls, greaterThan(0));
         expect(
-          RegExp(
-            r'text: \(key\) => key\.getString\(context\)',
-          ).allMatches(source).length,
+          RegExp(r'text: \(key\) => key\.getString\(context\)')
+              .allMatches(source)
+              .length,
           calls,
           reason: 'every clock call takes the lookup',
         );

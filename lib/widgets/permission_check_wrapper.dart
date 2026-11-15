@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../providers/sqlite_config_provider.dart';
 import 'setup_wizard.dart';
 import 'splash_status_layout.dart';

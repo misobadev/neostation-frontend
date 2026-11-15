@@ -84,54 +84,57 @@ void main() {
   });
 
   group('GameService.loadGamesForSystem (favorites)', () {
-    test('loads only favorite ROM-library games for favorites virtual system', () async {
-      await db.execute(
-        "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('snes', 'Super Nintendo', 'snes')",
-      );
-      await db.execute(
-        "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('music', 'Music', 'music')",
-      );
-      await db.execute(
-        "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('all', 'All', 'all')",
-      );
-      await db.execute(
-        "INSERT INTO user_system_settings (app_system_id) VALUES ('snes')",
-      );
+    test(
+      'loads only favorite ROM-library games for favorites virtual system',
+      () async {
+        await db.execute(
+          "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('snes', 'Super Nintendo', 'snes')",
+        );
+        await db.execute(
+          "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('music', 'Music', 'music')",
+        );
+        await db.execute(
+          "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('all', 'All', 'all')",
+        );
+        await db.execute(
+          "INSERT INTO user_system_settings (app_system_id) VALUES ('snes')",
+        );
 
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-a.smc', '/roms/snes/fav-a.smc', 'snes', 1)",
-      );
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-b.smc', '/roms/snes/fav-b.smc', 'snes', 1)",
-      );
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('not-fav.smc', '/roms/snes/not-fav.smc', 'snes', 0)",
-      );
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-music.mp3', '/roms/music/fav-music.mp3', 'music', 1)",
-      );
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-android.apk', 'com.example.app', 'android', 1)",
-      );
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-a.smc', '/roms/snes/fav-a.smc', 'snes', 1)",
+        );
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-b.smc', '/roms/snes/fav-b.smc', 'snes', 1)",
+        );
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('not-fav.smc', '/roms/snes/not-fav.smc', 'snes', 0)",
+        );
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-music.mp3', '/roms/music/fav-music.mp3', 'music', 1)",
+        );
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('fav-android.apk', 'com.example.app', 'android', 1)",
+        );
 
-      final favoritesSystem = SystemModel(
-        id: SystemFolderNames.favorites,
-        folderName: SystemFolderNames.favorites,
-        realName: 'Favorites',
-        iconImage: 'assets/images/icons/heart-bulk.png',
-        color: '#ff006a',
-        isVirtual: true,
-      );
+        final favoritesSystem = SystemModel(
+          id: SystemFolderNames.favorites,
+          folderName: SystemFolderNames.favorites,
+          realName: 'Favorites',
+          iconImage: 'assets/images/icons/heart-bulk.png',
+          color: '#ff006a',
+          isVirtual: true,
+        );
 
-      final games = await GameService.loadGamesForSystem(favoritesSystem);
-      final names = games.map((g) => g.romname).toSet();
+        final games = await GameService.loadGamesForSystem(favoritesSystem);
+        final names = games.map((g) => g.romname).toSet();
 
-      expect(names, contains('fav-a.smc'));
-      expect(names, contains('fav-b.smc'));
-      expect(names, isNot(contains('not-fav.smc')));
-      expect(names, isNot(contains('fav-music.mp3')));
-      expect(names, isNot(contains('fav-android.apk')));
-    });
+        expect(names, contains('fav-a.smc'));
+        expect(names, contains('fav-b.smc'));
+        expect(names, isNot(contains('not-fav.smc')));
+        expect(names, isNot(contains('fav-music.mp3')));
+        expect(names, isNot(contains('fav-android.apk')));
+      },
+    );
   });
 
   // isGameLaunchInProgress widens the launch window used to suppress the

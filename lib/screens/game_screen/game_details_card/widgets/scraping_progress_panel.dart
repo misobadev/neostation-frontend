@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
+
 import '../../../../themes/corner_radii.dart';
 
 /// Progress panel shown over the details card while a single game is scraped.

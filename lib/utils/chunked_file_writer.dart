@@ -19,14 +19,21 @@ Future<RandomAccessFile> Function(File file) openFileForChunks =
 /// disk) while no flush is waiting, it reports the error as uncaught, drops
 /// every later chunk, and its final flush never completes, so the copy hangs.
 ///
+/// With [flush], the bytes are flushed to the disk before the file is closed.
+///
 /// On any failure (a write, the final close, or [chunks] itself) the source is
 /// cancelled, the partial file is deleted and the error is rethrown unchanged.
-Future<void> writeChunksToFile(File file, Stream<List<int>> chunks) async {
+Future<void> writeChunksToFile(
+  File file,
+  Stream<List<int>> chunks, {
+  bool flush = false,
+}) async {
   final handle = await openFileForChunks(file);
   try {
     await for (final chunk in chunks) {
       await handle.writeFrom(chunk);
     }
+    if (flush) await handle.flush();
     await handle.close();
   } catch (_) {
     try {

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:neostation/services/logger_service.dart';
+
 import 'retro_achievements_cache.dart';
 import '../models/retro_achievements_user.dart';
 import '../models/retro_achievements_summary.dart';
@@ -44,9 +46,8 @@ class RetroAchievementsService {
       Map<String, String> parameters,
       String cacheKey,
     ) {
-      final url = Uri.parse(
-        '$_baseUrl/$endpoint.php',
-      ).replace(queryParameters: {...parameters, 'y': apiKey});
+      final url = Uri.parse('$_baseUrl/$endpoint.php')
+          .replace(queryParameters: {...parameters, 'y': apiKey});
       final headers = {
         'User-Agent': 'NeoStation/1.0',
         'Accept': 'application/json',
@@ -171,9 +172,8 @@ class RetroAchievementsService {
       throw StateError('A RetroAchievements API key is required');
     }
 
-    final url = Uri.parse(
-      '$_baseUrl/API_GetAchievementOfTheWeek.php',
-    ).replace(queryParameters: {'y': effectiveApiKey});
+    final url = Uri.parse('$_baseUrl/API_GetAchievementOfTheWeek.php')
+        .replace(queryParameters: {'y': effectiveApiKey});
 
     return _fetchWithCache<RetroAchievementsGOTW?>(
       cacheKey: 'gotw',
@@ -257,9 +257,8 @@ class RetroAchievementsService {
     String? apiKey,
     http.Client? client,
   }) async {
-    final url = Uri.parse(
-      '$_baseUrl/API_GetUserProfile.php',
-    ).replace(queryParameters: {'u': username, 'y': resolveApiKey(apiKey)});
+    final url = Uri.parse('$_baseUrl/API_GetUserProfile.php')
+        .replace(queryParameters: {'u': username, 'y': resolveApiKey(apiKey)});
 
     const headers = {
       'User-Agent': 'NeoStation/1.0',
@@ -361,9 +360,8 @@ class RetroAchievementsService {
         '_t': timestamp.toString(),
       };
 
-      final url = Uri.parse(
-        '$_baseUrl/API_GetGameInfoAndUserProgress.php',
-      ).replace(queryParameters: queryParams);
+      final url = Uri.parse('$_baseUrl/API_GetGameInfoAndUserProgress.php')
+          .replace(queryParameters: queryParams);
 
       final response = await http.get(
         url,

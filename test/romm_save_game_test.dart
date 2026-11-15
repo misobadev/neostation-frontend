@@ -72,24 +72,21 @@ void main() {
     expect(RommAsset.fromJson({}, isState: true).romId, isNull);
   });
 
-  test(
-    'groups by ROM identity, preserving recent order and separating unknown owners',
-    () {
-      final groups = RommSaveGame.group([
-        inventoryAsset('Same.state.auto', state: true, romId: 2),
-        inventoryAsset('Same.srm', romId: 1),
-        inventoryAsset('Same [2026-10-02_17-55-08].srm', romId: 2),
-        inventoryAsset('Same.srm', romId: null),
-        inventoryAsset('Same.state', romId: null, state: true),
-      ]);
-      expect(groups.length, 4);
-      expect(groups.map((g) => g.romId), [2, 1, null, null]);
-      expect(groups.first.saveCount, 1);
-      expect(groups.first.stateCount, 1);
-      expect(groups.first.fallbackTitle, 'Same');
-      expect(groups[2].key, isNot(groups[3].key));
-    },
-  );
+  test('groups by ROM identity, preserving recent order and separating unknown owners', () {
+    final groups = RommSaveGame.group([
+      inventoryAsset('Same.state.auto', state: true, romId: 2),
+      inventoryAsset('Same.srm', romId: 1),
+      inventoryAsset('Same [2026-10-02_17-55-08].srm', romId: 2),
+      inventoryAsset('Same.srm', romId: null),
+      inventoryAsset('Same.state', romId: null, state: true),
+    ]);
+    expect(groups.length, 4);
+    expect(groups.map((g) => g.romId), [2, 1, null, null]);
+    expect(groups.first.saveCount, 1);
+    expect(groups.first.stateCount, 1);
+    expect(groups.first.fallbackTitle, 'Same');
+    expect(groups[2].key, isNot(groups[3].key));
+  });
 
   group('existing artwork lookup', () {
     late InventoryConnection connection;

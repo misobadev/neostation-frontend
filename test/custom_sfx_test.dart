@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/models/config_model.dart';
 import 'package:neostation/models/custom_sfx.dart';
@@ -23,10 +24,25 @@ class FakeAudio implements SfxAudioBackend {
   final stopped = <Object>[];
   final volumes = <double>[];
   bool failFiles = false;
+  bool failInit = false;
+  bool failDeinit = false;
+  int deinitCalls = 0;
   Completer<void>? gate;
+  Completer<void>? initGate;
+  int initCalls = 0;
   @override
   Future<void> init() async {
+    initCalls++;
+    if (initGate != null) await initGate!.future;
+    if (failInit) throw StateError('Native initialization failed');
     isInitialized = true;
+  }
+
+  @override
+  void deinit() {
+    deinitCalls++;
+    if (failDeinit) throw StateError('Native cleanup failed');
+    isInitialized = false;
   }
 
   @override
@@ -309,45 +325,75 @@ void main() {
     },
   );
 
-  test(
-    'each action uses its assigned clip and volume; next event stops custom playback',
-    () async {
-      await sfx.setCustomSounds({
-        SfxAction.movement: clip,
-        SfxAction.confirm: other,
-      });
-      sfx.setVolume(0.2);
-      await sfx.playNavSound();
-      expect(audio.played.last, await files.resolve(clip));
-      await Future<void>.delayed(const Duration(milliseconds: 65));
-      await sfx.playEnterSound();
-      expect(audio.played.last, await files.resolve(other));
-      expect(audio.stopped, [1]);
-      await Future<void>.delayed(const Duration(milliseconds: 65));
-      await sfx.playBackSound();
-      expect(audio.played.last, 'assets/sounds/back.wav');
-      expect(audio.stopped, [1, 2]);
-      expect(audio.volumes, everyElement(0.2));
-    },
-  );
+  test('each action uses its assigned clip and volume; next event stops custom playback', () async {
+    await sfx.setCustomSounds({
+      SfxAction.movement: clip,
+      SfxAction.confirm: other,
+    });
+    sfx.setVolume(0.2);
+    await sfx.playNavSound();
+    expect(audio.played.last, await files.resolve(clip));
+    await Future<void>.delayed(const Duration(milliseconds: 65));
+    await sfx.playEnterSound();
+    expect(audio.played.last, await files.resolve(other));
+    expect(audio.stopped, [1]);
+    await Future<void>.delayed(const Duration(milliseconds: 65));
+    await sfx.playBackSound();
+    expect(audio.played.last, 'assets/sounds/back.wav');
+    expect(audio.stopped, [1, 2]);
+    expect(audio.volumes, everyElement(0.2));
+  });
 
-  test(
-    'disabled and dark-screen playback stay silent and duplicate calls debounce',
-    () async {
-      sfx.setEnabled(false);
-      await sfx.playNavSound();
-      expect(sfx.isInitialized, false);
-      sfx.setEnabled(true);
-      SfxService.isScreenOn = () => false;
-      await sfx.playEnterSound();
-      expect(sfx.isInitialized, false);
-      SfxService.isScreenOn = () => true;
-      await Future<void>.delayed(const Duration(milliseconds: 65));
-      await sfx.playNavSound();
-      await sfx.playNavSound();
-      expect(audio.played.length, 1);
-    },
-  );
+  test('disabled and dark-screen playback stay silent and duplicate calls debounce', () async {
+    sfx.setEnabled(false);
+    await sfx.playNavSound();
+    expect(sfx.isInitialized, false);
+    sfx.setEnabled(true);
+    SfxService.isScreenOn = () => false;
+    await sfx.playEnterSound();
+    expect(sfx.isInitialized, false);
+    SfxService.isScreenOn = () => true;
+    await Future<void>.delayed(const Duration(milliseconds: 65));
+    await sfx.playNavSound();
+    await sfx.playNavSound();
+    expect(audio.played.length, 1);
+  });
+
+  test('disabled SFX does not reopen audio on resume', () async {
+    audio.isInitialized = false;
+    sfx.setEnabled(false);
+    await sfx.setCustomSounds({SfxAction.back: clip});
+    await sfx.reinitializeAfterEngineRestart();
+    expect(audio.initCalls, 0);
+    expect(audio.isInitialized, isFalse);
+
+    sfx.setEnabled(true);
+    await sfx.playBackSound();
+    expect(audio.initCalls, 1);
+    expect(audio.played, [await files.resolve(clip)]);
+  });
+
+  test('disabled SFX still permits explicit clip validation', () async {
+    audio.isInitialized = false;
+    sfx.setEnabled(false);
+    await sfx.validateClip('import.wav');
+    expect(sfx.isEnabled, isFalse);
+    expect(audio.initCalls, 1);
+    expect(audio.disposed, contains('import.wav'));
+    expect(audio.played, isEmpty);
+    audio.duration = const Duration(seconds: 6);
+    await expectLater(sfx.validateClip('long.wav'), throwsFormatException);
+    expect(audio.disposed, contains('long.wav'));
+  });
+
+  test('disabling SFX preserves an existing shared audio engine', () async {
+    await sfx.init();
+    sfx.setEnabled(false);
+    await sfx.validateClip('import.wav');
+    expect(audio.isInitialized, isTrue);
+    expect(audio.initCalls, 0);
+    expect(audio.played, isEmpty);
+  });
 
   test(
     'unreadable custom clips fall back and resetting restores built-ins',
@@ -379,6 +425,44 @@ void main() {
       2,
     );
   });
+
+  test('screen-off during audio initialization releases the engine', () async {
+    audio.isInitialized = false;
+    audio.initGate = Completer<void>();
+    final initializing = sfx.init();
+    await pumpEventQueue();
+    expect(audio.initCalls, 1);
+
+    SfxService.isScreenOn = () => false;
+    audio.initGate!.complete();
+    await initializing;
+    expect(audio.isInitialized, isFalse);
+    expect(sfx.isInitialized, isFalse);
+
+    SfxService.isScreenOn = () => true;
+    await sfx.reinitializeAfterEngineRestart();
+    await sfx.playBackSound();
+    expect(audio.initCalls, 2);
+    expect(audio.played, ['assets/sounds/back.wav']);
+  });
+
+  for (final failure in ['initialization', 'cleanup']) {
+    test('screen-off completes when native audio $failure fails', () async {
+      audio.isInitialized = false;
+      audio.failInit = failure == 'initialization';
+      audio.failDeinit = failure == 'cleanup';
+      audio.initGate = Completer<void>();
+      final initializing = sfx.init();
+      await pumpEventQueue();
+      expect(audio.initCalls, 1);
+
+      SfxService.isScreenOn = () => false;
+      audio.initGate!.complete();
+      await initializing;
+      expect(audio.deinitCalls, 1);
+      expect(sfx.isInitialized, isFalse);
+    });
+  }
 
   test(
     'failed persistence preserves assignment and removes staged import',

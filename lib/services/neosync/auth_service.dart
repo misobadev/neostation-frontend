@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:neostation/models/user.dart';
 import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/services/neosync/neosync_http.dart';
 import 'package:neostation/utils/app_config.dart';
 import 'package:neostation/utils/log_redaction.dart';
 
@@ -29,16 +31,34 @@ enum SessionRestore {
 }
 
 class AuthService extends ChangeNotifier {
+  AuthService({
+    this.requestTimeout = defaultRequestTimeout,
+    this.profileTimeout = defaultProfileTimeout,
+  });
+
   /// Storage key for the authentication JWT token.
   static const String _tokenKey = 'auth_token';
 
   static final _log = LoggerService.instance;
 
+  /// How long a sign-in request (login, registration, the verification and
+  /// password e-mails) may take. Without a limit, a server that takes the
+  /// connection and then says nothing would keep the Login button spinning
+  /// for as long as the socket lived.
+  static const Duration defaultRequestTimeout = Duration(seconds: 15);
+
   /// How long the profile request may take before it counts as unreachable.
   /// `main` awaits [initialize], so an unbounded request on a handheld that
   /// powered on before its Wi-Fi associated would hold the whole app on the
   /// splash screen for as long as the socket took to give up.
-  static const Duration _profileTimeout = Duration(seconds: 10);
+  static const Duration defaultProfileTimeout = Duration(seconds: 10);
+
+  /// The limit for each sign-in request (and for connecting, on the default
+  /// client); see [defaultRequestTimeout].
+  final Duration requestTimeout;
+
+  /// The limit for the profile request; see [defaultProfileTimeout].
+  final Duration profileTimeout;
 
   /// Background retry schedule for a session that could not be restored
   /// because nothing was reachable. Covers the cold-boot window in which a
@@ -55,11 +75,17 @@ class AuthService extends ChangeNotifier {
     Duration(seconds: 120),
   ];
 
-  /// HTTP client for the session reads. Null in the app, where the service
-  /// uses its own; tests swap it between phases to take the network away and
-  /// give it back.
+  /// HTTP client for every request. Null in the app, where the service uses
+  /// its own; tests swap it between phases to take the network away and give
+  /// it back.
   @visibleForTesting
   http.Client? httpClient;
+
+  /// The service's own client, created on first use and closed in [dispose].
+  http.Client? _defaultClient;
+
+  http.Client get _client =>
+      httpClient ?? (_defaultClient ??= neoSyncHttpClient(requestTimeout));
 
   /// Guards against two overlapping retry loops (one from [initialize], one
   /// from a caller that retried by hand).
@@ -184,7 +210,9 @@ class AuthService extends ChangeNotifier {
       final baseUrl = AppConfig.authBaseUrl;
       _log.i('Attempting registration to: $baseUrl/register');
 
-      final response = await http.post(
+      final response = await sendWithTimeout(
+        _client,
+        'POST',
         Uri.parse('$baseUrl/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -192,6 +220,7 @@ class AuthService extends ChangeNotifier {
           'email': email,
           'password': password,
         }),
+        timeout: requestTimeout,
       );
 
       final data = jsonDecode(response.body);
@@ -199,8 +228,7 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode == 201) {
         return {
           'success': true,
-          'message':
-              'Registration successful. Please check your email to verify your account.',
+          'message': 'Registration successful. Please check your email to verify your account.',
         };
       } else {
         return {
@@ -209,7 +237,11 @@ class AuthService extends ChangeNotifier {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': redactSecrets('Network error: $e')};
+      return {
+        'success': false,
+        'message': redactSecrets('Network error: $e'),
+        'isNetworkError': true,
+      };
     }
   }
 
@@ -222,10 +254,13 @@ class AuthService extends ChangeNotifier {
       final baseUrl = AppConfig.authBaseUrl;
       _log.i('Attempting login to: $baseUrl/login');
 
-      final response = await http.post(
+      final response = await sendWithTimeout(
+        _client,
+        'POST',
         Uri.parse('$baseUrl/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
+        timeout: requestTimeout,
       );
 
       final data = jsonDecode(response.body);
@@ -276,17 +311,24 @@ class AuthService extends ChangeNotifier {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': redactSecrets('Network error: $e')};
+      return {
+        'success': false,
+        'message': redactSecrets('Network error: $e'),
+        'isNetworkError': true,
+      };
     }
   }
 
   /// Verifies a user's email using a verification [token] sent via email.
   Future<Map<String, dynamic>> verifyEmail(String token) async {
     try {
-      final response = await http.post(
+      final response = await sendWithTimeout(
+        _client,
+        'POST',
         Uri.parse('${AppConfig.authBaseUrl}/verify-email'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'token': token}),
+        timeout: requestTimeout,
       );
 
       final data = jsonDecode(response.body);
@@ -304,7 +346,11 @@ class AuthService extends ChangeNotifier {
         return {'success': false, 'message': errorMessage};
       }
     } catch (e) {
-      return {'success': false, 'message': redactSecrets('Network error: $e')};
+      return {
+        'success': false,
+        'message': redactSecrets('Network error: $e'),
+        'isNetworkError': true,
+      };
     }
   }
 
@@ -313,10 +359,13 @@ class AuthService extends ChangeNotifier {
     String email,
   ) async {
     try {
-      final response = await http.post(
+      final response = await sendWithTimeout(
+        _client,
+        'POST',
         Uri.parse('${AppConfig.authBaseUrl}/check-email-status'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email}),
+        timeout: requestTimeout,
       );
 
       final data = jsonDecode(response.body);
@@ -334,17 +383,24 @@ class AuthService extends ChangeNotifier {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': redactSecrets('Network error: $e')};
+      return {
+        'success': false,
+        'message': redactSecrets('Network error: $e'),
+        'isNetworkError': true,
+      };
     }
   }
 
   /// Triggers a resend of the account verification email to the specified address.
   Future<Map<String, dynamic>> resendVerificationEmail(String email) async {
     try {
-      final response = await http.post(
+      final response = await sendWithTimeout(
+        _client,
+        'POST',
         Uri.parse('${AppConfig.authBaseUrl}/resend-verification'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email}),
+        timeout: requestTimeout,
       );
 
       final data = jsonDecode(response.body);
@@ -360,7 +416,11 @@ class AuthService extends ChangeNotifier {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': redactSecrets('Network error: $e')};
+      return {
+        'success': false,
+        'message': redactSecrets('Network error: $e'),
+        'isNetworkError': true,
+      };
     }
   }
 
@@ -388,12 +448,13 @@ class AuthService extends ChangeNotifier {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       };
-      final client = httpClient;
-      final response =
-          await (client == null
-                  ? http.get(url, headers: headers)
-                  : client.get(url, headers: headers))
-              .timeout(_profileTimeout);
+      final response = await sendWithTimeout(
+        _client,
+        'GET',
+        url,
+        headers: headers,
+        timeout: profileTimeout,
+      );
 
       final data = jsonDecode(response.body);
 
@@ -425,10 +486,13 @@ class AuthService extends ChangeNotifier {
   /// Initiates a password recovery request for the specified email address.
   Future<Map<String, dynamic>> forgotPassword(String email) async {
     try {
-      final response = await http.post(
+      final response = await sendWithTimeout(
+        _client,
+        'POST',
         Uri.parse('${AppConfig.authBaseUrl}/forgot-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email}),
+        timeout: requestTimeout,
       );
 
       final data = jsonDecode(response.body);
@@ -449,7 +513,11 @@ class AuthService extends ChangeNotifier {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': redactSecrets('Network error: $e')};
+      return {
+        'success': false,
+        'message': redactSecrets('Network error: $e'),
+        'isNetworkError': true,
+      };
     }
   }
 
@@ -459,10 +527,13 @@ class AuthService extends ChangeNotifier {
     String newPassword,
   ) async {
     try {
-      final response = await http.post(
+      final response = await sendWithTimeout(
+        _client,
+        'POST',
         Uri.parse('${AppConfig.authBaseUrl}/reset-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'token': token, 'new_password': newPassword}),
+        timeout: requestTimeout,
       );
 
       final data = jsonDecode(response.body);
@@ -481,8 +552,18 @@ class AuthService extends ChangeNotifier {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': redactSecrets('Network error: $e')};
+      return {
+        'success': false,
+        'message': redactSecrets('Network error: $e'),
+        'isNetworkError': true,
+      };
     }
+  }
+
+  @override
+  void dispose() {
+    _defaultClient?.close();
+    super.dispose();
   }
 
   /// Terminates the current user session and purges the stored authentication token.

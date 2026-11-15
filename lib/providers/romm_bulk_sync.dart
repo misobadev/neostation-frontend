@@ -9,8 +9,10 @@ import 'romm_provider.dart';
 
 /// Fetches one page of the source being synced. Offset/limit paging only — the
 /// filter (platform, collection, search) is bound by whoever supplies this.
-typedef RommPageFetcher =
-    Future<RommRomPage> Function({required int limit, required int offset});
+typedef RommPageFetcher = Future<RommRomPage> Function({
+  required int limit,
+  required int offset,
+});
 
 /// True when [rom] is already on disk and should be skipped.
 typedef RommDownloadedCheck = Future<bool> Function(RommRom rom);
@@ -54,8 +56,9 @@ typedef RommLinkWriteResult = ({int written, int failed});
 /// Writes the mapping rows for the matches the plan was approved with, in as
 /// few transactions as the writer can manage. Rows only — never metadata or
 /// media: a sync can touch thousands of ROMs.
-typedef RommLocalLinkWriter =
-    Future<RommLinkWriteResult> Function(List<RommPendingLink> pending);
+typedef RommLocalLinkWriter = Future<RommLinkWriteResult> Function(
+  List<RommPendingLink> pending,
+);
 
 /// Downloads one ROM, resolving to its final [RommDownload] record.
 typedef RommRomDownloader = Future<RommDownload> Function(RommRom rom);
@@ -87,8 +90,9 @@ class RommSyncDestination {
 ///
 /// Called once per queued ROM, so implementations are expected to memoize —
 /// the answer is a property of the ROM's platform, not of the ROM.
-typedef RommDestinationProbe =
-    Future<RommSyncDestination?> Function(RommRom rom);
+typedef RommDestinationProbe = Future<RommSyncDestination?> Function(
+  RommRom rom,
+);
 
 /// Last chance to call the sync off, once its real size is known. Returning
 /// false abandons the queue before anything is downloaded.

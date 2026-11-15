@@ -40,8 +40,7 @@ void main() {
 
     test('prefers the Flatpak config when the executable is a Flatpak', () {
       final candidates = RetroArchConfigService.linuxConfigCandidates(
-        exePath:
-            '/home/deck/.local/share/flatpak/exports/bin/org.libretro.RetroArch',
+        exePath: '/home/deck/.local/share/flatpak/exports/bin/org.libretro.RetroArch',
       );
 
       expect(candidates.first, contains('.var/app/org.libretro.RetroArch'));

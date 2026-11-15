@@ -95,55 +95,49 @@ void main() {
     },
   );
 
-  test(
-    'manual matching forces refresh and resolves a previously unmatched stored hash',
-    () async {
-      await service.refresh(apiKey: 'test');
-      await RetroAchievementsRepository.completeRaCatalogueMatch();
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash, id_ra, ra_match_source) VALUES ('manual.nes', '/manual.nes', 'nes', ?, 999, 'manual')",
-        [hash],
-      );
-      await RaLibraryMatchRunner.run(
-        strings: strings,
-        apiKey: 'test',
-        catalogueService: service,
-      );
-      expect(requests, 2);
-      final rows = await db.rawQuery(
-        'SELECT rom_path, id_ra, ra_hash FROM user_roms ORDER BY rom_path',
-      );
-      expect(rows.first['id_ra'], 999);
-      expect(rows.last['id_ra'], 123);
-      expect(rows.last['ra_hash'], hash);
-      expect(
-        await RetroAchievementsRepository.hasPendingRaCatalogueMatch(),
-        isFalse,
-      );
-    },
-  );
+  test('manual matching forces refresh and resolves a previously unmatched stored hash', () async {
+    await service.refresh(apiKey: 'test');
+    await RetroAchievementsRepository.completeRaCatalogueMatch();
+    await db.execute(
+      "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash, id_ra, ra_match_source) VALUES ('manual.nes', '/manual.nes', 'nes', ?, 999, 'manual')",
+      [hash],
+    );
+    await RaLibraryMatchRunner.run(
+      strings: strings,
+      apiKey: 'test',
+      catalogueService: service,
+    );
+    expect(requests, 2);
+    final rows = await db.rawQuery(
+      'SELECT rom_path, id_ra, ra_hash FROM user_roms ORDER BY rom_path',
+    );
+    expect(rows.first['id_ra'], 999);
+    expect(rows.last['id_ra'], 123);
+    expect(rows.last['ra_hash'], hash);
+    expect(
+      await RetroAchievementsRepository.hasPendingRaCatalogueMatch(),
+      isFalse,
+    );
+  });
 
-  test(
-    'automatic matching retries a pending catalogue even when daily refresh is skipped',
-    () async {
-      await service.refresh(apiKey: 'test');
-      await RaLibraryMatchRunner.run(
-        strings: strings,
-        trigger: RaMatchTrigger.automatic,
-        apiKey: 'test',
-        catalogueService: service,
-      );
-      expect(requests, 1);
-      expect(
-        (await db.rawQuery('SELECT id_ra FROM user_roms')).single['id_ra'],
-        123,
-      );
-      expect(
-        await RetroAchievementsRepository.hasPendingRaCatalogueMatch(),
-        isFalse,
-      );
-    },
-  );
+  test('automatic matching retries a pending catalogue even when daily refresh is skipped', () async {
+    await service.refresh(apiKey: 'test');
+    await RaLibraryMatchRunner.run(
+      strings: strings,
+      trigger: RaMatchTrigger.automatic,
+      apiKey: 'test',
+      catalogueService: service,
+    );
+    expect(requests, 1);
+    expect(
+      (await db.rawQuery('SELECT id_ra FROM user_roms')).single['id_ra'],
+      123,
+    );
+    expect(
+      await RetroAchievementsRepository.hasPendingRaCatalogueMatch(),
+      isFalse,
+    );
+  });
 
   test(
     'fetch includes hashes, achievement filter and correct console',
@@ -337,45 +331,36 @@ void main() {
     },
   );
 
-  test(
-    'launch during catalogue download pauses the runner before publishing or hashing',
-    () async {
-      respond = (_) async {
-        expect(RaLibraryMatchRunner.isRunning, isTrue);
-        GameSessionManager.beginLaunchPending();
-        return http.Response(jsonEncode([game()]), 200);
-      };
-      try {
-        final paused = await RaLibraryMatchRunner.run(
-          strings: strings,
-          apiKey: 'test',
-          catalogueService: service,
-        );
-        expect(paused, isTrue);
-        expect(RaLibraryMatchRunner.isRunning, isFalse);
-        expect(
-          await RetroAchievementsRepository.findGameIdByHash(hash),
-          isNull,
-        );
-        expect(
-          await db.rawQuery('SELECT * FROM app_ra_catalogue_sync'),
-          isEmpty,
-        );
-      } finally {
-        GameSessionManager.clearLaunchPending();
-      }
-      respond = (_) async => http.Response(jsonEncode([game()]), 200);
-      await RaLibraryMatchRunner.run(
+  test('launch during catalogue download pauses the runner before publishing or hashing', () async {
+    respond = (_) async {
+      expect(RaLibraryMatchRunner.isRunning, isTrue);
+      GameSessionManager.beginLaunchPending();
+      return http.Response(jsonEncode([game()]), 200);
+    };
+    try {
+      final paused = await RaLibraryMatchRunner.run(
         strings: strings,
         apiKey: 'test',
         catalogueService: service,
       );
-      expect(
-        (await db.rawQuery('SELECT id_ra FROM user_roms')).single['id_ra'],
-        123,
-      );
-    },
-  );
+      expect(paused, isTrue);
+      expect(RaLibraryMatchRunner.isRunning, isFalse);
+      expect(await RetroAchievementsRepository.findGameIdByHash(hash), isNull);
+      expect(await db.rawQuery('SELECT * FROM app_ra_catalogue_sync'), isEmpty);
+    } finally {
+      GameSessionManager.clearLaunchPending();
+    }
+    respond = (_) async => http.Response(jsonEncode([game()]), 200);
+    await RaLibraryMatchRunner.run(
+      strings: strings,
+      apiKey: 'test',
+      catalogueService: service,
+    );
+    expect(
+      (await db.rawQuery('SELECT id_ra FROM user_roms')).single['id_ra'],
+      123,
+    );
+  });
 
   test('runner prevents a second refresh while one is in flight', () async {
     respond = (_) async {
@@ -397,34 +382,32 @@ void main() {
     expect(requests, 1);
   });
 
-  test(
-    'manual refresh failure reports saved-data fallback and still matches locally',
-    () async {
-      await service.refresh(apiKey: 'test', now: now);
-      respond = (_) async => http.Response('unavailable', 500);
-      await RaLibraryMatchRunner.run(
-        strings: const RaMatchStrings(
-          title: 'match',
-          lookingUp: 'lookup',
-          hashing: 'hash',
-          done: 'done',
-          nothingToDo: 'none',
-          paused: 'paused',
-          failed: 'failed',
-          catalogueRefreshFailed: 'saved-data-fallback',
-        ),
-        apiKey: 'test',
-        catalogueService: service,
-      );
-      expect(
-        (await db.rawQuery('SELECT id_ra FROM user_roms')).single['id_ra'],
-        123,
-      );
-      final notification = GlobalNotificationService().notifier.value
-          .singleWhere((n) => n.id == RaLibraryMatchRunner.notificationId);
-      expect(notification.message, 'saved-data-fallback');
-    },
-  );
+  test('manual refresh failure reports saved-data fallback and still matches locally', () async {
+    await service.refresh(apiKey: 'test', now: now);
+    respond = (_) async => http.Response('unavailable', 500);
+    await RaLibraryMatchRunner.run(
+      strings: const RaMatchStrings(
+        title: 'match',
+        lookingUp: 'lookup',
+        hashing: 'hash',
+        done: 'done',
+        nothingToDo: 'none',
+        paused: 'paused',
+        failed: 'failed',
+        catalogueRefreshFailed: 'saved-data-fallback',
+      ),
+      apiKey: 'test',
+      catalogueService: service,
+    );
+    expect(
+      (await db.rawQuery('SELECT id_ra FROM user_roms')).single['id_ra'],
+      123,
+    );
+    final notification = GlobalNotificationService().notifier.value.singleWhere(
+      (n) => n.id == RaLibraryMatchRunner.notificationId,
+    );
+    expect(notification.message, 'saved-data-fallback');
+  });
 
   test('migration 172 is idempotent and preserves refresh state', () async {
     final raw = sqlite.sqlite3.openInMemory();

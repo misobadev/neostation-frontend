@@ -127,43 +127,40 @@ void main() {
       expect(await ConfigRepository.getThemeName(), 'system');
     });
 
-    test(
-      'an unreadable theme file keeps both the saved name and the startup cache',
-      () async {
-        // A palette written by a previous launch, i.e. the user's real theme.
-        SharedPreferences.setMockInitialValues({
-          'flutter.startup_theme_background': 0xFF101010,
-          'flutter.startup_theme_foreground': 0xFFF0F0F0,
-          'flutter.startup_theme_primary': 0xFF605DFF,
-        });
-        await ConfigRepository.updateThemeName('neon');
+    test('an unreadable theme file keeps both the saved name and the startup cache', () async {
+      // A palette written by a previous launch, i.e. the user's real theme.
+      SharedPreferences.setMockInitialValues({
+        'flutter.startup_theme_background': 0xFF101010,
+        'flutter.startup_theme_foreground': 0xFFF0F0F0,
+        'flutter.startup_theme_primary': 0xFF605DFF,
+      });
+      await ConfigRepository.updateThemeName('neon');
 
-        // One unreadable file makes the load incomplete, so a missing id proves
-        // nothing — exactly the shape of a user-data directory that isn't ready
-        // yet on a cold boot.
-        final dir = Directory(
-          p.join(await ConfigService.getUserDataPath(), 'custom_themes'),
-        );
-        await dir.create(recursive: true);
-        final broken = File(p.join(dir.path, 'broken.json'));
-        await broken.writeAsString('{ this is not json');
-        addTearDown(() async {
-          if (broken.existsSync()) await broken.delete();
-        });
+      // One unreadable file makes the load incomplete, so a missing id proves
+      // nothing — exactly the shape of a user-data directory that isn't ready
+      // yet on a cold boot.
+      final dir = Directory(
+        p.join(await ConfigService.getUserDataPath(), 'custom_themes'),
+      );
+      await dir.create(recursive: true);
+      final broken = File(p.join(dir.path, 'broken.json'));
+      await broken.writeAsString('{ this is not json');
+      addTearDown(() async {
+        if (broken.existsSync()) await broken.delete();
+      });
 
-        final provider = await ThemeProvider.create();
+      final provider = await ThemeProvider.create();
 
-        // Falls back for this session...
-        expect(provider.currentThemeName, 'system');
-        // ...without discarding the user's choice...
-        expect(await ConfigRepository.getThemeName(), 'neon');
-        // ...and without writing the system palette over the cache, which would
-        // make the NEXT launch paint its startup screens in the wrong colours
-        // before snapping to the restored theme.
-        final colors = await StartupThemeCache.load();
-        expect(colors.background, const Color(0xFF101010));
-        expect(colors.primary, const Color(0xFF605DFF));
-      },
-    );
+      // Falls back for this session...
+      expect(provider.currentThemeName, 'system');
+      // ...without discarding the user's choice...
+      expect(await ConfigRepository.getThemeName(), 'neon');
+      // ...and without writing the system palette over the cache, which would
+      // make the NEXT launch paint its startup screens in the wrong colours
+      // before snapping to the restored theme.
+      final colors = await StartupThemeCache.load();
+      expect(colors.background, const Color(0xFF101010));
+      expect(colors.primary, const Color(0xFF605DFF));
+    });
   });
 }

@@ -5,8 +5,11 @@ import 'package:neostation/widgets/selection_grid/selection_grid_geometry.dart';
 
 /// Builds the widget for the item at [index]; [cellSize] is the card's
 /// resolved size from the grid geometry.
-typedef SelectionGridItemBuilder =
-    Widget Function(BuildContext context, int index, Size cellSize);
+typedef SelectionGridItemBuilder = Widget Function(
+  BuildContext context,
+  int index,
+  Size cellSize,
+);
 
 /// A virtualized, row-major grid with an animated selection highlight that is
 /// aligned with the cards **by construction**.

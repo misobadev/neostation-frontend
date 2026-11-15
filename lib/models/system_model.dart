@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../constants/system_folder_names.dart';
 import 'neo_sync_models.dart';
 import 'ra_hash_policy.dart';

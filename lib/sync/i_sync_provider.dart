@@ -12,6 +12,7 @@
 library;
 
 import 'dart:io';
+
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/sync_models.dart';
@@ -34,7 +35,10 @@ abstract class ISyncProvider {
 
   bool get isAuthenticated;
 
-  /// Last error message; null when no error.
+  /// The provider's own connection or sync error; null when there is none.
+  ///
+  /// Unrelated calls such as listing or browsing must not set it: a game's sync
+  /// status mark shows it whatever that game's own state.
   String? get lastError;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────

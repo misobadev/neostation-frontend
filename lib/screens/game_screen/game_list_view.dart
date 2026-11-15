@@ -371,15 +371,14 @@ class GameListViewState extends State<GameListView>
                         decoration: BoxDecoration(
                           color: highlightColor,
                           borderRadius:
-                              Theme.of(
-                                context,
-                              ).extension<CornerRadii>()?.radiusInternal ??
+                              Theme.of(context)
+                                  .extension<CornerRadii>()
+                                  ?.radiusInternal ??
                               BorderRadius.circular(14.r),
                           boxShadow: [
                             BoxShadow(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.shadow.withValues(alpha: 0.1),
+                              color: Theme.of(context).colorScheme.shadow
+                                  .withValues(alpha: 0.1),
                               blurRadius: 4.r,
                               offset: Offset(2.0.r, 2.0.r),
                             ),

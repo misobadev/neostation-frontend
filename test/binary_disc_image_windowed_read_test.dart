@@ -87,32 +87,29 @@ void main() {
         await image!.close();
       });
 
-      test(
-        'a sector read out of order still lands on the right bytes',
-        () async {
-          final file = _writeImage(
-            tempDir,
-            'image.iso',
-            sectorSize: layout.sectorSize,
-            dataOffset: layout.dataOffset,
-            sectors: sectorCount,
+      test('a sector read out of order still lands on the right bytes', () async {
+        final file = _writeImage(
+          tempDir,
+          'image.iso',
+          sectorSize: layout.sectorSize,
+          dataOffset: layout.dataOffset,
+          sectors: sectorCount,
+        );
+
+        final image = await BinaryDiscImage.openImage(file.path);
+
+        // Forwards into a window, then backwards out of it: the ISO9660 walk
+        // jumps around before any file is streamed, so a window that only ever
+        // moves forward would serve stale bytes here.
+        for (final lba in [0, 300, 5, 599, 256, 255, 1]) {
+          expect(
+            await image!.readSector(0, lba),
+            _userBytes(lba),
+            reason: 'sector $lba after an out-of-order jump',
           );
-
-          final image = await BinaryDiscImage.openImage(file.path);
-
-          // Forwards into a window, then backwards out of it: the ISO9660 walk
-          // jumps around before any file is streamed, so a window that only ever
-          // moves forward would serve stale bytes here.
-          for (final lba in [0, 300, 5, 599, 256, 255, 1]) {
-            expect(
-              await image!.readSector(0, lba),
-              _userBytes(lba),
-              reason: 'sector $lba after an out-of-order jump',
-            );
-          }
-          await image!.close();
-        },
-      );
+        }
+        await image!.close();
+      });
 
       test('reads past the end of the image report failure', () async {
         final file = _writeImage(

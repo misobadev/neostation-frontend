@@ -29,7 +29,7 @@ import 'package:neostation/services/logger_service.dart';
 ///
 /// Android is untouched: it blocks the pad natively while an emulator is in
 /// the foreground, and [initialize] is never called there.
-class DesktopWindowFocus with WindowListener {
+class DesktopWindowFocus {
   DesktopWindowFocus._();
 
   static final DesktopWindowFocus _instance = DesktopWindowFocus._();
@@ -43,6 +43,8 @@ class DesktopWindowFocus with WindowListener {
   static bool _focused = true;
   static bool _listening = false;
   static DateTime? _lastVerification;
+  static Window? _window;
+  static ListenerId? _listenerId;
 
   /// Whether gamepad input should be acted on right now.
   ///
@@ -51,19 +53,31 @@ class DesktopWindowFocus with WindowListener {
 
   /// Starts tracking window focus. Desktop only; safe to call more than once.
   ///
-  /// Call after `windowManager.ensureInitialized()`, which owns the channel
-  /// this listens on.
+  /// Call after the app's window exists.
   static Future<void> initialize() async {
     if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) return;
     if (_listening) return;
 
-    windowManager.addListener(_instance);
+    final window = WindowManager.instance.getCurrent();
+    if (window == null) return;
+
+    _window = window;
+    _listenerId = window.addListener((event) {
+      switch (event) {
+        case WindowFocusedEvent():
+          _instance.onWindowFocus();
+        case WindowBlurredEvent():
+          _instance.onWindowBlur();
+        default:
+          break;
+      }
+    });
     _listening = true;
 
     // Seed from the real state rather than assuming: initialization happens
     // during startup, and the user may already have clicked away.
     try {
-      _focused = await windowManager.isFocused();
+      _focused = window.isFocused;
     } catch (e) {
       // Leave the fail-open default in place.
       _log.w('[WindowFocus] Could not read initial focus state: $e');
@@ -87,30 +101,28 @@ class DesktopWindowFocus with WindowListener {
     }
     _lastVerification = now;
 
-    windowManager
-        .isFocused()
-        .then((focused) {
-          if (focused && !_focused) {
-            _log.w(
-              '[WindowFocus] Input arrived while blurred but the window is '
-              'focused; correcting (a focus event was missed)',
-            );
-            _focused = true;
-          }
-        })
-        .catchError((Object e) {
-          _log.w('[WindowFocus] Focus re-check failed: $e');
-        });
+    final window = _window;
+    if (window == null) return;
+
+    try {
+      if (window.isFocused && !_focused) {
+        _log.w(
+          '[WindowFocus] Input arrived while blurred but the window is '
+          'focused; correcting (a focus event was missed)',
+        );
+        _focused = true;
+      }
+    } catch (e) {
+      _log.w('[WindowFocus] Focus re-check failed: $e');
+    }
   }
 
-  @override
   void onWindowFocus() {
     if (_focused) return;
     _focused = true;
     _log.i('[WindowFocus] Window focused — gamepad input enabled');
   }
 
-  @override
   void onWindowBlur() {
     if (!_focused) return;
     _focused = false;
@@ -124,6 +136,13 @@ class DesktopWindowFocus with WindowListener {
   /// Restores the pristine state. Tests only.
   @visibleForTesting
   static void resetForTesting() {
+    final window = _window;
+    final listenerId = _listenerId;
+    if (window != null && listenerId != null) {
+      window.removeListener(listenerId);
+    }
+    _window = null;
+    _listenerId = null;
     _focused = true;
     _listening = false;
     _lastVerification = null;

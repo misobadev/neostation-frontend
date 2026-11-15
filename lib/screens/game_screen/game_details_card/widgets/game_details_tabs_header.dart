@@ -93,9 +93,9 @@ class GameDetailsTabsHeader extends StatelessWidget {
             // Tab Navigation Group: Hardware-mapped navigation controls.
             NeoGlass(
               cornerRadius:
-                  Theme.of(
-                    context,
-                  ).extension<CornerRadii>()?.radiusExternalRadius ??
+                  Theme.of(context)
+                      .extension<CornerRadii>()
+                      ?.radiusExternalRadius ??
                   _controlSize(12),
               child: SizedBox(
                 height: _controlSize(36),
@@ -118,9 +118,9 @@ class GameDetailsTabsHeader extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: theme.colorScheme.primary,
                               borderRadius:
-                                  Theme.of(
-                                    context,
-                                  ).extension<CornerRadii>()?.radiusInternal ??
+                                  Theme.of(context)
+                                      .extension<CornerRadii>()
+                                      ?.radiusInternal ??
                                   BorderRadius.circular(_controlSize(14)),
                             ),
                           ),

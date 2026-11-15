@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:neostation/utils/user_data_startup_check.dart'
+    as user_data_check;
 import 'package:path/path.dart' as p;
 
 import 'logger_service.dart';
@@ -99,20 +101,8 @@ class StorageSpaceService {
   /// degrades to checking that destination on its own rather than grouping it
   /// with something it may not share a volume with.
   @visibleForTesting
-  static String androidVolumeRoot(String path) {
-    final normalized = p.normalize(path);
-    // `/sdcard` is the historical symlink to primary shared storage; mapping it
-    // keeps it from being counted as a volume of its own.
-    if (normalized == '/sdcard' || normalized.startsWith('/sdcard/')) {
-      return '/storage/emulated/0';
-    }
-    if (!normalized.startsWith('/storage/')) return normalized;
-    final segments = p.split(normalized);
-    // p.split('/storage/emulated/0/roms') -> ['/', 'storage', 'emulated', '0', …]
-    final wanted = segments.length > 2 && segments[2] == 'emulated' ? 4 : 3;
-    if (segments.length < wanted) return normalized;
-    return p.joinAll(segments.take(wanted));
-  }
+  static String androidVolumeRoot(String path) =>
+      user_data_check.androidVolumeRoot(path);
 
   static Future<int?> _viaChannel(String path) async {
     final bytes = await _channel.invokeMethod<int>('getFreeSpace', {

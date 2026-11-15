@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'dart:io';
 
 /// Configuration settings for the NeoSync cloud synchronization service.
@@ -364,6 +365,11 @@ class LocalSaveFile {
   /// Path relative to the tracked synchronization root.
   final String relativePath;
 
+  /// The path NeoSync keeps this file under in the cloud, when it isn't
+  /// [relativePath]: a RetroArch memory card shared by every game of its
+  /// system goes up under its system's fixed path. Null otherwise.
+  final String? cloudPath;
+
   LocalSaveFile({
     required this.filePath,
     required this.fileName,
@@ -372,6 +378,7 @@ class LocalSaveFile {
     required this.gameName,
     required this.isSynced,
     required this.relativePath,
+    this.cloudPath,
   });
 
   /// Returns formatted file size string.
@@ -418,6 +425,33 @@ enum GameSyncStatus {
 
   /// The last synchronization attempt failed.
   error,
+}
+
+/// What uploading a custom save folder did, so the screen can say so.
+enum CustomFolderUploadOutcome {
+  /// NeoSync isn't signed in; nothing ran.
+  notSignedIn,
+
+  /// Another sync was running; nothing ran.
+  busy,
+
+  /// No folder is configured, or it no longer exists.
+  noFolder,
+
+  /// The folder holds no save files NeoStation can read.
+  empty,
+
+  /// Every save uploaded or was already up to date.
+  uploaded,
+
+  /// At least one save failed to upload.
+  failed,
+
+  /// The NeoSync account is out of storage.
+  quotaExceeded,
+
+  /// The user pressed Stop; the files before it went up, the rest didn't.
+  cancelled,
 }
 
 /// Represents the comprehensive synchronization state of a specific game.

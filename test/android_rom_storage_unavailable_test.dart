@@ -167,27 +167,20 @@ void main() {
       expect(await romRows(), 1);
     }, timeout: waitLimit);
 
-    test(
-      'an SD card picked through SAF is named by its volume and folder',
-      () async {
-        // Off a device a SAF root lists no folders, like a card that is out.
-        const root =
-            'content://com.android.externalstorage.documents/tree/3734-3464%3AROMs';
-        await storeRom(root);
-        final provider = SqliteConfigProvider();
-        await provider.addRomFolder(root, scan: false);
+    test('an SD card picked through SAF is named by its volume and folder', () async {
+      // Off a device a SAF root lists no folders, like a card that is out.
+      const root =
+          'content://com.android.externalstorage.documents/tree/3734-3464%3AROMs';
+      await storeRom(root);
+      final provider = SqliteConfigProvider();
+      await provider.addRomFolder(root, scan: false);
 
-        await provider.scanSystems(waitForAndroidStorage: true);
+      await provider.scanSystems(waitForAndroidStorage: true);
 
-        expectLibraryKept(provider);
-        expect(
-          unreachableBell()?.message,
-          unreachableMessage('3734-3464:ROMs'),
-        );
-        expect(await romRows(), 1);
-      },
-      timeout: waitLimit,
-    );
+      expectLibraryKept(provider);
+      expect(unreachableBell()?.message, unreachableMessage('3734-3464:ROMs'));
+      expect(await romRows(), 1);
+    }, timeout: waitLimit);
   });
 
   group('a plain root that cannot be read', () {

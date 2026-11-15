@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/romm_link_row.dart';
 import 'package:neostation/models/romm_platform.dart';
 import 'package:neostation/models/romm_rom.dart';
@@ -10,12 +11,15 @@ import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
+import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/romm/romm_library_linker.dart';
+import 'package:neostation/services/romm/romm_link_runner.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
+import 'package:neostation/utils/romm_failure_message.dart';
 
 import 'database_test_helper.dart';
 
@@ -28,19 +32,43 @@ import 'database_test_helper.dart';
 /// The linker itself is a recording fake — its algorithm has its own tests —
 /// so the linker is faked here, but the real platform loader classifies against app_systems, so a test database is seeded.
 
+/// The Tools run's text, in English, with the failure messages it may need.
+final _linkStrings = RommLinkStrings(
+  title: 'Link library to RomM',
+  preparing: 'Preparing…',
+  progressTemplate: '{done} of {total} — {system}',
+  doneTemplate: 'Linked {count} games',
+  nothingToDo: 'Nothing new to link',
+  failed: 'Linking failed',
+  unavailable: 'Not available right now',
+  stoppedEarlyTemplate: 'Stopped early — linked {count} games so far',
+  partialTemplate: 'Linked {count} games; {failed} systems unread',
+  failureTexts: {
+    for (final key in rommBrowseFailureKeys) key: AppLocale.en[key] as String,
+  },
+);
+
 class _FakeRommService extends RommService {
   /// What [getPlatforms] answers — after [platformsGate] completes, when one
-  /// is set, so a test can hold a platform load open.
+  /// is set, so a test can hold a platform load open — or [platformsError],
+  /// thrown instead when set.
   List<RommPlatform> platforms = const [];
   Completer<void>? platformsGate;
+  Object? platformsError;
+
+  /// How many times the platform list was asked for.
+  int platformRequests = 0;
 
   @override
   bool get playtimeSyncAvailable => false;
 
   @override
   Future<List<RommPlatform>> getPlatforms() async {
+    platformRequests++;
     final gate = platformsGate;
     if (gate != null) await gate.future;
+    final error = platformsError;
+    if (error != null) throw error;
     return platforms;
   }
 }
@@ -349,6 +377,173 @@ void main() {
       },
     );
 
+    // The failure itself, not its English message, so the Tools row can say
+    // why in the app language.
+    test('a platform list that failed to load fails the pass with its '
+        'failure', () async {
+      (browse.fakeService as _FakeRommService).platformsError = RommException(
+        'Request failed (500)',
+        statusCode: 500,
+        kind: RommFailure.serverError,
+      );
+      await build(autoSweep: false, withLinker: realLinker());
+      browse.connected = true;
+
+      await expectLater(
+        provider.linkLibrary(),
+        throwsA(
+          isA<RommLinkPassException>().having(
+            (e) => e.cause,
+            'cause',
+            isA<RommException>()
+                .having((c) => c.kind, 'kind', RommFailure.serverError)
+                .having((c) => c.statusCode, 'statusCode', 500),
+          ),
+        ),
+      );
+    });
+
+    test('the Tools run says why the platform list failed to load', () async {
+      (browse.fakeService as _FakeRommService).platformsError = RommException(
+        'Cannot reach server',
+        kind: RommFailure.unreachable,
+        detail: 'Connection refused',
+      );
+      await build(autoSweep: false, withLinker: realLinker());
+      browse.connected = true;
+      GlobalNotificationService().notifier.value = [];
+      addTearDown(() => GlobalNotificationService().notifier.value = []);
+
+      final linked = await RommLinkRunner.run(strings: _linkStrings);
+
+      expect(linked, isNull);
+      final row = GlobalNotificationService().notifier.value.firstWhere(
+        (n) => n.id == RommLinkRunner.notificationId,
+      );
+      expect(row.message, "Can't reach the RomM server: Connection refused");
+      expect(row.type, GlobalNotificationType.error);
+    });
+
+    // Only the platform load's own failure counts. Another RomM load (the RomM
+    // tab opening loads the collections too) that failed while the platforms
+    // were on their way left its error where the pass read it, so a server
+    // with no platforms failed the pass with the collections' error instead
+    // of reporting nothing to link.
+    test('another load failing meanwhile doesn\'t fail an empty platform '
+        'list', () async {
+      final svc = browse.fakeService as _FakeRommService;
+      svc.platformsGate = Completer<void>();
+      await build(autoSweep: false, withLinker: realLinker());
+      browse.connected = true;
+
+      final listing = provider.listPlatformsForLinkPass();
+      await pumpEventQueue();
+      // The fake browse provider's own service is unconfigured, so this fails
+      // ("Server URL is empty") without a request, as a server error would.
+      await browse.loadCollections();
+      expect(browse.collectionsFailure, isNotNull);
+      expect(browse.lastError, isNotNull, reason: 'the error the pass read');
+
+      svc.platformsGate!.complete();
+      expect(await listing, isEmpty);
+    });
+
+    // The RomM tab (or an earlier run) leaves the platform list cached; the
+    // run reloads it, so a server that has gone away fails the run with its
+    // reason instead of failing platform by platform behind "nothing new".
+    test('a cached platform list is reloaded for the run', () async {
+      final svc = browse.fakeService as _FakeRommService;
+      svc.platforms = [
+        const RommPlatform(id: 1, name: 'SNES', slug: 'snes', romCount: 1),
+      ];
+      await build(autoSweep: false, withLinker: realLinker());
+      browse.connected = true;
+      await browse.loadPlatforms();
+      expect(svc.platformRequests, 1);
+
+      final summary = await provider.linkLibrary();
+
+      expect(svc.platformRequests, 2);
+      expect(summary!.rowsAdded, 1);
+    });
+
+    // A load can start just as the one the pass waited for finishes (from a
+    // listener of its last notification), before the pass's forced reload;
+    // the forced call then does nothing, and the pass must wait for that load
+    // rather than read the list it is replacing.
+    test('a load that starts as the awaited one ends is awaited too', () async {
+      final svc = browse.fakeService as _FakeRommService;
+      svc.platforms = [
+        const RommPlatform(id: 1, name: 'SNES', slug: 'snes', romCount: 1),
+      ];
+      svc.platformsGate = Completer<void>();
+      await build(autoSweep: false, withLinker: realLinker());
+      browse.connected = true;
+
+      final first = browse.loadPlatforms();
+      final secondGate = Completer<void>();
+      var started = false;
+      void startSecond() {
+        if (started || browse.isLoadingPlatforms) return;
+        started = true;
+        // Held open, so a pass that didn't wait would read the list first.
+        svc.platformsGate = secondGate;
+        svc.platformsError = RommException(
+          'Request failed (500)',
+          statusCode: 500,
+          kind: RommFailure.serverError,
+        );
+        browse.loadPlatforms(force: true);
+      }
+
+      browse.addListener(startSecond);
+      addTearDown(() => browse.removeListener(startSecond));
+
+      final pass = provider.linkLibrary();
+      svc.platformsGate!.complete();
+      await first;
+      await pumpEventQueue();
+      secondGate.complete();
+
+      await expectLater(
+        pass,
+        throwsA(
+          isA<RommLinkPassException>().having(
+            (e) => e.cause,
+            'cause',
+            isA<RommException>().having((c) => c.statusCode, 'status', 500),
+          ),
+        ),
+      );
+    });
+
+    test('a cached platform list that fails to reload fails the run with '
+        'its reason', () async {
+      final svc = browse.fakeService as _FakeRommService;
+      svc.platforms = [
+        const RommPlatform(id: 1, name: 'SNES', slug: 'snes', romCount: 1),
+      ];
+      await build(autoSweep: false, withLinker: realLinker());
+      browse.connected = true;
+      await browse.loadPlatforms();
+      svc.platformsError = RommException(
+        'Cannot reach server',
+        kind: RommFailure.unreachable,
+        detail: 'Connection refused',
+      );
+      GlobalNotificationService().notifier.value = [];
+      addTearDown(() => GlobalNotificationService().notifier.value = []);
+
+      final linked = await RommLinkRunner.run(strings: _linkStrings);
+
+      expect(linked, isNull);
+      final row = GlobalNotificationService().notifier.value.firstWhere(
+        (n) => n.id == RommLinkRunner.notificationId,
+      );
+      expect(row.message, "Can't reach the RomM server: Connection refused");
+      expect(row.type, GlobalNotificationType.error);
+    });
+
     test('the lock is released after a failed pass', () async {
       // The `finally` is what guarantees this now that the exception is not
       // swallowed on the way out: a pass that throws must not leave `_linking`
@@ -395,6 +590,155 @@ void main() {
         0,
         reason: 'notifyListeners on a disposed ChangeNotifier throws',
       );
+    });
+  });
+
+  // What the Tools row says for each way a pass can end. The pass ran (the
+  // recording linker returns [result]); the row has to tell the user whether
+  // RomM was actually checked.
+  group('the Tools row', () {
+    final serverError = RommException(
+      'Request failed (500)',
+      statusCode: 500,
+      kind: RommFailure.serverError,
+    );
+
+    Future<({int? linked, GlobalNotificationData row})> runWith(
+      RommLinkPassSummary result,
+    ) async {
+      await build(autoSweep: false);
+      browse.connected = true;
+      linker.result = result;
+      GlobalNotificationService().notifier.value = [];
+      addTearDown(() => GlobalNotificationService().notifier.value = []);
+      final linked = await RommLinkRunner.run(strings: _linkStrings);
+      final row = GlobalNotificationService().notifier.value.firstWhere(
+        (n) => n.id == RommLinkRunner.notificationId,
+      );
+      return (linked: linked, row: row);
+    }
+
+    test('every platform failing says why, as an error', () async {
+      final outcome = await runWith(
+        RommLinkPassSummary(
+          platformFailures: 2,
+          systemsFailed: 2,
+          firstFailure: RommException(
+            'Request failed (500)',
+            statusCode: 500,
+            kind: RommFailure.serverError,
+          ),
+        ),
+      );
+
+      expect(outcome.linked, isNull);
+      expect(
+        outcome.row.message,
+        'The RomM server answered with an error (500).',
+      );
+      expect(outcome.row.type, GlobalNotificationType.error);
+    });
+
+    test('some systems failing says how many, with what was linked', () async {
+      final outcome = await runWith(
+        RommLinkPassSummary(
+          platformsProcessed: 3,
+          platformFailures: 1,
+          systemsFailed: 1,
+          rowsAdded: 5,
+          firstFailure: serverError,
+        ),
+      );
+
+      expect(outcome.linked, 5);
+      expect(outcome.row.message, 'Linked 5 games; 1 systems unread');
+      expect(outcome.row.type, GlobalNotificationType.info);
+    });
+
+    test(
+      'some systems failing with nothing new linked still says so',
+      () async {
+        final outcome = await runWith(
+          RommLinkPassSummary(
+            platformsProcessed: 2,
+            platformFailures: 1,
+            systemsFailed: 1,
+            firstFailure: serverError,
+          ),
+        );
+
+        expect(outcome.row.message, 'Linked 0 games; 1 systems unread');
+        expect(outcome.row.type, GlobalNotificationType.info);
+      },
+    );
+
+    test('links that could not be saved, with others saved, count as failed '
+        'systems', () async {
+      final outcome = await runWith(
+        const RommLinkPassSummary(
+          platformsProcessed: 2,
+          rowsAdded: 2,
+          rowsFailed: 3,
+          systemsFailed: 1,
+        ),
+      );
+
+      expect(outcome.row.message, 'Linked 2 games; 1 systems unread');
+    });
+
+    test('only links that could not be saved, nothing saved: linking '
+        'failed', () async {
+      final outcome = await runWith(
+        const RommLinkPassSummary(
+          platformsProcessed: 1,
+          rowsFailed: 4,
+          systemsFailed: 1,
+        ),
+      );
+
+      expect(outcome.linked, isNull);
+      expect(outcome.row.message, 'Linking failed');
+      expect(outcome.row.type, GlobalNotificationType.error);
+    });
+
+    test('a pass that linked games is unchanged', () async {
+      final outcome = await runWith(
+        const RommLinkPassSummary(platformsProcessed: 2, rowsAdded: 3),
+      );
+      expect(outcome.linked, 3);
+      expect(outcome.row.message, 'Linked 3 games');
+      expect(outcome.row.type, GlobalNotificationType.success);
+    });
+
+    test('failed platforms and failed writes, nothing saved: the partial row, '
+        'not "linking failed"', () async {
+      final outcome = await runWith(
+        RommLinkPassSummary(
+          platformsProcessed: 1,
+          platformFailures: 1,
+          rowsFailed: 2,
+          systemsFailed: 2,
+          firstFailure: serverError,
+        ),
+      );
+
+      expect(outcome.row.message, 'Linked 0 games; 2 systems unread');
+      expect(outcome.row.type, GlobalNotificationType.info);
+    });
+
+    test('a pass that never reached the server (all linked) is nothing '
+        'new', () async {
+      final outcome = await runWith(const RommLinkPassSummary());
+
+      expect(outcome.row.message, 'Nothing new to link');
+    });
+
+    test('a pass with nothing new is unchanged', () async {
+      final outcome = await runWith(
+        const RommLinkPassSummary(platformsProcessed: 2),
+      );
+      expect(outcome.linked, 0);
+      expect(outcome.row.message, 'Nothing new to link');
     });
   });
 }

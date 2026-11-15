@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:provider/provider.dart';
+
 import '../../providers/retro_achievements_provider.dart';
 import '../../providers/file_provider.dart';
 import '../../providers/sqlite_config_provider.dart';
@@ -9,13 +10,17 @@ import '../../repositories/retro_achievements_repository.dart';
 import '../../widgets/confirm_action_dialog.dart';
 import '../../widgets/custom_notification.dart';
 import '../../responsive.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
+
 import '../../services/game_service.dart' show GamepadNavigationManager;
 import '../app_screen.dart' show AppNavigation, AppTabs;
+
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
+
 import '../../utils/login_form_selection.dart';
 import '../../models/retro_achievements_dashboard_models.dart';
 import '../../models/system_model.dart';

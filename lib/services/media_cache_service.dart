@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+
 import '../models/game_model.dart';
 import '../providers/file_provider.dart';
 import 'media_isolate_service.dart';

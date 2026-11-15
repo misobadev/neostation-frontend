@@ -5,6 +5,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 
 /// Shared bottom "back" button used by every NeoSync sub-view.
 ///
@@ -49,8 +50,8 @@ class NeoSyncLogoutButton extends StatelessWidget {
         SfxService().playNavSound();
         onTap();
       },
-      textColor: theme.colorScheme.onError,
-      backgroundColor: theme.colorScheme.error,
+      textColor: theme.colorScheme.onTertiaryFixed,
+      backgroundColor: theme.colorScheme.tertiaryFixed,
     );
   }
 }
@@ -80,69 +81,59 @@ class NeoSyncSectionHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
 
-    return Container(
-      padding: EdgeInsets.all(10.r),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: radii.radiusExternal,
-        border: Border.all(color: theme.colorScheme.outline, width: 1.r),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.1),
-            blurRadius: 4.r,
-            offset: Offset(2.0.r, 2.0.r),
+    return NeoGlassRim(
+      cornerRadius: radii.radiusExternalRadius,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 8.r),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: radii.radiusExternal,
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.15),
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: radii.radiusInternal,
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 8.r),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                theme.colorScheme.primary.withValues(alpha: 0.15),
-                theme.colorScheme.primary.withValues(alpha: 0.05),
-              ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 28.r,
+              height: 28.r,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                borderRadius: radii.radiusInternal,
+              ),
+              child: Icon(icon, color: theme.colorScheme.primary, size: 16.r),
             ),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: theme.colorScheme.primary, size: 18.r),
-              SizedBox(width: 8.r),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13.r,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+            SizedBox(width: 8.r),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.r,
+                      color: theme.colorScheme.onSurface,
                     ),
-                    if (subtitle != null && subtitle!.isNotEmpty) ...[
-                      SizedBox(height: 2.r),
-                      Text(
-                        subtitle!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 8.r,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (subtitle != null && subtitle!.isNotEmpty) ...[
+                    SizedBox(height: 2.r),
+                    Text(
+                      subtitle!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 8.r,
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
                         ),
                       ),
-                    ],
+                    ),
                   ],
-                ),
+                ],
               ),
-              ?trailing,
-            ],
-          ),
+            ),
+            ?trailing,
+          ],
         ),
       ),
     );

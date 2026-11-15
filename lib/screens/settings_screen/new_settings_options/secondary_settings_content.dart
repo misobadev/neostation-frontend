@@ -18,8 +18,9 @@ import 'widgets/settings_section_header.dart';
 /// secondary display is active (the menu entry is hidden otherwise), so it
 /// always renders its full set of controls.
 ///
-/// Items (gamepad index order): 0 = fanart dim, 1 = screenshot access,
-/// 2 = dim delay, 3 = dim darkness, 4 = dock enabled, 5 = dock slots.
+/// Items (gamepad index order): 0 = fanart dim, 1 = hide system logo,
+/// 2 = screenshot access, 3 = dim delay, 4 = dim darkness, 5 = dock enabled,
+/// 6 = dock slots.
 class SecondarySettingsContent extends StatefulWidget {
   final bool isContentFocused;
   final int selectedContentIndex;
@@ -61,7 +62,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
   @override
   void initState() {
     super.initState();
-    for (var i = 0; i < 6; i++) {
+    for (var i = 0; i < 7; i++) {
       _itemKeys.add(GlobalKey());
     }
     WidgetsBinding.instance.addObserver(this);
@@ -107,7 +108,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
   }
 
   /// Number of navigable items in this panel.
-  int getItemCount() => 6;
+  int getItemCount() => 7;
 
   /// Dispatches a gamepad-select to the focused item.
   void selectItem(int index) {
@@ -115,17 +116,21 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
     if (index == 0) {
       _cycleFanartDim(provider);
     } else if (index == 1) {
-      ScreenshotService.openAccessSettings();
+      provider.updateSecondaryHideSystemLogo(
+        !provider.config.secondaryHideSystemLogo,
+      );
     } else if (index == 2) {
-      _cycleDimDelay(provider);
+      ScreenshotService.openAccessSettings();
     } else if (index == 3) {
+      _cycleDimDelay(provider);
+    } else if (index == 4) {
       // Darkness is meaningless when the panel never dims.
       if (provider.config.nowPlayingDimDelay > 0) {
         _cycleDimLevel(provider);
       }
-    } else if (index == 4) {
-      provider.updateDockEnabled(!provider.config.dockEnabled);
     } else if (index == 5) {
+      provider.updateDockEnabled(!provider.config.dockEnabled);
+    } else if (index == 6) {
       // Slot count is meaningless when the dock is hidden.
       if (provider.config.dockEnabled) {
         _cycleDockSlotCount(provider);
@@ -251,7 +256,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
   /// The switch reflects the granted state; toggling it (the OS service can't be
   /// flipped programmatically) opens Android's accessibility settings.
   Widget _buildScreenshotAccessRow() {
-    const index = 1;
+    const index = 2;
     return Padding(
       padding: EdgeInsets.only(left: _rowIndent),
       child: SettingRow(
@@ -300,6 +305,16 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
                   onTap: () => _cycleFanartDim(provider),
                 ),
                 SizedBox(height: 12.r),
+                _buildToggleRow(
+                  index: 1,
+                  title: AppLocale.secondaryHideSystemLogo.getString(context),
+                  subtitle: AppLocale.secondaryHideSystemLogoSubtitle.getString(
+                    context,
+                  ),
+                  value: config.secondaryHideSystemLogo,
+                  onChanged: (v) => provider.updateSecondaryHideSystemLogo(v),
+                ),
+                SizedBox(height: 12.r),
                 _buildScreenshotAccessRow(),
                 SizedBox(height: 24.r),
                 SettingsSectionHeader(
@@ -308,7 +323,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
                   ),
                 ),
                 _buildValueRow(
-                  index: 2,
+                  index: 3,
                   title: AppLocale.nowPlayingDimAfter.getString(context),
                   subtitle: AppLocale.nowPlayingDimAfterSubtitle.getString(
                     context,
@@ -318,7 +333,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
                 ),
                 SizedBox(height: 12.r),
                 _buildValueRow(
-                  index: 3,
+                  index: 4,
                   title: AppLocale.nowPlayingDimDarkness.getString(context),
                   subtitle: AppLocale.nowPlayingDimDarknessSubtitle.getString(
                     context,
@@ -332,7 +347,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
                   label: AppLocale.secondarySectionDock.getString(context),
                 ),
                 _buildToggleRow(
-                  index: 4,
+                  index: 5,
                   title: AppLocale.nowPlayingDockEnabled.getString(context),
                   subtitle: AppLocale.nowPlayingDockEnabledSubtitle.getString(
                     context,
@@ -342,7 +357,7 @@ class SecondarySettingsContentState extends State<SecondarySettingsContent>
                 ),
                 SizedBox(height: 12.r),
                 _buildValueRow(
-                  index: 5,
+                  index: 6,
                   title: AppLocale.nowPlayingDockSlots.getString(context),
                   subtitle: AppLocale.nowPlayingDockSlotsSubtitle.getString(
                     context,

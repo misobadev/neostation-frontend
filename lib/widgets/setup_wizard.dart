@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
@@ -15,10 +16,13 @@ import 'package:neostation/widgets/system_art_pack_tile.dart';
 import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/services/esde_import_service.dart';
 import 'package:neostation/services/global_notification_service.dart';
+
 import '../providers/sqlite_config_provider.dart';
 import '../utils/gamepad_nav.dart';
+
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
+
 import '../widgets/tv_directory_picker.dart';
 import '../widgets/folder_not_empty_dialog.dart';
 import '../widgets/info_dialog.dart';
@@ -348,8 +352,13 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     } catch (e) {
       _log.e('Wizard: user-data path check failed: $e');
     }
-    final p = await ConfigService.getUserDataPath();
-    if (mounted) setState(() => _selectedUserDataPath = p);
+    try {
+      final p = await ConfigService.getUserDataPath();
+      if (mounted) setState(() => _selectedUserDataPath = p);
+    } catch (e) {
+      // The folder went missing after the startup check: nothing to show.
+      _log.e('Wizard: user-data path unavailable: $e');
+    }
   }
 
   Future<void> _resetUnwritableUserDataPath() async {
@@ -370,6 +379,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       await context.read<SqliteConfigProvider>().reinitialize();
       if (!mounted) return;
       await context.read<NeoAssetsProvider>().reinitialize();
+      await LoggerService.instance.reinitialize();
+      if (!mounted) return;
+      await context.read<FileProvider>().reinitialize();
     }
   }
 
@@ -989,6 +1001,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       // System Art still shows the pack as applied.
       if (!mounted) return problem;
       await context.read<NeoAssetsProvider>().reinitialize();
+
+      // Every art lookup goes through this provider, which resolved the media
+      // folder at launch: without it the art scraped from here on lands in
+      // the new folder but isn't found until the next launch. The log file
+      // lives in the user-data folder too.
+      await LoggerService.instance.reinitialize();
+      if (!mounted) return problem;
+      await context.read<FileProvider>().reinitialize();
 
       if (mounted) setState(() => _selectedUserDataPath = selected);
     } catch (e) {

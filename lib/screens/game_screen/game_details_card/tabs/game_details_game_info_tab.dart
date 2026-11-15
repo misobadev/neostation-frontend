@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/services/sfx_service.dart';
+
 import '../../../../models/system_model.dart';
 import '../../../../models/game_model.dart';
 import '../../../../providers/file_provider.dart';
@@ -263,9 +264,8 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
               context,
               isActive: _isPanelActive,
               resting: BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.25),
+                color: Theme.of(context).colorScheme.shadow
+                    .withValues(alpha: 0.25),
                 blurRadius: 2.r,
                 offset: Offset(2.0.r, 2.0.r),
               ),
@@ -314,9 +314,8 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
                       ],
                     ),
                     Divider(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.1),
+                      color: Theme.of(context).colorScheme.onSurface
+                          .withValues(alpha: 0.1),
                       height: 10.r,
                     ),
                   ],
@@ -375,9 +374,8 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Divider(
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.1),
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.1),
             height: 10.r,
           ),
           if (name.isNotEmpty)
@@ -450,9 +448,8 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
                 AppLocale.scrapeToDownload.getString(context),
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.7),
                   fontSize: 12.r,
                   height: 1.5,
                 ),
@@ -604,9 +601,8 @@ class _InfoPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = Theme.of(
-      context,
-    ).colorScheme.onSurface.withValues(alpha: alpha);
+    final Color color = Theme.of(context).colorScheme.onSurface
+        .withValues(alpha: alpha);
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 4.r),

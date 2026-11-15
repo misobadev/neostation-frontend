@@ -107,12 +107,10 @@ class OrphanCleanupStrings {
 }
 
 /// The cleanup's work, as [MetadataCleanupService.clean] takes it.
-typedef OrphanCleanupClean =
-    Future<MetadataCleanupResult> Function({
-      String? mediaDirectoryPath,
-      void Function(double progress, OrphanedMetadataItem currentItem)?
-      onProgress,
-    });
+typedef OrphanCleanupClean = Future<MetadataCleanupResult> Function({
+  String? mediaDirectoryPath,
+  void Function(double progress, OrphanedMetadataItem currentItem)? onProgress,
+});
 
 /// Runs the delete half of Tools -> Clean Orphaned Metadata, and reports it
 /// through [GlobalNotificationService].

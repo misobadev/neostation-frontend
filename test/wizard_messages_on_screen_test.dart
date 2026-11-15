@@ -210,8 +210,10 @@ void main() {
       );
       expect(checks, contains('_hasStoredRoms()'));
       final caught = checks.indexOf(
-        '\n    } catch (e) {\n      _error = _text(\n'
-        '        AppLocale.errorScanningRomsDetail,',
+        RegExp(
+          r'\}\s*catch\s*\(e\)\s*\{\s*_error\s*=\s*_text\('
+          r'\s*AppLocale\.errorScanningRomsDetail\b',
+        ),
       );
       expect(caught, isNot(-1), reason: 'the checks before the scan throw');
       expect(checks.substring(caught), contains('_setScanning(false);'));
@@ -235,18 +237,16 @@ void main() {
 
     test('can be skipped', () {
       expect(
-        RegExp(
-          r'if \(_currentStep == _stepScanning\) \{\s*if \(_scanFailed\(',
-        ).hasMatch(method('void _handleSkip()')),
+        RegExp(r'if \(_currentStep == _stepScanning\) \{\s*if \(_scanFailed\(')
+            .hasMatch(method('void _handleSkip()')),
         isTrue,
       );
     });
   });
 
   test('the desktop ROM folder picker title is translated', () {
-    final scanning = File(
-      'lib/providers/sqlite_config_provider/scanning.dart',
-    ).readAsStringSync();
+    final scanning = File('lib/providers/sqlite_config_provider/scanning.dart')
+        .readAsStringSync();
     expect(scanning, isNot(contains("dialogTitle: 'Select ROM Folder'")));
   });
 

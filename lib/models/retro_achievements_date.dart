@@ -12,7 +12,6 @@ DateTime? parseRetroAchievementsDateUtc(String? raw) {
   }
   final hasExplicitZone =
       normalized.endsWith('Z') || _raDateZonePattern.hasMatch(normalized);
-  return DateTime.tryParse(
-    hasExplicitZone ? normalized : '${normalized}Z',
-  )?.toUtc();
+  return DateTime.tryParse(hasExplicitZone ? normalized : '${normalized}Z')
+      ?.toUtc();
 }

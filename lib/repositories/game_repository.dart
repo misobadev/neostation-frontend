@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:neostation/services/logger_service.dart';
+
 import '../models/database_game_model.dart';
 import '../models/romm_link_row.dart';
 import '../data/datasources/sqlite_database_service.dart';
@@ -234,6 +236,33 @@ class GameRepository {
     String systemId,
     String filename,
   ) => SqliteService.getSingleGame(systemId, filename);
+
+  /// The filename the library indexes the game at [romPath] under in
+  /// [appSystemId] — `user_roms.filename`, extension included — or null when
+  /// the library has no such row. Metadata rows join the library on it, so
+  /// a scrape keyed by anything else (the extension-stripped
+  /// `GameModel.romname`, for one) never shows.
+  static Future<String?> indexedFilename(
+    String appSystemId,
+    String romPath,
+  ) async {
+    try {
+      final db = await SqliteService.getDatabase();
+      final rows = await db.query(
+        'user_roms',
+        columns: ['filename'],
+        where: 'app_system_id = ? AND rom_path = ?',
+        whereArgs: [appSystemId, romPath],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      final name = rows.first['filename']?.toString();
+      return name == null || name.isEmpty ? null : name;
+    } catch (e) {
+      LoggerService.instance.e('Error reading the indexed filename: $e');
+      return null;
+    }
+  }
 
   static Object? _revisionDatabase;
 

@@ -11,6 +11,8 @@ import 'package:neostation/widgets/plan_farewell_modal.dart';
 import 'package:neostation/widgets/plan_welcome_modal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 /// The NeoSync plan modals (welcome after an upgrade, farewell after a
 /// downgrade) can open over any screen. They registered no gamepad navigation
 /// layer, so the screen underneath kept the controller: A and B went to it
@@ -35,13 +37,18 @@ void main() {
 
   late _HostLog host;
 
-  setUp(() => host = _HostLog());
+  setUp(() {
+    host = _HostLog();
+    resetGamepadClock();
+  });
+  tearDown(restoreGamepadClock);
 
   /// A navigator ignores input for a moment after it activates (and repeated
-  /// presses are throttled), so a test waits like a person would.
-  Future<void> settleInput(WidgetTester tester) => tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 600)),
-  );
+  /// presses are throttled); advancing its clock is enough.
+  Future<void> settleInput(WidgetTester tester) async {
+    advanceGamepadClock(const Duration(milliseconds: 600));
+    await tester.pump();
+  }
 
   Future<BuildContext> pumpHost(WidgetTester tester) async {
     late BuildContext ctx;

@@ -74,6 +74,9 @@ mixin AppLocale {
   static const String ignoreArticlesInGameSort = 'ignoreArticlesInGameSort';
   static const String ignoreArticlesInGameSortSubtitle =
       'ignoreArticlesInGameSortSubtitle';
+  static const String videoPreviews = 'videoPreviews';
+  static const String videoPreviewsSubtitle = 'videoPreviewsSubtitle';
+  static const String videoPreviewsOff = 'videoPreviewsOff';
   // ---------------------------------------------------------------------------
   // Navigation / Controls
   // ---------------------------------------------------------------------------
@@ -98,6 +101,11 @@ mixin AppLocale {
   static const String startupStorageUnavailable = 'startup_storage_unavailable';
   static const String startupStorageRetry = 'startup_storage_retry';
   static const String startupStorageUseDefault = 'startup_storage_use_default';
+  static const String startupStorageFolderMissing =
+      'startup_storage_folder_missing';
+  static const String startupStorageStartEmpty = 'startup_storage_start_empty';
+  static const String startupStorageCreateFailed =
+      'startup_storage_create_failed';
 
   // ---------------------------------------------------------------------------
   // Game / Playback
@@ -231,6 +239,10 @@ mixin AppLocale {
   static const String androidAppLayoutTab = 'android_app_layout_tab';
   static const String scanOnStartup = 'scan_on_startup';
   static const String scanOnStartupSubtitle = 'scan_on_startup_subtitle';
+  static const String performanceMode = 'performance_mode';
+  static const String performanceModeSubtitle = 'performance_mode_subtitle';
+  static const String performanceModeNeoglassDisabled =
+      'performance_mode_neoglass_disabled';
   static const String nowPlayingDimAfter = 'now_playing_dim_after';
   static const String nowPlayingDimAfterSubtitle =
       'now_playing_dim_after_subtitle';
@@ -248,6 +260,9 @@ mixin AppLocale {
   static const String nowPlayingFanartDimSubtitle =
       'now_playing_fanart_dim_subtitle';
   static const String nowPlayingDimOff = 'now_playing_dim_off';
+  static const String secondaryHideSystemLogo = 'secondary_hide_system_logo';
+  static const String secondaryHideSystemLogoSubtitle =
+      'secondary_hide_system_logo_subtitle';
   static const String secondarySectionNowPlaying =
       'secondary_section_now_playing';
   static const String secondarySectionDock = 'secondary_section_dock';
@@ -396,6 +411,7 @@ mixin AppLocale {
 
   static const String rommLinkLibraryStoppedEarly =
       'romm_link_library_stopped_early';
+  static const String rommLinkLibraryPartial = 'romm_link_library_partial';
   static const String rematchAchievementsSubtitle =
       'rematch_achievements_subtitle';
   static const String rematchAchievementsWarning =
@@ -497,6 +513,9 @@ mixin AppLocale {
   static const String neoSyncLogin = 'neo_sync_login';
   static const String neoSyncSynchronizing = 'neo_sync_synchronizing';
   static const String neoSyncNotConnected = 'neo_sync_not_connected';
+  static const String neoSyncUnreachable = 'neo_sync_unreachable';
+  static const String neoSyncBillingUnconfirmed =
+      'neo_sync_billing_unconfirmed';
   static const String neoSyncSynchronized = 'neo_sync_synchronized';
   static const String neoSyncSavesSync = 'neo_sync_saves_sync';
   static const String neoSyncNoSave = 'neo_sync_no_save';
@@ -588,6 +607,8 @@ mixin AppLocale {
   static const String backWithB = 'back_with_b';
   static const String cancelSubscription = 'cancel_subscription';
   static const String cancelSubscriptionConfirm = 'cancel_subscription_confirm';
+  static const String subscriptionCancelledKeepPlan =
+      'subscription_cancelled_keep_plan';
   static const String keepSubscription = 'keep_subscription';
   static const String deleteCloudSave = 'delete_cloud_save';
   static const String deleteCloudSaveConfirm = 'delete_cloud_save_confirm';
@@ -606,6 +627,7 @@ mixin AppLocale {
   static const String lastSyncedSave = 'last_synced_save';
   static const String saveListMenu = 'save_list_menu';
   static const String customSaveFoldersMenu = 'custom_save_folders_menu';
+  static const String customSaveFoldersShort = 'custom_save_folders_short';
   static const String updateYourPlanMenu = 'update_your_plan_menu';
   static const String customFoldersSubtitle = 'custom_folders_subtitle';
   static const String noCustomFoldersConfigured =
@@ -795,6 +817,7 @@ mixin AppLocale {
   static const String gameInfo = 'game_info';
   static const String manage = 'manage';
   static const String forceRescrape = 'force_rescrape';
+  static const String rescrapeFromRomm = 'rescrape_from_romm';
   static const String gameTitle = 'game_title';
   static const String publisher = 'publisher';
   static const String genre = 'genre';
@@ -1076,6 +1099,30 @@ mixin AppLocale {
   static const String neoSyncLocalSavesOnly = 'neo_sync_local_saves_only';
   static const String neoSyncCloudSavesOnly = 'neo_sync_cloud_saves_only';
   static const String neoSyncSaveConflict = 'neo_sync_save_conflict';
+  static const String neoSyncKeptCloudCopy = 'neo_sync_kept_cloud_copy';
+  static const String neoSyncNewerCloudCopy = 'neo_sync_newer_cloud_copy';
+  static const String keptCopiesTitle = 'kept_copies_title';
+  static const String keptCopiesSubtitle = 'kept_copies_subtitle';
+  static const String keptCopiesCount = 'kept_copies_count';
+  static const String keptCopiesNone = 'kept_copies_none';
+  static const String keptCopyFromOtherDevice = 'kept_copy_from_other_device';
+  static const String keptCopyBeforeDownload = 'kept_copy_before_download';
+  static const String keptCopyFromServer = 'kept_copy_from_server';
+  static const String keptCopyReplaced = 'kept_copy_replaced';
+  static const String keptCopyCurrentSave = 'kept_copy_current_save';
+  static const String keptCopyNoCurrentSave = 'kept_copy_no_current_save';
+  static const String keptCopySameAsSave = 'kept_copy_same_as_save';
+  static const String keptCopyRestore = 'kept_copy_restore';
+  static const String keptCopyRestoreTitle = 'kept_copy_restore_title';
+  static const String keptCopyRestoreBody = 'kept_copy_restore_body';
+  static const String keptCopySharedCard = 'kept_copy_shared_card';
+  static const String keptCopyRestored = 'kept_copy_restored';
+  static const String keptCopyRestoreFailed = 'kept_copy_restore_failed';
+  static const String keptCopyDeleteTitle = 'kept_copy_delete_title';
+  static const String keptCopyDeleteBody = 'kept_copy_delete_body';
+  static const String keptCopyDeleteFailed = 'kept_copy_delete_failed';
+  static const String keptCopyCloseGame = 'kept_copy_close_game';
+  static const String keptCopyWaitForSync = 'kept_copy_wait_for_sync';
   static const String neoSyncCloudSyncDisabled = 'neo_sync_cloud_sync_disabled';
   static const String neoSyncQuotaExceeded = 'neo_sync_quota_exceeded';
   static const String packageNameMissing = 'package_name_missing';
@@ -1308,6 +1355,9 @@ mixin AppLocale {
   static const String folderNotEmptyUseAnyway = 'folder_not_empty_use_anyway';
   static const String userDataFolderNotWritable =
       'user_data_folder_not_writable';
+  static const String userDataFolderCantWrite = 'user_data_folder_cant_write';
+  static const String userDataMoveToCardAppFolder =
+      'user_data_move_to_card_app_folder';
   static const String userDataFolderGrantAllFiles =
       'user_data_folder_grant_all_files';
   static const String moveUserDataTitle = 'move_user_data_title';
@@ -1316,9 +1366,17 @@ mixin AppLocale {
       'move_user_data_dest_not_empty';
   static const String moveUserDataConfirm = 'move_user_data_confirm';
   static const String migratingUserData = 'migrating_user_data';
+  static const String userDataMoveRunning = 'user_data_move_running';
+  static const String userDataMoveRemovingOldCopy =
+      'user_data_move_removing_old_copy';
   static const String migratingUserDataComplete =
       'migrating_user_data_complete';
   static const String migratingUserDataError = 'migrating_user_data_error';
+  static const String userDataMoveBusy = 'user_data_move_busy';
+  static const String userDataMoveNoSpace = 'user_data_move_no_space';
+  static const String userDataMoveBlocked = 'user_data_move_blocked';
+  static const String userDataMoveOverlapping = 'user_data_move_overlapping';
+  static const String userDataMoveFailed = 'user_data_move_failed';
   static const String migratingFiles = 'migrating_files';
   static const String deleteGame = 'delete_game';
   static const String deleteGameConfirm = 'delete_game_confirm';
@@ -1632,7 +1690,62 @@ mixin AppLocale {
   static const String customFolderUploadComplete =
       'custom_folder_upload_complete';
   static const String customFolderUploadFailed = 'custom_folder_upload_failed';
+  static const String customFolderUploadConfirm =
+      'custom_folder_upload_confirm';
+  static const String customFolderUploadManyFiles =
+      'custom_folder_upload_many_files';
+  static const String customFolderUploadLargeFiles =
+      'custom_folder_upload_large_files';
+  static const String customFolderUploadOverQuota =
+      'custom_folder_upload_over_quota';
+  static const String customFolderUploadStopped =
+      'custom_folder_upload_stopped';
   static const String customSaveFoldersMigrate = 'custom_save_folders_migrate';
+  // ---------------------------------------------------------------------------
+  // Discovery
+  // ---------------------------------------------------------------------------
+  static const String discovery = 'discovery';
+  static const String showDiscoveryTab = 'show_discovery_tab';
+  static const String showDiscoveryTabSubtitle = 'show_discovery_tab_subtitle';
+  static const String discoveryGameOfTheWeek = 'discovery_game_of_the_week';
+  static const String discoveryHiddenGem = 'discovery_hidden_gem';
+  static const String discoveryHiddenGemSubtitle =
+      'discovery_hidden_gem_subtitle';
+  static const String discoveryAchievementSpotlight =
+      'discovery_achievement_spotlight';
+  static const String discoveryGenrePicks = 'discovery_genre_picks';
+  static const String discoveryReroll = 'discovery_reroll';
+  static const String discoveryRerollHint = 'discovery_reroll_hint';
+  static const String discoveryNeverPlayed = 'discovery_never_played';
+  static const String discoveryEmptyLibrary = 'discovery_empty_library';
+  static const String discoveryNeedsScraping = 'discovery_needs_scraping';
+  static const String discoveryNoPickAvailable = 'discovery_no_pick_available';
+  static const String discoveryWeekOf = 'discovery_week_of';
+  static const String discoveryAchievementsCount =
+      'discovery_achievements_count';
+
+  // Genre shelf labels, one per GenreBucket (lib/utils/genre_buckets.dart).
+  static const String genrePlatform = 'genre_platform';
+  static const String genreRpg = 'genre_rpg';
+  static const String genreShooter = 'genre_shooter';
+  static const String genreFighting = 'genre_fighting';
+  static const String genreRacing = 'genre_racing';
+  static const String genrePuzzle = 'genre_puzzle';
+  static const String genreSports = 'genre_sports';
+  static const String genreAdventure = 'genre_adventure';
+  static const String genreStrategy = 'genre_strategy';
+  static const String genreSimulation = 'genre_simulation';
+  static const String genreAction = 'genre_action';
+  static const String genreArcade = 'genre_arcade';
+  static const String genreOther = 'genre_other';
+  static const String genreBeatEmUp = 'genre_beat_em_up';
+  static const String genreShootEmUp = 'genre_shoot_em_up';
+  static const String genreMusicRhythm = 'genre_music_rhythm';
+  static const String genreBoardCard = 'genre_board_card';
+  static const String genrePinball = 'genre_pinball';
+  static const String genreEducational = 'genre_educational';
+  static const String genreQuiz = 'genre_quiz';
+  static const String genreCompilation = 'genre_compilation';
 
   // RomM manual link picker / Manage tab link rows.
   static const String rommLinkRow = 'romm_link_row';
@@ -1706,8 +1819,8 @@ mixin AppLocale {
 
   /// All locale maps keyed by the language codes the app registers with
   /// `FlutterLocalization` in `main.dart` (and that settings passes to
-  /// `translate`). Note `zh_Hant` is a raw code in this app, not a Flutter
-  /// script subtag, so a plain string match is enough.
+  /// `translate`). Traditional Chinese is registered as `zh` with the `Hant`
+  /// script, so it is keyed here by the app's `zh_Hant` identifier.
   ///
   /// `main.dart` currently duplicates this registry for its two `init`
   /// calls; deriving those `MapLocale` lists from this map is a known
@@ -1756,7 +1869,12 @@ mixin AppLocale {
 /// visible, greppy failure rather than a silent blank.
 extension AppLocaleContextFreeLookup on String {
   String getStringForCurrentLocale() {
-    final language = FlutterLocalization.instance.currentLocale?.languageCode;
+    final locale = FlutterLocalization.instance.currentLocale;
+    final language = locale == null
+        ? null
+        : (locale.scriptCode == 'Hant' || locale.languageCode == 'zh_Hant'
+              ? 'zh_Hant'
+              : locale.languageCode);
     final map = AppLocale._mapsByLanguageCode[language] ?? AppLocale.en;
     return (map[this] ?? AppLocale.en[this] ?? this).toString();
   }

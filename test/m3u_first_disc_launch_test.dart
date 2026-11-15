@@ -186,9 +186,8 @@ void main() {
 
       expect(
         command['data'],
-        Uri.file(
-          '${directory.path}/Tales of Symphonia (Disc 1).chd',
-        ).toString(),
+        Uri.file('${directory.path}/Tales of Symphonia (Disc 1).chd')
+            .toString(),
       );
     });
 

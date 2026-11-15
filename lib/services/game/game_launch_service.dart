@@ -1,10 +1,12 @@
 import 'dart:io';
+
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:path/path.dart' as path;
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import '../../models/game_model.dart';
 import '../../models/system_model.dart';
 import '../../models/emulator_model.dart';
@@ -116,27 +118,10 @@ class GameLaunchService {
       // distinguishes a choice the user actually made (a per-game override, or a
       // system default they set) from one we guessed for them — only the former
       // is worth failing the launch over.
-      String? preferredPlayerId = game.emulatorName;
-      bool isExplicitChoice = preferredPlayerId != null;
-      String source = isExplicitChoice ? 'per-game override' : 'none';
-
-      if (preferredPlayerId == null && system.id != null) {
-        final userDefault =
-            await EmulatorRepository.getUserDefaultEmulatorForSystem(
-              system.id!,
-            );
-        if (userDefault != null) {
-          preferredPlayerId = userDefault.uniqueId;
-          isExplicitChoice = true;
-          source = 'system default (user-selected)';
-        } else {
-          final defaultEmu = await _resolveDefaultInstalledEmulator(system);
-          if (defaultEmu != null) {
-            preferredPlayerId = defaultEmu.uniqueId;
-            source = 'auto-resolved default';
-          }
-        }
-      }
+      final preference = await _preferredEmulator(system, game);
+      String? preferredPlayerId = preference.uniqueId;
+      final bool isExplicitChoice = preference.explicit;
+      String source = preference.source;
 
       // Formats a system can launch are not interchangeable: a PS3 shortcut is
       // not an ISO, and a native port is not an emulator ROM. Pick the installed
@@ -274,20 +259,22 @@ class GameLaunchService {
                 if (coreFailure != null) return coreFailure;
               }
 
-              final result = await platform
-                  .invokeMethod('launchGenericIntent', {
-                    'package': packageName,
-                    'activity': activityName,
-                    'action': action,
-                    'category': category,
-                    'data': data,
-                    'type': type,
-                    'extras': extrasList,
-                    'activity_flags': launchCmd['activity_flags'] != null
-                        ? List<String>.from(launchCmd['activity_flags'] as List)
-                        : <String>[],
-                    'keep_saf_uri': launchCmd['keep_saf_uri'] == true,
-                  });
+              final result = await platform.invokeMethod(
+                'launchGenericIntent',
+                {
+                  'package': packageName,
+                  'activity': activityName,
+                  'action': action,
+                  'category': category,
+                  'data': data,
+                  'type': type,
+                  'extras': extrasList,
+                  'activity_flags': launchCmd['activity_flags'] != null
+                      ? List<String>.from(launchCmd['activity_flags'] as List)
+                      : <String>[],
+                  'keep_saf_uri': launchCmd['keep_saf_uri'] == true,
+                },
+              );
 
               if (result == true) {
                 GameSessionManager.registerGameLaunch(system, game);
@@ -658,19 +645,20 @@ class GameLaunchService {
     return null;
   }
 
-  /// Whether a desktop RetroArch core exists, or null when the answer cannot
-  /// be determined (unknown install layout), in which case launch anyway.
-  static Future<bool?> _desktopRetroArchCoreInstalled(
-    String coreName,
-    EmulatorModel? retroArch,
-  ) async {
-    if (coreName.isEmpty) return null;
-    if (path.isAbsolute(coreName)) return File(coreName).exists();
-    if (retroArch == null) return null;
-
-    final coresDir = await _getRetroArchCoresDirectory(retroArch);
-    if (!await Directory(coresDir).exists()) return null;
-    return await _getCoreFullPath(coreName) != null;
+  /// Whether a desktop RetroArch launch should stop because its core is
+  /// positively missing.
+  ///
+  /// Only an absolute core path is authoritative here. A relative name is
+  /// resolved by RetroArch from its own `libretro_directory`, which the
+  /// frontend cannot read; probing a guessed cores directory and aborting was
+  /// the 0.16.0 regression that broke working Linux installs.
+  @visibleForTesting
+  static bool desktopCoreIsPositivelyMissing({
+    required String coreArg,
+    required bool coreFileExists,
+  }) {
+    if (coreArg.isEmpty) return false;
+    return path.isAbsolute(coreArg) && !coreFileExists;
   }
 
   /// Internal logic for launching RetroArch cores on Android.
@@ -1203,19 +1191,22 @@ class GameLaunchService {
       var processExecutable = executable;
       var launchedViaOpen = false;
 
-      // Desktop RetroArch runs from the same system JSON as Android, so the
-      // missing-core guard has to exist here too; the standalone RetroArch
-      // path below only covers systems without a JSON profile.
+      // Desktop RetroArch resolves a relative `-L core_libretro.so` from its
+      // own `libretro_directory`, which the frontend cannot read. Only an
+      // absolute core path can be checked here; aborting a relative one after
+      // probing a guessed directory broke working Linux installs in 0.16.0.
       if (executable.toLowerCase().contains('retroarch')) {
         final coreArg = _retroArchCoreFromArgs(args);
         if (coreArg != null) {
-          final installed = await _desktopRetroArchCoreInstalled(
-            coreArg,
-            detected['RetroArch'],
-          );
-          if (installed == false) {
+          final coreExists = path.isAbsolute(coreArg)
+              ? await File(coreArg).exists()
+              : true; // Unknown: leave it for RetroArch to resolve.
+          if (desktopCoreIsPositivelyMissing(
+            coreArg: coreArg,
+            coreFileExists: coreExists,
+          )) {
             if (!context.mounted) return GameLaunchResult.failure('', '');
-            _log.w('[CoreCheck] RetroArch core "$coreArg" is not installed');
+            _log.w('[CoreCheck] RetroArch core "$coreArg" is missing');
             return GameLaunchResult.failure(
               AppLocale.coreNotInstalled
                   .getString(context)
@@ -1338,6 +1329,62 @@ class GameLaunchService {
         e.toString(),
       );
     }
+  }
+
+  /// The emulator [game] is meant to launch with, before the extension rule:
+  /// its per-game override, else the system default the user picked, else the
+  /// best installed default ([_resolveDefaultInstalledEmulator]). [explicit]
+  /// marks a choice the user made, which the launch fails on rather than
+  /// replaces.
+  static Future<({String? uniqueId, bool explicit, String source})>
+  _preferredEmulator(SystemModel system, GameModel game) async {
+    final perGame = game.emulatorName;
+    if (perGame != null) {
+      return (uniqueId: perGame, explicit: true, source: 'per-game override');
+    }
+    if (system.id == null) {
+      return (uniqueId: null, explicit: false, source: 'none');
+    }
+    final userDefault =
+        await EmulatorRepository.getUserDefaultEmulatorForSystem(system.id!);
+    if (userDefault != null) {
+      return (
+        uniqueId: userDefault.uniqueId,
+        explicit: true,
+        source: 'system default (user-selected)',
+      );
+    }
+    final defaultEmu = await _resolveDefaultInstalledEmulator(system);
+    if (defaultEmu != null) {
+      return (
+        uniqueId: defaultEmu.uniqueId,
+        explicit: false,
+        source: 'auto-resolved default',
+      );
+    }
+    return (uniqueId: null, explicit: false, source: 'none');
+  }
+
+  /// The unique id of the emulator [game] would launch with, chosen the way
+  /// [launchGame] chooses it (per-game override, system default, best installed
+  /// default, then the extension rule). Null when nothing resolves, or when no
+  /// emulator could launch the game's format.
+  ///
+  /// For code that has to act on the game's emulator without launching it,
+  /// such as placing a downloaded save where that emulator reads it.
+  static Future<String?> resolveLaunchEmulatorId(
+    SystemModel system,
+    GameModel game,
+  ) async {
+    final preference = await _preferredEmulator(system, game);
+    final resolution = await _resolveExtensionAwareEmulator(
+      system,
+      game,
+      preference.uniqueId,
+      preference.explicit,
+    );
+    if (resolution.unsupported || resolution.explicitMismatch) return null;
+    return resolution.uniqueId ?? preference.uniqueId;
   }
 
   /// Resolves which emulator to auto-select when a game has no per-game
@@ -2031,9 +2078,8 @@ class GameLaunchService {
 
       // Nothing exists yet; hand back the most likely location so the caller's
       // "cores directory not found" message names somewhere actionable.
-      return LinuxEmulatorDiscovery.retroArchCoresDirCandidates(
-        retroArch.path,
-      ).first;
+      return LinuxEmulatorDiscovery.retroArchCoresDirCandidates(retroArch.path)
+          .first;
     } else if (Platform.isMacOS) {
       final homeDir = ConfigService.getRealHomePath();
       return path.join(homeDir, 'Library/Application Support/RetroArch/cores');

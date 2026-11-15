@@ -1,8 +1,10 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/providers/theme_provider.dart';
+
 import '../../models/secondary_display_state.dart';
 import '../../l10n/app_locale.dart';
 import '../../widgets/monospaced_clock.dart';
@@ -128,9 +130,9 @@ String formatPlayTime(int? seconds, String Function(String key) text) {
   final h = seconds ~/ 3600;
   final m = (seconds % 3600) ~/ 60;
   if (h > 0) {
-    return text(
-      AppLocale.playTimeHoursMinutes,
-    ).replaceFirst('{h}', '$h').replaceFirst('{m}', '$m');
+    return text(AppLocale.playTimeHoursMinutes)
+        .replaceFirst('{h}', '$h')
+        .replaceFirst('{m}', '$m');
   }
   if (m > 0) return text(AppLocale.playTimeMinutes).replaceFirst('{m}', '$m');
   return text(AppLocale.playTimeUnderMinute);

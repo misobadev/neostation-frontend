@@ -18,6 +18,7 @@ import android.provider.Settings
 import androidx.core.view.WindowCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import org.flame_engine.gamepads_android.EventListener
 import org.flame_engine.gamepads_android.GamepadsCompatibleActivity
 import android.os.Looper
 import java.lang.Runnable
@@ -275,6 +276,11 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         methodChannel?.setMethodCallHandler {
             call, result ->
             when (call.method) {
+                "syncDeviceScreenState" -> {
+                    val power = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+                    notifyFlutterScreenState(power.isInteractive)
+                    result.success(null)
+                }
                 "launchGenericIntent" -> {
                     val packageName = call.argument<String>("package")
                     val activityName = call.argument<String>("activity")
@@ -983,6 +989,12 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         // BLOQUEAR COMPLETAMENTE el botón BACK (tanto del sistema como del gamepad)
         if (keyEvent.keyCode == KeyEvent.KEYCODE_BACK) {
             return true // Consumir completamente, no pasar a ningún lado
+        }
+
+        // Volume keys skip the gamepad plugin and the launch block (up to
+        // 30 s) and go straight to Android, so the volume can always change.
+        if (EventListener.isSystemKey(keyEvent.keyCode)) {
+            return super.dispatchKeyEvent(keyEvent)
         }
 
         if (gamepadBlocked) return true

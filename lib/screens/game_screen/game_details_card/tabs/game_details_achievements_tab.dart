@@ -9,6 +9,7 @@ import 'package:neostation/screens/game_screen/game_details_card/widgets/header_
 import 'package:neostation/screens/game_screen/game_details_card/widgets/panel_gate_highlight.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/themes/corner_radii.dart';
+
 import '../../../../models/retro_achievements_game_info.dart';
 
 /// How far the panel's content sits from its own edge, horizontally.
@@ -325,9 +326,8 @@ class GameDetailsAchievementsTabState
   /// which is itself the answer to "why is there no set here".
   Widget _buildHashLine(BuildContext context) {
     final String hash = (widget.raHash ?? '').trim();
-    final Color color = Theme.of(
-      context,
-    ).colorScheme.onSurface.withValues(alpha: 0.5);
+    final Color color = Theme.of(context).colorScheme.onSurface
+        .withValues(alpha: 0.5);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -448,9 +448,8 @@ class GameDetailsAchievementsTabState
                             Text(
                               '\u2013 / $snapshotTotal  \u00b7  \u2013%',
                               style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.75),
+                                color: Theme.of(context).colorScheme.onSurface
+                                    .withValues(alpha: 0.75),
                                 fontSize: 11.r,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -495,12 +494,12 @@ class GameDetailsAchievementsTabState
                         child: Center(
                           child: LinearProgressIndicator(
                             minHeight: 1.r,
-                            backgroundColor: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.1),
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.35),
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.1),
+                            color: Theme.of(context).colorScheme.onSurface
+                                .withValues(alpha: 0.35),
                           ),
                         ),
                       ),
@@ -595,12 +594,12 @@ class GameDetailsAchievementsTabState
                               .getString(context)
                               .toUpperCase(),
                           onTap: widget.onFixMatch!,
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onPrimary,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .primary,
+                          foregroundColor: Theme.of(context)
+                              .colorScheme
+                              .onPrimary,
                         ),
                       ],
                     ],
@@ -656,9 +655,8 @@ class GameDetailsAchievementsTabState
               context,
               isActive: _isPanelActive,
               resting: BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.25),
+                color: Theme.of(context).colorScheme.shadow
+                    .withValues(alpha: 0.25),
                 blurRadius: 2.r,
                 offset: Offset(2.0.r, 2.0.r),
               ),
@@ -700,9 +698,8 @@ class GameDetailsAchievementsTabState
                         Text(
                           '$unlocked / $total  ·  $percentage%',
                           style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.75),
+                            color: Theme.of(context).colorScheme.onSurface
+                                .withValues(alpha: 0.75),
                             fontSize: 11.r,
                             fontWeight: FontWeight.w600,
                           ),
@@ -733,12 +730,12 @@ class GameDetailsAchievementsTabState
                                   isFocused:
                                       _isPanelActive &&
                                       _headerFocusIndex == index,
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                                  foregroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
+                                  backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest,
+                                  foregroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface,
                                 ),
                               ),
                             if (widget.headerAction != null) ...[
@@ -750,9 +747,8 @@ class GameDetailsAchievementsTabState
                       ],
                     ),
                     Divider(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.1),
+                      color: Theme.of(context).colorScheme.onSurface
+                          .withValues(alpha: 0.1),
                       height: 10.r,
                     ),
                   ],
@@ -863,9 +859,8 @@ class _SelectedAchievementInfo extends StatelessWidget {
             Text(
               achievement.description,
               style: TextStyle(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.8),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.8),
                 fontSize: 9.r,
                 height: 1.4,
               ),
@@ -941,9 +936,8 @@ class _AchievementsSkeleton extends StatelessWidget {
       itemCount: tiles,
       itemBuilder: (context, index) => DecoratedBox(
         decoration: BoxDecoration(
-          color: Theme.of(
-            context,
-          ).colorScheme.onSurface.withValues(alpha: 0.06),
+          color: Theme.of(context).colorScheme.onSurface
+              .withValues(alpha: 0.06),
           borderRadius: radii.radiusInternal,
         ),
       ),
@@ -996,9 +990,8 @@ class _AchievementsGrid extends StatelessWidget {
             decoration: BoxDecoration(
               border: Border.all(
                 color: isSelected
-                    ? Theme.of(context).colorScheme.secondary.withValues(
-                        alpha: isFocused ? 1.0 : 0.35,
-                      )
+                    ? Theme.of(context).colorScheme.secondary
+                          .withValues(alpha: isFocused ? 1.0 : 0.35)
                     : Colors.transparent,
                 width: isSelected ? 2.r : 1.r,
               ),

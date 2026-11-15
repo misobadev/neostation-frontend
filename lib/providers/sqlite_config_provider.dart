@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:file_picker/file_picker.dart';
+
 import '../models/custom_sfx.dart';
 import '../services/custom_sfx_import_service.dart';
+
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/screenshot_service.dart';
 import 'package:neostation/services/sfx_service.dart';
+
 import '../models/system_model.dart';
 import '../models/config_model.dart';
 import '../models/emulator_model.dart';
@@ -22,7 +26,9 @@ import '../services/permission_service.dart';
 import '../services/steam_scraper_service.dart';
 import '../services/systems_update_service.dart';
 import '../models/secondary_display_state.dart';
+
 import 'package:flutter/services.dart';
+
 import '../widgets/tv_directory_picker.dart';
 import '../constants/system_folder_names.dart';
 import '../l10n/app_locale.dart';
@@ -32,6 +38,8 @@ import '../services/game_session_persistence.dart';
 import '../utils/nav_tabs.dart';
 import '../services/saf_directory_service.dart';
 import '../services/saf_grant_service.dart';
+
+import '../utils/user_data_move_guard.dart';
 
 part 'sqlite_config_provider/mutators.dart';
 part 'sqlite_config_provider/scanning.dart';
@@ -49,10 +57,9 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   @visibleForTesting
   SqliteConfigProvider.forTesting({
-    required CustomSfxImportService sfxImporter,
+    required this._sfxImporter,
     required SfxService sfxPlayback,
-  }) : _sfxImporter = sfxImporter,
-       _customSfxPlayback = sfxPlayback;
+  }) : _customSfxPlayback = sfxPlayback;
 
   final CustomSfxImportService _sfxImporter;
   final SfxService _customSfxPlayback;
@@ -365,9 +372,11 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
         _secondaryDisplayState!.updateState(
           dockApps: _config.dockApps,
           dockEnabled: _config.dockEnabled,
+          hideSystemLogo: _config.secondaryHideSystemLogo,
           dockSlotCount: _config.dockSlotCount,
           nowPlayingDimDelay: _config.nowPlayingDimDelay,
           nowPlayingDimLevel: _config.nowPlayingDimLevel,
+          videoPreviewDelay: _config.videoPreviewDelay,
           fanartDimLevel: _config.fanartDimLevel,
           sfxEnabled: _config.sfxEnabled,
           sfxVolume: _config.sfxVolume,

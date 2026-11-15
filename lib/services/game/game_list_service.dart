@@ -1,5 +1,6 @@
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
+
 import '../../models/game_model.dart';
 import '../../models/database_game_model.dart';
 import '../../models/system_model.dart';
@@ -175,9 +176,9 @@ class GameListService {
         return [];
       }
 
-      final databaseGames = (await GameRepository.getGamesBySystem(
-        system.id!,
-      )).where((dbGame) => !dbGame.isHidden).toList();
+      final databaseGames = (await GameRepository.getGamesBySystem(system.id!))
+          .where((dbGame) => !dbGame.isHidden)
+          .toList();
       final validExtensions = await SystemRepository.getExtensionsForSystem(
         system.id!,
       );
@@ -372,13 +373,11 @@ class GameListService {
         .whereType<String>()
         .toSet();
 
-    final settingsBySystem = <String, Map<String, dynamic>>{};
-    final extensionsBySystem = <String, Set<String>>{};
-    for (final sid in systemIds) {
-      settingsBySystem[sid] = await SystemRepository.getSystemSettings(sid);
-      final exts = await SystemRepository.getExtensionsForSystem(sid);
-      extensionsBySystem[sid] = exts.map((e) => e.toLowerCase()).toSet();
-    }
+    final settingsBySystem = await SystemRepository.getSystemSettingsMap(
+      systemIds,
+    );
+    final extensionsBySystem =
+        await SystemRepository.getExtensionsMapForSystems(systemIds);
     return (
       settingsBySystem: settingsBySystem,
       extensionsBySystem: extensionsBySystem,

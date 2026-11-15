@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/widgets/custom_toggle_switch.dart';
 import 'package:neostation/widgets/neo_glass.dart';
+
+import 'settings_action_button.dart';
 
 /// Actionable settings tile: a bordered card with a leading icon, a
 /// title/subtitle block and a trailing control (toggle or action button).
@@ -57,9 +60,7 @@ class SettingsCardRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final borderColor = selected
-        ? theme.colorScheme.primary
-        : theme.colorScheme.outline.withValues(alpha: 0);
+    const borderColor = Colors.transparent;
     final foreground = selected
         ? theme.colorScheme.surface
         : theme.colorScheme.onSurface.withValues(alpha: disabled ? 0.4 : 1.0);
@@ -67,6 +68,7 @@ class SettingsCardRow extends StatelessWidget {
         ? theme.colorScheme.surface.withValues(alpha: disabled ? 0.25 : 0.6)
         : theme.colorScheme.onSurface.withValues(alpha: disabled ? 0.25 : 0.6);
 
+    final trailingTheme = _settingsTrailingTheme(context, focused: selected);
     final row = Container(
       decoration: BoxDecoration(
         color: selected
@@ -122,7 +124,11 @@ class SettingsCardRow extends StatelessWidget {
                     ),
                   ),
                   if (trailing != null) SizedBox(width: 12.r),
-                  ?trailing,
+                  if (trailing is SettingsActionButton ||
+                      trailing is CustomToggleSwitch)
+                    trailing!
+                  else if (trailing != null)
+                    Theme(data: trailingTheme, child: trailing!),
                 ],
               ),
               ?belowContent,
@@ -141,4 +147,27 @@ class SettingsCardRow extends StatelessWidget {
           : row,
     );
   }
+}
+
+/// Themes the trailing control with the row's current text colour.
+///
+/// Chips, action buttons and glyphs must stay visible on both the normal surface
+/// and the inverted selected row, so their primary/onSurface accents follow the
+/// row foreground instead of the global accent.
+ThemeData _settingsTrailingTheme(
+  BuildContext context, {
+  required bool focused,
+}) {
+  final theme = Theme.of(context);
+  final scheme = theme.colorScheme;
+  final foreground = focused ? scheme.surface : scheme.onSurface;
+  final background = focused ? scheme.onSurface : scheme.surface;
+  return theme.copyWith(
+    colorScheme: scheme.copyWith(
+      primary: foreground,
+      onPrimary: background,
+      onSurface: foreground,
+    ),
+    iconTheme: IconThemeData(color: foreground),
+  );
 }

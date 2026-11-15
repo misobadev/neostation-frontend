@@ -9,9 +9,18 @@ import 'package:neostation/models/config_model.dart';
 ///
 /// The ordinal **is** the canonical tab index used by `AppScreenState`
 /// (`_selectedTabIndex`, `_buildCurrentTabContent`, the secondary-display tab
-/// names). Append new tabs at the end — inserting one renumbers every existing
-/// tab and silently repoints all of that dispatch.
-enum NavTab { systems, sync, achievements, romm, settings, androidApps }
+/// names). Moving or inserting a tab renumbers every tab after it, so `AppTabs`
+/// has to be renumbered in the same commit — nothing persists a tab index, but
+/// the two must agree or the dispatch silently repoints.
+enum NavTab {
+  systems,
+  discovery,
+  sync,
+  achievements,
+  romm,
+  settings,
+  androidApps,
+}
 
 /// Static description of one navigation tab: how it is drawn, whether the user
 /// may hide it, and how that preference is read and written.
@@ -68,6 +77,15 @@ const Map<NavTab, NavTabSpec> navTabSpecs = {
     icon: 'assets/images/icons/grids.webp',
     labelKey: AppLocale.systems,
   ),
+  NavTab.discovery: NavTabSpec(
+    icon: '',
+    labelKey: AppLocale.discovery,
+    iconData: Symbols.storefront_rounded,
+    hidden: _hideTabDiscovery,
+    withHidden: _withHideTabDiscovery,
+    settingsTitleKey: AppLocale.showDiscoveryTab,
+    settingsSubtitleKey: AppLocale.showDiscoveryTabSubtitle,
+  ),
   NavTab.sync: NavTabSpec(
     icon: 'assets/images/icons/cloud-add.webp',
     labelKey: AppLocale.statSaves,
@@ -107,6 +125,7 @@ const Map<NavTab, NavTabSpec> navTabSpecs = {
 bool _hideTabSync(ConfigModel c) => c.hideTabSync;
 bool _hideTabAchievements(ConfigModel c) => c.hideTabAchievements;
 bool _hideTabRomm(ConfigModel c) => c.hideTabRomm;
+bool _hideTabDiscovery(ConfigModel c) => c.hideTabDiscovery;
 
 ConfigModel _withHideTabSync(ConfigModel c, bool hidden) =>
     c.copyWith(hideTabSync: hidden);
@@ -114,6 +133,8 @@ ConfigModel _withHideTabAchievements(ConfigModel c, bool hidden) =>
     c.copyWith(hideTabAchievements: hidden);
 ConfigModel _withHideTabRomm(ConfigModel c, bool hidden) =>
     c.copyWith(hideTabRomm: hidden);
+ConfigModel _withHideTabDiscovery(ConfigModel c, bool hidden) =>
+    c.copyWith(hideTabDiscovery: hidden);
 
 /// Description of [tab], never null — see [_fallbackSpec].
 NavTabSpec navTabSpec(NavTab tab) => navTabSpecs[tab] ?? _fallbackSpec;
@@ -134,11 +155,16 @@ List<NavTab> visibleNavTabs(ConfigModel config) {
   return orderNavTabs(visible);
 }
 
-/// Places Android Apps beside Systems without changing tab identities.
+/// Places Android Apps right after Discovery, or after Systems when Discovery
+/// is hidden, without changing tab identities.
 List<NavTab> orderNavTabs(List<NavTab> tabs) {
   final ordered = List<NavTab>.of(tabs);
   if (ordered.remove(NavTab.androidApps)) {
-    ordered.insert(1, NavTab.androidApps);
+    final discoveryIndex = ordered.indexOf(NavTab.discovery);
+    ordered.insert(
+      discoveryIndex >= 0 ? discoveryIndex + 1 : 1,
+      NavTab.androidApps,
+    );
   }
   return ordered;
 }

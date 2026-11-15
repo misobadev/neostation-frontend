@@ -381,7 +381,7 @@
       "description": "Supported extensions: steam, droiddeck. Launch files exported by DroidDeck; the game must be installed in DroidDeck.",
       "platforms": {
         "android": {
-          "launch_arguments": "-a android.intent.action.VIEW -n com.droiddeck.launcher/.MainActivity -d \"{file.uri}\"",
+          "launch_arguments": "-a android.intent.action.VIEW -n com.droiddeck.launcher/.MainActivity -d \"{file.uri}\" --activity-clear-top",
           "keep_saf_uri": true
         }
       }

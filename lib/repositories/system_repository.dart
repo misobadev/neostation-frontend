@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import '../models/system_model.dart';
 import '../data/datasources/sqlite_service.dart';
 
@@ -165,8 +166,16 @@ class SystemRepository {
   static Future<Map<String, dynamic>> getSystemSettings(String systemId) =>
       SqliteService.getSystemSettings(systemId);
 
+  static Future<Map<String, Map<String, dynamic>>> getSystemSettingsMap(
+    Iterable<String> systemIds,
+  ) => SqliteService.getSystemSettingsMap(systemIds);
+
   static Future<Set<String>> getExtensionsForSystem(String systemId) =>
       SqliteService.getExtensionsForSystem(systemId);
+
+  static Future<Map<String, Set<String>>> getExtensionsMapForSystems(
+    Iterable<String> systemIds,
+  ) => SqliteService.getExtensionsMapForSystems(systemIds);
 
   // ── System extensions ─────────────────────────────────────────────────────
 

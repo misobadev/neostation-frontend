@@ -85,14 +85,22 @@ extension _PullToRefresh on _SystemCardGridViewState {
   void _adjustGridDensity(int delta) {
     try {
       final provider = context.read<SqliteConfigProvider>();
-      final sizes = ['S', 'M', 'L', 'XL'];
-      final currentIndex = sizes.indexOf(provider.config.systemGridColumns);
+      final sizes = widget.pinchSizes;
+      final currentSize = widget.pinchSize ?? provider.config.systemGridColumns;
+      final currentIndex = sizes.indexOf(currentSize);
       if (currentIndex == -1) return;
       final newIndex = (currentIndex + delta).clamp(0, sizes.length - 1);
       if (newIndex != currentIndex) {
         final newSize = sizes[newIndex];
-        provider.updateSystemGridColumns(newSize);
-        _cols = Responsive.getSystemsCrossAxisCountFromSize(newSize);
+        final onChanged = widget.onPinchSizeChanged;
+        if (onChanged != null) {
+          onChanged(newSize);
+        } else {
+          provider.updateSystemGridColumns(newSize);
+        }
+        _cols =
+            widget.crossAxisCountForSize?.call(newSize) ??
+            Responsive.getSystemsCrossAxisCountFromSize(newSize);
         _cachedVirtualGrid = null;
         _cachedGridCols = null;
         _showCardSizeLabel(newSize);

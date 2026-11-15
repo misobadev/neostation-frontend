@@ -16,9 +16,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   Future<Map<String, dynamic>> loadSystem(String name) async {
-    final json =
-        jsonDecode(await rootBundle.loadString('assets/systems/$name'))
-            as Map<String, dynamic>;
+    final json = jsonDecode(
+      await rootBundle.loadString('assets/systems/$name'),
+    ) as Map<String, dynamic>;
     return json['system'] as Map<String, dynamic>;
   }
 

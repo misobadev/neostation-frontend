@@ -95,9 +95,11 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
         isSecondaryActive: true,
         nowPlayingDimDelay: _config.nowPlayingDimDelay,
         nowPlayingDimLevel: _config.nowPlayingDimLevel,
+        videoPreviewDelay: _config.videoPreviewDelay,
         fanartDimLevel: _config.fanartDimLevel,
         dockApps: _config.dockApps,
         dockEnabled: _config.dockEnabled,
+        hideSystemLogo: _config.secondaryHideSystemLogo,
         dockSlotCount: _config.dockSlotCount,
         sfxEnabled: _config.sfxEnabled,
         sfxVolume: _config.sfxVolume,
@@ -194,9 +196,11 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
       } else if (_initialized &&
           (!listEquals(state.dockApps, _config.dockApps) ||
               state.dockEnabled != _config.dockEnabled ||
+              state.hideSystemLogo != _config.secondaryHideSystemLogo ||
               state.dockSlotCount != _config.dockSlotCount ||
               state.nowPlayingDimDelay != _config.nowPlayingDimDelay ||
               state.nowPlayingDimLevel != _config.nowPlayingDimLevel ||
+              state.videoPreviewDelay != _config.videoPreviewDelay ||
               state.fanartDimLevel != _config.fanartDimLevel ||
               state.sfxEnabled != _config.sfxEnabled ||
               state.sfxVolume != _config.sfxVolume ||
@@ -228,9 +232,11 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
         _secondaryDisplayState?.updateState(
           dockApps: _config.dockApps,
           dockEnabled: _config.dockEnabled,
+          hideSystemLogo: _config.secondaryHideSystemLogo,
           dockSlotCount: _config.dockSlotCount,
           nowPlayingDimDelay: _config.nowPlayingDimDelay,
           nowPlayingDimLevel: _config.nowPlayingDimLevel,
+          videoPreviewDelay: _config.videoPreviewDelay,
           fanartDimLevel: _config.fanartDimLevel,
           sfxEnabled: _config.sfxEnabled,
           sfxVolume: _config.sfxVolume,

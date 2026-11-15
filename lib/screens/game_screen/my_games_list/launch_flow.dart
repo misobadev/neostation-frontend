@@ -188,6 +188,10 @@ extension _LaunchFlow on _SystemGamesListState {
       return;
     }
 
+    // Refused during a user-data move: a zipped game unpacks into the user
+    // data's temp folder, which the move is copying.
+    if (refuseWhileUserDataMoves()) return;
+
     rebuild(() => _isGameLaunching = true);
 
     // Resolve targeted hardware system for the launch.
@@ -309,15 +313,8 @@ extension _LaunchFlow on _SystemGamesListState {
       return;
     }
 
-    // Push a manager layer to deactivate the current active gamepad layer
-    // (games_grid / games_carousel / system_games_list) so the random dialog
-    // can capture back input without it leaking through to the parent.
-    GamepadNavigationManager.pushLayer(
-      'random_dialog',
-      onActivate: () {},
-      onDeactivate: () {},
-    );
-
+    // The dialogue holds its own modal navigation layer, which deactivates the
+    // list's (games_grid / games_carousel / system_games_list) while it is open.
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -355,13 +352,6 @@ extension _LaunchFlow on _SystemGamesListState {
           },
         );
       },
-    ).then((_) async {
-      // Wait a bit to prevent the button press from being processed twice
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (mounted) {
-        // Pop the dialog layer to reactivate the previous gamepad layer.
-        GamepadNavigationManager.popLayer('random_dialog');
-      }
-    });
+    );
   }
 }

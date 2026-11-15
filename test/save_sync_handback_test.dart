@@ -40,27 +40,24 @@ void main() {
 
   Future<void> persist(String id) async => persisted.add(id);
 
-  test(
-    'disconnecting the active provider hands save sync back to NeoSync',
-    () async {
-      await SyncManager.instance.setActive(
-        RomMSyncProvider.kProviderId,
-        persist: persist,
-      );
-      persisted.clear();
+  test('disconnecting the active provider hands save sync back to NeoSync', () async {
+    await SyncManager.instance.setActive(
+      RomMSyncProvider.kProviderId,
+      persist: persist,
+    );
+    persisted.clear();
 
-      final moved = await SyncManager.instance.releaseIfActive(
-        RomMSyncProvider.kProviderId,
-        persist: persist,
-      );
+    final moved = await SyncManager.instance.releaseIfActive(
+      RomMSyncProvider.kProviderId,
+      persist: persist,
+    );
 
-      expect(moved, isTrue);
-      expect(SyncManager.instance.activeProviderId, NeoSyncAdapter.kProviderId);
-      // Persisted, not just held in memory: the choice has to survive a restart,
-      // or the next launch resurrects the disconnected provider.
-      expect(persisted, [NeoSyncAdapter.kProviderId]);
-    },
-  );
+    expect(moved, isTrue);
+    expect(SyncManager.instance.activeProviderId, NeoSyncAdapter.kProviderId);
+    // Persisted, not just held in memory: the choice has to survive a restart,
+    // or the next launch resurrects the disconnected provider.
+    expect(persisted, [NeoSyncAdapter.kProviderId]);
+  });
 
   test(
     'disconnecting a provider that does not own save sync changes nothing',

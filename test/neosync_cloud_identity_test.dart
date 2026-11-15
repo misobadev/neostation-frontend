@@ -116,6 +116,35 @@ void main() {
     });
   });
 
+  group('sharedCardPath', () {
+    test('puts a PS2 card under PS2/, whatever its case', () {
+      expect(
+        CloudPathBuilder.sharedCardPath('ps2', 'Game.ps2'),
+        'saves/PS2/Game.ps2',
+      );
+      expect(
+        CloudPathBuilder.sharedCardPath('ps2', 'MCD001.PS2'),
+        'saves/PS2/MCD001.PS2',
+      );
+    });
+
+    test('puts a Dreamcast VMU under dc/, for either system name', () {
+      for (final system in ['dc', 'dreamcast']) {
+        expect(
+          CloudPathBuilder.sharedCardPath(system, 'vmu_save_A1.bin'),
+          'saves/dc/vmu_save_A1.bin',
+        );
+      }
+    });
+
+    test('leaves every other file to its own path', () {
+      expect(CloudPathBuilder.sharedCardPath('ps2', 'Game.srm'), isNull);
+      expect(CloudPathBuilder.sharedCardPath('dc', 'Game.A1.bin'), isNull);
+      expect(CloudPathBuilder.sharedCardPath('psx', 'Game.ps2'), isNull);
+      expect(CloudPathBuilder.sharedCardPath(null, 'vmu_save_A1.bin'), isNull);
+    });
+  });
+
   group('dedupeCloudFiles', () {
     NeoSyncFile file({
       required String id,

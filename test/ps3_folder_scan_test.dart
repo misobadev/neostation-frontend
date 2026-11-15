@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 import 'package:neostation/data/datasources/sqlite_database_service.dart';
@@ -28,12 +29,10 @@ void main() {
       path.join(directory.path, lowerCase ? 'usrdir' : 'USRDIR'),
     );
     await usrdir.create(recursive: true);
-    await File(
-      path.join(directory.path, lowerCase ? 'param.sfo' : 'PARAM.SFO'),
-    ).writeAsBytes([0]);
-    await File(
-      path.join(usrdir.path, lowerCase ? 'eboot.bin' : 'EBOOT.BIN'),
-    ).writeAsBytes([0]);
+    await File(path.join(directory.path, lowerCase ? 'param.sfo' : 'PARAM.SFO'))
+        .writeAsBytes([0]);
+    await File(path.join(usrdir.path, lowerCase ? 'eboot.bin' : 'EBOOT.BIN'))
+        .writeAsBytes([0]);
     await File(path.join(usrdir.path, 'internal.iso')).writeAsBytes([0]);
     final trophies = Directory(path.join(directory.path, 'TROPDIR'));
     await trophies.create();

@@ -32,15 +32,18 @@ class RaCatalogueService {
     for (var offset = 0; ; offset += pageSize) {
       await _pace();
       if (isCancelled?.call() ?? false) throw StateError('Catalogue cancelled');
-      final uri =
-          Uri.https('retroachievements.org', '/API/API_GetGameList.php', {
-            'y': apiKey,
-            'i': '$consoleId',
-            'f': '1',
-            'h': '1',
-            'o': '$offset',
-            'c': '$pageSize',
-          });
+      final uri = Uri.https(
+        'retroachievements.org',
+        '/API/API_GetGameList.php',
+        {
+          'y': apiKey,
+          'i': '$consoleId',
+          'f': '1',
+          'h': '1',
+          'o': '$offset',
+          'c': '$pageSize',
+        },
+      );
       final response = await _client
           .get(
             uri,

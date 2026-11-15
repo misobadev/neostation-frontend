@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import '../../../models/system_model.dart';
 
 /// A premium informational sidebar component displaying system metadata.
@@ -35,14 +36,12 @@ class SystemDetailsState extends State<SystemDetails> {
               width: double.infinity,
               padding: EdgeInsets.all(12.r),
               decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outline.withValues(alpha: 0.1),
+                  color: Theme.of(context).colorScheme.outline
+                      .withValues(alpha: 0.1),
                   width: 1.r,
                 ),
               ),
@@ -51,9 +50,8 @@ class SystemDetailsState extends State<SystemDetails> {
                     ? neoStationDescription
                     : widget.selectedSystem!.description!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.8),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.8),
                   fontSize: 11.r,
                 ),
                 maxLines: 7,
@@ -132,9 +130,8 @@ class SystemDetailsState extends State<SystemDetails> {
           ),
           if (widget.selectedSystem != null)
             BoxShadow(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary
+                  .withValues(alpha: 0.1),
               blurRadius: 16.r,
               spreadRadius: 1.r,
             ),
@@ -254,9 +251,8 @@ class SystemDetailsState extends State<SystemDetails> {
       width: double.infinity,
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest
+            .withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12.r),
         border: Border.all(
           color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),

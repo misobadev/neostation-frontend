@@ -13,9 +13,10 @@ void main() {
   // The provider library: the main file and every part of it.
   final sources = [
     File('lib/providers/sqlite_config_provider.dart'),
-    ...Directory(
-      'lib/providers/sqlite_config_provider',
-    ).listSync().whereType<File>().where((f) => f.path.endsWith('.dart')),
+    ...Directory('lib/providers/sqlite_config_provider')
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.dart')),
   ];
 
   // `_scanStatus = 'Text` with a capital letter: a fixed message. Matched

@@ -1,9 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../l10n/app_locale.dart';
 import '../../models/ra_cabinet.dart';
 import '../../models/ra_event_calendar.dart';
@@ -447,9 +449,9 @@ class RaCollectionTabState extends State<RaCollectionTab> {
                                             color:
                                                 index == _selected &&
                                                     widget.focused
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.primary
+                                                ? Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
                                                 : earned
                                                 ? (award?.hardcore == true ||
                                                           status ==

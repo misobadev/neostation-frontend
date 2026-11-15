@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import '../models/database_game_model.dart';
 import '../models/system_model.dart';
 import '../data/datasources/sqlite_database_service.dart';
@@ -108,9 +109,9 @@ class SqliteDatabaseProvider extends ChangeNotifier {
     String systemFolderName,
   ) async {
     try {
-      final games = (await GameRepository.loadGamesForSystem(
-        systemFolderName,
-      )).where((game) => !game.isHidden).toList();
+      final games = (await GameRepository.loadGamesForSystem(systemFolderName))
+          .where((game) => !game.isHidden)
+          .toList();
       _database[systemFolderName] = games;
       notifyListeners();
       return games;

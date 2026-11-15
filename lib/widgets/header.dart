@@ -3,8 +3,11 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
+
 import 'dart:async';
 import 'dart:io';
+
+import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/responsive.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -12,7 +15,10 @@ import 'package:neostation/themes/app_themes.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
+import 'package:neostation/services/game_service.dart';
+import 'package:neostation/widgets/header_discovery_reroll.dart';
 import 'package:neostation/widgets/bumper_glyph.dart';
+import 'package:neostation/widgets/core_footer.dart';
 import 'package:neostation/widgets/notification_bell.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/utils/header_layout.dart';
@@ -26,17 +32,21 @@ class Header extends StatefulWidget {
   final int selectedTabIndex;
   final Function(int) onTabSelected;
 
+  /// Touch search entry shown on the Systems tab. Null hides it.
+  final VoidCallback? onSearch;
+
   const Header({
     super.key,
     required this.selectedTabIndex,
     required this.onTabSelected,
+    this.onSearch,
   });
 
   @override
   HeaderState createState() => HeaderState();
 }
 
-class HeaderState extends State<Header> {
+class HeaderState extends State<Header> with WidgetsBindingObserver {
   final Battery _battery = Battery();
   int _batteryLevel = 100;
   BatteryState? _batteryState;
@@ -44,6 +54,10 @@ class HeaderState extends State<Header> {
   bool _isTelevision = false;
   DateTime _now = DateTime.now();
   Timer? _timeUpdateTimer;
+
+  /// False while an emulator owns the foreground; a screen-on edge behind it
+  /// must not restart the ticker.
+  bool _appActive = true;
   late final List<FocusNode> _tabFocusNodes;
 
   /// First slot shown when the tab strip has more visible tabs than it has
@@ -55,14 +69,14 @@ class HeaderState extends State<Header> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    GameService.deviceScreenOn.addListener(_onDeviceScreenPowerChanged);
     _tabFocusNodes = List.generate(
       NavTab.values.length,
       (_) => FocusNode(skipTraversal: true),
     );
-    _getBatteryLevel();
     _listenToBatteryState();
-    _updateTime();
-    _startTimeUpdateTimer();
+    _refreshTimeAndBattery();
     if (Platform.isAndroid) {
       PermissionService.isTelevision().then((isTV) {
         if (mounted && isTV) setState(() => _isTelevision = true);
@@ -72,12 +86,51 @@ class HeaderState extends State<Header> {
 
   @override
   void dispose() {
+    GameService.deviceScreenOn.removeListener(_onDeviceScreenPowerChanged);
+    WidgetsBinding.instance.removeObserver(this);
     _timeUpdateTimer?.cancel();
     _batteryStateSubscription?.cancel();
     for (final node in _tabFocusNodes) {
       node.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Covers desktop suspend and emulator return. On Android the HOME
+      // activity never resumes on unlock — the screen edge below handles it.
+      _appActive = true;
+      _refreshTimeAndBattery();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _appActive = false;
+      _stopTimeUpdateTimer();
+    }
+  }
+
+  /// Re-reads clock and charge and realigns the ticker. Android holds timers
+  /// while asleep and the HOME activity is not paused on lock, so without this
+  /// the header can show pre-lock values long after unlock.
+  void _refreshTimeAndBattery() {
+    _updateTime();
+    _startTimeUpdateTimer();
+  }
+
+  /// Refreshes on wake and stops the ticker while the screen is off.
+  void _onDeviceScreenPowerChanged() {
+    if (!GameService.deviceScreenOn.value) {
+      _stopTimeUpdateTimer();
+    } else if (_appActive) {
+      _refreshTimeAndBattery();
+    }
+  }
+
+  void _stopTimeUpdateTimer() {
+    _timeUpdateTimer?.cancel();
+    _timeUpdateTimer = null;
   }
 
   /// Subscribes to real-time battery state changes (charging/discharging/full).
@@ -89,7 +142,7 @@ class HeaderState extends State<Header> {
         if (mounted) {
           setState(() => _batteryState = state);
         }
-      });
+      }, onError: (_) {});
     } catch (_) {
       // Some platforms don't expose battery state; ignore silently.
     }
@@ -106,23 +159,24 @@ class HeaderState extends State<Header> {
   }
 
   void _startTimeUpdateTimer() {
+    _timeUpdateTimer?.cancel();
+
     // Calculate how many seconds remain until the next minute
     final now = DateTime.now();
     final secondsUntilNextMinute = 60 - now.second;
 
     // Create initial timer that fires at the start of the next minute
-    Future.delayed(Duration(seconds: secondsUntilNextMinute), () {
-      if (mounted) {
-        _updateTime();
-        // Then create a periodic timer every 60 seconds
-        _timeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
-          if (mounted) {
-            _updateTime();
-          } else {
-            timer.cancel();
-          }
-        });
-      }
+    _timeUpdateTimer = Timer(Duration(seconds: secondsUntilNextMinute), () {
+      if (!mounted) return;
+      _updateTime();
+      // Then create a periodic timer every 60 seconds
+      _timeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+        if (mounted) {
+          _updateTime();
+        } else {
+          timer.cancel();
+        }
+      });
     });
   }
 
@@ -283,6 +337,40 @@ class HeaderState extends State<Header> {
               return Stack(
                 alignment: Alignment.center,
                 children: [
+                  // Left slot: Discovery's Re-roll, which lives here because
+                  // that board has no footer to put it in.
+                  if (NavTab.values[widget.selectedTabIndex] ==
+                      NavTab.discovery)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [HeaderDiscoveryReroll()],
+                      ),
+                    ),
+
+                  if (widget.onSearch != null)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: EdgeInsets.only(left: 8.r),
+                        child: GamepadControl(
+                          iconPath: 'assets/images/gamepad/Xbox_X_button.png',
+                          label: AppLocale.searchTitle.getString(context),
+                          onTap: () {
+                            SfxService().playNavSound();
+                            widget.onSearch?.call();
+                          },
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .tertiaryFixed,
+                          textColor: Theme.of(context)
+                              .colorScheme
+                              .onTertiaryFixed,
+                        ),
+                      ),
+                    ),
+
                   // Grouped Tab Navigation with Background (Glass Style)
                   Align(
                     key: const ValueKey('tabs-container'),
@@ -343,9 +431,9 @@ class HeaderState extends State<Header> {
                                             width: 32.r,
                                             child: Container(
                                               decoration: BoxDecoration(
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary,
                                                 borderRadius:
                                                     Theme.of(context)
                                                         .extension<
@@ -371,9 +459,8 @@ class HeaderState extends State<Header> {
                                                     navTabSpec(tab).icon,
                                                     navTabSpec(tab).labelKey
                                                         .getString(context),
-                                                    iconData: navTabSpec(
-                                                      tab,
-                                                    ).iconData,
+                                                    iconData: navTabSpec(tab)
+                                                        .iconData,
                                                     coverage:
                                                         (1.0 -
                                                                 (slot - index)
@@ -450,9 +537,9 @@ class HeaderState extends State<Header> {
                                 Text(
                                   clockText,
                                   style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface,
                                     fontSize: 12.r,
                                     fontWeight: FontWeight.w500,
                                     letterSpacing: 0.3.r,

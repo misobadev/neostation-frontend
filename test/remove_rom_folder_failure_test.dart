@@ -48,9 +48,10 @@ void main() {
     ['nes', path.split('/').last, path],
   );
 
-  Future<List<String>> storedRomPaths() async => (await db.rawQuery(
-    'SELECT rom_path FROM user_roms ORDER BY rom_path',
-  )).map((r) => r['rom_path'] as String).toList();
+  Future<List<String>> storedRomPaths() async =>
+      (await db.rawQuery('SELECT rom_path FROM user_roms ORDER BY rom_path'))
+          .map((r) => r['rom_path'] as String)
+          .toList();
 
   // Makes one kind of write fail, as a locked or missing database would.
   Future<void> failOn(String event) => db.execute(

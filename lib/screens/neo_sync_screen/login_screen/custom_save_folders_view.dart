@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -9,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/system_model.dart';
 import 'package:neostation/repositories/neosync_save_folder_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
@@ -17,12 +19,17 @@ import 'package:neostation/services/user_data_location_service.dart';
 import 'package:neostation/widgets/custom_notification.dart' as custom;
 import 'package:neostation/widgets/tv_directory_picker.dart';
 import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
+import 'package:neostation/utils/custom_folder_upload_prompt.dart';
+import 'package:neostation/themes/corner_radii.dart';
+
 import '../../app_screen.dart';
 import 'custom_save_folders_panel.dart';
 import 'neo_sync_shared.dart';
+import '../../../utils/auto_folder_upload_notice.dart';
 
 /// Full-screen Custom Save Folders view.
 ///
@@ -34,7 +41,22 @@ import 'neo_sync_shared.dart';
 class CustomSaveFoldersView extends StatefulWidget {
   final VoidCallback onBack;
 
-  const CustomSaveFoldersView({super.key, required this.onBack});
+  /// Called once a folder is saved, in place of NeoSync's upload of it. Set
+  /// when another provider owns save sync (RomM): its folders are for that
+  /// provider, and uploading them to NeoSync would put the saves in a second
+  /// cloud the user didn't choose.
+  final Future<void> Function(
+    String system,
+    String emulatorSlug,
+    String folderPath,
+  )?
+  onConfigured;
+
+  const CustomSaveFoldersView({
+    super.key,
+    required this.onBack,
+    this.onConfigured,
+  });
 
   @override
   State<CustomSaveFoldersView> createState() => _CustomSaveFoldersViewState();
@@ -48,6 +70,9 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
   List<SystemModel> _systems = [];
   List<(String, String, String)> _configured = [];
   bool _syncing = false;
+
+  /// Counting a picked folder before asking to upload it.
+  bool _checking = false;
   int _selectedFolderIndex = 0;
 
   @override
@@ -76,6 +101,7 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
       onSelectItem: _openConfigDialog,
       onSelectButton: _handleSelectFolder,
       onFavorite: _openConfigDialog,
+      onXButton: _stopUpload,
       onSettings: () {},
     );
 
@@ -101,6 +127,7 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
   /// folder; the list is empty-only so it becomes a no-op when there is nothing
   /// configured.
   Future<void> _handleSelectFolder() async {
+    if (_checking) return;
     if (_configured.isEmpty) {
       _openConfigDialog();
       return;
@@ -217,12 +244,27 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
         return;
       }
 
+      // NeoSync uploads everything in the folder, and once it is saved,
+      // opening its system uploads it again without asking: so ask first, and
+      // save nothing if the answer is no. RomM uploads only the saves of games
+      // linked to it, so its hand-over doesn't ask.
+      if (widget.onConfigured == null && !await _confirmUpload(folderPath)) {
+        return;
+      }
+
       await NeoSyncSaveFolderRepository.saveFolder(
         system,
         emulatorSlug,
         folderPath,
       );
       await _loadConfigured();
+
+      if (!mounted) return;
+      final onConfigured = widget.onConfigured;
+      if (onConfigured != null) {
+        await onConfigured(system, emulatorSlug, folderPath);
+        return;
+      }
 
       if (!mounted) return;
       final provider = context.read<NeoSyncProvider>();
@@ -258,44 +300,80 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
           );
         }
 
-        // A sync already running makes the upload return without listing the
-        // folder, so its file count says nothing about this folder.
-        final wasBusy = provider.isSyncing;
         provider.addListener(listener);
+        final CustomFolderUploadOutcome outcome;
         try {
-          await provider.syncCustomSaveFolder(system, emulatorSlug);
+          outcome = await provider.syncCustomSaveFolder(system, emulatorSlug);
         } finally {
           provider.removeListener(listener);
         }
 
         if (!mounted) return;
-        if (!wasBusy && provider.totalFiles == 0) {
-          // Nothing to upload: an empty folder, or one NeoStation can't list.
-          // Without All files access, say how to grant it.
-          final needsAllFilesAccess =
-              !await PermissionService.hasAllFilesAccess();
-          if (!mounted) return;
-          final allFilesHint = needsAllFilesAccess
-              ? '\n${AppLocale.userDataFolderGrantAllFiles.getString(context)}'
-              : '';
+        void show(String message, custom.NotificationType type) {
           custom.AppNotification.showNotification(
             context,
-            '${AppLocale.neoSyncNoSave.getString(context)}$allFilesHint',
-            type: custom.NotificationType.info,
+            message,
+            type: type,
             notificationId: notificationId,
             progress: 1,
           );
-        } else {
-          custom.AppNotification.showNotification(
-            context,
-            AppLocale.customFolderUploadComplete
-                .getString(context)
-                .replaceFirst('{uploaded}', '${provider.uploadedFiles}')
-                .replaceFirst('{skipped}', '${provider.skippedFiles}'),
-            type: custom.NotificationType.success,
-            notificationId: notificationId,
-            progress: 1,
-          );
+        }
+
+        // Only an upload that ran reports this folder's numbers: a busy or
+        // failed one says so instead of showing another sync's counts.
+        switch (outcome) {
+          case CustomFolderUploadOutcome.busy:
+            show(
+              AppLocale.neoSyncSynchronizing.getString(context),
+              custom.NotificationType.info,
+            );
+          case CustomFolderUploadOutcome.notSignedIn:
+            show(
+              AppLocale.neoSyncNotConnected.getString(context),
+              custom.NotificationType.error,
+            );
+          case CustomFolderUploadOutcome.quotaExceeded:
+            show(
+              AppLocale.neoSyncQuotaExceeded.getString(context),
+              custom.NotificationType.error,
+            );
+          case CustomFolderUploadOutcome.noFolder:
+          case CustomFolderUploadOutcome.failed:
+            show(
+              AppLocale.customFolderUploadFailed.getString(context),
+              custom.NotificationType.error,
+            );
+          case CustomFolderUploadOutcome.uploaded:
+            // Went through: the automatic upload's failure entry is stale.
+            clearAutoFolderUploadNotice(system, emulatorSlug);
+            show(
+              AppLocale.customFolderUploadComplete
+                  .getString(context)
+                  .replaceFirst('{uploaded}', '${provider.uploadedFiles}')
+                  .replaceFirst('{skipped}', '${provider.skippedFiles}'),
+              custom.NotificationType.success,
+            );
+          case CustomFolderUploadOutcome.cancelled:
+            show(
+              AppLocale.customFolderUploadStopped
+                  .getString(context)
+                  .replaceFirst('{uploaded}', '${provider.uploadedFiles}'),
+              custom.NotificationType.info,
+            );
+          case CustomFolderUploadOutcome.empty:
+            clearAutoFolderUploadNotice(system, emulatorSlug);
+            // Nothing to upload: an empty folder, or one NeoStation can't list.
+            // Without All files access, say how to grant it.
+            final needsAllFilesAccess =
+                !await PermissionService.hasAllFilesAccess();
+            if (!mounted) return;
+            final allFilesHint = needsAllFilesAccess
+                ? '\n${AppLocale.userDataFolderGrantAllFiles.getString(context)}'
+                : '';
+            show(
+              '${AppLocale.neoSyncNoSave.getString(context)}$allFilesHint',
+              custom.NotificationType.info,
+            );
         }
       } finally {
         if (mounted) setState(() => _syncing = false);
@@ -316,12 +394,66 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
     }
   }
 
+  /// Shows what uploading [folderPath] to NeoSync would send (file count and
+  /// size, with a warning when it doesn't look like a save folder) and asks
+  /// whether to go ahead. An empty folder doesn't ask: there's nothing to
+  /// send, and the upload reports that itself.
+  Future<bool> _confirmUpload(String folderPath) async {
+    final provider = context.read<NeoSyncProvider>();
+    // Counting a large folder, and fetching the quota, can take a while: the
+    // view takes no Configure or Remove meanwhile, or a second prompt could
+    // open alongside the first.
+    setState(() => _checking = true);
+    final SaveFolderSummary summary;
+    try {
+      summary = await summariseSaveFolderInBackground(folderPath);
+      if (!mounted || summary.files == 0) return mounted;
+      // Fresh each time: an upload since the last refresh used up space.
+      try {
+        await provider.loadQuota().timeout(const Duration(seconds: 5));
+      } catch (_) {
+        // The last known quota (or none) then decides the warning.
+      }
+      if (!mounted) return false;
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+    final quota = provider.quota;
+    final freeBytes = quota == null || quota.totalQuota <= 0
+        ? null
+        : quota.totalQuota - quota.usedQuota;
+
+    _gamepadNav.deactivate();
+    final confirmed = await ConfirmActionDialog.show(
+      context,
+      title: AppLocale.customSaveFoldersTitle.getString(context),
+      body: customFolderUploadPrompt(
+        summary: summary,
+        folderLabel: path.basename(folderPath),
+        freeBytes: freeBytes,
+        text: (key) => key.getString(context),
+      ),
+      confirmLabel: AppLocale.upload.getString(context),
+      cancelLabel: AppLocale.cancel.getString(context),
+      icon: Symbols.cloud_upload_rounded,
+    );
+    // The prompt's layer hands the controller back when it closes.
+    return confirmed;
+  }
+
+  /// Stop (X): ends the running upload before its next file.
+  void _stopUpload() {
+    if (!_syncing) return;
+    context.read<NeoSyncProvider>().cancelCustomFolderUpload();
+  }
+
   Future<void> _removeFolder(String system, String emulatorSlug) async {
     await NeoSyncSaveFolderRepository.removeFolder(system, emulatorSlug);
     await _loadConfigured();
   }
 
   Future<void> _openConfigDialog() async {
+    if (_checking) return;
     // The dialogue's own layer takes the controller from this view and hands
     // it back when it closes. It is pushed after the dialogue's first frame, so
     // let go of the controller now rather than share that frame's presses.
@@ -369,123 +501,145 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
           ),
           SizedBox(height: 8.r),
           Expanded(
-            child: Container(
-              padding: EdgeInsets.all(12.r),
-              decoration: BoxDecoration(
-                color: theme.cardColor.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                  width: 1.r,
+            child: NeoGlassRim(
+              cornerRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                  .radiusExternalRadius,
+              child: Container(
+                padding: EdgeInsets.all(12.r),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius:
+                      (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                          .radiusExternal,
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                  ),
                 ),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 8.r),
-                    Text(
-                      AppLocale.customSaveFolderConfiguredList.getString(
-                        context,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: 8.r),
+                      Text(
+                        AppLocale.customSaveFolderConfiguredList.getString(
+                          context,
+                        ),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11.r,
+                        ),
                       ),
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11.r,
-                      ),
-                    ),
-                    SizedBox(height: 6.r),
-                    if (_configured.isEmpty)
-                      Padding(
-                        padding: EdgeInsets.all(12.r),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              Icon(
-                                Symbols.folder_special_rounded,
-                                size: 40.r,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.4,
-                                ),
-                              ),
-                              SizedBox(height: 8.r),
-                              Text(
-                                AppLocale.noCustomFoldersConfigured.getString(
-                                  context,
-                                ),
-                                style: TextStyle(
-                                  fontSize: 12.r,
+                      SizedBox(height: 6.r),
+                      if (_configured.isEmpty)
+                        Padding(
+                          padding: EdgeInsets.all(12.r),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Symbols.folder_special_rounded,
+                                  size: 40.r,
                                   color: theme.colorScheme.onSurface.withValues(
-                                    alpha: 0.6,
+                                    alpha: 0.4,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    else
-                      for (var i = 0; i < _configured.length; i++) ...[
-                        Padding(
-                          padding: EdgeInsets.only(bottom: 6.r),
-                          child: Container(
-                            padding: EdgeInsets.all(8.r),
-                            decoration: BoxDecoration(
-                              color: i == _selectedFolderIndex
-                                  ? theme.colorScheme.secondary.withValues(
-                                      alpha: 0.12,
-                                    )
-                                  : theme.colorScheme.primary.withValues(
-                                      alpha: 0.05,
-                                    ),
-                              borderRadius: BorderRadius.circular(8.r),
-                              border: Border.all(
-                                color: i == _selectedFolderIndex
-                                    ? theme.colorScheme.secondary.withValues(
-                                        alpha: 0.6,
-                                      )
-                                    : theme.colorScheme.primary.withValues(
-                                        alpha: 0.15,
-                                      ),
-                                width: i == _selectedFolderIndex ? 2.r : 1.r,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${_configured[i].$1} / ${_configured[i].$2}',
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 10.r,
-                                            ),
-                                      ),
-                                      SizedBox(height: 2.r),
-                                      Text(
-                                        _configured[i].$3,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              fontSize: 9.r,
-                                              fontFamily: 'monospace',
-                                              color: theme.colorScheme.onSurface
-                                                  .withValues(alpha: 0.7),
-                                            ),
-                                      ),
-                                    ],
+                                SizedBox(height: 8.r),
+                                Text(
+                                  AppLocale.noCustomFoldersConfigured.getString(
+                                    context,
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 12.r,
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.6),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      ],
-                  ],
+                        )
+                      else
+                        for (var i = 0; i < _configured.length; i++) ...[
+                          Padding(
+                            padding: EdgeInsets.only(bottom: 6.r),
+                            child: NeoGlassRim(
+                              cornerRadius:
+                                  (theme.extension<CornerRadii>() ??
+                                          CornerRadii.m())
+                                      .radiusInternalRadius,
+                              child: Container(
+                                padding: EdgeInsets.all(8.r),
+                                decoration: BoxDecoration(
+                                  color: i == _selectedFolderIndex
+                                      ? theme.colorScheme.onSurface
+                                      : theme
+                                            .colorScheme
+                                            .surfaceContainerHighest
+                                            .withValues(alpha: 0.16),
+                                  borderRadius:
+                                      (theme.extension<CornerRadii>() ??
+                                              CornerRadii.m())
+                                          .radiusInternal,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${_configured[i].$1} / ${_configured[i].$2}',
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 10.r,
+                                                  color:
+                                                      i == _selectedFolderIndex
+                                                      ? theme
+                                                            .colorScheme
+                                                            .surface
+                                                      : theme
+                                                            .colorScheme
+                                                            .onSurface,
+                                                ),
+                                          ),
+                                          SizedBox(height: 2.r),
+                                          Text(
+                                            _configured[i].$3,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  fontSize: 9.r,
+                                                  fontFamily: 'monospace',
+                                                  color:
+                                                      i == _selectedFolderIndex
+                                                      ? theme
+                                                            .colorScheme
+                                                            .surface
+                                                            .withValues(
+                                                              alpha: 0.7,
+                                                            )
+                                                      : theme
+                                                            .colorScheme
+                                                            .onSurface
+                                                            .withValues(
+                                                              alpha: 0.7,
+                                                            ),
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -494,22 +648,35 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              GamepadControl(
-                label: AppLocale.customSaveFolderConfigure.getString(context),
-                iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
-                onTap: busy ? null : _openConfigDialog,
-                textColor: theme.colorScheme.onTertiaryFixed,
-                backgroundColor: theme.colorScheme.tertiaryFixed,
-              ),
-              SizedBox(width: 8.r),
-              GamepadControl(
-                label: AppLocale.delete.getString(context),
-                iconPath: 'assets/images/gamepad/Xbox_View_button.png',
-                onTap: busy ? null : () => _handleSelectFolder(),
-                textColor: theme.colorScheme.onError,
-                backgroundColor: theme.colorScheme.error,
-              ),
-              SizedBox(width: 8.r),
+              // While an upload runs, Configure and Delete can't be used;
+              // Stop takes their place.
+              if (busy) ...[
+                GamepadControl(
+                  label: AppLocale.stop.getString(context),
+                  iconPath: 'assets/images/gamepad/Xbox_X_button.png',
+                  onTap: _stopUpload,
+                  textColor: theme.colorScheme.onTertiaryFixed,
+                  backgroundColor: theme.colorScheme.tertiaryFixed,
+                ),
+                SizedBox(width: 8.r),
+              ] else ...[
+                GamepadControl(
+                  label: AppLocale.customSaveFolderConfigure.getString(context),
+                  iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
+                  onTap: _checking ? null : _openConfigDialog,
+                  textColor: theme.colorScheme.onTertiaryFixed,
+                  backgroundColor: theme.colorScheme.tertiaryFixed,
+                ),
+                SizedBox(width: 8.r),
+                GamepadControl(
+                  label: AppLocale.delete.getString(context),
+                  iconPath: 'assets/images/gamepad/Xbox_View_button.png',
+                  onTap: _checking ? null : () => _handleSelectFolder(),
+                  textColor: theme.colorScheme.onTertiaryFixed,
+                  backgroundColor: theme.colorScheme.tertiaryFixed,
+                ),
+                SizedBox(width: 8.r),
+              ],
               NeoSyncBackButton(onTap: () => widget.onBack()),
             ],
           ),

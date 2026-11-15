@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:neostation/constants/recent_card_sizes.dart';
 import 'package:neostation/services/saf_directory_service.dart';
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
+
 import '../../models/config_model.dart';
 import '../../models/custom_sfx.dart';
 import '../../models/system_model.dart';
@@ -221,6 +223,10 @@ class SqliteConfigService {
   static Future<ConfigModel> loadConfig() async {
     try {
       final userConfig = await SqliteService.getUserConfig();
+      final rawPreviewDelay = userConfig?['video_preview_delay'];
+      final videoPreviewDelay = rawPreviewDelay != null
+          ? (int.tryParse(rawPreviewDelay.toString()) ?? 2).clamp(-1, 5)
+          : (userConfig?['video_previews'] == 0 ? -1 : 2);
       var romFolders = await SqliteService.getUserRomFolders();
       if (Platform.isAndroid && romFolders.isEmpty) {
         final recoveredFolders =
@@ -308,6 +314,7 @@ class SqliteConfigService {
         systemSortOrder: userConfig?['system_sort_order']?.toString() ?? 'asc',
         ignoreArticlesInGameSort:
             userConfig?['ignore_articles_in_game_sort'] == 1,
+        videoPreviewDelay: videoPreviewDelay,
         collectionSortBy:
             userConfig?['collection_sort_by']?.toString() ?? 'name',
         collectionSortOrder:
@@ -357,6 +364,12 @@ class SqliteConfigService {
                 ) ??
                 0) ==
             1,
+        hideTabDiscovery:
+            (int.tryParse(
+                  userConfig?['hide_tab_discovery']?.toString() ?? '0',
+                ) ??
+                0) ==
+            1,
         activeSyncProvider:
             userConfig?['active_sync_provider']?.toString() ?? 'neosync',
         autoUpdateApp:
@@ -371,6 +384,16 @@ class SqliteConfigService {
             1,
         systemGridColumns:
             userConfig?['system_grid_columns']?.toString() ?? 'M',
+        discoveryGridColumns: ConfigModel.normalizeGridColumns(
+          userConfig?['discovery_grid_columns'],
+        ),
+        discoveryViewMode:
+            userConfig?['discovery_view_mode']?.toString() == 'carousel'
+            ? 'carousel'
+            : 'grid',
+        androidGridColumns: ConfigModel.normalizeGridColumns(
+          userConfig?['android_grid_columns'],
+        ),
         gameGridColumns: userConfig?['game_grid_columns']?.toString() ?? 'M',
         gameListSize:
             const {
@@ -387,6 +410,13 @@ class SqliteConfigService {
         dockEnabled:
             (int.tryParse(userConfig?['dock_enabled']?.toString() ?? '1') ??
                 1) ==
+            1,
+        // Missing column/row => 0 => logo shown (the default).
+        secondaryHideSystemLogo:
+            (int.tryParse(
+                  userConfig?['secondary_hide_system_logo']?.toString() ?? '0',
+                ) ??
+                0) ==
             1,
         dockSlotCount:
             (int.tryParse(userConfig?['dock_slot_count']?.toString() ?? '3') ??
@@ -444,6 +474,11 @@ class SqliteConfigService {
                 ) ??
                 0) ==
             1,
+        // Missing column/row => 0 => off (the default).
+        performanceMode:
+            (int.tryParse(userConfig?['performance_mode']?.toString() ?? '0') ??
+                0) ==
+            1,
         // Missing column/row => 0 => blur off (the default). The frosted blur
         // is only smooth on a powerful GPU, so it starts disabled.
         neoglassBlur:
@@ -462,7 +497,7 @@ class SqliteConfigService {
                       userConfig?['neoglass_border_width']?.toString() ?? '2',
                     ) ??
                     2)
-                .clamp(0.0, 8.0),
+                .clamp(0.0, 2.0),
       );
     } catch (e) {
       _log.e('Error applying configuration in loadConfig: $e');
@@ -501,6 +536,8 @@ class SqliteConfigService {
           scanOnStartup: config.scanOnStartup ? 1 : 0,
           ignoreHiddenFiles: config.ignoreHiddenFiles ? 1 : 0,
           ignoreArticlesInGameSort: config.ignoreArticlesInGameSort ? 1 : 0,
+          videoPreviews: config.videoPreviewDelay >= 0 ? 1 : 0,
+          videoPreviewDelay: config.videoPreviewDelay,
           setupCompleted: config.setupCompleted ? 1 : 0,
           hideBottomScreen: config.hideBottomScreen ? 1 : 0,
           videoSound: config.videoSound ? 1 : 0,
@@ -521,15 +558,20 @@ class SqliteConfigService {
           hideTabRomm: config.hideTabRomm ? 1 : 0,
           hideSearchCard: config.hideSearchCard ? 1 : 0,
           androidAppsAsTab: config.androidAppsAsTab ? 1 : 0,
+          hideTabDiscovery: config.hideTabDiscovery ? 1 : 0,
           activeSyncProvider: config.activeSyncProvider,
           autoUpdateApp: config.autoUpdateApp ? 1 : 0,
           autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
           systemGridColumns: config.systemGridColumns,
+          discoveryGridColumns: config.discoveryGridColumns,
+          discoveryViewMode: config.discoveryViewMode,
+          androidGridColumns: config.androidGridColumns,
           gameGridColumns: config.gameGridColumns,
           gameListSize: config.gameListSize,
           gameCarouselCardStyle: config.gameCarouselCardStyle,
           dockApps: jsonEncode(config.dockApps),
           dockEnabled: config.dockEnabled ? 1 : 0,
+          secondaryHideSystemLogo: config.secondaryHideSystemLogo ? 1 : 0,
           dockSlotCount: config.dockSlotCount,
           nowPlayingDimDelay: config.nowPlayingDimDelay,
           nowPlayingDimLevel: config.nowPlayingDimLevel,
@@ -540,6 +582,7 @@ class SqliteConfigService {
           raMatchOnStartup: config.raMatchOnStartup ? 1 : 0,
           subfolderViewAll: config.subfolderViewAll ? 1 : 0,
           hideSystemLogos: config.hideSystemLogos ? 1 : 0,
+          performanceMode: config.performanceMode ? 1 : 0,
           neoglassBlur: config.neoglassBlur,
           neoglassTransparency: config.neoglassTransparency,
           neoglassBorderWidth: config.neoglassBorderWidth,

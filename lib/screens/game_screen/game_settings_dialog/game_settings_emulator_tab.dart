@@ -150,9 +150,8 @@ class GameSettingsEmulatorTabState extends State<GameSettingsEmulatorTab> {
           AppLocale.noEmulator.getString(context),
           style: TextStyle(
             fontSize: 12.r,
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.6),
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.6),
           ),
         ),
       );
@@ -171,9 +170,8 @@ class GameSettingsEmulatorTabState extends State<GameSettingsEmulatorTab> {
                 Icon(
                   Symbols.sports_esports_rounded,
                   size: 12.r,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.6),
                 ),
                 SizedBox(width: 4.r),
                 Text(
@@ -181,9 +179,8 @@ class GameSettingsEmulatorTabState extends State<GameSettingsEmulatorTab> {
                   style: TextStyle(
                     fontSize: 11.r,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: Theme.of(context).colorScheme.onSurface
+                        .withValues(alpha: 0.6),
                   ),
                 ),
               ],

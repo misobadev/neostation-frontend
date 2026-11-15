@@ -51,9 +51,8 @@ void main() {
   }
 
   test('the second screen\'s Screen Return dialogue has no fixed English', () {
-    final source = File(
-      'lib/screens/secondary_screen/secondary_screen.dart',
-    ).readAsStringSync();
+    final source = File('lib/screens/secondary_screen/secondary_screen.dart')
+        .readAsStringSync();
     final start = source.indexOf('Widget _buildAccessibilityDialog(');
     final end = source.indexOf('Widget _buildDialogButton(', start);
     expect(start, isNonNegative);

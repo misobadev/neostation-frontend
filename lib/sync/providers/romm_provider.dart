@@ -21,6 +21,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
+import 'package:neostation/models/core_emulator_model.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/romm_asset.dart';
@@ -28,13 +29,17 @@ import 'package:neostation/models/romm_platform.dart';
 import 'package:neostation/models/romm_rom.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/repositories/emulator_repository.dart';
+import 'package:neostation/repositories/neosync_save_folder_repository.dart';
 import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/services/retroarch_config_service.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
+import 'package:neostation/services/game/game_launch_service.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/utils/cloud_path_builder.dart';
+import 'package:neostation/utils/kept_save_copy.dart';
 import 'package:neostation/services/romm/romm_library_linker.dart';
 import 'package:neostation/services/romm_playtime_service.dart';
 import 'package:neostation/services/romm_service.dart';
@@ -42,6 +47,8 @@ import 'package:neostation/services/romm_service.dart';
 import '../i_sync_provider.dart';
 import '../retroarch_state_signature.dart';
 import '../sync_manager.dart';
+import '../../utils/emulator_loader.dart';
+import '../../utils/kept_cloud_copy_notice.dart';
 import '../../utils/safe_path.dart';
 
 /// Locates the local save/state files belonging to a game.
@@ -49,11 +56,26 @@ typedef LocateGameSaves = Future<List<LocalSaveFile>> Function(GameModel game);
 
 /// Resolves the candidate local destination paths for a cloud file named
 /// [relativeName] (e.g. `saves/Game.srm`) belonging to a game.
-typedef ResolveSaveTargets =
-    Future<List<String>> Function(GameModel game, String relativeName);
+typedef ResolveSaveTargets = Future<List<String>> Function(
+  GameModel game,
+  String relativeName,
+);
 
 /// Enumerates the local library, for the pending-upload sweep.
 typedef ListLocalGames = Future<List<GameModel>> Function();
+
+/// The standalone save folders configured for a system (the Saves tab's
+/// Standalone save folders), by system folder name.
+typedef ListSaveFolders = Future<List<String>> Function(
+  String systemFolderName,
+);
+
+/// Where [game]'s emulator keeps its saves, when that emulator is standalone:
+/// `standalone: false` when it is a RetroArch core or can't be told, so the
+/// usual RetroArch placement applies; `folder: null` when it is standalone
+/// and no folder is configured for it.
+typedef ResolveStandaloneSaveFolder =
+    Future<({bool standalone, String? folder})> Function(GameModel game);
 
 /// Outcome of the pre-upload check that protects a remote copy the local one is
 /// about to replace.
@@ -105,6 +127,12 @@ enum _Pending {
 /// What [RomMSyncProvider._syncGame] made of a game: the cloud state to show,
 /// and what an upload-capable pass left waiting to go up.
 typedef _GameSync = ({GameSyncStatus status, _Pending uploads});
+
+/// What became of one [RomMSyncProvider._download]: whether it wrote, whether
+/// it refused a state written by a different core, and whether it failed (the
+/// server's copy could not be fetched or written). A routine refusal (no
+/// target, an expired launch deadline, a newer local copy) is none of these.
+typedef _DownloadOutcome = ({bool wrote, bool coreMismatch, bool failed});
 
 /// Identifies a game in the library. Two systems can each hold a `Same.zip`.
 typedef _GameKey = ({String? system, String romname});
@@ -182,6 +210,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   final LocateGameSaves? _locateOverride;
   final ResolveSaveTargets? _resolveTargetsOverride;
   final ListLocalGames? _listGamesOverride;
+  final ListSaveFolders? _saveFoldersOverride;
+  final ResolveStandaloneSaveFolder? _standaloneFolderOverride;
 
   final Map<String, GameSyncState> _gameSyncStates = {};
 
@@ -196,13 +226,16 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     @visibleForTesting LocateGameSaves? locateSaves,
     @visibleForTesting ResolveSaveTargets? resolveTargets,
     @visibleForTesting ListLocalGames? listGames,
-    @visibleForTesting bool autoSweep = true,
+    @visibleForTesting ListSaveFolders? saveFolders,
+    @visibleForTesting ResolveStandaloneSaveFolder? standaloneSaveFolder,
+    @visibleForTesting this._autoSweep = true,
     @visibleForTesting RommLibraryLinker? linker,
     @visibleForTesting Duration sweepStartupDelay = _sweepStartupDelay,
   }) : _locateOverride = locateSaves,
        _resolveTargetsOverride = resolveTargets,
        _listGamesOverride = listGames,
-       _autoSweep = autoSweep,
+       _saveFoldersOverride = saveFolders,
+       _standaloneFolderOverride = standaloneSaveFolder,
        _startupDelay = sweepStartupDelay {
     _linker = linker ?? _buildLinker();
     if (!_autoSweep) return;
@@ -240,6 +273,117 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         game,
         relativeName,
       );
+
+  Future<List<String>> _saveFolders(String systemFolderName) async {
+    final override = _saveFoldersOverride;
+    if (override != null) return override(systemFolderName);
+    final folders = await NeoSyncSaveFolderRepository.getFoldersForSystem(
+      systemFolderName,
+    );
+    return folders.values.toList();
+  }
+
+  Future<({bool standalone, String? folder})> _standaloneSaveFolder(
+    GameModel game,
+  ) async {
+    final override = _standaloneFolderOverride;
+    if (override != null) return override(game);
+    const notStandalone = (standalone: false, folder: null);
+    final folderName = game.systemFolderName;
+    if (folderName == null || folderName.isEmpty) return notStandalone;
+    final system = await SystemRepository.getSystemByFolderName(folderName);
+    if (system == null) return notStandalone;
+    // The emulator the game launches with, so the save lands where the
+    // emulator that will open it reads it.
+    final uniqueId = await GameLaunchService.resolveLaunchEmulatorId(
+      system,
+      game,
+    );
+    if (uniqueId == null) return notStandalone;
+    return standaloneSaveFolderFor(
+      uniqueId: uniqueId,
+      emulators: await loadEmulatorsForSystem(system),
+      folders: await NeoSyncSaveFolderRepository.getFoldersForSystem(
+        system.folderName,
+      ),
+    );
+  }
+
+  /// Whether the emulator [uniqueId] is standalone, and the save folder
+  /// configured for it in [folders] (by emulator unique id), if any.
+  ///
+  /// Decided as the folder picker decides it: a RetroArch core is never
+  /// standalone, even when it is flagged so, and an emulator this device
+  /// doesn't list is treated as not standalone, which keeps the RetroArch
+  /// placement used before standalone folders were known here.
+  @visibleForTesting
+  static ({bool standalone, String? folder}) standaloneSaveFolderFor({
+    required String uniqueId,
+    required List<CoreEmulatorModel> emulators,
+    required Map<String, String> folders,
+  }) {
+    const notStandalone = (standalone: false, folder: null);
+    if (CloudPathBuilder.slugFromEmulatorUniqueId(uniqueId)
+        .startsWith('retroarch.')) {
+      return notStandalone;
+    }
+    final emulator = emulators.where((e) => e.uniqueId == uniqueId).firstOrNull;
+    if (emulator == null || !emulator.isStandalone) return notStandalone;
+    final folder = folders[uniqueId];
+    return (
+      standalone: true,
+      folder: folder == null || folder.isEmpty ? null : folder,
+    );
+  }
+
+  /// Where a download of [asset] is written: null when it must not be
+  /// written at all (the reason is logged).
+  ///
+  /// A standalone emulator reads its saves from the folder configured for it,
+  /// never from RetroArch's saves folder, so its downloads go there: onto the
+  /// file they replace when that file is in a configured folder ([paired]),
+  /// or into the emulator's folder otherwise (a copy outside its folders is
+  /// never paired for such a game; see the reconcile loop in [_syncGame]). A
+  /// standalone emulator with no folder gets nothing, rather than a copy in
+  /// RetroArch's folder that no emulator opens. Everything else is placed the
+  /// RetroArch way, by [_resolveTargets].
+  ///
+  /// A file in a configured folder goes back where it came from whichever
+  /// emulator the game launches with: on a shared-card system (PS2,
+  /// Dreamcast) the card in a standalone's folder is the copy that exists.
+  Future<List<String>?> _downloadTargets(
+    GameModel game,
+    RommAsset asset, {
+    required String relativeName,
+    required String localName,
+    required _Placement placement,
+    LocalSaveFile? paired,
+  }) async {
+    if (paired != null && await placement.inSaveFolder(paired.filePath)) {
+      return [paired.filePath];
+    }
+    final standalone = await placement.standalone();
+    if (standalone.standalone) {
+      final folder = standalone.folder;
+      if (folder == null) {
+        _log.i(
+          'RomM download: ${asset.fileName} not written — ${game.romname} '
+          'launches with a standalone emulator with no save folder set',
+        );
+        return null;
+      }
+      if (asset.isState) {
+        _log.i(
+          'RomM download: ${asset.fileName} not written — a save state, and '
+          '${game.romname} launches with a standalone emulator',
+        );
+        return null;
+      }
+      final target = safeJoin(folder, localName);
+      return target == null ? const [] : [target];
+    }
+    return _resolveTargets(game, relativeName);
+  }
 
   /// The library, for the sweep. Injectable for the same reason the path
   /// resolution is: reaching the real one means seeding `user_roms` and its
@@ -288,8 +432,11 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   @override
   bool get isAuthenticated => _browse.isConnected;
 
+  /// The connection's error only. The browse provider also records failed
+  /// searches and collection loads, which say nothing about syncing saves.
   @override
-  String? get lastError => _browse.lastError;
+  String? get lastError =>
+      _browse.status == RommConnectionStatus.error ? _browse.lastError : null;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -350,7 +497,9 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   ///
   /// What it reports left to upload is [_Pending.unknown] when the pass never
   /// got as far as comparing the saves (no connection, or a listing that
-  /// failed), for the caller to answer from the disk.
+  /// failed), for the caller to answer from the disk. When only one of the two
+  /// listings failed, the other kind is synced as usual and the game still
+  /// reports [GameSyncStatus.error].
   Future<_GameSync> _syncGame(
     GameModel game, {
     required bool downloadOnly,
@@ -382,27 +531,63 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
 
     final localFiles = syncableSaves(game, await _locateSaves(game));
+    // Where downloads go, worked out once per pass and only if one needs it:
+    // finding the game's emulator enumerates the system's emulators.
+    final placement = _Placement(
+      folders: () async {
+        final system = game.systemFolderName;
+        return system == null || system.isEmpty
+            ? const <String>[]
+            : _saveFolders(system);
+      },
+      standalone: () => _standaloneSaveFolder(game),
+    );
 
-    final List<RommAsset> remote;
-    try {
-      // The two listings are independent GETs; fetch them concurrently so the
-      // launch-blocking sync pays one round-trip, not two serial ones.
-      final results = await Future.wait([
-        _svc.listSaves(romId: romId),
-        _svc.listStates(romId: romId),
-      ]);
-      // Collapse a slot's version history before anything looks at the listing,
-      // so the pairing loop and the remote-only pass below agree on which asset
-      // represents each local file. Conflict backups are dropped first: they
-      // must never reach the pairing loop, and filtering them here is cheaper
-      // than deduping them and discarding the survivor.
-      remote = latestPerLocalName(
-        syncableRemote([...results[0], ...results[1]]),
-      );
-    } catch (e) {
-      _log.e('RomM listSaves/listStates failed for ${game.romname}: $e');
+    // The two listings are independent GETs; fetch them concurrently so the
+    // launch-blocking sync pays one round-trip, not two serial ones. Each is
+    // also independent in failure: RomM can fail one (its states route, say)
+    // while the other answers, and the kind that listed still syncs.
+    Future<List<RommAsset>?> listed(
+      String kind,
+      Future<List<RommAsset>> Function() list,
+    ) async {
+      try {
+        return await list();
+      } catch (e) {
+        _log.e('RomM list$kind failed for ${game.romname}: $e');
+        return null;
+      }
+    }
+
+    final results = await Future.wait([
+      listed('Saves', () => _svc.listSaves(romId: romId)),
+      listed('States', () => _svc.listStates(romId: romId)),
+    ]);
+    final savesListed = results[0] != null;
+    final statesListed = results[1] != null;
+    if (!savesListed && !statesListed) {
       return (status: GameSyncStatus.error, uploads: _Pending.unknown);
     }
+    // Collapse a slot's version history before anything looks at the listing,
+    // so the pairing loop and the remote-only pass below agree on which asset
+    // represents each local file. Conflict backups are dropped first: they
+    // must never reach the pairing loop, and filtering them here is cheaper
+    // than deduping them and discarding the survivor.
+    final remote = latestPerLocalName(
+      syncableRemote([...?results[0], ...?results[1]]),
+    );
+    // Only the local files of a kind that listed are compared. With no
+    // listing, a local file would look missing on the server and take the
+    // local-only upload, which RomM applies by file name: it could replace a
+    // newer copy that nothing here has seen.
+    final partial = !savesListed || !statesListed;
+    final reconciled = partial
+        ? localFiles
+              .where(
+                (l) => l.relativePath.startsWith('states/') == statesListed,
+              )
+              .toList()
+        : localFiles;
 
     // Assets already paired with a local file. Keyed by kind *and* id: the two
     // endpoints number their rows independently, so a bare id would let a save
@@ -410,16 +595,38 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     final matchedRemote = <({bool isState, int id})>{};
     int uploaded = 0, downloaded = 0, coreMismatched = 0;
     int conflictsPreserved = 0, uploadsFailed = 0, uploadsDeferred = 0;
+    // The conflict copies this pass keeps, by save; see the tidy below.
+    final keptThisPass = <String, String>{};
+    int downloadsFailed = 0;
     void countUpload(_UploadOutcome outcome) {
       if (outcome == _UploadOutcome.uploaded) uploaded++;
       if (outcome == _UploadOutcome.failed) uploadsFailed++;
     }
 
-    bool anyLocal = localFiles.isNotEmpty;
+    void countDownload(_DownloadOutcome r) {
+      if (r.wrote) downloaded++;
+      if (r.coreMismatch) coreMismatched++;
+      if (r.failed) downloadsFailed++;
+    }
+
+    bool anyLocal = reconciled.isNotEmpty;
     bool anyRemote = remote.isNotEmpty;
 
     // 1) Reconcile each local file against its remote counterpart.
-    for (final local in localFiles) {
+    for (final local in reconciled) {
+      // A game that launches with a standalone emulator only has the copy in
+      // that emulator's folder. One elsewhere — RetroArch's, as an older
+      // version downloaded it there — is not its save: pairing it would keep
+      // fetching the server's copy into the folder and never settle, or, with
+      // the server unchanged, leave the folder without the save. Left out, the
+      // server's copy is placed like any save this device lacks.
+      // Only asked on a system with folders set, so a highlighted game's
+      // status check doesn't enumerate emulators for every RetroArch game.
+      if ((await placement.folders()).isNotEmpty &&
+          !await placement.inSaveFolder(local.filePath) &&
+          (await placement.standalone()).standalone) {
+        continue;
+      }
       final isState = local.relativePath.startsWith('states/');
       final baseName = path.basename(local.filePath);
       RommAsset? match;
@@ -462,9 +669,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       // dead for those users rather than merely occasionally stale.
       //
       // Attempting the pull is safe because it is not the decision that
-      // overwrites anything: [_download]'s per-target mtime guard refuses to
-      // write over a local file newer than the remote, so a genuinely-ahead
-      // local save survives and simply uploads on the next upload-capable pass.
+      // overwrites anything: [_download]'s per-target guard refuses to write
+      // over a local file newer than the remote whose bytes changed since the
+      // last sync, so a genuinely-ahead local save survives and simply uploads
+      // on the next upload-capable pass.
       // What changes is only the case where the server copy is strictly newer
       // than the local one, which is exactly the other device's session.
       //
@@ -490,14 +698,16 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           await _recordSynced(local, match.updatedAtMs, pullDigest);
           continue;
         }
-        final r = await _download(
-          game,
-          match,
-          localFiles: localFiles,
-          deadline: deadline,
+        countDownload(
+          await _download(
+            game,
+            match,
+            localFiles: localFiles,
+            placement: placement,
+            paired: local,
+            deadline: deadline,
+          ),
         );
-        if (r.wrote) downloaded++;
-        if (r.coreMismatch) coreMismatched++;
       } else if (localChanged && !downloadOnly) {
         // Local newer (or both changed → prefer local). The asset exists, so
         // this replaces it in place rather than creating a second one.
@@ -557,12 +767,17 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         // over it is what destroyed another device's state on `main`. The
         // outcome still prefers local — the session that just ended wins — but
         // the copy it replaces is kept first.
+        String? keptCopy;
         if (remoteChanged) {
           final guard = await _guardDivergedRemote(
             match,
             local,
             recordedHash: recorded?['file_hash'] as String?,
             pushDigest: pushDigest,
+            onKept: (copy) {
+              keptThisPass[local.filePath] = copy;
+              keptCopy = copy;
+            },
           );
           if (guard == _RemoteGuard.unreadable) {
             // Nothing recorded: the file stays pending and the next pass asks
@@ -577,15 +792,24 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           }
           if (guard == _RemoteGuard.preserved) conflictsPreserved++;
         }
-        countUpload(
-          await _upload(
-            romId,
-            local,
-            isState,
-            existing: match,
-            digest: pushDigest,
-          ),
+        final outcome = await _upload(
+          romId,
+          local,
+          isState,
+          existing: match,
+          digest: pushDigest,
         );
+        countUpload(outcome);
+        // Only once this device's copy has replaced the other on the server:
+        // until then the kept copy is not yet the only one left.
+        final kept = keptCopy;
+        if (kept != null && outcome == _UploadOutcome.uploaded) {
+          reportKeptCloudCopy(
+            gameName: game.name,
+            savePath: local.filePath,
+            backupPath: kept,
+          );
+        }
       }
     }
 
@@ -593,24 +817,38 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     for (final a in remote) {
       if (statusOnly || uploadOnly) break;
       if (matchedRemote.contains(a.key)) continue;
-      final r = await _download(
-        game,
-        a,
-        localFiles: localFiles,
-        deadline: deadline,
+      countDownload(
+        await _download(
+          game,
+          a,
+          localFiles: localFiles,
+          placement: placement,
+          deadline: deadline,
+        ),
       );
-      if (r.wrote) downloaded++;
-      if (r.coreMismatch) coreMismatched++;
     }
 
     _log.i(
       'RomM sync ${game.romname}: $uploaded up, $downloaded down '
-      '(${localFiles.length} local, ${remote.length} remote)'
+      '(${reconciled.length} local, ${remote.length} remote)'
+      '${partial ? ', ${savesListed ? 'states' : 'saves'} not listed' : ''}'
       '${uploadsFailed > 0 ? ', $uploadsFailed upload(s) failed' : ''}'
+      '${downloadsFailed > 0 ? ', $downloadsFailed download(s) failed' : ''}'
       '${uploadsDeferred > 0 ? ', $uploadsDeferred deferred' : ''}'
       '${coreMismatched > 0 ? ', $coreMismatched kept (different core)' : ''}'
       '${conflictsPreserved > 0 ? ', $conflictsPreserved conflict backup(s)' : ''}',
     );
+
+    // A save this pass kept a conflict copy of now has one more copy; at most
+    // a few stay. Only the post-close pass keeps any, so the pre-launch pass
+    // reads nothing here.
+    for (final MapEntry(key: save, value: copy) in keptThisPass.entries) {
+      await tidyKeptCopies(
+        save,
+        sources: rommKeptCopySources,
+        justKept: {copy},
+      );
+    }
 
     // Playtime rides along with the upload-capable passes only. The pre-launch
     // pass is on the launch's critical path and playtime changes nothing about
@@ -624,7 +862,17 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     if (uploadsFailed > 0) {
       return (status: GameSyncStatus.error, uploads: _Pending.waiting);
     }
+    // The kind that didn't list was never compared, so whether it has a save
+    // waiting is for the disk to say, as after a listing that failed outright.
+    if (partial) {
+      return (status: GameSyncStatus.error, uploads: _Pending.unknown);
+    }
     final uploads = uploadsDeferred > 0 ? _Pending.deferred : _Pending.none;
+    // A save the server has that didn't come down is as much a failed sync as
+    // one that didn't go up: the game would start on the older copy.
+    if (downloadsFailed > 0) {
+      return (status: GameSyncStatus.error, uploads: uploads);
+    }
     if (!anyLocal && !anyRemote) {
       return (status: GameSyncStatus.noSaveFound, uploads: uploads);
     }
@@ -945,6 +1193,22 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
   }
 
+  /// Whether the file at [filePath] still holds the bytes recorded at its
+  /// last sync, so only its time moved: an emulator that rewrites the same
+  /// save on exit makes it look newer than the server's copy without changing
+  /// anything in it. False when nothing was recorded, or on any doubt.
+  static Future<bool> _unchangedSinceLastSync(String filePath) async {
+    try {
+      final recorded = await SyncRepository.getSyncState(kProviderId, filePath);
+      final hash = recorded?['file_hash'] as String?;
+      if (hash == null || hash.isEmpty) return false;
+      return await _md5OfFile(filePath) == hash;
+    } catch (e) {
+      _log.w('RomM: could not compare $filePath with its last sync: $e');
+      return false;
+    }
+  }
+
   /// Whether RomM's own `content_hash` for [asset] provably describes the same
   /// bytes as [digest], an [_md5OfFile] of [local].
   ///
@@ -1037,11 +1301,14 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// post-close pass reaches here — the sweep bails on `uploadOnly &&
   /// remoteChanged` before this point and the pre-launch pass never takes the
   /// upload branch — so there is no launch deadline to spend it against.
+  ///
+  /// [onKept] gets the kept copy's path when it is written.
   Future<_RemoteGuard> _guardDivergedRemote(
     RommAsset match,
     LocalSaveFile local, {
     required String? recordedHash,
     required String? pushDigest,
+    void Function(String copyPath)? onKept,
   }) async {
     // Cheap path: RomM's own hash can rule divergence out without a transfer,
     // but only where it is an MD5 of the stored bytes. States have none and a
@@ -1075,22 +1342,32 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       return _RemoteGuard.clear;
     }
 
+    final backup = File(
+      '${local.filePath}$conflictBackupMarker${_backupStamp()}',
+    );
+    var created = false;
     try {
-      final backup = File(
-        '${local.filePath}$conflictBackupMarker${_backupStamp()}',
-      );
       await backup.parent.create(recursive: true);
+      // Only a file this guard creates is removed should the write fail.
+      created = !await backup.exists();
       await backup.writeAsBytes(bytes, flush: true);
       _log.w(
         'RomM conflict: ${path.basename(local.filePath)} and the server both '
         'changed since the last sync — kept the remote copy as '
         '${path.basename(backup.path)} before uploading the local one',
       );
+      onKept?.call(backup.path);
       return _RemoteGuard.preserved;
     } catch (e) {
       _log.e(
         'RomM conflict guard: cannot write backup for ${local.filePath}: $e',
       );
+      // Cut short, it would be listed as a copy to restore.
+      try {
+        if (created) await backup.delete();
+      } on FileSystemException {
+        // Nothing more to undo.
+      }
       return _RemoteGuard.unreadable;
     }
   }
@@ -1196,13 +1473,6 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
   }
 
-  /// Fetches [asset] and writes it to this device's local target(s).
-  ///
-  /// [coreMismatch] reports the one refusal a caller needs to distinguish from
-  /// an ordinary no-op: the transfer was declined because the remote state was
-  /// written by a different core (see the guard below). Everything else — no
-  /// target, an expired deadline, a newer local copy — is a routine `wrote:
-  /// false`.
   /// The bytes RomM holds for [asset], or null when they cannot be fetched.
   ///
   /// Both saves and states download via the asset's `download_path`; only saves
@@ -1217,10 +1487,20 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     return null;
   }
 
-  Future<({bool wrote, bool coreMismatch})> _download(
+  /// Fetches [asset] and writes it to this device's local target(s).
+  ///
+  /// [_DownloadOutcome.coreMismatch] reports the one refusal a caller needs to
+  /// distinguish from an ordinary no-op: the transfer was declined because the
+  /// remote state was written by a different core (see the guard below).
+  /// [_DownloadOutcome.failed] reports that the server's copy could not be
+  /// fetched or written. Everything else (no target, an expired deadline, a
+  /// newer local copy) is a routine `wrote: false`.
+  Future<_DownloadOutcome> _download(
     GameModel game,
     RommAsset asset, {
     required List<LocalSaveFile> localFiles,
+    required _Placement placement,
+    LocalSaveFile? paired,
     SyncDeadline? deadline,
   }) async {
     var skippedCoreMismatch = false;
@@ -1238,13 +1518,25 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       final relativeName = sub.isNotEmpty
           ? '$prefix/$sub/$localName'
           : '$prefix/$localName';
-      final targets = await _resolveTargets(game, relativeName);
+      final targets = await _downloadTargets(
+        game,
+        asset,
+        relativeName: relativeName,
+        localName: localName,
+        placement: placement,
+        paired: paired,
+      );
+      if (targets == null) {
+        return (wrote: false, coreMismatch: false, failed: false);
+      }
       if (targets.isEmpty) {
         _log.w('RomM download: no local target for ${asset.fileName}');
-        return (wrote: false, coreMismatch: false);
+        return (wrote: false, coreMismatch: false, failed: false);
       }
       final bytes = await _fetchAssetBytes(asset);
-      if (bytes == null) return (wrote: false, coreMismatch: false);
+      if (bytes == null) {
+        return (wrote: false, coreMismatch: false, failed: true);
+      }
 
       // Pre-launch deadline guard: the network fetch is done, but if the
       // launch-blocking wait has already elapsed the game is running on the
@@ -1254,19 +1546,22 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         _log.i(
           'RomM download: abandon ${asset.fileName} (launch deadline passed)',
         );
-        return (wrote: false, coreMismatch: false);
+        return (wrote: false, coreMismatch: false, failed: false);
       }
 
       var wroteAny = false;
       for (final target in targets) {
         final f = File(target);
         // Per-target guard (mirrors NeoSync): never overwrite a copy that is
-        // newer than the remote asset. resolveLocalTargetPaths can return
+        // newer than the remote asset, unless its bytes are still the ones
+        // recorded at the last sync (only its time moved, as when an emulator
+        // rewrites the same save on exit). resolveLocalTargetPaths can return
         // several folders and the higher-level decision only inspected one, so
         // a different folder may hold newer local progress we must not clobber.
         if (await f.exists()) {
           final localMs = (await f.stat()).modified.millisecondsSinceEpoch;
-          if (localMs > asset.updatedAtMs + _mtimeToleranceMs) {
+          if (localMs > asset.updatedAtMs + _mtimeToleranceMs &&
+              !await _unchangedSinceLastSync(target)) {
             _log.i('RomM download: skip $target (local newer than remote)');
             continue;
           }
@@ -1313,11 +1608,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         );
         wroteAny = true;
       }
-      return (wrote: wroteAny, coreMismatch: skippedCoreMismatch);
+      return (
+        wrote: wroteAny,
+        coreMismatch: skippedCoreMismatch,
+        failed: false,
+      );
     } catch (e) {
       if (isPermissionDenied(e)) rethrow;
       _log.e('RomM download failed (${asset.fileName}): $e');
-      return (wrote: false, coreMismatch: skippedCoreMismatch);
+      return (wrote: false, coreMismatch: skippedCoreMismatch, failed: true);
     }
   }
 
@@ -1361,6 +1660,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     bool statusOnly = false,
     SyncDeadline? deadline,
   }) async {
+    // A status-only check writes nothing, so it doesn't hold up a move.
+    if (!statusOnly) _activeSyncs++;
     try {
       final sync = await _syncGame(
         game,
@@ -1379,8 +1680,20 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       return (result: SyncResult.ok(), uploads: sync.uploads);
     } catch (e) {
       return (result: _failGame(game, e), uploads: _Pending.unknown);
+    } finally {
+      if (!statusOnly) _activeSyncs--;
     }
   }
+
+  /// Per-game syncs and playtime pulls in progress.
+  int _activeSyncs = 0;
+
+  /// A save sync, the upload sweep or the playtime pull is running. Each
+  /// writes the database (sync state, playtime), so moving the user data waits
+  /// for it: anything written after the move copied the database would be
+  /// lost with the old folder. A status-only check writes nothing and doesn't
+  /// count.
+  bool get isSyncing => _activeSyncs > 0 || _sweeping.value != null;
 
   @override
   GameSyncState? getGameSyncState(String gameId) => _gameSyncStates[gameId];
@@ -1713,8 +2026,13 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           downloadOnly: false,
           uploadOnly: true,
         );
-        // A sync that could not tell leaves the pre-check's answer standing.
-        final left = sync.uploads == _Pending.unknown ? pending : sync.uploads;
+        // A sync that could not tell is answered from the disk again: one that
+        // listed only saves or only states may have sent some since the
+        // pre-check. If the disk can't say either, the pre-check's answer
+        // stands.
+        var left = sync.uploads;
+        if (left == _Pending.unknown) left = await _pendingUpload(game);
+        if (left == _Pending.unknown) left = pending;
         if (left == _Pending.waiting) {
           failed++;
         } else if (left == _Pending.deferred) {
@@ -1946,33 +2264,41 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     shouldStop: () => _disposed || !_browse.isConnected,
   );
 
-  /// The browse provider's platform list, loaded if it hasn't been yet.
+  /// The server's platform list, reloaded for this pass.
   ///
   /// Going through [RommProvider.loadPlatforms] rather than the service means
-  /// the list is shared with the browse screen (a no-op when it already
-  /// loaded it) and, more to the point, that its support classification has
-  /// run — which warms the per-platform system cache
-  /// [RommProvider.systemForPlatform] reads and lets it try each platform's
-  /// `fs_slug`. The provider swallows a failed load into
-  /// [RommProvider.lastError], which is surfaced here as an error so the pass
-  /// reports it rather than reading "no platforms".
+  /// its support classification runs, which warms the per-platform system
+  /// cache [RommProvider.systemForPlatform] reads and lets it try each
+  /// platform's `fs_slug`, and the browse screen gets the fresh list too.
   ///
-  /// A load already in flight (the browse screen opened just before the pass
-  /// fired) is awaited, not raced: `loadPlatforms` returns at once while one
-  /// is running, and the pass would otherwise read an empty list and report
-  /// "0 platforms processed, complete" with nothing to say why. Should the
-  /// list still be empty and loading after that (a forced reload started
-  /// underneath us), the pass fails with that as its named reason.
+  /// The load is forced. The list the RomM tab (or the match picker, the
+  /// search filter, an earlier pass) cached for the session would let a pass
+  /// start against a server that has since gone away: every platform then
+  /// failed on its own, and the pass ended as "nothing new to link". A forced
+  /// load asks the server, and its failure — swallowed by the provider into
+  /// [RommProvider.platformsFailure] — fails the pass with its reason, cached
+  /// list or not. Only that load's own failure counts: [RommProvider.lastError]
+  /// is shared with the other loads and the connection. A failed reload keeps
+  /// the browse screen's list as it was.
+  ///
+  /// A load already in flight is awaited, not raced: `loadPlatforms` returns
+  /// at once while one is running, so the forced load would do nothing. That
+  /// holds both before the forced call and after it (the browse screen can
+  /// start a load in between). Should the list still be empty and loading
+  /// after that, the pass fails with that as its named reason.
   @visibleForTesting
   Future<List<RommPlatform>> listPlatformsForLinkPass() async {
     if (_browse.isLoadingPlatforms) {
       _log.i('RomM link pass waiting: the platform list is still loading');
       await _browse.platformsLoaded;
     }
-    await _browse.loadPlatforms();
+    await _browse.loadPlatforms(force: true);
+    if (_browse.isLoadingPlatforms) await _browse.platformsLoaded;
     final platforms = _browse.platforms;
-    if (platforms.isEmpty && _browse.lastError != null) {
-      throw StateError(_browse.lastError!);
+    final failure = _browse.platformsFailure;
+    if (failure != null) {
+      // The failure itself, so the Tools run can say why in the app language.
+      throw failure;
     }
     if (platforms.isEmpty && _browse.isLoadingPlatforms) {
       throw StateError('the platform list is still loading');
@@ -1999,7 +2325,16 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   ///
   /// Never throws: a failure here must not stop the upload sweep that follows.
   Future<void> pullRecentPlaytime() async {
-    if (!_browse.isConnected || !_svc.playtimeSyncAvailable) return;
+    _activeSyncs++;
+    try {
+      await _pullRecentPlaytime();
+    } finally {
+      _activeSyncs--;
+    }
+  }
+
+  Future<void> _pullRecentPlaytime() async {
+    if (!_browse.isConnected || !_svc.playtimePullAvailable) return;
 
     final List<RommRom> recent;
     try {
@@ -2052,4 +2387,32 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
   @override
   Future<SyncQuota?> getQuota() async => null;
+}
+
+/// A sync pass's answers about where [RomMSyncProvider] puts a game's
+/// downloads, each looked up on first use and then reused.
+class _Placement {
+  _Placement({
+    required Future<List<String>> Function() folders,
+    required Future<({bool standalone, String? folder})> Function() standalone,
+  }) : _foldersLookup = folders,
+       _standaloneLookup = standalone;
+
+  final Future<List<String>> Function() _foldersLookup;
+  final Future<({bool standalone, String? folder})> Function()
+  _standaloneLookup;
+  Future<List<String>>? _folders;
+  Future<({bool standalone, String? folder})>? _standalone;
+
+  /// The game's system's configured standalone save folders.
+  Future<List<String>> folders() => _folders ??= _foldersLookup();
+
+  /// Whether [filePath] is inside one of [folders].
+  Future<bool> inSaveFolder(String filePath) async => (await folders()).any(
+    (root) => path.equals(root, filePath) || path.isWithin(root, filePath),
+  );
+
+  /// Whether the game launches with a standalone emulator, and its folder.
+  Future<({bool standalone, String? folder})> standalone() =>
+      _standalone ??= _standaloneLookup();
 }

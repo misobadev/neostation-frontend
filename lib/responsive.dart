@@ -113,6 +113,13 @@ class Responsive extends StatelessWidget {
     }
   }
 
+  /// Maps a Discovery card size to its column count.
+  ///
+  /// Discovery uses the same density scale as the systems grid: S=7, M=6,
+  /// L=5 and XL=4. An unknown value falls back to M.
+  static int getDiscoveryCrossAxisCountFromSize(String size) =>
+      getSystemsCrossAxisCountFromSize(size);
+
   /// Obtener el crossAxisCount para el grid de Apps de Android
   /// 10 para pantallas grandes, menos para pequeñas
   static int getAndroidAppsCrossAxisCount(BuildContext context) {

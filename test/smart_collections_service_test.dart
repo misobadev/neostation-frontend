@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
+
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:flutter/widgets.dart';
 import 'package:neostation/models/collection_model.dart';
@@ -154,80 +155,74 @@ void main() {
     },
   );
 
-  test(
-    'editing rules and metadata changes are reflected without recreating collection',
-    () async {
-      final collection = await CollectionsService.createCollection(
-        'RPGs',
-        rules: rules,
-      );
-      final rpgRules = SmartCollectionRules(
-        rules: [
-          SmartRule(
-            field: SmartField.genre,
-            operator: SmartOperator.isEqual,
-            value: 'RPG',
-          ),
-        ],
-      );
-      await CollectionsService.updateRules(collection.id, rpgRules);
-      expect(await SmartCollectionsService.gamesFor(collection.id), isEmpty);
-      await db.execute(
-        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, genre, real_name) VALUES ('snes', 'Chrono.sfc', 'RPG', 'Chrono Trigger')",
-      );
-      expect(
-        (await SmartCollectionsService.preview(rpgRules)).single.realName,
-        'Chrono Trigger',
-      );
-      expect(
-        (await SmartCollectionsService.snapshot()).collections.single.id,
-        collection.id,
-      );
-      expect(
-        (await SmartCollectionsService.snapshot()).collections.single.gameCount,
-        1,
-      );
-    },
-  );
+  test('editing rules and metadata changes are reflected without recreating collection', () async {
+    final collection = await CollectionsService.createCollection(
+      'RPGs',
+      rules: rules,
+    );
+    final rpgRules = SmartCollectionRules(
+      rules: [
+        SmartRule(
+          field: SmartField.genre,
+          operator: SmartOperator.isEqual,
+          value: 'RPG',
+        ),
+      ],
+    );
+    await CollectionsService.updateRules(collection.id, rpgRules);
+    expect(await SmartCollectionsService.gamesFor(collection.id), isEmpty);
+    await db.execute(
+      "INSERT INTO user_screenscraper_metadata (app_system_id, filename, genre, real_name) VALUES ('snes', 'Chrono.sfc', 'RPG', 'Chrono Trigger')",
+    );
+    expect(
+      (await SmartCollectionsService.preview(rpgRules)).single.realName,
+      'Chrono Trigger',
+    );
+    expect(
+      (await SmartCollectionsService.snapshot()).collections.single.id,
+      collection.id,
+    );
+    expect(
+      (await SmartCollectionsService.snapshot()).collections.single.gameCount,
+      1,
+    );
+  });
 
-  test(
-    'manual collections remain independent and invalid smart definitions fail closed',
-    () async {
-      final manual = await CollectionsService.createCollection('Handpicked');
-      await CollectionsService.addGame(manual.id, game);
-      final smart = await CollectionsService.createCollection(
-        'Smart',
-        rules: rules,
-      );
-      await db.execute(
-        'UPDATE user_collections SET rules_json = ? WHERE id = ?',
-        ['{bad', smart.id],
-      );
-      final snapshot = await SmartCollectionsService.snapshot();
-      expect(
-        snapshot.collections.firstWhere((c) => c.id == smart.id).rulesInvalid,
-        isTrue,
-      );
-      expect(
-        snapshot.collections.firstWhere((c) => c.id == smart.id).gameCount,
-        0,
-      );
-      expect(await SmartCollectionsService.gamesFor(smart.id), isEmpty);
-      expect(await CollectionsService.collectionIdsFor(game), {manual.id});
-      final before = (await db.rawQuery(
+  test('manual collections remain independent and invalid smart definitions fail closed', () async {
+    final manual = await CollectionsService.createCollection('Handpicked');
+    await CollectionsService.addGame(manual.id, game);
+    final smart = await CollectionsService.createCollection(
+      'Smart',
+      rules: rules,
+    );
+    await db.execute(
+      'UPDATE user_collections SET rules_json = ? WHERE id = ?',
+      ['{bad', smart.id],
+    );
+    final snapshot = await SmartCollectionsService.snapshot();
+    expect(
+      snapshot.collections.firstWhere((c) => c.id == smart.id).rulesInvalid,
+      isTrue,
+    );
+    expect(
+      snapshot.collections.firstWhere((c) => c.id == smart.id).gameCount,
+      0,
+    );
+    expect(await SmartCollectionsService.gamesFor(smart.id), isEmpty);
+    expect(await CollectionsService.collectionIdsFor(game), {manual.id});
+    final before = (await db.rawQuery(
+      'SELECT rules_json FROM user_collections WHERE id = ?',
+      [smart.id],
+    )).single;
+    await CollectionsService.renameCollection(smart.id, 'Renamed');
+    expect(
+      (await db.rawQuery(
         'SELECT rules_json FROM user_collections WHERE id = ?',
         [smart.id],
-      )).single;
-      await CollectionsService.renameCollection(smart.id, 'Renamed');
-      expect(
-        (await db.rawQuery(
-          'SELECT rules_json FROM user_collections WHERE id = ?',
-          [smart.id],
-        )).single,
-        before,
-      );
-    },
-  );
+      )).single,
+      before,
+    );
+  });
 
   test(
     'provider re-reads persisted state on resume and updates badges',
@@ -266,40 +261,31 @@ void main() {
       expect(provider.isInAnyCollection(romPath), isTrue);
     },
   );
-  test(
-    'rule library reflects metadata and history writes; unrelated tables keep the revision',
-    () async {
-      final revision = await GameRepository.smartLibraryRevision();
-      await db.execute('CREATE TABLE unrelated_settings (value TEXT)');
-      await db.execute("INSERT INTO unrelated_settings VALUES ('setting')");
-      expect(await GameRepository.smartLibraryRevision(), revision);
-      await db.execute(
-        "UPDATE user_roms SET play_time = 120 WHERE rom_path = ?",
-        [romPath],
-      );
-      expect(await GameRepository.smartLibraryRevision(), isNot(revision));
-      expect(
-        (await SmartCollectionsService.library()).games.single.playTime,
-        120,
-      );
-      await db.execute(
-        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, genre) VALUES ('snes', 'Chrono.sfc', 'RPG')",
-      );
-      expect(
-        (await SmartCollectionsService.library()).games.single.genre,
-        'RPG',
-      );
-      // Naming settings decide the displayed title a rule matches.
-      final beforeSettings = await GameRepository.smartLibraryRevision();
-      await db.execute(
-        "INSERT INTO user_system_settings (app_system_id, prefer_file_name) VALUES ('snes', 1)",
-      );
-      expect(
-        await GameRepository.smartLibraryRevision(),
-        isNot(beforeSettings),
-      );
-    },
-  );
+  test('rule library reflects metadata and history writes; unrelated tables keep the revision', () async {
+    final revision = await GameRepository.smartLibraryRevision();
+    await db.execute('CREATE TABLE unrelated_settings (value TEXT)');
+    await db.execute("INSERT INTO unrelated_settings VALUES ('setting')");
+    expect(await GameRepository.smartLibraryRevision(), revision);
+    await db.execute(
+      "UPDATE user_roms SET play_time = 120 WHERE rom_path = ?",
+      [romPath],
+    );
+    expect(await GameRepository.smartLibraryRevision(), isNot(revision));
+    expect(
+      (await SmartCollectionsService.library()).games.single.playTime,
+      120,
+    );
+    await db.execute(
+      "INSERT INTO user_screenscraper_metadata (app_system_id, filename, genre) VALUES ('snes', 'Chrono.sfc', 'RPG')",
+    );
+    expect((await SmartCollectionsService.library()).games.single.genre, 'RPG');
+    // Naming settings decide the displayed title a rule matches.
+    final beforeSettings = await GameRepository.smartLibraryRevision();
+    await db.execute(
+      "INSERT INTO user_system_settings (app_system_id, prefer_file_name) VALUES ('snes', 1)",
+    );
+    expect(await GameRepository.smartLibraryRevision(), isNot(beforeSettings));
+  });
 
   test('smart collections sort by the displayed name', () async {
     // Scraped titles sort Alpha < Zulu; the filenames sort the other way.
@@ -468,25 +454,22 @@ void main() {
       expect(provider.byId('new'), isNotNull);
     },
   );
-  test(
-    'member metadata changes refresh an open collection without membership changes',
-    () async {
-      final collection = await CollectionsService.createCollection(
-        'Smart',
-        rules: rules,
-      );
-      final provider = CollectionsProvider();
-      addTearDown(provider.dispose);
-      await provider.load();
-      final revision = provider.collectionRevision(collection.id);
-      await db.execute(
-        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, real_name) VALUES ('snes', 'Chrono.sfc', 'New title')",
-      );
-      await provider.load();
-      expect(provider.byId(collection.id)!.gameCount, 1);
-      expect(provider.collectionRevision(collection.id), greaterThan(revision));
-    },
-  );
+  test('member metadata changes refresh an open collection without membership changes', () async {
+    final collection = await CollectionsService.createCollection(
+      'Smart',
+      rules: rules,
+    );
+    final provider = CollectionsProvider();
+    addTearDown(provider.dispose);
+    await provider.load();
+    final revision = provider.collectionRevision(collection.id);
+    await db.execute(
+      "INSERT INTO user_screenscraper_metadata (app_system_id, filename, real_name) VALUES ('snes', 'Chrono.sfc', 'New title')",
+    );
+    await provider.load();
+    expect(provider.byId(collection.id)!.gameCount, 1);
+    expect(provider.collectionRevision(collection.id), greaterThan(revision));
+  });
   test(
     'another engine connection invalidates the snapshot on its next read',
     () async {

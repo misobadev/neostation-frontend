@@ -15,17 +15,22 @@ import 'package:neostation/services/ra_library_match_runner.dart';
 import 'package:neostation/services/retro_achievements_helper.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+
 import '../widgets/fixed_header.dart';
 import 'systems_screen/system_content.dart';
+import 'search_screen/search_screen.dart';
 import 'systems_screen/my_systems_section/initial_setup_widget.dart';
+import 'discovery_screen/discovery_content.dart';
 import 'retro_achievements_screen/ra_content.dart';
 import 'settings_screen/new_settings_screen.dart';
 import 'saves_screen/saves_tab.dart';
 import 'romm_screen/romm_tab.dart';
 import 'game_screen/android_apps/android_apps_grid.dart';
+
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/repositories/emulator_repository.dart';
+
 import 'dart:async';
 import 'dart:io';
 
@@ -48,14 +53,19 @@ class AppScreen extends StatefulWidget {
 /// delegation logic below is written against these names rather than literals.
 abstract final class AppTabs {
   static const int systems = 0;
-  static const int sync = 1;
-  static const int achievements = 2;
-  static const int romm = 3;
-  static const int settings = 4;
-  static const int androidApps = 5;
+
+  /// Second in the strip, beside Systems: it is a way into the library rather
+  /// than a tool, so it belongs with the browsing tabs and not after Settings.
+  static const int discovery = 1;
+
+  static const int sync = 2;
+  static const int achievements = 3;
+  static const int romm = 4;
+  static const int settings = 5;
+  static const int androidApps = 6;
 
   /// Total number of tabs, used for wrap-around when cycling with the bumpers.
-  static const int count = 6;
+  static const int count = 7;
 }
 
 /// Bridge class providing static access to the main application navigation state.
@@ -97,6 +107,9 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
 
   /// Internal state tracker for system selection within the System tab.
   int _selectedSystemIndex = 0;
+
+  /// Guards the header's touch Search control against a double push.
+  bool _searchOpen = false;
 
   /// Input orchestration layer for gamepad and keyboard support.
   late GamepadNavigation _gamepadNav;
@@ -210,6 +223,10 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
     }
 
     unawaited(_fixRetroarchAndroidDefault());
+
+    // Updates downloaded by an earlier run are no longer needed. Awaited, so
+    // it can't remove a download the update below starts.
+    await UpdateService.cleanUpDownloads();
 
     // App update check (network) — runs alongside the scan, no longer blocking it.
     if (configProvider.config.autoUpdateApp) {
@@ -572,9 +589,8 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
 
       // The same label as the header's tab strip, translated here: the
       // second engine reads the language only when it starts.
-      final tabName = navTabSpec(
-        NavTab.values[index],
-      ).labelKey.getString(context);
+      final tabName = navTabSpec(NavTab.values[index]).labelKey
+          .getString(context);
 
       secondaryState.updateState(
         systemName: tabName,
@@ -673,6 +689,9 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
                       ? FixedHeader(
                           selectedTabIndex: _selectedTabIndex,
                           onTabSelected: _onTabSelected,
+                          onSearch: _selectedTabIndex == AppTabs.systems
+                              ? () => unawaited(_openSearchFromHeader())
+                              : null,
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -695,6 +714,16 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
         );
       },
     );
+  }
+
+  Future<void> _openSearchFromHeader() async {
+    if (_searchOpen) return;
+    _searchOpen = true;
+    try {
+      await openSearch(context);
+    } finally {
+      _searchOpen = false;
+    }
   }
 
   Widget _buildFooterForCurrentTab() {
@@ -736,12 +765,12 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _gamepadNav.deactivate();
         });
-        return AndroidAppsGrid(
-          system: androidSystem,
-          embedded: true,
-          onPreviousTab: AppNavigation.previousTab,
-          onNextTab: AppNavigation.nextTab,
-        );
+        return AndroidAppsGrid(system: androidSystem, embedded: true);
+      case AppTabs.discovery:
+        // Discovery hosts the systems grid, which pushes its own gamepad layer
+        // on top of this one. Adding a deactivate callback here would leave two
+        // navigators competing for the same presses (#255).
+        return DiscoveryContent();
       default:
         return SystemContent(
           selectedIndex: _selectedSystemIndex,
