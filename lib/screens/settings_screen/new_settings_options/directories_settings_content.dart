@@ -26,6 +26,7 @@ import 'package:neostation/widgets/tv_directory_picker.dart';
 import 'package:neostation/widgets/user_data_move_progress_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:neostation/utils/user_data_folder_choice.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/user_data_move_busy.dart';
 import 'package:neostation/utils/user_data_move_failure_message.dart';
@@ -663,20 +664,14 @@ class DirectoriesSettingsContentState
         if (isTV) {
           selected = await TvDirectoryPicker.show(context);
         } else {
-          // Regular Android: SAF picker → resolve to accessible path.
-          // On Android 15+, SD card volumes require app-specific external
-          // storage dirs; resolveAndroidUserDataPath handles this automatically.
+          // Regular Android: the system picker. The folder picked is the one
+          // tried: whether NeoStation can write it is found out below, never
+          // assumed from the permission.
           try {
             final uri = await PermissionService.requestFolderAccess();
             if (uri != null) {
               final uriStr = uri.toString();
-              final hasFiles = await PermissionService.hasAllFilesAccess();
-              selected =
-                  await UserDataLocationService.resolveAndroidUserDataPath(
-                    uriStr,
-                    hasAllFilesAccess: hasFiles,
-                  ) ??
-                  UserDataLocationService.safUriToRealPath(uriStr);
+              selected = UserDataLocationService.safUriToRealPath(uriStr);
               unusable = selected == null;
             }
           } on PlatformException catch (e) {
@@ -709,23 +704,41 @@ class DirectoriesSettingsContentState
       }
 
       final current = _currentUserDataPath;
-      if (current == null || selected == current) return;
+      if (current == null) return;
 
       // Tried before the move is offered: a folder NeoStation can't write
       // was otherwise only found out once the move had been confirmed and
-      // its progress shown.
-      if (!await UserDataLocationService.canUseAsUserDataFolder(selected)) {
-        final suggestAllFilesAccess = await _shouldSuggestAllFilesAccess();
-        if (!mounted) return;
-        AppNotification.showNotification(
-          context,
-          userDataFolderNotWritableMessage(
-            (key) => key.getString(context),
-            suggestAllFilesAccess: suggestAllFilesAccess,
-          ),
-          type: NotificationType.error,
-        );
-        return;
+      // its progress shown. On an SD card, NeoStation's own folder there is
+      // offered instead of a folder it can't write, and the dialogue says
+      // so; nothing else is ever swapped for the folder picked.
+      String? notice;
+      switch (await chooseUserDataFolder(
+        picked: selected,
+        current: current,
+        canUse: UserDataLocationService.canUseAsUserDataFolder,
+        appDirs: UserDataLocationService.appStorageFolders,
+      )) {
+        case SameUserDataFolder():
+          return;
+        case PickedUserDataFolder(:final path):
+          selected = path;
+        case CardUserDataFolder(:final path):
+          _log.i('User data: $selected can\'t be written; offering $path');
+          selected = path;
+          if (!mounted) return;
+          notice = AppLocale.userDataMoveToCardAppFolder.getString(context);
+        case UnwritableUserDataFolder():
+          final suggestAllFilesAccess = await _shouldSuggestAllFilesAccess();
+          if (!mounted) return;
+          AppNotification.showNotification(
+            context,
+            userDataFolderNotWritableMessage(
+              (key) => key.getString(context),
+              suggestAllFilesAccess: suggestAllFilesAccess,
+            ),
+            type: NotificationType.error,
+          );
+          return;
       }
       if (!mounted) return;
 
@@ -741,6 +754,7 @@ class DirectoriesSettingsContentState
         fromPath: current,
         toPath: selected,
         destItemCount: entryCount,
+        notice: notice,
       );
       if (!proceed || !mounted) return;
       // Something may have started while the picker and dialogue were open.

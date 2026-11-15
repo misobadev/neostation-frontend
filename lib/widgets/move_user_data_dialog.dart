@@ -21,11 +21,16 @@ class MoveUserDataDialog extends StatefulWidget {
   final String toPath;
   final int destItemCount;
 
+  /// Shown first in the body when the destination isn't the folder the user
+  /// picked, saying why.
+  final String? notice;
+
   const MoveUserDataDialog({
     super.key,
     required this.fromPath,
     required this.toPath,
     required this.destItemCount,
+    this.notice,
   });
 
   static Future<bool> show(
@@ -33,6 +38,7 @@ class MoveUserDataDialog extends StatefulWidget {
     required String fromPath,
     required String toPath,
     required int destItemCount,
+    String? notice,
   }) async {
     final result = await showDialog<bool>(
       context: context,
@@ -41,6 +47,7 @@ class MoveUserDataDialog extends StatefulWidget {
         fromPath: fromPath,
         toPath: toPath,
         destItemCount: destItemCount,
+        notice: notice,
       ),
     );
     return result ?? false;
@@ -199,6 +206,17 @@ class _MoveUserDataDialogState extends State<MoveUserDataDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // First, so it is on screen without scrolling: the
+                        // destination isn't the folder picked.
+                        if (widget.notice case final notice?) ...[
+                          Text(
+                            notice,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.tertiary,
+                            ),
+                          ),
+                          SizedBox(height: 10.r),
+                        ],
                         Text(
                           AppLocale.moveUserDataBody.getString(context),
                           style: theme.textTheme.bodyMedium?.copyWith(

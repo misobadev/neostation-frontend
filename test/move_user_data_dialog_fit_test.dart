@@ -95,6 +95,7 @@ void main() {
     String to = sdCardPath,
     int destItemCount = 5,
     double textScale = 1,
+    String? notice,
   }) async {
     tester.view.physicalSize = window;
     tester.view.devicePixelRatio = 1;
@@ -139,6 +140,7 @@ void main() {
       fromPath: from,
       toPath: to,
       destItemCount: destItemCount,
+      notice: notice,
     );
     await tester.pumpAndSettle();
     return result;
@@ -274,6 +276,48 @@ void main() {
       expect(await result, isTrue);
     });
   }
+
+  // NEO-240: a folder other than the one picked is never offered silently.
+  testWidgets('a notice says why the folder isn\'t the one picked, and the '
+      'buttons still fit on the Thor', (tester) async {
+    final notice = en(AppLocale.userDataMoveToCardAppFolder);
+    final result = await showMove(
+      tester,
+      const Size(832, 468),
+      notice: notice,
+      textScale: 1.15,
+    );
+
+    expect(find.text(notice), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    // On screen as the dialogue opens, before any scrolling: A confirms
+    // straight away.
+    expect(bodyScroll(tester).pixels, 0);
+    final viewport = tester.getRect(
+      find.descendant(
+        of: find.byType(MoveUserDataDialog),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    final text = tester.getRect(find.text(notice));
+    expect(
+      viewport.contains(text.topLeft),
+      isTrue,
+      reason: '$text in $viewport',
+    );
+    expect(
+      viewport.contains(text.bottomRight - const Offset(1, 1)),
+      isTrue,
+      reason: '$text in $viewport',
+    );
+    await tapButton(tester, en(AppLocale.moveUserDataConfirm));
+    expect(await result, isTrue);
+  });
+
+  testWidgets('without a notice there is none', (tester) async {
+    await showMove(tester, const Size(1280, 720));
+    expect(find.text(en(AppLocale.userDataMoveToCardAppFolder)), findsNothing);
+  });
 
   testWidgets('a dialogue that fits does not scroll', (tester) async {
     await showMove(tester, const Size(1280, 720));
