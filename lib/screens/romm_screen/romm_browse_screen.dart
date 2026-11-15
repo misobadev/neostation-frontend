@@ -681,6 +681,8 @@ class _RommBrowseScreenState extends State<RommBrowseScreen> {
         return AppLocale.rommNoSystemMatch.getString(context);
       case RommDownloadError.noWritableFolder:
         return AppLocale.rommNoWritableFolder.getString(context);
+      case RommDownloadError.notEnoughSpace:
+        return AppLocale.rommNotEnoughSpace.getString(context);
       case RommDownloadError.extraction:
       case RommDownloadError.network:
       case RommDownloadError.none:

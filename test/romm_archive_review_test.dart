@@ -118,15 +118,15 @@ void main() {
     "an install into the system folder never replaces another game's file",
     () async {
       // A server-chosen name that collides with a file this ROM never
-      // recorded: the other game's file must survive, and the archive is
-      // deleted rather than kept for extracting by hand.
+      // recorded: the other game's file must survive. The archive itself is
+      // sound, so it is kept for extracting by hand.
       final other = File(p.join(dir.path, 'Disc 1.chd'))..writeAsBytesSync([9]);
       final path = zip({
         'Disc 1.chd': [1],
         'Disc 2.chd': [2],
       });
-      expect(
-        await RommArchiveService.prepareGameDownload(
+      await expectLater(
+        RommArchiveService.prepareGameDownload(
           path,
           dir.path,
           'Game',
@@ -135,24 +135,145 @@ void main() {
           reuseExistingDirectory: true,
           playlistName: 'Old.m3u',
         ),
-        isNull,
+        throwsA(isA<RommArchiveRefusedException>()),
       );
       expect(other.readAsBytesSync(), [9]);
       expect(File(p.join(dir.path, 'Disc 2.chd')).existsSync(), isFalse);
-      expect(File(path).existsSync(), isFalse);
+      expect(File(path).existsSync(), isTrue);
     },
   );
 
-  test('an archive with too many entries is refused and deleted', () async {
+  Matcher refused(RommArchiveRefusal reason) => throwsA(
+    isA<RommArchiveRefusedException>().having(
+      (e) => e.reason,
+      'reason',
+      reason,
+    ),
+  );
+
+  test('an archive with too many entries is refused but kept', () async {
+    addTearDown(() => RommArchiveService.debugMaxEntries = null);
+    RommArchiveService.debugMaxEntries = 100;
+    final path = zip({for (var i = 0; i <= 100; i++) 'f$i.iso': []});
+    await expectLater(
+      RommArchiveService.prepareDownload(path, dir.path, {'iso'}),
+      refused(RommArchiveRefusal.unsupported),
+    );
+    expect(File(path).existsSync(), isTrue);
+    expect(File(p.join(dir.path, 'f0.iso')).existsSync(), isFalse);
+  });
+
+  test('an archive larger than the free space is refused but kept', () async {
+    addTearDown(() => RommArchiveService.debugFreeBytes = null);
+    RommArchiveService.debugFreeBytes = 1;
     final path = zip({
-      for (var i = 0; i <= RommArchiveService.maxEntries; i++) 'f$i.iso': [],
+      'Game/Disc 1.chd': [1, 2],
+    });
+    await expectLater(
+      RommArchiveService.prepareDownload(path, dir.path, {'m3u', 'chd'}),
+      refused(RommArchiveRefusal.notEnoughSpace),
+    );
+    expect(File(path).existsSync(), isTrue);
+    expect(Directory(p.join(dir.path, 'Game')).existsSync(), isFalse);
+  });
+
+  test('an entry posing as the install record is unsafe', () async {
+    final path = zip({
+      'Game/Disc 1.chd': [1],
+      'Game/${RommArchiveService.manifestName}': 'Other.sav\n'.codeUnits,
     });
     expect(
-      await RommArchiveService.prepareDownload(path, dir.path, {'iso'}),
+      await RommArchiveService.prepareGameDownload(path, dir.path, 'Game', {
+        'm3u',
+        'chd',
+      }),
       isNull,
     );
     expect(File(path).existsSync(), isFalse);
-    expect(File(p.join(dir.path, 'f0.iso')).existsSync(), isFalse);
+  });
+
+  test('an oversized playlist is not read into memory', () async {
+    final path = zip({
+      'Game/Game.m3u': List.filled(
+        RommArchiveService.maxDescriptorBytes + 1,
+        65,
+      ),
+      'Game/Disc 1.chd': [1],
+    });
+    await expectLater(
+      RommArchiveService.prepareGameDownload(path, dir.path, 'Game', {
+        'm3u',
+        'chd',
+      }),
+      refused(RommArchiveRefusal.unsupported),
+    );
+    expect(File(path).existsSync(), isTrue);
+  });
+
+  group('install steps', () {
+    tearDown(() => RommArchiveService.debugInstallHook = null);
+
+    test(
+      'a backup that cannot be restored is parked beside its place',
+      () async {
+        final gameDir = await Directory(p.join(dir.path, 'Game')).create();
+        File(p.join(gameDir.path, 'Disc 1.chd')).writeAsBytesSync([8]);
+        File(p.join(gameDir.path, 'Disc 2.chd')).writeAsBytesSync([9]);
+        final path = zip({
+          'Game/Disc 1.chd': [1],
+          'Game/Disc 2.chd': [2],
+        });
+        // The install runs in another isolate, so the hook keeps its own
+        // state and the test reads the outcome off the disk.
+        RommArchiveService.debugInstallHook = (step, target) async {
+          if (step != 'rename' || !target.endsWith('Disc 2.chd')) return;
+          // Disc 1 is installed by now. Put a folder where it was, so neither
+          // the rollback's delete nor its restore can work.
+          final victim = p.join(p.dirname(target), 'Disc 1.chd');
+          if (!File(victim).existsSync()) return;
+          File(victim).deleteSync();
+          File(p.join(victim, 'blocker')).createSync(recursive: true);
+          throw StateError('disk went away');
+        };
+        expect(
+          await RommArchiveService.prepareGameDownload(path, dir.path, 'Game', {
+            'm3u',
+            'chd',
+          }),
+          isNull,
+        );
+        expect(
+          File(p.join(gameDir.path, 'Disc 1.chd.romm-backup'))
+              .readAsBytesSync(),
+          [8],
+        );
+        expect(File(p.join(gameDir.path, 'Disc 2.chd')).readAsBytesSync(), [9]);
+        expect(File(path).existsSync(), isTrue);
+      },
+    );
+
+    test("a locked archive doesn't undo a finished install", () async {
+      final path = zip({
+        'Game/Disc 1.chd': [1],
+        'Game/Disc 2.chd': [2],
+      });
+      RommArchiveService.debugInstallHook = (step, _) async {
+        if (step == 'deleteArchive') {
+          throw const FileSystemException('locked by antivirus');
+        }
+      };
+      expect(
+        await RommArchiveService.prepareGameDownload(path, dir.path, 'Game', {
+          'm3u',
+          'chd',
+        }),
+        'Game.m3u',
+      );
+      expect(File(p.join(dir.path, 'Game', 'Disc 2.chd')).readAsBytesSync(), [
+        2,
+      ]);
+      expect(File(path).existsSync(), isTrue);
+    });
   });
 
   test('a game folder that is a link is not installed into', () async {
@@ -163,16 +284,15 @@ void main() {
       'Game/Disc 1.chd': [1],
       'Game/Disc 2.chd': [2],
     });
-    expect(
-      await RommArchiveService.prepareGameDownload(
-        path,
-        systemDir.path,
-        'Game',
-        {'m3u', 'chd'},
-      ),
-      isNull,
+    await expectLater(
+      RommArchiveService.prepareGameDownload(path, systemDir.path, 'Game', {
+        'm3u',
+        'chd',
+      }),
+      refused(RommArchiveRefusal.conflict),
     );
     expect(elsewhere.listSync(), isEmpty);
+    expect(File(path).existsSync(), isTrue);
   });
 
   test(
@@ -564,7 +684,12 @@ void main() {
         final gameDir = Directory(p.join(systemDir.path, 'Game'));
         expect(
           gameDir.listSync().map((entry) => p.basename(entry.path)).toSet(),
-          {'Game.m3u', 'Disc 1.chd', 'Disc 2.chd'},
+          {
+            'Game.m3u',
+            'Disc 1.chd',
+            'Disc 2.chd',
+            RommArchiveService.manifestName,
+          },
         );
       },
     );
@@ -757,7 +882,7 @@ void main() {
         expect(result.status, RommDownloadStatus.completed);
         expect(
           target.listSync().map((entry) => p.basename(entry.path)).toSet(),
-          {'Game.scummvm', 'LOOM.000'},
+          {'Game.scummvm', 'LOOM.000', RommArchiveService.manifestName},
         );
         expect(Directory(p.join(target.path, 'loom')).existsSync(), isFalse);
       },
@@ -781,5 +906,140 @@ void main() {
         expect(copy?.filename, 'Custom.m3u');
       },
     );
+
+    test('a deleted game downloads again over the discs it left', () async {
+      // Deleting a game removes its playlist; the discs and the user's own
+      // memory card stay in its folder. Older download rows name files that
+      // are gone.
+      final gameDir = await Directory(p.join(dir.path, 'psx', 'Game'))
+          .create(recursive: true);
+      File(p.join(gameDir.path, 'Disc 1.chd')).writeAsBytesSync([8]);
+      File(p.join(gameDir.path, 'Disc 2.chd')).writeAsBytesSync([9]);
+      final card = File(p.join(gameDir.path, 'Card.mcr'))
+        ..writeAsBytesSync([7]);
+      for (final name in ['Game.zip', 'Game.m3u']) {
+        await RommSaveMapRepository.putMapping(
+          romname: name,
+          systemFolder: 'psx',
+          rommRomId: 42,
+          source: RommLinkSource.download,
+          fsName: 'Game',
+        );
+      }
+      expect(await provider.isDownloaded(rom, [dir.path]), isFalse);
+      serve({
+        'Game/Disc 1.chd': [1],
+        'Game/Disc 2.chd': [2],
+      });
+      final result = await provider.downloadRom(rom, romFolders: [dir.path]);
+      expect(result.status, RommDownloadStatus.completed);
+      expect(File(p.join(gameDir.path, 'Disc 1.chd')).readAsBytesSync(), [1]);
+      expect(card.readAsBytesSync(), [7]);
+      expect(await RommSaveMapRepository.localNamesForRom(42), [
+        (romname: 'Game.m3u', systemFolder: 'psx'),
+      ]);
+      final fresh = _DiscProvider();
+      addTearDown(fresh.dispose);
+      expect(await fresh.isDownloaded(rom, [dir.path]), isTrue);
+    });
+
+    test('a file the earlier install wrote is replaced again', () async {
+      // Not in a format the system launches, so only the install record
+      // says it is this game's.
+      serve({
+        'Game/Disc 1.chd': [1],
+        'Game/Game.cfg': [1],
+      });
+      expect(
+        (await provider.downloadRom(rom, romFolders: [dir.path])).status,
+        RommDownloadStatus.completed,
+      );
+      final gameDir = p.join(dir.path, 'psx', 'Game');
+      File(p.join(gameDir, 'Game.m3u')).deleteSync();
+      serve({
+        'Game/Disc 1.chd': [2],
+        'Game/Game.cfg': [2],
+      });
+      expect(
+        (await provider.downloadRom(rom, romFolders: [dir.path])).status,
+        RommDownloadStatus.completed,
+      );
+      expect(File(p.join(gameDir, 'Game.cfg')).readAsBytesSync(), [2]);
+    });
+
+    test("a user's file in the game folder stops the install", () async {
+      final gameDir = await Directory(p.join(dir.path, 'psx', 'Game'))
+          .create(recursive: true);
+      final notes = File(p.join(gameDir.path, 'notes.txt'))
+        ..writeAsBytesSync([7]);
+      serve({
+        'Game/Disc 1.chd': [1],
+        'Game/notes.txt': [1],
+      });
+      final result = await provider.downloadRom(rom, romFolders: [dir.path]);
+      expect(result.status, RommDownloadStatus.failed);
+      expect(result.error, RommDownloadError.extraction);
+      expect(notes.readAsBytesSync(), [7]);
+      // Sound, so kept: moving the file and extracting by hand still works.
+      expect(File(p.join(dir.path, 'psx', 'Game.zip')).existsSync(), isTrue);
+    });
+
+    test('not enough space keeps the download and says so', () async {
+      addTearDown(() => RommArchiveService.debugFreeBytes = null);
+      RommArchiveService.debugFreeBytes = 0;
+      serve({
+        'Game/Disc 1.chd': [1],
+      });
+      final result = await provider.downloadRom(rom, romFolders: [dir.path]);
+      expect(result.status, RommDownloadStatus.failed);
+      expect(result.error, RommDownloadError.notEnoughSpace);
+      expect(
+        Directory(p.join(dir.path, 'psx'))
+            .listSync()
+            .map((entry) => p.basename(entry.path))
+            .toSet(),
+        {'Game.zip'},
+      );
+    });
+
+    test("a playlist line that isn't a sibling disc is not replaced", () async {
+      final systemDir = await Directory(p.join(dir.path, 'psx')).create();
+      File(p.join(systemDir.path, 'Custom.m3u'))
+          .writeAsStringSync('Disc 1.chd\nCard.mcr\n');
+      final card = File(p.join(systemDir.path, 'Card.mcr'))
+        ..writeAsBytesSync([7]);
+      await RommSaveMapRepository.putMapping(
+        romname: 'Custom.m3u',
+        systemFolder: 'psx',
+        rommRomId: 42,
+        source: RommLinkSource.download,
+        fsName: 'Game',
+      );
+      serve({
+        'Disc 1.chd': [1],
+        'Card.mcr': [1],
+      });
+      final result = await provider.downloadRom(rom, romFolders: [dir.path]);
+      expect(result.status, RommDownloadStatus.failed);
+      expect(card.readAsBytesSync(), [7]);
+    });
+
+    test('a nested bundle copy is served from the cache', () async {
+      File(p.join(dir.path, 'psx', 'Game', 'Discs', 'Custom.m3u'))
+          .createSync(recursive: true);
+      await RommSaveMapRepository.putMapping(
+        romname: 'Custom.m3u',
+        systemFolder: 'psx',
+        rommRomId: 42,
+        source: RommLinkSource.download,
+        fsName: 'Game',
+      );
+      final first = await provider.findLocalCopy(rom, [dir.path]);
+      expect(first, isNotNull);
+      // Without the row a fresh probe can't find the file, so only the
+      // cache can answer.
+      await RommSaveMapRepository.removeMapping('Custom.m3u', 'psx');
+      expect(await provider.findLocalCopy(rom, [dir.path]), same(first));
+    });
   });
 }

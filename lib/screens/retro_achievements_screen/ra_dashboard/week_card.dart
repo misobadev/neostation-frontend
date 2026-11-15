@@ -74,10 +74,35 @@ extension _WeekCard on RADashboardHubState {
       rommProvider.cancelDownload(rom.id);
       return;
     }
+    final romFolders = context.read<SqliteConfigProvider>().config.romFolders;
+    final fileProvider = context.read<FileProvider>();
+    // A copy already on disk (copied by hand, or from before RomM) is linked,
+    // as the browse screen does, instead of downloaded again over the top.
+    final copy = await rommProvider.findLocalCopy(rom, romFolders);
+    if (!mounted) return;
+    if (copy != null) {
+      final linked = await rommProvider.linkLocalCopy(rom, copy);
+      if (!mounted) return;
+      AppNotification.showNotification(
+        context,
+        switch (linked) {
+          RommMappingWriteResult.written => AppLocale.rommLinked,
+          RommMappingWriteResult.kept => AppLocale.rommDownloaded,
+          RommMappingWriteResult.failed => AppLocale.rommLinkFailed,
+        }.getString(context),
+        type: linked == RommMappingWriteResult.failed
+            ? NotificationType.error
+            : NotificationType.info,
+      );
+      if (linked == RommMappingWriteResult.written) {
+        await rommProvider.importMetadataIfMissing(rom, copy, fileProvider);
+      }
+      return;
+    }
     final result = await rommProvider.downloadRom(
       rom,
-      romFolders: context.read<SqliteConfigProvider>().config.romFolders,
-      fileProvider: context.read<FileProvider>(),
+      romFolders: romFolders,
+      fileProvider: fileProvider,
     );
     if (!mounted) return;
     rebuild(() => _weekDownload = result);
@@ -124,6 +149,8 @@ extension _WeekCard on RADashboardHubState {
         return AppLocale.rommNoSystemMatch.getString(context);
       case RommDownloadError.noWritableFolder:
         return AppLocale.rommNoWritableFolder.getString(context);
+      case RommDownloadError.notEnoughSpace:
+        return AppLocale.rommNotEnoughSpace.getString(context);
       case RommDownloadError.extraction:
       case RommDownloadError.network:
       case RommDownloadError.none:

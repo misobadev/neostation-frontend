@@ -413,6 +413,10 @@ class RommSaveMapRepository {
         columns: ['romname'],
         where: 'romm_rom_id = ? AND system_folder = ?',
         whereArgs: [rommRomId, systemFolder],
+        // The newest row wins: a ROM re-downloaded into a new layout leaves
+        // its old row behind until [removeOtherDownloadRows] runs, and
+        // without an order SQLite may keep answering with the stale one.
+        orderBy: 'updated_at DESC, rowid DESC',
         limit: 1,
       );
       if (rows.isEmpty) return null;
@@ -421,6 +425,37 @@ class RommSaveMapRepository {
     } catch (e) {
       _log.e('Error reading RomM rom map for id $rommRomId: $e');
       return null;
+    }
+  }
+
+  /// Drops the `download` rows [rommRomId] has in [systemFolder] other than
+  /// [keep], after a download installed it under [keep].
+  ///
+  /// A row naming a file the new install replaced or moved (an extensionless
+  /// raw download, a root playlist) would otherwise keep pointing the badge
+  /// and the stale-raw check at a file that is gone. Manual and auto rows are
+  /// left alone: they describe links the user or the link pass made.
+  static Future<void> removeOtherDownloadRows(
+    int rommRomId,
+    String systemFolder, {
+    required String keep,
+  }) async {
+    try {
+      final db = await SqliteService.getDatabase();
+      await db.delete(
+        'app_romm_rom_map',
+        where:
+            'romm_rom_id = ? AND system_folder = ? AND romname != ? '
+            'AND link_source = ?',
+        whereArgs: [
+          rommRomId,
+          systemFolder,
+          keep,
+          RommLinkSource.download.dbValue,
+        ],
+      );
+    } catch (e) {
+      _log.e('Error pruning RomM rom map rows for id $rommRomId: $e');
     }
   }
 

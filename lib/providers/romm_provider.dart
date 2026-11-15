@@ -53,6 +53,10 @@ enum RommDownloadError {
   noWritableFolder,
   network,
   extraction,
+
+  /// The archive's contents don't fit in the free space. The download is
+  /// kept, so freeing space and retrying doesn't need it fetched again.
+  notEnoughSpace,
 }
 
 /// Tracks an in-flight or finished download for a single ROM.
@@ -1948,9 +1952,11 @@ class RommProvider extends ChangeNotifier {
           romFolders: romFolders,
           fileProvider: fileProvider,
         ).catchError((Object e, StackTrace st) {
-          // Anything that escaped the steps below (an unwritable ROM folder,
-          // a revoked "All files access") must still end the download, or the
-          // tracker stays "downloading" until the app restarts.
+          // Anything that escaped the steps below must still end the
+          // download, or the tracker stays "downloading" until the app
+          // restarts. A file-system error there is the ROM folder (unwritable,
+          // or "All files access" revoked); anything else is a bug, reported
+          // as a failed install rather than blamed on the folder.
           _log.e(
             'RomM: download of rom ${rom.id} (${oneLine(rom.fsName)}) failed',
             error: e,
@@ -1958,7 +1964,9 @@ class RommProvider extends ChangeNotifier {
           );
           tracker
             ..status = RommDownloadStatus.failed
-            ..error = RommDownloadError.noWritableFolder
+            ..error = e is FileSystemException
+                ? RommDownloadError.noWritableFolder
+                : RommDownloadError.extraction
             ..errorDetail = oneLine('$e');
           _notifyDownloadState();
           return tracker;
@@ -2087,7 +2095,10 @@ class RommProvider extends ChangeNotifier {
         p.join(destDir, recordedName),
       if (existing != null &&
           p.extension(existing.filename).toLowerCase() == '.m3u')
-        ...await _playlistEntries(existing.path),
+        ...await _playlistEntries(
+          existing.path,
+          _normalizeExtensions(extensions),
+        ),
     };
     // Downloads never overwrite library files before extraction is verified.
     // The folder is named per ROM so a retry after a crash replaces the
@@ -2199,12 +2210,27 @@ class RommProvider extends ChangeNotifier {
         final target = p.join(destDir, indexedName);
         if (await File(target).exists() &&
             !replaceable.any((path) => p.equals(path, target))) {
-          throw const RommUnsafeArchiveException(
-            'it would replace a file that belongs to another game',
+          throw const RommArchiveRefusedException(
+            RommArchiveRefusal.conflict,
+            "it would replace a file that isn't this game's",
           );
         }
         await File(destPath).rename(target);
       }
+    } on RommArchiveRefusedException catch (e) {
+      // Not installed for a reason the user can fix (space, a file in the
+      // way) or that isn't supported. The download is kept either way, so a
+      // retry after freeing space doesn't download it again.
+      _log.w('RomM: did not install rom ${rom.id} ($logName): ${e.message}');
+      await _keepFailedDownload(destPath, destDir, staleRaw, staleBackup);
+      tracker
+        ..status = RommDownloadStatus.failed
+        ..error = e.reason == RommArchiveRefusal.notEnoughSpace
+            ? RommDownloadError.notEnoughSpace
+            : RommDownloadError.extraction
+        ..errorDetail = 'Not installed: ${e.message}';
+      _notifyDownloadState();
+      return tracker;
     } catch (e) {
       _log.e('RomM: installing rom ${rom.id} ($logName) failed', error: e);
       await _keepFailedDownload(destPath, destDir, staleRaw, staleBackup);
@@ -2258,7 +2284,14 @@ class RommProvider extends ChangeNotifier {
     );
     switch (linked) {
       case RommMappingWriteResult.written:
-        break;
+        // A re-download can land under another name (a playlist where the
+        // raw archive used to be). Older download rows for this ROM would
+        // otherwise still name the old file for the badge and save sync.
+        await RommSaveMapRepository.removeOtherDownloadRows(
+          rom.id,
+          system.folderName,
+          keep: indexedName,
+        );
       case RommMappingWriteResult.kept:
         _log.i(
           'RomM: ${system.folderName}/$indexedName keeps its manual link; '
@@ -2449,21 +2482,34 @@ class RommProvider extends ChangeNotifier {
   /// Mapping rows per transaction in [_writeBulkLinks].
   static const int _linkWriteChunk = 200;
 
-  /// The files the playlist at [path] lists, resolved against its folder.
-  /// Absolute and escaping lines are left out: they are not this game's to
-  /// replace.
-  static Future<List<String>> _playlistEntries(String path) async {
+  /// The discs the playlist at [path] lists, resolved against its folder.
+  /// Only bare names next to the playlist, in a format the system launches,
+  /// count: a line naming another folder, or a file like a save, is not this
+  /// game's to replace. An oversized file is not a playlist and lists nothing.
+  static Future<List<String>> _playlistEntries(
+    String path,
+    Set<String> extensions,
+  ) async {
     try {
+      final file = File(path);
+      if (await file.length() > RommArchiveService.maxDescriptorBytes) {
+        return const [];
+      }
       final dir = p.dirname(path);
       return [
-        for (final raw in await File(path).readAsLines())
-          if (raw.trim().isNotEmpty && !raw.trim().startsWith('#'))
-            safeJoin(dir, raw.trim()),
-      ].whereType<String>().toList();
+        for (final raw in await file.readAsLines())
+          if (_isBareSibling(raw.trim(), extensions)) p.join(dir, raw.trim()),
+      ];
     } catch (_) {
       return const [];
     }
   }
+
+  static bool _isBareSibling(String line, Set<String> extensions) =>
+      line.isNotEmpty &&
+      !line.startsWith('#') &&
+      isSafeFileName(line) &&
+      extensions.contains(_extensionOf(line));
 
   /// After a failed install, keeps the downloaded archive in the ROM folder
   /// (so a multi-GB download is not lost and can be extracted by hand) and

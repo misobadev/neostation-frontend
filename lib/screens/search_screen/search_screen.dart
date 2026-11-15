@@ -1160,6 +1160,7 @@ class _SearchScreenState extends State<SearchScreen> {
         switch (result.error) {
           RommDownloadError.noSystemMatch => AppLocale.rommNoSystemMatch,
           RommDownloadError.noWritableFolder => AppLocale.rommNoWritableFolder,
+          RommDownloadError.notEnoughSpace => AppLocale.rommNotEnoughSpace,
           _ => AppLocale.rommDownloadFailed,
         }.getString(context),
         NotificationType.error,

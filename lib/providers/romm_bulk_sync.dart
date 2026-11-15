@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 
 import '../models/romm_rom.dart';
 import '../models/romm_rom_page.dart';
@@ -677,7 +678,10 @@ class RommBulkSync extends ChangeNotifier {
     if (rom.isMultiFile) return true;
     final ext = rom.fsExtension.toLowerCase().replaceFirst('.', '');
     final name = rom.fsName.toLowerCase();
-    return ext == 'zip' ||
+    // No extension at all: the download is sniffed, and may turn out to be
+    // a ZIP or 7z that is unpacked (see ensureArchiveExtension).
+    return ext.isEmpty && p.extension(name).isEmpty ||
+        ext == 'zip' ||
         ext == '7z' ||
         name.endsWith('.zip') ||
         name.endsWith('.7z');

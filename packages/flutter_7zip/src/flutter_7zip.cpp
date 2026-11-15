@@ -7,6 +7,10 @@
 #include <algorithm>
 #include <string>
 #ifdef _WIN32
+// Keeps windows.h from defining min/max macros, which break std::min/max.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #endif
 
@@ -90,9 +94,19 @@ public:
   /// Decodes [index] into the cached folder buffer. On success the file's
   /// bytes are outBuffer[offset, offset + size).
   SRes extract(const uint32_t index, size_t* offset, size_t* size) const {
-    return SzArEx_Extract(&db, const_cast<ILookInStreamPtr>(&lookStream.vt), index, &blockIndex,
-                          &outBuffer, &outBufferSize, offset, size, const_cast<ISzAllocPtr>(&allocImp),
-                          const_cast<ISzAllocPtr>(&allocTempImp));
+    const SRes res = SzArEx_Extract(&db, const_cast<ILookInStreamPtr>(&lookStream.vt), index,
+                                    &blockIndex, &outBuffer, &outBufferSize, offset, size,
+                                    const_cast<ISzAllocPtr>(&allocImp),
+                                    const_cast<ISzAllocPtr>(&allocTempImp));
+    if (res != SZ_OK) {
+      // A failed decode can leave the cache claiming a block it never
+      // finished; the next file of that block would read the partial buffer.
+      _FreeImp(&allocImp, outBuffer);
+      outBuffer = nullptr;
+      outBufferSize = 0;
+      blockIndex = 0xFFFFFFFF;
+    }
+    return res;
   }
 
   uint32_t numFiles() const {

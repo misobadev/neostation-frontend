@@ -1288,6 +1288,18 @@ void _preflightTests() {
         archived(1, 'zip'),
         archived(2, '7z'),
         _rom(3, sizeBytes: 100),
+        // #788: a folder ROM RomM serves as a ZIP, but which it reports with
+        // no extension and has_multiple_files false.
+        RommRom(
+          id: 4,
+          name: 'Game 4',
+          platformId: 1,
+          platformSlug: 'ps2',
+          fsName: 'Game 4',
+          fsNameNoExt: 'Game 4',
+          fsExtension: '',
+          fsSizeBytes: 100,
+        ),
       ];
       RommBulkSyncPlan? seen;
       final sync = RommBulkSync();
@@ -1301,10 +1313,10 @@ void _preflightTests() {
           seen = plan;
           return false;
         },
-        concurrency: 3,
+        concurrency: 4,
       );
 
-      expect(seen!.requiredBytes, 300 + 100 + 100);
+      expect(seen!.requiredBytes, 400 + 100 + 100 + 100);
     });
 
     test('the headroom never exceeds what the queue holds', () async {
