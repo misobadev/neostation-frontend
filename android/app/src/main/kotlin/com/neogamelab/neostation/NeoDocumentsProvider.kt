@@ -238,13 +238,13 @@ class NeoDocumentsProvider : DocumentsProvider() {
         )
         val customPath = prefs.getString("flutter.custom_user_data_path", null)
         val dir = if (!customPath.isNullOrEmpty()) {
-            File(customPath)
+            // A folder set in Settings that is missing was moved, renamed or
+            // deleted, or is on a drive that isn't mounted: never created here,
+            // or NeoStation would open on it, empty, at its next start.
+            File(customPath).takeIf { it.isDirectory } ?: return null
         } else {
             val root = context.getExternalFilesDir(null) ?: return null
-            File(root, "user-data")
-        }
-        if (!dir.exists()) {
-            dir.mkdirs()
+            File(root, "user-data").also { if (!it.exists()) it.mkdirs() }
         }
         return try {
             dir.canonicalFile

@@ -8,6 +8,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/utils/user_data_startup_check.dart';
 
 import '../models/system_model.dart';
 import '../models/config_model.dart';
@@ -52,25 +53,73 @@ class ConfigService {
   static const Duration _androidStorageRetryDelay = Duration(seconds: 3);
   static const int _androidStorageMaxAttempts = 20;
 
+  /// How long a drive's root may take to answer whether it is there: a
+  /// network share that is offline can hold a check for the length of its
+  /// timeout.
+  static const Duration _volumeCheckTimeout = Duration(seconds: 5);
+
+  static UserDataPlatform? _platformForTesting;
+  static Duration? _androidStorageRetryDelayForTesting;
+  static int? _androidStorageMaxAttemptsForTesting;
+  static bool? _removableVolumeForTesting;
+
+  /// Makes [getUserDataPath] treat a missing folder as on [platform] (null:
+  /// the real one), the Android wait pause for [retryDelay] and look
+  /// [maxAttempts] times, and the folder as on a removable volume or not
+  /// ([removable]), so its Android paths can run in a host test.
+  @visibleForTesting
+  static void setUserDataPlatformForTesting(
+    UserDataPlatform? platform, {
+    Duration? retryDelay,
+    int? maxAttempts,
+    bool? removable,
+  }) {
+    _platformForTesting = platform;
+    _androidStorageRetryDelayForTesting = retryDelay;
+    _androidStorageMaxAttemptsForTesting = maxAttempts;
+    _removableVolumeForTesting = removable;
+  }
+
+  static UserDataPlatform get _platform =>
+      _platformForTesting ??
+      (Platform.isAndroid
+          ? UserDataPlatform.android
+          : Platform.isWindows
+          ? UserDataPlatform.windows
+          : Platform.isMacOS
+          ? UserDataPlatform.macos
+          : UserDataPlatform.linux);
+
   /// In-flight Android cold-boot wait, shared by every concurrent caller so the
   /// retry loop runs once instead of once per consumer.
   static Future<String>? _androidStorageWait;
 
-  /// Set when the retry loop has already given up on [_unavailableStoragePath].
-  /// Later callers then fail fast instead of each blocking for another full
-  /// timeout — `getUserDataPath()` has a dozen call sites, and serialising
-  /// their waits used to stall startup for minutes.
-  static bool _androidStorageUnavailable = false;
+  /// Set once the configured folder at [_unavailableStoragePath] is known to
+  /// be unusable: its drive never appeared (after the Android retry loop gave
+  /// up), or the folder itself is missing. Later callers then fail fast
+  /// instead of each blocking for another full timeout —
+  /// `getUserDataPath()` has a dozen call sites, and serialising their waits
+  /// used to stall startup for minutes — and nothing creates the folder.
+  static UserDataProblem? _userDataProblem;
   static String? _unavailableStoragePath;
 
   /// Session-only opt-out: the user explicitly chose to continue with the
-  /// platform default location after the configured volume never appeared.
+  /// platform default location after the configured folder or its drive was
+  /// missing.
   static bool _useDefaultPathFallback = false;
 
-  /// Whether the configured user-data volume was declared unreachable this
+  /// Marks the session that chose [continueWithDefaultUserDataPath], for the
+  /// second screen's engine: a separate isolate in the same process, which
+  /// shares no memory with this one but reads the same preferences.
+  static const String _fallbackSessionKey = 'user_data_fallback_session';
+
+  /// Whether the configured user-data folder was declared unusable this
   /// session. UI may use this to explain the state instead of silently
   /// presenting an empty library.
-  static bool get storageUnavailable => _androidStorageUnavailable;
+  static bool get storageUnavailable => _userDataProblem != null;
+
+  /// Why the configured user-data folder is unusable, if it is.
+  static UserDataProblem? get userDataProblem => _userDataProblem;
 
   /// The configured path that [storageUnavailable] refers to, if any.
   static String? get unavailableStoragePath => _unavailableStoragePath;
@@ -79,24 +128,94 @@ class ConfigService {
   /// from scratch. Call after the configured path changes or when the user
   /// asks to retry.
   static void resetStorageAvailability() {
-    _androidStorageUnavailable = false;
+    _userDataProblem = null;
     _unavailableStoragePath = null;
     _useDefaultPathFallback = false;
   }
 
   /// Abandons the configured custom path for the remainder of this session and
   /// resolves to the platform default instead. This is the user's explicit
-  /// escape hatch from an unmountable volume; it is deliberately not persisted.
-  static void continueWithDefaultUserDataPath() {
+  /// escape hatch from a missing folder or drive. It lasts for this process
+  /// only: the mark it leaves for the second screen names this process, so a
+  /// later start ignores it.
+  static Future<void> continueWithDefaultUserDataPath() async {
     _log.w('User opted to continue with the default user-data path');
-    _androidStorageUnavailable = false;
+    _userDataProblem = null;
     _useDefaultPathFallback = true;
+    // Only Android has a second screen's engine to tell.
+    if (_platform != UserDataPlatform.android) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final session = _sessionId();
+      if (session.isNotEmpty) {
+        await prefs.setString(_fallbackSessionKey, session);
+      }
+    } catch (e) {
+      _log.w('Could not mark the session fallback for the second screen: $e');
+    }
+  }
+
+  /// This process, as told apart from a later one that reuses its id: the
+  /// boot, the process id and the process's start time since that boot.
+  static String _sessionId() {
+    try {
+      final boot = File('/proc/sys/kernel/random/boot_id')
+          .readAsStringSync()
+          .trim();
+      final stat = File('/proc/self/stat').readAsStringSync();
+      // The command name (field 2) is in parentheses and may hold spaces;
+      // the start time is field 22, the 20th after it.
+      final fields = stat.substring(stat.lastIndexOf(')') + 2).split(' ');
+      return '$boot:$pid:${fields[19]}';
+    } catch (e) {
+      // Without them a later process could match: no marker at all.
+      _log.w('No session id for the second screen: $e');
+      return '';
+    }
+  }
+
+  static Future<bool> _fallbackChosenThisSession(
+    SharedPreferences prefs,
+  ) async {
+    if (_platform != UserDataPlatform.android) return false;
+    final session = _sessionId();
+    if (session.isEmpty) return false;
+    try {
+      // Written by the other engine: its cached copy is stale here.
+      await prefs.reload();
+    } catch (_) {
+      // Keep the cached values.
+    }
+    return prefs.getString(_fallbackSessionKey) == session;
+  }
+
+  /// Creates the configured user-data folder that went missing, empty, at the
+  /// user's explicit request, and clears the verdict so it is used. A folder
+  /// that came back meanwhile is left as it is. Refused unless its drive is
+  /// still there: on a drive unplugged or swapped meanwhile it would create
+  /// a lookalike path.
+  static Future<void> createMissingUserDataFolder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final customPath = prefs.getString(_customPathKey);
+    if (customPath == null || customPath.isEmpty) return;
+    final present = await Directory(customPath)
+        .exists()
+        .timeout(_volumeCheckTimeout, onTimeout: () => false);
+    if (!present &&
+        await _missingUserDataProblem(customPath) !=
+            UserDataProblem.folderMissing) {
+      throw StateError('The drive of $customPath is not there');
+    }
+    _log.w('User chose to start with an empty user-data folder: $customPath');
+    await Directory(customPath).create(recursive: true);
+    resetStorageAvailability();
   }
 
   /// Resolves the user-data path once, up front, so the cold-boot wait happens
   /// while a loading UI is visible rather than piecemeal inside later callers.
   ///
-  /// Returns false when the configured volume never became available.
+  /// Returns false when the configured folder can't be used: its drive never
+  /// became available, or the folder is missing ([userDataProblem]).
   static Future<bool> ensureUserDataStorageReady() async {
     try {
       await getUserDataPath();
@@ -109,8 +228,11 @@ class ConfigService {
 
   /// Resolves the absolute path to the user's local data directory.
   ///
-  /// Checks for a user-configured custom path first (stored in SharedPreferences).
-  /// Falls back to the platform default if no custom path is set.
+  /// Checks for a user-configured custom path first (stored in
+  /// SharedPreferences). Falls back to the platform default if no custom path
+  /// is set, or the user chose to continue without it this session. A custom
+  /// folder that is missing is never created here: this throws a [StateError]
+  /// and records why in [userDataProblem].
   static Future<String> getUserDataPath() async {
     final prefs = await SharedPreferences.getInstance();
     final customPath = prefs.getString(_customPathKey);
@@ -118,46 +240,102 @@ class ConfigService {
         customPath.isNotEmpty &&
         !_useDefaultPathFallback) {
       final dir = Directory(customPath);
-      if (await dir.exists()) {
+      // An offline network share can hold this for its whole timeout.
+      if (await dir.exists().timeout(
+        _volumeCheckTimeout,
+        onTimeout: () => false,
+      )) {
         return customPath;
       }
 
-      if (Platform.isAndroid) {
-        // A default launcher can start while the removable volume containing
-        // the user data is still mounting. Falling back to the app-private
-        // default here creates a second, empty database and makes the whole
-        // app look freshly installed. Wait for the configured volume instead.
-        if (_androidStorageUnavailable &&
-            _unavailableStoragePath == customPath) {
-          throw StateError(
-            'Configured user-data storage is unavailable: $customPath',
-          );
-        }
-
-        return _androidStorageWait ??= _startAndroidStorageWait(customPath);
-      }
-
-      // Directory missing — try to create it (first-run on new device or new location).
-      // On desktop, falling back keeps the application usable when a removable
-      // custom path has genuinely been removed.
-      try {
-        await dir.create(recursive: true);
-        return customPath;
-      } catch (e) {
-        _log.w(
-          'ConfigService: custom path "$customPath" inaccessible ($e). '
-          'Falling back to default path.',
-        );
+      // The main screen chose to continue without it (this engine being the
+      // second screen's, which can't be told any other way).
+      if (await _fallbackChosenThisSession(prefs)) {
+        _useDefaultPathFallback = true;
         return getDefaultUserDataPath();
       }
+
+      // Never created here: an empty folder in place of one that was moved,
+      // renamed or deleted (or on a drive not mounted yet) opens NeoStation
+      // on an empty library, and falling back to the default location on
+      // its own does the same. The startup screen says what is missing and
+      // the user decides.
+      if (_userDataProblem != null && _unavailableStoragePath == customPath) {
+        throw StateError(
+          'Configured user-data storage is unavailable: $customPath',
+        );
+      }
+
+      if (_platform == UserDataPlatform.android) {
+        // A default launcher can start while the removable volume containing
+        // the user data is still mounting. Wait for it.
+        return _androidStorageWait ??= _startAndroidStorageWait(customPath);
+      }
+      _declareUnusable(customPath, await _missingUserDataProblem(customPath));
     }
     return getDefaultUserDataPath();
+  }
+
+  static Future<UserDataProblem> _missingUserDataProblem(String folder) async {
+    final platform = _platform;
+    var mounts = <String>{};
+    var fstab = <String>{};
+    if (platform == UserDataPlatform.linux) {
+      mounts = parseMountPoints(await _readOrEmpty('/proc/self/mounts'));
+      fstab = parseFstabMountPoints(await _readOrEmpty('/etc/fstab'));
+    }
+    return missingUserDataProblem(
+      folder,
+      platform,
+      exists: (path) =>
+          Directory(path)
+              .exists()
+              .timeout(_volumeCheckTimeout, onTimeout: () => false),
+      mountPoints: mounts,
+      fstabMountPoints: fstab,
+      // A share that doesn't answer counts as a drive that isn't there.
+      isDanglingLink: (path) async {
+        try {
+          if (await FileSystemEntity.type(
+                path,
+                followLinks: false,
+              ).timeout(_volumeCheckTimeout) !=
+              FileSystemEntityType.link) {
+            return false;
+          }
+          return await FileSystemEntity.type(path)
+                  .timeout(_volumeCheckTimeout) ==
+              FileSystemEntityType.notFound;
+        } on TimeoutException {
+          return true;
+        }
+      },
+    );
+  }
+
+  static Future<String> _readOrEmpty(String path) async {
+    try {
+      return await File(path).readAsString();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static Never _declareUnusable(String customPath, UserDataProblem problem) {
+    _userDataProblem = problem;
+    _unavailableStoragePath = customPath;
+    _log.w(
+      'Configured user-data folder unusable (${problem.name}): $customPath',
+    );
+    throw StateError(
+      'Configured user-data storage is unavailable: $customPath',
+    );
   }
 
   /// Runs the Android cold-boot retry loop for [customPath] and clears the
   /// shared in-flight slot once it settles. A success does not need caching —
   /// the `exists()` check in [getUserDataPath] is cheap — while a failure is
-  /// remembered via [_androidStorageUnavailable] so later callers fail fast.
+  /// remembered via [_userDataProblem] so later callers fail fast.
   static Future<String> _startAndroidStorageWait(String customPath) {
     final wait = _waitForAndroidStorage(customPath);
     unawaited(
@@ -168,34 +346,45 @@ class ConfigService {
     return wait;
   }
 
-  /// Waits for the volume holding [customPath] to appear, creating the final
-  /// directory only once its parent volume is mounted. Throws a [StateError]
-  /// (and latches [storageUnavailable]) when it never shows up.
+  /// Waits for the volume holding [customPath] to appear. Throws a
+  /// [StateError] (and latches [storageUnavailable]) when it never shows up,
+  /// or when it does but the folder isn't on it.
   static Future<String> _waitForAndroidStorage(String customPath) async {
     final dir = Directory(customPath);
-    for (var attempt = 1; attempt <= _androidStorageMaxAttempts; attempt++) {
+    // A removable volume's folder can show for a moment before the card is
+    // mounted in it (sdcardfs, Android 10 and older): a folder missing there
+    // is only believed when it is still missing one pause later.
+    var folderMissingSeen = false;
+    final removable =
+        _removableVolumeForTesting ?? isAndroidRemovableVolume(customPath);
+    final maxAttempts =
+        _androidStorageMaxAttemptsForTesting ?? _androidStorageMaxAttempts;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       if (await dir.exists()) return customPath;
 
-      // A missing last directory is safe to create only once its parent
-      // volume is available. Do not create a lookalike path before that.
-      if (await dir.parent.exists()) {
-        await dir.create(recursive: true);
-        return customPath;
+      if (await _missingUserDataProblem(customPath) ==
+          UserDataProblem.folderMissing) {
+        if (folderMissingSeen || !removable) {
+          _declareUnusable(customPath, UserDataProblem.folderMissing);
+        }
+        folderMissingSeen = true;
+      } else {
+        folderMissingSeen = false;
       }
 
-      if (attempt < _androidStorageMaxAttempts) {
+      if (attempt < maxAttempts) {
         _log.i(
-          'Waiting for custom user-data storage ($attempt/$_androidStorageMaxAttempts): $customPath',
+          'Waiting for custom user-data storage ($attempt/$maxAttempts): $customPath',
         );
-        await Future<void>.delayed(_androidStorageRetryDelay);
+        await Future<void>.delayed(
+          _androidStorageRetryDelayForTesting ?? _androidStorageRetryDelay,
+        );
       }
     }
 
-    _androidStorageUnavailable = true;
-    _unavailableStoragePath = customPath;
-    throw StateError(
-      'Configured user-data storage is unavailable: $customPath',
-    );
+    // A folder missing on a removable volume, seen only on the last look,
+    // is not believed (see above): the volume is taken for still mounting.
+    _declareUnusable(customPath, UserDataProblem.volumeMissing);
   }
 
   /// Returns the platform default user-data path, ignoring any custom override.
@@ -294,8 +483,9 @@ class ConfigService {
 
   /// Resolves the absolute path for storing media assets (thumbnails, videos).
   ///
-  /// When a custom user-data path is set, media always lives inside it at `media/`.
-  /// Otherwise falls back to platform-specific defaults.
+  /// When a custom user-data path is set, media lives inside it at `media/`
+  /// (unless the user chose to continue without it this session, when the
+  /// default is used). Otherwise falls back to platform-specific defaults.
   static Future<String> getMediaPath() async {
     if (Platform.isAndroid) {
       // On Android getUserDataPath() already handles the custom override.
@@ -319,7 +509,12 @@ class ConfigService {
       final prefs = await SharedPreferences.getInstance();
       final customPath = prefs.getString(_customPathKey);
       if (customPath != null && customPath.isNotEmpty) {
-        return path.join(customPath, 'media');
+        // Media lives in the user-data folder: unusable together, and the
+        // default's when this session continues without it.
+        final userDataPath = await getUserDataPath();
+        if (userDataPath == customPath) {
+          return path.join(customPath, 'media');
+        }
       }
       final testingPath = _defaultUserDataPathForTesting;
       if (testingPath != null) return path.join(testingPath, 'media');
