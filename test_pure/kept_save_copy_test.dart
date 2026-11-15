@@ -1038,4 +1038,123 @@ void main() {
       },
     );
   });
+
+  group('RomM: this device\'s save, kept before a download replaces it', () {
+    late Directory root;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('kept_romm_local_');
+    });
+
+    tearDown(() async {
+      if (!Platform.isWindows) {
+        await Process.run('chmod', ['-R', 'u+w', root.path]);
+      }
+      await root.delete(recursive: true);
+    });
+
+    test('is named with the local time it was kept, as RomM\'s conflict '
+        'copies are, and read back as RomM\'s before-download copy', () {
+      final at = DateTime(2026, 11, 12, 11, 7, 5);
+      final copy = rommLocalCopyPath('/saves/Zelda.srm', at);
+      expect(p.basename(copy), 'Zelda.srm.romm-local-2026-11-12_11-07-05');
+      expect(isKeptCopyPath(copy), isTrue);
+      final name = parseKeptCopyPath(copy)!;
+      expect(name.savePath, '/saves/Zelda.srm');
+      expect(name.source, KeptCopySource.rommBeforeDownload);
+      expect(name.stampedAt, at);
+      final second = parseKeptCopyPath(
+        rommLocalCopyPath('/saves/Zelda.srm', at, attempt: 2),
+      )!;
+      expect(
+        p.basename(rommLocalCopyPath('/saves/Zelda.srm', at, attempt: 2)),
+        'Zelda.srm.romm-local-2026-11-12_11-07-05-2',
+      );
+      expect(second.savePath, '/saves/Zelda.srm');
+      expect(second.stampedAt, at);
+    });
+
+    test('holds the save\'s bytes, and never writes over a copy already '
+        'there', () async {
+      final save = File(p.join(root.path, 'Zelda.srm'))
+        ..writeAsBytesSync([1, 2, 3]);
+      final at = DateTime(2026, 11, 12, 11, 7, 5);
+      final first = await keepRommLocalCopy(save.path, now: at);
+      final second = await keepRommLocalCopy(save.path, now: at);
+      expect(first, rommLocalCopyPath(save.path, at));
+      expect(second, rommLocalCopyPath(save.path, at, attempt: 2));
+      expect(File(first).readAsBytesSync(), [1, 2, 3]);
+      expect(File(second).readAsBytesSync(), [1, 2, 3]);
+    });
+
+    test(
+      'passes over a name taken by a link, never writing through it',
+      () async {
+        if (Platform.isWindows) return;
+        final save = File(p.join(root.path, 'Zelda.srm'))
+          ..writeAsBytesSync([1, 2, 3]);
+        final outside = await Directory.systemTemp.createTemp('kept_outside_');
+        addTearDown(() => outside.delete(recursive: true));
+        final target = File(p.join(outside.path, 'target'))
+          ..writeAsBytesSync([7]);
+        final at = DateTime(2026, 11, 12, 11, 7, 5);
+        Link(rommLocalCopyPath(save.path, at)).createSync(target.path);
+
+        final kept = await keepRommLocalCopy(save.path, now: at);
+
+        expect(kept, rommLocalCopyPath(save.path, at, attempt: 2));
+        expect(File(kept).readAsBytesSync(), [1, 2, 3]);
+        expect(target.readAsBytesSync(), [7]);
+      },
+    );
+
+    test('fails, leaving nothing, when it can\'t be written', () async {
+      if (Platform.isWindows) return;
+      final save = File(p.join(root.path, 'Zelda.srm'))
+        ..writeAsBytesSync([1, 2, 3]);
+      await Process.run('chmod', ['555', root.path]);
+      await expectLater(
+        keepRommLocalCopy(save.path),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(root.listSync().map((e) => p.basename(e.path)), ['Zelda.srm']);
+    });
+
+    test('is listed and tidied with RomM\'s copies, never with NeoSync\'s, '
+        'whose copies RomM leaves alone', () async {
+      expect(rommKeptCopySources, contains(KeptCopySource.rommBeforeDownload));
+      expect(
+        neoSyncKeptCopySources,
+        isNot(contains(KeptCopySource.rommBeforeDownload)),
+      );
+      expect(
+        rommKeptCopySources,
+        isNot(contains(KeptCopySource.beforeDownload)),
+      );
+
+      final save = File(p.join(root.path, 'Zelda.srm'))..writeAsBytesSync([0]);
+      final neoSyncCopy = File(
+        localCopyPath(save.path, DateTime.utc(2026, 1, 1)),
+      )..writeAsBytesSync([9]);
+      for (var day = 1; day <= 4; day++) {
+        final at = DateTime(2026, 11, day, 12);
+        File(rommLocalCopyPath(save.path, at))
+          ..writeAsBytesSync([day])
+          ..setLastModifiedSync(at);
+      }
+
+      await tidyKeptCopies(save.path, sources: rommKeptCopySources);
+
+      final left = root.listSync().map((e) => p.basename(e.path)).toList()
+        ..sort();
+      expect(left, [
+        'Zelda.srm',
+        'Zelda.srm.local-20260101-000000.neosync.bak',
+        'Zelda.srm.romm-local-2026-11-02_12-00-00',
+        'Zelda.srm.romm-local-2026-11-03_12-00-00',
+        'Zelda.srm.romm-local-2026-11-04_12-00-00',
+      ]);
+      expect(neoSyncCopy.existsSync(), isTrue);
+    });
+  });
 }
