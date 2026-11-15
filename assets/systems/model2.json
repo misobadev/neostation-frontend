@@ -1,0 +1,107 @@
+{
+  "system": {
+    "id": "model2",
+    "multidisc": false,
+    "name": "Sega Model 2",
+    "short_name": "SM2",
+    "details": {
+      "manufacturer": "Sega",
+      "release_date": "1993-08-01",
+      "description": "Sega Model 2 Arcade Machine.",
+      "type": "arcade"
+    },
+    "ids": {
+      "screenscraper": 54
+    },
+    "folders": [
+      "model2",
+      "Sega Model 2",
+      "SM2",
+      "sm2"
+    ],
+    "colors": [
+      "#c3073f",
+      "#f0f3bd"
+    ],
+    "extensions": [
+      "zip",
+      "7z"
+    ]
+  },
+  "emulators": [
+    {
+      "name": "RetroArch64 MAME",
+      "default_core": true,
+      "unique_id": "model2.ra64.mamearcade",
+      "description": "Supported extensions: zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mamearcade\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch32 MAME",
+      "default_core": true,
+      "unique_id": "model2.ra32.mamearcade",
+      "description": "Supported extensions: zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mamearcade\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch MAME",
+      "default_core": true,
+      "unique_id": "model2.ra.mamearcade",
+      "description": "Supported extensions: zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"mamearcade\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch MAME (Current)",
+      "unique_id": "model2.ra.mame",
+      "description": "Supported extensions: zip, 7z.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L mame_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L mame_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L mame_libretro.dylib \"{file.path}\""
+        }
+      },
+      "default_core": true
+    }
+  ],
+  "neosync": {
+    "sync": true,
+    "android_sync_folder": [
+      "{SYNC_DIR}"
+    ],
+    "windows_sync_folder": [
+      "{SYNC_DIR}"
+    ],
+    "linux_sync_folder": [
+      "{SYNC_DIR}"
+    ],
+    "macos_sync_folder": [
+      "{SYNC_DIR}"
+    ]
+  }
+}
