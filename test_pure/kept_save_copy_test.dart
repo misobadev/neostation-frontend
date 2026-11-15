@@ -919,4 +919,123 @@ void main() {
       expect(save.existsSync(), isTrue);
     });
   });
+
+  // NEO-243: when the cloud's copy turned out newer, this device's save was
+  // kept only in the single before-download slot, which the next download
+  // overwrites. It is now kept as its own, dated copy.
+  group('this device\'s save, kept before a newer cloud copy replaces it', () {
+    late Directory root;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('kept_local_');
+    });
+
+    tearDown(() async {
+      await root.delete(recursive: true);
+    });
+
+    test('is named with the time it was kept, and read back as a '
+        'before-download copy with that time', () {
+      final at = DateTime.utc(2026, 11, 12, 11, 7, 5);
+      final copy = localCopyPath('/saves/Zelda.srm', at);
+      expect(p.basename(copy), 'Zelda.srm.local-20261112-110705.neosync.bak');
+      final name = parseKeptCopyPath(copy)!;
+      expect(name.savePath, '/saves/Zelda.srm');
+      expect(name.source, KeptCopySource.beforeDownload);
+      expect(name.stampedAt, at);
+      final second = parseKeptCopyPath(
+        localCopyPath('/saves/Zelda.srm', at, attempt: 2),
+      )!;
+      expect(second.savePath, '/saves/Zelda.srm');
+      expect(second.stampedAt, at);
+      // The single slot keeps no time.
+      expect(
+        parseKeptCopyPath('/saves/Zelda.srm.neosync.bak')!.stampedAt,
+        isNull,
+      );
+    });
+
+    test('holds the save\'s bytes, and never writes over a copy already '
+        'there', () async {
+      final save = File(p.join(root.path, 'Zelda.srm'))
+        ..writeAsBytesSync([1, 2, 3]);
+      final at = DateTime.utc(2026, 11, 12, 11, 7, 5);
+      final first = await keepLocalCopy(save.path, now: at);
+      final second = await keepLocalCopy(save.path, now: at);
+      expect(first, isNot(second));
+      expect(File(first).readAsBytesSync(), [1, 2, 3]);
+      expect(File(second).readAsBytesSync(), [1, 2, 3]);
+      expect(p.basename(second), endsWith('-2.neosync.bak'));
+    });
+
+    test(
+      'passes over a name taken by a link, never writing through it',
+      () async {
+        if (Platform.isWindows) return;
+        final save = File(p.join(root.path, 'Zelda.srm'))
+          ..writeAsBytesSync([1, 2, 3]);
+        final outside = await Directory.systemTemp.createTemp('kept_outside_');
+        addTearDown(() => outside.delete(recursive: true));
+        final target = File(p.join(outside.path, 'target'))
+          ..writeAsBytesSync([7]);
+        final at = DateTime.utc(2026, 11, 12, 11, 7, 5);
+        Link(localCopyPath(save.path, at)).createSync(target.path);
+
+        final kept = await keepLocalCopy(save.path, now: at);
+
+        expect(kept, localCopyPath(save.path, at, attempt: 2));
+        expect(File(kept).readAsBytesSync(), [1, 2, 3]);
+        expect(target.readAsBytesSync(), [7]);
+      },
+    );
+
+    test('keeps the bytes it is given, as read for the upload', () async {
+      final save = File(p.join(root.path, 'Zelda.srm'))
+        ..writeAsBytesSync([1, 2, 3]);
+      final kept = await keepLocalCopy(save.path, bytes: const [4, 5]);
+      expect(File(kept).readAsBytesSync(), [4, 5]);
+    });
+
+    test('fails, leaving nothing, when it can\'t be written', () async {
+      if (Platform.isWindows) return;
+      final save = File(p.join(root.path, 'Zelda.srm'))
+        ..writeAsBytesSync([1, 2, 3]);
+      await Process.run('chmod', ['555', root.path]);
+      addTearDown(() => Process.run('chmod', ['755', root.path]));
+      await expectLater(
+        keepLocalCopy(save.path),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(root.listSync().map((e) => p.basename(e.path)), ['Zelda.srm']);
+    });
+
+    test(
+      'counts towards the copies a save keeps; the single slot doesn\'t',
+      () async {
+        final save = File(p.join(root.path, 'Zelda.srm'))
+          ..writeAsBytesSync([0]);
+        File('${save.path}.neosync.bak')
+          ..writeAsBytesSync([9])
+          ..setLastModifiedSync(DateTime.utc(2026, 1, 1));
+        for (var day = 1; day <= 4; day++) {
+          final at = DateTime.utc(2026, 11, day);
+          File(localCopyPath(save.path, at))
+            ..writeAsBytesSync([day])
+            ..setLastModifiedSync(at);
+        }
+
+        await tidyKeptCopies(save.path, sources: neoSyncKeptCopySources);
+
+        final left = root.listSync().map((e) => p.basename(e.path)).toList()
+          ..sort();
+        expect(left, [
+          'Zelda.srm',
+          'Zelda.srm.local-20261102-000000.neosync.bak',
+          'Zelda.srm.local-20261103-000000.neosync.bak',
+          'Zelda.srm.local-20261104-000000.neosync.bak',
+          'Zelda.srm.neosync.bak',
+        ]);
+      },
+    );
+  });
 }

@@ -191,6 +191,22 @@ void main() {
       expect(save.readAsBytesSync(), localBytes, reason: 'this device wins');
     });
 
+    // NEO-243 review: the copy's name is predictable (the cloud copy's time).
+    test('a link planted at the copy\'s name is refused: nothing written '
+        'through it, nothing uploaded', () async {
+      if (Platform.isWindows) return;
+      final outside = await Directory.systemTemp.createTemp('both_outside_');
+      addTearDown(() => outside.delete(recursive: true));
+      final target = File(p.join(outside.path, 'target'))
+        ..writeAsBytesSync([7]);
+      Link(p.join(folder.path, backupName)).createSync(target.path);
+
+      expect(await sync(), isNot(GameSyncStatus.upToDate));
+
+      expect(service.events.where((e) => e.startsWith('upload')), isEmpty);
+      expect(target.readAsBytesSync(), [7]);
+    });
+
     test('says so in the bell, naming the copy', () async {
       await sync();
 
@@ -343,19 +359,88 @@ void main() {
       },
     );
 
-    test('says nothing when the upload found the cloud newer and took it '
-        'instead', () async {
-      service.upload = (_) => {
-        'success': true,
-        'skipped': true,
-        'downloaded': true,
+    // NEO-243: the cloud's copy was newer, so it was downloaded over this
+    // device's save, which was left only in the single before-download slot
+    // the next download overwrites, and nothing was said.
+    test(
+      'when the cloud copy turned out newer and was taken instead: this '
+      'device\'s save is kept as its own copy, and the bell says so',
+      () async {
+        String? keptHere;
+        // What the service does when the server's copy is newer: this device's
+        // save is kept as its own copy and the cloud's written over it.
+        service.upload = (file) {
+          keptHere = '${file.path}.local-20261112-110705.neosync.bak';
+          file.copySync(keptHere!);
+          file
+            ..writeAsBytesSync(cloudBytes)
+            ..setLastModifiedSync(
+              DateTime.now().add(const Duration(minutes: 1)),
+            );
+          return {
+            'success': true,
+            'skipped': true,
+            'downloaded': true,
+            'keptLocalPath': keptHere,
+          };
+        };
+
+        expect(await sync(), GameSyncStatus.upToDate);
+
+        expect(save.readAsBytesSync(), cloudBytes);
+        expect(File(keptHere!).readAsBytesSync(), localBytes);
+        // The cloud copy kept first now holds the save's bytes, so it went.
+        expect(backups(), ['Zelda.sav.local-20261112-110705.neosync.bak']);
+        final entry = bell.notifier.value.single;
+        expect(entry.title, 'Zelda');
+        expect(
+          entry.message,
+          AppLocale.neoSyncNewerCloudCopy.getStringForCurrentLocale(),
+        );
+      },
+    );
+  });
+
+  test(
+    'when the cloud copy turned out newer, this device\'s copy survives '
+    'the pass\'s tidy even past copies dated later (a clock set back)',
+    () async {
+      await recordLastSync();
+      playedHere();
+      service.download = {'success': true, 'data': cloudBytes};
+      for (var day = 1; day <= 3; day++) {
+        File(localCopyPath(save.path, DateTime.utc(2030, 1, day)))
+          ..writeAsBytesSync([day])
+          ..setLastModifiedSync(DateTime.utc(2030, 1, day));
+      }
+      String? keptHere;
+      service.upload = (file) {
+        keptHere = localCopyPath(file.path, DateTime.utc(2026, 11, 12));
+        file.copySync(keptHere!);
+        // The upload's check found a newer version still than the one the
+        // list named and the pass kept, so that kept copy isn't the save's.
+        file
+          ..writeAsBytesSync(const [8, 8, 8, 8, 8])
+          ..setLastModifiedSync(DateTime.now().add(const Duration(minutes: 1)));
+        return {
+          'success': true,
+          'skipped': true,
+          'downloaded': true,
+          'keptLocalPath': keptHere,
+        };
       };
 
-      expect(await sync(), GameSyncStatus.upToDate);
+      await sync();
 
-      expect(bell.notifier.value, isEmpty);
-    });
-  });
+      expect(File(keptHere!).existsSync(), isTrue);
+      expect(File(keptHere!).readAsBytesSync(), localBytes);
+      // The other device's copy the pass kept first survives too.
+      expect(
+        File(p.join(folder.path, backupName)).readAsBytesSync(),
+        cloudBytes,
+      );
+    },
+  );
 
   test('a save whose time has not moved is not taken as changed here, '
       'whatever hash was recorded', () async {

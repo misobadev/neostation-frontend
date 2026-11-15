@@ -5,6 +5,8 @@ import 'dart:math' show min;
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:neostation/utils/kept_save_copy.dart';
+import 'package:neostation/utils/save_changed_here.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/utils/app_config.dart';
@@ -222,12 +224,16 @@ class NeoSyncService extends ChangeNotifier {
   /// [scope] (shared/game) describe the file kind.
   ///
   /// When the check finds a newer copy in the cloud, that copy is downloaded
-  /// over [file] instead (the old one kept as `<file>.neosync.bak`). A failed
-  /// download is a failure, not "in sync". [deadline] returns the deadline of
-  /// a launch the file belongs to, if one is running; it is asked once the
-  /// copy is in, and when it has passed nothing is written and the result is
-  /// a failure marked `abandoned`, so the game's emulator never has its open
-  /// save replaced.
+  /// over [file] instead. A [file] changed here since its last sync
+  /// ([saveChangedHere]) is first kept as its own dated copy ([keepLocalCopy];
+  /// its path is the result's `keptLocalPath`), and if it can't be, nothing
+  /// is written; one that only fell behind gets the single
+  /// `<file>.neosync.bak` slot. A failed download is a failure, not "in
+  /// sync". [deadline] returns the deadline of a launch the file belongs to,
+  /// if one is running; it is asked once the download is in and again once
+  /// the copy is kept, and when it has passed nothing is written (a dated
+  /// copy is removed) and the result is a failure marked `abandoned`, so the
+  /// game's emulator never has its open save replaced.
   Future<Map<String, dynamic>> syncFile(
     File file,
     String gameName, {
@@ -335,12 +341,59 @@ class NeoSyncService extends ChangeNotifier {
           };
         }
         final bytes = download['data'] as List<int>;
-        try {
-          if (await file.exists()) {
-            await file.copy('${file.path}.neosync.bak');
+        // A save changed here since the last sync (or never synced) holds
+        // progress the cloud copy doesn't: it is kept as its own dated copy,
+        // listed in Save history, before the newer cloud copy is written over
+        // it, and if it can't be kept nothing is written. A save that only
+        // fell behind keeps the single before-download slot, which the next
+        // download overwrites.
+        final record = await SyncRepository.getSyncState('neosync', file.path);
+        final changedHere = saveChangedHere(
+          localTime: localModifiedAt.millisecondsSinceEpoch,
+          localHash: fileHash,
+          savedTime: record?['local_modified_at'] as int?,
+          savedHash: record?['file_hash'] as String?,
+        );
+        String? keptLocalPath;
+        if (await file.exists()) {
+          if (changedHere) {
+            try {
+              keptLocalPath = await keepLocalCopy(file.path, bytes: fileBytes);
+            } catch (e) {
+              const error =
+                  "Could not keep this device's copy before the newer cloud "
+                  'copy';
+              _log.w('$error of ${file.path}: $e');
+              _lastError = error;
+              return {'success': false, 'message': error};
+            }
+          } else {
+            try {
+              await file.copy('${file.path}.neosync.bak');
+            } catch (e) {
+              _log.w('Could not back up ${file.path}: $e');
+            }
           }
-        } catch (e) {
-          _log.w('Could not back up ${file.path}: $e');
+        }
+        // Asked again once the copy is kept, which can take a while for a
+        // large card: a launch that went ahead meanwhile has the save open.
+        if (deadline?.call()?.isExpired ?? false) {
+          if (keptLocalPath != null) {
+            try {
+              await File(keptLocalPath).delete();
+            } on FileSystemException {
+              // Left for the tidy; nothing was written over the save.
+            }
+          }
+          _log.i(
+            'Abandoning the newer cloud copy of ${file.path} '
+            '(launch deadline passed)',
+          );
+          return {
+            'success': false,
+            'abandoned': true,
+            'message': 'Launch deadline passed',
+          };
         }
         await file.parent.create(recursive: true);
         await file.writeAsBytes(bytes, flush: true);
@@ -364,6 +417,7 @@ class NeoSyncService extends ChangeNotifier {
           'success': true,
           'skipped': true,
           'downloaded': true,
+          'keptLocalPath': ?keptLocalPath,
           'message': 'Remote file is newer, downloaded',
         };
       }

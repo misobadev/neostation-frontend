@@ -22,3 +22,19 @@ void reportKeptCloudCopy({
         .replaceFirst('{file}', p.basename(backupPath)),
   );
 }
+
+/// Tells the user, in the notification bell, that the cloud had a newer copy
+/// of a save of [gameName], so it was downloaded over this device's, which is
+/// kept in Save history. The same entry as [reportKeptCloudCopy]'s, updated
+/// in place.
+void reportNewerCloudCopy({
+  required String gameName,
+  required String savePath,
+  GlobalNotificationService? notifications,
+}) {
+  (notifications ?? GlobalNotificationService()).show(
+    id: 'neosync-kept-cloud-copy-$savePath',
+    title: gameName,
+    message: AppLocale.neoSyncNewerCloudCopy.getStringForCurrentLocale(),
+  );
+}
