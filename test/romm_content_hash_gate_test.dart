@@ -488,6 +488,66 @@ void main() {
     );
   });
 
+  // NEO-231: the pull skipped any server copy older than the local file's
+  // time. An emulator that rewrites the same save bumps that time, so the other
+  // device's newer save never arrived, and nothing said so.
+  group('pulls when only the local time moved', () {
+    Future<void> otherDeviceUploads(String bytes) async {
+      svc.savesByRom[1] = [];
+      svc.seedSave(
+        1,
+        'Game.srm',
+        bytes.codeUnits,
+        // After this device's last upload, before the emulator's rewrite of
+        // the local file (`touch`, five minutes ahead).
+        updatedAt: DateTime.now().toUtc().add(const Duration(minutes: 1)),
+      );
+    }
+
+    test(
+      'an unchanged save whose time moved takes the newer server copy',
+      () async {
+        await localSave().writeAsString('SAVE-A');
+        await provider.syncGameSavesAfterClose(game);
+        await otherDeviceUploads('SAVE-B');
+        // The emulator rewrites the same save on exit.
+        await touch(localSave());
+        await provider.syncGameSavesAfterClose(game);
+        expect(
+          svc.updates,
+          isEmpty,
+          reason: 'the unchanged save was not pushed',
+        );
+
+        await provider.syncGameSavesBeforeLaunch(game);
+
+        expect(await localSave().readAsString(), 'SAVE-B');
+      },
+    );
+
+    test('a save changed here is still not overwritten', () async {
+      await localSave().writeAsString('SAVE-A');
+      await provider.syncGameSavesAfterClose(game);
+      await otherDeviceUploads('SAVE-B');
+      await localSave().writeAsString('SAVE-C');
+      await touch(localSave());
+
+      await provider.syncGameSavesBeforeLaunch(game);
+
+      expect(await localSave().readAsString(), 'SAVE-C');
+    });
+
+    test('with nothing recorded, a newer local file is kept', () async {
+      await otherDeviceUploads('SAVE-B');
+      await localSave().writeAsString('SAVE-X');
+      await touch(localSave());
+
+      await provider.syncGameSavesBeforeLaunch(game);
+
+      expect(await localSave().readAsString(), 'SAVE-X');
+    });
+  });
+
   group('skipping never consumes a remote copy it did not look at', () {
     test('a state another device advanced still arrives after a local skip', () async {
       // The gate's own hazard. A skip taken on the recorded hash proves only
