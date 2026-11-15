@@ -15,8 +15,10 @@ import 'package:neostation/repositories/scraper_repository.dart';
 import 'package:neostation/screens/game_screen/game_settings_dialog/game_settings_scrapping_tab.dart';
 import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/sfx_service.dart';
+import 'package:neostation/services/user_data_location_service.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/utils/user_data_move_guard.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -249,6 +251,31 @@ void main() {
     );
 
     expect(romm.calls, hasLength(1));
+  });
+
+  testWidgets('during a user-data move: it is refused and says why', (
+    tester,
+  ) async {
+    romm.connected = true;
+    await link();
+    await mount(tester);
+    UserDataLocationService.debugMoving = true;
+    addTearDown(() {
+      UserDataLocationService.debugMoving = false;
+      GlobalNotificationService().dismiss(userDataMoveRunningNoticeId);
+    });
+
+    await press(
+      tester,
+      () => tester.tap(find.text(en(AppLocale.rescrapeFromRomm))),
+    );
+
+    expect(romm.calls, isEmpty, reason: 'its art would stay in the old folder');
+    expect(updates, 0);
+    expect(
+      GlobalNotificationService().notifier.value.map((n) => n.id),
+      contains(userDataMoveRunningNoticeId),
+    );
   });
 
   testWidgets('while it runs, Force Rescrape doesn\'t start', (tester) async {

@@ -87,6 +87,12 @@ void main() {
       '_isScraping = true',
     );
     refusesBefore(
+      'lib/screens/game_screen/game_settings_dialog/'
+          'game_settings_scrapping_tab.dart',
+      'Future<void> _rescrapeFromRomm(',
+      '_isRommScraping = true',
+    );
+    refusesBefore(
       'lib/screens/game_screen/game_details_card/game_details_card_list.dart',
       'Future<void> _startSingleGameScrape(',
       'videoController',

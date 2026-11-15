@@ -383,6 +383,9 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
   /// RomM entry's, as Force Rescrape does with ScreenScraper's.
   Future<void> _rescrapeFromRomm() async {
     if (_busy || _isSaving) return;
+    // Refused during a user-data move, as Force Rescrape is: new art would
+    // stay in the old folder.
+    if (refuseWhileUserDataMoves()) return;
     final romm = context.read<RommProvider>();
     setState(() => _isRommScraping = true);
     try {
