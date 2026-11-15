@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logger/logger.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/utils/user_data_startup_check.dart';
 import 'package:path/path.dart' as p;
@@ -198,11 +199,23 @@ void main() {
       final onCard = p.join(card.path, 'NeoStation');
       SharedPreferences.setMockInitialValues({'custom_user_data_path': onCard});
 
-      final resolving = ConfigService.getUserDataPath();
-      await Future<void>.delayed(const Duration(milliseconds: 70));
-      Directory(onCard).createSync(recursive: true);
+      // The card turns up while the wait pauses between two looks. A look is
+      // two checks, the folder and then the card it sits on, and a card that
+      // appears between them reads as a missing folder, which is final. So it
+      // is created from the second wait's log line, once both checks of that
+      // look are done; on a timer it could land between them.
+      void mount(LogEvent event) {
+        if (event.message.toString().startsWith(
+          'Waiting for custom user-data storage (2/',
+        )) {
+          Directory(onCard).createSync(recursive: true);
+        }
+      }
 
-      expect(await resolving, onCard);
+      Logger.addLogListener(mount);
+      addTearDown(() => Logger.removeLogListener(mount));
+
+      expect(await ConfigService.getUserDataPath(), onCard);
     });
 
     test('the second screen follows "continue without it" in this session '
