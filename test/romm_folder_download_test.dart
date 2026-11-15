@@ -100,21 +100,18 @@ void main() {
         );
         expect(indexedName, 'Game [0100123400000000].nsp');
         expect(
-          File(
-            p.join(dir.path, 'Game/Game [0100123400000000].nsp'),
-          ).existsSync(),
+          File(p.join(dir.path, 'Game/Game [0100123400000000].nsp'))
+              .existsSync(),
           isTrue,
         );
         expect(
-          File(
-            p.join(dir.path, 'Game/updates/Game [0100123400000800].nsp'),
-          ).existsSync(),
+          File(p.join(dir.path, 'Game/updates/Game [0100123400000800].nsp'))
+              .existsSync(),
           isTrue,
         );
         expect(
-          File(
-            p.join(dir.path, 'Game/dlc/Game [0100123400001001].nsp'),
-          ).existsSync(),
+          File(p.join(dir.path, 'Game/dlc/Game [0100123400001001].nsp'))
+              .existsSync(),
           isTrue,
         );
         expect(File(archivePath).existsSync(), isFalse);

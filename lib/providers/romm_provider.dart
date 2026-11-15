@@ -1477,7 +1477,7 @@ class RommProvider extends ChangeNotifier {
               directory: bundleDir,
               systemDirectory: dir,
               filename: p.basename(nested.path),
-              path: nested.path,
+              nestedPath: nested.path,
             );
           }
         }
@@ -2062,9 +2062,8 @@ class RommProvider extends ChangeNotifier {
         !scummVm &&
             recordedName != null &&
             isSafeFileName(recordedName) &&
-            !_normalizeExtensions(
-              extensions,
-            ).contains(_extensionOf(recordedName))
+            !_normalizeExtensions(extensions)
+                .contains(_extensionOf(recordedName))
         ? p.join(destDir, recordedName)
         : null;
     final staleRaw =
@@ -3038,16 +3037,18 @@ class RommLocalCopy {
 
   /// Full path of the file. Usually [filename] in [directory], but a file
   /// nested inside a bundle's subfolder keeps [directory] at the bundle root.
-  String get path => _path ?? p.join(directory, filename);
-  final String? _path;
+  String get path => nestedPath ?? p.join(directory, filename);
+
+  /// The file's own path when it sits below [directory]; null otherwise.
+  final String? nestedPath;
 
   const RommLocalCopy({
     required this.system,
     required this.directory,
     this.systemDirectory,
     required this.filename,
-    String? path,
-  }) : _path = path;
+    this.nestedPath,
+  });
 
   /// [filename] with its extension stripped: the `GameModel.romname` the sync
   /// layer keys a game's cached state by (same rule as `DatabaseGameModel`).

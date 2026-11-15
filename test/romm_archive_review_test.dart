@@ -10,7 +10,9 @@ import 'package:neostation/models/system_model.dart';
 import 'package:neostation/data/datasources/sqlite_migrations.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
+
 import 'database_test_helper.dart';
+
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/services/romm_archive_service.dart';
 import 'package:path/path.dart' as p;
@@ -82,9 +84,8 @@ void main() {
   test(
     'legacy root playlist is replaced without a new bundle folder',
     () async {
-      File(
-        p.join(dir.path, 'Old.m3u'),
-      ).writeAsStringSync('Disc 1.chd\nDisc 2.chd\n');
+      File(p.join(dir.path, 'Old.m3u'))
+          .writeAsStringSync('Disc 1.chd\nDisc 2.chd\n');
       File(p.join(dir.path, 'Disc 1.chd')).writeAsBytesSync([9]);
       final path = zip({
         'Disc 1.chd': [1],
@@ -231,9 +232,8 @@ void main() {
 
   test('gdi track files are not extra playlist discs', () async {
     final path = zip({
-      'Game.gdi':
-          '3\n1 0 4 2352 track01.bin 0\n2 600 0 2352 "track 02.raw" 0\n3 45000 4 2352 track03.bin 0\n'
-              .codeUnits,
+      'Game.gdi': '3\n1 0 4 2352 track01.bin 0\n2 600 0 2352 "track 02.raw" 0\n3 45000 4 2352 track03.bin 0\n'
+          .codeUnits,
       'track01.bin': [1],
       'track 02.raw': [2],
       'track03.bin': [3],
@@ -694,9 +694,8 @@ void main() {
         )..createSync(recursive: true);
         expect(await provider.isDownloaded(rom, [dir.path]), isFalse);
         staged.deleteSync();
-        File(
-          p.join(dir.path, 'psx', 'Game', 'Discs', 'Custom.m3u'),
-        ).createSync(recursive: true);
+        File(p.join(dir.path, 'psx', 'Game', 'Discs', 'Custom.m3u'))
+            .createSync(recursive: true);
         expect(await provider.isDownloaded(rom, [dir.path]), isTrue);
       },
     );
@@ -705,9 +704,8 @@ void main() {
       'legacy root re-download replaces its mapped playlist in place',
       () async {
         final systemDir = await Directory(p.join(dir.path, 'psx')).create();
-        File(
-          p.join(systemDir.path, 'Custom.m3u'),
-        ).writeAsStringSync('Disc 1.chd\nDisc 2.chd\n');
+        File(p.join(systemDir.path, 'Custom.m3u'))
+            .writeAsStringSync('Disc 1.chd\nDisc 2.chd\n');
         File(p.join(systemDir.path, 'Disc 1.chd')).writeAsBytesSync([9]);
         await RommSaveMapRepository.putMapping(
           romname: 'Custom.m3u',
@@ -741,9 +739,8 @@ void main() {
           serverUrl: 'https://romm.test',
           apiKey: 'test',
         );
-        final target = await Directory(
-          p.join(dir.path, 'scummvm', 'loom'),
-        ).create(recursive: true);
+        final target = await Directory(p.join(dir.path, 'scummvm', 'loom'))
+            .create(recursive: true);
         File(p.join(target.path, 'Game.scummvm')).writeAsStringSync('loom');
         await RommSaveMapRepository.putMapping(
           romname: 'Game.scummvm',
@@ -769,9 +766,8 @@ void main() {
     test(
       'badge probe returns the actual predictable bundle directory',
       () async {
-        final bundle = await Directory(
-          p.join(dir.path, 'psx', 'Game'),
-        ).create(recursive: true);
+        final bundle = await Directory(p.join(dir.path, 'psx', 'Game'))
+            .create(recursive: true);
         File(p.join(bundle.path, 'Custom.m3u')).writeAsStringSync('Disc.chd\n');
         await RommSaveMapRepository.putMapping(
           romname: 'Custom.m3u',

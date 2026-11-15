@@ -129,9 +129,8 @@ class RommArchiveService {
         .toSet();
     final forceExtract = ext == '.zip' && isMultiFile && exts.contains('m3u');
     if (exts.contains(ext.replaceFirst('.', '')) && !forceExtract) {
-      await File(
-        archivePath,
-      ).rename(p.join(systemDir, p.basename(archivePath)));
+      await File(archivePath)
+          .rename(p.join(systemDir, p.basename(archivePath)));
       return p.basename(archivePath);
     }
     return prepareDownload(
@@ -353,9 +352,8 @@ class RommArchiveService {
       // temp dir: on Android that is internal storage, which can't hold a
       // multi-GB extraction when the ROMs live on an SD card. A hidden folder
       // on the same volume also lets the final step rename instead of copy.
-      staging = await Directory(
-        p.dirname(archivePath),
-      ).createTemp('.romm_archive_');
+      staging = await Directory(p.dirname(archivePath))
+          .createTemp('.romm_archive_');
       for (final entry in files) {
         final output = File(safeJoin(staging.path, entry.path)!);
         await output.parent.create(recursive: true);
@@ -421,9 +419,8 @@ class RommArchiveService {
           // installed file; wrapper stripping and absolute paths break it.
           final bundled = launch.first;
           playlistPath = outputs[bundled]!;
-          final contents = await File(
-            safeJoin(staging.path, bundled.path)!,
-          ).readAsString();
+          final contents = await File(safeJoin(staging.path, bundled.path)!)
+              .readAsString();
           playlist =
               _resolvePlaylist(
                 contents,
@@ -453,9 +450,8 @@ class RommArchiveService {
           outputs[entry]!: safeJoin(staging.path, entry.path)!,
       };
       if (playlistPath != null) {
-        final generated = await Directory(
-          staging.path,
-        ).createTemp('.playlist_');
+        final generated = await Directory(staging.path)
+            .createTemp('.playlist_');
         final stagedPlaylist = p.join(generated.path, 'playlist');
         await File(stagedPlaylist).writeAsString(playlist!, flush: true);
         stagedOutputs[playlistPath] = stagedPlaylist;
@@ -568,9 +564,8 @@ class RommArchiveService {
         default:
           continue;
       }
-      final descriptor = await File(
-        safeJoin(staging, entry.path)!,
-      ).readAsString();
+      final descriptor = await File(safeJoin(staging, entry.path)!)
+          .readAsString();
       for (final reference in references.allMatches(descriptor)) {
         add(entry, reference.group(1) ?? reference.group(2)!);
       }
