@@ -56,6 +56,44 @@ void main() {
         contains('{file.content}'),
       );
       expect(byId['ps3.rpcs3']!.extensions, contains('folder'));
+      for (final id in ['ps3.com.armsx3', 'ps3.com.armsx3.play']) {
+        expect(byId[id]!.extensions, contains('chd'));
+      }
+    });
+
+    // Once any emulator declares extensions, launch selection only offers
+    // emulators that claim the game's extension (#691). A scanned extension
+    // nobody claims shows up in the library but has no compatible emulator.
+    test('every scanned extension has an emulator that claims it', () {
+      final files = Directory('assets/systems')
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.json'));
+      for (final file in files) {
+        final json = jsonDecode(file.readAsStringSync());
+        if (json is! Map<String, dynamic> || json['system'] is! Map) continue;
+        if (json['emulators'] is! List) continue;
+        final emulators = emulatorsOf(json);
+        // A system with no emulators is not launched through selection, and an
+        // emulator without a declaration accepts every extension.
+        if (emulators.isEmpty ||
+            emulators.any((emulator) => emulator.extensions.isEmpty)) {
+          continue;
+        }
+        final claimed = {
+          for (final emulator in emulators)
+            ...emulator.extensions.map((ext) => ext.toLowerCase()),
+        };
+        final scanned = ((json['system'] as Map)['extensions'] as List? ?? [])
+            .map((ext) => (ext as String).toLowerCase());
+        for (final extension in scanned) {
+          expect(
+            claimed,
+            contains(extension),
+            reason: '${file.path}: .$extension has no emulator',
+          );
+        }
+      }
     });
 
     test('ports are desktop-only desktop launchers', () {
