@@ -23,6 +23,7 @@ class AndroidAppCard extends StatefulWidget {
     required this.isSelected,
     this.isGame = false,
     required this.onTap,
+    this.onLongPress,
   });
 
   final GameModel app;
@@ -31,6 +32,9 @@ class AndroidAppCard extends StatefulWidget {
   /// Marked as a game during this visit; shown with a badge.
   final bool isGame;
   final VoidCallback onTap;
+
+  /// Touch route to the Y action (mark or unmark as a game).
+  final VoidCallback? onLongPress;
 
   @override
   State<AndroidAppCard> createState() => _AndroidAppCardState();
@@ -137,6 +141,7 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
                   }
                   widget.onTap();
                 },
+                onLongPress: widget.onLongPress,
                 canRequestFocus: false,
                 focusColor: Colors.transparent,
                 hoverColor: Colors.transparent,

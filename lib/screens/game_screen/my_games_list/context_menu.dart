@@ -153,6 +153,12 @@ extension _ContextMenu on _SystemGamesListState {
       _pendingCollectionRefresh = false;
       _pendingFavoriteReseats.clear();
       await _loadGames();
+      // Marking the last game as an app removes the Android Games card, so
+      // there is nothing left here: go back to Systems rather than show the
+      // "no ROMs found" empty state.
+      if (mounted && action == GameOptionsAction.markAsApp && _games.isEmpty) {
+        await _goBack();
+      }
       return;
     }
     _flushPendingFavoriteReseats();

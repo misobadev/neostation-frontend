@@ -225,7 +225,8 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
                         onEscapePressed: () =>
                             showAndroidOptionsDialog(context),
                         // Y marks the focused app as a game (or takes
-                        // it back out); a long-press does the same on touch.
+                        // it back out). The card below binds the touch
+                        // long-press itself, since it replaces the grid's.
                         onYPressed: _toggleGame,
                         enableTabBumpers: widget.embedded,
                         enablePullToRescan: false,
@@ -249,6 +250,10 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
                                 ),
                                 isSelected: isSelected,
                                 onTap: onTap,
+                                onLongPress: () {
+                                  _onCardTapped(index);
+                                  _toggleGame();
+                                },
                               );
                             },
                       ),
