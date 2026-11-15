@@ -25,6 +25,7 @@ import 'package:neostation/widgets/collection_badge.dart';
 import 'package:neostation/widgets/native_carousel.dart';
 import 'package:neostation/utils/performance_mode.dart';
 import 'package:neostation/widgets/game_view_footer.dart';
+import 'package:neostation/widgets/game_fanart_background.dart';
 import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/models/retro_achievements_game_info.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
@@ -1375,6 +1376,35 @@ class _GamesCarouselState extends State<GamesCarousel> {
     return _buildFallbackCard(game, theme);
   }
 
+  /// Renders the settled game's fanart over the theme background.
+  /// Missing fanart has no screenshot or system-logo fallback.
+  Widget _buildFanartBackground() {
+    final index = _settledIndex.clamp(0, widget.games.length - 1);
+    final game = widget.games[index];
+
+    return IgnorePointer(
+      child: RepaintBoundary(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
+            // Blend with the theme background so light themes stay light.
+            Opacity(
+              opacity: 0.20,
+              child: GameFanartBackground(
+                game: _isFolderIndex(index) ? null : game,
+                systemFolder: _folderForGame(game),
+                fileProvider: widget.fileProvider,
+                artworkVersion: widget.artworkVersion,
+                performanceMode: _performanceMode,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.games.isEmpty) {
@@ -1415,6 +1445,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
 
     return Stack(
       children: [
+        Positioned.fill(child: _buildFanartBackground()),
         Column(
           children: [
             // #188 layout: drop the top spacer so the carousel gets the full
