@@ -866,6 +866,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.gameInfo: 'Info do Jogo',
   AppLocale.manage: 'Gerenciar',
   AppLocale.forceRescrape: 'Forçar Rescrape',
+  AppLocale.rescrapeFromRomm: 'Rescrape do RomM',
   AppLocale.scrapingData: 'Dados do Scraping',
   AppLocale.scrapingMedia: 'Mídia do Scraping',
   AppLocale.gameTitle: 'Título',

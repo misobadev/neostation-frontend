@@ -848,6 +848,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.gameInfo: 'Game Info',
   AppLocale.manage: 'Manage',
   AppLocale.forceRescrape: 'Force Rescrape',
+  AppLocale.rescrapeFromRomm: 'Rescrape from RomM',
   AppLocale.scrapingData: 'Scraping Data',
   AppLocale.scrapingMedia: 'Scraping Media',
   AppLocale.gameTitle: 'Title',
