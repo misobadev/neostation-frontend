@@ -16,10 +16,45 @@ void main() {
       UserDataMoveFailureKind.noSpace: AppLocale.userDataMoveNoSpace,
       UserDataMoveFailureKind.blocked: AppLocale.userDataMoveBlocked,
       UserDataMoveFailureKind.overlapping: AppLocale.userDataMoveOverlapping,
-      // The wizard's message for the same problem.
-      UserDataMoveFailureKind.notWritable: AppLocale.userDataFolderNotWritable,
+      // Settings' own wording: the wizard's adds "or keep the default
+      // location", which doesn't fit once a custom folder is in use (NEO-68).
+      UserDataMoveFailureKind.notWritable: AppLocale.userDataFolderCantWrite,
       UserDataMoveFailureKind.other: AppLocale.userDataMoveFailed,
     });
+  });
+
+  // NEO-68: on Android, a folder outside the app's own storage needs All
+  // files access; Settings never said so.
+  test("a folder that can't be written says how to allow it on Android", () {
+    expect(
+      userDataMoveFailureMessage(
+        UserDataMoveFailureKind.notWritable,
+        (key) => key,
+        suggestAllFilesAccess: true,
+      ),
+      '${AppLocale.userDataFolderCantWrite}\n'
+      '${AppLocale.userDataFolderGrantAllFiles}',
+    );
+    expect(
+      userDataFolderNotWritableMessage(
+        (key) => key,
+        suggestAllFilesAccess: false,
+      ),
+      AppLocale.userDataFolderCantWrite,
+    );
+    // The hint is about access, so no other failure gets it.
+    for (final kind in UserDataMoveFailureKind.values) {
+      if (kind == UserDataMoveFailureKind.notWritable) continue;
+      expect(
+        userDataMoveFailureMessage(
+          kind,
+          (key) => key,
+          suggestAllFilesAccess: true,
+        ),
+        userDataMoveFailureMessage(kind, (key) => key),
+        reason: '$kind',
+      );
+    }
   });
 
   test('every message is translated in every language', () {
@@ -37,8 +72,12 @@ void main() {
       'zh': appLocaleZh,
       'zh_hant': appLocaleZhHant,
     };
-    for (final kind in UserDataMoveFailureKind.values) {
-      final key = userDataMoveFailureMessage(kind, (key) => key);
+    for (final key in [
+      for (final kind in UserDataMoveFailureKind.values)
+        userDataMoveFailureMessage(kind, (key) => key),
+      AppLocale.userDataFolderGrantAllFiles,
+      AppLocale.wizardFolderNotUsable,
+    ]) {
       for (final MapEntry(key: lang, value: map) in languages.entries) {
         final text = map[key];
         expect(text, isA<String>(), reason: '$lang lacks $key');

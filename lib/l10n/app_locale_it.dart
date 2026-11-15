@@ -125,6 +125,10 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.startupStorageUnavailable: 'NeoStation non è riuscito ad accedere alla cartella in cui sono salvati i tuoi dati. Verifica che la scheda SD o l\'unità sia collegata.',
   AppLocale.startupStorageRetry: 'Riprova',
   AppLocale.startupStorageUseDefault: 'Continua senza',
+  AppLocale.startupStorageFolderMissing: 'NeoStation non ha trovato la cartella in cui sono salvati i tuoi dati. Potrebbe essere stata spostata, rinominata o eliminata, oppure l\'unità su cui si trova non è collegata.',
+  AppLocale.startupStorageStartEmpty: 'Inizia con una cartella vuota',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation non è riuscito a creare la cartella in quella posizione.',
   AppLocale.startupLoading:
       'Preparazione di NeoStation. In attesa di archiviazione e servizi…',
 
@@ -1060,6 +1064,31 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync : Solo salvataggi cloud',
   AppLocale.neoSyncSaveConflict: 'NeoSync : Conflitto di salvataggio rilevato',
   AppLocale.neoSyncKeptCloudCopy: "Questo salvataggio è cambiato anche su un altro dispositivo. La copia di questo dispositivo è stata caricata, l'altra è conservata accanto come {file}.",
+  AppLocale.keptCopiesTitle: 'Cronologia dei salvataggi',
+  AppLocale.keptCopiesSubtitle: 'Versioni precedenti dei tuoi salvataggi, da sincronizzazioni e ripristini',
+  AppLocale.keptCopiesCount: 'Versioni: {count}',
+  AppLocale.keptCopiesNone: 'Nessuna cronologia dei salvataggi',
+  AppLocale.keptCopyFromOtherDevice: 'Da un altro dispositivo',
+  AppLocale.keptCopyBeforeDownload: 'Questo dispositivo, prima di un download',
+  AppLocale.keptCopyFromServer: 'Dal server, prima di un caricamento',
+  AppLocale.keptCopyReplaced: 'Sostituita da un ripristino',
+  AppLocale.keptCopyCurrentSave: 'Salvataggio attuale: {size}, {date}',
+  AppLocale.keptCopyNoCurrentSave: 'Nessun salvataggio attuale',
+  AppLocale.keptCopySameAsSave: 'Uguale al salvataggio attuale',
+  AppLocale.keptCopyRestore: 'Ripristina',
+  AppLocale.keptCopyRestoreTitle: 'Ripristinare questa versione?',
+  AppLocale.keptCopyRestoreBody: 'Sostituisce {file}. Il salvataggio attuale viene aggiunto alla cronologia, quindi puoi annullare da qui. Chiudi prima il gioco se è ancora aperto.',
+  AppLocale.keptCopySharedCard: 'Questa memory card contiene i salvataggi di tutti i giochi che la usano.',
+  AppLocale.keptCopyRestored:
+      'Versione ripristinata. La prossima sincronizzazione la caricherà.',
+  AppLocale.keptCopyRestoreFailed: 'Impossibile ripristinare la versione.',
+  AppLocale.keptCopyDeleteTitle: 'Eliminare questa versione?',
+  AppLocale.keptCopyDeleteBody:
+      "{file} verrà eliminato. L'operazione non può essere annullata.",
+  AppLocale.keptCopyDeleteFailed: 'Impossibile eliminare la versione.',
+  AppLocale.keptCopyCloseGame: 'Chiudi prima il gioco, poi riprova.',
+  AppLocale.keptCopyWaitForSync:
+      'Attendi la fine della sincronizzazione dei salvataggi, poi riprova.',
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync : Sincronizzazione cloud disabilitata',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync : Quota di archiviazione superata',
@@ -1228,6 +1257,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.folderNotEmptyBody: 'Questa cartella non è vuota (elementi: {count}). NeoStation memorizzerà qui i propri dati, insieme ai contenuti esistenti.',
   AppLocale.folderNotEmptyUseAnyway: 'Usa comunque',
   AppLocale.userDataFolderNotWritable: "Impossibile scrivere in questa cartella. Scegline un'altra o mantieni la posizione predefinita.",
+  AppLocale.userDataFolderCantWrite:
+      "Impossibile scrivere in questa cartella. Scegline un'altra.",
   AppLocale.userDataFolderGrantAllFiles: "Per usare questa cartella, consenti l'accesso a tutti i file per NeoStation in Impostazioni Android → App → Accesso speciale app → Accesso a tutti i file, poi selezionala di nuovo.",
   AppLocale.moveUserDataTitle: 'Spostare i dati utente?',
   AppLocale.moveUserDataBody: 'NeoStation sposterà i propri dati (database, media recuperati e impostazioni) dalla cartella attuale a quella nuova. I file non creati da NeoStation restano invariati.',

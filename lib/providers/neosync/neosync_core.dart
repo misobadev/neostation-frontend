@@ -442,6 +442,8 @@ extension NeoSyncCore on NeoSyncProvider {
 
       // Buscar TODOS los archivos de save locales para este juego (saves y states)
       final localSaveFiles = await _findGameSaveFiles(game);
+      // The cloud copies this pass keeps, by save; see the tidy below.
+      final keptThisPass = <String, String>{};
 
       // Si no hay archivos locales, verificar si hay archivos en la nube para descargar
       if (localSaveFiles.isEmpty) {
@@ -561,10 +563,14 @@ extension NeoSyncCore on NeoSyncProvider {
                 // Changed on another device too: keep the cloud's copy beside
                 // this one before replacing it, and upload nothing until it
                 // has been kept.
-                final backupPath = comparison.bothChanged
+                final kept = comparison.bothChanged
                     ? await _keepCloudCopy(localFile, cloudFile)
-                    : null;
-                if (comparison.bothChanged && backupPath == null) {
+                    : (ok: true, keptPath: null);
+                final backupPath = kept.keptPath;
+                if (backupPath != null) {
+                  keptThisPass[localFile.filePath] = backupPath;
+                }
+                if (!kept.ok) {
                   allUploadsSucceeded = false;
                   transferFailed = true;
                 } else {
@@ -670,6 +676,17 @@ extension NeoSyncCore on NeoSyncProvider {
         }
       }
 
+      // A save this pass kept a cloud copy of now has one more copy; at most
+      // a few stay. Only those saves: the rest have no new copy, and a shared
+      // card another game's pass has claimed may be mid-download.
+      for (final MapEntry(key: save, value: copy) in keptThisPass.entries) {
+        await tidyKeptCopies(
+          save,
+          sources: neoSyncKeptCopySources,
+          justKept: {copy},
+        );
+      }
+
       // 3. Actualizar estado final
       neo_sync.GameSyncStatus finalStatus;
       if (quotaExceededDuringProcessing) {
@@ -747,13 +764,19 @@ extension NeoSyncCore on NeoSyncProvider {
 
   /// Downloads [cloud], the cloud's copy of [local], to a file beside it (see
   /// [cloudCopyBackupPath]) before this device's copy replaces it in the
-  /// cloud. Returns where it went, or null if it couldn't be kept.
+  /// cloud. [ok] is false when it couldn't be kept, and the upload must wait;
+  /// [keptPath] is where it went, or null when there was nothing to keep: the
+  /// cloud's copy holds this device's bytes, so no other progress is lost.
   ///
   /// A copy already kept for this cloud version (same name, same size) is
   /// reused, so a pass after a failed upload doesn't fetch it again. Not
   /// under the name without a time or checksum: that one is the same for
   /// every cloud version.
-  Future<String?> _keepCloudCopy(LocalSaveFile local, NeoSyncFile cloud) async {
+  Future<({bool ok, String? keptPath})> _keepCloudCopy(
+    LocalSaveFile local,
+    NeoSyncFile cloud,
+  ) async {
+    const failed = (ok: false, keptPath: null);
     try {
       final backupPath = cloudCopyBackupPath(
         local.filePath,
@@ -765,7 +788,7 @@ extension NeoSyncCore on NeoSyncProvider {
           !backupPath.endsWith('.cloud.neosync.bak') &&
           await backup.exists() &&
           await backup.length() == cloud.fileSize) {
-        return backupPath;
+        return (ok: true, keptPath: backupPath);
       }
       final download = await _neoSyncService.downloadFile(cloud.id);
       final data = download['data'];
@@ -774,19 +797,40 @@ extension NeoSyncCore on NeoSyncProvider {
           'Could not keep the cloud copy of ${local.filePath}: '
           '${download['message']}',
         );
-        return null;
+        return failed;
       }
-      await backup.writeAsBytes(data, flush: true);
+      if (listEquals(data, await File(local.filePath).readAsBytes())) {
+        NeoSyncProvider._log.i(
+          '${local.filePath}: the cloud copy holds the same bytes; '
+          'nothing to keep',
+        );
+        return (ok: true, keptPath: null);
+      }
+      // Only a file this pass creates is removed should the write fail.
+      final created = !await backup.exists();
+      try {
+        await backup.writeAsBytes(data, flush: true);
+      } catch (_) {
+        // Cut short, it would be listed as a copy to restore.
+        if (created) {
+          try {
+            await backup.delete();
+          } on FileSystemException {
+            // Nothing more to undo.
+          }
+        }
+        rethrow;
+      }
       NeoSyncProvider._log.i(
         '${local.filePath} changed here and in the cloud: kept the cloud copy '
         'as $backupPath',
       );
-      return backupPath;
+      return (ok: true, keptPath: backupPath);
     } catch (e) {
       NeoSyncProvider._log.w(
         'Could not keep the cloud copy of ${local.filePath}: $e',
       );
-      return null;
+      return failed;
     }
   }
 
@@ -1008,10 +1052,12 @@ extension NeoSyncCore on NeoSyncProvider {
   /// A copy NeoStation downloaded into a card's cloud-path folder before cards
   /// were matched by that path is left out while the card the core uses is
   /// there, unless [includeCardCopies] (RomM pairs files by name and keeps
-  /// them all).
+  /// them all). With [includeGoneSaves], a save that is gone but has kept
+  /// copies is included too, with a size of -1 (see [locateKeptCopySaves]).
   Future<List<LocalSaveFile>> _findGameSaveFiles(
     GameModel game, {
     bool includeCardCopies = false,
+    bool includeGoneSaves = false,
   }) async {
     try {
       // 1. Obtener el sistema para resolver sus rutas JSON
@@ -1040,11 +1086,15 @@ extension NeoSyncCore on NeoSyncProvider {
           maxFileSize: maxFileSize,
           skipped: skipped,
         );
-        return (paths: paths, skipped: skipped);
+        final gone = includeGoneSaves
+            ? await goneSavesWithKeptCopies(resolvedFolders)
+            : const <String>[];
+        return (paths: paths, skipped: skipped, gone: gone);
       });
       _logUnreadable(listing.skipped);
 
       allFiles.addAll(listing.paths.map((path) => File(path)));
+      allFiles.addAll(listing.gone.map((path) => File(path)));
 
       // 4. Filtrar archivos según el sistema
       final List<LocalSaveFile> matchingFiles = [];
@@ -1210,6 +1260,34 @@ extension NeoSyncCore on NeoSyncProvider {
   Future<List<LocalSaveFile>> locateGameSaveFiles(GameModel game) =>
       _findGameSaveFiles(game, includeCardCopies: true);
 
+  /// [game]'s saves, as [locateGameSaveFiles] finds them, plus those that are
+  /// gone but have kept copies beside where they were, so one can be put
+  /// back. A gone save's size is -1. For the kept copies list only: a sync
+  /// never sees a save that isn't there.
+  Future<List<LocalSaveFile>> locateKeptCopySaves(GameModel game) =>
+      _findGameSaveFiles(game, includeCardCopies: true, includeGoneSaves: true);
+
+  /// Every folder saves are synced from: RetroArch's save and state folders
+  /// and each system's custom save folders. Kept copies of saves sit beside
+  /// the saves, so this is where all of them are found.
+  Future<List<String>> keptCopyFolders() async {
+    final folders = <String>{};
+    final saves = await _getRetroArchSavesPath();
+    if (saves != null && saves.isNotEmpty) folders.add(saves);
+    final states = await _getRetroArchStatesPath();
+    if (states != null && states.isNotEmpty) folders.add(states);
+    try {
+      folders.addAll(
+        (await NeoSyncSaveFolderRepository.getAllFolderPaths()).where(
+          (f) => f.isNotEmpty,
+        ),
+      );
+    } catch (e) {
+      NeoSyncProvider._log.e('Error reading custom save folders: $e');
+    }
+    return folders.toList();
+  }
+
   /// Resolves candidate local destination paths for a cloud file named
   /// [relativeName] (e.g. `saves/Game.srm` or `states/Game.state`) belonging to
   /// [game]. Returns an empty list if no destination can be resolved.
@@ -1272,6 +1350,7 @@ extension NeoSyncCore on NeoSyncProvider {
       final isSharedSystem = _sharesMemoryCards(system.folderName);
 
       for (final cloudFile in cloudFiles) {
+        if (_isKeptCopyInCloud(cloudFile)) continue;
         final fileName = path.basename(cloudFile.fileName).toLowerCase();
         bool isMatch = false;
 

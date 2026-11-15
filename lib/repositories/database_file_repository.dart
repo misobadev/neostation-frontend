@@ -41,4 +41,9 @@ class DatabaseFileRepository {
   /// Closes the database. The next access opens it again from the user-data
   /// folder saved at that point.
   static Future<void> close() => SqliteService.closeDatabase();
+
+  /// Runs [body] while every other database access waits (see
+  /// [SqliteService.withAccessHeld]).
+  static Future<T> withAccessHeld<T>(Future<T> Function() body) =>
+      SqliteService.withAccessHeld(body);
 }

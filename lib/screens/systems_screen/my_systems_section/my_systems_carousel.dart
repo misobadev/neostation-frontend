@@ -41,6 +41,7 @@ import 'package:neostation/widgets/native_carousel.dart';
 
 import 'system_list_builder.dart';
 import 'system_card.dart';
+import '../../../utils/user_data_move_guard.dart';
 
 /// Navigation-layer id the systems screen's own carousel registers under.
 ///
@@ -466,6 +467,13 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           );
           _gamepadNav.activate();
         }
+        return;
+      }
+
+      // Refused during a user-data move: a zipped game unpacks into the user
+      // data's temp folder, which the move is copying.
+      if (refuseWhileUserDataMoves()) {
+        if (mounted) _gamepadNav.activate();
         return;
       }
 

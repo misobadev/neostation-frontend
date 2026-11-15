@@ -21,6 +21,7 @@ import 'package:neostation/services/screenscraper_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/artwork_cache.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/utils/user_data_move_guard.dart';
 
 /// Sub-tabs inside the Scrapping tab of [GameSettingsDialog].
 enum _ScrappingSubTab { data, media }
@@ -258,6 +259,8 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
   /// (Identify…) and scraped from it.
   Future<void> _forceRescrape({int? identifyAs}) async {
     if (_isScraping) return;
+    // Refused during a user-data move: new art would stay in the old folder.
+    if (refuseWhileUserDataMoves()) return;
     final romPath = widget.game.romPath;
     if (romPath == null) return;
 
