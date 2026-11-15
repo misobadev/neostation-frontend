@@ -125,6 +125,9 @@ class SZArchive {
     var status = _bindings.checkArchiveStatus(archive);
     if (status != ArchiveStatus.kArchiveOK) {
       malloc.free(p);
+      // The native object exists even when opening failed; without this it
+      // (and its read buffer) leaked on every unreadable archive.
+      _bindings.closeArchive(archive);
       throw Exception('Failed to open archive.');
     }
     var a = SZArchive._(archive);

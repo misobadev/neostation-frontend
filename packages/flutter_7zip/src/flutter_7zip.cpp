@@ -4,6 +4,11 @@
 #include "7zip/C/7zFile.h"
 #include <iostream>
 #include <fstream>
+#include <algorithm>
+#include <string>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 void *_AllocImp(ISzAllocPtr p, size_t size) {
   return malloc(size);
@@ -17,38 +22,77 @@ void _FreeImp(ISzAllocPtr p, void *ptr) {
 
 static ISzAlloc AllocImp = { _AllocImp, _FreeImp };
 
+#ifdef _WIN32
+// The Dart side passes UTF-8. The ANSI file APIs would read it in the
+// system code page and fail on (or misname) any non-ASCII path.
+static std::wstring Utf8ToWide(const char* utf8) {
+  const int len = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
+  if (len <= 0) return std::wstring();
+  std::wstring wide(static_cast<size_t>(len), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wide.data(), len);
+  wide.resize(static_cast<size_t>(len - 1));
+  return wide;
+}
+#endif
+
 class Archive {
   CFileInStream archiveStream;
   CLookToRead2 lookStream;
   CSzArEx db;
   ISzAlloc allocImp = AllocImp;
   ISzAlloc allocTempImp = AllocImp;
+  bool fileOpen = false;
+
+  // The last decoded folder, kept between calls. SzArEx_Extract reuses it
+  // when the next file lives in the same folder; freeing it after every file
+  // made a solid archive decode its whole folder once per file.
+  mutable UInt32 blockIndex = 0xFFFFFFFF;
+  mutable Byte* outBuffer = nullptr;
+  mutable size_t outBufferSize = 0;
 
 public:
   ArchiveStatus status = kArchiveOK;
 
   explicit Archive(const char* path) {
-    if (InFile_Open(&archiveStream.file, path)) {
+    lookStream.buf = nullptr;
+    SzArEx_Init(&db);
+    File_Construct(&archiveStream.file);
+#ifdef _WIN32
+    const std::wstring widePath = Utf8ToWide(path);
+    const WRes openRes = widePath.empty() ? 1 : InFile_OpenW(&archiveStream.file, widePath.c_str());
+#else
+    const WRes openRes = InFile_Open(&archiveStream.file, path);
+#endif
+    if (openRes) {
       status = kArchiveOpenError;
       return;
     }
+    fileOpen = true;
     CrcGenerateTable();
     FileInStream_CreateVTable(&archiveStream);
     lookStream.realStream = &archiveStream.vt;
     lookStream.buf = new Byte[16 * 1024];
     lookStream.bufSize = 16 * 1024;
     LookToRead2_CreateVTable(&lookStream, False);
-    SzArEx_Init(&db);
+    LookToRead2_INIT(&lookStream);
     if (const auto res = SzArEx_Open(&db, &lookStream.vt, &allocImp, &allocTempImp); res != SZ_OK) {
       status = kArchiveOpenError;
-      File_Close(&archiveStream.file);
     }
   }
 
   ~Archive() {
+    _FreeImp(&allocImp, outBuffer);
     SzArEx_Free(&db, &allocImp);
-    File_Close(&archiveStream.file);
+    if (fileOpen) File_Close(&archiveStream.file);
     delete [] lookStream.buf;
+  }
+
+  /// Decodes [index] into the cached folder buffer. On success the file's
+  /// bytes are outBuffer[offset, offset + size).
+  SRes extract(const uint32_t index, size_t* offset, size_t* size) const {
+    return SzArEx_Extract(&db, const_cast<ILookInStreamPtr>(&lookStream.vt), index, &blockIndex,
+                          &outBuffer, &outBufferSize, offset, size, const_cast<ISzAllocPtr>(&allocImp),
+                          const_cast<ISzAllocPtr>(&allocTempImp));
   }
 
   uint32_t numFiles() const {
@@ -71,30 +115,20 @@ public:
 
     archiveFile.size = SzArEx_GetFileSize(&db, index);
 
-    if (db.CRCs.Defs[index]) {
-      archiveFile.crc32 = db.CRCs.Vals[index];
-    } else {
-      archiveFile.crc32 = 0;
-    }
-    
-    if (db.CTime.Defs != nullptr) {
-      if (db.CTime.Defs[index]) {
-        auto [Low, High] = db.CTime.Vals[index];
-        archiveFile.cTime = Low + (static_cast<uint64_t>(High) << 32);
-      } else {
-        archiveFile.cTime = 0;
-      }
+    // Defs are bit arrays (one bit per file), not byte arrays: indexing them
+    // as bytes read past their end for any archive with more than a few files.
+    archiveFile.crc32 = SzBitWithVals_Check(&db.CRCs, index) ? db.CRCs.Vals[index] : 0;
+
+    if (SzBitWithVals_Check(&db.CTime, index)) {
+      auto [Low, High] = db.CTime.Vals[index];
+      archiveFile.cTime = Low + (static_cast<uint64_t>(High) << 32);
     } else {
       archiveFile.cTime = 0;
     }
 
-    if (db.MTime.Defs != nullptr) {
-      if (db.MTime.Defs[index]) {
-        auto [Low, High] = db.MTime.Vals[index];
-        archiveFile.mTime = Low + (static_cast<uint64_t>(High) << 32);
-      } else {
-        archiveFile.mTime = 0;
-      }
+    if (SzBitWithVals_Check(&db.MTime, index)) {
+      auto [Low, High] = db.MTime.Vals[index];
+      archiveFile.mTime = Low + (static_cast<uint64_t>(High) << 32);
     } else {
       archiveFile.mTime = 0;
     }
@@ -103,60 +137,48 @@ public:
   }
 
   unsigned char* readFile(const uint32_t index) const {
-    const ArchiveFile archiveFile = getFileByIndex(index);
-    if (archiveFile.is_dir) {
+    // Not getFileByIndex: it allocates the name, which nothing here frees.
+    if (index >= db.NumFiles || SzArEx_IsDir(&db, index)) {
       return nullptr;
     }
-    auto* buffer = new unsigned char[archiveFile.size];
-    size_t read = 0;
-    uint32_t blockIndex;
-    Byte* outBuffer = nullptr;
-    size_t outBufferSize;
-    size_t offset;
-    size_t outSizeProcessed;
-    while (read < archiveFile.size) {
-      if (const auto res = SzArEx_Extract(&db, &lookStream.vt, index, &blockIndex, &outBuffer, &outBufferSize, &offset, &outSizeProcessed, &allocImp, &allocTempImp); res != SZ_OK) {
-        delete[] buffer;
-        return nullptr;
-      }
-      for (auto i = offset; i < outSizeProcessed + offset; i++) {
-        buffer[read] = outBuffer[i];
-        read++;
-      }
-      _FreeImp(&allocImp, outBuffer);
+    const size_t fileSize = SzArEx_GetFileSize(&db, index);
+    size_t offset = 0;
+    size_t outSizeProcessed = 0;
+    if (extract(index, &offset, &outSizeProcessed) != SZ_OK || outSizeProcessed != fileSize) {
+      return nullptr;
     }
+    auto* buffer = new unsigned char[fileSize > 0 ? fileSize : 1];
+    std::copy(outBuffer + offset, outBuffer + offset + outSizeProcessed, buffer);
     return buffer;
   }
 
   ArchiveStatus extractFileToPath(const uint32_t index, const char* path) const {
-    const ArchiveFile archiveFile = getFileByIndex(index);
-    if (archiveFile.is_dir) {
+    if (index >= db.NumFiles || SzArEx_IsDir(&db, index)) {
       return kArchiveReadError;
     }
-    size_t read = 0;
-    uint32_t blockIndex;
-    Byte* outBuffer = nullptr;
-    size_t outBufferSize;
-    size_t offset;
-    size_t outSizeProcessed;
+    const size_t fileSize = SzArEx_GetFileSize(&db, index);
+    size_t offset = 0;
+    size_t outSizeProcessed = 0;
+    if (extract(index, &offset, &outSizeProcessed) != SZ_OK || outSizeProcessed != fileSize) {
+      return kArchiveReadError;
+    }
     std::ofstream outFile;
+#ifdef _WIN32
+    outFile.open(Utf8ToWide(path).c_str(), std::ios::binary | std::ios::out);
+#else
     outFile.open(path, std::ios::binary | std::ios::out);
-    if (!outFile.is_open()) {
+#endif
+    if (!outFile.is_open() || !outFile.good()) {
       return kArchiveOpenError;
     }
-    if (!outFile.good()) {
-      return kArchiveOpenError;
-    }
-    while (read < archiveFile.size) {
-      if (const auto res = SzArEx_Extract(&db, &lookStream.vt, index, &blockIndex, &outBuffer, &outBufferSize, &offset, &outSizeProcessed, &allocImp, &allocTempImp); res != SZ_OK) {
-        outFile.close();
-        return ArchiveStatus::kArchiveReadError;
-      }
-      outFile.write(reinterpret_cast<const char *>(outBuffer+offset), outSizeProcessed);
-      read += outSizeProcessed;
-      _FreeImp(&allocImp, outBuffer);
-    }
+    outFile.write(reinterpret_cast<const char *>(outBuffer + offset), static_cast<std::streamsize>(outSizeProcessed));
+    // A full disk fails the write (or the flush on close): report it rather
+    // than hand back a truncated file as extracted.
+    const bool written = outFile.good();
     outFile.close();
+    if (!written || outFile.fail()) {
+      return kArchiveWriteError;
+    }
     return kArchiveOK;
   }
 };
