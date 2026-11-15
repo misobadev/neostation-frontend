@@ -124,6 +124,10 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.startupStorageUnavailable: 'NeoStation не удалось получить доступ к папке с вашими данными. Убедитесь, что SD-карта или накопитель подключены.',
   AppLocale.startupStorageRetry: 'Повторить',
   AppLocale.startupStorageUseDefault: 'Продолжить без неё',
+  AppLocale.startupStorageFolderMissing: 'NeoStation не удалось найти папку с вашими данными. Возможно, её переместили, переименовали или удалили, или накопитель, на котором она находится, не подключён.',
+  AppLocale.startupStorageStartEmpty: 'Начать с пустой папки',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation не удалось создать там папку.',
   AppLocale.startupLoading:
       'Подготовка NeoStation. Ожидание хранилища и служб...',
 
@@ -1231,6 +1235,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.folderNotEmptyBody: 'Эта папка не пуста (элементов: {count}). NeoStation будет хранить свои данные здесь, рядом с существующим содержимым.',
   AppLocale.folderNotEmptyUseAnyway: 'Всё равно использовать',
   AppLocale.userDataFolderNotWritable: "Не удаётся записать в эту папку. Выберите другую или оставьте расположение по умолчанию.",
+  AppLocale.userDataFolderCantWrite:
+      'Не удаётся записать в эту папку. Выберите другую.',
   AppLocale.userDataFolderGrantAllFiles: "Чтобы использовать эту папку, разрешите NeoStation доступ ко всем файлам в настройках Android → Приложения → Специальный доступ → Доступ ко всем файлам, затем выберите её снова.",
   AppLocale.moveUserDataTitle: 'Переместить данные пользователя?',
   AppLocale.moveUserDataBody: 'NeoStation переместит свои данные (базу данных, загруженные медиа и настройки) из текущей папки в новую. Файлы, созданные не NeoStation, останутся нетронутыми.',

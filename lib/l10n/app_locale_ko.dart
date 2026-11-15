@@ -123,6 +123,9 @@ const Map<String, dynamic> appLocaleKo = {
       'NeoStation이 데이터가 저장된 폴더에 접근하지 못했습니다. SD 카드나 드라이브가 연결되어 있는지 확인하세요.',
   AppLocale.startupStorageRetry: '다시 시도',
   AppLocale.startupStorageUseDefault: '이대로 계속',
+  AppLocale.startupStorageFolderMissing: 'NeoStation이 데이터가 저장된 폴더를 찾지 못했습니다. 이동되었거나 이름이 바뀌었거나 삭제되었을 수 있으며, 폴더가 있는 드라이브가 연결되어 있지 않을 수도 있습니다.',
+  AppLocale.startupStorageStartEmpty: '빈 폴더로 시작',
+  AppLocale.startupStorageCreateFailed: 'NeoStation이 그 위치에 폴더를 만들지 못했습니다.',
   AppLocale.startupLoading: 'NeoStation을 준비 중입니다. 저장소와 서비스를 기다리고 있습니다…',
 
   AppLocale.play: '플레이',
@@ -1170,6 +1173,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.folderNotEmptyUseAnyway: '그래도 사용',
   AppLocale.userDataFolderNotWritable:
       "이 폴더에 쓸 수 없습니다. 다른 폴더를 선택하거나 기본 위치를 유지하세요.",
+  AppLocale.userDataFolderCantWrite: '이 폴더에 쓸 수 없습니다. 다른 폴더를 선택하세요.',
   AppLocale.userDataFolderGrantAllFiles: "이 폴더를 사용하려면 Android 설정 → 애플리케이션 → 특별한 앱 액세스 → 모든 파일 액세스에서 NeoStation을 허용한 후 다시 선택하세요.",
   AppLocale.moveUserDataTitle: '사용자 데이터를 이동하시겠습니까?',
   AppLocale.moveUserDataBody: 'NeoStation은 자체 데이터(데이터베이스, 스크랩한 미디어, 설정)를 현재 폴더에서 새 폴더로 이동합니다. NeoStation에서 생성되지 않은 파일은 그대로 유지됩니다.',

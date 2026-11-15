@@ -126,6 +126,10 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.startupStorageUnavailable: 'NeoStation could not reach the folder where your data is stored. Check that the SD card or drive is connected.',
   AppLocale.startupStorageRetry: 'Retry',
   AppLocale.startupStorageUseDefault: 'Continue without it',
+  AppLocale.startupStorageFolderMissing: 'NeoStation could not find the folder where your data is stored. It may have been moved, renamed or deleted, or the drive it is on may not be connected.',
+  AppLocale.startupStorageStartEmpty: 'Start with an empty folder',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation could not create the folder there.',
   AppLocale.startupLoading:
       'Preparing NeoStation. Waiting for storage and services...',
 
@@ -1230,6 +1234,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.folderNotEmptyBody: 'This folder isn\'t empty (items: {count}). NeoStation will store its own data here, alongside the existing contents.',
   AppLocale.folderNotEmptyUseAnyway: 'Use Anyway',
   AppLocale.userDataFolderNotWritable: "Can't write to this folder. Pick another one, or keep the default location.",
+  AppLocale.userDataFolderCantWrite:
+      "Can't write to this folder. Pick another one.",
   AppLocale.userDataFolderGrantAllFiles: "To use this folder, allow All files access for NeoStation in Android Settings → Apps → Special app access → All files access, then pick it again.",
   AppLocale.moveUserDataTitle: 'Move User Data?',
   AppLocale.moveUserDataBody: 'NeoStation will move its own data — database, scraped media, and settings — from the current folder to the new one. Files not created by NeoStation are left untouched.',

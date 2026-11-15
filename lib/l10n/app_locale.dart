@@ -101,6 +101,11 @@ mixin AppLocale {
   static const String startupStorageUnavailable = 'startup_storage_unavailable';
   static const String startupStorageRetry = 'startup_storage_retry';
   static const String startupStorageUseDefault = 'startup_storage_use_default';
+  static const String startupStorageFolderMissing =
+      'startup_storage_folder_missing';
+  static const String startupStorageStartEmpty = 'startup_storage_start_empty';
+  static const String startupStorageCreateFailed =
+      'startup_storage_create_failed';
 
   // ---------------------------------------------------------------------------
   // Game / Playback
@@ -1349,6 +1354,7 @@ mixin AppLocale {
   static const String folderNotEmptyUseAnyway = 'folder_not_empty_use_anyway';
   static const String userDataFolderNotWritable =
       'user_data_folder_not_writable';
+  static const String userDataFolderCantWrite = 'user_data_folder_cant_write';
   static const String userDataFolderGrantAllFiles =
       'user_data_folder_grant_all_files';
   static const String moveUserDataTitle = 'move_user_data_title';

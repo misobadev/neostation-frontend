@@ -121,6 +121,9 @@ const Map<String, dynamic> appLocaleJa = {
       'NeoStation はデータの保存先フォルダーにアクセスできませんでした。SD カードまたはドライブが接続されているか確認してください。',
   AppLocale.startupStorageRetry: '再試行',
   AppLocale.startupStorageUseDefault: 'このまま続行',
+  AppLocale.startupStorageFolderMissing: 'NeoStation はデータの保存先フォルダーを見つけられませんでした。移動、名前の変更、削除のいずれかが行われたか、フォルダーのあるドライブが接続されていない可能性があります。',
+  AppLocale.startupStorageStartEmpty: '空のフォルダーで始める',
+  AppLocale.startupStorageCreateFailed: 'NeoStation はそこにフォルダーを作成できませんでした。',
   AppLocale.startupLoading: 'NeoStation を準備中です。ストレージとサービスを待機しています…',
 
   AppLocale.play: 'プレイ',
@@ -1164,6 +1167,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.folderNotEmptyUseAnyway: 'このまま使用',
   AppLocale.userDataFolderNotWritable:
       "このフォルダに書き込めません。別のフォルダを選ぶか、既定の場所のままにしてください。",
+  AppLocale.userDataFolderCantWrite: 'このフォルダに書き込めません。別のフォルダを選んでください。',
   AppLocale.userDataFolderGrantAllFiles: "このフォルダを使うには、Android の設定 → アプリ → 特別なアプリアクセス → 全ファイルアクセス で NeoStation を許可してから、もう一度選択してください。",
   AppLocale.moveUserDataTitle: 'ユーザーデータを移動しますか？',
   AppLocale.moveUserDataBody: 'NeoStation は自身のデータ（データベース、取得したメディア、設定）を現在のフォルダから新しいフォルダへ移動します。NeoStation が作成していないファイルはそのまま残ります。',

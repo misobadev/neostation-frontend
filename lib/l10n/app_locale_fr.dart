@@ -127,6 +127,10 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.startupStorageUnavailable: 'NeoStation n\'a pas pu accéder au dossier où vos données sont enregistrées. Vérifiez que la carte SD ou le lecteur est connecté.',
   AppLocale.startupStorageRetry: 'Réessayer',
   AppLocale.startupStorageUseDefault: 'Continuer sans',
+  AppLocale.startupStorageFolderMissing: 'NeoStation n\'a pas trouvé le dossier où vos données sont enregistrées. Il a peut-être été déplacé, renommé ou supprimé, ou le lecteur où il se trouve n\'est pas connecté.',
+  AppLocale.startupStorageStartEmpty: 'Commencer avec un dossier vide',
+  AppLocale.startupStorageCreateFailed:
+      'NeoStation n\'a pas pu créer le dossier à cet endroit.',
   AppLocale.startupLoading:
       'Préparation de NeoStation. En attente du stockage et des services…',
 
@@ -1250,6 +1254,8 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.folderNotEmptyBody: 'Ce dossier n’est pas vide (éléments : {count}). NeoStation y stockera ses propres données, aux côtés du contenu existant.',
   AppLocale.folderNotEmptyUseAnyway: 'Utiliser quand même',
   AppLocale.userDataFolderNotWritable: "Impossible d'écrire dans ce dossier. Choisissez-en un autre ou gardez l'emplacement par défaut.",
+  AppLocale.userDataFolderCantWrite:
+      "Impossible d'écrire dans ce dossier. Choisissez-en un autre.",
   AppLocale.userDataFolderGrantAllFiles: "Pour utiliser ce dossier, autorisez l'accès à tous les fichiers pour NeoStation dans Paramètres Android → Applications → Accès spéciaux des applications → Accès à tous les fichiers, puis choisissez-le à nouveau.",
   AppLocale.moveUserDataTitle: 'Déplacer les données ?',
   AppLocale.moveUserDataBody: 'NeoStation déplacera ses propres données (base de données, médias récupérés et paramètres) du dossier actuel vers le nouveau. Les fichiers non créés par NeoStation restent intacts.',

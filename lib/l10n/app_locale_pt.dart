@@ -128,6 +128,10 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.startupStorageUnavailable: 'O NeoStation não conseguiu acessar a pasta onde seus dados estão guardados. Verifique se o cartão SD ou a unidade está conectado.',
   AppLocale.startupStorageRetry: 'Tentar novamente',
   AppLocale.startupStorageUseDefault: 'Continuar sem ela',
+  AppLocale.startupStorageFolderMissing: 'O NeoStation não encontrou a pasta onde seus dados estão guardados. Ela pode ter sido movida, renomeada ou excluída, ou a unidade onde ela está pode não estar conectada.',
+  AppLocale.startupStorageStartEmpty: 'Começar com uma pasta vazia',
+  AppLocale.startupStorageCreateFailed:
+      'O NeoStation não conseguiu criar a pasta ali.',
   AppLocale.startupLoading: 'Preparando o NeoStation. A aguardar pelo armazenamento e pelos serviços...',
 
   AppLocale.play: 'Jogar',
@@ -1250,6 +1254,8 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.folderNotEmptyBody: 'Esta pasta não está vazia (itens: {count}). O NeoStation irá armazenar os seus próprios dados aqui, junto com o conteúdo existente.',
   AppLocale.folderNotEmptyUseAnyway: 'Usar mesmo assim',
   AppLocale.userDataFolderNotWritable: "Não é possível gravar nesta pasta. Escolha outra ou mantenha o local padrão.",
+  AppLocale.userDataFolderCantWrite:
+      'Não é possível gravar nesta pasta. Escolha outra.',
   AppLocale.userDataFolderGrantAllFiles: "Para usar esta pasta, permita o acesso a todos os arquivos para o NeoStation em Configurações do Android → Apps → Acesso especial a apps → Acesso a todos os arquivos e selecione-a novamente.",
   AppLocale.moveUserDataTitle: 'Mover dados do usuário?',
   AppLocale.moveUserDataBody: 'O NeoStation moverá seus próprios dados — banco de dados, mídia obtida e configurações — da pasta atual para a nova. Arquivos não criados pelo NeoStation permanecem intactos.',

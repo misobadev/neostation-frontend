@@ -1179,8 +1179,38 @@ class SqliteService {
   // Lock logging initialization to avoid recursion
   Completer<DatabaseAdapter>? _initCompleter;
 
+  /// Set while [withAccessHeld] runs: other callers wait for it before they
+  /// get the database.
+  Completer<void>? _accessHold;
+
+  /// Marks the zone of the [withAccessHeld] body, whose own accesses go ahead.
+  static final Object _holdOwner = Object();
+
+  /// Runs [body] while every other caller of [database] waits, and lets them
+  /// go when it ends. Moving the user data copies the database, switches to
+  /// the new folder and closes the old database in [body], so a write that
+  /// arrives meanwhile lands in the new database rather than in the old one,
+  /// which the move then deletes. Code inside [body] (and anything it awaits)
+  /// uses the database as usual. Keep [body] short: reads wait too.
+  ///
+  /// A caller that already holds the database from before the hold, such as
+  /// a scan in progress, isn't held: the move refuses to start while one runs.
+  static Future<T> withAccessHeld<T>(Future<T> Function() body) async {
+    final hold = Completer<void>();
+    instance._accessHold = hold;
+    try {
+      return await runZoned(body, zoneValues: {_holdOwner: true});
+    } finally {
+      instance._accessHold = null;
+      hold.complete();
+    }
+  }
+
   /// Provides the database instance (lazy initialization).
   Future<DatabaseAdapter> get database async {
+    while (_accessHold != null && Zone.current[_holdOwner] != true) {
+      await _accessHold!.future;
+    }
     if (_database != null && _initialized) {
       return _database!;
     }

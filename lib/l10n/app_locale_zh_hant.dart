@@ -122,6 +122,10 @@ const Map<String, dynamic> appLocaleZhHant = {
       'NeoStation 無法存取儲存資料的資料夾。請確認 SD 卡或儲存裝置已連接。',
   AppLocale.startupStorageRetry: '重試',
   AppLocale.startupStorageUseDefault: '繼續（不使用）',
+  AppLocale.startupStorageFolderMissing:
+      'NeoStation 找不到儲存資料的資料夾。它可能已被移動、重新命名或刪除，或者它所在的儲存裝置未連接。',
+  AppLocale.startupStorageStartEmpty: '使用空資料夾開始',
+  AppLocale.startupStorageCreateFailed: 'NeoStation 無法在該位置建立資料夾。',
   AppLocale.startupLoading: '正在準備 NeoStation，等待儲存空間與服務就緒…',
 
   AppLocale.play: '開始遊戲',
@@ -1137,6 +1141,7 @@ const Map<String, dynamic> appLocaleZhHant = {
       '此資料夾已包含 {count} 個項目。NeoStation 會將自己的資料儲存在此處，與現有內容放在一起。',
   AppLocale.folderNotEmptyUseAnyway: '仍然使用',
   AppLocale.userDataFolderNotWritable: "無法寫入此資料夾。請選擇其他資料夾，或保留預設位置。",
+  AppLocale.userDataFolderCantWrite: '無法寫入此資料夾。請選擇其他資料夾。',
   AppLocale.userDataFolderGrantAllFiles: "若要使用此資料夾，請在 Android 設定 → 應用程式 → 特殊應用程式存取權 → 所有檔案存取權 中允許 NeoStation，然後重新選擇。",
   AppLocale.moveUserDataTitle: '移動使用者資料？',
   AppLocale.moveUserDataBody: 'NeoStation 會將自己的資料（資料庫、抓取的媒體和設定）從目前的資料夾移動到新的資料夾。非 NeoStation 建立的檔案不會被更動。',

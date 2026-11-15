@@ -122,6 +122,10 @@ const Map<String, dynamic> appLocaleZh = {
       'NeoStation 无法访问保存数据的文件夹。请确认 SD 卡或存储设备已连接。',
   AppLocale.startupStorageRetry: '重试',
   AppLocale.startupStorageUseDefault: '继续（不使用）',
+  AppLocale.startupStorageFolderMissing:
+      'NeoStation 找不到保存数据的文件夹。它可能已被移动、重命名或删除，或者它所在的存储设备未连接。',
+  AppLocale.startupStorageStartEmpty: '使用空文件夹开始',
+  AppLocale.startupStorageCreateFailed: 'NeoStation 无法在该位置创建文件夹。',
   AppLocale.startupLoading: '正在准备 NeoStation，等待存储和服务就绪…',
 
   AppLocale.play: '开始游戏',
@@ -1137,6 +1141,7 @@ const Map<String, dynamic> appLocaleZh = {
       '此文件夹已包含 {count} 个项目。NeoStation 会将自己的数据存储在此处，与现有内容放在一起。',
   AppLocale.folderNotEmptyUseAnyway: '仍然使用',
   AppLocale.userDataFolderNotWritable: "无法写入此文件夹。请选择其他文件夹，或保留默认位置。",
+  AppLocale.userDataFolderCantWrite: '无法写入此文件夹。请选择其他文件夹。',
   AppLocale.userDataFolderGrantAllFiles:
       "要使用此文件夹，请在 Android 设置 → 应用 → 特殊应用权限 → 所有文件访问权限 中允许 NeoStation，然后重新选择。",
   AppLocale.moveUserDataTitle: '移动用户数据？',
