@@ -128,6 +128,7 @@ class RommArchiveService {
     String? playlistName,
     String? replaceRoot,
     Set<String> replaceable = const {},
+    int? romId,
   }) async {
     final ext = p.extension(archivePath).toLowerCase();
     if (scummVm) {
@@ -135,6 +136,7 @@ class RommArchiveService {
         archivePath,
         systemDir,
         replaceRoot: replaceRoot,
+        romId: romId,
       );
     }
     final folderName = gameFolderName(gameName);
@@ -160,6 +162,7 @@ class RommArchiveService {
       // the files recorded for this ROM.
       replaceRoot: replaceRoot,
       replaceable: replaceable,
+      romId: romId,
       // A new game folder is never written through a link the user keeps
       // there (to another drive, say). A re-download into the copy found for
       // this ROM is the user's own layout and allowed.
@@ -175,6 +178,7 @@ class RommArchiveService {
     String downloadPath,
     String destDir, {
     String? replaceRoot,
+    int? romId,
   }) async {
     final ext = p.extension(downloadPath).toLowerCase();
     if ({'.zip', '.7z', '.rar'}.contains(ext)) {
@@ -184,6 +188,7 @@ class RommArchiveService {
         {'scummvm'},
         scummVm: true,
         replaceRoot: replaceRoot,
+        romId: romId,
       );
       // ScummVM never scans an archive, so keeping one "as-is" would report
       // a download that can't be played as a success (the bug #635 fixed).
@@ -198,13 +203,16 @@ class RommArchiveService {
         final root = destDir;
         final target = p.join(root, id, p.basename(downloadPath));
         await _checkTarget(root, target, downloadPath);
+        // The target folder is this game's only when the copy found for
+        // this ROM is there, or its install record names this ROM.
+        final folder = p.dirname(target);
+        final ours =
+            replaceRoot ??
+            ((await readInstallRecord(folder)).romId == romId && romId != null
+                ? folder
+                : null);
         if (await File(target).exists() &&
-            !await _mayReplace(
-              target,
-              replaceRoot ?? p.dirname(target),
-              const {},
-              const {'scummvm'},
-            )) {
+            !_mayReplace(target, ours, const {}, const {'scummvm'}, const {})) {
           throw const RommArchiveRefusedException(
             RommArchiveRefusal.conflict,
             "it would replace a file that isn't this game's",
@@ -212,6 +220,7 @@ class RommArchiveService {
         }
         await File(target).parent.create(recursive: true);
         await File(downloadPath).rename(target);
+        await _recordInstall(folder, romId, [target]);
         return p.basename(target);
       }
     }
@@ -221,7 +230,7 @@ class RommArchiveService {
     final target = p.join(destDir, p.basename(downloadPath));
     if (!p.equals(target, downloadPath)) {
       if (await File(target).exists() &&
-          !await _mayReplace(target, replaceRoot, const {}, const {})) {
+          !_mayReplace(target, replaceRoot, const {}, const {}, const {})) {
         throw const RommArchiveRefusedException(
           RommArchiveRefusal.conflict,
           "it would replace a file that isn't this game's",
@@ -249,6 +258,7 @@ class RommArchiveService {
     String? replaceRoot,
     Set<String> replaceable = const {},
     bool refuseLinkedDest = false,
+    int? romId,
   }) async {
     final exts = extensions
         .map((ext) => ext.toLowerCase().replaceFirst(RegExp(r'^\.'), ''))
@@ -289,6 +299,7 @@ class RommArchiveService {
           replaceRoot,
           replaceable,
           refuseLinkedDest,
+          romId,
         );
       });
     } on RommArchiveRefusedException catch (e) {
@@ -334,6 +345,7 @@ class RommArchiveService {
     String? replaceRoot,
     Set<String> replaceable,
     bool refuseLinkedDest,
+    int? romId,
   ) async {
     final archive = _Reader.open(archivePath);
     Directory? staging;
@@ -354,13 +366,14 @@ class RommArchiveService {
       for (final (index, raw) in entries.indexed) {
         final path = _normalizeEntryPath(raw.name);
         if (raw.isLink ||
+            // A NUL ends the path where Dart hands it to the OS, so
+            // `.romm_installed\0.bin` would be written as `.romm_installed`.
+            raw.name.codeUnits.any((unit) => unit < 0x20 || unit == 0x7F) ||
             path == null ||
             safeJoin(destDir, path) == null ||
             !seen.add(path.toLowerCase()) ||
-            // Our own bookkeeping file must only ever be written by us.
-            path
-                .split('/')
-                .any((segment) => segment.toLowerCase() == manifestName)) {
+            // Our own bookkeeping files must only ever be written by us.
+            path.split('/').any(_isReservedName)) {
           throw const RommUnsafeArchiveException(
             'unsafe or duplicate archive entry',
           );
@@ -555,24 +568,27 @@ class RommArchiveService {
                 (singleFileDir != null && p.equals(destDir, singleFileDir)))
           ? null
           : destDir;
+      // A folder that merely has this game's name may be another ROM's or
+      // the user's own: it only counts as this ROM's when its install
+      // record says so.
+      final recordedHere =
+          romId != null &&
+          gameFolder != null &&
+          await FileSystemEntity.type(gameFolder, followLinks: false) ==
+              FileSystemEntityType.directory &&
+          (await readInstallRecord(gameFolder)).romId == romId;
       await _install(
         stagedOutputs,
         staging.path,
         destDir,
         archivePath,
-        replaceRoot:
-            replaceRoot ??
-            (gameFolder != null &&
-                    await FileSystemEntity.type(
-                          gameFolder,
-                          followLinks: false,
-                        ) ==
-                        FileSystemEntityType.directory
-                ? gameFolder
-                : null),
+        replaceRoot: replaceRoot ?? (recordedHere ? gameFolder : null),
         replaceable: replaceable,
         claimedExtensions: scummVm ? const {'scummvm', 'dpt'} : exts,
-        manifestDir: gameFolder,
+        // A re-download into the bundle found for this ROM records there
+        // too, so its new files are known next time.
+        recordDir: gameFolder ?? replaceRoot,
+        romId: romId,
       );
       return indexedName;
     } finally {
@@ -740,18 +756,28 @@ class RommArchiveService {
     String? replaceRoot,
     Set<String> replaceable = const {},
     Set<String> claimedExtensions = const {},
-    String? manifestDir,
+    String? recordDir,
+    int? romId,
   }) async {
+    // Read once: a folder game can have thousands of files to check. Only a
+    // record naming this ROM counts.
+    final record = replaceRoot == null
+        ? const InstallRecord(null, {})
+        : await readInstallRecord(replaceRoot);
+    final recorded = romId != null && record.romId == romId
+        ? record.paths
+        : const <String>{};
     // Checked for every file before anything moves: a server-chosen name must
     // not replace another game's files, whose backups would only live in
     // staging and be deleted with it.
     for (final target in outputs.keys) {
       if (await File(target).exists() &&
-          !await _mayReplace(
+          !_mayReplace(
             target,
             replaceRoot,
             replaceable,
             claimedExtensions,
+            recorded,
           )) {
         throw RommArchiveRefusedException(
           RommArchiveRefusal.conflict,
@@ -828,21 +854,8 @@ class RommArchiveService {
     // caller's download folder sweep retries it.
     // Recorded so a later download of this ROM may replace exactly these
     // files, whatever their format, and nothing else in the folder.
-    if (manifestDir != null) {
-      try {
-        final relative = {
-          ...await _readManifest(manifestDir),
-          for (final target in outputs.keys)
-            if (p.isWithin(manifestDir, target))
-              p.relative(target, from: manifestDir).replaceAll('\\', '/'),
-        }.toList()..sort();
-        await File(p.join(manifestDir, manifestName))
-            .writeAsString('${relative.join('\n')}\n', flush: true);
-      } catch (e) {
-        LoggerService.instance.w(
-          'RomM: could not record installed files: ${oneLine('$e')}',
-        );
-      }
+    if (recordDir != null) {
+      await _recordInstall(recordDir, romId, outputs.keys);
     }
     try {
       await debugInstallHook?.call('deleteArchive', archivePath);
@@ -854,24 +867,82 @@ class RommArchiveService {
     }
   }
 
-  /// Name of the file, in a game's own folder, listing what installs of
-  /// that game wrote there (relative `/` paths, one per line).
+  /// Name of the file, in a game's own folder, recording which RomM ROM
+  /// installed there and what it wrote: a `# romm-rom-id: <id>` line, then
+  /// relative `/` paths, one per line.
   static const manifestName = '.romm_installed';
 
-  static Future<Set<String>> _readManifest(String dir) async {
+  static const _recordIdPrefix = '# romm-rom-id: ';
+
+  /// Largest install record that is read. A folder game of 250,000 files
+  /// with long paths stays under it.
+  static const maxRecordBytes = 64 << 20;
+
+  /// Whether an archive entry's path [segment] names one of this service's
+  /// own files (`.romm_installed`, `.romm_download_*`), as Windows would
+  /// resolve it: trailing dots and spaces dropped, a `:stream` suffix
+  /// ignored.
+  static bool _isReservedName(String segment) {
+    final colon = segment.indexOf(':');
+    final name = (colon < 0 ? segment : segment.substring(0, colon))
+        .replaceFirst(RegExp(r'[. ]+$'), '')
+        .toLowerCase();
+    return name.startsWith('.romm_');
+  }
+
+  /// The install record in [dir], or an empty one when there is none, it
+  /// isn't a plain file, or it is too big to be real.
+  @visibleForTesting
+  static Future<InstallRecord> readInstallRecord(String dir) async {
     final file = File(p.join(dir, manifestName));
     try {
       if (await FileSystemEntity.type(file.path, followLinks: false) !=
               FileSystemEntityType.file ||
-          await file.length() > maxDescriptorBytes) {
-        return const {};
+          await file.length() > maxRecordBytes) {
+        return const InstallRecord(null, {});
       }
-      return {
-        for (final line in await file.readAsLines())
-          if (line.trim().isNotEmpty) line.trim().toLowerCase(),
-      };
+      int? romId;
+      final paths = <String>{};
+      for (final raw in await file.readAsLines()) {
+        final line = raw.trim();
+        if (line.startsWith(_recordIdPrefix)) {
+          romId ??= int.tryParse(line.substring(_recordIdPrefix.length));
+        } else if (line.isNotEmpty && !line.startsWith('#')) {
+          paths.add(line.toLowerCase());
+        }
+      }
+      return InstallRecord(romId, paths);
     } catch (_) {
-      return const {};
+      return const InstallRecord(null, {});
+    }
+  }
+
+  /// Adds [targets] inside [dir] to its install record for [romId]. A
+  /// record another ROM wrote is left alone: this install didn't make the
+  /// folder ours.
+  static Future<void> _recordInstall(
+    String dir,
+    int? romId,
+    Iterable<String> targets,
+  ) async {
+    if (romId == null) return;
+    try {
+      final existing = await readInstallRecord(dir);
+      if (existing.romId != null && existing.romId != romId) return;
+      final relative = {
+        if (existing.romId == romId) ...existing.paths,
+        for (final target in targets)
+          if (p.isWithin(dir, target))
+            p.relative(target, from: dir).replaceAll('\\', '/'),
+      }.toList()..sort();
+      await File(p.join(dir, manifestName)).writeAsString(
+        '$_recordIdPrefix$romId\n${relative.join('\n')}\n',
+        flush: true,
+      );
+    } catch (e) {
+      LoggerService.instance.w(
+        'RomM: could not record installed files: ${oneLine('$e')}',
+      );
     }
   }
 
@@ -911,15 +982,17 @@ class RommArchiveService {
 
   /// Whether an existing file at [target] may be replaced: a path in
   /// [replaceable] (the files recorded for this ROM), or, inside
-  /// [replaceRoot] (this game's own folder), a file an earlier install
-  /// recorded in its manifest or one in a format the system launches. Other
-  /// files there (memory cards, saves, the user's notes) are left alone.
-  static Future<bool> _mayReplace(
+  /// [replaceRoot] (this ROM's own folder), a file in a format the system
+  /// launches or one in [recorded] (what this ROM's install record lists).
+  /// Other files there (memory cards, saves, the user's notes) are left
+  /// alone.
+  static bool _mayReplace(
     String target,
     String? replaceRoot,
     Set<String> replaceable,
     Set<String> claimedExtensions,
-  ) async {
+    Set<String> recorded,
+  ) {
     if (replaceable.any((path) => p.equals(path, target))) return true;
     if (replaceRoot == null || !p.isWithin(replaceRoot, target)) return false;
     if (claimedExtensions.contains(_ext(target))) return true;
@@ -927,7 +1000,7 @@ class RommArchiveService {
         .relative(target, from: replaceRoot)
         .replaceAll('\\', '/')
         .toLowerCase();
-    return (await _readManifest(replaceRoot)).contains(relative);
+    return recorded.contains(relative);
   }
 
   static Future<void> _checkTarget(
@@ -1112,4 +1185,14 @@ class _SevenZipReader implements _Reader {
 
   @override
   void close() => _archive.dispose();
+}
+
+/// What [RommArchiveService.manifestName] in a game folder says: the RomM
+/// ROM that installed there (null when unrecorded) and the lower-cased
+/// relative paths it wrote.
+@immutable
+class InstallRecord {
+  final int? romId;
+  final Set<String> paths;
+  const InstallRecord(this.romId, this.paths);
 }

@@ -2190,6 +2190,7 @@ class RommProvider extends ChangeNotifier {
           scummVm: scummVm,
           replaceRoot: replaceRoot,
           replaceable: replaceable,
+          romId: rom.id,
         );
         if (extractedName == null) {
           _log.w(

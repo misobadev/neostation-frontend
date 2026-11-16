@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
@@ -192,6 +193,70 @@ void main() {
     expect(File(path).existsSync(), isFalse);
   });
 
+  for (final name in [
+    '.romm_installed\u0000.bin',
+    '.romm_installed.',
+    '.ROMM_INSTALLED ',
+    '.romm_installed:stream',
+    '.romm_download_9/part',
+  ]) {
+    test('an entry named ${jsonEncode(name)} is unsafe', () async {
+      final path = zip({
+        'Game/Disc 1.chd': [1],
+        'Game/$name': '# romm-rom-id: 42\nCard.mcr\n'.codeUnits,
+      });
+      expect(
+        await RommArchiveService.prepareGameDownload(path, dir.path, 'Game', {
+          'm3u',
+          'chd',
+        }, romId: 42),
+        isNull,
+      );
+      expect(File(path).existsSync(), isFalse);
+      expect(Directory(p.join(dir.path, 'Game')).existsSync(), isFalse);
+    });
+  }
+
+  test('a same-named folder with no record is not replaced', () async {
+    // The user's own folder, or one from before install records: only the
+    // copy the provider found for this ROM (replaceRoot) would make it ours.
+    final disc = File(p.join(dir.path, 'Game', 'Disc 1.chd'))
+      ..createSync(recursive: true)
+      ..writeAsBytesSync([8]);
+    final path = zip({
+      'Game/Disc 1.chd': [1],
+      'Game/Disc 2.chd': [2],
+    });
+    await expectLater(
+      RommArchiveService.prepareGameDownload(path, dir.path, 'Game', {
+        'm3u',
+        'chd',
+      }, romId: 42),
+      refused(RommArchiveRefusal.conflict),
+    );
+    expect(disc.readAsBytesSync(), [8]);
+    expect(File(path).existsSync(), isTrue);
+  });
+
+  test('an install records the ROM that made the folder', () async {
+    final path = zip({
+      'Game/Disc 1.chd': [1],
+      'Game/Disc 2.chd': [2],
+    });
+    expect(
+      await RommArchiveService.prepareGameDownload(path, dir.path, 'Game', {
+        'm3u',
+        'chd',
+      }, romId: 42),
+      'Game.m3u',
+    );
+    final record = await RommArchiveService.readInstallRecord(
+      p.join(dir.path, 'Game'),
+    );
+    expect(record.romId, 42);
+    expect(record.paths, {'disc 1.chd', 'disc 2.chd', 'game.m3u'});
+  });
+
   test('an oversized playlist is not read into memory', () async {
     final path = zip({
       'Game/Game.m3u': List.filled(
@@ -239,7 +304,7 @@ void main() {
           await RommArchiveService.prepareGameDownload(path, dir.path, 'Game', {
             'm3u',
             'chd',
-          }),
+          }, replaceRoot: gameDir.path),
           isNull,
         );
         expect(
@@ -917,6 +982,11 @@ void main() {
       File(p.join(gameDir.path, 'Disc 2.chd')).writeAsBytesSync([9]);
       final card = File(p.join(gameDir.path, 'Card.mcr'))
         ..writeAsBytesSync([7]);
+      // What the earlier install of this ROM recorded there.
+      File(p.join(gameDir.path, RommArchiveService.manifestName))
+          .writeAsStringSync(
+            '# romm-rom-id: 42\nDisc 1.chd\nDisc 2.chd\nGame.m3u\n',
+          );
       for (final name in ['Game.zip', 'Game.m3u']) {
         await RommSaveMapRepository.putMapping(
           romname: name,
@@ -1022,6 +1092,30 @@ void main() {
       final result = await provider.downloadRom(rom, romFolders: [dir.path]);
       expect(result.status, RommDownloadStatus.failed);
       expect(card.readAsBytesSync(), [7]);
+    });
+
+    test("another ROM's folder of the same name is not replaced", () async {
+      // A different RomM entry (say the .7z of the same game) installed
+      // here first. Its files are its own, even in a launchable format.
+      final gameDir = await Directory(p.join(dir.path, 'psx', 'Game'))
+          .create(recursive: true);
+      final disc = File(p.join(gameDir.path, 'Disc 1.chd'))
+        ..writeAsBytesSync([8]);
+      File(p.join(gameDir.path, RommArchiveService.manifestName))
+          .writeAsStringSync('# romm-rom-id: 7\nDisc 1.chd\nGame.m3u\n');
+      serve({
+        'Game/Disc 1.chd': [1],
+        'Game/Disc 2.chd': [2],
+      });
+      final result = await provider.downloadRom(rom, romFolders: [dir.path]);
+      expect(result.status, RommDownloadStatus.failed);
+      expect(disc.readAsBytesSync(), [8]);
+      expect(File(p.join(dir.path, 'psx', 'Game.zip')).existsSync(), isTrue);
+      expect(
+        (await RommArchiveService.readInstallRecord(gameDir.path)).romId,
+        7,
+        reason: "the other ROM's record is left alone",
+      );
     });
 
     test('a nested bundle copy is served from the cache', () async {
