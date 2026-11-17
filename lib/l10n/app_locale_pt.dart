@@ -1057,6 +1057,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Apenas saves na nuvem',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Conflito de save detectado',
   AppLocale.neoSyncNewerCloudCopy: 'A nuvem tinha uma cópia mais recente deste save, então ela foi baixada. A cópia deste dispositivo está no Histórico de saves, de onde você pode restaurá-la.',
+  AppLocale.neoSyncFirstCardSyncTookCloud: "Este cartão de memória nunca tinha sido sincronizado a partir deste dispositivo e era diferente do que está na nuvem, então o da nuvem foi baixado. O cartão deste dispositivo está no Histórico de saves, de onde você pode restaurá-lo.",
   AppLocale.neoSyncKeptCloudCopy: "Este save também foi alterado em outro dispositivo. A cópia deste dispositivo foi enviada, e a outra foi guardada ao lado como {file}.",
   AppLocale.keptCopiesTitle: 'Histórico de saves',
   AppLocale.keptCopiesSubtitle:

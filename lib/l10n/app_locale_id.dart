@@ -1046,6 +1046,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Hanya simpanan cloud',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Konflik simpanan terdeteksi',
   AppLocale.neoSyncNewerCloudCopy: 'Cloud memiliki salinan simpanan ini yang lebih baru, jadi salinan itu diunduh. Salinan perangkat ini disimpan di Riwayat simpanan dan bisa dipulihkan dari sana.',
+  AppLocale.neoSyncFirstCardSyncTookCloud: "Kartu memori ini belum pernah disinkronkan dari perangkat ini dan berbeda dengan yang ada di cloud, jadi kartu dari cloud diunduh. Kartu perangkat ini disimpan di Riwayat simpanan dan bisa dipulihkan dari sana.",
   AppLocale.neoSyncKeptCloudCopy: "Simpanan ini juga berubah di perangkat lain. Salinan perangkat ini diunggah, dan salinan lainnya disimpan di sebelahnya sebagai {file}.",
   AppLocale.keptCopiesTitle: 'Riwayat simpanan',
   AppLocale.keptCopiesSubtitle:

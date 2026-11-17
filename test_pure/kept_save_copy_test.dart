@@ -325,6 +325,23 @@ void main() {
       },
     );
 
+    test('only the top level of a folder, when asked', () async {
+      final top = write(p.join('dc', 'vmu_save_A1.bin.neosync.bak'), [1]);
+      write(p.join('dc', 'textures', 'T1', 'tex.png.neosync.bak'), [2]);
+      write(p.join('dc', 'textures', 'gone.bin.neosync.bak'), [3]);
+
+      expect(
+        await listKeptCopyPaths([p.join(root.path, 'dc')], recursive: false),
+        [top.path],
+      );
+      expect(
+        await goneSavesWithKeptCopies([
+          p.join(root.path, 'dc'),
+        ], recursive: false),
+        [p.join(root.path, 'dc', 'vmu_save_A1.bin')],
+      );
+    });
+
     test('a save that is gone is found by its copies', () async {
       write(p.join('saves', 'Zelda.srm'), [1]);
       write(p.join('saves', 'Zelda.srm.neosync.bak'), [2]);

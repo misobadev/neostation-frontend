@@ -54,6 +54,7 @@ class KeptSaveCopies {
     String Function()? activeProviderId,
     Future<List<String>> Function(GameModel game)? locateSaves,
     Future<List<String>> Function()? saveFolders,
+    Future<List<String>> Function()? cardFolders,
     bool Function()? gameRunning,
     bool Function(String providerId, GameModel? game)? syncing,
   }) : _activeProviderId =
@@ -65,6 +66,11 @@ class KeptSaveCopies {
                save.filePath,
            ]),
        _saveFolders = saveFolders ?? neoSync.keptCopyFolders,
+       _cardFolders =
+           cardFolders ??
+           (saveFolders != null
+               ? (() async => const <String>[])
+               : neoSync.keptCopyCardFolders),
        _gameRunning =
            gameRunning ?? (() => GameSessionManager.isGameLaunchInProgress),
        _syncing =
@@ -73,6 +79,10 @@ class KeptSaveCopies {
   final String Function() _activeProviderId;
   final Future<List<String>> Function(GameModel game) _locateSaves;
   final Future<List<String>> Function() _saveFolders;
+
+  /// Folders whose top level only holds saves: RetroArch's shared-card
+  /// folders in its system folder.
+  final Future<List<String>> Function() _cardFolders;
   final bool Function() _gameRunning;
   final bool Function(String providerId, GameModel? game) _syncing;
 
@@ -111,7 +121,10 @@ class KeptSaveCopies {
   Future<List<KeptSaveGroup>> all() async {
     final sources = _sources;
     if (sources.isEmpty) return const [];
-    final copyPaths = await listKeptCopyPaths(await _saveFolders());
+    final copyPaths = {
+      ...await listKeptCopyPaths(await _saveFolders()),
+      ...await listKeptCopyPaths(await _cardFolders(), recursive: false),
+    }.toList();
     if (whyNotNow() == null) {
       final bySave = <String, List<String>>{};
       for (final copy in copyPaths) {
