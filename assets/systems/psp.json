@@ -86,6 +86,17 @@
       }
     },
     {
+      "name": "Standalone PPSSPP Duo",
+      "unique_id": "psp.org.ppsspp.ppssppduo",
+      "description": "Supported extensions: cso, chd, elf, iso, pbp, prx.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n org.ppsspp.ppssppduo/org.ppsspp.ppsspp.PpssppActivity -a android.intent.action.VIEW -c android.intent.category.DEFAULT -d \"{file.uri}\" -t application/octet-stream --activity-clear-task --activity-clear-top --activity-no-history"
+        }
+      }
+    },
+    {
       "name": "RetroArch64 PPSSPP",
       "default_core": true,
       "unique_id": "psp.ra64.ppsspp",
