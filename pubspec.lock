@@ -37,10 +37,10 @@ packages:
     dependency: "direct main"
     description:
       name: archive
-      sha256: de5ac590b8155e4e676088d714bd41ea620449a6adc0f7950c5073874b287ddb
+      sha256: "2fda90592c0afd219c5e285618a98da835cd10df38372666093d25dfe457a2d0"
       url: "https://pub.dev"
     source: hosted
-    version: "4.6.0"
+    version: "4.7.1"
   args:
     dependency: transitive
     description:
@@ -141,10 +141,10 @@ packages:
     dependency: transitive
     description:
       name: cnativeapi
-      sha256: c43703998995e132b0656d2b8a95ed2bedc6b22ccee2c827bcdc075e0330e319
+      sha256: "510107ee007a7b4a01aa1eaec3ed097007d65760be6b272f093c4ca34a0d12ff"
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.10"
+    version: "0.6.1"
   code_assets:
     dependency: transitive
     description:
@@ -423,10 +423,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_soloud
-      sha256: "9a439ebd477ee7b1c5cdf0f70765fbfae21b484b5b5bfd1446057f61b4111003"
+      sha256: c30fbcf0e38d59e69602fafd965ed75392ace9ecb22938d99ac96fd0545383b1
       url: "https://pub.dev"
     source: hosted
-    version: "5.2.3"
+    version: "5.3.0"
   flutter_staggered_animations:
     dependency: "direct main"
     description:
@@ -439,10 +439,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_svg
-      sha256: "100c19dcc4ff60083e95a44a6f44f3a1bb887d353c5d86f6a9b688aa3cb46236"
+      sha256: "455a22036f8d1b7c74f53283c8644d6af2f6f7c9ec72c7b06a2ff70fb3954a54"
       url: "https://pub.dev"
     source: hosted
-    version: "2.3.2"
+    version: "2.4.0"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -629,6 +629,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.0"
+  listen:
+    dependency: transitive
+    description:
+      name: listen
+      sha256: "47501a08016a43fcad79252439d723f50f14f88fa7bfd8a177e0a417e5c9e1f2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
   logger:
     dependency: "direct main"
     description:
@@ -681,10 +689,10 @@ packages:
     dependency: transitive
     description:
       name: material_ui
-      sha256: a30f5d0625b6b83770f53ca3f7aafd6fd9d147cb3853f54a70668541046fe5d6
+      sha256: a6b19012df437a356cbc01f8ea22a105e07194c47c9a6009da0032a0ce35c4ab
       url: "https://pub.dev"
     source: hosted
-    version: "1.10.0"
+    version: "1.11.1"
   meta:
     dependency: transitive
     description:
@@ -721,18 +729,18 @@ packages:
     dependency: transitive
     description:
       name: nativeapi
-      sha256: "118045bb549cb6fabad472a3a22a537e7310bbf20097350f5027808b4a5853ce"
+      sha256: c0c566cf6788a6b6a32ce2666f02364b7fb50133f07a744bc1e793b5b8bb2c78
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.10"
+    version: "0.6.1"
   nativeapi_flutter:
     dependency: transitive
     description:
       name: nativeapi_flutter
-      sha256: "357a405c69212f5157da1bd3be183a53c2b841d0de0eb51f4a3947913712aec4"
+      sha256: "3bb647f299932a4a19aa066051aabc6872f6876fa50c38a0ef132da414e9db26"
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.10"
+    version: "0.6.1"
   nested:
     dependency: transitive
     description:
@@ -1142,10 +1150,10 @@ packages:
     dependency: "direct main"
     description:
       name: sqlite3
-      sha256: b1ec21d306ddbec59a88ae3682ad81728561f7105db78fea0fdd67f06911a519
+      sha256: "8765980411f9b6733534efe9d014fad0750fa649590598772c04692deb34886b"
       url: "https://pub.dev"
     source: hosted
-    version: "3.9.0"
+    version: "3.9.1"
   stack_trace:
     dependency: transitive
     description:
@@ -1198,26 +1206,26 @@ packages:
     dependency: "direct dev"
     description:
       name: test
-      sha256: ca578dc12bb8b2f40b67b7d3bd2fac4f31c01a6ff7130a14e2597b919934507f
+      sha256: de5d145b0afff7921e5e788a880f52d7e5f3ae24068a202f6fd3b58e4ba26323
       url: "https://pub.dev"
     source: hosted
-    version: "1.31.1"
+    version: "1.32.0"
   test_api:
     dependency: transitive
     description:
       name: test_api
-      sha256: "2a122cbe059f8b610d3a5415f42e255b6c17b1f21eee1d960f31080237fb4f11"
+      sha256: "0a10344e901e5b2e63819567951cb6a06673ed6b84f40462188ff5a0c41f371f"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.12"
+    version: "0.7.14"
   test_core:
     dependency: transitive
     description:
       name: test_core
-      sha256: d2e98ec12998368dc59ddd47ab709f2cd55acd6b66dc7db764455a44082f4bc5
+      sha256: "80f3fb49087454e07e7e07c67578cfdd156c8c3a5227d8b3f47c7b2d019c2e93"
       url: "https://pub.dev"
     source: hosted
-    version: "0.6.18"
+    version: "0.6.20"
   typed_data:
     dependency: transitive
     description:
@@ -1470,10 +1478,10 @@ packages:
     dependency: "direct main"
     description:
       name: window_manager
-      sha256: bdd6b1a2c1ce50f3bba7ffbaa0d5dc5feb6b6a24fd20269da4de90244f77a471
+      sha256: "43fc05da6cf670b456a758c88b60e2c1371fc32e1030aac308d0087d87c9368d"
       url: "https://pub.dev"
     source: hosted
-    version: "0.6.0"
+    version: "0.7.0"
   windows_file_picker:
     dependency: transitive
     description:
