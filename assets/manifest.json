@@ -1,5 +1,5 @@
 {
-  "latest_version": "0.3.44",
+  "latest_version": "0.3.45",
   "systems": [
     "2600",
     "32x",
@@ -16,6 +16,7 @@
     "arc",
     "ard",
     "ast",
+    "atari800",
     "aw",
     "bbcmicro",
     "c64",
@@ -60,6 +61,7 @@
     "md-hacks",
     "mini",
     "mo2",
+    "model2",
     "model3",
     "msx",
     "music",
