@@ -130,6 +130,39 @@
       }
     },
     {
+      "name": "Standalone Lemon",
+      "unique_id": "switch.dev.lemon.lemon_emulator",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n dev.lemon.lemon_emulator/dev.lemon.lemon_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d \"{file.uri}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone Lemon Lite",
+      "unique_id": "switch.dev.lemon.lemon_emulator.lite",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n dev.lemon.lemon_emulator.lite/dev.lemon.lemon_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d \"{file.uri}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone Lemon Lite & Spoofed",
+      "unique_id": "switch.com.antutu.ABenchMark",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.antutu.ABenchMark/dev.lemon.lemon_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d \"{file.uri}\""
+        }
+      }
+    },
+    {
       "name": "Standalone Yuzu",
       "unique_id": "switch.org.yuzu.yuzu_emu",
       "description": "Supported extensions: nro, nso, nca, xci, nsp.",
