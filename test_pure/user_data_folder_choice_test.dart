@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:neostation/utils/user_data_folder_choice.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 /// Settings used to swap every folder picked for user data for NeoStation's
@@ -195,4 +198,50 @@ void main() {
       }
     });
   });
+
+  // NEO-256: the folder the data is in, picked by another path (a link to it,
+  // or under a linked parent), looked like a new folder, and the move then
+  // deleted everything in it.
+  group('the folder the data is in, by another path', () {
+    late Directory tmp;
+    late String data;
+
+    setUp(() {
+      tmp = Directory.systemTemp.createTempSync('neo_choice_');
+      data = p.join(tmp.path, 'user-data');
+      Directory(data).createSync();
+    });
+    tearDown(() => tmp.deleteSync(recursive: true));
+
+    Future<UserDataFolderChoice> choose(String picked) => chooseUserDataFolder(
+      picked: picked,
+      current: data,
+      canUse: (_) async => true,
+      appDirs: () async => const [],
+    );
+
+    test('through a link to it: nothing to do', () async {
+      final alias = p.join(tmp.path, 'alias');
+      Link(alias).createSync(data);
+      expect(await choose(alias), isA<SameUserDataFolder>());
+    });
+
+    test('under a linked parent: nothing to do', () async {
+      final parent = p.join(tmp.path, 'parent-alias');
+      Link(parent).createSync(tmp.path);
+      expect(
+        await choose(p.join(parent, 'user-data')),
+        isA<SameUserDataFolder>(),
+      );
+    });
+
+    test('a folder beside it, through the same link: moved to', () async {
+      final parent = p.join(tmp.path, 'parent-alias');
+      Link(parent).createSync(tmp.path);
+      expect(
+        await choose(p.join(parent, 'elsewhere')),
+        isA<PickedUserDataFolder>(),
+      );
+    });
+  }, skip: Platform.isWindows ? 'needs symbolic links' : false);
 }

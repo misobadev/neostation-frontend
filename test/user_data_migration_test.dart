@@ -105,6 +105,8 @@ void main() {
     tearDown(() async {
       UserDataLocationService.debugAfterCopy = null;
       UserDataLocationService.debugBeforeRename = null;
+      UserDataLocationService.debugCanHoldLinks = null;
+      UserDataLocationService.debugBeforeDelete = null;
       await SqliteService.closeDatabase();
       if (await tmp.exists()) await tmp.delete(recursive: true);
     });
@@ -740,6 +742,628 @@ void main() {
         reason: 'the clash was found before anything was put in place',
       );
     });
+
+    // NEO-245: the move listed folders following symbolic links, so a link
+    // in our folder to one outside (media → ES-DE's downloaded_media, say)
+    // had the target's files copied over and then deleted where they were.
+    // Links now move as links, like `mv`: recreated in the new folder
+    // pointing at the same place, and nothing at the target is touched.
+    group('links', () {
+      late Directory outside; // a folder that isn't ours, behind a link
+      late File thesis;
+
+      setUp(() {
+        outside = Directory(p.join(tmp.path, 'Documents'))..createSync();
+        thesis = File(p.join(outside.path, 'thesis.txt'))
+          ..writeAsStringSync('thesis');
+        File(p.join(outside.path, 'sub', 'deep.txt'))
+          ..createSync(recursive: true)
+          ..writeAsStringSync('deep');
+        Directory(p.join(outside.path, 'empty')).createSync();
+      });
+
+      /// Every entry under [dir], not following links: a link shows its target.
+      Map<String, String> tree(Directory dir) => {
+        if (dir.existsSync())
+          for (final e in dir.listSync(recursive: true, followLinks: false))
+            p.relative(e.path, from: dir.path): e is Link
+                ? '-> ${e.targetSync()}'
+                : e is File
+                ? e.readAsStringSync()
+                : '<dir>',
+      };
+
+      Map<String, String> outsideBefore() => tree(outside);
+
+      String? linkTarget(String path) =>
+          FileSystemEntity.typeSync(path, followLinks: false) ==
+              FileSystemEntityType.link
+          ? Link(path).targetSync()
+          : null;
+
+      bool gone(String path) =>
+          FileSystemEntity.typeSync(path, followLinks: false) ==
+          FileSystemEntityType.notFound;
+
+      test('a folder link inside ours moves as a link', () async {
+        final before = outsideBefore();
+        Link(p.join(esde.path, 'media', 'x')).createSync(outside.path);
+
+        await migrate();
+
+        expect(tree(outside), before, reason: 'nothing at the target moved');
+        expect(linkTarget(p.join(dest.path, 'media', 'x')), outside.path);
+        expect(gone(p.join(esde.path, 'media', 'x')), isTrue);
+        expect(
+          File(p.join(dest.path, 'media', 'snes', 'boxart', 'ct.png'))
+              .readAsStringSync(),
+          'neostation-scraped',
+        );
+        expect(readDatabase(p.join(dest.path, 'data.sqlite')), (3, 'ok'));
+      });
+
+      test('a file link inside ours moves as a link', () async {
+        Link(p.join(esde.path, 'media', 'snes', 'shared.png'))
+            .createSync(thesis.path);
+
+        await migrate();
+
+        expect(thesis.readAsStringSync(), 'thesis');
+        expect(
+          linkTarget(p.join(dest.path, 'media', 'snes', 'shared.png')),
+          thesis.path,
+        );
+        expect(gone(p.join(esde.path, 'media', 'snes', 'shared.png')), isTrue);
+      });
+
+      test('a linked media folder moves as a link', () async {
+        // Shared art: NeoStation's media is ES-DE's downloaded_media.
+        Directory(p.join(esde.path, 'media')).deleteSync(recursive: true);
+        Link(p.join(esde.path, 'media')).createSync(outside.path);
+        final before = outsideBefore();
+
+        await migrate();
+
+        expect(tree(outside), before, reason: 'the shared art stays');
+        expect(linkTarget(p.join(dest.path, 'media')), outside.path);
+        expect(gone(p.join(esde.path, 'media')), isTrue);
+        expect(readDatabase(p.join(dest.path, 'data.sqlite')), (3, 'ok'));
+      });
+
+      test('a linked media folder kept outside ours moves as a link', () async {
+        // Linux and macOS keep media outside the user-data folder.
+        Directory(p.join(esde.path, 'media')).deleteSync(recursive: true);
+        final media = p.join(tmp.path, 'media-link');
+        Link(media).createSync(outside.path);
+        final before = outsideBefore();
+
+        await UserDataLocationService.migrateData(
+          sourceUserDataPath: esde.path,
+          sourceMediaPath: media,
+          destPath: dest.path,
+        );
+
+        expect(tree(outside), before);
+        expect(linkTarget(p.join(dest.path, 'media')), outside.path);
+        expect(gone(media), isTrue);
+      });
+
+      test('a link where the move makes a folder changes nothing', () async {
+        // media both in the user-data folder and, as a link, kept outside it:
+        // the link would take the place of the folder the move makes.
+        final media = p.join(tmp.path, 'media-link');
+        Link(media).createSync(outside.path);
+        final destBefore = tree(dest);
+
+        await expectLater(
+          UserDataLocationService.migrateData(
+            sourceUserDataPath: esde.path,
+            sourceMediaPath: media,
+            destPath: dest.path,
+          ),
+          failsWith(UserDataMoveFailureKind.blocked),
+        );
+
+        expect(tree(dest), destBefore);
+        expect(neoArt.readAsStringSync(), 'neostation-scraped');
+        expect(linkTarget(media), outside.path);
+      });
+
+      test('a relative link still points at the same place', () async {
+        Link(p.join(esde.path, 'media', 'x'))
+            .createSync(p.join('..', '..', 'Documents'));
+
+        await migrate();
+
+        expect(
+          Link(p.join(dest.path, 'media', 'x')).resolveSymbolicLinksSync(),
+          outside.resolveSymbolicLinksSync(),
+        );
+        expect(thesis.readAsStringSync(), 'thesis');
+      });
+
+      test(
+        'a link within what moves follows it; one to our folder goes',
+        () async {
+          // media/loop → media is recreated as media/loop → the new media; a
+          // link to the whole folder would hold ours in a loop, so it goes.
+          Link(p.join(esde.path, 'media', 'loop'))
+              .createSync(p.join(esde.path, 'media'));
+          Link(p.join(esde.path, 'media', 'up')).createSync(esde.path);
+
+          await migrate();
+
+          expect(tree(Directory(p.join(dest.path, 'media'))), {
+            'snes': '<dir>',
+            'snes/boxart': '<dir>',
+            'snes/boxart/ct.png': 'neostation-scraped',
+            'loop': '-> ${p.join(dest.path, 'media')}',
+          }, reason: 'copied once; nothing points back at the old folder');
+          expect(readDatabase(p.join(dest.path, 'data.sqlite')), (3, 'ok'));
+          expect(
+            esSystems.readAsStringSync(),
+            '<systemList/>',
+            reason: 'foreign files stay, even reached through a link',
+          );
+          expect(gone(p.join(esde.path, 'media')), isTrue);
+        },
+      );
+
+      test('a link to another of our folders follows it there', () async {
+        Link(p.join(esde.path, 'media', 'genesis'))
+            .createSync(p.join(esde.path, 'media', 'snes'));
+
+        await migrate();
+
+        expect(
+          linkTarget(p.join(dest.path, 'media', 'genesis')),
+          p.join(dest.path, 'media', 'snes'),
+        );
+      });
+
+      test(
+        'a link to what stays in the old folder still leads there',
+        () async {
+          // NeoStation's media is ES-DE's downloaded_media, in the same folder.
+          Directory(p.join(esde.path, 'media')).deleteSync(recursive: true);
+          final downloaded = p.join(esde.path, 'downloaded_media');
+          Link(p.join(esde.path, 'media')).createSync(downloaded);
+
+          await migrate();
+
+          expect(linkTarget(p.join(dest.path, 'media')), downloaded);
+          expect(scrapedArt.readAsStringSync(), 'PRECIOUS ARTWORK BYTES');
+        },
+      );
+
+      test('a link into the new folder is neither followed nor kept', () async {
+        final mine = File(p.join(dest.path, 'mine.txt'))
+          ..writeAsStringSync('mine');
+        Link(p.join(esde.path, 'media', 'x')).createSync(dest.path);
+
+        await migrate();
+
+        expect(mine.readAsStringSync(), 'mine');
+        expect(readDatabase(p.join(dest.path, 'data.sqlite')), (3, 'ok'));
+        expect(
+          File(p.join(dest.path, 'config.json')).readAsStringSync(),
+          'config-bytes',
+        );
+        expect(gone(p.join(dest.path, 'media', 'x')), isTrue);
+      });
+
+      test(
+        'a link where the new folder has a folder changes nothing',
+        () async {
+          Directory(p.join(esde.path, 'media')).deleteSync(recursive: true);
+          Link(p.join(esde.path, 'media')).createSync(outside.path);
+          File(p.join(dest.path, 'media', 'theirs.png'))
+            ..createSync(recursive: true)
+            ..writeAsStringSync('theirs');
+          final destBefore = tree(dest);
+
+          await expectLater(
+            migrate(),
+            failsWith(UserDataMoveFailureKind.blocked),
+          );
+
+          expect(tree(dest), destBefore);
+          expect(linkTarget(p.join(esde.path, 'media')), outside.path);
+          expect(readDatabase(db.path), (3, 'ok'));
+        },
+      );
+
+      test(
+        'a linked art pack moves as a link; others in themes/ stay',
+        () async {
+          final pack = Directory(p.join(tmp.path, 'packs', 'Pack'))
+            ..createSync(recursive: true);
+          File(p.join(pack.path, 'pack.json')).writeAsStringSync('{}');
+          Directory(p.join(esde.path, 'themes')).createSync();
+          Link(p.join(esde.path, 'themes', 'Pack')).createSync(pack.path);
+          Link(p.join(esde.path, 'themes', 'es-theme'))
+              .createSync(outside.path);
+
+          await migrate();
+
+          expect(linkTarget(p.join(dest.path, 'themes', 'Pack')), pack.path);
+          expect(File(p.join(pack.path, 'pack.json')).readAsStringSync(), '{}');
+          expect(
+            linkTarget(p.join(esde.path, 'themes', 'es-theme')),
+            outside.path,
+            reason: 'not an art pack, so not ours',
+          );
+          expect(gone(p.join(dest.path, 'themes', 'es-theme')), isTrue);
+        },
+      );
+
+      test(
+        'a folder swapped for a link mid-move is not deleted through',
+        () async {
+          // The old copies are deleted by path: a folder of ours replaced by a
+          // link after it was listed would have the target's same-named files
+          // deleted instead.
+          final decoy = File(p.join(outside.path, 'ct.png'))
+            ..writeAsStringSync('not ours');
+          final boxart = p.join(esde.path, 'media', 'snes', 'boxart');
+          var swapped = false;
+          UserDataLocationService.debugBeforeRename = (copy, destFile) async {
+            if (swapped) return;
+            swapped = true;
+            Directory(boxart).renameSync(p.join(tmp.path, 'boxart-elsewhere'));
+            Link(boxart).createSync(outside.path);
+          };
+
+          await migrate();
+
+          expect(decoy.readAsStringSync(), 'not ours');
+          expect(
+            File(p.join(dest.path, 'media', 'snes', 'boxart', 'ct.png'))
+                .readAsStringSync(),
+            'neostation-scraped',
+          );
+        },
+      );
+
+      test('a relative link above which a folder is a link', () async {
+        // The user-data folder is reached through a link: `..` in the link is
+        // taken from the folder's real place, as the file system takes it.
+        final alias = p.join(tmp.path, 'aliases', 'ud');
+        Directory(p.dirname(alias)).createSync();
+        Link(alias).createSync(esde.path);
+        Link(p.join(esde.path, 'media', 'x'))
+            .createSync(p.join('..', '..', 'Documents'));
+
+        await UserDataLocationService.migrateData(
+          sourceUserDataPath: alias,
+          sourceMediaPath: p.join(alias, 'media'),
+          destPath: dest.path,
+        );
+
+        expect(
+          Link(p.join(dest.path, 'media', 'x')).resolveSymbolicLinksSync(),
+          outside.resolveSymbolicLinksSync(),
+        );
+      });
+
+      test(
+        'a linked art-pack folder is recreated, and stays for ES-DE',
+        () async {
+          final themes = Directory(p.join(tmp.path, 'shared-themes'))
+            ..createSync();
+          Link(p.join(esde.path, 'themes')).createSync(themes.path);
+
+          await migrate();
+
+          expect(linkTarget(p.join(dest.path, 'themes')), themes.path);
+          expect(linkTarget(p.join(esde.path, 'themes')), themes.path);
+        },
+      );
+
+      test('a database or key file leading nowhere is not carried', () async {
+        Link(p.join(esde.path, 'data.sqlite-journal'))
+            .createSync(p.join(tmp.path, 'gone', 'journal'));
+        Link(p.join(esde.path, 'credentials.key'))
+            .createSync(p.join(tmp.path, 'gone', 'key'));
+
+        await migrate();
+
+        expect(gone(p.join(dest.path, 'data.sqlite-journal')), isTrue);
+        expect(gone(p.join(dest.path, 'credentials.key')), isTrue);
+        expect(readDatabase(p.join(dest.path, 'data.sqlite')), (3, 'ok'));
+        expect(gone(p.join(esde.path, 'data.sqlite-journal')), isTrue);
+      });
+
+      test('a linked key file moves as a file; its target stays', () async {
+        final key = File(p.join(outside.path, 'key'))
+          ..writeAsStringSync('secret');
+        Link(p.join(esde.path, 'credentials.key')).createSync(key.path);
+
+        await migrate();
+
+        expect(
+          FileSystemEntity.typeSync(
+            p.join(dest.path, 'credentials.key'),
+            followLinks: false,
+          ),
+          FileSystemEntityType.file,
+        );
+        expect(
+          File(p.join(dest.path, 'credentials.key')).readAsStringSync(),
+          'secret',
+        );
+        expect(key.readAsStringSync(), 'secret');
+      });
+
+      test('a new folder that cannot hold links gets their content', () async {
+        UserDataLocationService.debugCanHoldLinks = (_) async => false;
+        Link(p.join(esde.path, 'media', 'x')).createSync(outside.path);
+        final before = outsideBefore();
+
+        await migrate();
+
+        expect(tree(outside), before, reason: 'nothing at the target goes');
+        expect(
+          File(p.join(dest.path, 'media', 'x', 'thesis.txt'))
+              .readAsStringSync(),
+          'thesis',
+        );
+        expect(
+          File(p.join(dest.path, 'media', 'x', 'sub', 'deep.txt'))
+              .readAsStringSync(),
+          'deep',
+        );
+        expect(
+          FileSystemEntity.typeSync(
+            p.join(dest.path, 'media', 'x'),
+            followLinks: false,
+          ),
+          FileSystemEntityType.directory,
+        );
+        expect(gone(p.join(esde.path, 'media', 'x')), isTrue);
+      });
+
+      test(
+        'a folder in the new one leading back into ours changes nothing',
+        () async {
+          // Moved through it, every copy would land on its own source, which
+          // was then deleted.
+          Link(p.join(dest.path, 'media'))
+              .createSync(p.join(esde.path, 'media'));
+
+          await expectLater(
+            migrate(),
+            failsWith(UserDataMoveFailureKind.blocked),
+          );
+
+          expect(neoArt.readAsStringSync(), 'neostation-scraped');
+          expect(readDatabase(db.path), (3, 'ok'));
+        },
+      );
+
+      test('a link placed before the move gave up is taken back', () async {
+        Link(p.join(esde.path, 'media', 'x')).createSync(outside.path);
+        UserDataLocationService.debugBeforeRename = (copy, target) async {
+          if (p.basename(target) == 'config.json') {
+            File(p.join(p.dirname(copy), 'data.sqlite')).writeAsStringSync('');
+          }
+        };
+
+        await expectLater(migrate(), failsWith(UserDataMoveFailureKind.other));
+
+        expect(gone(p.join(dest.path, 'media', 'x')), isTrue);
+        expect(linkTarget(p.join(esde.path, 'media', 'x')), outside.path);
+        expect(thesis.readAsStringSync(), 'thesis');
+      });
+
+      test(
+        'the same folder by a path the file system resolves moves nothing',
+        () async {
+          // a/l/.. is the folder holding l's target, not a: the file system
+          // takes `..` after the link.
+          final x = Directory(p.join(tmp.path, 'x'))..createSync();
+          Directory(p.join(tmp.path, 'a')).createSync();
+          Link(p.join(tmp.path, 'a', 'l')).createSync(x.path);
+
+          await migrate(to: '${p.join(tmp.path, 'a', 'l')}/../ES-DE');
+
+          expect(readDatabase(db.path), (3, 'ok'));
+          expect(neoArt.readAsStringSync(), 'neostation-scraped');
+        },
+      );
+
+      test(
+        'a stale -wal link in the new folder goes, even one leading nowhere',
+        () async {
+          Link(p.join(dest.path, 'data.sqlite-wal'))
+              .createSync(p.join(tmp.path, 'gone', 'wal'));
+
+          await migrate();
+
+          expect(gone(p.join(dest.path, 'data.sqlite-wal')), isTrue);
+          expect(readDatabase(p.join(dest.path, 'data.sqlite')), (3, 'ok'));
+        },
+      );
+
+      test(
+        'a folder swapped for a link once its first file went keeps the rest',
+        () async {
+          // Checked again for every file: one swap after the first deletion
+          // must not take the folder's other same-named files with it.
+          final boxart = p.join(esde.path, 'media', 'snes', 'boxart');
+          File(p.join(boxart, 'two.png')).writeAsStringSync('ours too');
+          final decoys = [
+            for (final name in ['ct.png', 'two.png'])
+              File(p.join(outside.path, name))..writeAsStringSync('not ours'),
+          ];
+          var seen = 0;
+          UserDataLocationService.debugBeforeDelete = (file) async {
+            if (p.dirname(file) != boxart || ++seen != 2) return;
+            Directory(boxart).renameSync(p.join(tmp.path, 'boxart-elsewhere'));
+            Link(boxart).createSync(outside.path);
+          };
+
+          await migrate();
+
+          for (final decoy in decoys) {
+            expect(decoy.readAsStringSync(), 'not ours', reason: decoy.path);
+          }
+        },
+      );
+
+      test(
+        'copying for a folder without links leaves links inside alone',
+        () async {
+          UserDataLocationService.debugCanHoldLinks = (_) async => false;
+          final secrets = Directory(p.join(tmp.path, 'secrets'))..createSync();
+          File(p.join(secrets.path, 'id_rsa')).writeAsStringSync('key');
+          Link(p.join(outside.path, 'loot')).createSync(secrets.path);
+          Link(p.join(outside.path, 'back')).createSync(esde.path);
+          Link(p.join(esde.path, 'media', 'x')).createSync(outside.path);
+
+          await migrate();
+
+          expect(
+            File(p.join(dest.path, 'media', 'x', 'thesis.txt'))
+                .readAsStringSync(),
+            'thesis',
+          );
+          expect(gone(p.join(dest.path, 'media', 'x', 'loot')), isTrue);
+          expect(gone(p.join(dest.path, 'media', 'x', 'back')), isTrue);
+          expect(
+            File(p.join(secrets.path, 'id_rsa')).readAsStringSync(),
+            'key',
+          );
+        },
+      );
+
+      test(
+        'copying for a folder without links skips what moves anyway',
+        () async {
+          UserDataLocationService.debugCanHoldLinks = (_) async => false;
+          Link(p.join(esde.path, 'media', 'genesis'))
+              .createSync(p.join(esde.path, 'media', 'snes'));
+          final unplugged = p.join(esde.path, 'media', 'unplugged');
+          Link(unplugged).createSync(p.join(tmp.path, 'not-there'));
+
+          await migrate();
+
+          expect(
+            gone(p.join(dest.path, 'media', 'genesis')),
+            isTrue,
+            reason: 'snes moves; no second copy of it',
+          );
+          expect(gone(p.join(esde.path, 'media', 'genesis')), isTrue);
+          expect(
+            linkTarget(unplugged),
+            p.join(tmp.path, 'not-there'),
+            reason: 'a link leading nowhere has nothing to copy, and stays',
+          );
+        },
+      );
+
+      test(
+        'a linked art-pack folder is not put where the new folder has one',
+        () async {
+          final themes = Directory(p.join(tmp.path, 'shared-themes'))
+            ..createSync();
+          Link(p.join(esde.path, 'themes')).createSync(themes.path);
+          final theirs = File(p.join(dest.path, 'themes', 'es-theme', 'x.xml'))
+            ..createSync(recursive: true)
+            ..writeAsStringSync('theirs');
+
+          await migrate();
+
+          expect(theirs.readAsStringSync(), 'theirs');
+          expect(
+            FileSystemEntity.typeSync(
+              p.join(dest.path, 'themes'),
+              followLinks: false,
+            ),
+            FileSystemEntityType.directory,
+          );
+          expect(linkTarget(p.join(esde.path, 'themes')), themes.path);
+        },
+      );
+
+      test(
+        'an absolute link through another of ours still leads there',
+        () async {
+          // media/a → <old>/media/b, and b → Documents: b is removed with the
+          // old folder, so a is recreated leading where it really did.
+          Link(p.join(esde.path, 'media', 'b')).createSync(outside.path);
+          Link(p.join(esde.path, 'media', 'a'))
+              .createSync(p.join(esde.path, 'media', 'b'));
+
+          await migrate();
+
+          expect(
+            Link(p.join(dest.path, 'media', 'a')).resolveSymbolicLinksSync(),
+            outside.resolveSymbolicLinksSync(),
+          );
+        },
+      );
+
+      test('a link to a link of theirs still goes through it', () async {
+        // EmuDeck-style: ES-DE's downloaded_media is itself a link to the SD
+        // card, and NeoStation's media leads to it. The new media must still
+        // lead to downloaded_media, not past it, so a moved card still works.
+        final card = Directory(p.join(tmp.path, 'sd', 'downloaded_media'));
+        Directory(p.join(esde.path, 'downloaded_media'))
+            .renameSync((card..parent.createSync(recursive: true)).path);
+        Link(p.join(esde.path, 'downloaded_media')).createSync(card.path);
+        Directory(p.join(esde.path, 'media')).deleteSync(recursive: true);
+        Link(p.join(esde.path, 'media')).createSync('downloaded_media');
+
+        await migrate();
+
+        expect(
+          linkTarget(p.join(dest.path, 'media')),
+          p.join(esde.resolveSymbolicLinksSync(), 'downloaded_media'),
+        );
+        expect(
+          File(p.join(card.path, 'snes', 'Chrono Trigger.png'))
+              .readAsStringSync(),
+          'PRECIOUS ARTWORK BYTES',
+        );
+      });
+
+      // NEO-256: the same folder by another path looked like a new one, so
+      // every file of ours was copied onto itself and then deleted.
+      test('the same folder reached through a link moves nothing', () async {
+        final alias = p.join(tmp.path, 'alias');
+        Link(alias).createSync(esde.path);
+
+        await migrate(to: alias);
+
+        expect(readDatabase(db.path), (3, 'ok'));
+        expect(neoArt.readAsStringSync(), 'neostation-scraped');
+        expect(config.readAsStringSync(), 'config-bytes');
+      });
+
+      test('the same folder under a linked parent moves nothing', () async {
+        final alias = Link(p.join(tmp.path, 'b', 'parent'))
+          ..createSync(tmp.path, recursive: true);
+
+        await migrate(to: p.join(alias.path, 'ES-DE'));
+
+        expect(readDatabase(db.path), (3, 'ok'));
+        expect(neoArt.readAsStringSync(), 'neostation-scraped');
+      });
+
+      test('a folder in ours reached through a link is refused', () async {
+        final alias = p.join(tmp.path, 'alias');
+        Link(alias).createSync(esde.path);
+
+        await expectLater(
+          migrate(to: p.join(alias, 'relocated')),
+          failsWith(UserDataMoveFailureKind.overlapping),
+        );
+
+        expect(readDatabase(db.path), (3, 'ok'));
+        expect(neoArt.readAsStringSync(), 'neostation-scraped');
+      });
+    }, skip: Platform.isWindows ? 'needs symbolic links' : false);
 
     // NEO-236: the database was copied before the other files were put in
     // place, and the app kept writing to it until it was closed, so whatever
