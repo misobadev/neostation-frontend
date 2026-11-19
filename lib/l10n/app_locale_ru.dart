@@ -1048,6 +1048,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Только облачные сохранения',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Конфликт сохранений',
   AppLocale.neoSyncNewerCloudCopy: 'В облаке была более новая копия этого сохранения, поэтому она скачана. Копия с этого устройства хранится в Истории сохранений, откуда её можно восстановить.',
+  AppLocale.neoSyncFirstCardSyncTookCloud: "Эта карта памяти ещё не синхронизировалась с этого устройства и отличалась от карты в облаке, поэтому скачана карта из облака. Карта с этого устройства хранится в Истории сохранений, откуда её можно восстановить.",
   AppLocale.neoSyncKeptCloudCopy: "Это сохранение изменилось и на другом устройстве. Копия с этого устройства загружена, а другая сохранена рядом как {file}.",
   AppLocale.keptCopiesTitle: 'История сохранений',
   AppLocale.keptCopiesSubtitle:

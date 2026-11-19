@@ -1101,6 +1101,8 @@ mixin AppLocale {
   static const String neoSyncSaveConflict = 'neo_sync_save_conflict';
   static const String neoSyncKeptCloudCopy = 'neo_sync_kept_cloud_copy';
   static const String neoSyncNewerCloudCopy = 'neo_sync_newer_cloud_copy';
+  static const String neoSyncFirstCardSyncTookCloud =
+      'neo_sync_first_card_sync_took_cloud';
   static const String keptCopiesTitle = 'kept_copies_title';
   static const String keptCopiesSubtitle = 'kept_copies_subtitle';
   static const String keptCopiesCount = 'kept_copies_count';

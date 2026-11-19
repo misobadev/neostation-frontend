@@ -1065,6 +1065,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync : Solo salvataggi cloud',
   AppLocale.neoSyncSaveConflict: 'NeoSync : Conflitto di salvataggio rilevato',
   AppLocale.neoSyncNewerCloudCopy: "Nel cloud c'era una copia più recente di questo salvataggio, quindi è stata scaricata. La copia di questo dispositivo è nella Cronologia dei salvataggi, da cui puoi ripristinarla.",
+  AppLocale.neoSyncFirstCardSyncTookCloud: "Questa memory card non era mai stata sincronizzata da questo dispositivo ed era diversa da quella nel cloud, quindi è stata scaricata quella del cloud. La memory card di questo dispositivo è nella Cronologia dei salvataggi, da cui puoi ripristinarla.",
   AppLocale.neoSyncKeptCloudCopy: "Questo salvataggio è cambiato anche su un altro dispositivo. La copia di questo dispositivo è stata caricata, l'altra è conservata accanto come {file}.",
   AppLocale.keptCopiesTitle: 'Cronologia dei salvataggi',
   AppLocale.keptCopiesSubtitle: 'Versioni precedenti dei tuoi salvataggi, da sincronizzazioni e ripristini',
