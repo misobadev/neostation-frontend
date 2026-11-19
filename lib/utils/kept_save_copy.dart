@@ -370,7 +370,10 @@ Future<List<KeptSaveGroup>> keptCopiesBeside(
 
 /// Every kept copy under [folders], subfolders included. A folder that is
 /// missing or can't be read is skipped, and one inside another is listed once.
-Future<List<String>> listKeptCopyPaths(List<String> folders) async {
+Future<List<String>> listKeptCopyPaths(
+  List<String> folders, {
+  bool recursive = true,
+}) async {
   final found = <String>{};
   for (final folder in folders) {
     final dir = Directory(folder);
@@ -378,7 +381,7 @@ Future<List<String>> listKeptCopyPaths(List<String> folders) async {
     // Links to folders aren't followed: one planted in a shared save folder
     // would point the list, and the tidy after it, at another folder.
     final entities = dir
-        .list(recursive: true, followLinks: false)
+        .list(recursive: recursive, followLinks: false)
         .handleError((Object _) {}, test: (e) => e is FileSystemException);
     await for (final entity in entities) {
       if (entity is File && parseKeptCopyPath(entity.path) != null) {
@@ -391,9 +394,12 @@ Future<List<String>> listKeptCopyPaths(List<String> folders) async {
 
 /// The saves under [folders] that are gone but have kept copies there, so a
 /// copy can bring them back.
-Future<List<String>> goneSavesWithKeptCopies(List<String> folders) async {
+Future<List<String>> goneSavesWithKeptCopies(
+  List<String> folders, {
+  bool recursive = true,
+}) async {
   final saves = {
-    for (final copy in await listKeptCopyPaths(folders))
+    for (final copy in await listKeptCopyPaths(folders, recursive: recursive))
       ?parseKeptCopyPath(copy)?.savePath,
   };
   return [
