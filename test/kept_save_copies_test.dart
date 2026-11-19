@@ -117,6 +117,7 @@ void main() {
       write('Zelda.sav.cloud-20261108-130405.neosync.bak', [2]);
       write('Zelda.sav.neosync.bak', [3]);
       write('Zelda.sav.romm-conflict-2026-11-06_18-32-44', [4]);
+      write('Zelda.sav.romm-local-2026-11-07_09-00-00', [8]);
       write('Zelda.sav.replaced-20261109-110000.neosync.bak', [7]);
       // Three copies a save, within the cap; the restored-over copy belongs
       // to a save that is gone.
@@ -155,15 +156,18 @@ void main() {
       });
     });
 
-    test('RomM lists its conflict copies and restored-over saves', () async {
+    test('RomM lists its conflict copies, this device\'s copies kept before '
+        'a download, and restored-over saves', () async {
       providerId = RomMSyncProvider.kProviderId;
       expect(sourcesIn(await copies().forGame(game)), {
         KeptCopySource.serverConflict,
+        KeptCopySource.rommBeforeDownload,
         KeptCopySource.replaced,
       });
       final all = await copies().all();
       expect(sourcesIn(all), {
         KeptCopySource.serverConflict,
+        KeptCopySource.rommBeforeDownload,
         KeptCopySource.replaced,
       });
       expect(all.map((g) => p.basename(g.savePath)), ['Gone.sav', 'Zelda.sav']);
