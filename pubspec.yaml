@@ -52,17 +52,17 @@ dependencies:
   # ignores 2.5+ until then.
   shared_preferences_android: ">=2.4.27 <2.5.0"
   http: ^1.6.0
-  flutter_svg: ^2.3.2
+  flutter_svg: ^2.4.0
   crypto: ^3.0.8
-  archive: ^4.6.0
+  archive: ^4.7.1
   web_socket_channel: ^3.0.3
   url_launcher: ^6.3.3
   widget_mask: ^1.0.0
   flutter_screenutil: 5.9.3
-  window_manager: ^0.6.0
+  window_manager: ^0.7.0
   permission_handler: ^12.0.3
   pointycastle: ^4.0.0
-  sqlite3: ^3.8.0
+  sqlite3: ^3.9.1
   fullscreen_window: ^1.2.1
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
