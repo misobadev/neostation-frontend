@@ -1486,6 +1486,7 @@ mixin AppLocale {
   static const String rommNoSystemMatch = 'romm_no_system_match';
   static const String rommPlatformUnsupported = 'romm_platform_unsupported';
   static const String rommNoWritableFolder = 'romm_no_writable_folder';
+  static const String rommNotEnoughSpace = 'romm_not_enough_space';
   static const String rommNotConnected = 'romm_not_connected';
 
   // Bulk "sync a whole platform/collection".

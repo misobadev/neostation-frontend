@@ -185,7 +185,7 @@ class RommBulkSyncPlan {
   /// Sum of the queue's `fs_size_bytes` — what will be transferred.
   final int downloadBytes;
 
-  /// [downloadBytes] plus the transient headroom multi-disc extraction needs
+  /// [downloadBytes] plus the transient headroom archive extraction needs
   /// (see [RommBulkSync.transientHeadroomBytes]). This is the number to
   /// compare against free space.
   final int requiredBytes;
@@ -660,13 +660,31 @@ class RommBulkSync extends ChangeNotifier {
     final workers = concurrency < 1 ? 1 : concurrency;
     final sizes = [
       for (final rom in roms)
-        if (rom.isMultiFile) rom.fsSizeBytes,
+        if (_mayExtract(rom)) rom.fsSizeBytes,
     ]..sort((a, b) => b.compareTo(a));
     var extra = 0;
     for (var i = 0; i < sizes.length && i < workers; i++) {
       extra += sizes[i];
     }
     return extra;
+  }
+
+  /// A download that may be unpacked after it lands, so it briefly needs
+  /// room for both the archive and its contents. Since single-file ZIP/7z
+  /// downloads are extracted too, this is not just multi-disc games. A system
+  /// that launches the archive keeps it, but over-reserving only warns.
+  static bool _mayExtract(RommRom rom) {
+    if (rom.isMultiFile) return true;
+    final ext = rom.fsExtension.toLowerCase().replaceFirst('.', '');
+    final name = rom.fsName.toLowerCase();
+    // No extension reported (the name may still hold a dot, as in
+    // "Dr. Mario 64"): the download is sniffed, and may turn out to be a ZIP
+    // or 7z that is unpacked (see ensureArchiveExtension).
+    return ext.isEmpty ||
+        ext == 'zip' ||
+        ext == '7z' ||
+        name.endsWith('.zip') ||
+        name.endsWith('.7z');
   }
 
   void _reset() {

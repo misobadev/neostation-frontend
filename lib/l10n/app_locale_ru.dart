@@ -1347,6 +1347,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.rommNoSystemMatch:
       'Нет подходящей локальной системы для этой платформы',
   AppLocale.rommPlatformUnsupported: 'Не поддерживается',
+  AppLocale.rommNotEnoughSpace: 'Недостаточно свободного места, чтобы распаковать эту игру. Освободите место в папке с ROM и повторите попытку.',
   AppLocale.rommNoWritableFolder: 'Не удалось записать в папку с ROM. Предоставьте NeoStation «Доступ ко всем файлам» и повторите попытку.',
   AppLocale.rommNotConnected:
       'Сначала подключитесь к серверу RomM в Настройках',
