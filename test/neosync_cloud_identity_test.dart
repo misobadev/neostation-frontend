@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/utils/cloud_path_builder.dart';
+import 'package:path/path.dart' as p;
 
 /// Cross-OS identity tests for NeoSync.
 ///
@@ -142,6 +143,68 @@ void main() {
       expect(CloudPathBuilder.sharedCardPath('dc', 'Game.A1.bin'), isNull);
       expect(CloudPathBuilder.sharedCardPath('psx', 'Game.ps2'), isNull);
       expect(CloudPathBuilder.sharedCardPath(null, 'vmu_save_A1.bin'), isNull);
+    });
+  });
+
+  group('RetroArch system-folder cards', () {
+    const system = '/ra/system';
+
+    test('LRPS2 keeps its cards in pcsx2/memcards, Flycast in dc', () {
+      expect(
+        CloudPathBuilder.retroArchSystemCardFolder('ps2', system),
+        p.join(system, 'pcsx2', 'memcards'),
+      );
+      expect(
+        CloudPathBuilder.retroArchSystemCardFolder('dc', system),
+        p.join(system, 'dc'),
+      );
+      expect(
+        CloudPathBuilder.retroArchSystemCoreFolder('ps2', system),
+        p.join(system, 'pcsx2'),
+      );
+      expect(
+        CloudPathBuilder.retroArchSystemCoreFolder('dc', system),
+        p.join(system, 'dc'),
+      );
+    });
+
+    test('no other system has one', () {
+      for (final other in ['psx', 'dreamcast', 'gc', null]) {
+        expect(
+          CloudPathBuilder.retroArchSystemCardFolder(other, system),
+          isNull,
+        );
+        expect(
+          CloudPathBuilder.retroArchSystemCoreFolder(other, system),
+          isNull,
+        );
+      }
+    });
+
+    test('names the cores keep there are cards; per-game cards are not', () {
+      for (final name in ['Mcd001.ps2', 'MCD002.PS2', 'Mcd010.ps2']) {
+        expect(CloudPathBuilder.isRetroArchSystemCardName('ps2', name), isTrue);
+      }
+      for (final name in ['vmu_save_A1.bin', 'VMU_SAVE_d2.BIN']) {
+        expect(CloudPathBuilder.isRetroArchSystemCardName('dc', name), isTrue);
+      }
+      for (final (system, name) in [
+        ('ps2', 'Game.ps2'),
+        ('ps2', 'Mcd.ps2'),
+        ('ps2', 'Mcd001.ps2.bak'),
+        ('ps2', 'xMcd001.ps2'),
+        ('dc', 'Game.A1.bin'),
+        ('dc', 'vmu_save_E1.bin'),
+        ('dc', 'vmu_save_A1.bin.bak'),
+        ('dc', 'dc_flash.bin'),
+        ('psx', 'Mcd001.ps2'),
+      ]) {
+        expect(
+          CloudPathBuilder.isRetroArchSystemCardName(system, name),
+          isFalse,
+          reason: '$system $name',
+        );
+      }
     });
   });
 

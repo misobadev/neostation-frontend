@@ -401,7 +401,8 @@ class _KeptCopiesViewState extends State<KeptCopiesView> {
 
   String _sourceText(KeptCopySource source) => switch (source) {
     KeptCopySource.otherDevice => AppLocale.keptCopyFromOtherDevice,
-    KeptCopySource.beforeDownload => AppLocale.keptCopyBeforeDownload,
+    KeptCopySource.beforeDownload ||
+    KeptCopySource.rommBeforeDownload => AppLocale.keptCopyBeforeDownload,
     KeptCopySource.serverConflict => AppLocale.keptCopyFromServer,
     KeptCopySource.replaced => AppLocale.keptCopyReplaced,
   }.getString(context);

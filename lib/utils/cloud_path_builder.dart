@@ -1,3 +1,5 @@
+import 'package:path/path.dart' as p;
+
 import '../models/neo_sync_models.dart';
 
 /// Builds and parses the canonical NeoSync cloud paths.
@@ -145,6 +147,47 @@ class CloudPathBuilder {
       return '$rootSave/dc/$fileName';
     }
     return null;
+  }
+
+  /// The folder of RetroArch's system folder [systemDirectory] that the
+  /// RetroArch core of [systemFolder] keeps its own folder in: LRPS2's
+  /// `pcsx2` (its BIOS goes there), Flycast's `dc`. Its being there shows the
+  /// core is set up on this device. Null for any other system.
+  static String? retroArchSystemCoreFolder(
+    String? systemFolder,
+    String systemDirectory,
+  ) => switch (systemFolder) {
+    'ps2' => p.join(systemDirectory, 'pcsx2'),
+    'dc' => p.join(systemDirectory, 'dc'),
+    _ => null,
+  };
+
+  /// The folder of RetroArch's system folder [systemDirectory] where the
+  /// RetroArch core of [systemFolder] keeps the memory cards every game of
+  /// the system shares: LRPS2's `pcsx2/memcards`, Flycast's `dc` (which also
+  /// holds the console's BIOS, flash and textures). Null for any other
+  /// system.
+  static String? retroArchSystemCardFolder(
+    String? systemFolder,
+    String systemDirectory,
+  ) => switch (systemFolder) {
+    'ps2' => p.join(systemDirectory, 'pcsx2', 'memcards'),
+    'dc' => p.join(systemDirectory, 'dc'),
+    _ => null,
+  };
+
+  /// Whether [fileName] is named like a card the RetroArch core of
+  /// [systemFolder] keeps in its system folder ([retroArchSystemCardFolder]):
+  /// LRPS2's `Mcd001.ps2`, `Mcd002.ps2`, ...; Flycast's `vmu_save_A1.bin`,
+  /// ... A per-game card (`<game>.ps2`), which the core keeps in the saves
+  /// folder, is not.
+  static bool isRetroArchSystemCardName(String? systemFolder, String fileName) {
+    final lower = fileName.toLowerCase();
+    return switch (systemFolder) {
+      'ps2' => RegExp(r'^mcd\d+\.ps2$').hasMatch(lower),
+      'dc' => RegExp(r'^vmu_save_[a-d]\d\.bin$').hasMatch(lower),
+      _ => false,
+    };
   }
 
   /// Whether [cloudPath] refers to the same save as the local [localPath].

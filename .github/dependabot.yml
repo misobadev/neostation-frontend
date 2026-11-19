@@ -12,6 +12,10 @@ updates:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
+      # Held on the 2.4 line until the Flutter 3.50 upgrade (NEO-249, NEO-242).
+      - dependency-name: "shared_preferences_android"
+        versions:
+          - ">=2.5.0"
     groups:
       pub-dependencies:
         patterns:

@@ -22,6 +22,11 @@ enum KeptCopySource {
   /// The save a restore replaced, kept so the restore can be undone
   /// (`<save>.replaced-<time>.neosync.bak`).
   replaced,
+
+  /// RomM: this device's save, kept before a download replaced it when it
+  /// had changed here too (`<save>.romm-local-<time>`; see
+  /// [keepRommLocalCopy]).
+  rommBeforeDownload,
 }
 
 /// What a kept copy's name says: the save it is a copy of, where it came from
@@ -29,8 +34,8 @@ enum KeptCopySource {
 ///
 /// For [KeptCopySource.otherDevice] the time is when the copy was saved on the
 /// other device; for [KeptCopySource.serverConflict],
-/// [KeptCopySource.replaced] and a dated [KeptCopySource.beforeDownload] copy,
-/// when it was kept.
+/// [KeptCopySource.replaced], [KeptCopySource.rommBeforeDownload] and a dated
+/// [KeptCopySource.beforeDownload] copy, when it was kept.
 class KeptCopyName {
   const KeptCopyName({
     required this.savePath,
@@ -50,6 +55,10 @@ const String keptCopyEnding = '.neosync.bak';
 /// What RomM puts between a save's name and the time in its conflict copies.
 const String serverConflictMarker = '.romm-conflict-';
 
+/// What RomM puts between a save's name and the time in its copies of this
+/// device's save, kept before a download ([keepRommLocalCopy]).
+const String rommLocalCopyMarker = '.romm-local-';
+
 final _otherDevice = RegExp(
   r'^(.+)\.cloud(?:-(\d{8}-\d{6})|-[A-Za-z0-9]{1,12})?\.neosync\.bak$',
   caseSensitive: false,
@@ -67,15 +76,19 @@ final _serverConflict = RegExp(
   r'^(.+)\.romm-conflict-(.+)$',
   caseSensitive: false,
 );
-final _serverConflictTime = RegExp(
-  r'^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$',
+final _rommStamp = RegExp(r'^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$');
+final _rommLocal = RegExp(
+  r'^(.+)\.romm-local-(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})(?:-\d+)?$',
+  caseSensitive: false,
 );
 
 /// Whether [path] names a kept copy of a save rather than a save: these are
 /// never synced as saves.
 bool isKeptCopyPath(String path) {
   final name = p.basename(path).toLowerCase();
-  return name.endsWith(keptCopyEnding) || name.contains(serverConflictMarker);
+  return name.endsWith(keptCopyEnding) ||
+      name.contains(serverConflictMarker) ||
+      name.contains(rommLocalCopyMarker);
 }
 
 /// Whether the save at [path] is a memory card that every game of its system
@@ -132,26 +145,38 @@ KeptCopyName? _parseKeptCopyName(String path) {
       source: KeptCopySource.beforeDownload,
     );
   }
+  m = _rommLocal.firstMatch(name);
+  if (m != null) {
+    return KeptCopyName(
+      savePath: save(m.group(1)!),
+      source: KeptCopySource.rommBeforeDownload,
+      stampedAt: _localStamp(m.group(2)!),
+    );
+  }
   m = _serverConflict.firstMatch(name);
   if (m != null) {
-    final t = _serverConflictTime.firstMatch(m.group(2)!);
     return KeptCopyName(
       savePath: save(m.group(1)!),
       source: KeptCopySource.serverConflict,
-      // RomM writes the local time.
-      stampedAt: t == null
-          ? null
-          : DateTime(
-              int.parse(t.group(1)!),
-              int.parse(t.group(2)!),
-              int.parse(t.group(3)!),
-              int.parse(t.group(4)!),
-              int.parse(t.group(5)!),
-              int.parse(t.group(6)!),
-            ),
+      stampedAt: _localStamp(m.group(2)!),
     );
   }
   return null;
+}
+
+/// `yyyy-MM-dd_HH-mm-ss` as a local time (RomM's copies are named with the
+/// local time), or null.
+DateTime? _localStamp(String stamp) {
+  final t = _rommStamp.firstMatch(stamp);
+  if (t == null) return null;
+  return DateTime(
+    int.parse(t.group(1)!),
+    int.parse(t.group(2)!),
+    int.parse(t.group(3)!),
+    int.parse(t.group(4)!),
+    int.parse(t.group(5)!),
+    int.parse(t.group(6)!),
+  );
 }
 
 /// `YYYYMMDD-HHMMSS` as a UTC time, or null.
@@ -198,12 +223,51 @@ Future<String> keepLocalCopy(
   String savePath, {
   DateTime? now,
   List<int>? bytes,
-}) async {
-  final content = bytes ?? await File(savePath).readAsBytes();
+}) {
   final at = now ?? DateTime.now();
-  final path = await _createExclusively(
+  return _keepCopy(
+    savePath,
+    bytes,
     (attempt) => localCopyPath(savePath, at, attempt: attempt),
   );
+}
+
+/// Where [keepRommLocalCopy] keeps this device's save at [savePath], kept at
+/// [at]: `<save>.romm-local-<local yyyy-MM-dd_HH-mm-ss>[-attempt]`, named as
+/// RomM's conflict copies are, so the two sort together.
+String rommLocalCopyPath(String savePath, DateTime at, {int attempt = 1}) {
+  final t = at.toLocal();
+  String two(int n) => n.toString().padLeft(2, '0');
+  final suffix = attempt > 1 ? '-$attempt' : '';
+  return '$savePath$rommLocalCopyMarker'
+      '${t.year.toString().padLeft(4, '0')}-${two(t.month)}-${two(t.day)}'
+      '_${two(t.hour)}-${two(t.minute)}-${two(t.second)}$suffix';
+}
+
+/// Keeps a copy of this device's save at [savePath] before RomM downloads the
+/// server's copy over it, and returns where ([rommLocalCopyPath], at [now]).
+/// As [keepLocalCopy]: created exclusively, removed if cut short, and the
+/// error rethrown so the caller writes nothing over the save.
+Future<String> keepRommLocalCopy(
+  String savePath, {
+  DateTime? now,
+  List<int>? bytes,
+}) {
+  final at = now ?? DateTime.now();
+  return _keepCopy(
+    savePath,
+    bytes,
+    (attempt) => rommLocalCopyPath(savePath, at, attempt: attempt),
+  );
+}
+
+Future<String> _keepCopy(
+  String savePath,
+  List<int>? bytes,
+  String Function(int attempt) pathFor,
+) async {
+  final content = bytes ?? await File(savePath).readAsBytes();
+  final path = await _createExclusively(pathFor);
   try {
     await File(path).writeAsBytes(content, flush: true);
   } catch (_) {
@@ -306,7 +370,10 @@ Future<List<KeptSaveGroup>> keptCopiesBeside(
 
 /// Every kept copy under [folders], subfolders included. A folder that is
 /// missing or can't be read is skipped, and one inside another is listed once.
-Future<List<String>> listKeptCopyPaths(List<String> folders) async {
+Future<List<String>> listKeptCopyPaths(
+  List<String> folders, {
+  bool recursive = true,
+}) async {
   final found = <String>{};
   for (final folder in folders) {
     final dir = Directory(folder);
@@ -314,7 +381,7 @@ Future<List<String>> listKeptCopyPaths(List<String> folders) async {
     // Links to folders aren't followed: one planted in a shared save folder
     // would point the list, and the tidy after it, at another folder.
     final entities = dir
-        .list(recursive: true, followLinks: false)
+        .list(recursive: recursive, followLinks: false)
         .handleError((Object _) {}, test: (e) => e is FileSystemException);
     await for (final entity in entities) {
       if (entity is File && parseKeptCopyPath(entity.path) != null) {
@@ -327,9 +394,12 @@ Future<List<String>> listKeptCopyPaths(List<String> folders) async {
 
 /// The saves under [folders] that are gone but have kept copies there, so a
 /// copy can bring them back.
-Future<List<String>> goneSavesWithKeptCopies(List<String> folders) async {
+Future<List<String>> goneSavesWithKeptCopies(
+  List<String> folders, {
+  bool recursive = true,
+}) async {
   final saves = {
-    for (final copy in await listKeptCopyPaths(folders))
+    for (final copy in await listKeptCopyPaths(folders, recursive: recursive))
       ?parseKeptCopyPath(copy)?.savePath,
   };
   return [
@@ -433,6 +503,7 @@ const Set<KeptCopySource> neoSyncKeptCopySources = {
 /// The kept copies RomM writes, and lists while it is the save provider.
 const Set<KeptCopySource> rommKeptCopySources = {
   KeptCopySource.serverConflict,
+  KeptCopySource.rommBeforeDownload,
   KeptCopySource.replaced,
 };
 

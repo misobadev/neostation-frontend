@@ -451,17 +451,4 @@ class RetroArchConfigService {
   void clearCache() {
     _cachedConfig = null;
   }
-
-  /// Returns the expected absolute paths for the 4 Dreamcast VMU save files
-  /// based on the provided RetroArch system directory.
-  List<String> getDreamcastSavePaths(String systemDir) {
-    final dcFolder = path.join(systemDir, 'dc');
-
-    return [
-      path.join(dcFolder, 'vmu_save_A1.bin'),
-      path.join(dcFolder, 'vmu_save_B1.bin'),
-      path.join(dcFolder, 'vmu_save_C1.bin'),
-      path.join(dcFolder, 'vmu_save_D1.bin'),
-    ];
-  }
 }
