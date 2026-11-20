@@ -153,6 +153,11 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Count of files skipped (already up to date).
   int _skippedFiles = 0;
 
+  /// Count of memory cards a standalone folder's upload left for a game's
+  /// next launch: never synced from this device, and not the same as the
+  /// cloud's.
+  int _leftForLaunchFiles = 0;
+
   /// Count of files successfully downloaded from the cloud.
   int _downloadedFiles = 0;
 
@@ -259,6 +264,10 @@ class NeoSyncProvider extends ChangeNotifier {
   int get processedFiles => _processedFiles;
   int get uploadedFiles => _uploadedFiles;
   int get skippedFiles => _skippedFiles;
+
+  /// Memory cards the last standalone folder upload left for a game's next
+  /// launch (see [_leftForLaunchFiles]).
+  int get leftForLaunchFiles => _leftForLaunchFiles;
   int get downloadedFiles => _downloadedFiles;
   List<String> get processedItems => _processedItems;
 
@@ -371,10 +380,14 @@ class NeoSyncProvider extends ChangeNotifier {
   /// the pre-launch deadline that [deadline] returns has passed. It is asked
   /// once the file is in, so a launch that started during the download counts.
   /// A failed download throws.
+  ///
+  /// With [backUpFirst] false the local file isn't copied to the single
+  /// before-download slot first (the caller kept a copy of it already).
   Future<bool> _downloadCloudFile(
     NeoSyncFile cloudFile,
     File localFile, {
     SyncDeadline? Function()? deadline,
+    bool backUpFirst = true,
   }) async {
     _log.i('Download: starting ${cloudFile.fileName} -> ${localFile.path}');
     final result = await _neoSyncService.downloadFile(cloudFile.id);
@@ -393,7 +406,7 @@ class NeoSyncProvider extends ChangeNotifier {
       final bytes = result['data'] as List<int>;
       try {
         await localFile.parent.create(recursive: true);
-        await _backupLocalFile(localFile);
+        if (backUpFirst) await _backupLocalFile(localFile);
         await localFile.writeAsBytes(bytes, flush: true);
         _log.i('Download: OK ${bytes.length} bytes -> ${localFile.path}');
       } on FileSystemException catch (e) {

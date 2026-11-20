@@ -1562,6 +1562,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.removeCustomFolderConfirm: 'Rimuovere questa cartella di salvataggio standalone? I file locali non verranno eliminati, solo scollegati dalla sincronizzazione.',
   AppLocale.uploadingCustomFolder: 'Caricamento dei salvataggi da {folder}...',
   AppLocale.customFolderUploadComplete: 'Cartella standalone sincronizzata: {uploaded} caricati, {skipped} già aggiornati',
+  AppLocale.customFolderUploadLeftForLaunch: "Memory card mai sincronizzate da questo dispositivo, rimandate al prossimo avvio di un gioco che le usa, che userà quella del cloud e conserverà quella di questo dispositivo nella Cronologia dei salvataggi: {left}",
   AppLocale.customFolderUploadFailed:
       'Sincronizzazione della cartella personalizzata fallita',
   AppLocale.customFolderUploadConfirm:

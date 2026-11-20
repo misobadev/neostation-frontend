@@ -40,7 +40,7 @@ void reportNewerCloudCopy({
 }
 
 /// Tells the user, in the notification bell, that a memory card of [gameName]
-/// RetroArch keeps in its system folder was synced from this device for the
+/// that every game of its system shares was synced from this device for the
 /// first time and wasn't the same as the cloud's, so the cloud's card was
 /// downloaded over it; this device's is kept in Save history. The same entry
 /// as [reportKeptCloudCopy]'s, updated in place.

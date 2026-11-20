@@ -1561,6 +1561,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.uploadingCustomFolder:
       'Spielstände aus {folder} werden hochgeladen...',
   AppLocale.customFolderUploadComplete: 'Standaloner Ordner synchronisiert: {uploaded} hochgeladen, {skipped} bereits aktuell',
+  AppLocale.customFolderUploadLeftForLaunch: "Von diesem Gerät noch nie synchronisierte Speicherkarten, zurückgestellt bis zum nächsten Start eines Spiels, das sie verwendet. Dabei wird die Karte aus der Cloud verwendet und die dieses Geräts im Spielstand-Verlauf aufbewahrt: {left}",
   AppLocale.customFolderUploadFailed:
       'Synchronisierung des benutzerdefinierten Ordners fehlgeschlagen',
   AppLocale.customFolderUploadConfirm: 'Dateien, die aus {folder} zu NeoSync hochgeladen werden: {count} ({size}).',

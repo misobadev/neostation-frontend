@@ -1546,6 +1546,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.removeCustomFolderConfirm: '¿Eliminar esta carpeta de guardado standalone? Sus archivos locales no se borrarán, solo se desvinculará de la sincronización.',
   AppLocale.uploadingCustomFolder: 'Subiendo guardados de {folder}...',
   AppLocale.customFolderUploadComplete: 'Carpeta standalone sincronizada: {uploaded} subidos, {skipped} ya actualizados',
+  AppLocale.customFolderUploadLeftForLaunch: "Tarjetas de memoria nunca sincronizadas desde este dispositivo, pendientes para el próximo inicio de un juego que las use, que usará la de la nube y guardará la de este dispositivo en el Historial de partidas: {left}",
   AppLocale.customFolderUploadFailed:
       'Error al sincronizar la carpeta standalone',
   AppLocale.customFolderUploadConfirm:

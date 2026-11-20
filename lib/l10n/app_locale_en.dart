@@ -1518,6 +1518,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.removeCustomFolderConfirm: 'Remove this standalone save folder? Its local files will not be deleted, only unlinked from sync.',
   AppLocale.uploadingCustomFolder: 'Uploading saves from {folder}...',
   AppLocale.customFolderUploadComplete: 'Standalone folder synced: {uploaded} uploaded, {skipped} already up to date',
+  AppLocale.customFolderUploadLeftForLaunch: "Memory cards never synced from this device, left for the next launch of a game that uses them, which uses the cloud's card and keeps this device's in Save history: {left}",
   AppLocale.customFolderUploadFailed: 'Failed to sync standalone folder',
   AppLocale.customFolderUploadConfirm:
       'Files to upload to NeoSync from {folder}: {count} ({size}).',

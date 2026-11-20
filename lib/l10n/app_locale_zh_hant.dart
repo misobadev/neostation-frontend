@@ -1411,6 +1411,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.uploadingCustomFolder: '正在上傳 {folder} 中的存檔...',
   AppLocale.customFolderUploadComplete:
       '獨立資料夾已同步：已上傳 {uploaded} 個，{skipped} 個已是最新',
+  AppLocale.customFolderUploadLeftForLaunch:
+      "尚未從此裝置同步過的記憶卡，留待下次啟動使用它們的遊戲時處理（屆時使用雲端的記憶卡，此裝置上的記憶卡則保留在存檔歷史中）：{left}",
   AppLocale.customFolderUploadFailed: '獨立資料夾同步失敗',
   AppLocale.customFolderUploadConfirm:
       '將從 {folder} 上傳到 NeoSync 的檔案：{count} 個（{size}）。',

@@ -544,7 +544,18 @@ void main() {
         'game on its system', () async {
       // Highlighting a PS2 game uploads the system's ARMSX2 card; the user then
       // launches a different PS2 game, which plays on the same card.
-      File(p.join(ps2Folder.path, 'Mcd001.ps2')).writeAsStringSync('card');
+      final card = File(p.join(ps2Folder.path, 'Mcd001.ps2'))
+        ..writeAsStringSync('card');
+      // Synced from this device before: a card never synced here waits for a
+      // launch rather than being sent on a highlight (NEO-266).
+      await SyncRepository.saveSyncState(
+        NeoSyncProvider.kSyncProviderId,
+        card.path,
+        0,
+        0,
+        0,
+        fileHash: 'synced-before',
+      );
       // A second card, only in the cloud and held, keeps the launch running.
       service.cloud = [
         cloudSave('Mcd003.ps2', system: 'ps2', emulator: 'armsx2'),

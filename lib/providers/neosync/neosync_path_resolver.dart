@@ -60,13 +60,19 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       system.folderName,
     );
     final root = customRootForPath(folders, file.path);
+    final emulator = customFolderEmulator(folders, root);
+    if (root == null || emulator == null) return null;
+    return (root: root, emulatorUniqueId: emulator);
+  }
+
+  /// The emulator whose custom folder in [folders] is [root] (the first of
+  /// them, should two emulators share one folder), or null for no [root].
+  String? customFolderEmulator(Map<String, String> folders, String? root) {
     if (root == null) return null;
     for (final entry in folders.entries) {
-      if (entry.value == root) {
-        return (root: root, emulatorUniqueId: entry.key);
-      }
+      if (entry.value == root) return entry.key;
     }
-    return (root: root, emulatorUniqueId: folders.keys.first);
+    return folders.keys.first;
   }
 
   /// Returns the custom folder root from [folders] that contains [filePath],
@@ -667,11 +673,21 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       }
     }
 
+    // A standalone emulator's save belongs in that emulator's custom folder.
+    // Without one here it stays in the cloud: placed in RetroArch's saves
+    // folder, it was uploaded again as RetroArch's, and RetroArch got a save
+    // it never asked for.
+    if (cloudFile.type == 'custom') {
+      NeoSyncProvider._log.d(
+        'Download: not placing ${cloudFile.filePath}: no custom folder here '
+        'for ${cloudFile.emulator ?? 'its emulator'}',
+      );
+      return const [];
+    }
+
     // A card every game of the system shares goes where the RetroArch core
     // keeps it, in the system folder, on a device where that core is set up.
-    // Not another emulator's card (type custom), which only goes into a
-    // custom folder set up for that emulator.
-    if (includeSystemCards && !isState && cloudFile.type != 'custom') {
+    if (includeSystemCards && !isState) {
       final systemCard = await _retroArchSystemCardTarget(
         system.folderName,
         relativeName,

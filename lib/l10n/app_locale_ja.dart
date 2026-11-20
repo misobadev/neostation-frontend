@@ -1444,6 +1444,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.uploadingCustomFolder: '{folder} からセーブをアップロード中...',
   AppLocale.customFolderUploadComplete:
       'スタンドアロンフォルダーを同期しました：{uploaded}件アップロード、{skipped}件は既に最新',
+  AppLocale.customFolderUploadLeftForLaunch: "この端末からまだ同期されていないメモリーカード（次にそのカードを使うゲームを起動したときにクラウドのカードを使用し、この端末のカードはセーブ履歴に保管します）：{left}",
   AppLocale.customFolderUploadFailed: 'スタンドアロンフォルダーの同期に失敗しました',
   AppLocale.customFolderUploadConfirm:
       '{folder} から NeoSync にアップロードするファイル：{count}件（{size}）。',
