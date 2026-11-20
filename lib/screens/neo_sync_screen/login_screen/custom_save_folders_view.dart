@@ -346,11 +346,18 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
           case CustomFolderUploadOutcome.uploaded:
             // Went through: the automatic upload's failure entry is stale.
             clearAutoFolderUploadNotice(system, emulatorSlug);
+            final left = provider.leftForLaunchFiles;
             show(
-              AppLocale.customFolderUploadComplete
-                  .getString(context)
-                  .replaceFirst('{uploaded}', '${provider.uploadedFiles}')
-                  .replaceFirst('{skipped}', '${provider.skippedFiles}'),
+              [
+                AppLocale.customFolderUploadComplete
+                    .getString(context)
+                    .replaceFirst('{uploaded}', '${provider.uploadedFiles}')
+                    .replaceFirst('{skipped}', '${provider.skippedFiles}'),
+                if (left > 0)
+                  AppLocale.customFolderUploadLeftForLaunch
+                      .getString(context)
+                      .replaceFirst('{left}', '$left'),
+              ].join('\n'),
               custom.NotificationType.success,
             );
           case CustomFolderUploadOutcome.cancelled:

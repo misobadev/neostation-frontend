@@ -208,6 +208,61 @@ void main() {
     });
   });
 
+  group('memory card formats', () {
+    test('the PCSX2 family writes one format', () {
+      for (final emulator in [
+        'ps2.net.pcsx2.android',
+        'ps2.xyz.aethersx2.android',
+        'ps2.xyz.aethersx2.tturnip',
+        'ps2.com.armsx2',
+        'ps2.come.nanodata.armsx2',
+        'retroarch.lrps2',
+        'retroarch.pcsx2',
+      ]) {
+        expect(
+          CloudPathBuilder.sameMemoryCardFormat(
+            emulator,
+            'ps2.net.pcsx2.android',
+          ),
+          isTrue,
+          reason: emulator,
+        );
+      }
+    });
+
+    test('Flycast and Reicast write one format', () {
+      for (final emulator in ['retroarch.flycast', 'dc.com.reicast.emulator']) {
+        expect(
+          CloudPathBuilder.sameMemoryCardFormat(
+            emulator,
+            'dc.com.flycast.emulator',
+          ),
+          isTrue,
+          reason: emulator,
+        );
+      }
+    });
+
+    test('any other emulator is its own format', () {
+      // EmuCoreX's lineage is unknown, so its cards are kept apart.
+      expect(
+        CloudPathBuilder.sameMemoryCardFormat(
+          'ps2.com.sbro.emucorex',
+          'ps2.net.pcsx2.android',
+        ),
+        isFalse,
+      );
+      expect(
+        CloudPathBuilder.sameMemoryCardFormat('standalone', 'another'),
+        isFalse,
+      );
+      expect(
+        CloudPathBuilder.sameMemoryCardFormat('standalone', 'standalone'),
+        isTrue,
+      );
+    });
+  });
+
   group('dedupeCloudFiles', () {
     NeoSyncFile file({
       required String id,

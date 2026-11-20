@@ -60,13 +60,19 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       system.folderName,
     );
     final root = customRootForPath(folders, file.path);
+    final emulator = customFolderEmulator(folders, root);
+    if (root == null || emulator == null) return null;
+    return (root: root, emulatorUniqueId: emulator);
+  }
+
+  /// The emulator whose custom folder in [folders] is [root] (the first of
+  /// them, should two emulators share one folder), or null for no [root].
+  String? customFolderEmulator(Map<String, String> folders, String? root) {
     if (root == null) return null;
     for (final entry in folders.entries) {
-      if (entry.value == root) {
-        return (root: root, emulatorUniqueId: entry.key);
-      }
+      if (entry.value == root) return entry.key;
     }
-    return (root: root, emulatorUniqueId: folders.keys.first);
+    return folders.keys.first;
   }
 
   /// Returns the custom folder root from [folders] that contains [filePath],

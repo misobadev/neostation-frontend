@@ -1564,6 +1564,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.uploadingCustomFolder:
       'Téléversement des sauvegardes de {folder}...',
   AppLocale.customFolderUploadComplete: 'Dossier standalone synchronisé : {uploaded} téléversés, {skipped} déjà à jour',
+  AppLocale.customFolderUploadLeftForLaunch: "Cartes mémoire jamais synchronisées depuis cet appareil, laissées pour le prochain lancement d'un jeu qui les utilise, qui utilisera celle du cloud et conservera celle de cet appareil dans l'Historique des sauvegardes : {left}",
   AppLocale.customFolderUploadFailed:
       'Échec de la synchronisation du dossier personnalisé',
   AppLocale.customFolderUploadConfirm:

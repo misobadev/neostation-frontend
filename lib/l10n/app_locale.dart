@@ -1691,6 +1691,8 @@ mixin AppLocale {
   static const String uploadingCustomFolder = 'uploading_custom_folder';
   static const String customFolderUploadComplete =
       'custom_folder_upload_complete';
+  static const String customFolderUploadLeftForLaunch =
+      'custom_folder_upload_left_for_launch';
   static const String customFolderUploadFailed = 'custom_folder_upload_failed';
   static const String customFolderUploadConfirm =
       'custom_folder_upload_confirm';

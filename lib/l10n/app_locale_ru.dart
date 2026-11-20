@@ -1532,6 +1532,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.removeCustomFolderConfirm: 'Удалить эту пользовательскую папку сохранений? Локальные файлы не будут удалены, только отключены от синхронизации.',
   AppLocale.uploadingCustomFolder: 'Загрузка сохранений из {folder}...',
   AppLocale.customFolderUploadComplete: 'Пользовательская папка синхронизирована: {uploaded} загружено, {skipped} уже актуальны',
+  AppLocale.customFolderUploadLeftForLaunch: "Карты памяти, ещё не синхронизировавшиеся с этого устройства, отложены до следующего запуска игры, которая их использует: будет использована карта из облака, а карта с этого устройства сохранится в Истории сохранений: {left}",
   AppLocale.customFolderUploadFailed:
       'Не удалось синхронизировать пользовательскую папку',
   AppLocale.customFolderUploadConfirm:

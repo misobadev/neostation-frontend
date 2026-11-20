@@ -7,6 +7,7 @@ import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/repositories/neosync_save_folder_repository.dart';
+import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:path/path.dart' as p;
@@ -132,6 +133,17 @@ void main() {
         );
         cardFile = File(p.join(folder.path, card))
           ..writeAsBytesSync(const [1, 2, 3, 4]);
+        // Synced from this device before: a card never synced here is only
+        // acted on just before a launch (NEO-266), and these tests are about
+        // how the games of a system share one card within a session.
+        await SyncRepository.saveSyncState(
+          NeoSyncProvider.kSyncProviderId,
+          cardFile.path,
+          0,
+          0,
+          0,
+          fileHash: 'synced-before',
+        );
         service = _FakeNeoSync();
         provider = NeoSyncProvider(service)..setAuthService(_SignedIn());
       });

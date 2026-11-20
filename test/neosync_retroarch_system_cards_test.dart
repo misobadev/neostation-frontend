@@ -221,7 +221,10 @@ void main() {
       test('is uploaded under its system\'s fixed cloud path', () async {
         final only = card(cardName, newer, DateTime(2026, 9, 1));
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, [only.path]);
         expect(service.uploadPaths, ['saves/$cloudPath']);
@@ -233,7 +236,10 @@ void main() {
         card(cardName, inCloud, cloudTime);
         service.cloud = [cloudCard(cloudPath, inCloud)];
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, isEmpty);
         expect(service.downloads, isEmpty);
@@ -254,7 +260,10 @@ void main() {
           ..cloud = [cloudCard(cloudPath, inCloud)]
           ..cloudBytes = inCloud;
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.downloads, ['cloud-card']);
         expect(real.readAsBytesSync(), inCloud);
@@ -281,7 +290,10 @@ void main() {
               ..cloud = [cloudCard(cloudPath, inCloud)]
               ..cloudBytes = inCloud;
 
-            await provider.detectGameSaveFiles(game());
+            await provider.syncGameSavesBeforeLaunch(
+              game(),
+              deadline: SyncDeadline(const Duration(minutes: 1)),
+            );
 
             expect(service.uploads, isEmpty);
             expect(service.downloads, ['cloud-card']);
@@ -300,7 +312,10 @@ void main() {
             ..cloud = [cloudCard(cloudPath, inCloud)]
             ..cloudBytes = inCloud;
 
-          await provider.detectGameSaveFiles(game());
+          await provider.syncGameSavesBeforeLaunch(
+            game(),
+            deadline: SyncDeadline(const Duration(minutes: 1)),
+          );
 
           final entry = bell.notifier.value.single;
           expect(entry.title, 'GameA.iso');
@@ -317,7 +332,10 @@ void main() {
             ..cloud = [cloudCard(cloudPath, inCloud)]
             ..downloadsFail = true;
 
-          await provider.detectGameSaveFiles(game());
+          await provider.syncGameSavesBeforeLaunch(
+            game(),
+            deadline: SyncDeadline(const Duration(minutes: 1)),
+          );
 
           expect(local.readAsBytesSync(), older);
           expect(
@@ -336,7 +354,10 @@ void main() {
             ..downloadsFail = true
             ..beforeDownloadAnswers = () => local.writeAsBytesSync([0, 0]);
 
-          await provider.detectGameSaveFiles(game());
+          await provider.syncGameSavesBeforeLaunch(
+            game(),
+            deadline: SyncDeadline(const Duration(minutes: 1)),
+          );
 
           final copies = keptCopies()
               .where((name) => name.contains('.local-'))
@@ -350,7 +371,10 @@ void main() {
           service
             ..cloud = [cloudCard(cloudPath, inCloud)]
             ..cloudBytes = inCloud;
-          await provider.detectGameSaveFiles(game());
+          await provider.syncGameSavesBeforeLaunch(
+            game(),
+            deadline: SyncDeadline(const Duration(minutes: 1)),
+          );
           service.downloads.clear();
 
           await provider.syncGameSavesAfterClose(game());
@@ -370,7 +394,10 @@ void main() {
           ..cloud = [cloudCard(cloudPath, inCloud)]
           ..cloudBytes = inCloud;
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(File(p.join(cards, cardName)).readAsBytesSync(), inCloud);
         expect(Directory(p.join(saves, cloudFolder)).existsSync(), isFalse);
@@ -383,7 +410,10 @@ void main() {
           ..cloud = [cloudCard(cloudPath, inCloud)]
           ..cloudBytes = inCloud;
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(
           File(p.join(saves, cloudFolder, cardName)).readAsBytesSync(),
@@ -401,7 +431,10 @@ void main() {
               ..cloud = [cloudCard('PS2/GameA.ps2', inCloud)]
               ..cloudBytes = inCloud;
 
-            await provider.detectGameSaveFiles(game());
+            await provider.syncGameSavesBeforeLaunch(
+              game(),
+              deadline: SyncDeadline(const Duration(minutes: 1)),
+            );
 
             expect(File(p.join(cards, 'GameA.ps2')).existsSync(), isFalse);
             expect(
@@ -426,7 +459,10 @@ void main() {
           card(other, newer, DateTime(2026, 9, 1));
         }
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, [only.path]);
       });
@@ -437,7 +473,10 @@ void main() {
           await writeConfig(systemDirectory: value);
           card(cardName, newer, DateTime(2026, 9, 1));
 
-          await provider.detectGameSaveFiles(game());
+          await provider.syncGameSavesBeforeLaunch(
+            game(),
+            deadline: SyncDeadline(const Duration(minutes: 1)),
+          );
 
           expect(service.uploads, isEmpty);
         });
@@ -458,7 +497,10 @@ void main() {
           ]
           ..cloudBytes = inCloud;
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, [real.path]);
         expect(real.readAsBytesSync(), newer);
@@ -478,7 +520,10 @@ void main() {
           ]
           ..cloudBytes = inCloud;
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(File(p.join(cards, cardName)).existsSync(), isFalse);
       });
@@ -495,7 +540,10 @@ void main() {
           ..cloud = [cloudCard(cloudPath, inCloud)]
           ..cloudBytes = inCloud;
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, isEmpty);
         expect(target.readAsBytesSync(), older);
@@ -511,7 +559,10 @@ void main() {
           );
           final only = card(cardName, newer, DateTime(2026, 9, 1));
 
-          await provider.detectGameSaveFiles(game());
+          await provider.syncGameSavesBeforeLaunch(
+            game(),
+            deadline: SyncDeadline(const Duration(minutes: 1)),
+          );
 
           expect(service.uploads, [only.path]);
           expect(service.uploadTypes, ['custom']);
@@ -558,7 +609,10 @@ void main() {
           'synced, so a change made here later is uploaded', () async {
         final local = card(cardName, inCloud, DateTime(2026, 2, 1));
         service.cloud = [cloudCard(cloudPath, inCloud)];
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
         expect(service.uploads, isEmpty);
         expect(service.downloads, isEmpty);
 
@@ -581,7 +635,10 @@ void main() {
         service
           ..cloud = [cloudCard(cloudPath, inCloud)]
           ..cloudBytes = inCloud;
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
         final placed = File(p.join(cards, cardName));
         expect(placed.readAsBytesSync(), inCloud);
 
@@ -605,7 +662,10 @@ void main() {
           ..createSync(recursive: true)
           ..writeAsBytesSync(newer);
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, [real.path]);
         expect(service.uploadPaths, ['saves/$cloudPath']);
@@ -619,7 +679,10 @@ void main() {
               ..createSync(recursive: true)
               ..writeAsBytesSync(newer);
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, [inSaves.path]);
         expect(service.uploadPaths, ['saves/$cloudPath']);
@@ -636,7 +699,10 @@ void main() {
           ..createSync(recursive: true)
           ..writeAsBytesSync(older);
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, [real.path]);
         expect(service.uploadPaths, ['saves/$cloudPath']);
@@ -661,7 +727,10 @@ void main() {
             ..cloud = [cloudCard(cloudPath, inCloud)]
             ..cloudBytes = inCloud;
 
-          await provider.detectGameSaveFiles(game());
+          await provider.syncGameSavesBeforeLaunch(
+            game(),
+            deadline: SyncDeadline(const Duration(minutes: 1)),
+          );
 
           expect(big.lengthSync(), 10 * 1024 * 1024 + 1);
           expect(service.uploads, isEmpty);
@@ -672,7 +741,10 @@ void main() {
         final other = system == 'ps2' ? 'Custom.ps2' : 'vmu_save_E1.bin';
         card(other, newer, DateTime(2026, 9, 1));
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, isEmpty);
       });
@@ -687,7 +759,10 @@ void main() {
           ..cloud = [cloudCard(cloudPath, inCloud)]
           ..cloudBytes = inCloud;
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, isEmpty);
         expect(File(p.join(cards, cardName)).readAsBytesSync(), inCloud);
@@ -702,7 +777,10 @@ void main() {
           ..writeAsBytesSync(older)
           ..setLastModifiedSync(DateTime(2026, 1, 1));
 
-        await provider.detectGameSaveFiles(game());
+        await provider.syncGameSavesBeforeLaunch(
+          game(),
+          deadline: SyncDeadline(const Duration(minutes: 1)),
+        );
 
         expect(service.uploads, [real.path]);
       });

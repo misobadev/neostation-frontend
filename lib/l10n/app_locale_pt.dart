@@ -1554,6 +1554,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.removeCustomFolderConfirm: 'Remover esta pasta de save standalone? Os arquivos locais não serão excluídos, apenas desvinculados da sincronização.',
   AppLocale.uploadingCustomFolder: 'Enviando saves de {folder}...',
   AppLocale.customFolderUploadComplete: 'Pasta standalone sincronizada: {uploaded} enviados, {skipped} já atualizados',
+  AppLocale.customFolderUploadLeftForLaunch: "Cartões de memória nunca sincronizados a partir deste dispositivo, deixados para a próxima inicialização de um jogo que os use, que usará o da nuvem e guardará o deste dispositivo no Histórico de saves: {left}",
   AppLocale.customFolderUploadFailed:
       'Falha ao sincronizar a pasta personalizada',
   AppLocale.customFolderUploadConfirm:

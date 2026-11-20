@@ -1544,6 +1544,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.removeCustomFolderConfirm: 'Hapus folder simpanan standalone ini? File lokal tidak akan dihapus, hanya dilepas dari sinkronisasi.',
   AppLocale.uploadingCustomFolder: 'Mengunggah simpanan dari {folder}...',
   AppLocale.customFolderUploadComplete: 'Folder standalone disinkronkan: {uploaded} diunggah, {skipped} sudah terbaru',
+  AppLocale.customFolderUploadLeftForLaunch: "Kartu memori yang belum pernah disinkronkan dari perangkat ini, ditunda hingga game yang memakainya dijalankan berikutnya; saat itu kartu dari cloud dipakai dan kartu perangkat ini disimpan di Riwayat simpanan: {left}",
   AppLocale.customFolderUploadFailed: 'Gagal menyinkronkan folder standalone',
   AppLocale.customFolderUploadConfirm:
       'File yang akan diunggah ke NeoSync dari {folder}: {count} ({size}).',

@@ -1431,6 +1431,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.uploadingCustomFolder: '{folder}에서 세이브 업로드 중...',
   AppLocale.customFolderUploadComplete:
       '독립형 폴더 동기화 완료: {uploaded}개 업로드, {skipped}개는 이미 최신',
+  AppLocale.customFolderUploadLeftForLaunch: "이 기기에서 동기화한 적 없는 메모리 카드(다음에 이 카드를 쓰는 게임을 실행할 때 클라우드의 카드를 사용하고 이 기기의 카드는 세이브 기록에 보관합니다): {left}",
   AppLocale.customFolderUploadFailed: '독립형 폴더 동기화 실패',
   AppLocale.customFolderUploadConfirm:
       '{folder}에서 NeoSync로 업로드할 파일: {count}개 ({size}).',

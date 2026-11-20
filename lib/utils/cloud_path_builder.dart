@@ -190,6 +190,26 @@ class CloudPathBuilder {
     };
   }
 
+  /// The memory-card format of the emulator [emulator] (an emulator slug or
+  /// unique id) writes, for emulators known to share one: the PCSX2 family
+  /// (PCSX2, AetherSX2 and its forks, NetherSX2, ARMSX2, RetroArch's LRPS2
+  /// and pcsx2 cores) writes PCSX2 `.ps2` cards, and Flycast (standalone or
+  /// RetroArch's core) and Reicast, which Flycast was forked from, the same
+  /// VMUs. Any other emulator is its own format (EmuCoreX's lineage is
+  /// unknown, so it is kept apart).
+  static String memoryCardFormat(String emulator) {
+    final id = emulator.toLowerCase();
+    const pcsx2 = ['pcsx2', 'aethersx2', 'nethersx2', 'armsx2', 'lrps2'];
+    if (pcsx2.any(id.contains)) return 'pcsx2';
+    if (id.contains('flycast') || id.contains('reicast')) return 'flycast';
+    return id;
+  }
+
+  /// Whether emulators [a] and [b] write memory cards in the same format, so
+  /// a card of one is the same card for the other ([memoryCardFormat]).
+  static bool sameMemoryCardFormat(String a, String b) =>
+      memoryCardFormat(a) == memoryCardFormat(b);
+
   /// Whether [cloudPath] refers to the same save as the local [localPath].
   ///
   /// The `type` is cross-checked against the local `saves/`/`states/` root so a

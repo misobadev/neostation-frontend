@@ -375,6 +375,10 @@ class LocalSaveFile {
   /// the saves folder.
   final bool inRetroArchSystemFolder;
 
+  /// The emulator whose custom save folder this file is in (the folder's
+  /// emulator slug), or null outside custom folders.
+  final String? customFolderEmulator;
+
   LocalSaveFile({
     required this.filePath,
     required this.fileName,
@@ -385,6 +389,7 @@ class LocalSaveFile {
     required this.relativePath,
     this.cloudPath,
     this.inRetroArchSystemFolder = false,
+    this.customFolderEmulator,
   });
 
   /// Returns formatted file size string.
