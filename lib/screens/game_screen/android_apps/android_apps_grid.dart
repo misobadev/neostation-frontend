@@ -40,7 +40,8 @@ class AndroidAppsGrid extends StatefulWidget {
   State<AndroidAppsGrid> createState() => _AndroidAppsGridState();
 }
 
-class _AndroidAppsGridState extends State<AndroidAppsGrid> {
+class _AndroidAppsGridState extends State<AndroidAppsGrid>
+    with WidgetsBindingObserver {
   static final _log = LoggerService.instance;
 
   /// The systems grid pops the layer it pushed by id; a unique id keeps two
@@ -64,19 +65,60 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
   @override
   void initState() {
     super.initState();
-    _loadApps();
+    WidgetsBinding.instance.addObserver(this);
+    // Show what the database already has at once, then pick up apps installed
+    // or removed since the last scan.
+    _loadApps().then((_) => _refreshInstalledApps());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Returning from the Play Store or system settings is when an app has
+    // most likely been installed or removed.
+    if (state == AppLifecycleState.resumed) _refreshInstalledApps();
+  }
+
+  /// Re-reads the installed apps and reloads the grid if anything was read.
+  Future<void> _refreshInstalledApps() async {
+    if (!mounted) return;
+    final refreshed = await context
+        .read<SqliteConfigProvider>()
+        .refreshAndroidApps();
+    if (refreshed && mounted) await _loadApps();
+  }
+
+  /// Reloads after an app is hidden or restored, along with the Android
+  /// system itself, whose card count leaves hidden apps out.
+  Future<void> _onAppsChanged() async {
+    final configProvider = context.read<SqliteConfigProvider>();
+    await _loadApps();
+    await configProvider.refreshSystem(widget.system);
   }
 
   /// Populates the grid by loading detected Android packages from the database.
+  ///
+  /// Focus follows the focused app rather than its index, so an app added
+  /// ahead of it or hidden from the list doesn't move the cursor elsewhere.
   Future<void> _loadApps() async {
     try {
+      final focusedPackage = _apps.isEmpty
+          ? null
+          : _apps[_selectedIndex.clamp(0, _apps.length - 1)].romPath;
       final apps = await GameService.loadGamesForSystem(widget.system);
       if (mounted) {
         setState(() {
           _apps = apps;
-          _selectedIndex = apps.isEmpty
-              ? 0
-              : _selectedIndex.clamp(0, apps.length - 1);
+          _selectedIndex = androidAppsFocusIndex(
+            apps,
+            focusedPackage,
+            _selectedIndex,
+          );
           _isLoading = false;
         });
       }
@@ -188,8 +230,14 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
                         onCardTapped: _onCardTapped,
                         onEnterPressed: _launchSelectedApp,
                         onBackPressed: widget.embedded ? null : _goBack,
-                        onEscapePressed: () =>
-                            showAndroidOptionsDialog(context),
+                        onEscapePressed: () => showAndroidOptionsDialog(
+                          context,
+                          system: widget.system,
+                          focusedApp: _apps.isEmpty
+                              ? null
+                              : _apps[selectedIndex],
+                          onAppsChanged: _onAppsChanged,
+                        ),
                         bindYButton: false,
                         enableTabBumpers: widget.embedded,
                         enablePullToRescan: false,
@@ -283,4 +331,21 @@ class _AndroidAppsGridState extends State<AndroidAppsGrid> {
       ),
     );
   }
+}
+
+/// Where the focus goes after the app list reloads: back onto
+/// [focusedPackage] if it is still listed, otherwise as close to
+/// [previousIndex] as the new list allows.
+@visibleForTesting
+int androidAppsFocusIndex(
+  List<GameModel> apps,
+  String? focusedPackage,
+  int previousIndex,
+) {
+  if (apps.isEmpty) return 0;
+  if (focusedPackage != null) {
+    final index = apps.indexWhere((app) => app.romPath == focusedPackage);
+    if (index != -1) return index;
+  }
+  return previousIndex.clamp(0, apps.length - 1);
 }

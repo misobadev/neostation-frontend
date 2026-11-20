@@ -69,6 +69,7 @@ class DatabaseTestHelper {
       CREATE TABLE user_roms (
         filename TEXT,
         rom_path TEXT PRIMARY KEY,
+        virtual_folder_name TEXT,
         title_name TEXT,
         title_id TEXT,
         description TEXT,
