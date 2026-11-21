@@ -8,17 +8,16 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:provider/provider.dart';
-import 'package:neostation/models/config_model.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/themes/app_themes.dart';
 import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/themes/theme_glass.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/widgets/theme_card.dart';
 import 'package:neostation/widgets/custom_notification.dart';
-import 'package:neostation/widgets/custom_toggle_switch.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/widgets/tv_directory_picker.dart';
 import 'package:neostation/responsive.dart';
@@ -26,8 +25,6 @@ import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'settings_title.dart';
-import 'widgets/setting_row.dart';
-import 'widgets/setting_value_chip.dart';
 
 import 'package:neostation/utils/user_data_move_guard.dart';
 
@@ -67,9 +64,19 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
   /// The corner rounding row, after the NeoGlass controls.
   static const int _cornerRowIndex = 1 + _neoglassRowCount;
 
-  /// Every full-width row above the theme grid: Performance Mode, the
-  /// NeoGlass appearance controls and the corner rounding.
+  /// The option tiles above the theme grid, side by side: Performance Mode,
+  /// the NeoGlass appearance controls and the corner rounding.
   static const int _topRowCount = _cornerRowIndex + 1;
+
+  /// The grid column under option tile [index], and back: the row of tiles
+  /// spans the grid's width, so each maps onto the column beneath it.
+  int _columnUnderTile(int index) =>
+      (index * _gridColumns / _topRowCount).floor().clamp(0, _gridColumns - 1);
+  int _tileOverColumn(int column) =>
+      (((column + 0.5) * _topRowCount) / _gridColumns).floor().clamp(
+        0,
+        _topRowCount - 1,
+      );
 
   /// Blur sigma choices (Off / 1 / 2). 0 disables the blur entirely.
   static const List<int> _blurSteps = [0, 1, 2];
@@ -129,13 +136,13 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
     final gridCount = _gridCount(context);
     int newIndex;
     if (current < _topRowCount) {
-      // NeoGlass rows: move up, or wrap to the grid's last cell.
-      newIndex = current == 0 ? _gridStartIndex + gridCount - 1 : current - 1;
+      // The option tiles are the top row: nothing above them.
+      return;
     } else {
       final gridIndex = current - _gridStartIndex;
       if (gridIndex < _gridColumns) {
-        // Top grid row: step up into the last NeoGlass row.
-        newIndex = _topRowCount - 1;
+        // Top grid row: step up into the option tile above.
+        newIndex = _tileOverColumn(gridIndex);
       } else {
         newIndex =
             _gridStartIndex +
@@ -157,8 +164,9 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
     final gridCount = _gridCount(context);
     int newIndex;
     if (current < _topRowCount) {
-      // NeoGlass rows: move down, or into the grid's first cell.
-      newIndex = current == _topRowCount - 1 ? _gridStartIndex : current + 1;
+      // Option tiles: down into the grid cell beneath.
+      newIndex =
+          _gridStartIndex + _columnUnderTile(current).clamp(0, gridCount - 1);
     } else {
       final gridIndex = current - _gridStartIndex;
       newIndex =
@@ -177,7 +185,10 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
   bool navigateLeft() {
     final current = widget.selectedContentIndex;
     if (current < _topRowCount) {
-      return true; // NeoGlass rows are full-width; Left returns to the menu.
+      // Along the option tiles; the first one hands back to the menu.
+      if (current == 0) return true;
+      widget.onSelectionChanged?.call(current - 1);
+      return false;
     }
     final gridIndex = current - _gridStartIndex;
     if (gridIndex % _gridColumns == 0) {
@@ -199,7 +210,11 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
   void navigateRight() {
     final current = widget.selectedContentIndex;
     if (current < _topRowCount) {
-      return; // NeoGlass rows are full-width; Right is a no-op.
+      // Along the option tiles.
+      if (current < _topRowCount - 1) {
+        widget.onSelectionChanged?.call(current + 1);
+      }
+      return;
     }
     final gridIndex = current - _gridStartIndex;
     final newIndex =
@@ -439,20 +454,68 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
           ),
           SizedBox(height: 12.r),
 
-          _buildPerformanceRow(context, config),
-
-          SizedBox(height: 20.r),
-
-          // NeoGlass appearance controls (frosted-glass chrome).
-          Text(
-            AppLocale.neoglassGroup.getString(context),
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontSize: 13.r, fontWeight: FontWeight.w600),
+          // The appearance options, compact so the themes show without
+          // scrolling: one row of tiles, each its name and current value,
+          // all as tall as the tallest.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (index, label, value, enabled) in [
+                  (
+                    0,
+                    AppLocale.performanceMode.getString(context),
+                    config.performanceMode ? 'ON' : 'OFF',
+                    true,
+                  ),
+                  (
+                    1,
+                    AppLocale.neoglassBlur.getString(context),
+                    _blurLabel(config.neoglassBlur),
+                    !config.performanceMode,
+                  ),
+                  (
+                    2,
+                    AppLocale.neoglassTransparency.getString(context),
+                    '${config.neoglassTransparency}',
+                    !config.performanceMode,
+                  ),
+                  (
+                    3,
+                    AppLocale.neoglassBorderWidth.getString(context),
+                    _borderLabel(config.neoglassBorderWidth),
+                    !config.performanceMode,
+                  ),
+                  // Not a glass effect: it costs nothing, so performance mode
+                  // leaves it alone.
+                  (
+                    _cornerRowIndex,
+                    AppLocale.cornerRadius.getString(context),
+                    _cornerLabels[config.cornerRadius.clamp(0, 5)],
+                    true,
+                  ),
+                ]) ...[
+                  if (index > 0) SizedBox(width: 6.r),
+                  Expanded(
+                    child: _buildOptionTile(
+                      keyIndex: index,
+                      label: label,
+                      value: value,
+                      enabled: enabled,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          if (config.performanceMode) ...[
-            SizedBox(height: 4.r),
+          if (config.performanceMode || config.neoglassBlur > 0) ...[
+            SizedBox(height: 6.r),
             Text(
-              AppLocale.performanceModeNeoglassDisabled.getString(context),
+              config.performanceMode
+                  ? AppLocale.performanceModeNeoglassDisabled.getString(context)
+                  : AppLocale.neoglassBlurGpuWarning.getString(context),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 9.r,
                 color: Theme.of(context).colorScheme.onSurface
@@ -460,55 +523,7 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
               ),
             ),
           ],
-          SizedBox(height: 8.r),
-          _buildNeoglassRow(
-            keyIndex: 1,
-            title: AppLocale.neoglassBlur.getString(context),
-            subtitle: AppLocale.neoglassBlurSubtitle.getString(context),
-            value: _blurLabel(config.neoglassBlur),
-            enabled: !config.performanceMode,
-          ),
-          if (config.neoglassBlur > 0 && !config.performanceMode) ...[
-            SizedBox(height: 4.r),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12.r),
-              child: Text(
-                AppLocale.neoglassBlurGpuWarning.getString(context),
-                style: TextStyle(
-                  fontSize: 9.r,
-                  color: Theme.of(context).colorScheme.onSurface
-                      .withValues(alpha: 0.6),
-                ),
-              ),
-            ),
-          ],
           SizedBox(height: 12.r),
-          _buildNeoglassRow(
-            keyIndex: 2,
-            title: AppLocale.neoglassTransparency.getString(context),
-            subtitle: AppLocale.neoglassTransparencySubtitle.getString(context),
-            value: '${config.neoglassTransparency}',
-            enabled: !config.performanceMode,
-          ),
-          SizedBox(height: 12.r),
-          _buildNeoglassRow(
-            keyIndex: 3,
-            title: AppLocale.neoglassBorderWidth.getString(context),
-            subtitle: AppLocale.neoglassBorderWidthSubtitle.getString(context),
-            value: _borderLabel(config.neoglassBorderWidth),
-            enabled: !config.performanceMode,
-          ),
-          SizedBox(height: 12.r),
-          // Not a glass effect: it costs nothing, so performance mode leaves
-          // it alone.
-          _buildNeoglassRow(
-            keyIndex: _cornerRowIndex,
-            title: AppLocale.cornerRadius.getString(context),
-            subtitle: AppLocale.cornerRadiusSubtitle.getString(context),
-            value: _cornerLabels[config.cornerRadius.clamp(0, 5)],
-            enabled: true,
-          ),
-          SizedBox(height: 20.r),
 
           // Theme grid.
           GridView.builder(
@@ -581,57 +596,82 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
     );
   }
 
-  /// Builds one NeoGlass appearance row (a [SettingRow] with a value chip).
-  Widget _buildNeoglassRow({
+  /// One compact option tile: its name over its current value. A, a tap or
+  /// a click steps it to its next value.
+  Widget _buildOptionTile({
     required int keyIndex,
-    required String title,
-    required String subtitle,
+    required String label,
     required String value,
     required bool enabled,
   }) {
-    final isFocused =
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final focused =
         widget.isContentFocused && widget.selectedContentIndex == keyIndex;
+    final radius = (theme.extension<CornerRadii>() ?? CornerRadii.m())
+        .radiusInternalRadius;
+    final fg = focused ? scheme.surface : scheme.onSurface;
+    final tile = AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      // At least this tall, taller when the system text is larger.
+      constraints: BoxConstraints(minHeight: 44.r),
+      padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 6.r),
+      decoration: BoxDecoration(
+        color: focused
+            ? scheme.onSurface
+            : scheme.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 8.5.r, color: fg.withValues(alpha: 0.7)),
+          ),
+          SizedBox(height: 3.r),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12.r,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
+          ),
+        ],
+      ),
+    );
+    final rimWidth = NeoGlass.borderWidthOf(context);
     return Opacity(
       opacity: enabled ? 1 : 0.4,
       child: IgnorePointer(
         ignoring: !enabled,
-        child: SettingRow(
-          key: _itemKeys[keyIndex],
-          onTap: () {
-            SfxService().playNavSound();
-            widget.onSelectionChanged?.call(keyIndex);
-            selectItem(keyIndex);
-          },
-          focused: isFocused,
-          title: title,
-          subtitle: subtitle,
-          trailing: SettingValueChip(text: value),
+        child: Semantics(
+          button: true,
+          label: '$label: $value',
+          excludeSemantics: true,
+          child: GestureDetector(
+            key: _itemKeys[keyIndex],
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              SfxService().playNavSound();
+              widget.onSelectionChanged?.call(keyIndex);
+              selectItem(keyIndex);
+            },
+            child: rimWidth <= 0
+                ? tile
+                : NeoGlassRim(
+                    cornerRadius: radius,
+                    borderWidth: rimWidth,
+                    child: tile,
+                  ),
+          ),
         ),
-      ),
-    );
-  }
-
-  /// The Performance Mode toggle. It lives here because it overrides the glass
-  /// controls directly below it.
-  Widget _buildPerformanceRow(BuildContext context, ConfigModel config) {
-    final isFocused =
-        widget.isContentFocused && widget.selectedContentIndex == 0;
-    return SettingRow(
-      key: _itemKeys[0],
-      onTap: () {
-        SfxService().playNavSound();
-        widget.onSelectionChanged?.call(0);
-        selectItem(0);
-      },
-      focused: isFocused,
-      title: AppLocale.performanceMode.getString(context),
-      subtitle: AppLocale.performanceModeSubtitle.getString(context),
-      trailing: CustomToggleSwitch(
-        value: config.performanceMode,
-        onChanged: (value) {
-          context.read<SqliteConfigProvider>().updatePerformanceMode(value);
-        },
-        activeColor: Theme.of(context).colorScheme.primary,
       ),
     );
   }
