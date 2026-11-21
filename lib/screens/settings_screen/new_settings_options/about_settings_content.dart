@@ -171,7 +171,9 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
               children: [
                 Column(
                   children: [
-                    BrandLogo(width: 120.r),
+                    SizedBox.square(dimension: 72.r, child: const BrandEye()),
+                    SizedBox(height: 10.r),
+                    BrandWordmark(width: 104.r),
                     SizedBox(height: 6.r),
                     Text(
                       _appVersion,
