@@ -231,6 +231,8 @@ const Map<String, dynamic> appLocaleId = {
       '0 = tanpa transparansi, 30 = 50% transparansi',
   AppLocale.neoglassBorderWidth: 'Bingkai Kaca',
   AppLocale.neoglassBorderWidthSubtitle: 'Ketebalan tepi kaca',
+  AppLocale.cornerRadius: 'Sudut',
+  AppLocale.cornerRadiusSubtitle: 'Seberapa bulat kartu dan panel',
   AppLocale.systemTheme: 'Tema Sistem',
   AppLocale.importTheme: 'Impor Tema',
   AppLocale.importThemeSuccess: 'Tema "%s" diimpor',

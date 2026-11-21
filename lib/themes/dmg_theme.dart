@@ -4,9 +4,9 @@ import 'package:neostation/themes/corner_radii.dart';
 
 // Dmg — a Game Boy (DMG-01) palette by DarthArk, imported from the NeoStation
 // theme designer. The four greens are the original handheld screen shades.
-const Color _primaryColor = Color(0xFF306230);
+const Color _primaryColor = Color(0xFF0F380F);
 const Color _onPrimaryColor = Color(0xFF9BBC0F);
-const Color _secondaryColor = Color(0xFF0F380F);
+const Color _secondaryColor = Color(0xFF306230);
 const Color _onSecondaryColor = Color(0xFF9BBC0F);
 const Color _surfaceColor = Color(0xFF8BAC0F);
 const Color _onSurfaceColor = Color(0xFF0F380F);
@@ -17,17 +17,17 @@ const Color _shadowColor = Color(0xFF306230);
 const Color _backgroundColor = Color(0xFF9BBC0F);
 
 const Color _batteryFull = Color(0xFF0F380F);
-const Color _batteryMedium = Color(0xFF8BAC0F);
+const Color _batteryMedium = Color(0xFF306230);
 const Color _batteryLow = Color(0xFF4A2A0F);
 const Color _batteryPower = Color(0xFF306230);
 
 const Color _errorColor = Color(0xFF4A2A0F);
 const Color _onErrorColor = Color(0xFF9BBC0F);
-const Color _warningColor = Color(0xFF8BAC0F);
-const Color _onWarningColor = Color(0xFF0F380F);
+const Color _warningColor = Color(0xFF306230);
+const Color _onWarningColor = Color(0xFF9BBC0F);
 const Color _successColor = Color(0xFF0F380F);
 const Color _onSuccessColor = Color(0xFF9BBC0F);
-const Color _infoColor = Color(0xFF306230);
+const Color _infoColor = Color(0xFF0F380F);
 const Color _onInfoColor = Color(0xFF9BBC0F);
 
 final ThemeData dmgTheme = ThemeData(

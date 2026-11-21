@@ -633,4 +633,14 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     await _saveOrRevert(previous);
     _notify();
   }
+
+  /// Sets how round every theme's corners are (0 square to 5 the roundest).
+  Future<void> updateCornerRadius(int value) async {
+    final clamped = value.clamp(0, 5);
+    if (_config.cornerRadius == clamped) return;
+    final previous = _config;
+    _config = _config.copyWith(cornerRadius: clamped);
+    await _saveOrRevert(previous);
+    _notify();
+  }
 }

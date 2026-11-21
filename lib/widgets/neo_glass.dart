@@ -160,6 +160,7 @@ class NeoGlass extends StatelessWidget {
               cornerRadius: cornerRadius,
               intensity: rimIntensity,
               strokeWidth: effectiveBorderWidth,
+              ink: _rimInk(context),
             )
           : null,
       child: ClipRRect(
@@ -207,11 +208,22 @@ class NeoGlassRim extends StatelessWidget {
               cornerRadius: cornerRadius,
               intensity: intensity,
               strokeWidth: width,
+              ink: _rimInk(context),
             )
           : null,
       child: child,
     );
   }
+}
+
+/// The rim's colour on a light ground: a rim that brightens the edge
+/// disappears there, so it darkens the edge in the theme's ink instead. Null on
+/// a dark ground, where the rim is the white highlight.
+Color? _rimInk(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.scaffoldBackgroundColor.computeLuminance() > 0.4
+      ? theme.colorScheme.onSurface
+      : null;
 }
 
 /// Paints the glass rim: a soft specular highlight sweeping with the light
@@ -222,15 +234,26 @@ class _GlassRimPainter extends CustomPainter {
     required this.cornerRadius,
     required this.intensity,
     required this.strokeWidth,
-  }) : _colors = [
-         Colors.white.withValues(alpha: 0.08 * intensity),
-         Colors.white.withValues(alpha: 0.05 * intensity),
-         Colors.white.withValues(alpha: 0.012 * intensity),
-       ];
+    this.ink,
+  }) : _colors = ink == null
+           ? [
+               Colors.white.withValues(alpha: 0.08 * intensity),
+               Colors.white.withValues(alpha: 0.05 * intensity),
+               Colors.white.withValues(alpha: 0.012 * intensity),
+             ]
+           : [
+               ink.withValues(alpha: 0.22 * intensity),
+               ink.withValues(alpha: 0.16 * intensity),
+               ink.withValues(alpha: 0.12 * intensity),
+             ];
 
   final double cornerRadius;
   final double intensity;
   final double strokeWidth;
+
+  /// The rim's colour on a light ground, drawn over the edge; null for the
+  /// white highlight added to a dark one.
+  final Color? ink;
 
   // Precomputed, size-independent gradient stops (alpha depends only on
   // [intensity]); the shader itself is built per paint from the panel size.
@@ -266,7 +289,7 @@ class _GlassRimPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..isAntiAlias = true
-        ..blendMode = BlendMode.plus
+        ..blendMode = ink == null ? BlendMode.plus : BlendMode.srcOver
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -280,5 +303,6 @@ class _GlassRimPainter extends CustomPainter {
   bool shouldRepaint(_GlassRimPainter oldDelegate) =>
       oldDelegate.cornerRadius != cornerRadius ||
       oldDelegate.intensity != intensity ||
-      oldDelegate.strokeWidth != strokeWidth;
+      oldDelegate.strokeWidth != strokeWidth ||
+      oldDelegate.ink != ink;
 }

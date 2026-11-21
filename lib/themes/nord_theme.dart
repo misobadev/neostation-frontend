@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 
-const Color _primaryColor = Color(0xFF5e81ac);
-const Color _onPrimaryColor = Color(0xFF03060b);
-const Color _secondaryColor = Color(0xFF81a1c1);
-const Color _onSecondaryColor = Color(0xFF06090d);
+const Color _primaryColor = Color(0xFF4C6A92);
+const Color _onPrimaryColor = Color(0xFFECEFF4);
+const Color _secondaryColor = Color(0xFF52698A);
+const Color _onSecondaryColor = Color(0xFFECEFF4);
 const Color _surfaceColor = Color(0xFFd8dee9);
 const Color _onSurfaceColor = Color(0xFF2e3440);
 
@@ -14,19 +14,19 @@ const Color _shadowColor = Color(0xFF2e3440);
 
 const Color _backgroundColor = Color(0xFFeceff4);
 
-const Color _batteryFull = Color(0xFF6E855A);
-const Color _batteryMedium = Color(0xFFebcb8b);
-const Color _batteryLow = Color(0xFFbf616a);
-const Color _batteryPower = Color(0xFFb48ead);
+const Color _batteryFull = Color(0xFF5A7046);
+const Color _batteryMedium = Color(0xFF8F6B1E);
+const Color _batteryLow = Color(0xFFA9444E);
+const Color _batteryPower = Color(0xFF86627F);
 
-const Color _errorColor = Color(0xFFbf616a);
-const Color _onErrorColor = Color(0xFF0d0304);
-const Color _warningColor = Color(0xFFebcb8b);
-const Color _onWarningColor = Color(0xFF130f07);
-const Color _successColor = Color(0xFF6E855A);
-const Color _onSuccessColor = Color(0xFF0a0d07);
-const Color _infoColor = Color(0xFFb48ead);
-const Color _onInfoColor = Color(0xFF0c070b);
+const Color _errorColor = Color(0xFFA9444E);
+const Color _onErrorColor = Color(0xFFFFFFFF);
+const Color _warningColor = Color(0xFF8F6B1E);
+const Color _onWarningColor = Color(0xFFFFFFFF);
+const Color _successColor = Color(0xFF5A7046);
+const Color _onSuccessColor = Color(0xFFFFFFFF);
+const Color _infoColor = Color(0xFF86627F);
+const Color _onInfoColor = Color(0xFFFFFFFF);
 
 final ThemeData nordTheme = ThemeData(
   useMaterial3: true,

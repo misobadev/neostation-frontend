@@ -37,15 +37,15 @@ class StartupThemeColors {
   /// the fallback whenever the cache cannot be read. Values mirror
   /// `dark_theme.dart` so a default install shows no handoff at all.
   static const fallback = StartupThemeColors(
-    background: Color(0xFF121212),
-    foreground: Color(0xFFEFEFEF),
-    primary: Color(0xFFEFEFEF),
+    background: Color(0xFF111216),
+    foreground: Color(0xFFF1EDE4),
+    primary: Color(0xFFF1EDE4),
     chrome: StartupChrome(
-      surface: Color(0xFF282828),
-      tertiary: Color(0xFFEFEFEF),
-      onTertiary: Color(0xFF1D1D1D),
-      tertiaryFixed: Color(0xFF282828),
-      onTertiaryFixed: Color(0xFFEFEFEF),
+      surface: Color(0xFF24252D),
+      tertiary: Color(0xFFFF5A4A),
+      onTertiary: Color(0xFF111216),
+      tertiaryFixed: Color(0xFF24252D),
+      onTertiaryFixed: Color(0xFFF1EDE4),
       radiusExternal: 14,
       radiusInternal: 10,
     ),

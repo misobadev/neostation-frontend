@@ -471,7 +471,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 188;
+  static const int _databaseVersion = 189;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -2020,7 +2020,8 @@ class SqliteService {
         performance_mode INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
-        neoglass_border_width REAL DEFAULT 2
+        neoglass_border_width REAL DEFAULT 2,
+        corner_radius INTEGER DEFAULT 3
       );
       ''',
       '''
@@ -3015,6 +3016,7 @@ class SqliteService {
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
+    int? cornerRadius,
   }) async {
     final db = await instance.database;
 
@@ -3198,6 +3200,9 @@ class SqliteService {
     }
     if (neoglassBorderWidth != null) {
       updates['neoglass_border_width'] = neoglassBorderWidth;
+    }
+    if (cornerRadius != null) {
+      updates['corner_radius'] = cornerRadius;
     }
 
     if (showAchievementsBadge != null) {

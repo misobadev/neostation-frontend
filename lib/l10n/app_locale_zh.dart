@@ -218,6 +218,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.neoglassTransparencySubtitle: '0 = 无透明度，30 = 50% 透明度',
   AppLocale.neoglassBorderWidth: '玻璃边框',
   AppLocale.neoglassBorderWidthSubtitle: '玻璃边缘的粗细',
+  AppLocale.cornerRadius: '圆角',
+  AppLocale.cornerRadiusSubtitle: '卡片和面板的圆角程度',
   AppLocale.systemTheme: '系统默认',
   AppLocale.importTheme: '导入主题',
   AppLocale.importThemeSuccess: '已导入主题“%s”',

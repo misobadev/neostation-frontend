@@ -20,7 +20,7 @@ const Color _batteryLow = Color(0xFFf04e4f);
 const Color _batteryPower = Color(0xFF00bafe);
 
 const Color _errorColor = Color(0xFFf04e4f);
-const Color _onErrorColor = Color(0xFF690000);
+const Color _onErrorColor = Color(0xFF2A0000);
 const Color _warningColor = Color(0xFFffbf00);
 const Color _onWarningColor = Color(0xFF854200);
 const Color _successColor = Color(0xFF01df72);

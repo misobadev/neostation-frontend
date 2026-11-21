@@ -492,6 +492,10 @@ class SqliteConfigService {
                     ) ??
                     2)
                 .clamp(0.0, 2.0),
+        // Missing column/row => 3 => medium corners.
+        cornerRadius:
+            (int.tryParse(userConfig?['corner_radius']?.toString() ?? '3') ?? 3)
+                .clamp(0, 5),
       );
     } catch (e) {
       _log.e('Error applying configuration in loadConfig: $e');
@@ -579,6 +583,7 @@ class SqliteConfigService {
           neoglassBlur: config.neoglassBlur,
           neoglassTransparency: config.neoglassTransparency,
           neoglassBorderWidth: config.neoglassBorderWidth,
+          cornerRadius: config.cornerRadius,
         );
 
         await SqliteService.saveUserRomFolders(config.romFolders);

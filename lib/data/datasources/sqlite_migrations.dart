@@ -702,6 +702,9 @@ class SqliteMigrations {
       case 188:
         await _migrateToVersion188(db);
         break;
+      case 189:
+        await _migrateToVersion189(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7650,6 +7653,30 @@ class SqliteMigrations {
       _log.i('Migration v188 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v188: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v189: adds `user_config.corner_radius`, the corner rounding the
+  /// user picks for every theme (0 square to 5 the roundest, 3 by default).
+  static Future<void> _migrateToVersion189(Database db) async {
+    _log.i('Migration v189: Adding corner_radius to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('corner_radius')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN corner_radius INTEGER DEFAULT 3',
+        );
+        _log.i('v189: corner_radius column added');
+      } else {
+        _log.i('v189: corner_radius already present, nothing to do');
+      }
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v189: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

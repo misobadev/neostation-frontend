@@ -231,6 +231,8 @@ const Map<String, dynamic> appLocaleEn = {
       '0 = no transparency, 30 = 50% transparency',
   AppLocale.neoglassBorderWidth: 'Glass Border',
   AppLocale.neoglassBorderWidthSubtitle: 'Width of the glass edge',
+  AppLocale.cornerRadius: 'Corners',
+  AppLocale.cornerRadiusSubtitle: 'How round cards and panels are',
   AppLocale.systemTheme: 'System',
   AppLocale.importTheme: 'Import Theme',
   AppLocale.importThemeSuccess: 'Imported "%s"',

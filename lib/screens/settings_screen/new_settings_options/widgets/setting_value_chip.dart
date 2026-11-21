@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/themes/corner_radii.dart';
 
 /// Compact pill showing the current value of a settings row (language, a
 /// cyclable option, etc.). Pair it as the [SettingRow.trailing] control; wrap
@@ -24,7 +25,11 @@ class SettingValueChip extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 6.r),
       decoration: BoxDecoration(
         color: theme.colorScheme.primary.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6.r),
+        borderRadius: BorderRadius.circular(
+          (Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m())
+                  .radiusInternalRadius *
+              0.6,
+        ),
         border: Border.all(
           color: theme.colorScheme.primary.withValues(alpha: 0.4),
           width: 0.5.r,

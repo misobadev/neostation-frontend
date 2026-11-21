@@ -216,6 +216,8 @@ mixin AppLocale {
   static const String neoglassBorderWidth = 'neoglass_border_width';
   static const String neoglassBorderWidthSubtitle =
       'neoglass_border_width_subtitle';
+  static const String cornerRadius = 'corner_radius';
+  static const String cornerRadiusSubtitle = 'corner_radius_subtitle';
   static const String systemTheme = 'system_theme';
   static const String importTheme = 'import_theme';
   static const String importThemeSuccess = 'import_theme_success';

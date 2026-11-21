@@ -225,6 +225,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.neoglassTransparencySubtitle: '0 = 透明なし、30 = 50% 透明',
   AppLocale.neoglassBorderWidth: 'ガラスの枠',
   AppLocale.neoglassBorderWidthSubtitle: 'ガラスの縁の太さ',
+  AppLocale.cornerRadius: '角',
+  AppLocale.cornerRadiusSubtitle: 'カードとパネルの角の丸み',
   AppLocale.systemTheme: 'システムテーマ',
   AppLocale.importTheme: 'テーマをインポート',
   AppLocale.importThemeSuccess: 'テーマ「%s」をインポートしました',

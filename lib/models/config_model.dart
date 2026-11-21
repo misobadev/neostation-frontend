@@ -311,6 +311,10 @@ class ConfigModel {
   /// glass border.
   final double neoglassBorderWidth;
 
+  /// How round corners are drawn in every theme: 0 square, then
+  /// extra small, small, medium (the default), large and extra large.
+  final int cornerRadius;
+
   const ConfigModel({
     this.romFolders = const [],
     this.detectedSystems = const [],
@@ -373,6 +377,7 @@ class ConfigModel {
     this.neoglassBlur = 0,
     this.neoglassTransparency = 10,
     this.neoglassBorderWidth = 2,
+    this.cornerRadius = 3,
   });
 
   /// Convenience getter that returns the primary ROM folder, if any are configured.
@@ -669,6 +674,13 @@ class ConfigModel {
                   ) ??
                   2)
               .clamp(0.0, 2.0),
+      cornerRadius:
+          (int.tryParse(
+                    (json['cornerRadius'] ?? json['corner_radius'] ?? 3)
+                        .toString(),
+                  ) ??
+                  3)
+              .clamp(0, 5),
     );
   }
 
@@ -762,6 +774,7 @@ class ConfigModel {
       'neoglassBlur': neoglassBlur,
       'neoglassTransparency': neoglassTransparency,
       'neoglassBorderWidth': neoglassBorderWidth,
+      'cornerRadius': cornerRadius,
     };
   }
 
@@ -828,6 +841,7 @@ class ConfigModel {
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
+    int? cornerRadius,
   }) {
     return ConfigModel(
       romFolders: romFolders ?? this.romFolders,
@@ -895,6 +909,7 @@ class ConfigModel {
       neoglassBlur: neoglassBlur ?? this.neoglassBlur,
       neoglassTransparency: neoglassTransparency ?? this.neoglassTransparency,
       neoglassBorderWidth: neoglassBorderWidth ?? this.neoglassBorderWidth,
+      cornerRadius: cornerRadius ?? this.cornerRadius,
     );
   }
 

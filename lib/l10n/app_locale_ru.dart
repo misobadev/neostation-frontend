@@ -230,6 +230,8 @@ const Map<String, dynamic> appLocaleRu = {
       '0 = без прозрачности, 30 = 50% прозрачности',
   AppLocale.neoglassBorderWidth: 'Рамка стекла',
   AppLocale.neoglassBorderWidthSubtitle: 'Толщина края стекла',
+  AppLocale.cornerRadius: 'Углы',
+  AppLocale.cornerRadiusSubtitle: 'Насколько скруглены карточки и панели',
   AppLocale.systemTheme: 'Системная',
   AppLocale.importTheme: 'Импорт темы',
   AppLocale.importThemeSuccess: 'Тема «%s» импортирована',

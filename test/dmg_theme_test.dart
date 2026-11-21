@@ -20,7 +20,8 @@ void main() {
         theme.colorScheme.onSurface,
         const Color(0xFF0F380F),
       ); // base-content
-      expect(theme.colorScheme.primary, const Color(0xFF306230)); // primary
+      // The darkest shade, so the selector's text (the lightest) reads on it.
+      expect(theme.colorScheme.primary, const Color(0xFF0F380F));
       expect(theme.colorScheme.tertiary, theme.colorScheme.primary);
       expect(theme.colorScheme.onTertiary, theme.colorScheme.onPrimary);
       expect(theme.colorScheme.tertiaryFixed, theme.colorScheme.surface);

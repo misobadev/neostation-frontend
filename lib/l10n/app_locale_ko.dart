@@ -226,6 +226,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.neoglassTransparencySubtitle: '0 = 투명 없음, 30 = 50% 투명',
   AppLocale.neoglassBorderWidth: '유리 테두리',
   AppLocale.neoglassBorderWidthSubtitle: '유리 가장자리 두께',
+  AppLocale.cornerRadius: '모서리',
+  AppLocale.cornerRadiusSubtitle: '카드와 패널의 모서리 둥글기',
   AppLocale.systemTheme: '시스템',
   AppLocale.importTheme: '테마 가져오기',
   AppLocale.importThemeSuccess: '"%s" 가져옴',

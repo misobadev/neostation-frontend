@@ -43,6 +43,7 @@ import 'package:neostation/utils/display_metrics_log.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/themes/anta_text_theme.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/legacy_install_import.dart';
 import 'package:neostation/utils/rom_folder_path.dart';
@@ -1925,6 +1926,9 @@ class _MyAppState extends State<MyApp> {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
+          final cornerStep = context.select<SqliteConfigProvider, int>(
+            (config) => config.config.cornerRadius,
+          );
           return ScreenUtilInit(
             designSize: const Size(640, 480),
             minTextAdapt: true,
@@ -1979,28 +1983,33 @@ class _MyAppState extends State<MyApp> {
                           ),
                         );
                       },
-                      theme: themeProvider.currentTheme.copyWith(
-                        textTheme: antaTextTheme(
-                          themeProvider.currentTheme.textTheme,
-                        ),
-                        iconTheme: const IconThemeData(fill: 1.0),
-                        visualDensity: VisualDensity.adaptivePlatformDensity,
-                        materialTapTargetSize: MaterialTapTargetSize.padded,
-                        pageTransitionsTheme: PageTransitionsTheme(
-                          builders: {
-                            TargetPlatform.android:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.iOS:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.windows:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.macOS:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.linux:
-                                FadeUpwardsPageTransitionsBuilder(),
-                          },
-                        ),
-                      ),
+                      theme:
+                          CornerRadii.applyStep(
+                            themeProvider.currentTheme,
+                            cornerStep,
+                          ).copyWith(
+                            textTheme: antaTextTheme(
+                              themeProvider.currentTheme.textTheme,
+                            ),
+                            iconTheme: const IconThemeData(fill: 1.0),
+                            visualDensity:
+                                VisualDensity.adaptivePlatformDensity,
+                            materialTapTargetSize: MaterialTapTargetSize.padded,
+                            pageTransitionsTheme: PageTransitionsTheme(
+                              builders: {
+                                TargetPlatform.android:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.iOS:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.windows:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.macOS:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.linux:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                              },
+                            ),
+                          ),
                       home: PermissionCheckWrapper(
                         child: AppLifecycleHandler(child: MainScreen()),
                       ),

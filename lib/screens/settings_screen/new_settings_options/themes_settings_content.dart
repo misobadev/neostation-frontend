@@ -12,6 +12,7 @@ import 'package:neostation/models/config_model.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/themes/app_themes.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/themes/theme_glass.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/services/logger_service.dart';
@@ -63,9 +64,12 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
   /// NeoGlass appearance rows shown at the top, above the theme grid.
   static const int _neoglassRowCount = 3;
 
-  /// Every full-width row above the theme grid: Performance Mode plus the
-  /// NeoGlass appearance controls.
-  static const int _topRowCount = 1 + _neoglassRowCount;
+  /// The corner rounding row, after the NeoGlass controls.
+  static const int _cornerRowIndex = 1 + _neoglassRowCount;
+
+  /// Every full-width row above the theme grid: Performance Mode, the
+  /// NeoGlass appearance controls and the corner rounding.
+  static const int _topRowCount = _cornerRowIndex + 1;
 
   /// Blur sigma choices (Off / 1 / 2). 0 disables the blur entirely.
   static const List<int> _blurSteps = [0, 1, 2];
@@ -230,6 +234,10 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
       if (index == 0) {
         await context.read<SqliteConfigProvider>().updatePerformanceMode(
           !config.performanceMode,
+        );
+      } else if (index == _cornerRowIndex) {
+        await context.read<SqliteConfigProvider>().updateCornerRadius(
+          (config.cornerRadius + 1) % CornerRadii.stepCount,
         );
       } else if (!config.performanceMode) {
         await _cycleNeoglassOption(index - 1);
@@ -490,6 +498,16 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
             value: _borderLabel(config.neoglassBorderWidth),
             enabled: !config.performanceMode,
           ),
+          SizedBox(height: 12.r),
+          // Not a glass effect: it costs nothing, so performance mode leaves
+          // it alone.
+          _buildNeoglassRow(
+            keyIndex: _cornerRowIndex,
+            title: AppLocale.cornerRadius.getString(context),
+            subtitle: AppLocale.cornerRadiusSubtitle.getString(context),
+            value: _cornerLabels[config.cornerRadius.clamp(0, 5)],
+            enabled: true,
+          ),
           SizedBox(height: 20.r),
 
           // Theme grid.
@@ -617,6 +635,9 @@ class ThemesSettingsContentState extends State<ThemesSettingsContent> {
       ),
     );
   }
+
+  /// Labels for the corner steps, square to the roundest.
+  static const List<String> _cornerLabels = ['0', 'XS', 'S', 'M', 'L', 'XL'];
 
   /// Label for a blur sigma: "Off" at 0, otherwise the number.
   String _blurLabel(int blur) =>

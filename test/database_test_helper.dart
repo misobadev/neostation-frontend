@@ -178,7 +178,8 @@ class DatabaseTestHelper {
         performance_mode INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
-        neoglass_border_width REAL DEFAULT 2
+        neoglass_border_width REAL DEFAULT 2,
+        corner_radius INTEGER DEFAULT 3
       )
     ''');
 
