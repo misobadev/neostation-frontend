@@ -62,11 +62,12 @@ class GooeyMotion extends ChangeNotifier {
     return (1 - (to.center - _center).distance / total).clamp(0.0, 1.0);
   }
 
-  /// How far the liquid drags a card while it travels. The next card leans a
-  /// little towards the liquid coming for it, then moves with it one for one
-  /// while it overshoots and settles, so the ring never leaves the card it
-  /// lands on; the card being left is pulled a little along the way the
-  /// liquid goes until it lets go. Zero at rest and for every other card.
+  /// How far the liquid drags a card while it travels. The next card stays put
+  /// until the ring reaches it, then is pushed on with it one for one while it
+  /// overshoots and settles, so the ring never leaves the card it lands on.
+  /// The card being left is tugged along the way the ring goes as it pulls
+  /// out, then springs back with a small rebound. Zero at rest and for every
+  /// other card.
   Offset dragOf({required bool target}) {
     final from = _from;
     final to = _to;
@@ -80,20 +81,18 @@ class GooeyMotion extends ChangeNotifier {
           (offset.dx * path.dx + offset.dy * path.dy) / pathLength > 0) {
         return offset;
       }
-      // Still coming: the card leans towards it, a little.
-      final lean = offset * 0.08;
-      final limit = to.shortestSide * 0.04;
-      final length = lean.distance;
-      return length <= limit ? lean : lean * (limit / length);
+      // Still coming: the card waits for it.
+      return Offset.zero;
     }
-    final away = _center - from.center;
-    final distance = away.distance;
-    if (distance < 0.5) return Offset.zero;
-    // Strongest while the liquid is still joined to the card, gone once the
-    // drop it pulls out of it has let go.
-    final hold = 1 - Curves.easeOut.transform((arrival / 0.55).clamp(0.0, 1.0));
-    final reach = math.min(distance * 0.14, from.shortestSide * 0.04);
-    return away / distance * reach * hold;
+    final path = to.center - from.center;
+    final pathLength = path.distance;
+    if (pathLength < 0.5) return Offset.zero;
+    // Tugged along the way the ring goes as it pulls out, then let go and
+    // springing back past its place a little before it settles: a damped
+    // swing over the ring's way to the next card, peaking early.
+    final t = arrival;
+    final swing = math.exp(-4 * t) * math.sin(2.4 * math.pi * t) / 0.497;
+    return path / pathLength * (from.shortestSide * 0.08 * swing);
   }
 
   /// Points the liquid at [target]. A new [selection] makes it travel there
@@ -135,21 +134,21 @@ class GooeyMotion extends ChangeNotifier {
   void advance(double dt) {
     final to = _to;
     if (!_moving || to == null) return;
-    // From far away the spring pulls as if the card were only about one card
-    // away, and the speed is capped to match, so a long jump (a tap on the
-    // other end of the grid) travels at a steady pace and overshoots no more
-    // than a jump to the next card does.
+    // The speed is capped by how far there is left to go: from far away the
+    // ring flies (a tap on the other end of the grid takes about as long as a
+    // press to the next card), and it slows to a short jump's speed as it
+    // comes in, so it lands, overshoots and drags the card no more than a
+    // move to the next card does.
     final reach = to.shortestSide * 1.2;
-    final topSpeed = math.sqrt(_stiffness) * reach;
+    final rate = math.sqrt(_stiffness);
     var left = math.min(dt, 0.1);
     while (left > 0) {
       final h = math.min(_step, left);
       left -= h;
-      var offset = to.center - _center;
-      final distance = offset.distance;
-      if (distance > reach) offset = offset * (reach / distance);
+      final offset = to.center - _center;
       final pull = offset * _stiffness - _velocity * _damping;
       _velocity += pull * h;
+      final topSpeed = rate * math.max(reach, offset.distance);
       final speed = _velocity.distance;
       if (speed > topSpeed) _velocity = _velocity * (topSpeed / speed);
       _center += _velocity * h;
