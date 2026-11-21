@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/constants/recent_card_sizes.dart';
 import 'package:neostation/models/config_model.dart';
 import 'package:neostation/models/database_game_model.dart';
 import 'package:neostation/models/discovery_models.dart';
@@ -105,7 +106,8 @@ class DiscoveryStorefront extends StatelessWidget {
       crossAxisCount: crossAxisCount,
       // The same 0.8 card shape the systems grid uses with its logo footer.
       childAspectRatio: 0.80,
-      // Game of the Week spans two columns, like the recent card.
+      // Game of the Week spans two columns like the compact recent card.
+      recentCardSize: RecentCardSizes.twoByOne,
       selectedIndex: selectedIndex,
       systems: cards,
       navLayerId: kDiscoveryGridNavLayerId,

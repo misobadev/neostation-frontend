@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:neostation/constants/recent_card_sizes.dart';
 import 'package:neostation/services/saf_directory_service.dart';
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
@@ -323,6 +324,11 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['hide_recent_card']?.toString() ?? '0') ??
                 0) ==
             1,
+        // Missing column/row => the compact card, the default.
+        recentCardSize:
+            userConfig?['recent_card_size']?.toString().isNotEmpty == true
+            ? userConfig!['recent_card_size'].toString()
+            : RecentCardSizes.twoByOne,
         // Missing column/row => the wheel tab (see migration v110).
         gameDetailsTab:
             userConfig?['game_details_tab']?.toString().isNotEmpty == true
@@ -548,6 +554,7 @@ class SqliteConfigService {
           collectionSortOrder: config.collectionSortOrder,
           appLanguage: config.appLanguage,
           hideRecentCard: config.hideRecentCard ? 1 : 0,
+          recentCardSize: config.recentCardSize,
           gameDetailsTab: config.gameDetailsTab,
           hideTabSync: config.hideTabSync ? 1 : 0,
           hideTabAchievements: config.hideTabAchievements ? 1 : 0,

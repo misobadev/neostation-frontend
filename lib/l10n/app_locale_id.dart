@@ -188,6 +188,10 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.hideRecentCard: 'Kartu Terbaru',
   AppLocale.hideRecentCardSubtitle:
       'Tampilkan kartu game terbaru di grid sistem',
+  AppLocale.recentCardSize: 'Ukuran Kartu Terbaru',
+  AppLocale.recentCardSizeSubtitle: 'Ukuran kartu game terbaru di grid sistem',
+  AppLocale.recentCardSizeDefault: 'Besar',
+  AppLocale.recentCardSize2x1: 'Ringkas',
   AppLocale.themesSubtitle: 'Personalisasi tampilan NeoStation',
   AppLocale.neoglassGroup: 'NeoGlass',
   AppLocale.neoglassBlur: 'Blur Kaca',

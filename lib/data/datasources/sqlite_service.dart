@@ -471,7 +471,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 189;
+  static const int _databaseVersion = 190;
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1972,9 +1972,7 @@ class SqliteService {
         app_language TEXT DEFAULT 'en',
         active_theme TEXT DEFAULT '',
         hide_recent_card INTEGER DEFAULT 0,
-        -- Unused since the Recently Played card has one size. Kept so a
-        -- fresh install matches the schema upgraded devices already have.
-        recent_card_size TEXT DEFAULT 'default',
+        recent_card_size TEXT DEFAULT '2x1',
         -- Unused since the vertical action rail was removed. Kept so a fresh
         -- install matches the schema migration v103 left on upgraded devices.
         legend_hidden INTEGER DEFAULT 0,
@@ -2978,6 +2976,7 @@ class SqliteService {
     String? appLanguage,
     String? activeTheme,
     int? hideRecentCard,
+    String? recentCardSize,
     String? gameDetailsTab,
     int? hideTabSync,
     int? hideTabAchievements,
@@ -3092,6 +3091,9 @@ class SqliteService {
     }
     if (hideRecentCard != null) {
       updates['hide_recent_card'] = hideRecentCard;
+    }
+    if (recentCardSize != null) {
+      updates['recent_card_size'] = recentCardSize;
     }
     if (gameDetailsTab != null) {
       updates['game_details_tab'] = gameDetailsTab;

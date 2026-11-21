@@ -188,6 +188,11 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.hideRecentCard: 'Карточка недавних игр',
   AppLocale.hideRecentCardSubtitle:
       'Показать карточку недавних игр в сетке систем',
+  AppLocale.recentCardSize: 'Размер карточки',
+  AppLocale.recentCardSizeSubtitle:
+      'Размер карточки недавних игр в сетке систем',
+  AppLocale.recentCardSizeDefault: 'Большая',
+  AppLocale.recentCardSize2x1: 'Компактно',
   AppLocale.themesSubtitle: 'Персонализируйте внешний вид вашей NeoStation',
   AppLocale.neoglassGroup: 'NeoGlass',
   AppLocale.neoglassBlur: 'Размытие стекла',

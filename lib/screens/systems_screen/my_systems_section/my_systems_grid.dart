@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:neostation/constants/recent_card_sizes.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/responsive.dart';
@@ -225,6 +226,7 @@ class MySystems extends StatelessWidget {
               childAspectRatio: configProvider.config.hideSystemLogos
                   ? 1.0
                   : 0.80,
+              recentCardSize: configProvider.config.recentCardSize,
               selectedIndex: selectedIndex,
               onCardTapped: onCardTapped,
               systems: allSystems,
@@ -680,6 +682,7 @@ class SystemCardGridView extends StatefulWidget {
     this.onWestPressed,
     this.bindYButton = true,
     this.systems = const [],
+    this.recentCardSize = RecentCardSizes.defaultSize,
     this.navLayerId = kSystemsGridNavLayerId,
     this.cardOverrideBuilder,
     this.enableTabBumpers = true,
@@ -696,6 +699,9 @@ class SystemCardGridView extends StatefulWidget {
 
   final int crossAxisCount;
   final double childAspectRatio;
+
+  /// Cell span the 'Recent Games' card takes — a [RecentCardSizes] value.
+  final String recentCardSize;
 
   /// Optional per-card aspect ratios. When supplied, each card is laid out with
   /// its own height (width / aspectRatio). This is used to render systems with
@@ -844,6 +850,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
   List<List<int>>? _cachedVirtualGrid;
   int? _cachedGridCols;
   int? _cachedGridSystemCount;
+  String? _cachedGridRecentSize;
 
   /// Cached conversion of widget.systems to SystemInfo list, rebuilt only on systems change.
   late List<SystemInfo> _systemCards;
@@ -941,7 +948,8 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
     super.didUpdateWidget(oldWidget);
     _cols = widget.crossAxisCount;
     if (oldWidget.systems != widget.systems ||
-        oldWidget.crossAxisCount != widget.crossAxisCount) {
+        oldWidget.crossAxisCount != widget.crossAxisCount ||
+        oldWidget.recentCardSize != widget.recentCardSize) {
       _cachedVirtualGrid = null;
       _systemCards = _toSystemCards(widget.systems);
     }
@@ -977,15 +985,21 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
   List<List<int>> _buildVirtualGrid(List<SystemInfo> cards, int cols) {
     if (_cachedVirtualGrid != null &&
         _cachedGridCols == cols &&
-        _cachedGridSystemCount == cards.length) {
+        _cachedGridSystemCount == cards.length &&
+        _cachedGridRecentSize == widget.recentCardSize) {
       return _cachedVirtualGrid!;
     }
 
-    final grid = buildVirtualGrid(cards, cols);
+    final grid = buildVirtualGrid(
+      cards,
+      cols,
+      recentCardSize: widget.recentCardSize,
+    );
 
     _cachedVirtualGrid = grid;
     _cachedGridCols = cols;
     _cachedGridSystemCount = cards.length;
+    _cachedGridRecentSize = widget.recentCardSize;
     return grid;
   }
 
@@ -1333,7 +1347,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
             ? 0.0
             : rowHeights.reduce((a, b) => a + b) - spY;
 
-        final (recentW, recentH) = recentCardSpan(cols);
+        final (recentW, recentH) = recentCardSpan(widget.recentCardSize, cols);
 
         final List<Widget> cardWidgets = [];
         final Map<int, Rect> slots = {};
@@ -1404,7 +1418,9 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
                   info: card,
                   isSelected: cardIsSelected,
                   showShadow: false,
-                  isCompact: card.isGame,
+                  isCompact:
+                      card.isGame &&
+                      widget.recentCardSize == RecentCardSizes.twoByOne,
                   onTap: handleTap,
                   onLongPress: widget.onYPressed == null
                       ? null

@@ -191,6 +191,11 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.hideRecentCard: 'Card de Recentes',
   AppLocale.hideRecentCardSubtitle:
       'Mostrar o card de jogos recentes na grade de sistemas',
+  AppLocale.recentCardSize: 'Tamanho do card recente',
+  AppLocale.recentCardSizeSubtitle:
+      'Tamanho do card de jogos recentes na grade de sistemas',
+  AppLocale.recentCardSizeDefault: 'Grande',
+  AppLocale.recentCardSize2x1: 'Compacto',
   AppLocale.themesSubtitle: 'Personalize o visual do NeoStation',
   AppLocale.neoglassGroup: 'NeoGlass',
   AppLocale.neoglassBlur: 'Desfoque do vidro',

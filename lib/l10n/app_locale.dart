@@ -185,8 +185,12 @@ mixin AppLocale {
   static const String systemsSettingsSubtitle = 'systems_settings_subtitle';
   static const String hideRecentCard = 'hide_recent_card';
   static const String hideRecentCardSubtitle = 'hide_recent_card_subtitle';
+  static const String recentCardSize = 'recent_card_size';
+  static const String recentCardSizeSubtitle = 'recent_card_size_subtitle';
   static const String searchCard = 'search_card';
   static const String searchCardSubtitle = 'search_card_subtitle';
+  static const String recentCardSizeDefault = 'recent_card_size_default';
+  static const String recentCardSize2x1 = 'recent_card_size_2x1';
 
   // ---------------------------------------------------------------------------
   // General settings

@@ -240,7 +240,7 @@ extension _GamepadGridNav on _SystemCardGridViewState {
     }
 
     final selectedCard = cards[widget.selectedIndex];
-    final (_, recentH) = recentCardSpan(cols);
+    final (_, recentH) = recentCardSpan(widget.recentCardSize, cols);
     final spanH = selectedCard.isGame ? recentH : 1;
 
     double itemTop = rowTop(selectedRow);

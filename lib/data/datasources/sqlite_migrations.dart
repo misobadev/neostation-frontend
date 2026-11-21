@@ -705,6 +705,9 @@ class SqliteMigrations {
       case 189:
         await _migrateToVersion189(db);
         break;
+      case 190:
+        await _migrateToVersion190(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7677,6 +7680,34 @@ class SqliteMigrations {
       }
     } catch (e, stackTrace) {
       _log.e('Error in migration v189: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v190: the compact Recently Played card becomes the default.
+  ///
+  /// The large card was stored as 'default' by the column's own default, not
+  /// by a choice, so those rows move to the compact card once; anyone who
+  /// wants the large one picks it again in Settings › Systems.
+  static Future<void> _migrateToVersion190(Database db) async {
+    _log.i('Migration v190: Compact Recently Played card by default');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('recent_card_size')) {
+        _log.i('v190: recent_card_size is not present, nothing to do');
+        return;
+      }
+      db.execute(
+        "UPDATE user_config SET recent_card_size = '2x1' "
+        "WHERE recent_card_size IS NULL OR recent_card_size = 'default'",
+      );
+      _log.i('Migration v190 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v190: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }
