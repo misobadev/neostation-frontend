@@ -34,6 +34,7 @@ import 'package:neostation/models/retro_achievements_game_info.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/services/retro_achievements_helper.dart';
 import 'package:neostation/screens/game_screen/game_details_card/dialogs/game_achievements_dialog.dart';
+import 'package:neostation/utils/grid_sizes.dart';
 
 class GamesGrid extends StatefulWidget {
   final SystemModel system;
@@ -621,22 +622,7 @@ class _GamesGridState extends State<GamesGrid> with TickerProviderStateMixin {
   void _updateCrossAxisCount() {
     try {
       final config = context.read<SqliteConfigProvider>().config;
-      switch (config.gameGridColumns) {
-        case 'S':
-          _crossAxisCount = 7;
-          break;
-        case 'M':
-          _crossAxisCount = 6;
-          break;
-        case 'L':
-          _crossAxisCount = 5;
-          break;
-        case 'XL':
-          _crossAxisCount = 4;
-          break;
-        default:
-          _crossAxisCount = 6;
-      }
+      _crossAxisCount = GridSizes.columns(config.gameGridColumns);
     } catch (_) {
       _crossAxisCount = 5;
     }
@@ -654,7 +640,7 @@ class _GamesGridState extends State<GamesGrid> with TickerProviderStateMixin {
   void _adjustGameGridDensity(int delta) {
     try {
       final provider = context.read<SqliteConfigProvider>();
-      final sizes = ['S', 'M', 'L', 'XL'];
+      const sizes = GridSizes.values;
       final currentIndex = sizes.indexOf(provider.config.gameGridColumns);
       if (currentIndex == -1) return;
       final newIndex = (currentIndex + delta).clamp(0, sizes.length - 1);

@@ -796,23 +796,28 @@ class _SystemCardState extends State<SystemCard> {
             color: _highlighted
                 ? Theme.of(context).colorScheme.onSecondary
                 : Theme.of(context).colorScheme.onSurface,
-            builder: (color) => Text(
-              AppLocale.timePlayedLabel
-                  .getString(context)
-                  .replaceFirst(
-                    '{time}',
-                    _formatPlayTimeLocalized(
-                      widget.info.gameModel?.playTime ?? 0,
-                    ),
-                  )
-                  .toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 10.r,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.0,
+            // Shrinks rather than cuts off on the narrow cards of the
+            // smallest sizes.
+            builder: (color) => FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                AppLocale.timePlayedLabel
+                    .getString(context)
+                    .replaceFirst(
+                      '{time}',
+                      _formatPlayTimeLocalized(
+                        widget.info.gameModel?.playTime ?? 0,
+                      ),
+                    )
+                    .toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10.r,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                ),
               ),
             ),
           ),

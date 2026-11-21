@@ -6,6 +6,8 @@ import 'package:neostation/constants/recent_card_sizes.dart';
 
 import 'emulator_model.dart';
 
+import 'package:neostation/utils/grid_sizes.dart';
+
 String _normalizeGameListSize(String value) =>
     const {'S', 'M', 'L', 'XL'}.contains(value) ? value : 'S';
 
@@ -37,10 +39,8 @@ class ConfigModel {
   static const int dockMaxSlots = 5;
 
   /// Normalizes a persisted grid size, defaulting to M.
-  static String normalizeGridColumns(Object? value) {
-    final size = value?.toString() ?? 'M';
-    return const {'S', 'M', 'L', 'XL'}.contains(size) ? size : 'M';
-  }
+  static String normalizeGridColumns(Object? value) =>
+      GridSizes.normalize(value);
 
   /// Smallest and largest number of dock slots the user may choose to show.
   static const int dockMinSlotCount = 0;
@@ -226,21 +226,21 @@ class ConfigModel {
   /// Whether to automatically check and prompt for system/emulator config updates on startup.
   final bool autoUpdateSystems;
 
-  /// Preferred grid column density for the systems grid ('S', 'M', 'L', 'XL').
+  /// Preferred grid column density for the systems grid (see [GridSizes]).
   final String systemGridColumns;
 
-  /// Preferred grid column density for the Discovery board ('S', 'M', 'L',
-  /// 'XL'). Discovery uses the same scale as the systems grid.
+  /// Preferred grid column density for the Discovery board (see
+  /// [GridSizes]). Discovery uses the same scale as the systems grid.
   final String discoveryGridColumns;
 
   /// Discovery layout: `'grid'` or `'carousel'`.
   final String discoveryViewMode;
 
-  /// Preferred grid column density for the Android apps board ('S', 'M', 'L',
-  /// 'XL').
+  /// Preferred grid column density for the Android apps board (see
+  /// [GridSizes]).
   final String androidGridColumns;
 
-  /// Preferred grid column density for the games grid ('S', 'M', 'L', 'XL').
+  /// Preferred grid column density for the games grid (see [GridSizes]).
   final String gameGridColumns;
 
   /// Preferred text and row size for the game list ('S', 'M', 'L', 'XL').

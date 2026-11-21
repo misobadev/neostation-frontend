@@ -59,6 +59,8 @@ import 'package:neostation/services/secondary_achievements_controller.dart';
 import 'system_list_builder.dart';
 import '../../../utils/user_data_move_guard.dart';
 
+import 'package:neostation/utils/grid_sizes.dart';
+
 part 'my_systems_grid/gamepad_grid_nav.dart';
 part 'my_systems_grid/theme_background.dart';
 part 'my_systems_grid/pull_to_refresh.dart';
@@ -688,7 +690,7 @@ class SystemCardGridView extends StatefulWidget {
     this.enableTabBumpers = true,
     this.enablePullToRescan = true,
     this.enablePinchResize = true,
-    this.pinchSizes = const ['S', 'M', 'L', 'XL'],
+    this.pinchSizes = GridSizes.values,
     this.pinchSize,
     this.onPinchSizeChanged,
     this.crossAxisCountForSize,

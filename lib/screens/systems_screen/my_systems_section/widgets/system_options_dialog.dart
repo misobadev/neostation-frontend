@@ -13,6 +13,7 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/utils/grid_sizes.dart';
 
 /// Actions the Options dialog can hand back to the systems screen.
 enum SystemOptionsAction { search, gameSettings }
@@ -324,9 +325,10 @@ class _SystemOptionsDialogState extends State<SystemOptionsDialog> {
     if (rows.isEmpty) return;
     if (!rows[_submenuIndex].segmented) return;
 
-    const sizes = ['S', 'M', 'L', 'XL'];
+    const sizes = GridSizes.values;
     final current = sizes.indexOf(config.systemGridColumns);
-    final next = (current < 0 ? 1 : current) + delta;
+    final next =
+        (current < 0 ? sizes.indexOf(GridSizes.defaultSize) : current) + delta;
     if (next < 0 || next >= sizes.length) return;
 
     context.read<SqliteConfigProvider>().updateSystemGridColumns(sizes[next]);
@@ -692,7 +694,7 @@ class _SystemOptionsDialogState extends State<SystemOptionsDialog> {
     final accent = theme.colorScheme.primary;
     final cornerRadii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     final radius = cornerRadii.radiusInternal;
-    const sizes = ['S', 'M', 'L', 'XL'];
+    const sizes = GridSizes.values;
     final selected = sizes.indexOf(config.systemGridColumns);
     final focusedBackground = theme.colorScheme.onSurface;
     final focusedForeground = theme.colorScheme.surface;

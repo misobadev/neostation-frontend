@@ -12,6 +12,8 @@ import 'package:flutter_localization/flutter_localization.dart';
 
 import '../themes/corner_radii.dart';
 
+import 'package:neostation/utils/grid_sizes.dart';
+
 /// Opens the view/sort picker used by the collections browser.
 ///
 /// The systems screen moved its display and sorting controls into the centered
@@ -177,7 +179,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
   }
 
   /// Index within the card-size row when it is focused. 0=S,1=M,2=L,3=XL
-  int _cardSizeIndex = 1; // default M
+  int _cardSizeIndex = GridSizes.values.indexOf(GridSizes.defaultSize);
 
   /// The two card styles, in the order the row lays them out.
   static const List<String> _cardStyles = ['fanart', 'box'];
@@ -189,9 +191,9 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
   void initState() {
     super.initState();
     final config = context.read<SqliteConfigProvider>().config;
-    final sizes = ['S', 'M', 'L', 'XL'];
+    const sizes = GridSizes.values;
     final idx = sizes.indexOf(config.systemGridColumns);
-    _cardSizeIndex = idx >= 0 ? idx : 1;
+    _cardSizeIndex = idx >= 0 ? idx : sizes.indexOf(GridSizes.defaultSize);
     final styleIdx = _cardStyles.indexOf(config.gameCarouselCardStyle);
     _cardStyleIndex = styleIdx >= 0 ? styleIdx : 0;
 
@@ -269,7 +271,9 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
     final opt = options[_selectedIndex];
     if (opt.isCardSize) {
       setState(() {
-        _cardSizeIndex = (_cardSizeIndex - 1 + 4) % 4;
+        _cardSizeIndex =
+            (_cardSizeIndex - 1 + GridSizes.values.length) %
+            GridSizes.values.length;
       });
       SfxService().playNavSound();
       _applyCardSize();
@@ -289,7 +293,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
     final opt = options[_selectedIndex];
     if (opt.isCardSize) {
       setState(() {
-        _cardSizeIndex = (_cardSizeIndex + 1) % 4;
+        _cardSizeIndex = (_cardSizeIndex + 1) % GridSizes.values.length;
       });
       SfxService().playNavSound();
       _applyCardSize();
@@ -303,8 +307,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
   }
 
   void _applyCardSize() {
-    final sizes = ['S', 'M', 'L', 'XL'];
-    final size = sizes[_cardSizeIndex];
+    final size = GridSizes.values[_cardSizeIndex];
     final configProvider = context.read<SqliteConfigProvider>();
     configProvider.updateSystemGridColumns(size);
   }
@@ -320,10 +323,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
     final opt = options[_selectedIndex];
     if (opt.isCardSize) {
       _applyCardSize();
-      Navigator.pop(
-        context,
-        'card_size_${['S', 'M', 'L', 'XL'][_cardSizeIndex]}',
-      );
+      Navigator.pop(context, 'card_size_${GridSizes.values[_cardSizeIndex]}');
       return;
     }
     if (opt.isCardStyle) {
@@ -503,7 +503,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
         // row picks fanart/box art. Same focus, same left/right handling, same
         // paint — only the values and where they are written differ.
         final isSize = opt.isCardSize;
-        final values = isSize ? const ['S', 'M', 'L', 'XL'] : _cardStyles;
+        final values = isSize ? GridSizes.values : _cardStyles;
         final labels = isSize
             ? values
             : [

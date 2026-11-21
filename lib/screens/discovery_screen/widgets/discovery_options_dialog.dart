@@ -10,8 +10,9 @@ import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 import 'package:provider/provider.dart';
+import 'package:neostation/utils/grid_sizes.dart';
 
-const List<String> _sizes = ['S', 'M', 'L', 'XL'];
+const List<String> _sizes = GridSizes.values;
 
 /// Opens the Discovery options menu from Start, mirroring the Systems tab.
 Future<void> showDiscoveryOptionsDialog(BuildContext context) {

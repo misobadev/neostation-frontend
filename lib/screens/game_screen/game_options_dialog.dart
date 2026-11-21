@@ -11,6 +11,7 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/widgets/context_menu/game_context_menu.dart';
+import 'package:neostation/utils/grid_sizes.dart';
 
 /// Actions the game Options panel can hand back to the games screen.
 enum GameOptionsAction {
@@ -865,7 +866,7 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
     ConfigModel config,
     String id,
   ) {
-    const sizes = ['S', 'M', 'L', 'XL'];
+    const sizes = GridSizes.values;
     switch (id) {
       case 'card_size':
         return _SegmentSpec(
