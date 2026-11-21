@@ -253,7 +253,9 @@ class _GifPainter extends CustomPainter {
         BoxFit.cover => 2.0,
         _ => 0.0,
       })
-      ..setImageSampler(0, image);
+      // Smoothed sampling: the default (none) picks the nearest texel, which
+      // pixelates a frame drawn at any size but its own.
+      ..setImageSampler(0, image, filterQuality: FilterQuality.medium);
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
 
