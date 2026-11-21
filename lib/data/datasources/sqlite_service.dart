@@ -5281,6 +5281,13 @@ class SqliteService {
   ///
   /// `android` and `music` are excluded exactly as [getFavoriteGames] and the
   /// "all systems" game list do: neither holds games worth recommending.
+  ///
+  /// So are hidden games and every game of a system hidden in Settings: the
+  /// board recommends games, and a system the user has hidden is one they don't
+  /// want offered. The flag is written by folder name, but a system has one
+  /// detection row, so it is matched by system id and doesn't depend on which
+  /// folder name that row holds. A system with no detection row has not been
+  /// hidden, so `NOT EXISTS` rather than a join that would drop it.
   static Future<List<Map<String, Object?>>> getDiscoveryCandidates() async {
     final db = await instance.database;
     return db.rawQuery('''
@@ -5308,6 +5315,11 @@ class SqliteService {
                  GROUP BY game_id) ra
              ON ra.game_id = ur.id_ra
       WHERE s.folder_name NOT IN ('android', 'music')
+        AND COALESCE(ur.is_hidden, 0) = 0
+        AND NOT EXISTS (
+          SELECT 1 FROM user_detected_systems uds
+          WHERE uds.app_system_id = ur.app_system_id AND uds.is_hidden = 1
+        )
     ''');
   }
 
