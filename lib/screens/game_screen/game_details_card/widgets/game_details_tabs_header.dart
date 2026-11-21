@@ -99,8 +99,10 @@ class GameDetailsTabsHeader extends StatelessWidget {
                   _controlSize(12),
               child: SizedBox(
                 height: _controlSize(36),
+                // The same inset as the cursor's above and below, so the
+                // selected tab sits evenly inside the pill.
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: _controlSize(8)),
+                  padding: EdgeInsets.symmetric(horizontal: _controlSize(4)),
                   child: SizedBox(
                     width: totalTabsWidth,
                     height: _controlSize(36),
