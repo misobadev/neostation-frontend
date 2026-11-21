@@ -88,6 +88,9 @@ The **Save List** shows every file you have in the cloud. You can:
 - **Refresh** the list to show the latest files.
 - **Delete** a cloud save.
 
+![The NeoSync save list showing cloud saves for several games](/screenshots/neosync-save-list.webp)
+*The NeoSync save list.*
+
 ## Custom Save Folders
 
 Standalone emulators store their saves in folders that NeoStation cannot find on its own. You point NeoStation at the folder once, per system and emulator:
