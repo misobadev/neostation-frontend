@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/screens/retro_achievements_screen/ra_cover_square.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/retro_achievements_dashboard_models.dart';
@@ -831,32 +832,12 @@ class RaGamesTabState extends State<RaGamesTab> {
     );
   }
 
-  Widget _boxArt(BuildContext context, RaGamesListItem item) {
-    final theme = Theme.of(context);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6.r),
-      child: SizedBox(
-        width: 38.r,
-        height: 50.r,
-        child: Image.network(
-          _raMediaUrl(
-            item.imageBoxArt.isNotEmpty ? item.imageBoxArt : item.imageIcon,
-          ),
-          fit: BoxFit.cover,
-          cacheWidth: (38 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-          cacheHeight: (50 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-          errorBuilder: (context, error, stackTrace) => Container(
-            color: theme.colorScheme.surface,
-            child: Icon(
-              Symbols.emoji_events_rounded,
-              color: theme.colorScheme.primary,
-              size: 18.r,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _boxArt(BuildContext context, RaGamesListItem item) => RaCoverSquare(
+    url: _raMediaUrl(
+      item.imageBoxArt.isNotEmpty ? item.imageBoxArt : item.imageIcon,
+    ),
+    size: 46.r,
+  );
 
   // Duplicated from the Unlocks tab pending the ticket-09 helper extraction
   // (see the overhaul README's handoff list).

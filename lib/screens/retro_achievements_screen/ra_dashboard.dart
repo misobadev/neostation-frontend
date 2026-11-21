@@ -54,6 +54,11 @@ class RADashboardHub extends StatefulWidget {
   /// draws itself. Kept mounted while the overview is on show.
   final Widget? sectionContent;
 
+  /// A game opened from one of the sections, shown in the panel in place of
+  /// the section (which stays mounted underneath, so going back lands where
+  /// the player left it). Null while no game is open.
+  final Widget? gameContent;
+
   /// Whether the dashboard is currently visible. Dedicated collection pages
   /// mount separately, so this flag gates dashboard refresh work.
   final bool active;
@@ -76,6 +81,7 @@ class RADashboardHub extends StatefulWidget {
     this.menuFocused = false,
     this.onSectionTap,
     this.sectionContent,
+    this.gameContent,
     this.active = true,
   });
 

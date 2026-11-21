@@ -83,6 +83,10 @@ class _RAContentState extends State<RAContent>
   /// duplicate routes.
   bool _gameActivationInFlight = false;
 
+  /// The RetroAchievements game shown in the dashboard panel, over the
+  /// section it was opened from. Null while none is open.
+  ({int gameId, String title, int? achievementId})? _openGame;
+
   /// Matches the ScreenScraper login's password field, which the RA card sits
   /// next to: an API key is as worth hiding as a password, and as easy to
   /// mistype without being able to check it.
@@ -168,6 +172,7 @@ class _RAContentState extends State<RAContent>
                   menuFocused: _menuFocused,
                   onSectionTap: _tapSection,
                   sectionContent: _buildSectionContent(),
+                  gameContent: _buildOpenGame(),
                   aotwFocusKey: _aotwFocusKey,
                   recentUnlocksFocusKey: _recentUnlocksFocusKey,
                   gamesPreviewFocusKey: _gamesPreviewFocusKey,

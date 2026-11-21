@@ -64,6 +64,7 @@ extension _GamepadNav on _RAContentState {
 
   void _showSection(RaDashboardSection section, {required bool focusPanel}) {
     rebuild(() {
+      _openGame = null;
       _section = section;
       _menuIndex = section.index;
       _menuFocused = !focusPanel;
@@ -190,6 +191,7 @@ extension _GamepadNav on _RAContentState {
 
   void _resetDashboardSelection() {
     rebuild(() {
+      _openGame = null;
       _section = RaDashboardSection.overview;
       _menuIndex = 0;
       _menuFocused = true;

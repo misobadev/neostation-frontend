@@ -78,25 +78,37 @@ extension _DrillDownHost on _RAContentState {
     return _openRaGameAchievements(gameId: item.gameId, gameTitle: item.title);
   }
 
+  /// Opens the game in the dashboard panel, over the list it was picked
+  /// from; the sidebar and the tabs stay on screen and B comes back.
   Future<void> _openRaGameAchievements({
     required int gameId,
     required String gameTitle,
     int? achievementId,
   }) async {
-    if (_gameActivationInFlight || gameId <= 0) return;
-    _gameActivationInFlight = true;
-    try {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => RaGameAchievementsPage(
-            gameId: gameId,
-            fallbackTitle: gameTitle,
-            highlightAchievementId: achievementId,
-          ),
-        ),
-      );
-    } finally {
-      _gameActivationInFlight = false;
-    }
+    if (gameId <= 0) return;
+    rebuild(
+      () => _openGame = (
+        gameId: gameId,
+        title: gameTitle,
+        achievementId: achievementId,
+      ),
+    );
+  }
+
+  void _closeOpenGame() {
+    if (_openGame == null) return;
+    rebuild(() => _openGame = null);
+  }
+
+  Widget? _buildOpenGame() {
+    final game = _openGame;
+    if (game == null) return null;
+    return RaGameAchievementsPage(
+      key: ValueKey('ra-game-${game.gameId}-${game.achievementId}'),
+      gameId: game.gameId,
+      fallbackTitle: game.title,
+      highlightAchievementId: game.achievementId,
+      onClose: _closeOpenGame,
+    );
   }
 }

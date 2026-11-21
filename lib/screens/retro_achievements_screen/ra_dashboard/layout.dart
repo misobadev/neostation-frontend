@@ -170,7 +170,19 @@ extension _Layout on RADashboardHubState {
     final theme = Theme.of(context);
     final section = widget.section;
     final overview = section == RaDashboardSection.overview;
-    return Column(
+    // The collections were drawn on their own pages before, which scaled the
+    // text they inherit; the game view and the sections keep that scale.
+    Widget scaled(Widget child) => Theme(
+      data: theme.copyWith(
+        textTheme: theme.textTheme.apply(fontSizeFactor: 11.r / 14),
+      ),
+      child: DefaultTextStyle(
+        style: theme.textTheme.bodyMedium!.copyWith(fontSize: 11.r),
+        child: child,
+      ),
+    );
+    final game = widget.gameContent;
+    final sectionView = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildPanelHeader(context, section),
@@ -181,20 +193,20 @@ extension _Layout on RADashboardHubState {
             sizing: StackFit.expand,
             children: [
               _buildOverview(context, raProvider),
-              // The collections were drawn on their own pages before, which
-              // scaled the text they inherit; keep that scale here.
-              Theme(
-                data: theme.copyWith(
-                  textTheme: theme.textTheme.apply(fontSizeFactor: 11.r / 14),
-                ),
-                child: DefaultTextStyle(
-                  style: theme.textTheme.bodyMedium!.copyWith(fontSize: 11.r),
-                  child: widget.sectionContent ?? const SizedBox.shrink(),
-                ),
-              ),
+              scaled(widget.sectionContent ?? const SizedBox.shrink()),
             ],
           ),
         ),
+      ],
+    );
+    if (game == null) return sectionView;
+    // A game opened from a section takes the panel; the section stays
+    // mounted (and keeps its scroll) underneath.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Offstage(child: TickerMode(enabled: false, child: sectionView)),
+        scaled(game),
       ],
     );
   }
