@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/system_model.dart';
+import 'package:neostation/providers/discovery_provider.dart';
 import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
@@ -329,6 +330,8 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
     // Read before the awaits: the dialog is popped as soon as this finishes.
     final databaseProvider = context.read<SqliteDatabaseProvider>();
     final configProvider = context.read<SqliteConfigProvider>();
+    // Nullable: not every widget tree provides it (tests, for one).
+    final discoveryProvider = context.read<DiscoveryProvider?>();
 
     try {
       await GameRepository.setGameHidden(
@@ -336,6 +339,9 @@ class GameSettingsManageTabState extends State<GameSettingsManageTab> {
         hiddenRomname,
         true,
       );
+      // Discovery keeps its board for the week; it must stop recommending the
+      // game now, not after the next restart.
+      discoveryProvider?.markStale();
       // The systems screen keeps its own cached copies — the recent-games row
       // and the ROM count on the system card — so both are re-read here rather
       // than left showing a game that no longer appears in any list.
