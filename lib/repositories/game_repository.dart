@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:neostation/services/logger_service.dart';
 
+import '../constants/system_folder_names.dart';
 import '../models/database_game_model.dart';
 import '../models/romm_link_row.dart';
 import '../data/datasources/sqlite_database_service.dart';
@@ -252,7 +253,7 @@ class GameRepository {
         'user_roms',
         columns: ['filename'],
         where: 'app_system_id = ? AND rom_path = ?',
-        whereArgs: [appSystemId, romPath],
+        whereArgs: [SystemFolderNames.rowSystemFolder(appSystemId), romPath],
         limit: 1,
       );
       if (rows.isEmpty) return null;
@@ -300,6 +301,14 @@ class GameRepository {
     final external = await db.rawQuery('PRAGMA data_version');
     return (db, local.single['value'], external.single.values.single);
   }
+
+  /// Marks the installed app [packageName] as a game, or sends it back.
+  static Future<void> setAndroidGame(String packageName, bool isGame) =>
+      SqliteService.setAndroidGame(packageName, isGame);
+
+  /// The packages of the installed apps the user marked as games.
+  static Future<List<String>> getAndroidGamePackages() =>
+      SqliteService.getAndroidGamePackages();
 
   static Future<List<DatabaseGameModel>> getAllGames() =>
       SqliteService.getAllGames();

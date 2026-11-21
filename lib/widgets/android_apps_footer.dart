@@ -11,6 +11,7 @@ import 'footer_label_pill.dart';
 class AndroidAppsFooter extends CoreFooter {
   final String appName;
   final VoidCallback onLaunch;
+  final VoidCallback? onToggleGame;
   final VoidCallback? onBack;
   final bool showBack;
 
@@ -18,6 +19,7 @@ class AndroidAppsFooter extends CoreFooter {
     super.key,
     required this.appName,
     required this.onLaunch,
+    this.onToggleGame,
     this.onBack,
     this.showBack = true,
   });
@@ -51,6 +53,16 @@ class AndroidAppsFooter extends CoreFooter {
           onTap: onBack,
           backgroundColor: theme.colorScheme.tertiaryFixed,
           textColor: theme.colorScheme.onTertiaryFixed,
+        ),
+        SizedBox(width: 8.r),
+      ],
+      if (onToggleGame != null) ...[
+        GamepadControl(
+          iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
+          label: AppLocale.androidGameHint.getString(context),
+          onTap: onToggleGame,
+          backgroundColor: theme.colorScheme.secondary,
+          textColor: theme.colorScheme.onSecondary,
         ),
         SizedBox(width: 8.r),
       ],

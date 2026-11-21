@@ -183,8 +183,6 @@ class ConfigModel {
   /// migration v158); search stays reachable from every card's Y menu.
   final bool hideSearchCard;
 
-  final bool androidAppsAsTab;
-
   /// Whether the Discovery navigation tab is hidden. See [hideTabSync].
   final bool hideTabDiscovery;
 
@@ -355,7 +353,6 @@ class ConfigModel {
     this.hideTabScraper = false,
     this.hideTabRomm = false,
     this.hideSearchCard = true,
-    this.androidAppsAsTab = false,
     this.hideTabDiscovery = false,
     this.activeSyncProvider = 'neosync',
     this.autoUpdateApp = true,
@@ -528,12 +525,6 @@ class ConfigModel {
                   .toString() ==
               '1' ||
           (json['hideSearchCard'] ?? false).toString().toLowerCase() == 'true',
-      androidAppsAsTab:
-          (json['androidAppsAsTab'] ?? json['android_apps_as_tab'] ?? 0)
-                  .toString() ==
-              '1' ||
-          (json['androidAppsAsTab'] ?? false).toString().toLowerCase() ==
-              'true',
       hideTabDiscovery:
           (json['hideTabDiscovery'] ?? json['hide_tab_discovery'] ?? 0)
                   .toString() ==
@@ -758,7 +749,6 @@ class ConfigModel {
       'hideTabScraper': hideTabScraper,
       'hideTabRomm': hideTabRomm,
       'hideSearchCard': hideSearchCard,
-      'androidAppsAsTab': androidAppsAsTab,
       'hideTabDiscovery': hideTabDiscovery,
       'activeSyncProvider': activeSyncProvider,
       'autoUpdateApp': autoUpdateApp,
@@ -826,7 +816,6 @@ class ConfigModel {
     bool? hideTabScraper,
     bool? hideTabRomm,
     bool? hideSearchCard,
-    bool? androidAppsAsTab,
     bool? hideTabDiscovery,
     String? activeSyncProvider,
     bool? autoUpdateApp,
@@ -892,7 +881,6 @@ class ConfigModel {
       hideTabScraper: hideTabScraper ?? this.hideTabScraper,
       hideTabRomm: hideTabRomm ?? this.hideTabRomm,
       hideSearchCard: hideSearchCard ?? this.hideSearchCard,
-      androidAppsAsTab: androidAppsAsTab ?? this.androidAppsAsTab,
       hideTabDiscovery: hideTabDiscovery ?? this.hideTabDiscovery,
       activeSyncProvider: activeSyncProvider ?? this.activeSyncProvider,
       autoUpdateApp: autoUpdateApp ?? this.autoUpdateApp,

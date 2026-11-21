@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
 
+import '../constants/system_folder_names.dart';
 import '../models/rom_fingerprint.dart';
 import '../models/screenscraper_game_candidate.dart';
 import '../repositories/game_repository.dart';
@@ -833,7 +834,29 @@ class ScreenScraperService {
   }
 
   /// Scrapes a single game by its filename and updates its local state.
+  ///
+  /// [appSystemId] may be a system that lists another's rows ("Android
+  /// Games"); the metadata is saved under the system that owns the row, where
+  /// the game lists read it.
   static Future<Map<String, dynamic>> scrapeSingleGame({
+    required String appSystemId,
+    required String romName,
+    required String systemFolder,
+    required String romPath,
+    String? gameName,
+    Function(String status, double progress)? onProgress,
+    bool forceOverwrite = false,
+  }) => _scrapeSingleGame(
+    appSystemId: SystemFolderNames.rowSystemFolder(appSystemId),
+    romName: romName,
+    systemFolder: systemFolder,
+    romPath: romPath,
+    gameName: gameName,
+    onProgress: onProgress,
+    forceOverwrite: forceOverwrite,
+  );
+
+  static Future<Map<String, dynamic>> _scrapeSingleGame({
     required String appSystemId,
     required String romName,
     required String systemFolder,
@@ -876,7 +899,9 @@ class ScreenScraperService {
           romName,
           appSystemId: appSystemId,
           maxDailyRequests: 0,
-          gameName: (systemFolder == 'android') ? gameName : null,
+          gameName: SystemFolderNames.isAndroidApps(systemFolder)
+              ? gameName
+              : null,
           manualGameId: manualGameId,
         );
         if (gameInfoResult != null && gameInfoResult['gameInfo'] != null) break;
@@ -1079,6 +1104,8 @@ class ScreenScraperService {
     String? gameName,
     Function(String status, double progress)? onProgress,
   }) async {
+    // As in [scrapeSingleGame]: the row's own system holds its metadata.
+    final rowSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
     try {
       // Scraping without the pick stored would fetch the automatic match —
       // the very game the user is correcting — so stop instead.
@@ -1095,19 +1122,19 @@ class ScreenScraperService {
       return {'success': false, 'message': AppLocale.scrapeUnexpectedError};
     }
     await _clearScrapedMedia(
-      appSystemId: appSystemId,
+      appSystemId: rowSystemId,
       romName: romName,
       systemFolder: systemFolder,
     );
     // Its media are gone now, whatever the scrape does next: if it fails,
     // "New content only" has to fetch them again.
     try {
-      await ScraperRepository.markGameUnfinished(appSystemId, romName);
+      await ScraperRepository.markGameUnfinished(rowSystemId, romName);
     } catch (e) {
       _log.e('Error clearing the scraped mark for $romName: $e');
     }
     return scrapeSingleGame(
-      appSystemId: appSystemId,
+      appSystemId: rowSystemId,
       romName: romName,
       systemFolder: systemFolder,
       romPath: romPath,
@@ -1387,7 +1414,9 @@ class ScreenScraperService {
       final manualGameId = await ScraperRepository.getManualScreenScraperGameId(
         romPath,
       );
-      var fingerprint = (systemFolder == 'android' || manualGameId != null)
+      var fingerprint =
+          (SystemFolderNames.isAndroidApps(systemFolder) ||
+              manualGameId != null)
           ? null
           : await _resolveFingerprint(
               romPath,
@@ -1403,7 +1432,9 @@ class ScreenScraperService {
         crc: fingerprint?.crc32,
         romSize: fingerprint?.sizeBytes,
         maxDailyRequests: maxDailyRequests,
-        gameName: (systemFolder == 'android') ? titleName : null,
+        gameName: SystemFolderNames.isAndroidApps(systemFolder)
+            ? titleName
+            : null,
         manualGameId: manualGameId,
       );
       var gameInfo = gameResult?['gameInfo'];
@@ -1415,7 +1446,7 @@ class ScreenScraperService {
       // still matches). A name-only retry could never succeed where that
       // request failed, so none is sent.
       if (gameInfo == null &&
-          systemFolder != 'android' &&
+          !SystemFolderNames.isAndroidApps(systemFolder) &&
           manualGameId == null &&
           fingerprint == null) {
         // The name missed and no cheap hash was available, so this is the ROM

@@ -147,7 +147,9 @@ List<NavTab> visibleNavTabs(ConfigModel config) {
   final visible = NavTab.values
       .where((tab) {
         if (tab == NavTab.androidApps) {
-          return Platform.isAndroid && config.androidAppsAsTab;
+          // Installed apps live only in this tab on Android; the Systems
+          // grid shows just the Android Games the user picked.
+          return Platform.isAndroid;
         }
         return !(navTabSpec(tab).hidden?.call(config) ?? false);
       })

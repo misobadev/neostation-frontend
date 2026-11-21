@@ -84,6 +84,7 @@ class DatabaseTestHelper {
         rom_size INTEGER,
         rom_fingerprint_skipped TEXT,
         ss_manual_game_id INTEGER,
+        is_android_game INTEGER DEFAULT 0,
         id_ra INTEGER,
         ra_match_source TEXT,
         ra_hash_skipped TEXT,

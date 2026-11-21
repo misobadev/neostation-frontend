@@ -527,7 +527,7 @@ extension SqliteConfigScanning on SqliteConfigProvider {
       if (isFastScan) {
         // Only include those that auto-detect or are virtual depending on platform
         final List<String> fastScanFolders = Platform.isAndroid
-            ? ['android']
+            ? ['android', SystemFolderNames.androidGames]
             : [];
 
         systemsForMapping = _availableSystems.where((s) {
@@ -544,6 +544,7 @@ extension SqliteConfigScanning on SqliteConfigProvider {
       if (Platform.isAndroid) {
         final androidSystems = [
           {'folder': 'android'},
+          {'folder': SystemFolderNames.androidGames},
           {'folder': 'all'},
         ];
 
@@ -613,7 +614,8 @@ extension SqliteConfigScanning on SqliteConfigProvider {
           }
 
           // Special case: Android and ALL are always included for scanning
-          if (system.folderName == 'android' || system.folderName == 'all') {
+          if (SystemFolderNames.isAndroidApps(system.folderName) ||
+              system.folderName == 'all') {
             return true;
           }
 
@@ -905,6 +907,7 @@ extension SqliteConfigScanning on SqliteConfigProvider {
       int emulatorSystemsWithGamesCount = 0;
       final virtualSystems = [
         'android',
+        SystemFolderNames.androidGames,
         'music',
         'all',
         'steam',
@@ -1034,7 +1037,8 @@ extension SqliteConfigScanning on SqliteConfigProvider {
   }) async {
     try {
       // Allow scanning for Android system even if no ROM folders are selected
-      if (_config.romFolders.isEmpty && system.folderName != 'android') {
+      if (_config.romFolders.isEmpty &&
+          !SystemFolderNames.isAndroidApps(system.folderName)) {
         return ScanSummary(
           added: 0,
           removed: 0,
@@ -1057,6 +1061,13 @@ extension SqliteConfigScanning on SqliteConfigProvider {
 
       // Update ROM count in system
       await refreshSystem(system, rootFoldersMap: rootFoldersMap);
+
+      // Marked games whose icon is not cached yet (a reinstall, a cleared
+      // media folder) get it back. Not awaited: the scan result does not
+      // depend on it.
+      if (system.folderName == SystemFolderNames.androidGames) {
+        unawaited(AndroidGamesService.cacheMissingIcons());
+      }
 
       // Trigger Steam scraper if it's the Steam system
       if (system.folderName == 'steam') {
@@ -1503,6 +1514,7 @@ extension SqliteConfigScanning on SqliteConfigProvider {
       SystemFolderNames.collections: 3,
       'music': 4,
       'android': 5,
+      SystemFolderNames.androidGames: 6,
     };
 
     _detectedSystems.sort((a, b) {
