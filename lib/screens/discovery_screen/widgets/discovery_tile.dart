@@ -28,6 +28,7 @@ class DiscoveryCard extends StatelessWidget {
     required this.fileProvider,
     this.onTap,
     this.heroFooterUsesHalfWidth = true,
+    this.highlightSelected = true,
   });
 
   final DiscoveryTile tile;
@@ -39,6 +40,11 @@ class DiscoveryCard extends StatelessWidget {
   /// as the footer basis so its strip matches the cards beside it. In the
   /// carousel every page is one card wide, so this is false.
   final bool heroFooterUsesHalfWidth;
+
+  /// Whether a selected card switches its frame and footer to the selection
+  /// colour. The carousel turns it off: its centred card already stands out
+  /// by its place and size, so it keeps the same colours as the others.
+  final bool highlightSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +70,7 @@ class DiscoveryCard extends StatelessWidget {
               // frame behind the card; a shadow would then darken the liquid.
               color: liquid
                   ? Colors.transparent
-                  : isSelected
+                  : isSelected && highlightSelected
                   ? scheme.secondary
                   : scheme.surface,
               borderRadius: outerRadius,
@@ -149,7 +155,7 @@ class DiscoveryCard extends StatelessWidget {
                             width: double.infinity,
                             child: _DiscoveryFooter(
                               tile: tile,
-                              isSelected: isSelected,
+                              isSelected: isSelected && highlightSelected,
                             ),
                           ),
                         ],

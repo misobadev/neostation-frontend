@@ -159,6 +159,7 @@ class DiscoveryStorefront extends StatelessWidget {
             isSelected,
             onTap,
             heroFooterUsesHalfWidth: false,
+            highlightSelected: false,
           ),
       enableTabBumpers: true,
       enablePullToRescan: false,
@@ -177,6 +178,7 @@ class DiscoveryStorefront extends StatelessWidget {
     bool isSelected,
     VoidCallback onTap, {
     required bool heroFooterUsesHalfWidth,
+    bool highlightSelected = true,
   }) {
     return DiscoveryCard(
       tile: _present(tiles[index]),
@@ -184,6 +186,7 @@ class DiscoveryStorefront extends StatelessWidget {
       fileProvider: fileProvider,
       onTap: onTap,
       heroFooterUsesHalfWidth: heroFooterUsesHalfWidth,
+      highlightSelected: highlightSelected,
     );
   }
 
