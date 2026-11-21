@@ -181,8 +181,11 @@ class _DiscoveryFooter extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
+      // Shrinks a long name to fit, but never grows a short one past its
+      // size: filling the strip made "Game of the Week" and short names like
+      // "RPG" far larger than the rest.
       child: FittedBox(
-        fit: BoxFit.contain,
+        fit: BoxFit.scaleDown,
         child: GooeyCardChrome.fadeColor(
           context,
           color: color,
@@ -193,7 +196,7 @@ class _DiscoveryFooter extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: color,
-              fontSize: 18.r,
+              fontSize: 15.r,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.6.r,
             ),
