@@ -284,8 +284,14 @@ extension _WeekCard on RADashboardHubState {
                       ),
                   ],
                 ),
-                SizedBox(height: 8.r),
-                _buildAotwLibraryAction(context, raProvider, owned, accent),
+                // Only when there is something to do: open it, find it in
+                // RomM or download it. A game that is nowhere to be had
+                // leaves the card without a line saying so.
+                if (_buildAotwLibraryAction(context, raProvider, owned, accent)
+                    case final action?) ...[
+                  SizedBox(height: 8.r),
+                  action,
+                ],
               ],
             ],
           ),
@@ -294,7 +300,7 @@ extension _WeekCard on RADashboardHubState {
     );
   }
 
-  Widget _buildAotwLibraryAction(
+  Widget? _buildAotwLibraryAction(
     BuildContext context,
     RetroAchievementsProvider raProvider,
     OwnedWeekGameResolution? owned,
@@ -340,41 +346,7 @@ extension _WeekCard on RADashboardHubState {
       );
     }
     final remote = _rommWeekGame;
-    if (remote == null) {
-      final rommConnected = context.read<RommProvider>().isConnected;
-      if (!rommConnected) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _aotwLibraryLabel(
-              context,
-              Symbols.inventory_2_rounded,
-              AppLocale.raAotwNotInLibrary.getString(context),
-              accent,
-            ),
-            SizedBox(height: 6.r),
-            OutlinedButton.icon(
-              onPressed: widget.onOpenRomm,
-              icon: Icon(Symbols.cloud_rounded, size: 15.r),
-              label: Text(AppLocale.rommLogin.getString(context)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: accent,
-                textStyle: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 8.r,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        );
-      }
-      return _aotwLibraryLabel(
-        context,
-        Symbols.inventory_2_rounded,
-        AppLocale.raAotwNotInLibrary.getString(context),
-        accent,
-      );
-    }
+    if (remote == null) return null;
     final download =
         context.watch<RommProvider>().downloadFor(remote.id) ?? _weekDownload;
     final downloading = download?.status == RommDownloadStatus.downloading;

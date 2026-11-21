@@ -1408,7 +1408,6 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.raAotwEarnedPreviously: '今週より前に解除済み',
   AppLocale.raAotwNotEarned: '今週は未解除',
   AppLocale.raAotwStatusUnavailable: '個人ステータスを取得できません',
-  AppLocale.raAotwNotInLibrary: 'ライブラリにありません',
   AppLocale.raAotwWeekStarted: '{date}に開始',
   AppLocale.raAotwTrueRatio: 'True Ratio',
   AppLocale.raAotwParticipation: '{players}人中{unlocks}人 · {percent}%',

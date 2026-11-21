@@ -1376,7 +1376,6 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.raAotwEarnedPreviously: '本週之前已解鎖',
   AppLocale.raAotwNotEarned: '本週尚未解鎖',
   AppLocale.raAotwStatusUnavailable: '個人狀態無法使用',
-  AppLocale.raAotwNotInLibrary: '不在你的遊戲庫中',
   AppLocale.raAotwWeekStarted: '本週開始於 {date}',
   AppLocale.raAotwTrueRatio: '真實比率',
   AppLocale.raAotwParticipation: '{players} 名玩家中有 {unlocks} 名解鎖 · {percent}%',

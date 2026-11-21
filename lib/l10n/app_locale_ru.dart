@@ -1489,7 +1489,6 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.raAotwEarnedPreviously: 'Получено до этой недели',
   AppLocale.raAotwNotEarned: 'Не получено на этой неделе',
   AppLocale.raAotwStatusUnavailable: 'Личный статус недоступен',
-  AppLocale.raAotwNotInLibrary: 'Нет в вашей библиотеке',
   AppLocale.raAotwWeekStarted: 'Неделя началась {date}',
   AppLocale.raAotwTrueRatio: 'True Ratio',
   AppLocale.raAotwParticipation: '{unlocks} из {players} игроков · {percent}%',

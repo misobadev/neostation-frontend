@@ -1478,7 +1478,6 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.raAotwEarnedPreviously: 'Earned before this week',
   AppLocale.raAotwNotEarned: 'Not earned this week',
   AppLocale.raAotwStatusUnavailable: 'Personal status unavailable',
-  AppLocale.raAotwNotInLibrary: 'Not in your library',
   AppLocale.raAotwWeekStarted: 'Week started {date}',
   AppLocale.raAotwTrueRatio: 'True Ratio',
   AppLocale.raAotwParticipation: '{unlocks} of {players} players · {percent}%',

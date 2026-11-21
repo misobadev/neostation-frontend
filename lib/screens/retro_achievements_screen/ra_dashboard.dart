@@ -40,7 +40,6 @@ class RADashboardHub extends StatefulWidget {
   final ValueChanged<OwnedWeekGameResolution> onOwnedWeekGameSelected;
   final ValueChanged<RetroAchievementRecentUnlockItem>? onUnlockSelected;
   final void Function(int gameId, String title)? onGameSelected;
-  final VoidCallback? onOpenRomm;
 
   /// The section on show in the panel, and the one the menu marks.
   final RaDashboardSection section;
@@ -73,7 +72,6 @@ class RADashboardHub extends StatefulWidget {
     required this.onOwnedWeekGameSelected,
     this.onUnlockSelected,
     this.onGameSelected,
-    this.onOpenRomm,
     this.section = RaDashboardSection.overview,
     this.menuFocused = false,
     this.onSectionTap,
@@ -155,12 +153,11 @@ class RADashboardHubState extends State<RADashboardHub> {
       return;
     }
     if (_weekDownloadIndexing) return;
+    // A game RomM has is downloaded; one that is nowhere to be had does
+    // nothing (it used to switch to the RomM tab, landing on Systems when
+    // that tab is hidden).
     final remote = _rommWeekGame;
-    if (remote != null) {
-      _downloadWeekGame(remote, raProvider);
-    } else if (!context.read<RommProvider>().isConnected) {
-      widget.onOpenRomm?.call();
-    }
+    if (remote != null) _downloadWeekGame(remote, raProvider);
   }
 
   bool get weekCardSelectable =>

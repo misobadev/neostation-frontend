@@ -1500,7 +1500,6 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.raAotwEarnedPreviously: 'Diraih sebelum minggu ini',
   AppLocale.raAotwNotEarned: 'Belum diraih minggu ini',
   AppLocale.raAotwStatusUnavailable: 'Status pribadi tidak tersedia',
-  AppLocale.raAotwNotInLibrary: 'Tidak ada di pustaka Anda',
   AppLocale.raAotwWeekStarted: 'Minggu dimulai {date}',
   AppLocale.raAotwTrueRatio: 'Rasio Sebenarnya',
   AppLocale.raAotwParticipation: '{unlocks} dari {players} pemain · {percent}%',

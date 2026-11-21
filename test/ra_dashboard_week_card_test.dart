@@ -202,7 +202,10 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Not in your library'), findsOneWidget);
+    // A game that is nowhere to be had leaves the card without a line saying
+    // so, and without a RomM sign-in button.
+    expect(find.text('Not in your library'), findsNothing);
+    expect(find.text('RomM Login'), findsNothing);
   });
 
   testWidgets('keeps AOTW focusable when it is not local or in RomM', (

@@ -1395,7 +1395,6 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.raAotwEarnedPreviously: '이번 주 이전에 획득',
   AppLocale.raAotwNotEarned: '이번 주 미획득',
   AppLocale.raAotwStatusUnavailable: '개인 상태를 확인할 수 없음',
-  AppLocale.raAotwNotInLibrary: '라이브러리에 없음',
   AppLocale.raAotwWeekStarted: '{date}에 시작',
   AppLocale.raAotwTrueRatio: 'True Ratio',
   AppLocale.raAotwParticipation: '{players}명 중 {unlocks}명 · {percent}%',

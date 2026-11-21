@@ -1642,7 +1642,6 @@ mixin AppLocale {
   static const String raAotwEarnedPreviously = 'ra_aotw_earned_previously';
   static const String raAotwNotEarned = 'ra_aotw_not_earned';
   static const String raAotwStatusUnavailable = 'ra_aotw_status_unavailable';
-  static const String raAotwNotInLibrary = 'ra_aotw_not_in_library';
   static const String raAotwWeekStarted = 'ra_aotw_week_started';
   static const String raAotwTrueRatio = 'ra_aotw_true_ratio';
   static const String raAotwParticipation = 'ra_aotw_participation';

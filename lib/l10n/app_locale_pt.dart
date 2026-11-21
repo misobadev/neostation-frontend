@@ -1510,7 +1510,6 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.raAotwEarnedPreviously: 'Obtida antes desta semana',
   AppLocale.raAotwNotEarned: 'Não obtida esta semana',
   AppLocale.raAotwStatusUnavailable: 'Status pessoal indisponível',
-  AppLocale.raAotwNotInLibrary: 'Não está na sua biblioteca',
   AppLocale.raAotwWeekStarted: 'Semana iniciada em {date}',
   AppLocale.raAotwTrueRatio: 'True Ratio',
   AppLocale.raAotwParticipation:

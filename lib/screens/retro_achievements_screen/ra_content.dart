@@ -20,7 +20,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 
 import '../../services/game_service.dart' show GamepadNavigationManager;
-import '../app_screen.dart' show AppNavigation, AppTabs;
+import '../app_screen.dart' show AppNavigation;
 
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -176,7 +176,6 @@ class _RAContentState extends State<RAContent>
                   onUnlockSelected: _activateUnlock,
                   onGameSelected: (gameId, title) =>
                       _openRaGameAchievements(gameId: gameId, gameTitle: title),
-                  onOpenRomm: () => AppNavigation.goToTab(AppTabs.romm),
                   active: true,
                 ),
               ),
