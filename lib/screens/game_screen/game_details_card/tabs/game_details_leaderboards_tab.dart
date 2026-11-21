@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/retro_achievements_leaderboard.dart';
 import 'package:neostation/services/sfx_service.dart';
-import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/themes/corner_radii.dart';
 
 import '../widgets/panel_gate_highlight.dart';
@@ -318,7 +318,7 @@ class GameDetailsLeaderboardsTabState
           duration: PanelGateHighlight.duration,
           curve: Curves.easeOut,
           decoration: BoxDecoration(
-            color: ChromeSurface.fill(context),
+            // The glass inside draws the fill.
             borderRadius: radii.radiusExternal,
             border: PanelGateHighlight.border(
               context,
@@ -337,11 +337,17 @@ class GameDetailsLeaderboardsTabState
               ),
             ),
           ),
-          child: Column(
-            children: [
-              _buildHeader(context),
-              Expanded(child: _buildBody(context)),
-            ],
+          child: NeoGlass(
+            // Frosted like the game list beside it.
+            cornerRadius:
+                (Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m())
+                    .radiusExternalRadius,
+            child: Column(
+              children: [
+                _buildHeader(context),
+                Expanded(child: _buildBody(context)),
+              ],
+            ),
           ),
         ),
       ),
