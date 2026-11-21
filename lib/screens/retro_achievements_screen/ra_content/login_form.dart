@@ -78,14 +78,10 @@ extension _LoginForm on _RAContentState {
     required ThemeData theme,
     required Widget child,
   }) {
-    if (!isSelected(slot)) return child;
-    return Container(
-      foregroundDecoration: BoxDecoration(
-        borderRadius: _raRadii(context).radiusInternal,
-        border: Border.all(color: theme.colorScheme.onSurface, width: 2.r),
-      ),
-      child: child,
-    );
+    // The ring is the field's own border ([_raInputDecoration] with
+    // `selected`): one drawn around this box sat below the field on macOS,
+    // where the box is taller than the border.
+    return child;
   }
 
   /// A field sunk into the glass panel, its label kept inside as the
@@ -95,6 +91,7 @@ extension _LoginForm on _RAContentState {
     required String label,
     required String hint,
     Widget? suffixIcon,
+    bool selected = false,
   }) {
     final radius = _raRadii(context).radiusInternal;
     return InputDecoration(
@@ -119,12 +116,20 @@ extension _LoginForm on _RAContentState {
       enabledBorder: OutlineInputBorder(
         borderRadius: radius,
         borderSide: BorderSide(
-          color: theme.colorScheme.outline.withValues(alpha: 0.15),
+          color: selected
+              ? theme.colorScheme.onSurface
+              : theme.colorScheme.outline.withValues(alpha: 0.15),
+          width: selected ? 2.r : 1.r,
         ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.r),
+        borderSide: BorderSide(
+          color: selected
+              ? theme.colorScheme.onSurface
+              : theme.colorScheme.primary,
+          width: selected ? 2.r : 1.r,
+        ),
       ),
       suffixIcon: suffixIcon,
     );
@@ -246,6 +251,7 @@ extension _LoginForm on _RAContentState {
                 decoration: _raInputDecoration(
                   theme,
                   label: AppLocale.username.getString(context),
+                  selected: isSelected(0),
                   hint: AppLocale.enterUsername.getString(context),
                 ),
                 enabled: !raProvider.isLoading,
@@ -273,6 +279,7 @@ extension _LoginForm on _RAContentState {
                 decoration: _raInputDecoration(
                   theme,
                   label: AppLocale.raApiKey.getString(context),
+                  selected: isSelected(1),
                   hint: AppLocale.raEnterApiKey.getString(context),
                   suffixIcon: IconButton(
                     padding: EdgeInsets.zero,

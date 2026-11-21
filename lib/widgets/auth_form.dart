@@ -976,15 +976,10 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
       constraints: BoxConstraints(maxWidth: 240.r),
       child: child,
     );
-    if (!isSelected(slot)) return field;
-    final theme = Theme.of(context);
-    return Container(
-      foregroundDecoration: BoxDecoration(
-        borderRadius: _radii(context).radiusInternal,
-        border: Border.all(color: theme.colorScheme.onSurface, width: 2.r),
-      ),
-      child: field,
-    );
+    // The selection ring is the field's own border (see
+    // [_buildInputDecoration]): a ring drawn around this box instead sat
+    // below the field on macOS, where the box is taller than the border.
+    return field;
   }
 
   /// The ring a selected button wears, the fields' own: solid, no glow. The
@@ -1113,18 +1108,25 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         borderRadius: radius,
         borderSide: BorderSide.none,
       ),
+      // The selection ring: a solid line in the text colour, the same while
+      // typing, drawn as the field's own border so it always hugs the field.
       enabledBorder: OutlineInputBorder(
         borderRadius: radius,
         borderSide: BorderSide(
           color: isHighlighted
-              ? theme.colorScheme.primary
+              ? theme.colorScheme.onSurface
               : theme.colorScheme.outline.withValues(alpha: 0.15),
           width: isHighlighted ? 2.r : 1.r,
         ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.r),
+        borderSide: BorderSide(
+          color: isHighlighted
+              ? theme.colorScheme.onSurface
+              : theme.colorScheme.primary,
+          width: isHighlighted ? 2.r : 1.r,
+        ),
       ),
     );
   }
