@@ -64,6 +64,11 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
     'horizon': AppThemes.horizonTheme,
     'dmg': AppThemes.dmgTheme,
     'sixteen_bit': AppThemes.sixteenBitTheme,
+    'sunset': AppThemes.sunsetTheme,
+    'neon_arcade': AppThemes.neonArcadeTheme,
+    'deep_sea': AppThemes.deepSeaTheme,
+    'matcha': AppThemes.matchaTheme,
+    'famicom': AppThemes.famicomTheme,
   };
 
   /// Human-readable mapping for theme identifiers.
@@ -85,6 +90,11 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
     'horizon': 'Horizon',
     'dmg': 'Dmg',
     'sixteen_bit': '16 Bits',
+    'sunset': 'Sunset',
+    'neon_arcade': 'Neon Arcade',
+    'deep_sea': 'Deep Sea',
+    'matcha': 'Matcha',
+    'famicom': 'Famicom',
   };
 
   ThemeProvider._() {
