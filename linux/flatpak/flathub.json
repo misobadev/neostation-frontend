@@ -3,5 +3,5 @@
   "skip-appstream-check": false,
   "automerge-flathubbot-prs": false,
   "end-of-life": "This version is no longer supported.",
-  "end-of-life-rebase": "dev.misoba.neostation"
+  "end-of-life-rebase": "com.neogamelab.neostation"
 }

@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:neostation/services/logger_service.dart';
 
 /// Talks to the secondary-display Flutter engine's own native channel
-/// (`dev.misoba.neostation/secondary_apps`, registered by
+/// (`com.neogamelab.neostation/secondary_apps`, registered by
 /// `SecondaryAppsPresentation.kt`). The secondary engine cannot reach the main
 /// app's `/game` channel, so the bottom-screen app dock uses this instead to
 /// list installed apps, load their icons and launch them (preferring the
@@ -15,7 +15,7 @@ import 'package:neostation/services/logger_service.dart';
 /// refetch them across the channel.
 class SecondaryAppsService {
   static const MethodChannel _channel = MethodChannel(
-    'dev.misoba.neostation/secondary_apps',
+    'com.neogamelab.neostation/secondary_apps',
   );
 
   static final _log = LoggerService.instance;

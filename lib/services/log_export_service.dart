@@ -41,7 +41,7 @@ enum LogExportResult {
 /// work there. Desktop shows a save dialog instead.
 class LogExportService {
   static const MethodChannel _channel = MethodChannel(
-    'dev.misoba.neostation/game',
+    'com.neogamelab.neostation/game',
   );
 
   static final _log = LoggerService.instance;

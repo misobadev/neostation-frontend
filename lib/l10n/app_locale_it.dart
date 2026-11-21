@@ -132,42 +132,11 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.startupStorageStartEmpty: 'Inizia con una cartella vuota',
   AppLocale.startupStorageCreateFailed:
       'NeoStation non è riuscito a creare la cartella in quella posizione.',
-  AppLocale.startupBetaImportWrongFolder:
-      'Non è la cartella giusta. Scegli NeoStation con questa icona.',
-  AppLocale.startupBetaImportNoLibrary:
-      'La beta non ha una libreria da importare. Ricomincia da zero.',
-  AppLocale.startupBetaImportMeasuring: 'Controllo di cosa c\'è da copiare...',
-  AppLocale.startupBetaImportCopying:
-      'Copia dei tuoi dati dalla beta in corso. Tieni NeoStation aperta.',
-  AppLocale.startupBetaImportCancel: 'Annulla',
-  AppLocale.startupBetaImportNoSpace: 'Spazio libero insufficiente: i dati della beta occupano {needed} e ci sono {free} liberi.',
-  AppLocale.startupBetaImportFailed:
-      'La copia non è terminata ({error}). Non è stato modificato nulla.',
-  AppLocale.startupBetaImportDone: 'Copiati {files} file dalla beta. Accedi di nuovo a NeoSync, RetroAchievements, RomM e ScreenScraper e consenti di nuovo l\'accesso ai tuoi file quando richiesto: accessi e permessi non possono essere trasferiti. Quando è tutto qui, puoi disinstallare la beta.',
-  AppLocale.startupBetaImportContinue: 'Continua',
-  AppLocale.startupBetaImportUninstall: 'Disinstalla la beta',
   AppLocale.wizardStepOf: 'Passo {step} di {total}',
   AppLocale.wizardLanguageTitle: 'Scegli la tua lingua',
   AppLocale.wizardLanguageBody: 'Puoi cambiarla in seguito nelle Impostazioni.',
   AppLocale.wizardWelcomeBody: 'Il frontend gratuito e open source per tutti i tuoi giochi retrò. Premi A per iniziare la configurazione.',
   AppLocale.wizardStartSetup: 'Inizia la configurazione',
-  AppLocale.startupBetaImportChooseTitle: 'Trovata NeoStation beta',
-  AppLocale.startupBetaImportChooseBody: 'Su questo dispositivo è installata NeoStation beta {version}. Questa versione è una nuova app, quindi parte vuota. Vuoi portare libreria, impostazioni, media e temi dalla beta o ricominciare da zero?',
-  AppLocale.startupBetaImportImportAll: 'Importa tutto dalla beta',
-  AppLocale.startupBetaImportStartFresh: 'Ricomincia da zero',
-  AppLocale.startupBetaImportPrepareTitle: 'Scegli la cartella della beta',
-  AppLocale.startupBetaImportPrepareBody: 'Chiudi prima la beta. Nella schermata successiva tocca "Usa questa cartella" e poi "Consenti".',
-  AppLocale.startupBetaImportIconHint: 'Se si apre altrove, apri il menu ☰ e scegli NeoStation con questa icona:',
-  AppLocale.startupBetaImportChooseFolder: 'Scegli la cartella',
-  AppLocale.startupBetaImportBack: 'Indietro',
-  AppLocale.startupBetaImportCopyTitle: 'Copia dei tuoi dati',
-  AppLocale.startupBetaImportFoldersTitle:
-      'Concedi l\'accesso alle cartelle delle ROM',
-  AppLocale.startupBetaImportFoldersBody: 'Android concede l\'accesso alle cartelle a ogni app separatamente, quindi NeoStation ha di nuovo bisogno di accedere a queste cartelle. Nella schermata successiva lascia la cartella che si apre e tocca "Usa questa cartella" e "Consenti".',
-  AppLocale.startupBetaImportFolderAllow: 'Concedi l\'accesso',
-  AppLocale.startupBetaImportFolderLater: 'Più tardi',
-  AppLocale.startupBetaImportFolderWrong: 'Questa è un\'altra cartella. Scegli {folder} perché i tuoi giochi continuino a funzionare.',
-  AppLocale.startupBetaImportDoneTitle: 'Tutto pronto',
   AppLocale.startupLoading:
       'Preparazione di NeoStation. In attesa di archiviazione e servizi…',
 

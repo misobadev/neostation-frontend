@@ -131,42 +131,11 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.startupStorageStartEmpty: 'Начать с пустой папки',
   AppLocale.startupStorageCreateFailed:
       'NeoStation не удалось создать там папку.',
-  AppLocale.startupBetaImportWrongFolder:
-      'Это не та папка. Выберите NeoStation с этим значком.',
-  AppLocale.startupBetaImportNoLibrary:
-      'В бета-версии нет библиотеки для импорта. Начните с нуля.',
-  AppLocale.startupBetaImportMeasuring: 'Проверяем, что нужно скопировать...',
-  AppLocale.startupBetaImportCopying:
-      'Копируем ваши данные из бета-версии. Не закрывайте NeoStation.',
-  AppLocale.startupBetaImportCancel: 'Отмена',
-  AppLocale.startupBetaImportNoSpace: 'Недостаточно свободного места: данные бета-версии занимают {needed}, свободно {free}.',
-  AppLocale.startupBetaImportFailed:
-      'Копирование не завершилось ({error}). Ничего не изменено.',
-  AppLocale.startupBetaImportDone: 'Скопировано файлов из бета-версии: {files}. Войдите снова в NeoSync, RetroAchievements, RomM и ScreenScraper и снова разрешите доступ к файлам, когда появится запрос: входы и разрешения нельзя перенести. Когда всё будет на месте, бета-версию можно удалить.',
-  AppLocale.startupBetaImportContinue: 'Продолжить',
-  AppLocale.startupBetaImportUninstall: 'Удалить бета-версию',
   AppLocale.wizardStepOf: 'Шаг {step} из {total}',
   AppLocale.wizardLanguageTitle: 'Выберите язык',
   AppLocale.wizardLanguageBody: 'Его можно изменить позже в настройках.',
   AppLocale.wizardWelcomeBody: 'Бесплатный фронтенд с открытым исходным кодом для всех ваших ретро-игр. Нажмите A, чтобы начать настройку.',
   AppLocale.wizardStartSetup: 'Начать настройку',
-  AppLocale.startupBetaImportChooseTitle: 'Найдена бета-версия NeoStation',
-  AppLocale.startupBetaImportChooseBody: 'На этом устройстве установлена бета-версия NeoStation {version}. Эта версия — новое приложение, поэтому она начинает с нуля. Перенести библиотеку, настройки, медиафайлы и темы из бета-версии или начать с нуля?',
-  AppLocale.startupBetaImportImportAll: 'Импортировать всё из бета-версии',
-  AppLocale.startupBetaImportStartFresh: 'Начать с нуля',
-  AppLocale.startupBetaImportPrepareTitle: 'Выберите папку бета-версии',
-  AppLocale.startupBetaImportPrepareBody: 'Сначала закройте бета-версию. На следующем экране нажмите «Использовать эту папку», а затем «Разрешить».',
-  AppLocale.startupBetaImportIconHint: 'Если откроется другое место, откройте меню ☰ и выберите NeoStation с этим значком:',
-  AppLocale.startupBetaImportChooseFolder: 'Выбрать папку',
-  AppLocale.startupBetaImportBack: 'Назад',
-  AppLocale.startupBetaImportCopyTitle: 'Копируем ваши данные',
-  AppLocale.startupBetaImportFoldersTitle: 'Дайте доступ к папкам с ROM',
-  AppLocale.startupBetaImportFoldersBody: 'Android выдаёт доступ к папкам каждому приложению отдельно, поэтому NeoStation снова нужен доступ к этим папкам. На следующем экране оставьте открывшуюся папку и нажмите «Использовать эту папку» и «Разрешить».',
-  AppLocale.startupBetaImportFolderAllow: 'Дать доступ',
-  AppLocale.startupBetaImportFolderLater: 'Сделать позже',
-  AppLocale.startupBetaImportFolderWrong:
-      'Это другая папка. Выберите {folder}, чтобы игры продолжали работать.',
-  AppLocale.startupBetaImportDoneTitle: 'Готово',
   AppLocale.startupLoading:
       'Подготовка NeoStation. Ожидание хранилища и служб...',
 

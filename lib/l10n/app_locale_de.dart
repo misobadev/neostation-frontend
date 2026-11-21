@@ -133,41 +133,12 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.startupStorageStartEmpty: 'Mit leerem Ordner beginnen',
   AppLocale.startupStorageCreateFailed:
       'NeoStation konnte den Ordner dort nicht erstellen.',
-  AppLocale.startupBetaImportWrongFolder:
-      'Das ist nicht der richtige Ordner. Wähle NeoStation mit diesem Symbol.',
-  AppLocale.startupBetaImportNoLibrary:
-      'Die Beta hat keine Bibliothek zum Importieren. Fang bei null an.',
-  AppLocale.startupBetaImportMeasuring: 'Prüfe, was kopiert werden muss...',
-  AppLocale.startupBetaImportCopying:
-      'Deine Daten werden aus der Beta kopiert. Lass NeoStation geöffnet.',
-  AppLocale.startupBetaImportCancel: 'Abbrechen',
-  AppLocale.startupBetaImportNoSpace: 'Nicht genug freier Speicher: Die Daten der Beta belegen {needed}, frei sind {free}.',
-  AppLocale.startupBetaImportFailed: 'Das Kopieren wurde nicht abgeschlossen ({error}). Es wurde nichts geändert.',
-  AppLocale.startupBetaImportDone: '{files} Dateien aus der Beta kopiert. Melde dich erneut bei NeoSync, RetroAchievements, RomM und ScreenScraper an und erlaube wieder den Zugriff auf deine Dateien, wenn du gefragt wirst: Anmeldungen und Berechtigungen lassen sich nicht übertragen. Wenn alles da ist, kannst du die Beta deinstallieren.',
-  AppLocale.startupBetaImportContinue: 'Weiter',
-  AppLocale.startupBetaImportUninstall: 'Beta deinstallieren',
   AppLocale.wizardStepOf: 'Schritt {step} von {total}',
   AppLocale.wizardLanguageTitle: 'Wähle deine Sprache',
   AppLocale.wizardLanguageBody:
       'Du kannst sie später in den Einstellungen ändern.',
   AppLocale.wizardWelcomeBody: 'Das kostenlose Open-Source-Frontend für all deine Retro-Spiele. Drücke A, um mit der Einrichtung zu beginnen.',
   AppLocale.wizardStartSetup: 'Einrichtung starten',
-  AppLocale.startupBetaImportChooseTitle: 'NeoStation-Beta gefunden',
-  AppLocale.startupBetaImportChooseBody: 'Auf diesem Gerät ist die NeoStation-Beta {version} installiert. Diese Version ist eine neue App und startet daher leer. Bibliothek, Einstellungen, Medien und Designs aus der Beta übernehmen oder bei null anfangen?',
-  AppLocale.startupBetaImportImportAll: 'Alles aus der Beta importieren',
-  AppLocale.startupBetaImportStartFresh: 'Bei null anfangen',
-  AppLocale.startupBetaImportPrepareTitle: 'Wähle den Ordner der Beta',
-  AppLocale.startupBetaImportPrepareBody: 'Schließe zuerst die Beta. Tippe im nächsten Bildschirm auf „Diesen Ordner verwenden“ und dann auf „Zulassen“.',
-  AppLocale.startupBetaImportIconHint: 'Wenn sich etwas anderes öffnet, öffne das Menü ☰ und wähle NeoStation mit diesem Symbol:',
-  AppLocale.startupBetaImportChooseFolder: 'Ordner wählen',
-  AppLocale.startupBetaImportBack: 'Zurück',
-  AppLocale.startupBetaImportCopyTitle: 'Deine Daten werden kopiert',
-  AppLocale.startupBetaImportFoldersTitle: 'Gib Zugriff auf deine ROM-Ordner',
-  AppLocale.startupBetaImportFoldersBody: 'Android vergibt den Ordnerzugriff für jede App einzeln, daher braucht NeoStation erneut Zugriff auf diese Ordner. Behalte im nächsten Bildschirm den geöffneten Ordner bei und tippe auf „Diesen Ordner verwenden“ und „Zulassen“.',
-  AppLocale.startupBetaImportFolderAllow: 'Zugriff geben',
-  AppLocale.startupBetaImportFolderLater: 'Später',
-  AppLocale.startupBetaImportFolderWrong: 'Das ist ein anderer Ordner. Wähle {folder}, damit deine Spiele weiter funktionieren.',
-  AppLocale.startupBetaImportDoneTitle: 'Alles bereit',
   AppLocale.startupLoading:
       'NeoStation wird vorbereitet. Warte auf Speicher und Dienste…',
 

@@ -439,7 +439,7 @@ class ConfigService {
           home,
           'Library',
           'Application Support',
-          'dev.misoba.neostation',
+          'com.neogamelab.neostation',
         );
       } else {
         basePath = _getWindowsBasePath();
@@ -540,7 +540,7 @@ class ConfigService {
           home,
           'Library',
           'Application Support',
-          'dev.misoba.neostation',
+          'com.neogamelab.neostation',
         );
       } else {
         basePath = _getWindowsBasePath();

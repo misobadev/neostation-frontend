@@ -24,7 +24,7 @@ SIZES=(48 64 128 256 512)
 for size in "${SIZES[@]}"; do
   DIR="$OUT_DIR/${size}x${size}"
   mkdir -p "$DIR"
-  OUTPUT="$DIR/dev.misoba.neostation.png"
+  OUTPUT="$DIR/com.neogamelab.neostation.png"
 
   if command -v convert &> /dev/null; then
     convert "$LOGO" -resize "${size}x${size}" "$OUTPUT"

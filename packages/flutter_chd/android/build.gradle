@@ -1,4 +1,4 @@
-group = "dev.misoba.flutter_chd"
+group = "com.neogamelab.flutter_chd"
 version = "1.0"
 
 buildscript {
@@ -17,7 +17,7 @@ buildscript {
 apply plugin: "com.android.library"
 
 android {
-    namespace = "dev.misoba.flutter_chd"
+    namespace = "com.neogamelab.flutter_chd"
 
     // Bumping the plugin compileSdk version requires all clients of this plugin
     // to bump the version in their app.

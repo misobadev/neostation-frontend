@@ -127,44 +127,12 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.startupStorageFolderMissing: 'NeoStation はデータの保存先フォルダーを見つけられませんでした。移動、名前の変更、削除のいずれかが行われたか、フォルダーのあるドライブが接続されていない可能性があります。',
   AppLocale.startupStorageStartEmpty: '空のフォルダーで始める',
   AppLocale.startupStorageCreateFailed: 'NeoStation はそこにフォルダーを作成できませんでした。',
-  AppLocale.startupBetaImportWrongFolder:
-      '正しいフォルダではありません。このアイコンの NeoStation を選んでください。',
-  AppLocale.startupBetaImportNoLibrary: 'ベータ版にインポートできるライブラリがありません。最初から始めてください。',
-  AppLocale.startupBetaImportMeasuring: 'コピーする内容を確認しています...',
-  AppLocale.startupBetaImportCopying:
-      'ベータ版からデータをコピーしています。NeoStation を開いたままにしてください。',
-  AppLocale.startupBetaImportCancel: 'キャンセル',
-  AppLocale.startupBetaImportNoSpace:
-      '空き容量が足りません。ベータ版のデータは {needed} で、空きは {free} です。',
-  AppLocale.startupBetaImportFailed: 'コピーが完了しませんでした（{error}）。何も変更されていません。',
-  AppLocale.startupBetaImportDone: 'ベータ版から {files} 個のファイルをコピーしました。NeoSync、RetroAchievements、RomM、ScreenScraper にもう一度サインインし、求められたらファイルへのアクセスを再度許可してください。サインイン情報と権限は引き継げません。すべて揃ったら、ベータ版はアンインストールできます。',
-  AppLocale.startupBetaImportContinue: '続ける',
-  AppLocale.startupBetaImportUninstall: 'ベータ版をアンインストール',
   AppLocale.wizardStepOf: 'ステップ {step} / {total}',
   AppLocale.wizardLanguageTitle: '言語を選んでください',
   AppLocale.wizardLanguageBody: 'あとで設定から変更できます。',
   AppLocale.wizardWelcomeBody:
       'あなたのレトロゲームすべてのための、無料でオープンソースのフロントエンドです。A を押して設定を始めましょう。',
   AppLocale.wizardStartSetup: '設定を始める',
-  AppLocale.startupBetaImportChooseTitle: 'NeoStation ベータ版が見つかりました',
-  AppLocale.startupBetaImportChooseBody: 'この端末には NeoStation ベータ版 {version} がインストールされています。このバージョンは新しいアプリなので、空の状態で始まります。ベータ版からライブラリ、設定、メディア、テーマを引き継ぎますか？それとも最初から始めますか？',
-  AppLocale.startupBetaImportImportAll: 'ベータ版からすべてインポート',
-  AppLocale.startupBetaImportStartFresh: '最初から始める',
-  AppLocale.startupBetaImportPrepareTitle: 'ベータ版のフォルダを選択',
-  AppLocale.startupBetaImportPrepareBody:
-      'まずベータ版を閉じてください。次の画面で「このフォルダを使用」をタップし、続けて「許可」をタップしてください。',
-  AppLocale.startupBetaImportIconHint:
-      '別の場所が開いた場合は、☰ メニューを開き、このアイコンの NeoStation を選んでください：',
-  AppLocale.startupBetaImportChooseFolder: 'フォルダを選択',
-  AppLocale.startupBetaImportBack: '戻る',
-  AppLocale.startupBetaImportCopyTitle: 'データをコピーしています',
-  AppLocale.startupBetaImportFoldersTitle: 'ROM フォルダへのアクセスを許可',
-  AppLocale.startupBetaImportFoldersBody: 'Android ではフォルダへのアクセスがアプリごとに許可されるため、NeoStation はこれらのフォルダへのアクセスを再度必要とします。次の画面では開いたフォルダのまま「このフォルダを使用」と「許可」をタップしてください。',
-  AppLocale.startupBetaImportFolderAllow: 'アクセスを許可',
-  AppLocale.startupBetaImportFolderLater: '後で行う',
-  AppLocale.startupBetaImportFolderWrong:
-      '別のフォルダです。ゲームを引き続き使えるように {folder} を選んでください。',
-  AppLocale.startupBetaImportDoneTitle: '準備完了',
   AppLocale.startupLoading: 'NeoStation を準備中です。ストレージとサービスを待機しています…',
 
   AppLocale.play: 'プレイ',

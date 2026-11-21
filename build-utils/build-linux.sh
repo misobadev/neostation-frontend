@@ -340,10 +340,10 @@ elif [ -f "$PROJECT_ROOT/build-utils/appimage/Icon-512.png" ]; then
     cp "$PROJECT_ROOT/build-utils/appimage/Icon-512.png" "$APPDIR/neostation.png"
 fi
 
-cp "$PROJECT_ROOT/build-utils/appimage/dev.misoba.neostation.desktop" "$APPDIR/neostation.desktop" 2>/dev/null || true
+cp "$PROJECT_ROOT/build-utils/appimage/com.neogamelab.neostation.desktop" "$APPDIR/neostation.desktop" 2>/dev/null || true
 
-if [ -f "$PROJECT_ROOT/linux/packaging/dev.misoba.neostation.desktop" ]; then
-  cp "$PROJECT_ROOT/linux/packaging/dev.misoba.neostation.desktop" "$APPDIR/neostation.desktop"
+if [ -f "$PROJECT_ROOT/linux/packaging/com.neogamelab.neostation.desktop" ]; then
+  cp "$PROJECT_ROOT/linux/packaging/com.neogamelab.neostation.desktop" "$APPDIR/neostation.desktop"
 fi
 
 # Fix line endings

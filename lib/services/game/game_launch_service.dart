@@ -181,7 +181,7 @@ class GameLaunchService {
           if (Platform.isAndroid &&
               launchCmd.containsKey('package') &&
               launchCmd.containsKey('activity')) {
-            const platform = MethodChannel('dev.misoba.neostation/game');
+            const platform = MethodChannel('com.neogamelab.neostation/game');
 
             // Cleanup + real failure surfaced to the user. A failure in this
             // branch means the user's *chosen* emulator (resolved from its JSON
@@ -406,7 +406,7 @@ class GameLaunchService {
       _log.e('Error launching the game: $e');
       GamepadNavigationManager.reactivate();
       if (Platform.isAndroid) {
-        const platform = MethodChannel('dev.misoba.neostation/game');
+        const platform = MethodChannel('com.neogamelab.neostation/game');
         await platform.invokeMethod('setGamepadBlock', {'block': false});
       }
       if (!context.mounted) return GameLaunchResult.failure('', '');
@@ -709,7 +709,7 @@ class GameLaunchService {
         packageName = packages.first;
       }
 
-      const platform = MethodChannel('dev.misoba.neostation/game');
+      const platform = MethodChannel('com.neogamelab.neostation/game');
       if (!context.mounted) return GameLaunchResult.failure('', '');
 
       final coreFailure = await _retroArchCoreFailure(
@@ -749,7 +749,7 @@ class GameLaunchService {
         return GameLaunchResult.success();
       } else {
         GamepadNavigationManager.reactivate();
-        const platform = MethodChannel('dev.misoba.neostation/game');
+        const platform = MethodChannel('com.neogamelab.neostation/game');
         await platform.invokeMethod('setGamepadBlock', {'block': false});
         if (!context.mounted) return GameLaunchResult.failure('', '');
         return GameLaunchResult.failure(
@@ -759,7 +759,7 @@ class GameLaunchService {
       }
     } catch (e) {
       GamepadNavigationManager.reactivate();
-      const platform = MethodChannel('dev.misoba.neostation/game');
+      const platform = MethodChannel('com.neogamelab.neostation/game');
       await platform.invokeMethod('setGamepadBlock', {'block': false});
       if (!context.mounted) return GameLaunchResult.failure('', '');
 
@@ -1684,7 +1684,7 @@ class GameLaunchService {
         );
       }
 
-      const platform = MethodChannel('dev.misoba.neostation/game');
+      const platform = MethodChannel('com.neogamelab.neostation/game');
       GamepadNavigationManager.reactivate();
       await platform.invokeMethod('setGamepadBlock', {'block': true});
 
@@ -1722,7 +1722,7 @@ class GameLaunchService {
     } catch (e) {
       _log.e('Error launching standalone emulator on Android: $e');
       GamepadNavigationManager.reactivate();
-      const platform = MethodChannel('dev.misoba.neostation/game');
+      const platform = MethodChannel('com.neogamelab.neostation/game');
       await platform.invokeMethod('setGamepadBlock', {'block': false});
       if (!context.mounted) return GameLaunchResult.failure('', '');
 

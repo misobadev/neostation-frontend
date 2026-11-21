@@ -11,7 +11,7 @@ import 'package:test/test.dart';
 /// The provider's Kotlin has no test run in CI, so this reads the source.
 void main() {
   final provider = File(
-    'android/app/src/main/kotlin/dev/misoba/neostation/'
+    'android/app/src/main/kotlin/com/neogamelab/neostation/'
     'NeoDocumentsProvider.kt',
   ).readAsStringSync();
 

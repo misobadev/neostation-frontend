@@ -6,7 +6,6 @@
 #endif
 
 #include "flutter/generated_plugin_registrant.h"
-#include "legacy_keyring.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -24,9 +23,6 @@ static void first_frame_cb(MyApplication* self, FlView *view)
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
-  // Before flutter_secure_storage first reads the keyring.
-  legacy_keyring_import(APPLICATION_ID);
-
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
   // The window icon, from the app's own assets next to the executable.

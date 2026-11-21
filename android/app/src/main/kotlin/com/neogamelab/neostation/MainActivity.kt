@@ -1,4 +1,4 @@
-package dev.misoba.neostation
+package com.neogamelab.neostation
 
 import android.hardware.input.InputManager
 import android.os.Build
@@ -35,11 +35,11 @@ import com.hcoderlee.subscreen.sub_screen.SharedStateManager
 import androidx.core.content.FileProvider
 
 class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
-    private val CHANNEL = "dev.misoba.neostation/game"
+    private val CHANNEL = "com.neogamelab.neostation/game"
     // Max size the dock/picker renders an app icon at; icons are rasterized to
     // this (in px) before encoding so we don't ship/decode full-res drawables.
     private val ICON_TARGET_DP = 56f
-    private val LAUNCHER_CHANNEL = "dev.misoba.neostation/launcher"
+    private val LAUNCHER_CHANNEL = "com.neogamelab.neostation/launcher"
     // How long a dock-launched app gets to reach the bottom display before the
     // Now Playing panel comes back. Generous: a cold app start on this hardware
     // can take seconds, and coming back early is the bug this guards against.
@@ -59,7 +59,6 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     private var gamepadBlockTimeout: Handler? = null // Timeout para desbloquear automáticamente
     private var methodChannel: MethodChannel? = null // Canal para comunicación con Flutter
     private var launcherMethodChannel: MethodChannel? = null // Canal para launcher
-    private var legacyBetaImporter: LegacyBetaImporter? = null
     private var secondaryDisplayChannel: MethodChannel? = null // Canal para pantalla secundaria
     private var gameLaunchTimestamp: Long = 0 // Timestamp del lanzamiento del juego
     private var displayListener: android.hardware.display.DisplayManager.DisplayListener? = null
@@ -585,7 +584,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         }
 
         // Secondary display channel
-        secondaryDisplayChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.misoba.neostation/secondary_display")
+        secondaryDisplayChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.neogamelab.neostation/secondary_display")
         secondaryDisplayChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "setSecondaryDisplayVisible" -> {
@@ -606,9 +605,6 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                 secondaryDisplayChannel?.invokeMethod("onAccessibilityConnected", null)
             }
         }
-
-        // Import from a NeoStation beta (com.neogamelab.neostation).
-        legacyBetaImporter = LegacyBetaImporter(this, flutterEngine.dartExecutor.binaryMessenger)
 
         // Launcher channel
         launcherMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LAUNCHER_CHANNEL)
@@ -723,7 +719,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
         ) ?: return false
         // Build the component via ComponentName so the class keeps its real
-        // namespace (dev.misoba.neostation.*) while the package picks up the
+        // namespace (com.neogamelab.neostation.*) while the package picks up the
         // flavor's applicationId suffix (.dev/.featuretest). A hand-built
         // "$packageName/$packageName.Foo" string gets the class package wrong on
         // suffixed flavors and never matches.
@@ -1308,7 +1304,6 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (legacyBetaImporter?.onActivityResult(requestCode, resultCode, data) == true) return
         if (requestCode == SAF_PICKER_REQUEST_CODE) {
             if (resultCode == android.app.Activity.RESULT_OK && data != null && data.data != null) {
                 val uri = data.data!!

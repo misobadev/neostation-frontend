@@ -60,9 +60,6 @@
         <package android:name="com.retroarch.ra32" />
         <package android:name="com.retroarch.a" />
         <package android:name="com.retroarch.plus" />
-        <!-- A NeoStation beta, published under this id, whose data can be
-             imported on first start. -->
-        <package android:name="com.neogamelab.neostation" />
         <!-- Visible so the frontend can verify RetroArch's installed-core
              receiver before sending its query. -->
         <intent>

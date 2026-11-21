@@ -12,7 +12,7 @@ import 'package:neostation/services/logger_service.dart';
 /// APK installation permissions, and device type detection (e.g., Android TV).
 class PermissionService {
   static const MethodChannel _channel = MethodChannel(
-    'dev.misoba.neostation/game',
+    'com.neogamelab.neostation/game',
   );
 
   static final _log = LoggerService.instance;

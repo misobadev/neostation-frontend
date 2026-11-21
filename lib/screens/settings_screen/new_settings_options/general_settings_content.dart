@@ -193,7 +193,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
   Future<void> _checkDefaultLauncher() async {
     if (Platform.isAndroid) {
       try {
-        const platform = MethodChannel('dev.misoba.neostation/launcher');
+        const platform = MethodChannel('com.neogamelab.neostation/launcher');
         final isDefault =
             await platform.invokeMethod<bool>('isDefaultLauncher') ?? false;
         setState(() {
@@ -226,7 +226,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
   Future<void> _toggleLauncher(bool value) async {
     if (Platform.isAndroid) {
       try {
-        const platform = MethodChannel('dev.misoba.neostation/launcher');
+        const platform = MethodChannel('com.neogamelab.neostation/launcher');
         await platform.invokeMethod('openLauncherSettings');
       } catch (e) {
         _log.e('Launcher settings activity could not be resolved: $e');
@@ -238,7 +238,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
   Future<void> _openSystemSettings() async {
     if (Platform.isAndroid) {
       try {
-        const platform = MethodChannel('dev.misoba.neostation/launcher');
+        const platform = MethodChannel('com.neogamelab.neostation/launcher');
         await platform.invokeMethod('openSystemSettings');
       } catch (e) {
         _log.e('System settings activity could not be resolved: $e');

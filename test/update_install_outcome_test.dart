@@ -10,7 +10,7 @@ import 'package:neostation/services/update_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('dev.misoba.neostation/game');
+  const channel = MethodChannel('com.neogamelab.neostation/game');
   final apk = File('neostation.apk');
   final defaultPermission = UpdateService.ensureInstallPermission;
 

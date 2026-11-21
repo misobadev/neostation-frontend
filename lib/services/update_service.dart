@@ -777,7 +777,7 @@ rm -f "$scriptPath"
       _log.i('UpdateService: Executing APK installation...');
 
       // Invoke platform-specific logic in MainActivity.kt
-      final platform = const MethodChannel('dev.misoba.neostation/game');
+      final platform = const MethodChannel('com.neogamelab.neostation/game');
       await platform.invokeMethod('installApk', {'filePath': apkFile.path});
 
       return UpdateOutcome.installing;

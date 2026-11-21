@@ -237,7 +237,7 @@ class SwitchSaveDetector {
     String emulatorName,
   ) async {
     try {
-      const platform = MethodChannel('dev.misoba.neostation/game');
+      const platform = MethodChannel('com.neogamelab.neostation/game');
       final mirrorPath = await platform.invokeMethod<String>(
         'mirrorEmulatorNand',
         {'packageName': packageName, 'emulatorName': emulatorName},

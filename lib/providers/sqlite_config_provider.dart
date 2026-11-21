@@ -117,7 +117,7 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   static final _log = LoggerService.instance;
   static const _secondaryDisplayChannel = MethodChannel(
-    'dev.misoba.neostation/secondary_display',
+    'com.neogamelab.neostation/secondary_display',
   );
 
   /// Forces whether [scanSystems] runs its Android pre-scan checks (storage

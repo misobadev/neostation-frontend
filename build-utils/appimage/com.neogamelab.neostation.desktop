@@ -6,5 +6,5 @@ Exec=neostation
 Icon=neostation
 Categories=Game;Emulator;
 Terminal=false
-StartupWMClass=dev.misoba.neostation
+StartupWMClass=com.neogamelab.neostation
 

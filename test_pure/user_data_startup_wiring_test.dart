@@ -53,7 +53,7 @@ void main() {
 
   test('the document provider creates only the default folder', () {
     final provider = File(
-      'android/app/src/main/kotlin/dev/misoba/neostation/'
+      'android/app/src/main/kotlin/com/neogamelab/neostation/'
       'NeoDocumentsProvider.kt',
     ).readAsStringSync();
     final baseDir = body(provider, 'private fun baseDir(): File?', '\n    }\n');

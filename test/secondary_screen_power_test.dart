@@ -18,7 +18,7 @@ import 'package:neostation/services/secondary_apps_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('dev.misoba.neostation/secondary_apps');
+  const channel = MethodChannel('com.neogamelab.neostation/secondary_apps');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 

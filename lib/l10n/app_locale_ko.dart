@@ -129,44 +129,12 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.startupStorageFolderMissing: 'NeoStation이 데이터가 저장된 폴더를 찾지 못했습니다. 이동되었거나 이름이 바뀌었거나 삭제되었을 수 있으며, 폴더가 있는 드라이브가 연결되어 있지 않을 수도 있습니다.',
   AppLocale.startupStorageStartEmpty: '빈 폴더로 시작',
   AppLocale.startupStorageCreateFailed: 'NeoStation이 그 위치에 폴더를 만들지 못했습니다.',
-  AppLocale.startupBetaImportWrongFolder:
-      '올바른 폴더가 아닙니다. 이 아이콘의 NeoStation을 선택하세요.',
-  AppLocale.startupBetaImportNoLibrary: '베타에 가져올 라이브러리가 없습니다. 처음부터 시작하세요.',
-  AppLocale.startupBetaImportMeasuring: '복사할 항목을 확인하는 중...',
-  AppLocale.startupBetaImportCopying:
-      '베타에서 데이터를 복사하는 중입니다. NeoStation을 열어 두세요.',
-  AppLocale.startupBetaImportCancel: '취소',
-  AppLocale.startupBetaImportNoSpace:
-      '여유 공간이 부족합니다. 베타의 데이터는 {needed}이고 여유 공간은 {free}입니다.',
-  AppLocale.startupBetaImportFailed: '복사가 완료되지 않았습니다({error}). 변경된 내용은 없습니다.',
-  AppLocale.startupBetaImportDone: '베타에서 파일 {files}개를 복사했습니다. NeoSync, RetroAchievements, RomM, ScreenScraper에 다시 로그인하고, 요청이 표시되면 파일 액세스를 다시 허용하세요. 로그인 정보와 권한은 옮길 수 없습니다. 모두 옮겨진 것을 확인한 후 베타를 제거할 수 있습니다.',
-  AppLocale.startupBetaImportContinue: '계속',
-  AppLocale.startupBetaImportUninstall: '베타 제거',
   AppLocale.wizardStepOf: '{total}단계 중 {step}단계',
   AppLocale.wizardLanguageTitle: '언어를 선택하세요',
   AppLocale.wizardLanguageBody: '나중에 설정에서 변경할 수 있습니다.',
   AppLocale.wizardWelcomeBody:
       '모든 레트로 게임을 위한 무료 오픈 소스 프런트엔드입니다. A를 눌러 설정을 시작하세요.',
   AppLocale.wizardStartSetup: '설정 시작',
-  AppLocale.startupBetaImportChooseTitle: 'NeoStation 베타를 찾았습니다',
-  AppLocale.startupBetaImportChooseBody: '이 기기에 NeoStation 베타 {version}이 설치되어 있습니다. 이 버전은 새 앱이므로 빈 상태로 시작합니다. 베타에서 라이브러리, 설정, 미디어, 테마를 가져올까요, 아니면 처음부터 시작할까요?',
-  AppLocale.startupBetaImportImportAll: '베타에서 모두 가져오기',
-  AppLocale.startupBetaImportStartFresh: '처음부터 시작',
-  AppLocale.startupBetaImportPrepareTitle: '베타의 폴더 선택',
-  AppLocale.startupBetaImportPrepareBody:
-      '먼저 베타를 닫으세요. 다음 화면에서 "이 폴더 사용"을 탭한 다음 "허용"을 탭하세요.',
-  AppLocale.startupBetaImportIconHint:
-      '다른 위치가 열리면 ☰ 메뉴를 열고 이 아이콘의 NeoStation을 선택하세요:',
-  AppLocale.startupBetaImportChooseFolder: '폴더 선택',
-  AppLocale.startupBetaImportBack: '뒤로',
-  AppLocale.startupBetaImportCopyTitle: '데이터를 복사하는 중',
-  AppLocale.startupBetaImportFoldersTitle: 'ROM 폴더에 대한 액세스 허용',
-  AppLocale.startupBetaImportFoldersBody: 'Android는 앱마다 폴더 액세스를 따로 허용하므로 NeoStation에 이 폴더에 대한 액세스가 다시 필요합니다. 다음 화면에서 열린 폴더를 그대로 두고 "이 폴더 사용"과 "허용"을 탭하세요.',
-  AppLocale.startupBetaImportFolderAllow: '액세스 허용',
-  AppLocale.startupBetaImportFolderLater: '나중에',
-  AppLocale.startupBetaImportFolderWrong:
-      '다른 폴더입니다. 게임이 계속 작동하도록 {folder}을(를) 선택하세요.',
-  AppLocale.startupBetaImportDoneTitle: '모두 완료',
   AppLocale.startupLoading: 'NeoStation을 준비 중입니다. 저장소와 서비스를 기다리고 있습니다…',
 
   AppLocale.play: '플레이',

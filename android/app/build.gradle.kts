@@ -23,7 +23,7 @@ val hasReleaseSigning = listOf(
 }
 
 android {
-    namespace = "dev.misoba.neostation"
+    namespace = "com.neogamelab.neostation"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -45,7 +45,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "dev.misoba.neostation"
+        applicationId = "com.neogamelab.neostation"
         manifestPlaceholders["appName"] = "NeoStation"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.

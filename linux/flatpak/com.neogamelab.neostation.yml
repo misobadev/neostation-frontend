@@ -1,4 +1,4 @@
-app-id: dev.misoba.neostation
+app-id: com.neogamelab.neostation
 runtime: org.gnome.Platform
 runtime-version: '50'
 sdk: org.gnome.Sdk
@@ -37,22 +37,22 @@ modules:
       - mkdir -p /app/bin /app/data
       - cp -r neostation-bundle/* /app/bin/
       - chmod +x /app/bin/neostation
-      - install -Dm644 dev.misoba.neostation.desktop /app/share/applications/dev.misoba.neostation.desktop
-      - install -Dm644 dev.misoba.neostation.metainfo.xml /app/share/metainfo/dev.misoba.neostation.metainfo.xml
+      - install -Dm644 com.neogamelab.neostation.desktop /app/share/applications/com.neogamelab.neostation.desktop
+      - install -Dm644 com.neogamelab.neostation.metainfo.xml /app/share/metainfo/com.neogamelab.neostation.metainfo.xml
       - |
         for size in 64 128 256 512; do
           mkdir -p /app/share/icons/hicolor/${size}x${size}/apps
           ffmpeg -y -i assets/images/logo.png -vf scale=${size}:${size} \
-            /app/share/icons/hicolor/${size}x${size}/apps/dev.misoba.neostation.png
+            /app/share/icons/hicolor/${size}x${size}/apps/com.neogamelab.neostation.png
         done
     sources:
       - type: dir
         path: ../../build/linux/x64/release/bundle
         dest: neostation-bundle
       - type: file
-        path: dev.misoba.neostation.desktop
+        path: com.neogamelab.neostation.desktop
       - type: file
-        path: dev.misoba.neostation.metainfo.xml
+        path: com.neogamelab.neostation.metainfo.xml
       - type: file
         path: ../../assets/images/logo.png
         dest: assets/images
