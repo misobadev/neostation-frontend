@@ -526,12 +526,15 @@ void main() {
     // under the cap and takes up every unit the row does not spend.
     await pumpFooter(tester, showsPill: true, width: handheldCardWidth);
 
+    // PLAY is filled with the theme's main action colour.
+    final action = Theme.of(tester.element(find.byType(GameDetailsFooter)))
+        .colorScheme
+        .tertiary;
     final playButton = find.byWidgetPredicate(
       (widget) =>
           widget is Container &&
           widget.decoration is BoxDecoration &&
-          (widget.decoration! as BoxDecoration).color ==
-              const Color(0xFF2ECC71),
+          (widget.decoration! as BoxDecoration).color == action,
     );
     final rects = [
       for (final finder in [

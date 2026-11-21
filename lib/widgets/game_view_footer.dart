@@ -215,15 +215,16 @@ class GameViewFooter extends StatelessWidget {
         final radii =
             Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m();
         final isFocused = Focus.of(context).hasFocus;
+        // The theme's main action colour, lifted a little when focused.
+        final scheme = Theme.of(context).colorScheme;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           height: 32.r,
           decoration: BoxDecoration(
             color: isFocused
-                ? const Color(0xFF36F184)
-                : const Color(0xFF2ECC71),
+                ? Color.lerp(scheme.tertiary, scheme.onTertiary, 0.15)
+                : scheme.tertiary,
             borderRadius: radii.radiusExternal,
-            border: Border.all(color: const Color(0xFF36F184), width: 1.r),
             boxShadow: [
               BoxShadow(
                 color: Theme.of(context).colorScheme.shadow
@@ -240,7 +241,7 @@ class GameViewFooter extends StatelessWidget {
               focusColor: Colors.transparent,
               hoverColor: Colors.transparent,
               highlightColor: Colors.transparent,
-              splashColor: Colors.white.withValues(alpha: 0.1),
+              splashColor: scheme.onTertiary.withValues(alpha: 0.1),
               borderRadius: radii.radiusExternal,
               onTap: () {
                 SfxService().playEnterSound();
@@ -259,7 +260,7 @@ class GameViewFooter extends StatelessWidget {
                     softWrap: false,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary,
+                      color: scheme.onTertiary,
                       fontWeight: FontWeight.w900,
                       fontSize: 11.r,
                       letterSpacing: 1.5,
