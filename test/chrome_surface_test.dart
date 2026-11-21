@@ -23,6 +23,7 @@ void main() {
     'aqua': AppThemes.aquaTheme,
     'palenight': AppThemes.palenightTheme,
     'horizon': AppThemes.horizonTheme,
+    'sixteenBit': AppThemes.sixteenBitTheme,
   };
 
   group('ChromeSurface', () {

@@ -17,6 +17,7 @@ import 'abyss_theme.dart' as abyss;
 import 'cyberpunk_theme.dart' as cyberpunk;
 import 'aqua_theme.dart' as aqua;
 import 'palenight_theme.dart' as palenight;
+import 'sixteen_bit_theme.dart' as sixteen_bit;
 import 'horizon_theme.dart' as horizon;
 import 'dmg_theme.dart' as dmg;
 
@@ -45,6 +46,7 @@ class AppThemes {
   static ThemeData get cyberpunkTheme => cyberpunk.cyberpunkTheme;
   static ThemeData get aquaTheme => aqua.aquaTheme;
   static ThemeData get palenightTheme => palenight.palenightTheme;
+  static ThemeData get sixteenBitTheme => sixteen_bit.sixteenBitTheme;
   static ThemeData get horizonTheme => horizon.horizonTheme;
   static ThemeData get dmgTheme => dmg.dmgTheme;
 
@@ -115,6 +117,8 @@ class AppThemes {
         return horizon.HorizonCustomColors();
       case 'dmg':
         return dmg.DmgCustomColors();
+      case 'sixteen_bit':
+        return sixteen_bit.SixteenBitCustomColors();
       default:
         return dark.DarkCustomColors();
     }
@@ -177,6 +181,9 @@ class AppThemes {
     } else if (surface == dmgTheme.colorScheme.surface ||
         secondary == dmgTheme.colorScheme.secondary) {
       return dmg.DmgCustomColors();
+    } else if (surface == sixteenBitTheme.colorScheme.surface ||
+        secondary == sixteenBitTheme.colorScheme.secondary) {
+      return sixteen_bit.SixteenBitCustomColors();
     } else {
       return dark.DarkCustomColors();
     }
@@ -219,6 +226,8 @@ class AppThemes {
         return horizonTheme;
       case 'dmg':
         return dmgTheme;
+      case 'sixteen_bit':
+        return sixteenBitTheme;
       default:
         return darkTheme;
     }

@@ -63,6 +63,7 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
     'palenight': AppThemes.palenightTheme,
     'horizon': AppThemes.horizonTheme,
     'dmg': AppThemes.dmgTheme,
+    'sixteen_bit': AppThemes.sixteenBitTheme,
   };
 
   /// Human-readable mapping for theme identifiers.
@@ -83,6 +84,7 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
     'palenight': 'Palenight',
     'horizon': 'Horizon',
     'dmg': 'Dmg',
+    'sixteen_bit': '16 Bits',
   };
 
   ThemeProvider._() {
