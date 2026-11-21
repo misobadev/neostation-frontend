@@ -21,6 +21,9 @@ Set up a local game library by adding one or more ROM folders, scanning them, an
 3. Choose the folder that contains your ROM library.
 4. NeoStation scans the folder and makes recognised systems available.
 
+![The NeoStation systems view after scanning a ROM folder](/screenshots/systems.webp)
+*After a scan, every recognised system appears as a card.*
+
 You can configure up to five ROM folders. Use **Rescan All ROM Folders** in the same screen after adding or changing files.
 
 > **Note:** Removing a ROM folder from NeoStation removes it as a library source only. It does not delete the files in that folder.

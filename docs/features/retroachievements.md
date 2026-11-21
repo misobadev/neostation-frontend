@@ -46,6 +46,9 @@ Selecting a game from **Games**, **AOTW**, or a Profile preview opens a dedicate
 
 The game page also contains a **Leaderboards** view. It loads only when opened, shows paginated entries, and highlights the signed-in user's entry when RetroAchievements returns one. A game can have no leaderboards or no entries even when the game itself is matched.
 
+![A game's RetroAchievements list next to its details](/screenshots/retroachievements.webp)
+*Achievements for a game, shown next to its details.*
+
 ## Match Your Library
 
 NeoStation can match new ROMs after the startup scan. To process your whole library with visible progress:

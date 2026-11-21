@@ -8,6 +8,9 @@ nav_order: 1
 
 NeoStation is a landscape, gamepad-driven emulation frontend for Windows, Linux, macOS, Android, and Android TV.
 
+![A system game list in NeoStation with artwork and the Play prompt](/screenshots/game-list.webp)
+*A system's game list, driven entirely by the gamepad.*
+
 ## Get started
 
 - [Getting Started](/getting-started/getting-started/) — add a ROM folder, scan it, and choose an emulator.

@@ -28,6 +28,9 @@ The scraper options include these sections:
 - **Language**
 - **Systems**
 
+![The NeoStation scraping screen with Scrape Mode, Media, Region and Language options](/screenshots/scraping.webp)
+*Scraping in progress, with the scraper options on the left.*
+
 You can start scraping from a game as well as from the scraping workflow. A game can also be re-scraped from its settings.
 
 ## If a Game Does Not Scrape
