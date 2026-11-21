@@ -1111,6 +1111,8 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                             ),
                             info: system,
                             isSelected: isSelected,
+                            // The centred card keeps the others' colours.
+                            highlightSelected: false,
                             backgroundCacheWidth: 1024,
                             artworkInset: 10,
                             onTap: handleTap,

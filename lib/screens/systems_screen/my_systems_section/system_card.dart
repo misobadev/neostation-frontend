@@ -60,6 +60,7 @@ class SystemCard extends StatefulWidget {
     this.isCompact = false,
     this.artworkInset = 4,
     this.showShadow = true,
+    this.highlightSelected = true,
   });
 
   /// The system or game metadata resolved for this card.
@@ -109,11 +110,19 @@ class SystemCard extends StatefulWidget {
   /// Whether the card casts its drop shadow.
   final bool showShadow;
 
+  /// Whether a selected card switches its frame and footer to the selection
+  /// colour. The carousel turns it off: its centred card already stands out
+  /// by its place and size, so it keeps the same colours as the others.
+  final bool highlightSelected;
+
   @override
   State<SystemCard> createState() => _SystemCardState();
 }
 
 class _SystemCardState extends State<SystemCard> {
+  /// Whether the card wears the selection colours.
+  bool get _highlighted => widget.isSelected && widget.highlightSelected;
+
   late final FocusNode _focusNode;
   late final GlobalKey _contentStackKey;
   final MusicPlayerService _musicPlayerService = MusicPlayerService();
@@ -323,7 +332,7 @@ class _SystemCardState extends State<SystemCard> {
               // frame behind the card.
               color: (GooeyCardChrome.maybeOf(context)?.liquid ?? false)
                   ? Colors.transparent
-                  : widget.isSelected
+                  : _highlighted
                   ? Theme.of(context).colorScheme.secondary
                   : Theme.of(context).colorScheme.surface,
               borderRadius: outerRadius,
@@ -761,7 +770,7 @@ class _SystemCardState extends State<SystemCard> {
         children: [
           GooeyCardChrome.fadeColor(
             context,
-            color: widget.isSelected
+            color: _highlighted
                 ? Theme.of(context).colorScheme.onSecondary
                 : Theme.of(context).colorScheme.onSurface,
             builder: (color) => Text(
@@ -796,7 +805,7 @@ class _SystemCardState extends State<SystemCard> {
   /// it into a gradient) is both simpler to reason about and cheaper to paint.
   Widget _buildSystemFooter(BuildContext context) {
     final assetLogoPath = _resolveSystemLogoPath();
-    final selected = widget.isSelected;
+    final selected = _highlighted;
 
     return Padding(
       padding: EdgeInsets.only(bottom: 2.r, left: 4.r, right: 4.r),
