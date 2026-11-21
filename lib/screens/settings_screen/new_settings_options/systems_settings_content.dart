@@ -10,10 +10,8 @@ import 'package:provider/provider.dart';
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../widgets/custom_toggle_switch.dart';
-import '../../../constants/recent_card_sizes.dart';
 import '../../../constants/system_folder_names.dart';
 import 'settings_title.dart';
-import 'widgets/setting_value_chip.dart';
 import 'widgets/settings_card_row.dart';
 
 /// A specialized content panel for managing system visibility and interface components.
@@ -99,21 +97,6 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
             provider.updateHideRecentCard(!provider.config.hideRecentCard),
       ),
       _SystemSettingRow(
-        icon: Symbols.aspect_ratio_rounded,
-        title: AppLocale.recentCardSize.getString(context),
-        subtitle: AppLocale.recentCardSizeSubtitle.getString(context),
-        // The size only means anything while the card is on screen.
-        isDisabled: provider.config.hideRecentCard,
-        valueText: provider.config.recentCardSize == RecentCardSizes.twoByOne
-            ? AppLocale.recentCardSize2x1.getString(context)
-            : AppLocale.recentCardSizeDefault.getString(context),
-        onToggle: () => provider.updateRecentCardSize(
-          provider.config.recentCardSize == RecentCardSizes.twoByOne
-              ? RecentCardSizes.defaultSize
-              : RecentCardSizes.twoByOne,
-        ),
-      ),
-      _SystemSettingRow(
         icon: Symbols.favorite_rounded,
         title: AppLocale.favorite.getString(context),
         subtitle: SystemFolderNames.favorites,
@@ -188,13 +171,11 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
                     selected: isSelected,
                     disabled: item.isDisabled,
                     onTap: item.isDisabled ? null : onTap,
-                    trailing: item.valueText != null
-                        ? SettingValueChip(text: item.valueText!)
-                        : CustomToggleSwitch(
-                            value: item.isEnabled,
-                            onChanged: (_) => onTap(),
-                            disabled: item.isDisabled,
-                          ),
+                    trailing: CustomToggleSwitch(
+                      value: item.isEnabled,
+                      onChanged: (_) => onTap(),
+                      disabled: item.isDisabled,
+                    ),
                   );
                 },
               ),
@@ -215,10 +196,6 @@ class _SystemSettingRow {
   final bool isHideToggle;
   final bool isDisabled;
 
-  /// Current value of a cyclable row. When set, the row renders a value chip
-  /// instead of a toggle and [onToggle] advances to the next value.
-  final String? valueText;
-
   final VoidCallback onToggle;
 
   const _SystemSettingRow({
@@ -229,6 +206,5 @@ class _SystemSettingRow {
     this.isEnabled = false,
     this.isHideToggle = false,
     this.isDisabled = false,
-    this.valueText,
   });
 }

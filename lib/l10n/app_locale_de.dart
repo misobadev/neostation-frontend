@@ -219,11 +219,6 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.hideRecentCard: 'Zuletzt gespielt',
   AppLocale.hideRecentCardSubtitle:
       'Karte der zuletzt gespielten Spiele im Raster anzeigen',
-  AppLocale.recentCardSize: 'Größe der Karte',
-  AppLocale.recentCardSizeSubtitle:
-      'Größe der Karte für zuletzt gespielte Spiele im Raster',
-  AppLocale.recentCardSizeDefault: 'Standard',
-  AppLocale.recentCardSize2x1: 'Kompakt',
   AppLocale.themesSubtitle: 'Personalisiere das Design von NeoStation',
   AppLocale.neoglassGroup: 'NeoGlass',
   AppLocale.neoglassBlur: 'Glas-Blur',

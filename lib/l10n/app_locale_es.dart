@@ -219,11 +219,6 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.hideRecentCard: 'Tarjeta de Recientes',
   AppLocale.hideRecentCardSubtitle:
       'Muestra la tarjeta de jugados recientemente en la grilla',
-  AppLocale.recentCardSize: 'Tamaño de la tarjeta',
-  AppLocale.recentCardSizeSubtitle:
-      'Tamaño de la tarjeta de jugados recientemente en la grilla',
-  AppLocale.recentCardSizeDefault: 'Predeterminado',
-  AppLocale.recentCardSize2x1: 'Compacto',
   AppLocale.themesSubtitle: 'Personaliza la apariencia de tu NeoStation',
   AppLocale.neoglassGroup: 'NeoGlass',
   AppLocale.neoglassBlur: 'Desenfoque de cristal',

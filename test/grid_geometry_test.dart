@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:neostation/constants/recent_card_sizes.dart';
 import 'package:neostation/models/my_systems.dart';
 import 'package:neostation/screens/systems_screen/my_systems_section/grid_geometry.dart';
 
@@ -36,75 +35,38 @@ void main() {
       ]);
     });
 
-    test('game card expands to a 3x2 block when cols >= 3', () {
-      final grid = buildVirtualGrid([game()], 3);
-      expect(grid, [
-        [0, 0, 0],
-        [0, 0, 0],
-      ]);
-    });
-
-    test('game card stays 1x1 when cols < 3', () {
-      final grid = buildVirtualGrid([game(), system()], 2);
-      expect(grid, [
-        [0, 1],
-      ]);
-    });
-
-    test('a 2x1 game card takes two cells on the first row', () {
-      final grid = buildVirtualGrid(
-        [game(), system(), system()],
-        4,
-        recentCardSize: RecentCardSizes.twoByOne,
-      );
+    test('a game card takes two cells on the first row', () {
+      final grid = buildVirtualGrid([game(), system(), system()], 4);
       expect(grid, [
         [0, 0, 1, 2],
       ]);
     });
 
-    test('a 2x1 game card stays 1x1 in a single-column grid', () {
-      final grid = buildVirtualGrid(
-        [game(), system()],
-        1,
-        recentCardSize: RecentCardSizes.twoByOne,
-      );
+    test('a game card stays 1x1 in a single-column grid', () {
+      final grid = buildVirtualGrid([game(), system()], 1);
       expect(grid, [
         [0],
         [1],
       ]);
     });
 
-    test('first-fit places single cells after a leading game block', () {
-      // Game occupies cols 0-2 on rows 0-1; systems start on row 2.
+    test('single cells fill in beside and after a leading game card', () {
       final grid = buildVirtualGrid([game(), system(), system()], 3);
       expect(grid, [
-        [0, 0, 0],
-        [0, 0, 0],
-        [1, 2, -1],
+        [0, 0, 1],
+        [2, -1, -1],
       ]);
     });
   });
 
   group('recentCardSpan', () {
-    test('the default size is a 3x2 block on a wide grid', () {
-      expect(recentCardSpan(RecentCardSizes.defaultSize, 6), (3, 2));
+    test('is 2x1 from two columns up', () {
+      expect(recentCardSpan(2), (2, 1));
+      expect(recentCardSpan(7), (2, 1));
     });
 
-    test('the default size falls back to 1x1 below three columns', () {
-      expect(recentCardSpan(RecentCardSizes.defaultSize, 2), (1, 1));
-    });
-
-    test('the compact size is 2x1 from two columns up', () {
-      expect(recentCardSpan(RecentCardSizes.twoByOne, 2), (2, 1));
-      expect(recentCardSpan(RecentCardSizes.twoByOne, 7), (2, 1));
-    });
-
-    test('the compact size falls back to 1x1 in a single column', () {
-      expect(recentCardSpan(RecentCardSizes.twoByOne, 1), (1, 1));
-    });
-
-    test('an unknown size is treated as the default', () {
-      expect(recentCardSpan('nonsense', 6), (3, 2));
+    test('falls back to 1x1 in a single column', () {
+      expect(recentCardSpan(1), (1, 1));
     });
   });
 

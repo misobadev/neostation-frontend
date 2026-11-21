@@ -2,8 +2,6 @@ import 'dart:convert';
 
 import 'custom_sfx.dart';
 
-import 'package:neostation/constants/recent_card_sizes.dart';
-
 import 'emulator_model.dart';
 
 String _normalizeGameListSize(String value) =>
@@ -147,10 +145,6 @@ class ConfigModel {
 
   /// Whether to hide the "Recently Played" card from the main dashboard.
   final bool hideRecentCard;
-
-  /// Cell span of the "Recently Played" card in the systems grid: `'default'`
-  /// (3x2) or `'2x1'`. Ignored by the carousel, where every card is one slot.
-  final String recentCardSize;
 
   /// The game details card tab the user last selected with L1/R1, stored as the
   /// `DetailTab` enum name (e.g. 'wheel', 'box2d', 'screenshotVideo').
@@ -344,7 +338,6 @@ class ConfigModel {
     this.collectionSortOrder = 'asc',
     this.appLanguage = 'es',
     this.hideRecentCard = false,
-    this.recentCardSize = RecentCardSizes.defaultSize,
     this.gameDetailsTab = 'wheel',
     this.hideTabSync = false,
     this.hideTabAchievements = false,
@@ -489,11 +482,6 @@ class ConfigModel {
                   .toString() ==
               '1' ||
           (json['hideRecentCard'] ?? false).toString().toLowerCase() == 'true',
-      recentCardSize:
-          (json['recentCardSize'] ??
-                  json['recent_card_size'] ??
-                  RecentCardSizes.defaultSize)
-              .toString(),
       gameDetailsTab:
           (json['gameDetailsTab'] ?? json['game_details_tab'] ?? 'wheel')
               .toString(),
@@ -739,7 +727,6 @@ class ConfigModel {
       'collectionSortOrder': collectionSortOrder,
       'appLanguage': appLanguage,
       'hideRecentCard': hideRecentCard,
-      'recentCardSize': recentCardSize,
       'gameDetailsTab': gameDetailsTab,
       'hideTabSync': hideTabSync,
       'hideTabAchievements': hideTabAchievements,
@@ -806,7 +793,6 @@ class ConfigModel {
     String? collectionSortOrder,
     String? appLanguage,
     bool? hideRecentCard,
-    String? recentCardSize,
     String? gameDetailsTab,
     bool? hideTabSync,
     bool? hideTabAchievements,
@@ -871,7 +857,6 @@ class ConfigModel {
       collectionSortOrder: collectionSortOrder ?? this.collectionSortOrder,
       appLanguage: appLanguage ?? this.appLanguage,
       hideRecentCard: hideRecentCard ?? this.hideRecentCard,
-      recentCardSize: recentCardSize ?? this.recentCardSize,
       gameDetailsTab: gameDetailsTab ?? this.gameDetailsTab,
       hideTabSync: hideTabSync ?? this.hideTabSync,
       hideTabAchievements: hideTabAchievements ?? this.hideTabAchievements,

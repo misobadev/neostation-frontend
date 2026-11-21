@@ -1972,6 +1972,8 @@ class SqliteService {
         app_language TEXT DEFAULT 'en',
         active_theme TEXT DEFAULT '',
         hide_recent_card INTEGER DEFAULT 0,
+        -- Unused since the Recently Played card has one size. Kept so a
+        -- fresh install matches the schema upgraded devices already have.
         recent_card_size TEXT DEFAULT 'default',
         -- Unused since the vertical action rail was removed. Kept so a fresh
         -- install matches the schema migration v103 left on upgraded devices.
@@ -2975,7 +2977,6 @@ class SqliteService {
     String? appLanguage,
     String? activeTheme,
     int? hideRecentCard,
-    String? recentCardSize,
     String? gameDetailsTab,
     int? hideTabSync,
     int? hideTabAchievements,
@@ -3089,9 +3090,6 @@ class SqliteService {
     }
     if (hideRecentCard != null) {
       updates['hide_recent_card'] = hideRecentCard;
-    }
-    if (recentCardSize != null) {
-      updates['recent_card_size'] = recentCardSize;
     }
     if (gameDetailsTab != null) {
       updates['game_details_tab'] = gameDetailsTab;

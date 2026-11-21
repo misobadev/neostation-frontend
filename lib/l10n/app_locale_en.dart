@@ -220,11 +220,6 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.hideRecentCard: 'Recent Games Card',
   AppLocale.hideRecentCardSubtitle:
       'Show the recently played card in the systems grid',
-  AppLocale.recentCardSize: 'Recent Card Size',
-  AppLocale.recentCardSizeSubtitle:
-      'Size of the recently played card in the systems grid',
-  AppLocale.recentCardSizeDefault: 'Default',
-  AppLocale.recentCardSize2x1: 'Compact',
   AppLocale.themesSubtitle: 'Personalize the appearance of your NeoStation',
   AppLocale.neoglassGroup: 'NeoGlass',
   AppLocale.neoglassBlur: 'Glass Blur',
