@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// NeoStation's logo: the badge with the "NeoStation" wordmark, from the
+/// NeoStation's logo: the handheld isotype with the "NeoStation" wordmark, from the
 /// brand kit. The wordmark is bone on dark themes and ink on light ones, so it
 /// follows the brightness of the theme it is drawn in.
 class BrandLogo extends StatelessWidget {
@@ -13,8 +13,8 @@ class BrandLogo extends StatelessWidget {
   /// that matches its background.
   final Brightness? brightness;
 
-  /// Width over height of the logo assets (2192×295).
-  static const double aspectRatio = 2192 / 295;
+  /// Width over height of the logo assets (2192×321).
+  static const double aspectRatio = 2192 / 321;
 
   static const String darkBackgroundAsset = 'assets/images/logo_wordmark.png';
   static const String lightBackgroundAsset =
