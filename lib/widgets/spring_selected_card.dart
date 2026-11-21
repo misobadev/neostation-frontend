@@ -38,7 +38,7 @@ class SpringSelectedCard extends StatefulWidget {
 class _SpringSelectedCardState extends State<SpringSelectedCard> {
   static const double _rest = 1.0;
   static const double _raised = SpringSelectedCard.raisedScale;
-  static const Duration _raiseDuration = Duration(milliseconds: 240);
+  static const Duration _raiseDuration = Duration(milliseconds: 280);
   static const Duration _settleDuration = Duration(milliseconds: 320);
 
   late double _from;
@@ -105,7 +105,8 @@ class _SpringSelectedCardState extends State<SpringSelectedCard> {
         start: _from,
         end: _to,
         animDuration: raising ? _raiseDuration : _settleDuration,
-        curve: raising ? Curves.easeOutBack : Curves.easeOutCubic,
+        // No overshoot: the card grows to its raised size and stops there.
+        curve: raising ? Curves.easeOutCubic : Curves.easeInOutCubic,
         child: ValueListenableBuilder<Widget>(
           valueListenable: _child,
           builder: (context, child, _) => child,

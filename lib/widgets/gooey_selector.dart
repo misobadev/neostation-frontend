@@ -17,10 +17,11 @@ import 'package:flutter/scheduler.dart';
 /// [GooeySelector] is the layer behind the cards and [GooeySelectorRing] the
 /// one on top; both follow one [GooeyMotion].
 class GooeyMotion extends ChangeNotifier {
-  // The spring the liquid travels on: about seven tenths of critical damping,
-  // so it overshoots only a few pixels and settles in about half a second.
+  // The spring the liquid travels on: about eight tenths of critical damping,
+  // so it still flows but overshoots by about 1 % (the destination card
+  // follows that overshoot) and settles in about half a second.
   static const double _stiffness = 320;
-  static const double _damping = 25;
+  static final double _damping = 2 * 0.82 * math.sqrt(_stiffness);
   // Its size follows on a stiff, critically damped spring: it takes the next
   // card's size within a few frames and never grows past it, so leaving a
   // large card doesn't drag an oversized ring across the grid.
@@ -66,9 +67,9 @@ class GooeyMotion extends ChangeNotifier {
   /// How far the liquid drags a card while it travels. The next card stays put
   /// until the ring reaches it, then is pushed on with it one for one while it
   /// overshoots and settles, so the ring never leaves the card it lands on.
-  /// The card being left is tugged along the way the ring goes as it pulls
-  /// out, then springs back with a small rebound. Zero at rest and for every
-  /// other card.
+  /// The card being left is tugged gently along the way the ring goes as it
+  /// pulls out and eases back, without rebounding. Zero at rest and for
+  /// every other card.
   Offset dragOf({required bool target}) {
     final from = _from;
     final to = _to;
@@ -88,12 +89,12 @@ class GooeyMotion extends ChangeNotifier {
     final path = to.center - from.center;
     final pathLength = path.distance;
     if (pathLength < 0.5) return Offset.zero;
-    // Tugged along the way the ring goes as it pulls out, then let go and
-    // springing back past its place a little before it settles: a damped
-    // swing over the ring's way to the next card, peaking early.
-    final t = arrival;
-    final swing = math.exp(-4 * t) * math.sin(2.4 * math.pi * t) / 0.497;
-    return path / pathLength * (from.shortestSide * 0.08 * swing);
+    // Tugged along the way the ring goes as it pulls out, then eased back to
+    // its place: one rise and fall over the ring's way to the next card,
+    // peaking at a fifth of it, never past its place.
+    final t = arrival / 0.2;
+    final swing = t * math.exp(1 - t);
+    return path / pathLength * (from.shortestSide * 0.04 * swing);
   }
 
   /// Points the liquid at [target]. A new [selection] makes it travel there
