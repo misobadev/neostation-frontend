@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:async';
 
+import 'package:flutter/gestures.dart' show PointerPanZoomUpdateEvent;
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -282,6 +283,9 @@ class _GamesGridState extends State<GamesGrid> with TickerProviderStateMixin {
   final Map<int, Offset> _activePointers = {};
   double? _lastPinchDistance;
   DateTime? _lastPinchTime;
+
+  /// The trackpad pinch's scale at its last size step.
+  double _panZoomBase = 1.0;
 
   // Card size label
   final ValueNotifier<String?> _cardSizeLabel = ValueNotifier(null);
@@ -664,6 +668,20 @@ class _GamesGridState extends State<GamesGrid> with TickerProviderStateMixin {
     _cardSizeLabelTimer = Timer(const Duration(milliseconds: 1200), () {
       _cardSizeLabel.value = null;
     });
+  }
+
+  /// A trackpad pinch (macOS, Windows precision touchpads) arrives as one
+  /// pan-zoom gesture with a scale rather than as two pointers: every ~15 %
+  /// of scale since the last step changes the size by one.
+  void _handlePanZoomUpdate(PointerPanZoomUpdateEvent event) {
+    final ratio = event.scale / _panZoomBase;
+    if (ratio > 1.15) {
+      _adjustGameGridDensity(1);
+      _panZoomBase = event.scale;
+    } else if (ratio < 0.87) {
+      _adjustGameGridDensity(-1);
+      _panZoomBase = event.scale;
+    }
   }
 
   void _handlePointerDown(PointerDownEvent event) {
@@ -1354,6 +1372,8 @@ class _GamesGridState extends State<GamesGrid> with TickerProviderStateMixin {
                     onPointerMove: _handlePointerMove,
                     onPointerUp: _handlePointerUp,
                     onPointerCancel: _handlePointerCancel,
+                    onPointerPanZoomStart: (_) => _panZoomBase = 1.0,
+                    onPointerPanZoomUpdate: _handlePanZoomUpdate,
                     behavior: HitTestBehavior.translucent,
                     child: Stack(
                       children: [

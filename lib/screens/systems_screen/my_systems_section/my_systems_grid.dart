@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:async';
 
+import 'package:flutter/gestures.dart'
+    show PointerPanZoomStartEvent, PointerPanZoomUpdateEvent;
 import 'package:flutter/material.dart';
 import 'package:neostation/constants/recent_card_sizes.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -835,6 +837,9 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
   double? _lastPinchDistance;
   DateTime? _lastPinchTime;
 
+  /// The trackpad pinch's scale at its last size step.
+  double _panZoomBase = 1.0;
+
   /// Pull-to-refresh progress notifier (0.0 to 1.0).
   final ValueNotifier<double> _pullProgress = ValueNotifier(0.0);
   static const double _maxPull = 75.0;
@@ -1103,15 +1108,33 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
         // the pull's release edge (the pull only ever arms itself through the
         // scroll notifier above, so a host with rescan off can keep the pinch
         // without the pull arming).
-        if (Platform.isAndroid &&
-            (widget.enablePinchResize || widget.enablePullToRescan)) {
-          grid = Listener(
-            onPointerDown: _handlePointerDown,
-            onPointerMove: _handlePointerMove,
-            onPointerUp: _handlePointerUp,
-            onPointerCancel: _handlePointerCancel,
-            behavior: HitTestBehavior.translucent,
-            child: grid,
+        // The pinch works wherever there is a touchscreen or a trackpad; the
+        // pull to rescan stays on Android.
+        if (widget.enablePinchResize ||
+            (Platform.isAndroid && widget.enablePullToRescan)) {
+          final cards = grid;
+          // The whole space the grid is given takes the gesture, not only
+          // its rows: with a few cards (a new collection list) those are one
+          // strip at the top, and a pinch below them did nothing.
+          grid = LayoutBuilder(
+            builder: (context, constraints) => Listener(
+              onPointerDown: _handlePointerDown,
+              onPointerMove: _handlePointerMove,
+              onPointerUp: _handlePointerUp,
+              onPointerCancel: _handlePointerCancel,
+              onPointerPanZoomStart: _handlePanZoomStart,
+              onPointerPanZoomUpdate: _handlePanZoomUpdate,
+              behavior: HitTestBehavior.translucent,
+              child: constraints.hasBoundedWidth && constraints.hasBoundedHeight
+                  ? ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: constraints.maxWidth,
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: cards,
+                    )
+                  : cards,
+            ),
           );
         }
 
