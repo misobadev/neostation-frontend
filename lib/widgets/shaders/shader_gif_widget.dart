@@ -1,10 +1,20 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 
+/// An animated GIF (from a file, or an asset when no such file exists) drawn
+/// through the GIF shader.
+///
+/// Every widget showing the same GIF at the same size shares one player: the
+/// GIF is decoded once, a frame at a time, and a card rebuilt by the grid (a
+/// selection change, a scroll) picks the same player up again instead of
+/// decoding from scratch, so the art neither blanks out nor restarts. Only the
+/// GIF's own layer repaints when its frame changes.
 class ShaderGifWidget extends StatefulWidget {
   final String imagePath;
   final BoxFit fit;
@@ -19,220 +29,235 @@ class ShaderGifWidget extends StatefulWidget {
   State<ShaderGifWidget> createState() => _ShaderGifWidgetState();
 }
 
-class _ShaderGifWidgetState extends State<ShaderGifWidget>
-    with SingleTickerProviderStateMixin {
-  ui.FragmentProgram? _program;
-  List<ui.Image> _frames = [];
-  List<Duration> _frameDurations = [];
-
-  double _currentFrameIndex = 0;
-  Ticker? _ticker;
-  Duration _elapsedSinceStart = Duration.zero;
-  Duration _lastTick = Duration.zero;
+class _ShaderGifWidgetState extends State<ShaderGifWidget> {
+  _GifPlayer? _player;
 
   @override
   void initState() {
     super.initState();
-    _loadShader();
-    _loadGif();
+    _GifShader.load();
   }
 
   @override
   void didUpdateWidget(covariant ShaderGifWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imagePath != widget.imagePath) {
-      _loadGif();
-    }
+    if (oldWidget.imagePath != widget.imagePath) _release();
   }
 
-  Future<void> _loadShader() async {
-    try {
-      final program = await ui.FragmentProgram.fromAsset(
-        'assets/shaders/gif_player.frag',
-      );
-      if (mounted) {
-        setState(() {
-          _program = program;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading GIF shader: $e');
-    }
-  }
-
-  Future<void> _loadGif() async {
-    _ticker?.stop();
-    for (var f in _frames) {
-      f.dispose();
-    }
-    _frames = [];
-
-    final file = File(widget.imagePath);
-    if (!await file.exists()) return;
-
-    try {
-      final bytes = await file.readAsBytes();
-
-      // First pass: Just to get the logical size
-      final initialCodec = await ui.instantiateImageCodec(bytes);
-      final firstFrame = await initialCodec.getNextFrame();
-      final int logicalWidth = firstFrame.image.width;
-      final int logicalHeight = firstFrame.image.height;
-      initialCodec.dispose();
-
-      if (logicalWidth == 0) return;
-
-      // Calculate target dimensions for efficiency (W=250 approx)
-      const double targetWidthBase = 250.0;
-      final double scale = targetWidthBase / logicalWidth;
-      final int cellWidth = targetWidthBase.toInt();
-      final int cellHeight = (logicalHeight * scale).toInt();
-
-      // Second pass: Use BOTH targetWidth and targetHeight.
-      // THIS IS KEY: Providing both forces Skia to return full-size composed frames
-      // at exactly this size, solving all delta/offset issues.
-      final codec = await ui.instantiateImageCodec(
-        bytes,
-        targetWidth: cellWidth,
-        targetHeight: cellHeight,
-      );
-
-      final int frameCount = codec.frameCount;
-      final List<ui.Image> decodedFrames = [];
-      final List<Duration> durations = [];
-
-      for (int i = 0; i < frameCount; i++) {
-        final frameInfo = await codec.getNextFrame();
-        decodedFrames.add(frameInfo.image);
-        durations.add(frameInfo.duration);
-      }
-      codec.dispose();
-
-      if (mounted) {
-        setState(() {
-          _frames = decodedFrames;
-          _frameDurations = durations;
-          _currentFrameIndex = 0;
-        });
-        _startAnimation();
-      }
-    } catch (e) {
-      debugPrint('Error loading GIF: $e');
-    }
-  }
-
-  void _startAnimation() {
-    _ticker?.dispose();
-    _ticker = createTicker(_onTick);
-    _elapsedSinceStart = Duration.zero;
-    _lastTick = Duration.zero;
-    _ticker!.start();
-  }
-
-  void _onTick(Duration elapsed) {
-    if (_frameDurations.isEmpty) return;
-
-    final delta = elapsed - _lastTick;
-    _lastTick = elapsed;
-    _elapsedSinceStart += delta;
-
-    Duration totalCycleDuration = _frameDurations.fold(
-      Duration.zero,
-      (prev, curr) => prev + curr,
-    );
-
-    final minCycle = Duration(milliseconds: 33 * _frames.length);
-    if (totalCycleDuration < minCycle) {
-      totalCycleDuration = minCycle;
-    }
-
-    final Duration currentCycleTime = Duration(
-      microseconds:
-          _elapsedSinceStart.inMicroseconds % totalCycleDuration.inMicroseconds,
-    );
-
-    Duration accumulated = Duration.zero;
-    for (int i = 0; i < _frames.length; i++) {
-      Duration frameDur = _frameDurations[i];
-      if (frameDur < const Duration(milliseconds: 33)) {
-        frameDur = const Duration(milliseconds: 33);
-      }
-
-      accumulated += frameDur;
-      if (currentCycleTime < accumulated) {
-        if (mounted && _currentFrameIndex != i.toDouble()) {
-          setState(() {
-            _currentFrameIndex = i.toDouble();
-          });
-        }
-        break;
-      }
-    }
+  void _release() {
+    _player?.release();
+    _player = null;
   }
 
   @override
   void dispose() {
-    _ticker?.dispose();
-    for (var f in _frames) {
-      f.dispose();
-    }
+    _release();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_program == null || _frames.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final int index = _currentFrameIndex.toInt().clamp(0, _frames.length - 1);
-    final ui.Image currentFrame = _frames[index];
-
-    return CustomPaint(
-      painter: _ShaderGifPainter(
-        shader: _program!.fragmentShader(),
-        currentFrame: currentFrame,
-        fit: widget.fit,
-      ),
-      child: const SizedBox.expand(),
+    final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final logical = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : constraints.hasBoundedHeight
+            ? constraints.maxHeight
+            : 250.0;
+        // Decode at the size it is shown, rounded up so cards of nearly the
+        // same size share a player.
+        final bucket = (math.max(logical * dpr, 64) / 128).ceil() * 128;
+        final player = _player;
+        if (player == null || player.width != bucket) {
+          player?.release();
+          _player = _GifPlayer.acquire(widget.imagePath, bucket);
+        }
+        return RepaintBoundary(
+          child: CustomPaint(
+            painter: _GifPainter(_player!.frame, widget.fit),
+            child: const SizedBox.expand(),
+          ),
+        );
+      },
     );
   }
 }
 
-class _ShaderGifPainter extends CustomPainter {
-  final ui.FragmentShader shader;
-  final ui.Image currentFrame;
-  final BoxFit fit;
+/// Plays one GIF at one decode width for every widget showing it.
+class _GifPlayer {
+  _GifPlayer._(this.path, this.width);
 
-  _ShaderGifPainter({
-    required this.shader,
-    required this.currentFrame,
-    required this.fit,
-  });
+  static final Map<String, _GifPlayer> _players = {};
+
+  /// How long a player nobody shows is kept, so a card that is rebuilt (or
+  /// scrolled back into view) shortly after resumes where it was.
+  static const Duration _keepAlive = Duration(seconds: 3);
+
+  static _GifPlayer acquire(String path, int width) {
+    final player = _players.putIfAbsent('$path@$width', () {
+      final created = _GifPlayer._(path, width);
+      created._load();
+      return created;
+    });
+    player._users++;
+    player._releaseTimer?.cancel();
+    return player;
+  }
+
+  final String path;
+  final int width;
+  final ValueNotifier<ui.Image?> frame = ValueNotifier(null);
+
+  int _users = 0;
+  Timer? _releaseTimer;
+  Timer? _nextFrame;
+  ui.Codec? _codec;
+  bool _disposed = false;
+
+  /// When the current frame was due, so decoding time doesn't add up into a
+  /// slower loop: each frame is timed from when it should have appeared.
+  final Stopwatch _clock = Stopwatch();
+  Duration _due = Duration.zero;
+
+  void release() {
+    _users--;
+    if (_users > 0) return;
+    _releaseTimer?.cancel();
+    _releaseTimer = Timer(_keepAlive, () {
+      if (_users <= 0) _dispose();
+    });
+  }
+
+  Future<void> _load() async {
+    try {
+      final bytes = await _readBytes();
+      if (bytes == null || _disposed) return;
+      final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+      final descriptor = await ui.ImageDescriptor.encoded(buffer);
+      // Never above the GIF's own size; the height follows its aspect.
+      final w = math.min(width, descriptor.width);
+      final h = math.max(1, (descriptor.height * w / descriptor.width).round());
+      // Giving both sides makes the codec hand back whole composed frames at
+      // this size rather than the GIF's partial updates.
+      final codec = await descriptor.instantiateCodec(
+        targetWidth: w,
+        targetHeight: h,
+      );
+      descriptor.dispose();
+      buffer.dispose();
+      if (_disposed) {
+        codec.dispose();
+        return;
+      }
+      _codec = codec;
+      _clock.start();
+      await _advance();
+    } catch (e) {
+      debugPrint('Error loading GIF $path: $e');
+    }
+  }
+
+  Future<Uint8List?> _readBytes() async {
+    final file = File(path);
+    if (await file.exists()) return file.readAsBytes();
+    try {
+      final data = await rootBundle.load(path);
+      return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _advance() async {
+    final codec = _codec;
+    if (codec == null || _disposed) return;
+    final info = await codec.getNextFrame();
+    if (_disposed) {
+      info.image.dispose();
+      return;
+    }
+    final previous = frame.value;
+    frame.value = info.image;
+    previous?.dispose();
+    if (codec.frameCount <= 1) return;
+    _due += _delay(info.duration);
+    final now = _clock.elapsed;
+    // Fell far behind (the app was paused): carry on from now.
+    if (_due < now - const Duration(seconds: 1)) _due = now;
+    _nextFrame = Timer(_due - now, _advance);
+  }
+
+  /// A frame's delay as browsers play it: delays of 10 ms or less (often 0,
+  /// meaning "unset") play at 100 ms.
+  static Duration _delay(Duration duration) => duration.inMilliseconds <= 10
+      ? const Duration(milliseconds: 100)
+      : duration;
+
+  void _dispose() {
+    _disposed = true;
+    _players.remove('$path@$width');
+    _nextFrame?.cancel();
+    _codec?.dispose();
+    _codec = null;
+    final last = frame.value;
+    frame.value = null;
+    last?.dispose();
+    frame.dispose();
+  }
+}
+
+/// The GIF shader, loaded once for every GIF.
+class _GifShader {
+  static ui.FragmentProgram? program;
+  static Future<void>? _loading;
+
+  static void load() {
+    _loading ??= ui.FragmentProgram.fromAsset('assets/shaders/gif_player.frag')
+        .then<void>((p) => program = p)
+        .catchError((Object e) => debugPrint('Error loading GIF shader: $e'));
+  }
+}
+
+class _GifPainter extends CustomPainter {
+  _GifPainter(this.frame, this.fit) : super(repaint: frame);
+
+  final ValueListenable<ui.Image?> frame;
+  final BoxFit fit;
+  ui.FragmentShader? _shader;
 
   @override
   void paint(ui.Canvas canvas, ui.Size size) {
-    shader.setFloat(0, size.width);
-    shader.setFloat(1, size.height);
-    shader.setFloat(2, currentFrame.width.toDouble());
-    shader.setFloat(3, currentFrame.height.toDouble());
-
-    double fitValue = 0.0; // fill
-    if (fit == BoxFit.contain) {
-      fitValue = 1.0;
-    } else if (fit == BoxFit.cover) {
-      fitValue = 2.0;
+    final image = frame.value;
+    if (image == null || size.isEmpty) return;
+    final program = _GifShader.program;
+    if (program == null) {
+      // Until the shader is ready, draw the frame directly.
+      paintImage(
+        canvas: canvas,
+        rect: Offset.zero & size,
+        image: image,
+        fit: fit,
+        filterQuality: FilterQuality.medium,
+      );
+      return;
     }
-
-    shader.setFloat(4, fitValue);
-    shader.setImageSampler(0, currentFrame);
-
-    final paint = Paint()..shader = shader;
-    canvas.drawRect(ui.Offset.zero & size, paint);
+    final shader = _shader ??= program.fragmentShader();
+    shader
+      ..setFloat(0, size.width)
+      ..setFloat(1, size.height)
+      ..setFloat(2, image.width.toDouble())
+      ..setFloat(3, image.height.toDouble())
+      ..setFloat(4, switch (fit) {
+        BoxFit.contain => 1.0,
+        BoxFit.cover => 2.0,
+        _ => 0.0,
+      })
+      ..setImageSampler(0, image);
+    canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
 
   @override
-  bool shouldRepaint(covariant _ShaderGifPainter oldDelegate) {
-    return oldDelegate.currentFrame != currentFrame;
-  }
+  bool shouldRepaint(_GifPainter oldDelegate) =>
+      oldDelegate.frame != frame || oldDelegate.fit != fit;
 }
