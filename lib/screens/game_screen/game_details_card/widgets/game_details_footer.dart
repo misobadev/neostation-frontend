@@ -544,13 +544,10 @@ class GameDetailsFooter extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 4.r),
               child: Row(
                 children: [
-                  // RetroAchievements game icon.
-                  ClipRRect(
-                    borderRadius:
-                        Theme.of(context)
-                            .extension<CornerRadii>()
-                            ?.radiusInternal ??
-                        BorderRadius.circular(14.r),
+                  // RetroAchievements game icon, round like the pill around
+                  // it: the row's controls are circles and stadiums, so a
+                  // square icon with the theme's corners looked out of place.
+                  ClipOval(
                     child: Container(
                       width: _pillIconSize,
                       height: _pillIconSize,
