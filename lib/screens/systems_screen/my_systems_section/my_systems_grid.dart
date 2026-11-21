@@ -30,6 +30,8 @@ import 'grid_geometry.dart';
 import 'widgets/grid_loading_state.dart';
 import 'widgets/grid_empty_state.dart';
 
+import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
 import 'package:neostation/widgets/spring_selected_card.dart';
 
 import 'my_systems_carousel.dart';
@@ -851,6 +853,10 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   /// Set from the config in build; disables decorative effects at render time.
   bool _performanceMode = false;
 
+  /// The liquid selection's motion, shared by its layers behind and on top of
+  /// the cards.
+  final GooeyMotion _gooeyMotion = GooeyMotion();
+
   /// Cached ThemeData with scrollbar overrides — rebuilt only in didChangeDependencies.
   ThemeData? _cachedThemeData;
   ScrollBehavior? _cachedScrollBehavior;
@@ -955,6 +961,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
     _secondaryDisplayState?.removeListener(_onSecondaryStateChanged);
     _cleanupGamepad();
     _scrollController.dispose();
+    _gooeyMotion.dispose();
     super.dispose();
   }
 
@@ -1168,32 +1175,102 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
     required int cardIdx,
     required bool cardIsSelected,
   }) {
-    return SpringSelectedCard(
-      key: ValueKey('spring_card_${card.title}_$cardIdx'),
-      selected: cardIsSelected,
-      previouslySelected: cardIdx == _previousSelectedIndex,
-      animate: !_performanceMode,
-      child: RepaintBoundary(
-        // The anchor is a sibling overlay, never a wrapper around the card.
-        // Wrapping only the selected card changes that card's subtree shape as
-        // the selection travels, which remounts `SystemCard` and reloads its
-        // artwork — a visible flicker on every D-pad press. Here the tree is
-        // identical for every card and only the `SizedBox`'s key moves; a
-        // `SizedBox` has no state to lose. `passthrough` hands the card exactly
-        // the constraints it had before the Stack existed.
-        child: Stack(
-          fit: StackFit.passthrough,
-          children: [
-            cardWidget,
-            Positioned.fill(
-              child: IgnorePointer(
-                child: SizedBox.expand(
-                  key: cardIsSelected ? widget.selectedItemKey : null,
+    // The liquid selector draws the frame of the selected card, and of the
+    // card it is leaving, behind them; everywhere else the card draws its own.
+    final liquid =
+        !_performanceMode &&
+        (cardIsSelected || cardIdx == _previousSelectedIndex);
+    final drag = _performanceMode
+        ? null
+        : cardIsSelected
+        ? true
+        : cardIdx == _previousSelectedIndex
+        ? false
+        : null;
+    return GooeyCardDrag(
+      motion: _gooeyMotion,
+      role: drag,
+      child: GooeyCardChrome(
+        enabled: !_performanceMode,
+        liquid: liquid,
+        selected: cardIsSelected,
+        child: SpringSelectedCard(
+          key: ValueKey('spring_card_${card.title}_$cardIdx'),
+          selected: cardIsSelected,
+          previouslySelected: cardIdx == _previousSelectedIndex,
+          animate: !_performanceMode,
+          child: RepaintBoundary(
+            // The anchor is a sibling overlay, never a wrapper around the card.
+            // Wrapping only the selected card changes that card's subtree shape as
+            // the selection travels, which remounts `SystemCard` and reloads its
+            // artwork — a visible flicker on every D-pad press. Here the tree is
+            // identical for every card and only the `SizedBox`'s key moves; a
+            // `SizedBox` has no state to lose. `passthrough` hands the card exactly
+            // the constraints it had before the Stack existed.
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                cardWidget,
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: SizedBox.expand(
+                      key: cardIsSelected ? widget.selectedItemKey : null,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  /// The liquid selection behind the cards. Each card sits in its slot inside
+  /// a 2.r padding, and the selected one is raised by [SpringSelectedCard], so
+  /// the frames are the slots inset by that padding, the selected one scaled
+  /// up the same way.
+  Widget _buildGooeySelector(BuildContext context, Map<int, Rect> slots) {
+    final slot = slots[widget.selectedIndex];
+    if (slot == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final radius = theme.extension<CornerRadii>()?.radiusExternalRadius ?? 14.r;
+    Rect frame(Rect slot) => slot.deflate(2.r);
+    Rect raised(Rect rect) => Rect.fromCenter(
+      center: rect.center,
+      width: rect.width * SpringSelectedCard.raisedScale,
+      height: rect.height * SpringSelectedCard.raisedScale,
+    );
+    final previous = _previousSelectedIndex == null
+        ? null
+        : slots[_previousSelectedIndex];
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: GooeySelector(
+          motion: _gooeyMotion,
+          selection: widget.selectedIndex,
+          target: raised(frame(slot)),
+          color: theme.colorScheme.secondary,
+          baseColor: theme.colorScheme.surface,
+          radius: radius * SpringSelectedCard.raisedScale,
+          baseRects: [frame(slot), if (previous != null) frame(previous)],
+        ),
+      ),
+    );
+  }
+
+  /// The liquid ring on top of the cards while the selection travels. Its
+  /// width is the selected card's visible frame: the card's inset around its
+  /// artwork.
+  Widget _buildGooeyRing(BuildContext context) {
+    final theme = Theme.of(context);
+    final radius = theme.extension<CornerRadii>()?.radiusExternalRadius ?? 14.r;
+    return Positioned.fill(
+      child: GooeySelectorRing(
+        motion: _gooeyMotion,
+        color: theme.colorScheme.secondary,
+        radius: radius * SpringSelectedCard.raisedScale,
+        ringWidth: 4.r * SpringSelectedCard.raisedScale,
       ),
     );
   }
@@ -1255,6 +1332,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
         final (recentW, recentH) = recentCardSpan(widget.recentCardSize, cols);
 
         final List<Widget> cardWidgets = [];
+        final Map<int, Rect> slots = {};
         final Set<int> placedIndices = {};
         var animationPosition = 0;
 
@@ -1331,6 +1409,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
                       : () => _openMenuFor(cardIdx),
                 );
 
+            slots[cardIdx] = Rect.fromLTWH(left, top, width, cardHeight);
             cardWidgets.add(
               Positioned(
                 left: left,
@@ -1382,7 +1461,14 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
             ),
             child: SizedBox(
               height: totalHeight,
-              child: Stack(clipBehavior: Clip.none, children: cardWidgets),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  if (!_performanceMode) _buildGooeySelector(context, slots),
+                  ...cardWidgets,
+                  if (!_performanceMode) _buildGooeyRing(context),
+                ],
+              ),
             ),
           ),
         );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -318,7 +319,11 @@ class _SystemCardState extends State<SystemCard> {
             decoration: BoxDecoration(
               // The chrome (the frame around the artwork and the footer)
               // switches to secondary on selection; the artwork itself stays.
-              color: widget.isSelected
+              // Transparent while the grid's liquid selection draws the
+              // frame behind the card.
+              color: (GooeyCardChrome.maybeOf(context)?.liquid ?? false)
+                  ? Colors.transparent
+                  : widget.isSelected
                   ? Theme.of(context).colorScheme.secondary
                   : Theme.of(context).colorScheme.surface,
               borderRadius: outerRadius,
@@ -754,25 +759,29 @@ class _SystemCardState extends State<SystemCard> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            AppLocale.timePlayedLabel
-                .getString(context)
-                .replaceFirst(
-                  '{time}',
-                  _formatPlayTimeLocalized(
-                    widget.info.gameModel?.playTime ?? 0,
-                  ),
-                )
-                .toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: widget.isSelected
-                  ? Theme.of(context).colorScheme.onSecondary
-                  : Theme.of(context).colorScheme.onSurface,
-              fontSize: 10.r,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
+          GooeyCardChrome.fadeColor(
+            context,
+            color: widget.isSelected
+                ? Theme.of(context).colorScheme.onSecondary
+                : Theme.of(context).colorScheme.onSurface,
+            builder: (color) => Text(
+              AppLocale.timePlayedLabel
+                  .getString(context)
+                  .replaceFirst(
+                    '{time}',
+                    _formatPlayTimeLocalized(
+                      widget.info.gameModel?.playTime ?? 0,
+                    ),
+                  )
+                  .toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10.r,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.0,
+              ),
             ),
           ),
         ],
@@ -793,12 +802,13 @@ class _SystemCardState extends State<SystemCard> {
       padding: EdgeInsets.only(bottom: 2.r, left: 4.r, right: 4.r),
       child: FittedBox(
         fit: BoxFit.contain,
-        child: _buildSystemLogo(
-          assetLogoPath,
-          height: 128.r,
+        child: GooeyCardChrome.fadeColor(
+          context,
           color: selected
               ? Theme.of(context).colorScheme.onSecondary
               : Theme.of(context).colorScheme.onSurface,
+          builder: (color) =>
+              _buildSystemLogo(assetLogoPath, height: 128.r, color: color),
         ),
       ),
     );

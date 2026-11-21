@@ -18,6 +18,9 @@ class SpringSelectedCard extends StatefulWidget {
 
   final bool selected;
 
+  /// How much the selected card is raised; the liquid selector matches it.
+  static const double raisedScale = 1.04;
+
   /// Whether the selection lift/settle animation runs. Performance mode turns
   /// this off while keeping the card mounted and the selection state intact.
   final bool animate;
@@ -34,7 +37,7 @@ class SpringSelectedCard extends StatefulWidget {
 
 class _SpringSelectedCardState extends State<SpringSelectedCard> {
   static const double _rest = 1.0;
-  static const double _raised = 1.04;
+  static const double _raised = SpringSelectedCard.raisedScale;
   static const Duration _raiseDuration = Duration(milliseconds: 240);
   static const Duration _settleDuration = Duration(milliseconds: 320);
 

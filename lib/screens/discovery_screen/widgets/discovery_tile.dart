@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -49,6 +50,7 @@ class DiscoveryCard extends StatelessWidget {
     final innerRadius = radii?.radiusInternal ?? BorderRadius.circular(9.r);
     const artworkInset = 4.0;
     final performanceMode = context.performanceMode;
+    final liquid = GooeyCardChrome.maybeOf(context)?.liquid ?? false;
 
     return Padding(
       padding: EdgeInsets.all(2.r),
@@ -58,9 +60,15 @@ class DiscoveryCard extends StatelessWidget {
           cornerRadius: outerRadiusPx,
           child: Container(
             decoration: BoxDecoration(
-              color: isSelected ? scheme.secondary : scheme.surface,
+              // Transparent while the grid's liquid selection draws the
+              // frame behind the card; a shadow would then darken the liquid.
+              color: liquid
+                  ? Colors.transparent
+                  : isSelected
+                  ? scheme.secondary
+                  : scheme.surface,
               borderRadius: outerRadius,
-              boxShadow: performanceMode
+              boxShadow: performanceMode || liquid
                   ? null
                   : [
                       BoxShadow(
@@ -175,16 +183,20 @@ class _DiscoveryFooter extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
       child: FittedBox(
         fit: BoxFit.contain,
-        child: Text(
-          tile.labelKey.getString(context).toUpperCase(),
-          maxLines: 1,
-          softWrap: false,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: color,
-            fontSize: 18.r,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.6.r,
+        child: GooeyCardChrome.fadeColor(
+          context,
+          color: color,
+          builder: (color) => Text(
+            tile.labelKey.getString(context).toUpperCase(),
+            maxLines: 1,
+            softWrap: false,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: color,
+              fontSize: 18.r,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.6.r,
+            ),
           ),
         ),
       ),

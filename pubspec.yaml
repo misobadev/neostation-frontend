@@ -121,6 +121,7 @@ flutter:
     - assets/systems/
     - assets/sounds/
   shaders:
+    - assets/shaders/gooey_selector.frag
     - assets/shaders/stripes.frag
     - assets/shaders/fluid.frag
     - assets/shaders/gif_player.frag
