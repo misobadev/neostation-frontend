@@ -737,18 +737,41 @@ class _SystemCardState extends State<SystemCard> {
                         ? math.min(maxInset, shortestSide * insetFactor)
                         : maxInset;
 
+                    final cacheWidth = performanceCacheWidth(
+                      512,
+                      performanceMode: _performanceMode,
+                    );
+                    // The same drop shadow as the game list's wheel: a copy
+                    // in the theme's shadow colour, offset down and right,
+                    // scaled to the card.
+                    final shadowOffset = widget.isCompact ? 3.r : 5.r;
                     return Padding(
                       padding: EdgeInsets.all(inset),
-                      child: Image.file(
-                        _cachedWheelFile!,
-                        height: 256.r,
-                        fit: BoxFit.contain,
-                        cacheWidth: performanceCacheWidth(
-                          512,
-                          performanceMode: _performanceMode,
-                        ),
-                        errorBuilder: (context, error, stackTrace) =>
-                            const SizedBox.shrink(),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Transform.translate(
+                            offset: Offset(shadowOffset, shadowOffset),
+                            child: Image.file(
+                              _cachedWheelFile!,
+                              height: 256.r,
+                              fit: BoxFit.contain,
+                              cacheWidth: cacheWidth,
+                              color: Theme.of(context).colorScheme.shadow
+                                  .withValues(alpha: 0.5),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const SizedBox.shrink(),
+                            ),
+                          ),
+                          Image.file(
+                            _cachedWheelFile!,
+                            height: 256.r,
+                            fit: BoxFit.contain,
+                            cacheWidth: cacheWidth,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ],
                       ),
                     );
                   },
