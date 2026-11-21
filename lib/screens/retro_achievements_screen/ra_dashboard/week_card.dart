@@ -175,11 +175,11 @@ extension _WeekCard on RADashboardHubState {
         borderRadius: BorderRadius.circular(12.r),
         onTap: selectable ? selectWeekCard : null,
         child: Container(
-          padding: EdgeInsets.all(16.r),
+          padding: EdgeInsets.all(12.r),
           decoration: _cardDecoration(
             theme,
             borderColor: selected
-                ? theme.colorScheme.primary
+                ? theme.colorScheme.tertiary
                 : accent.withValues(
                     alpha: progress.earnedThisWeek
                         ? 0.55
@@ -188,12 +188,8 @@ extension _WeekCard on RADashboardHubState {
                         : 0.15,
                   ),
             borderWidth: selected ? 2.r : 1.r,
-            background: theme.cardColor.withValues(
-              alpha: progress.earnedThisWeek
-                  ? 0.40
-                  : owned != null
-                  ? 0.34
-                  : 0.25,
+            background: theme.colorScheme.onSurface.withValues(
+              alpha: progress.earnedThisWeek || owned != null ? 0.07 : 0.04,
             ),
           ),
           child: Column(
@@ -232,27 +228,27 @@ extension _WeekCard on RADashboardHubState {
                       ),
                 ],
               ),
-              SizedBox(height: 12.r),
+              SizedBox(height: 8.r),
               if (raProvider.gotwLoading && gotw == null)
-                _buildLoadingState(context, minHeight: 138.r)
+                _buildLoadingState(context, minHeight: 96.r)
               else if (raProvider.gotwError != null && gotw == null)
                 _buildSectionMessage(
                   context,
                   raProvider.gotwError!,
                   isError: true,
                   onRetry: raProvider.fetchGOTW,
-                  minHeight: 138.r,
+                  minHeight: 96.r,
                 )
               else if (gotw == null)
                 _buildSectionMessage(
                   context,
                   AppLocale.raAotwNoActive.getString(context),
-                  minHeight: 138.r,
+                  minHeight: 96.r,
                 )
               else
                 _buildAotwDetails(context, gotw, accent),
               if (gotw != null) ...[
-                SizedBox(height: 12.r),
+                SizedBox(height: 8.r),
                 Wrap(
                   spacing: 8.r,
                   runSpacing: 8.r,
@@ -288,7 +284,7 @@ extension _WeekCard on RADashboardHubState {
                       ),
                   ],
                 ),
-                SizedBox(height: 10.r),
+                SizedBox(height: 8.r),
                 _buildAotwLibraryAction(context, raProvider, owned, accent),
               ],
             ],
@@ -445,13 +441,13 @@ extension _WeekCard on RADashboardHubState {
         ClipRRect(
           borderRadius: BorderRadius.circular(10.r),
           child: SizedBox(
-            width: 80.r,
-            height: 80.r,
+            width: 60.r,
+            height: 60.r,
             child: Image.network(
               _raMediaUrl(gotw.achievement.badgeUrl),
               fit: BoxFit.cover,
-              cacheWidth: (80 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-              cacheHeight: (80 * MediaQuery.devicePixelRatioOf(context)).ceil(),
+              cacheWidth: (60 * MediaQuery.devicePixelRatioOf(context)).ceil(),
+              cacheHeight: (60 * MediaQuery.devicePixelRatioOf(context)).ceil(),
               errorBuilder: (context, error, stackTrace) => Container(
                 color: theme.colorScheme.surface,
                 child: Icon(

@@ -14,11 +14,15 @@ import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/screens/retro_achievements_screen/ra_content.dart';
 import 'package:neostation/screens/retro_achievements_screen/ra_dashboard.dart';
-import 'package:neostation/screens/retro_achievements_screen/ra_dedicated_pages.dart';
+import 'package:neostation/screens/retro_achievements_screen/ra_collection_tab.dart';
+import 'package:neostation/screens/retro_achievements_screen/ra_games_tab.dart';
+import 'package:neostation/screens/retro_achievements_screen/ra_unlocks_tab.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'gamepad_test_clock.dart';
 
 class _DashboardProvider extends RetroAchievementsProvider {
   _DashboardProvider({this.connected = true});
@@ -203,59 +207,79 @@ void main() {
     expect(find.byType(TextFormField), findsNWidgets(2));
   });
 
-  testWidgets('signed in shows a compact dashboard without nested tabs', (
+  testWidgets('signed in shows the section menu beside the overview', (
     tester,
   ) async {
     await pumpShell(tester, _DashboardProvider());
 
     expect(find.byType(RADashboardHub), findsOneWidget);
-    expect(find.text(AppLocale.en[AppLocale.raAotw]!), findsOneWidget);
+    expect(find.text(AppLocale.en[AppLocale.raOverview]!), findsOneWidget);
+    expect(find.text('Achievement of the Week'), findsOneWidget);
     expect(find.text(AppLocale.en[AppLocale.raSubtabUnlocks]!), findsOneWidget);
     expect(find.text(AppLocale.en[AppLocale.raSubtabGames]!), findsOneWidget);
     expect(find.text(AppLocale.en[AppLocale.raAwards]!), findsOneWidget);
+    expect(find.text(AppLocale.en[AppLocale.logout]!), findsOneWidget);
   });
 
-  testWidgets('dashboard keeps profile standing visible above destinations', (
-    tester,
-  ) async {
+  testWidgets('the sidebar keeps the profile standing visible', (tester) async {
     await pumpShell(tester, _DashboardProvider());
 
     expect(find.text('Rank #12 · Top 1.2%'), findsOneWidget);
-    expect(find.text('100 pts'), findsOneWidget);
+    expect(find.textContaining('100 pts'), findsOneWidget);
   });
 
-  testWidgets('dashboard destinations open dedicated routes', (tester) async {
-    await pumpShell(tester, _DashboardProvider());
-
-    await tester.tap(find.text(AppLocale.en[AppLocale.raSubtabGames]!).first);
-    await tester.pumpAndSettle();
-    expect(find.byType(RaGamesPage), findsOneWidget);
-    expect(GamepadNavigationManager.stackDepth, greaterThan(1));
-
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-    expect(find.byType(RaGamesPage), findsNothing);
-    expect(find.byType(RADashboardHub), findsOneWidget);
-    expect(GamepadNavigationManager.stackDepth, 1);
-  });
-
-  testWidgets('events and awards have separate full-screen destinations', (
+  testWidgets('menu rows show their section in the panel, not a new page', (
     tester,
   ) async {
     await pumpShell(tester, _DashboardProvider());
 
-    await tester.tap(find.text(AppLocale.en[AppLocale.raAotw]!).first);
+    await tester.tap(find.text(AppLocale.en[AppLocale.raSubtabGames]!));
     await tester.pumpAndSettle();
-    expect(find.byType(RaCollectionPage), findsOneWidget);
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    expect(find.byType(RaGamesTab), findsOneWidget);
+    expect(find.byType(RADashboardHub), findsOneWidget);
+    expect(GamepadNavigationManager.stackDepth, 1);
 
-    await tester.tap(find.text(AppLocale.en[AppLocale.raAwards]!).first);
+    await tester.tap(find.text(AppLocale.en[AppLocale.raSubtabUnlocks]!));
     await tester.pumpAndSettle();
-    expect(find.byType(RaCollectionPage), findsOneWidget);
+    expect(find.byType(RaUnlocksTab), findsOneWidget);
+    // A section once shown stays mounted.
+    expect(find.byType(RaGamesTab, skipOffstage: false), findsOneWidget);
+
+    await tester.tap(find.text(AppLocale.en[AppLocale.raAwards]!));
+    await tester.pumpAndSettle();
+    expect(find.byType(RaCollectionTab), findsOneWidget);
   });
 
-  testWidgets('awards header and inherited text scale with the page', (
+  testWidgets('down walks the menu and right enters the panel', (tester) async {
+    resetGamepadClock();
+    addTearDown(restoreGamepadClock);
+    await pumpShell(tester, _DashboardProvider());
+    Future<void> press(LogicalKeyboardKey key) async {
+      advanceGamepadClock(const Duration(milliseconds: 600));
+      await tester.pump();
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+    }
+
+    await press(LogicalKeyboardKey.arrowDown);
+    expect(
+      tester.widget<RADashboardHub>(find.byType(RADashboardHub)).section,
+      RaDashboardSection.aotw,
+    );
+
+    await press(LogicalKeyboardKey.arrowDown);
+    final hub = tester.widget<RADashboardHub>(find.byType(RADashboardHub));
+    expect(hub.section, RaDashboardSection.unlocks);
+    expect(hub.menuFocused, isTrue);
+
+    await press(LogicalKeyboardKey.arrowRight);
+    expect(
+      tester.widget<RADashboardHub>(find.byType(RADashboardHub)).menuFocused,
+      isFalse,
+    );
+  });
+
+  testWidgets('collections keep their text scale inside the panel', (
     tester,
   ) async {
     await pumpShell(
@@ -263,24 +287,10 @@ void main() {
       _DashboardProvider(),
       designSize: const Size(640, 480),
     );
-    await tester.tap(find.text(AppLocale.en[AppLocale.raAwards]!).first);
+    await tester.tap(find.text(AppLocale.en[AppLocale.raAwards]!));
     await tester.pumpAndSettle();
-    final appBar = tester.widget<AppBar>(find.byType(AppBar));
-    expect(appBar.toolbarHeight, 32.r);
-    expect(appBar.titleTextStyle?.fontSize, 14.r);
-    expect(appBar.iconTheme?.size, 16.r);
     final empty = find.text(AppLocale.en[AppLocale.noAwardsYet]!);
     final context = tester.element(empty);
     expect(DefaultTextStyle.of(context).style.fontSize, 11.r);
-  });
-
-  testWidgets('recent unlocks has a dedicated full-screen destination', (
-    tester,
-  ) async {
-    await pumpShell(tester, _DashboardProvider());
-
-    await tester.tap(find.text(AppLocale.en[AppLocale.raSubtabUnlocks]!).first);
-    await tester.pumpAndSettle();
-    expect(find.byType(RaUnlocksPage), findsOneWidget);
   });
 }

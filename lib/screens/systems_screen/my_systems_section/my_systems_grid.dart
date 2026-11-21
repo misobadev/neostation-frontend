@@ -213,12 +213,9 @@ class MySystems extends StatelessWidget {
       children: [
         Expanded(
           child: Padding(
-            padding: EdgeInsets.only(
-              left: 6.0.r,
-              right: 6.0.r,
-              top: 46.r,
-              bottom: 0.r,
-            ),
+            // Room for the selected card, which grows past its slot, to
+            // stay clear of the screen's edges and the header dock.
+            padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 52.r),
             child: SystemCardGridView(
               crossAxisCount: Responsive.getSystemsCrossAxisCountFromSize(
                 configProvider.config.systemGridColumns,

@@ -29,7 +29,7 @@ Future<List<CoreEmulatorModel>> loadEmulatorsForSystem(
       for (final e in emulators) {
         if (e.androidPackageName != null && e.androidPackageName!.isNotEmpty) {
           try {
-            const ch = MethodChannel('com.neogamelab.neostation/game');
+            const ch = MethodChannel('dev.misoba.neostation/game');
             var installed =
                 await ch.invokeMethod<bool>('isPackageInstalled', {
                   'packageName': e.androidPackageName,

@@ -24,6 +24,7 @@ import 'package:neostation/utils/neosync_failure_message.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/neo_glass.dart';
+import 'package:neostation/widgets/neosync_logo.dart';
 import 'package:neostation/widgets/plan_change_notice.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/sync/providers/neo_sync_adapter.dart';
@@ -435,30 +436,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
         }
 
         if (!authService.isLoggedIn) {
-          return Column(
-            children: [
-              SizedBox(height: 64.r),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.r),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        constraints: BoxConstraints(maxWidth: 260.r),
-                        child: AuthForm(onLoginSuccess: _onLoginSuccess),
-                      ),
-                      SizedBox(width: 16.r),
-                      SizedBox(width: 300.r, child: _buildInfoBox(context)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
+          return _buildSignedOutLayout(context);
         }
 
         return Scaffold(
@@ -619,16 +597,25 @@ class NeoSyncContentState extends State<NeoSyncContent>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Identity: name + plan ──
-            Text(
-              AppLocale.helloUser
-                  .getString(context)
-                  .replaceFirst('{name}', user?.username ?? ''),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 13.r,
-                color: theme.colorScheme.onSurface,
-              ),
-              overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                // NeoSync's isotype, in the theme's colour.
+                NeoSyncLogo.isotype(height: 16.r),
+                SizedBox(width: 8.r),
+                Expanded(
+                  child: Text(
+                    AppLocale.helloUser
+                        .getString(context)
+                        .replaceFirst('{name}', user?.username ?? ''),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.r,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 3.r),
             // Plan + online save count.
@@ -1033,104 +1020,116 @@ class NeoSyncContentState extends State<NeoSyncContent>
     );
   }
 
-  Widget _buildInfoBox(BuildContext context) {
+  /// Signed out: one NeoGlass panel, NeoSync introduced on the left (its
+  /// logo from the neosync.cloud brand kit, in the theme's colour) and the
+  /// sign-in form on the right.
+  Widget _buildSignedOutLayout(BuildContext context) {
     final theme = Theme.of(context);
     final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
-    return NeoGlassRim(
-      cornerRadius: radii.radiusExternalRadius,
-      child: Container(
-        padding: EdgeInsets.all(16.r),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: radii.radiusExternal,
-          border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.15),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Symbols.cloud_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 24.r,
-                ),
-                SizedBox(width: 12.r),
-                Expanded(
-                  child: Text(
-                    AppLocale.whatIsNeoSync.getString(context),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                      fontSize: 14.r,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 6.r),
-            Text(
-              AppLocale.neoSyncDescription.getString(context),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
-                fontSize: 8.r,
+    final line = theme.colorScheme.outline.withValues(alpha: 0.15);
+    return Center(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(16.r, 12.r, 16.r, 16.r),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 600.r),
+          child: NeoGlassRim(
+            cornerRadius: radii.radiusExternalRadius,
+            child: Container(
+              padding: EdgeInsets.all(20.r),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: radii.radiusExternal,
+                border: Border.all(color: line),
               ),
-              softWrap: true,
-            ),
-            SizedBox(height: 6.r),
-            _buildInfoItem(
-              context,
-              Symbols.cloud_upload_rounded,
-              AppLocale.neoSyncSavesSync.getString(context),
-            ),
-            _buildInfoItem(
-              context,
-              Symbols.devices_rounded,
-              AppLocale.crossPlatformDesc.getString(context),
-            ),
-            _buildInfoItem(
-              context,
-              Symbols.security_rounded,
-              AppLocale.securePrivateDesc.getString(context),
-            ),
-            SizedBox(height: 6.r),
-            RichText(
-              softWrap: true,
-              text: TextSpan(
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontStyle: FontStyle.italic,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  fontSize: 8.r,
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextSpan(
-                    text: AppLocale.learnMoreEcosystem.getString(context),
+                  Expanded(child: _buildInfoBox(context)),
+                  Container(
+                    width: 1,
+                    height: 200.r,
+                    margin: EdgeInsets.symmetric(horizontal: 20.r),
+                    color: line,
                   ),
-                  TextSpan(
-                    text: 'neosync.cloud',
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      decoration: TextDecoration.underline,
+                  Expanded(
+                    child: AuthForm(
+                      onLoginSuccess: _onLoginSuccess,
+                      framed: false,
                     ),
-                    recognizer: TapGestureRecognizer()
-                      ..onTap = () async {
-                        final url = Uri.parse('https://neosync.cloud');
-                        if (await canLaunchUrl(url)) {
-                          await launchUrl(
-                            url,
-                            mode: LaunchMode.externalApplication,
-                          );
-                        }
-                      },
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  /// NeoSync introduced: its logo, what it does and where to learn more.
+  Widget _buildInfoBox(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        NeoSyncLogo(height: 26.r),
+        SizedBox(height: 14.r),
+        Text(
+          AppLocale.neoSyncDescription.getString(context),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
+            fontSize: 10.r,
+          ),
+          softWrap: true,
+        ),
+        SizedBox(height: 6.r),
+        _buildInfoItem(
+          context,
+          Symbols.cloud_upload_rounded,
+          AppLocale.neoSyncSavesSync.getString(context),
+        ),
+        _buildInfoItem(
+          context,
+          Symbols.devices_rounded,
+          AppLocale.crossPlatformDesc.getString(context),
+        ),
+        _buildInfoItem(
+          context,
+          Symbols.security_rounded,
+          AppLocale.securePrivateDesc.getString(context),
+        ),
+        SizedBox(height: 6.r),
+        RichText(
+          softWrap: true,
+          text: TextSpan(
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 10.r,
+            ),
+            children: [
+              TextSpan(text: AppLocale.learnMoreEcosystem.getString(context)),
+              TextSpan(
+                text: 'neosync.cloud',
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
+                recognizer: TapGestureRecognizer()
+                  ..onTap = () async {
+                    final url = Uri.parse('https://neosync.cloud');
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(
+                        url,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    }
+                  },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1145,8 +1144,8 @@ class NeoSyncContentState extends State<NeoSyncContent>
         children: [
           Icon(
             icon,
-            size: 12.r,
-            color: theme.colorScheme.primary.withValues(alpha: 0.7),
+            size: 14.r,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
           ),
           SizedBox(width: 8.r),
           Expanded(
@@ -1154,7 +1153,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
               text,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                fontSize: 8.r,
+                fontSize: 10.r,
               ),
               softWrap: true,
             ),

@@ -312,12 +312,30 @@ jobs:
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}' | tr -d '\r')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # 1.0.0-rc.2+3002 -> "NeoStation 1.0.0 RC 2", published as a
+          # pre-release: stable installs (which read /releases/latest) never
+          # see it, release candidates do. 1.0.0+3010 -> "NeoStation 1.0.0".
+          NAME_VERSION="${VERSION%%+*}"
+          CORE="${NAME_VERSION%%-*}"
+          if [ "$NAME_VERSION" != "$CORE" ]; then
+            PRE="${NAME_VERSION#*-}"
+            case "$PRE" in
+              rc.*) LABEL="RC ${PRE#rc.}" ;;
+              *) LABEL="$PRE" ;;
+            esac
+            echo "name=NeoStation $CORE $LABEL" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "name=NeoStation $CORE" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          name: NeoStation Beta ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.name }}
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
           body: ${{ steps.build_changelog.outputs.changelog }}
           files: release-artifacts/*
           draft: true

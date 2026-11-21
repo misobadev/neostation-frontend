@@ -24,7 +24,7 @@ void main() {
     await SqliteService.updateSystemsVersion('0.4.2');
     PackageInfo.setMockInitialValues(
       appName: 'NeoStation',
-      packageName: 'com.neogamelab.neostation',
+      packageName: 'dev.misoba.neostation',
       version: '1.2.0',
       buildNumber: '1',
       buildSignature: '',

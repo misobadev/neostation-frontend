@@ -6,114 +6,17 @@ part of '../ra_dashboard.dart';
 /// All state lives on the host [State]; this extension only moves the
 /// methods out of the monolith — behaviour is unchanged.
 extension _SectionLists on RADashboardHubState {
-  Widget _buildDestinationRail(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _destinationCard(
-            context,
-            icon: Symbols.event_rounded,
-            label: AppLocale.raAotw.getString(context),
-            selected: widget.eventsSelected,
-            onTap: widget.onOpenEvents,
-          ),
-        ),
-        SizedBox(width: 6.r),
-        Expanded(
-          child: _destinationCard(
-            context,
-            icon: Symbols.lock_open_rounded,
-            label: AppLocale.raSubtabUnlocks.getString(context),
-            selected: widget.recentUnlocksSelected,
-            onTap: widget.onOpenUnlocks,
-          ),
-        ),
-        SizedBox(width: 6.r),
-        Expanded(
-          child: _destinationCard(
-            context,
-            icon: Symbols.sports_esports_rounded,
-            label: AppLocale.raSubtabGames.getString(context),
-            selected: widget.gamesSelected,
-            onTap: widget.onOpenGames,
-          ),
-        ),
-        SizedBox(width: 6.r),
-        Expanded(
-          child: _destinationCard(
-            context,
-            icon: Symbols.emoji_events_rounded,
-            label: AppLocale.raAwards.getString(context),
-            selected: widget.awardsSelected,
-            onTap: widget.onOpenAwards,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _destinationCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required bool selected,
-    required VoidCallback? onTap,
-  }) {
-    final theme = Theme.of(context);
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10.r),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          height: 54.r,
-          padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 5.r),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withValues(alpha: 0.22),
-            borderRadius: BorderRadius.circular(10.r),
-            border: Border.all(
-              color: selected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.outline.withValues(alpha: 0.35),
-              width: selected ? 2.r : 1.r,
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 17.r, color: theme.colorScheme.primary),
-              SizedBox(height: 3.r),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 8.r,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildRecentUnlocksCard(
     BuildContext context,
     RetroAchievementsProvider raProvider,
   ) {
     final unlocks = raProvider.recentUnlocks.take(3).toList();
     return Container(
-      padding: EdgeInsets.all(14.r),
+      padding: EdgeInsets.all(10.r),
       decoration: _cardDecoration(
         Theme.of(context),
         borderColor: widget.recentUnlocksPreviewSelected
-            ? Theme.of(context).colorScheme.primary
+            ? Theme.of(context).colorScheme.tertiary
             : null,
         borderWidth: widget.recentUnlocksPreviewSelected ? 2.r : null,
       ),
@@ -126,22 +29,22 @@ extension _SectionLists on RADashboardHubState {
             title: AppLocale.raRecentUnlocks.getString(context),
             trailing: AppLocale.raRecent30Days.getString(context),
           ),
-          SizedBox(height: 12.r),
+          SizedBox(height: 6.r),
           if (raProvider.recentUnlocksLoading && unlocks.isEmpty)
-            _buildLoadingState(context, minHeight: 138.r)
+            _buildLoadingState(context, minHeight: 96.r)
           else if (raProvider.recentUnlocksError != null && unlocks.isEmpty)
             _buildSectionMessage(
               context,
               raProvider.recentUnlocksError!,
               isError: true,
               onRetry: raProvider.fetchRecentUnlocks,
-              minHeight: 138.r,
+              minHeight: 96.r,
             )
           else if (unlocks.isEmpty)
             _buildSectionMessage(
               context,
               AppLocale.raNoRecentUnlocks.getString(context),
-              minHeight: 138.r,
+              minHeight: 96.r,
             )
           else
             Column(
@@ -202,10 +105,10 @@ extension _SectionLists on RADashboardHubState {
   }) {
     final theme = Theme.of(context);
     return Container(
-      padding: EdgeInsets.all(14.r),
+      padding: EdgeInsets.all(10.r),
       decoration: _cardDecoration(
         theme,
-        borderColor: selected ? theme.colorScheme.primary : null,
+        borderColor: selected ? theme.colorScheme.tertiary : null,
         borderWidth: selected ? 2.r : null,
       ),
       child: Column(
@@ -217,19 +120,19 @@ extension _SectionLists on RADashboardHubState {
             title: title,
             trailing: subtitle,
           ),
-          SizedBox(height: 10.r),
+          SizedBox(height: 6.r),
           if (loading)
-            _buildLoadingState(context, minHeight: 120.r)
+            _buildLoadingState(context, minHeight: 96.r)
           else if (error != null)
             _buildSectionMessage(
               context,
               error,
               isError: true,
               onRetry: onRetry,
-              minHeight: 120.r,
+              minHeight: 96.r,
             )
           else if (items.isEmpty)
-            _buildSectionMessage(context, emptyMessage, minHeight: 120.r)
+            _buildSectionMessage(context, emptyMessage, minHeight: 96.r)
           else
             Column(
               children: items
@@ -248,14 +151,14 @@ extension _SectionLists on RADashboardHubState {
   }) {
     final theme = Theme.of(context);
     return Padding(
-      padding: EdgeInsets.only(bottom: 10.r),
+      padding: EdgeInsets.only(bottom: 2.r),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8.r),
         child: Padding(
           padding: EdgeInsets.all(4.r),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               RaEarnedBadge(
                 casual: true,
@@ -298,27 +201,16 @@ extension _SectionLists on RADashboardHubState {
                   ],
                 ),
               ),
-              SizedBox(width: 8.r),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${item.points} ${AppLocale.raPointsAbbrev.getString(context)}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 9.r,
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  SizedBox(height: 3.r),
-                  Text(
-                    _formatDate(item.date),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 8.r,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
+              SizedBox(width: 6.r),
+              // The date is on the full list; here the row keeps its width
+              // for the title.
+              Text(
+                '${item.points} ${AppLocale.raPointsAbbrev.getString(context)}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 9.r,
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
@@ -334,7 +226,7 @@ extension _SectionLists on RADashboardHubState {
   }) {
     final theme = Theme.of(context);
     return Padding(
-      padding: EdgeInsets.only(bottom: 10.r),
+      padding: EdgeInsets.only(bottom: 2.r),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8.r),
@@ -373,14 +265,6 @@ extension _SectionLists on RADashboardHubState {
                       ),
                     ),
                   ],
-                ),
-              ),
-              SizedBox(width: 8.r),
-              Text(
-                _formatDate(item.lastPlayed),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 8.r,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
             ],

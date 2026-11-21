@@ -18,7 +18,7 @@ class SafDirectoryService {
   static bool? directoryPlatformIsAndroidOverride;
 
   /// Platform channel for communicating with native Android implementation.
-  static const platform = MethodChannel('com.neogamelab.neostation/game');
+  static const platform = MethodChannel('dev.misoba.neostation/game');
 
   static final _log = LoggerService.instance;
 

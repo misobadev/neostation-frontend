@@ -221,6 +221,9 @@ class RaCollectionTabState extends State<RaCollectionTab> {
 
   void selectCurrent() => _open();
 
+  /// Whether the cursor is in the grid's first column, where Left leaves it.
+  bool get atRowStart => _count == 0 || _selected % _columns == 0;
+
   void _open() {
     if (_count == 0) return;
     if (!widget.events) {
@@ -383,7 +386,7 @@ class RaCollectionTabState extends State<RaCollectionTab> {
                   )
                 : LayoutBuilder(
                     builder: (context, constraints) {
-                      _columns = (constraints.maxWidth / 92.r).floor().clamp(
+                      _columns = (constraints.maxWidth / 72.r).floor().clamp(
                         3,
                         14,
                       );

@@ -11,7 +11,7 @@ Reads CD tracks and sectors out of CHD disc images, over a vendored libchdr.
                        DESC
   s.homepage         = 'https://github.com/misobadev/neostation-frontend'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'NeoStation' => 'neostation@neogamelab.com' }
+  s.author           = { 'NeoStation' => 'miguel.soto@misoba.dev' }
 
   # This will ensure the source files in Classes/ are included in the native
   # builds of apps using this FFI plugin. Podspec does not support relative

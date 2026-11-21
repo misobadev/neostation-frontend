@@ -333,7 +333,7 @@ class GameSessionManager {
       _stopPlaytimeTimer();
 
       if (Platform.isAndroid) {
-        const platform = MethodChannel('com.neogamelab.neostation/game');
+        const platform = MethodChannel('dev.misoba.neostation/game');
         await platform.invokeMethod('setGamepadBlock', {'block': false});
         GameSessionPersistence.clearGameSession();
       } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {

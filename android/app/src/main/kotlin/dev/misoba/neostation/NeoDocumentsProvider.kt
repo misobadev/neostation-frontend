@@ -1,4 +1,4 @@
-package com.neogamelab.neostation
+package dev.misoba.neostation
 
 import android.database.Cursor
 import android.database.MatrixCursor

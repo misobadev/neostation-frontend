@@ -1,8 +1,9 @@
 import 'dart:io';
 
+import 'package:neostation/widgets/brand_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:neostation/app_version.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -40,7 +41,9 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
   /// card.
   final List<GlobalKey> _itemKeys = List.generate(5, (_) => GlobalKey());
 
-  String _appVersion = '';
+  /// From pubspec.yaml ([appVersion]): macOS keeps only numbers in its own
+  /// version string, so a release candidate would show as `1.0.0.1`.
+  final String _appVersion = 'v$appVersion';
   String _systemsVersion = '';
 
   /// Blocks a second export while the zip is still being built.
@@ -49,7 +52,6 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
   @override
   void initState() {
     super.initState();
-    _loadAppVersion();
     _loadSystemsVersion();
   }
 
@@ -77,23 +79,6 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
         });
       }
     } catch (_) {}
-  }
-
-  Future<void> _loadAppVersion() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      if (mounted) {
-        setState(() {
-          _appVersion = 'v${packageInfo.version}';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _appVersion = 'v1.0.0';
-        });
-      }
-    }
   }
 
   Future<void> _launchUrl(String url) async {
@@ -186,30 +171,10 @@ class AboutSettingsContentState extends State<AboutSettingsContent> {
               children: [
                 Column(
                   children: [
-                    SizedBox(
-                      width: 64.r,
-                      height: 64.r,
-                      child: Image.asset(
-                        'assets/images/logo_transparent.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Icon(
-                          Symbols.games_rounded,
-                          size: 64.r,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
+                    BrandLogo(width: 120.r),
                     SizedBox(height: 6.r),
                     Text(
-                      'NeoStation',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12.r,
-                      ),
-                    ),
-                    SizedBox(height: 1.h),
-                    Text(
-                      "Beta $_appVersion",
+                      _appVersion,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(
                           alpha: 0.6,

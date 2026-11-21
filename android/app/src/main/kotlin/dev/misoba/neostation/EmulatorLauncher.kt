@@ -1,4 +1,4 @@
-package com.neogamelab.neostation
+package dev.misoba.neostation
 
 import android.content.ActivityNotFoundException
 import android.content.ClipData

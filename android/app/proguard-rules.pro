@@ -17,7 +17,7 @@
 
 # For general plugins that might use reflection
 -dontwarn io.flutter.plugins.**
--dontwarn com.neogamelab.neostation.**
+-dontwarn dev.misoba.neostation.**
 
 # Fix for missing Play Core classes referenced by Flutter engine
 -dontwarn com.google.android.play.core.**

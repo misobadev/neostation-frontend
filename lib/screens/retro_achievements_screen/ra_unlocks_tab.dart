@@ -36,12 +36,22 @@ class RaUnlocksTab extends StatefulWidget {
   final VoidCallback? onBack;
   final VoidCallback? onSelect;
 
+  /// Drawn inside a panel that already has its own frame and title: no card
+  /// of its own and no header row.
+  final bool embedded;
+
+  /// Whether the D-pad is in this list. The cursor is hidden while it is not,
+  /// so the list doesn't look selected while the menu beside it has focus.
+  final bool focused;
+
   const RaUnlocksTab({
     super.key,
     required this.active,
     required this.onActivate,
     this.onBack,
     this.onSelect,
+    this.embedded = false,
+    this.focused = true,
   });
 
   @override
@@ -218,6 +228,10 @@ class RaUnlocksTabState extends State<RaUnlocksTab> {
           _scrollController.updateTotalItems(items.length + 1);
           _scrollController.setItemExtent(_rowExtent);
           final theme = Theme.of(context);
+          final body = items.isEmpty
+              ? _buildPendingArea(context, provider)
+              : _buildList(context, provider, items);
+          if (widget.embedded) return body;
           return Column(
             children: [
               Expanded(
@@ -229,11 +243,7 @@ class RaUnlocksTabState extends State<RaUnlocksTab> {
                     children: [
                       _buildHeader(context),
                       SizedBox(height: 12.r),
-                      Expanded(
-                        child: items.isEmpty
-                            ? _buildPendingArea(context, provider)
-                            : _buildList(context, provider, items),
-                      ),
+                      Expanded(child: body),
                     ],
                   ),
                 ),
@@ -346,7 +356,7 @@ class RaUnlocksTabState extends State<RaUnlocksTab> {
         return _buildUnlockRow(
           context,
           items[index],
-          selected: index == selected,
+          selected: widget.focused && index == selected,
           onTap: () => _tapRow(index, items[index]),
         );
       },

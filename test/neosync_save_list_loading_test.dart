@@ -169,12 +169,13 @@ void main() {
       .widget<OnlineSavesListView>(find.byType(OnlineSavesListView))
       .selectedIndex;
 
-  /// Walks from the search field, over the filter chips, to save [index].
+  /// Walks from the search field, over the filter chips, to save [index]:
+  /// the saves are a grid, so along its first row.
   Future<void> focusSave(WidgetTester tester, int index) async {
     await pressKey(tester, LogicalKeyboardKey.arrowDown); // filters
     await pressKey(tester, LogicalKeyboardKey.arrowDown); // first save
     for (var i = 0; i < index; i++) {
-      await pressKey(tester, LogicalKeyboardKey.arrowDown);
+      await pressKey(tester, LogicalKeyboardKey.arrowRight);
     }
     expect(highlighted(tester), index);
   }

@@ -14,7 +14,7 @@ workspace:
   - packages/gamepads_windows
   - packages/sub_screen
 
-version: 0.16.1+2134
+version: 1.0.0-rc.1+3001
 
 environment:
   sdk: '>=3.13.0 <4.0.0'
@@ -98,7 +98,7 @@ flutter_launcher_icons:
   windows:
     generate: true
     image_path: "assets/images/logo.png"
-    icon_size: 48
+    icon_size: 256
   macos:
     generate: true
     image_path: "assets/images/logo.png"
@@ -111,6 +111,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/logos/
+    - assets/images/neosync/
     - assets/images/emulators/
     - assets/images/gamepad/
     - assets/images/icons/

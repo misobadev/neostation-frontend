@@ -1,5 +1,10 @@
 import 'dart:io';
 
+import 'package:neostation/widgets/wizard_frame.dart';
+import 'package:neostation/widgets/wizard_language_picker.dart';
+import 'package:neostation/widgets/splash_status_layout.dart';
+import 'package:neostation/services/startup_language.dart';
+import 'package:neostation/widgets/west_button_glyph.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
@@ -105,17 +110,23 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   // Step indices. Android has two extra steps (Permissions + Accessibility)
   // that don't exist on desktop; the getters resolve to -1 there so a
   // comparison against a real (>= 0) step never matches.
-  //   Android: 0=UserData, 1=Permissions, 2=Folder, 3=Scanning,
-  //            4=EsdeImport, 5=ArtPack
-  //   Desktop: 0=UserData, 1=Folder, 2=Scanning, 3=EsdeImport, 4=ArtPack
+  //   Android: 0=Welcome, 1=Language, 2=UserData, 3=Permissions, 4=Folder,
+  //            5=Scanning, 6=EsdeImport, 7=ArtPack
+  //   Desktop: 0=Welcome, 1=Language, 2=UserData, 3=Folder, 4=Scanning,
+  //            5=EsdeImport, 6=ArtPack
   // The Permissions step covers both All-Files access and the accessibility
   // (Screen Return) service.
-  int get _stepUserData => 0;
-  int get _stepPermissions => Platform.isAndroid ? 1 : -1;
-  int get _stepFolder => Platform.isAndroid ? 2 : 1;
-  int get _stepScanning => Platform.isAndroid ? 3 : 2;
-  int get _stepEsde => Platform.isAndroid ? 4 : 3;
-  int get _stepArtPack => Platform.isAndroid ? 5 : 4;
+  int get _stepWelcome => 0;
+  int get _stepLanguage => 1;
+  int get _stepUserData => 2;
+  int get _stepPermissions => Platform.isAndroid ? 3 : -1;
+  int get _stepFolder => Platform.isAndroid ? 4 : 3;
+  int get _stepScanning => Platform.isAndroid ? 5 : 4;
+  int get _stepEsde => Platform.isAndroid ? 6 : 5;
+  int get _stepArtPack => Platform.isAndroid ? 7 : 6;
+
+  /// The language shown selected on the first step.
+  String _language = 'en';
 
   /// The art-pack step is always the final step of the wizard.
   bool get _isLastStep => _currentStep == _stepArtPack;
@@ -124,6 +135,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _initLanguage();
     _initializeSteps();
     _initGamepad();
     if (Platform.isAndroid) {
@@ -212,11 +224,29 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           _handleMainAction();
         }
       },
-      onBack: () {
-        _handleSkip();
+      // B always goes back a step; the step's other action (another
+      // user-data folder, or skipping an optional step) is on the West face
+      // button, as in the beta import wizard.
+      onBack: _handleBack,
+      onWestButton: () {
+        if (_currentStep == _stepUserData) {
+          if (!_isSelectingUserDataFolder) _selectUserDataLocationWizard();
+          return;
+        }
+        if (_canSkip) _handleSkip();
       },
-      onNavigateUp: () => _moveArtPackSelection(-1),
-      onNavigateDown: () => _moveArtPackSelection(1),
+      onNavigateUp: () => _currentStep == _stepLanguage
+          ? _moveLanguage(-WizardLanguagePicker.columns)
+          : _moveArtPackSelection(-1),
+      onNavigateDown: () => _currentStep == _stepLanguage
+          ? _moveLanguage(WizardLanguagePicker.columns)
+          : _moveArtPackSelection(1),
+      onNavigateLeft: () {
+        if (_currentStep == _stepLanguage) _moveLanguage(-1);
+      },
+      onNavigateRight: () {
+        if (_currentStep == _stepLanguage) _moveLanguage(1);
+      },
     );
     _gamepadNav?.initialize();
     _gamepadNav?.activate();
@@ -286,6 +316,44 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     );
   }
 
+  /// Whether the wizard is in the middle of something a step change would cut
+  /// short: a picker, an ES-DE import or an art pack download.
+  bool get _isBusy =>
+      _isSelectingFolder ||
+      _isSelectingUserDataFolder ||
+      _isImportingEsde ||
+      _isDownloadingArt;
+
+  /// Whether this step offers Back: every step but the first, and not while
+  /// it is busy or a scan is running (the scan would carry on behind the
+  /// folder step and land its systems there).
+  bool _canGoBack(SqliteConfigProvider provider) {
+    if (_currentStep == _stepWelcome || _isBusy) return false;
+    if (_currentStep == _stepScanning && provider.isScanning) return false;
+    return true;
+  }
+
+  /// Back one step. The permissions step exists on Android only, and its
+  /// index is skipped on the desktop by the step numbering itself.
+  void _handleBack() {
+    if (!_canGoBack(context.read<SqliteConfigProvider>())) return;
+    setState(() => _currentStep = _currentStep - 1);
+    if (_currentStep == _stepPermissions) _refreshPermissionStates();
+  }
+
+  /// The optional steps, whose other action is Skip: the folder and
+  /// permissions steps (Android only), the two trailing ones (ES-DE import,
+  /// art pack) everywhere, and a scan that stopped with an error.
+  bool get _canSkip {
+    if (_currentStep == _stepScanning) {
+      return _scanFailed(context.read<SqliteConfigProvider>());
+    }
+    return _currentStep == _stepEsde ||
+        _currentStep == _stepArtPack ||
+        (Platform.isAndroid &&
+            (_currentStep == _stepFolder || _currentStep == _stepPermissions));
+  }
+
   void _handleSkip() {
     // A running ES-DE import reports its outcome on this step, and a running
     // art pack download finishes setup itself.
@@ -342,7 +410,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   }
 
   void _initializeSteps() {
-    // Load the current user-data path for display in step 0.
+    // Load the current user-data path for display on the user-data step.
     _loadUserDataPath();
   }
 
@@ -390,14 +458,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   //          4=EsdeImport, 5=ArtPack (6 steps)
   // Desktop: 0=UserData, 1=FolderSelect, 2=Scanning, 3=EsdeImport,
   //          4=ArtPack (5 steps)
-  int get _totalSteps => Platform.isAndroid ? 6 : 5;
+  int get _totalSteps => Platform.isAndroid ? 8 : 7;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
     final isOled = themeProvider.isOled;
     final bgColor = theme.scaffoldBackgroundColor;
 
@@ -422,307 +488,36 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             ),
 
           // Contenido principal
-          SafeArea(
-            child: isLandscape
-                ? _buildLandscapeLayout(theme)
-                : _buildPortraitLayout(theme),
-          ),
+          SafeArea(child: _buildLayout(theme)),
         ],
       ),
     );
   }
 
-  Widget _buildPortraitLayout(ThemeData theme) {
-    return Center(
-      child: Container(
-        constraints: BoxConstraints(maxWidth: 600.w),
-        padding: EdgeInsets.all(32.r),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(32.r),
-          border: Border.all(
-            color: theme.colorScheme.primary.withValues(alpha: 0.2),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Logo
-            Image.asset(
-              'assets/images/logo_transparent.png',
-              width: 120.r,
-              height: 120.r,
-            ),
-            SizedBox(height: 24.r),
-
-            // Título
-            Text(
-              AppLocale.welcomeNeoStation.getString(context),
-              style: TextStyle(
-                fontSize: 28.r,
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 12.r),
-
-            Text(
-              AppLocale.letsGetSetup.getString(context),
-              style: TextStyle(
-                fontSize: 16.r,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            SizedBox(height: 48.r),
-
-            // Progress indicator
-            _buildProgressIndicator(theme),
-
-            SizedBox(height: 32.r),
-
-            // Step content
-            Expanded(child: _buildStepContent(theme)),
-
-            SizedBox(height: 24.r),
-
-            // Navigation buttons
-            _buildNavigationButtons(theme),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLandscapeLayout(ThemeData theme) {
-    return Padding(
-      padding: EdgeInsets.all(16.r),
-      child: Row(
-        children: [
-          // Left side: Logo and title
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: EdgeInsets.all(24.r),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(24.r),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  width: 1.r,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(
-                    'assets/images/logo_transparent.png',
-                    width: 64.r,
-                    height: 64.r,
-                  ),
-                  SizedBox(height: 12.r),
-
-                  Text(
-                    AppLocale.welcomeNeoStation.getString(context),
-                    style: TextStyle(
-                      fontSize: 14.r,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 8.r),
-
-                  Text(
-                    AppLocale.letsGetSetup.getString(context),
-                    style: TextStyle(
-                      fontSize: 10.r,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-
-                  SizedBox(height: 16.r),
-
-                  // Progress indicator vertical — scaled to fit the remaining
-                  // card height so it never overflows regardless of step count.
-                  Flexible(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: _buildVerticalProgressIndicator(theme),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          SizedBox(width: 16.r),
-
-          // Right side: Content and navigation
-          Expanded(
-            flex: 3,
-            child: Container(
-              padding: EdgeInsets.all(16.r),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(24.r),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.05),
-                  width: 1.r,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Center(
-                      child: Container(
-                        constraints: BoxConstraints(maxWidth: 400.w),
-                        child: _buildStepContent(theme),
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(height: 8.r),
-
-                  // Navigation buttons
-                  _buildNavigationButtons(theme),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVerticalProgressIndicator(ThemeData theme) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(_totalSteps, (index) {
-        final isCompleted = index < _currentStep;
-        final isCurrent = index == _currentStep;
-
-        return Column(
-          children: [
-            Container(
-              width: 24.r,
-              height: 24.r,
-              decoration: BoxDecoration(
-                color: isCompleted || isCurrent
-                    ? theme.colorScheme.primary
-                    : Colors.transparent,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isCompleted || isCurrent
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.primary.withValues(alpha: 0.3),
-                  width: 2.r,
-                ),
-              ),
-              child: Center(
-                child: isCompleted
-                    ? Icon(
-                        Symbols.check_rounded,
-                        color: Colors.white,
-                        size: 14.r,
-                      )
-                    : Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          fontSize: 10.r,
-                          fontWeight: FontWeight.bold,
-                          color: isCurrent
-                              ? Colors.white
-                              : theme.colorScheme.primary.withValues(
-                                  alpha: 0.5,
-                                ),
-                        ),
-                      ),
-              ),
-            ),
-            if (index < _totalSteps - 1)
-              Container(
-                width: 2.r,
-                height: 18.r,
-                color: isCompleted
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.primary.withValues(alpha: 0.2),
-              ),
-          ],
-        );
-      }),
-    );
-  }
-
-  Widget _buildProgressIndicator(ThemeData theme) {
-    // Scale down to fit the screen width so the extra steps don't overflow.
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(_totalSteps, (index) {
-          final isCompleted = index < _currentStep;
-          final isCurrent = index == _currentStep;
-
-          return Row(
-            children: [
-              Container(
-                width: 40.r,
-                height: 40.r,
-                decoration: BoxDecoration(
-                  color: isCompleted || isCurrent
-                      ? theme.colorScheme.primary
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isCompleted || isCurrent
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.primary.withValues(alpha: 0.3),
-                    width: 2.r,
-                  ),
-                ),
-                child: Center(
-                  child: isCompleted
-                      ? Icon(
-                          Symbols.check_rounded,
-                          color: Colors.white,
-                          size: 24.r,
-                        )
-                      : Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            fontSize: 18.r,
-                            fontWeight: FontWeight.bold,
-                            color: isCurrent
-                                ? Colors.white
-                                : theme.colorScheme.primary.withValues(
-                                    alpha: 0.5,
-                                  ),
-                          ),
-                        ),
-                ),
-              ),
-              if (index < _totalSteps - 1)
-                Container(
-                  width: 40.r,
-                  height: 2.r,
-                  color: isCompleted
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.primary.withValues(alpha: 0.2),
-                ),
-            ],
-          );
-        }),
-      ),
+  /// The layout every wizard shares ([WizardFrame]): the logo and the step
+  /// dots at fixed places, the step with its buttons centred under them.
+  Widget _buildLayout(ThemeData theme) {
+    final step = _currentStep + 1;
+    return WizardFrame(
+      step: step,
+      total: _totalSteps,
+      stepLabel: AppLocale.wizardStepOf
+          .getString(context)
+          .replaceAll('{step}', '$step')
+          .replaceAll('{total}', '$_totalSteps'),
+      color: theme.colorScheme.onSurface,
+      content: _buildStepContent(theme),
+      buttons: _buildNavigationButtons(theme),
     );
   }
 
   Widget _buildStepContent(ThemeData theme) {
+    if (_currentStep == _stepWelcome) {
+      return _buildWelcomeStep(theme);
+    }
+    if (_currentStep == _stepLanguage) {
+      return _buildLanguageStep(theme);
+    }
     if (_currentStep == _stepUserData) {
       return _buildUserDataLocationStep(theme);
     }
@@ -742,6 +537,117 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       return _buildArtPackStep(theme);
     }
     return Container();
+  }
+
+  /// The device's language is picked and applied straight away, so the
+  /// wizard speaks it from its first screen; the language step can change it.
+  void _initLanguage() {
+    _language = supportedLanguageFor(
+      WidgetsBinding.instance.platformDispatcher.locale,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final provider = context.read<SqliteConfigProvider>();
+      if (provider.config.appLanguage != _language) {
+        provider.updateAppLanguage(_language);
+      }
+    });
+  }
+
+  void _selectLanguage(String code) {
+    if (code == _language) return;
+    setState(() => _language = code);
+    context.read<SqliteConfigProvider>().updateAppLanguage(code);
+  }
+
+  void _moveLanguage(int delta) =>
+      _selectLanguage(WizardLanguagePicker.move(_language, delta));
+
+  /// The first step: what NeoStation is, and A to start.
+  Widget _buildWelcomeStep(ThemeData theme) {
+    // Sized as the beta import wizard's welcome, so the two read the same.
+    final textScale = SplashStatusLayout.textScaleOf(context);
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            AppLocale.welcomeNeoStation.getString(context),
+            style: TextStyle(
+              fontSize: 19 * textScale,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 12 * SplashStatusLayout.scaleOf(context)),
+          Text(
+            AppLocale.wizardWelcomeBody.getString(context),
+            style: TextStyle(
+              fontSize: 15 * textScale,
+              height: 1.35,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageStep(ThemeData theme) {
+    // The welcome's text sizes: twelve languages have to fit under the
+    // title on a handheld's short screen.
+    final scale = SplashStatusLayout.scaleOf(context);
+    final textScale = SplashStatusLayout.textScaleOf(context);
+
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // The icon beside the title rather than above it, so the grid
+          // keeps its room.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Symbols.translate_rounded,
+                size: 24 * textScale,
+                color: theme.colorScheme.onSurface,
+              ),
+              SizedBox(width: 10 * scale),
+              Flexible(
+                child: Text(
+                  AppLocale.wizardLanguageTitle.getString(context),
+                  style: TextStyle(
+                    fontSize: 19 * textScale,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8 * scale),
+          Text(
+            AppLocale.wizardLanguageBody.getString(context),
+            style: TextStyle(
+              fontSize: 13 * textScale,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 20 * scale),
+          WizardLanguagePicker(
+            selected: _language,
+            onSelected: _selectLanguage,
+            unit: scale,
+            fontSize: 14 * textScale / scale,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildUserDataLocationStep(ThemeData theme) {
@@ -820,19 +726,6 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               ),
             ),
           ],
-
-          SizedBox(height: isLandscape ? 12.r : 20.r),
-
-          // "Change Location" inline button
-          GamepadControl(
-            icon: Symbols.folder_rounded,
-            label: AppLocale.selectUserDataFolder.getString(context),
-            onTap: _isSelectingUserDataFolder
-                ? null
-                : () => _selectUserDataLocationWizard(),
-            busy: _isSelectingUserDataFolder,
-            textColor: theme.colorScheme.primary,
-          ),
         ],
       ),
     );
@@ -1194,7 +1087,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
   /// Whether the scan this step started stopped with an error. Without this
   /// the step waited for a completion that never came: Next stayed disabled
-  /// and B did nothing.
+  /// and Skip did nothing.
   bool _scanFailed(SqliteConfigProvider provider) =>
       !provider.isScanning && !provider.scanCompleted && provider.error != null;
 
@@ -1900,46 +1793,36 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       return Consumer<SqliteConfigProvider>(
         builder: (context, provider, child) {
           final failed = _scanFailed(provider);
-          return Row(
-            mainAxisAlignment: failed
-                ? MainAxisAlignment.spaceBetween
-                : MainAxisAlignment.end,
-            children: [
-              if (failed)
-                GamepadControl(
-                  iconPath: 'assets/images/gamepad/Xbox_B_button.png',
-                  label: AppLocale.skipForNow.getString(context),
-                  onTap: () => _handleSkip(),
-                  textColor: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              // Next once the scan completes; Retry if it stopped with an error
-              GamepadControl(
-                iconPath: 'assets/images/gamepad/Xbox_A_button.png',
-                label: failed
-                    ? AppLocale.retry.getString(context)
-                    : AppLocale.next.getString(context),
-                onTap: provider.scanCompleted || failed
-                    ? () => _handleMainAction()
-                    : null,
-                backgroundColor: theme.colorScheme.primary,
-                textColor: theme.colorScheme.onPrimary,
+          return _buttonRow([
+            if (_canGoBack(provider)) _backButton(theme),
+            if (failed)
+              _westButton(
+                theme,
+                AppLocale.skipForNow.getString(context),
+                () => _handleSkip(),
               ),
-            ],
-          );
+            // Next once the scan completes; Retry if it stopped with an error
+            GamepadControl(
+              iconPath: 'assets/images/gamepad/Xbox_A_button.png',
+              label: failed
+                  ? AppLocale.retry.getString(context)
+                  : AppLocale.next.getString(context),
+              onTap: provider.scanCompleted || failed
+                  ? () => _handleMainAction()
+                  : null,
+              backgroundColor: theme.colorScheme.tertiary,
+              textColor: theme.colorScheme.onTertiary,
+            ),
+          ]);
         },
       );
     }
 
-    // For other steps, use normal logic.
-    // Skip is offered on the optional steps: the folder and permissions steps
-    // (Android only), plus the two trailing optional steps (ES-DE import, art
-    // pack) on every platform. The permissions step always offers it — see
-    // _handleSkip for why it must never be gated on a grant succeeding.
-    final showSkip =
-        _currentStep == _stepEsde ||
-        _currentStep == _stepArtPack ||
-        (Platform.isAndroid &&
-            (_currentStep == _stepFolder || _currentStep == _stepPermissions));
+    // For other steps, use normal logic. Skip ([_canSkip]) is offered on the
+    // optional steps. The permissions step always offers it: see _handleSkip
+    // for why it must never be gated on a grant succeeding.
+    final showSkip = _canSkip;
+    final provider = context.watch<SqliteConfigProvider>();
     // Wrapped in a NeoAssets consumer so the art-pack step's button label
     // (Download vs Finish) stays in sync with the live theme/download state —
     // otherwise a non-reactive read can show "Finish" while the action still
@@ -1955,44 +1838,94 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             !neoAssets.hasActiveTheme &&
             neoAssets.themes.isEmpty &&
             neoAssets.loading;
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            if (showSkip)
-              GamepadControl(
-                iconPath: 'assets/images/gamepad/Xbox_B_button.png',
-                label: AppLocale.skipForNow.getString(context),
-                onTap: _isImportingEsde || _isDownloadingArt
-                    ? null
-                    : () => _handleSkip(),
-                textColor: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              )
-            else
-              SizedBox(width: 64.r),
-
-            // Main action button
-            GamepadControl(
-              iconPath: 'assets/images/gamepad/Xbox_A_button.png',
-              label: _getButtonText(),
-              onTap:
-                  (_isSelectingFolder ||
-                      _isImportingEsde ||
-                      _isDownloadingArt ||
-                      artLoading)
+        return _buttonRow([
+          if (_canGoBack(provider)) _backButton(theme),
+          if (_currentStep == _stepUserData)
+            _westButton(
+              theme,
+              AppLocale.selectUserDataFolder.getString(context),
+              _isSelectingUserDataFolder
                   ? null
-                  : () => _handleMainAction(),
-              busy: _isSelectingFolder || artLoading,
-              backgroundColor: theme.colorScheme.primary,
-              textColor: theme.colorScheme.onPrimary,
+                  : () => _selectUserDataLocationWizard(),
+              busy: _isSelectingUserDataFolder,
             ),
-          ],
-        );
+          if (showSkip)
+            _westButton(
+              theme,
+              AppLocale.skipForNow.getString(context),
+              _isImportingEsde || _isDownloadingArt
+                  ? null
+                  : () => _handleSkip(),
+            ),
+          // Main action button
+          GamepadControl(
+            iconPath: 'assets/images/gamepad/Xbox_A_button.png',
+            label: _getButtonText(),
+            onTap:
+                (_isSelectingFolder ||
+                    _isImportingEsde ||
+                    _isDownloadingArt ||
+                    artLoading)
+                ? null
+                : () => _handleMainAction(),
+            busy: _isSelectingFolder || artLoading,
+            backgroundColor: theme.colorScheme.tertiary,
+            textColor: theme.colorScheme.onTertiary,
+          ),
+        ]);
       },
     );
   }
 
+  /// The step's buttons, centred, as in the beta import wizard: Back (B)
+  /// first, then the step's other action (the West face button), then its
+  /// main action (A).
+  Widget _buttonRow(List<Widget> buttons) => Wrap(
+    alignment: WrapAlignment.center,
+    spacing: 12.r,
+    runSpacing: 8.r,
+    children: buttons,
+  );
+
+  /// The colours of the other buttons, as on the app's footers: the main
+  /// action is tertiary, the rest tertiaryFixed.
+  Color _secondaryButtonColor(ThemeData theme) =>
+      theme.colorScheme.onTertiaryFixed;
+
+  /// Back (B): to the previous step.
+  Widget _backButton(ThemeData theme) => GamepadControl(
+    iconPath: 'assets/images/gamepad/Xbox_B_button.png',
+    label: AppLocale.back.getString(context),
+    onTap: _handleBack,
+    backgroundColor: theme.colorScheme.tertiaryFixed,
+    textColor: _secondaryButtonColor(theme),
+  );
+
+  /// The step's other action, on the West face button (X on an Xbox
+  /// layout, Y on a Nintendo one).
+  Widget _westButton(
+    ThemeData theme,
+    String label,
+    VoidCallback? onTap, {
+    bool busy = false,
+  }) => WestButtonGlyph(
+    builder: (context, iconPath) => GamepadControl(
+      iconPath: iconPath,
+      label: label,
+      onTap: onTap,
+      busy: busy,
+      backgroundColor: theme.colorScheme.tertiaryFixed,
+      textColor: _secondaryButtonColor(theme),
+    ),
+  );
+
   String _getButtonText() {
-    if (_currentStep == _stepUserData) return AppLocale.next.getString(context);
+    if (_currentStep == _stepWelcome) {
+      return AppLocale.wizardStartSetup.getString(context);
+    }
+    if (_currentStep == _stepLanguage || _currentStep == _stepUserData) {
+      return AppLocale.next.getString(context);
+    }
     if (_currentStep == _stepPermissions) {
       // Grant the next pending permission; once both are satisfied, advance.
       if (!_storageGranted || !_accessibilityDone) {
@@ -2033,7 +1966,16 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   }
 
   Future<void> _handleMainAction() async {
-    // Step 0 (user data location): advance, then auto-skip the permissions step
+    if (_currentStep == _stepWelcome) {
+      setState(() => _currentStep = _stepLanguage);
+      return;
+    }
+    if (_currentStep == _stepLanguage) {
+      setState(() => _currentStep = _stepUserData);
+      return;
+    }
+
+    // Step 1 (user data location): advance, then auto-skip the permissions step
     // if both permissions are already granted.
     if (_currentStep == _stepUserData) {
       setState(() => _currentStep = _currentStep + 1);
@@ -2112,7 +2054,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     // Safety re-arm. The request below can fail to open anything at all on
     // some ROMs, and with no Settings screen there is no resume to re-activate
     // on either — which left the wizard permanently deaf to the controller,
-    // B (skip) included. Only fires while we still hold the foreground, so a
+    // Back and Skip included. Only fires while we still hold the foreground, so a
     // Settings screen that did open keeps input suspended as intended.
     _leftForegroundDuringGrant = false;
     // Deliberately not gated on still being the permissions step: a touch

@@ -5,7 +5,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:neostation/app_version.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -23,9 +23,16 @@ import 'package:neostation/utils/version_compare.dart';
 /// host architecture/OS, secure downloading, and platform-specific installation
 /// procedures (including multi-stage self-replacement on Desktop).
 class UpdateService {
-  /// GitHub Releases API endpoint for the latest production build.
+  /// GitHub Releases API endpoint for the latest stable release. GitHub
+  /// leaves pre-releases out of it, so a stable install is only ever offered
+  /// a stable release.
   static const String _githubApiUrl =
       'https://api.github.com/repos/misobadev/neostation-frontend/releases/latest';
+
+  /// Every recent release, pre-releases included: what a release candidate
+  /// checks, so it is offered the next candidate and then the release.
+  static const String _githubReleasesUrl =
+      'https://api.github.com/repos/misobadev/neostation-frontend/releases?per_page=30';
 
   static final _log = LoggerService.instance;
 
@@ -65,37 +72,33 @@ class UpdateService {
       // 1. Resolve local versioning from the application manifest.
       final currentVersion = await _getAppVersion();
 
-      // 2. Poll GitHub API for the latest release metadata. A bounded timeout
-      // keeps an offline/unreachable network from stalling the startup
-      // sequence, which defers the ROM scan until the update checks finish.
-      final response =
-          await (_httpClientOverride?.get(Uri.parse(_githubApiUrl)) ??
-                  http.get(Uri.parse(_githubApiUrl)))
-              .timeout(const Duration(seconds: 10));
+      // 2. Poll GitHub for the releases this install may move to. A bounded
+      // timeout keeps an offline/unreachable network from stalling the
+      // startup sequence, which defers the ROM scan until the update checks
+      // finish. A release candidate follows the pre-release channel: it
+      // reads every release, since /latest never names a pre-release.
+      final preReleaseChannel = isPreReleaseVersion(currentVersion);
+      final url = Uri.parse(
+        preReleaseChannel ? _githubReleasesUrl : _githubApiUrl,
+      );
+      final response = await (_httpClientOverride?.get(url) ?? http.get(url))
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
         _log.e('UpdateService: API failure (Status: ${response.statusCode})');
         return null;
       }
 
-      final releaseData = json.decode(response.body) as Map<String, dynamic>;
+      final decoded = json.decode(response.body);
+      final releases = preReleaseChannel
+          ? (decoded as List<dynamic>).cast<Map<String, dynamic>>()
+          : [decoded as Map<String, dynamic>];
 
-      // Standardize the tag for display: strip a leading 'v' and the build
-      // metadata. replaceFirst('v', '') would have removed a 'v' anywhere in
-      // the string, so only a genuine prefix is dropped here. The comparison
-      // below normalizes independently and tolerates either form.
-      final rawTag = releaseData['tag_name'].toString().trim();
-      final latestVersion =
-          (rawTag.startsWith('v') || rawTag.startsWith('V')
-                  ? rawTag.substring(1)
-                  : rawTag)
-              .split('+')
-              .first;
-
-      // 3. Perform semantic version comparison.
-      if (_isNewerVersion(currentVersion, latestVersion)) {
-        // Resolve the specific binary asset compatible with the host OS and architecture.
-        final assets = releaseData['assets'] as List<dynamic>;
+      // 3. The newest release first, by semantic version, then the next one
+      // down if it has no build for this platform.
+      for (final releaseData in newerReleases(releases, currentVersion)) {
+        final latestVersion = releaseVersion(releaseData);
+        final assets = releaseData['assets'] as List<dynamic>? ?? const [];
         final platformAsset = await _findPlatformAsset(assets);
 
         if (platformAsset != null) {
@@ -123,6 +126,41 @@ class UpdateService {
     }
   }
 
+  /// A release's version for display and comparison: its tag without the
+  /// `v` prefix and the build metadata (`v1.0.0-rc.1+3001` → `1.0.0-rc.1`).
+  /// replaceFirst('v', '') would have removed a 'v' anywhere in the string,
+  /// so only a genuine prefix is dropped.
+  @visibleForTesting
+  static String releaseVersion(Map<String, dynamic> release) {
+    final rawTag = (release['tag_name'] ?? '').toString().trim();
+    return (rawTag.startsWith('v') || rawTag.startsWith('V')
+            ? rawTag.substring(1)
+            : rawTag)
+        .split('+')
+        .first;
+  }
+
+  /// The [releases] newer than [currentVersion], newest first by semantic
+  /// version (GitHub lists them by date, and a hotfix to an older line can
+  /// be published after a newer one). Drafts and tags that can't be read as
+  /// a version are left out.
+  @visibleForTesting
+  static List<Map<String, dynamic>> newerReleases(
+    List<Map<String, dynamic>> releases,
+    String currentVersion,
+  ) {
+    final newer = <(SemVersion, Map<String, dynamic>)>[];
+    for (final release in releases) {
+      if (release['draft'] == true) continue;
+      final tag = releaseVersion(release);
+      final version = parseSemVersion(tag);
+      if (version == null || !_isNewerVersion(currentVersion, tag)) continue;
+      newer.add((version, release));
+    }
+    newer.sort((a, b) => b.$1.compareTo(a.$1));
+    return [for (final entry in newer) entry.$2];
+  }
+
   /// The SHA-256 in a GitHub asset's `digest` (`sha256:<hex>`), in lower case,
   /// or null when there is none.
   @visibleForTesting
@@ -133,16 +171,15 @@ class UpdateService {
     return RegExp(r'^[0-9a-f]{64}$').hasMatch(hex) ? hex : null;
   }
 
-  /// Extracts the application version string from the platform package info.
-  static Future<String> _getAppVersion() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      return packageInfo.version;
-    } catch (e) {
-      _log.e('UpdateService: Failed to read app version', error: e);
-      return '0.0.0';
-    }
-  }
+  /// The installed version, replaceable so a test can pose as any version.
+  @visibleForTesting
+  static String? debugInstalledVersion;
+
+  /// The installed version, pre-release suffix included. Read from
+  /// [appVersion] rather than package_info: macOS keeps only numbers, so a
+  /// release candidate would read there as the release itself.
+  static Future<String> _getAppVersion() async =>
+      debugInstalledVersion ?? appVersion;
 
   /// Performs a semantic comparison between two version strings.
   ///
@@ -740,7 +777,7 @@ rm -f "$scriptPath"
       _log.i('UpdateService: Executing APK installation...');
 
       // Invoke platform-specific logic in MainActivity.kt
-      final platform = const MethodChannel('com.neogamelab.neostation/game');
+      final platform = const MethodChannel('dev.misoba.neostation/game');
       await platform.invokeMethod('installApk', {'filePath': apkFile.path});
 
       return UpdateOutcome.installing;

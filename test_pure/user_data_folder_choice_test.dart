@@ -12,15 +12,15 @@ import 'package:test/test.dart';
 /// that same card, and the move dialogue says so.
 void main() {
   const appDirs = [
-    '/storage/emulated/0/Android/data/com.neogamelab.neostation/files',
-    '/storage/3734-3464/Android/data/com.neogamelab.neostation/files',
-    '/storage/1A2B-3C4D/Android/data/com.neogamelab.neostation/files',
+    '/storage/emulated/0/Android/data/dev.misoba.neostation/files',
+    '/storage/3734-3464/Android/data/dev.misoba.neostation/files',
+    '/storage/1A2B-3C4D/Android/data/dev.misoba.neostation/files',
   ];
   const card =
-      '/storage/3734-3464/Android/data/com.neogamelab.neostation/files/'
+      '/storage/3734-3464/Android/data/dev.misoba.neostation/files/'
       'user-data';
   const current =
-      '/storage/emulated/0/Android/data/com.neogamelab.neostation/files/'
+      '/storage/emulated/0/Android/data/dev.misoba.neostation/files/'
       'user-data';
 
   group('what Settings does with a folder picked', () {
@@ -143,7 +143,7 @@ void main() {
       );
       expect(
         userDataFolderOnSameCard('/storage/1A2B-3C4D/Games', appDirs),
-        '/storage/1A2B-3C4D/Android/data/com.neogamelab.neostation/files/'
+        '/storage/1A2B-3C4D/Android/data/dev.misoba.neostation/files/'
         'user-data',
       );
       expect(userDataFolderOnSameCard('/storage/3734-3464', appDirs), card);
@@ -188,7 +188,7 @@ void main() {
         'folder elsewhere', () {
       for (final dir in [
         '/storage/3734-3464',
-        '/mnt/3734-3464/Android/data/com.neogamelab.neostation/files',
+        '/mnt/3734-3464/Android/data/dev.misoba.neostation/files',
       ]) {
         expect(
           userDataFolderOnSameCard('/storage/3734-3464/x', [dir]),

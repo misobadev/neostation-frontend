@@ -95,6 +95,9 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.raEvents: 'Événements',
   AppLocale.raAotwYearTitle: 'Succès de la semaine ({year})',
   AppLocale.raAotw: 'AOTW',
+  AppLocale.raOverview: 'Aperçu',
+  AppLocale.raStatPlayed: 'Joués',
+  AppLocale.raStatBeaten: 'Terminés',
   AppLocale.raAwards: 'Récompenses',
   AppLocale.raSetOrder: 'Ordre du jeu',
   AppLocale.raPointsSort: 'Points décroissants',
@@ -131,6 +134,42 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.startupStorageStartEmpty: 'Commencer avec un dossier vide',
   AppLocale.startupStorageCreateFailed:
       'NeoStation n\'a pas pu créer le dossier à cet endroit.',
+  AppLocale.startupBetaImportWrongFolder: 'Ce n\'est pas le bon dossier. Choisissez le NeoStation avec cette icône.',
+  AppLocale.startupBetaImportNoLibrary:
+      'La bêta n\'a aucune bibliothèque à importer. Repartez de zéro.',
+  AppLocale.startupBetaImportMeasuring:
+      'Vérification de ce qu\'il y a à copier...',
+  AppLocale.startupBetaImportCopying:
+      'Copie de vos données depuis la bêta. Gardez NeoStation ouvert.',
+  AppLocale.startupBetaImportCancel: 'Annuler',
+  AppLocale.startupBetaImportNoSpace: 'Espace libre insuffisant : les données de la bêta occupent {needed} et {free} sont libres.',
+  AppLocale.startupBetaImportFailed:
+      'La copie n\'a pas abouti ({error}). Rien n\'a été modifié.',
+  AppLocale.startupBetaImportDone: '{files} fichiers copiés depuis la bêta. Reconnectez-vous à NeoSync, RetroAchievements, RomM et ScreenScraper, et autorisez de nouveau l\'accès à vos fichiers quand cela vous est demandé : les connexions et les autorisations ne peuvent pas être transférées. Une fois que tout est là, vous pouvez désinstaller la bêta.',
+  AppLocale.startupBetaImportContinue: 'Continuer',
+  AppLocale.startupBetaImportUninstall: 'Désinstaller la bêta',
+  AppLocale.wizardStepOf: 'Étape {step} sur {total}',
+  AppLocale.wizardLanguageTitle: 'Choisissez votre langue',
+  AppLocale.wizardLanguageBody:
+      'Vous pourrez la changer plus tard dans les Réglages.',
+  AppLocale.wizardWelcomeBody: 'Le frontend gratuit et open source pour tous vos jeux rétro. Appuyez sur A pour commencer la configuration.',
+  AppLocale.wizardStartSetup: 'Commencer la configuration',
+  AppLocale.startupBetaImportChooseTitle: 'Version bêta de NeoStation détectée',
+  AppLocale.startupBetaImportChooseBody: 'NeoStation bêta {version} est installé sur cet appareil. Cette version est une nouvelle application, elle démarre donc vide. Récupérer votre bibliothèque, vos réglages, vos médias et vos thèmes depuis la bêta, ou repartir de zéro ?',
+  AppLocale.startupBetaImportImportAll: 'Tout importer depuis la bêta',
+  AppLocale.startupBetaImportStartFresh: 'Repartir de zéro',
+  AppLocale.startupBetaImportPrepareTitle: 'Choisissez le dossier de la bêta',
+  AppLocale.startupBetaImportPrepareBody: 'Fermez d\'abord la bêta. À l\'écran suivant, touchez « Utiliser ce dossier », puis « Autoriser ».',
+  AppLocale.startupBetaImportIconHint: 'S\'il s\'ouvre ailleurs, ouvrez le menu ☰ et choisissez le NeoStation avec cette icône :',
+  AppLocale.startupBetaImportChooseFolder: 'Choisir le dossier',
+  AppLocale.startupBetaImportBack: 'Retour',
+  AppLocale.startupBetaImportCopyTitle: 'Copie de vos données',
+  AppLocale.startupBetaImportFoldersTitle: 'Donnez accès à vos dossiers de ROM',
+  AppLocale.startupBetaImportFoldersBody: 'Android accorde l\'accès aux dossiers à chaque application séparément, NeoStation a donc de nouveau besoin d\'accéder à ces dossiers. À l\'écran suivant, gardez le dossier qui s\'ouvre et touchez « Utiliser ce dossier » et « Autoriser ».',
+  AppLocale.startupBetaImportFolderAllow: 'Donner l\'accès',
+  AppLocale.startupBetaImportFolderLater: 'Plus tard',
+  AppLocale.startupBetaImportFolderWrong: 'C\'est un autre dossier. Choisissez {folder} pour que vos jeux continuent de fonctionner.',
+  AppLocale.startupBetaImportDoneTitle: 'Tout est prêt',
   AppLocale.startupLoading:
       'Préparation de NeoStation. En attente du stockage et des services…',
 

@@ -71,7 +71,7 @@ Folders that already contain `.m3u` playlists are skipped during the scan.
 # Coming soon to Flathub! In the meantime, you can build locally:
 flatpak-builder --user --install-deps-from=flathub \
   --repo=repo --force-clean \
-  build-dir linux/flatpak/com.neogamelab.neostation.yml
+  build-dir linux/flatpak/dev.misoba.neostation.yml
 ```
 
 ### Steam Deck

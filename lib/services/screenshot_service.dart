@@ -14,7 +14,7 @@ class ScreenshotService {
   static final _log = LoggerService.instance;
 
   static const MethodChannel _channel = MethodChannel(
-    'com.neogamelab.neostation/game',
+    'dev.misoba.neostation/game',
   );
 
   /// The last answer Android actually gave us, or null before the first check.

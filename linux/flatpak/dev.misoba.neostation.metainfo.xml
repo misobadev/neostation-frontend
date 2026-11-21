@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.neogamelab.neostation</id>
+  <id>dev.misoba.neostation</id>
 
   <name>NeoStation</name>
   <summary>Modern, multi-platform emulation frontend</summary>
@@ -31,7 +31,7 @@
   <url type="donation">https://www.patreon.com/cw/NeoStation</url>
   <url type="vcs-browser">https://github.com/misobadev/neostation-frontend</url>
 
-  <launchable type="desktop-id">com.neogamelab.neostation.desktop</launchable>
+  <launchable type="desktop-id">dev.misoba.neostation.desktop</launchable>
 
   <screenshots>
     <screenshot type="default">
@@ -40,8 +40,8 @@
     </screenshot>
   </screenshots>
 
-  <developer id="com.neogamelab">
-    <name>NeoGameLab</name>
+  <developer id="dev.misoba">
+    <name>Miguel Soto</name>
   </developer>
 
   <categories>
@@ -74,6 +74,6 @@
   </provides>
 
   <custom>
-    <value key="flathub::manifest">https://raw.githubusercontent.com/misobadev/neostation-frontend/main/linux/flatpak/com.neogamelab.neostation.yml</value>
+    <value key="flathub::manifest">https://raw.githubusercontent.com/misobadev/neostation-frontend/main/linux/flatpak/dev.misoba.neostation.yml</value>
   </custom>
 </component>

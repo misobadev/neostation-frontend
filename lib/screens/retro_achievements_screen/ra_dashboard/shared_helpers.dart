@@ -134,13 +134,13 @@ extension _SharedHelpers on RADashboardHubState {
         return ClipRRect(
           borderRadius: BorderRadius.circular(8.r),
           child: SizedBox(
-            width: 40.r,
-            height: 40.r,
+            width: 34.r,
+            height: 34.r,
             child: Image.network(
               url,
               fit: BoxFit.cover,
-              cacheWidth: (40 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-              cacheHeight: (40 * MediaQuery.devicePixelRatioOf(context)).ceil(),
+              cacheWidth: (34 * MediaQuery.devicePixelRatioOf(context)).ceil(),
+              cacheHeight: (34 * MediaQuery.devicePixelRatioOf(context)).ceil(),
               errorBuilder: (context, error, stackTrace) => Container(
                 color: theme.colorScheme.surface,
                 child: Icon(icon, color: theme.colorScheme.primary, size: 18.r),
@@ -159,10 +159,12 @@ extension _SharedHelpers on RADashboardHubState {
     double? borderWidth,
   }) {
     return BoxDecoration(
-      color: background ?? theme.cardColor.withValues(alpha: 0.25),
-      borderRadius: BorderRadius.circular(12.r),
+      color: background ?? theme.colorScheme.onSurface.withValues(alpha: 0.04),
+      borderRadius:
+          theme.extension<CornerRadii>()?.radiusInternal ??
+          BorderRadius.circular(10.r),
       border: Border.all(
-        color: borderColor ?? theme.colorScheme.primary.withValues(alpha: 0.15),
+        color: borderColor ?? theme.colorScheme.outline.withValues(alpha: 0.15),
         width: borderWidth ?? 1.r,
       ),
     );

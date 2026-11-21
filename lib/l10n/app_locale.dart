@@ -106,6 +106,57 @@ mixin AppLocale {
   static const String startupStorageStartEmpty = 'startup_storage_start_empty';
   static const String startupStorageCreateFailed =
       'startup_storage_create_failed';
+  static const String startupBetaImportWrongFolder =
+      'startup_beta_import_wrong_folder';
+  static const String startupBetaImportNoLibrary =
+      'startup_beta_import_no_library';
+  static const String startupBetaImportMeasuring =
+      'startup_beta_import_measuring';
+  static const String startupBetaImportCopying = 'startup_beta_import_copying';
+  static const String startupBetaImportCancel = 'startup_beta_import_cancel';
+  static const String startupBetaImportNoSpace = 'startup_beta_import_no_space';
+  static const String startupBetaImportFailed = 'startup_beta_import_failed';
+  static const String startupBetaImportDone = 'startup_beta_import_done';
+  static const String startupBetaImportContinue =
+      'startup_beta_import_continue';
+  static const String startupBetaImportUninstall =
+      'startup_beta_import_uninstall';
+  static const String wizardStepOf = 'wizard_step_of';
+  static const String wizardLanguageTitle = 'wizard_language_title';
+  static const String wizardLanguageBody = 'wizard_language_body';
+  static const String wizardWelcomeBody = 'wizard_welcome_body';
+  static const String wizardStartSetup = 'wizard_start_setup';
+  static const String startupBetaImportChooseTitle =
+      'startup_beta_import_choose_title';
+  static const String startupBetaImportChooseBody =
+      'startup_beta_import_choose_body';
+  static const String startupBetaImportImportAll =
+      'startup_beta_import_import_all';
+  static const String startupBetaImportStartFresh =
+      'startup_beta_import_start_fresh';
+  static const String startupBetaImportPrepareTitle =
+      'startup_beta_import_prepare_title';
+  static const String startupBetaImportPrepareBody =
+      'startup_beta_import_prepare_body';
+  static const String startupBetaImportIconHint =
+      'startup_beta_import_icon_hint';
+  static const String startupBetaImportChooseFolder =
+      'startup_beta_import_choose_folder';
+  static const String startupBetaImportBack = 'startup_beta_import_back';
+  static const String startupBetaImportCopyTitle =
+      'startup_beta_import_copy_title';
+  static const String startupBetaImportFoldersTitle =
+      'startup_beta_import_folders_title';
+  static const String startupBetaImportFoldersBody =
+      'startup_beta_import_folders_body';
+  static const String startupBetaImportFolderAllow =
+      'startup_beta_import_folder_allow';
+  static const String startupBetaImportFolderLater =
+      'startup_beta_import_folder_later';
+  static const String startupBetaImportFolderWrong =
+      'startup_beta_import_folder_wrong';
+  static const String startupBetaImportDoneTitle =
+      'startup_beta_import_done_title';
 
   // ---------------------------------------------------------------------------
   // Game / Playback
@@ -1559,6 +1610,9 @@ mixin AppLocale {
   static const String raEvents = 'raEvents';
   static const String raAotwYearTitle = 'ra_aotw_year_title';
   static const String raAotw = 'raAotw';
+  static const String raOverview = 'raOverview';
+  static const String raStatPlayed = 'raStatPlayed';
+  static const String raStatBeaten = 'raStatBeaten';
   static const String raAwards = 'raAwards';
   static const String raSetOrder = 'raSetOrder';
   static const String raPointsSort = 'raPointsSort';

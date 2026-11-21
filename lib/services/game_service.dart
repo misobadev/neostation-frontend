@@ -64,7 +64,7 @@ class GameService {
   static Future<void> initializeAndroidGameListener() async {
     if (!Platform.isAndroid) return;
 
-    const platform = MethodChannel('com.neogamelab.neostation/game');
+    const platform = MethodChannel('dev.misoba.neostation/game');
     platform.setMethodCallHandler((call) async {
       if (call.method == 'onGameReturned') {
         final elapsedSeconds =

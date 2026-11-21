@@ -69,6 +69,10 @@ extension _LoginForm on _RAContentState {
     }
   }
 
+  CornerRadii _raRadii(BuildContext context) =>
+      Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m();
+
+  /// A field's selection highlight: a solid ring, no glow, as on NeoSync's.
   Widget _buildFieldHighlight({
     required int slot,
     required ThemeData theme,
@@ -76,17 +80,135 @@ extension _LoginForm on _RAContentState {
   }) {
     if (!isSelected(slot)) return child;
     return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8.r),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.35),
-            blurRadius: 6.r,
-            spreadRadius: 1.r,
-          ),
-        ],
+      foregroundDecoration: BoxDecoration(
+        borderRadius: _raRadii(context).radiusInternal,
+        border: Border.all(color: theme.colorScheme.onSurface, width: 2.r),
       ),
       child: child,
+    );
+  }
+
+  /// A field sunk into the glass panel, its label kept inside as the
+  /// placeholder: floated, it sat on the field's edge under the ring.
+  InputDecoration _raInputDecoration(
+    ThemeData theme, {
+    required String label,
+    required String hint,
+    Widget? suffixIcon,
+  }) {
+    final radius = _raRadii(context).radiusInternal;
+    return InputDecoration(
+      labelText: label,
+      floatingLabelBehavior: FloatingLabelBehavior.never,
+      labelStyle: TextStyle(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+        fontSize: 11.r,
+      ),
+      hintText: hint,
+      hintStyle: TextStyle(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+        fontSize: 10.r,
+      ),
+      contentPadding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
+      filled: true,
+      fillColor: theme.scaffoldBackgroundColor,
+      border: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(
+          color: theme.colorScheme.outline.withValues(alpha: 0.15),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.r),
+      ),
+      suffixIcon: suffixIcon,
+    );
+  }
+
+  /// A button as the app's own (GamepadControl), wearing the fields' ring and
+  /// the A glyph while the cursor is on it, since A presses it.
+  Widget _raButton(
+    ThemeData theme, {
+    required int slot,
+    required String label,
+    required VoidCallback? onTap,
+    bool primary = false,
+    bool busy = false,
+  }) {
+    final selected = isSelected(slot);
+    final button = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: GamepadControl(
+        iconPath: selected ? 'assets/images/gamepad/Xbox_A_button.png' : null,
+        label: label,
+        onTap: onTap,
+        busy: busy,
+        backgroundColor: primary
+            ? theme.colorScheme.tertiary
+            : theme.colorScheme.tertiaryFixed,
+        textColor: primary
+            ? theme.colorScheme.onTertiary
+            : theme.colorScheme.onTertiaryFixed,
+      ),
+    );
+    if (!selected) return button;
+    return Container(
+      padding: EdgeInsets.all(2.r),
+      decoration: BoxDecoration(
+        borderRadius: _raRadii(context).radiusInternal,
+        border: Border.all(color: theme.colorScheme.onSurface, width: 2.r),
+      ),
+      child: button,
+    );
+  }
+
+  /// Signed out: one NeoGlass panel, RetroAchievements introduced on the left
+  /// and the login form on the right, as on the NeoSync tab.
+  Widget _buildSignedOutPanel(
+    BuildContext context,
+    RetroAchievementsProvider raProvider,
+  ) {
+    final theme = Theme.of(context);
+    final radii = _raRadii(context);
+    final line = theme.colorScheme.outline.withValues(alpha: 0.15);
+    return Center(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(16.r, 0, 16.r, 16.r),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 600.r),
+          child: NeoGlassRim(
+            cornerRadius: radii.radiusExternalRadius,
+            child: Container(
+              padding: EdgeInsets.all(20.r),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: radii.radiusExternal,
+                border: Border.all(color: line),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _buildInfoBox(context)),
+                  Container(
+                    width: 1,
+                    height: 200.r,
+                    margin: EdgeInsets.symmetric(horizontal: 20.r),
+                    color: line,
+                  ),
+                  Expanded(
+                    child: _buildLandscapeConnectionForm(context, raProvider),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -95,381 +217,208 @@ extension _LoginForm on _RAContentState {
     RetroAchievementsProvider raProvider,
   ) {
     final theme = Theme.of(context);
-    return Container(
-      padding: EdgeInsets.all(16.r),
-      decoration: BoxDecoration(
-        color: theme.cardColor.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1,
+    final field = BoxConstraints(maxWidth: 240.r);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            AppLocale.raLogin.getString(context),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+              fontSize: 14.r,
+            ),
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Header with the login title
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  AppLocale.raLogin.getString(context),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                    fontSize: 14.r,
-                  ),
+        SizedBox(height: 12.r),
+        ConstrainedBox(
+          constraints: field,
+          child: _buildFieldHighlight(
+            slot: 0,
+            theme: theme,
+            child: SizedBox(
+              height: 38.r,
+              child: TextFormField(
+                controller: _usernameController,
+                focusNode: _usernameFocus,
+                decoration: _raInputDecoration(
+                  theme,
+                  label: AppLocale.username.getString(context),
+                  hint: AppLocale.enterUsername.getString(context),
                 ),
-              ),
-            ],
-          ),
-
-          SizedBox(height: 12.r),
-
-          // Username field
-          Container(
-            constraints: BoxConstraints(maxWidth: 220.r),
-            child: _buildFieldHighlight(
-              slot: 0,
-              theme: theme,
-              child: SizedBox(
-                height: 32.r,
-                child: TextFormField(
-                  controller: _usernameController,
-                  focusNode: _usernameFocus,
-                  decoration: InputDecoration(
-                    labelText: AppLocale.username.getString(context),
-                    labelStyle: TextStyle(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                      fontSize: 10.r,
-                    ),
-                    floatingLabelStyle: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontSize: 10.r,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    hintText: AppLocale.enterUsername.getString(context),
-                    hintStyle: TextStyle(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                      fontSize: 10.r,
-                    ),
-                    filled: true,
-                    fillColor: theme.colorScheme.onSurface.withValues(
-                      alpha: 0.05,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                      borderSide: BorderSide(
-                        color: isSelected(0)
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.primary.withValues(alpha: 0.1),
-                        width: isSelected(0) ? 2.r : 1.r,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                      borderSide: BorderSide(
-                        color: theme.colorScheme.primary,
-                        width: 1.r,
-                      ),
-                    ),
-                  ),
-                  enabled: !raProvider.isLoading,
-                  style: TextStyle(fontSize: 11.r),
-                  textInputAction: TextInputAction.next,
-                  onFieldSubmitted: (_) => _apiKeyFocus.requestFocus(),
-                ),
+                enabled: !raProvider.isLoading,
+                style: TextStyle(fontSize: 12.r),
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => _apiKeyFocus.requestFocus(),
               ),
             ),
           ),
-          SizedBox(height: 6.r),
-
-          // API key field
-          Container(
-            constraints: BoxConstraints(maxWidth: 220.r),
-            child: _buildFieldHighlight(
-              slot: 1,
-              theme: theme,
-              child: SizedBox(
-                height: 32.r,
-                child: TextFormField(
-                  controller: _apiKeyController,
-                  focusNode: _apiKeyFocus,
-                  obscureText: _obscureApiKey,
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  decoration: InputDecoration(
-                    labelText: AppLocale.raApiKey.getString(context),
-                    suffixStyle: TextStyle(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.7),
-                      fontSize: 12.r,
+        ),
+        SizedBox(height: 8.r),
+        ConstrainedBox(
+          constraints: field,
+          child: _buildFieldHighlight(
+            slot: 1,
+            theme: theme,
+            child: SizedBox(
+              height: 38.r,
+              child: TextFormField(
+                controller: _apiKeyController,
+                focusNode: _apiKeyFocus,
+                obscureText: _obscureApiKey,
+                enableSuggestions: false,
+                autocorrect: false,
+                decoration: _raInputDecoration(
+                  theme,
+                  label: AppLocale.raApiKey.getString(context),
+                  hint: AppLocale.raEnterApiKey.getString(context),
+                  suffixIcon: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(
+                      size: 18.r,
+                      _obscureApiKey
+                          ? Symbols.visibility_rounded
+                          : Symbols.visibility_off_rounded,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
-                    labelStyle: TextStyle(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                      fontSize: 10.r,
-                    ),
-                    floatingLabelStyle: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontSize: 10.r,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    hintText: AppLocale.raEnterApiKey.getString(context),
-                    hintStyle: TextStyle(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                      fontSize: 10.r,
-                    ),
-                    filled: true,
-                    fillColor: theme.colorScheme.onSurface.withValues(
-                      alpha: 0.05,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                      borderSide: BorderSide(
-                        color: isSelected(1)
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.primary.withValues(alpha: 0.1),
-                        width: isSelected(1) ? 2.r : 1.r,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                      borderSide: BorderSide(
-                        color: theme.colorScheme.primary,
-                        width: 1.r,
-                      ),
-                    ),
-                    suffixIcon: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        size: 18.r,
-                        _obscureApiKey
-                            ? Symbols.visibility_rounded
-                            : Symbols.visibility_off_rounded,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.5,
-                        ),
-                      ),
-                      onPressed: () {
-                        rebuild(() {
-                          _obscureApiKey = !_obscureApiKey;
-                        });
-                      },
-                    ),
+                    onPressed: () {
+                      rebuild(() {
+                        _obscureApiKey = !_obscureApiKey;
+                      });
+                    },
                   ),
-                  enabled: !raProvider.isLoading,
-                  style: TextStyle(fontSize: 11.r),
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => _connectToRA(),
                 ),
+                enabled: !raProvider.isLoading,
+                style: TextStyle(fontSize: 12.r),
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _connectToRA(),
               ),
             ),
           ),
-          SizedBox(height: 6.r),
-
-          // Direct users to the page where RetroAchievements exposes their
-          // personal Web API key, without asking the app to handle passwords.
-          Container(
-            constraints: BoxConstraints(maxWidth: 320.r),
-            decoration: isSelected(2)
-                ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(8.r),
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.colorScheme.primary.withValues(
-                          alpha: 0.35,
-                        ),
-                        blurRadius: 8.r,
-                        spreadRadius: 1.r,
-                      ),
-                    ],
-                  )
-                : null,
-            child: OutlinedButton.icon(
-              onPressed: _openRaControlPanel,
-              icon: Icon(Symbols.key_rounded, size: 14.r),
-              label: Text(
-                AppLocale.raGetApiKey.getString(context),
-                style: TextStyle(fontSize: 11.r, fontWeight: FontWeight.w600),
-              ),
-              style: OutlinedButton.styleFrom(
-                minimumSize: Size(double.infinity, 32.r),
-                side: BorderSide(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.6),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(height: 4.r),
-          Text(
+        ),
+        SizedBox(height: 10.r),
+        _raButton(
+          theme,
+          slot: 2,
+          label: AppLocale.login.getString(context),
+          onTap: raProvider.isLoading ? null : _connectToRA,
+          primary: true,
+          busy: raProvider.isLoading,
+        ),
+        SizedBox(height: 10.r),
+        // Where RetroAchievements shows the personal Web API key, so the app
+        // never handles a password.
+        _raButton(
+          theme,
+          slot: 3,
+          label: AppLocale.raGetApiKey.getString(context),
+          onTap: _openRaControlPanel,
+        ),
+        SizedBox(height: 6.r),
+        ConstrainedBox(
+          constraints: field,
+          child: Text(
             AppLocale.raApiKeyHelp.getString(context),
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
-              fontSize: 8.r,
+              fontSize: 9.r,
             ),
           ),
-          SizedBox(height: 6.r),
-
-          // Connect button
-          Container(
-            constraints: BoxConstraints(maxWidth: 320.r),
-            decoration: isSelected(submitSlot)
-                ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(8.r),
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                        blurRadius: 8.r,
-                        spreadRadius: 2.r,
-                      ),
-                    ],
-                  )
-                : null,
-            child: SizedBox(
-              width: double.infinity,
-              height: 32.r,
-              child: ElevatedButton(
-                onPressed: raProvider.isLoading ? null : _connectToRA,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  elevation: 0,
-                  padding: EdgeInsets.zero,
-                ),
-                child: raProvider.isLoading
-                    ? SizedBox(
-                        width: 16.r,
-                        height: 16.r,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            theme.colorScheme.onPrimary,
-                          ),
-                        ),
-                      )
-                    : Text(
-                        AppLocale.login.getString(context),
-                        style: TextStyle(
-                          fontSize: 14.r,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
+  /// RetroAchievements introduced: its trophy and name, what it is and where
+  /// to sign up.
   Widget _buildInfoBox(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: EdgeInsets.all(16.r),
-      decoration: BoxDecoration(
-        color: theme.cardColor.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Symbols.emoji_events_rounded,
-                color: theme.colorScheme.primary,
-                size: 24.r,
-              ),
-              SizedBox(width: 12.r),
-              Expanded(
-                child: Text(
-                  AppLocale.raWhatIs.getString(context),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                    fontSize: 14.r,
-                  ),
+    final ink = theme.colorScheme.onSurface;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Image.asset(
+              'assets/images/icons/enhance-prize.webp',
+              width: 24.r,
+              height: 24.r,
+              color: ink,
+            ),
+            SizedBox(width: 10.r),
+            Flexible(
+              child: Text(
+                'RetroAchievements',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: ink,
+                  fontSize: 18.r,
                 ),
               ),
+            ),
+          ],
+        ),
+        SizedBox(height: 14.r),
+        Text(
+          AppLocale.raDescription.getString(context),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: ink.withValues(alpha: 0.9),
+            fontSize: 10.r,
+          ),
+          softWrap: true,
+        ),
+        SizedBox(height: 8.r),
+        _buildInfoItem(
+          context,
+          Symbols.star_outline_rounded,
+          AppLocale.raEarnPoints.getString(context),
+        ),
+        _buildInfoItem(
+          context,
+          Symbols.public_rounded,
+          AppLocale.raGlobalLeaderboards.getString(context),
+        ),
+        _buildInfoItem(
+          context,
+          Symbols.history_rounded,
+          AppLocale.raGameplayHistory.getString(context),
+        ),
+        SizedBox(height: 6.r),
+        RichText(
+          softWrap: true,
+          text: TextSpan(
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: ink.withValues(alpha: 0.6),
+              fontSize: 10.r,
+            ),
+            children: [
+              TextSpan(text: AppLocale.raCreateAccountAt.getString(context)),
+              TextSpan(
+                text: 'retroachievements.org',
+                style: TextStyle(
+                  color: ink,
+                  decoration: TextDecoration.underline,
+                ),
+                recognizer: TapGestureRecognizer()
+                  ..onTap = () async {
+                    final url = Uri.parse('https://retroachievements.org');
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(
+                        url,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    }
+                  },
+              ),
+              TextSpan(text: AppLocale.raToStartEarning.getString(context)),
             ],
           ),
-          SizedBox(height: 6.r),
-          Text(
-            AppLocale.raDescription.getString(context),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
-              fontSize: 8.r,
-            ),
-            softWrap: true,
-          ),
-          SizedBox(height: 6.r),
-          _buildInfoItem(
-            context,
-            Symbols.star_outline_rounded,
-            AppLocale.raEarnPoints.getString(context),
-          ),
-          _buildInfoItem(
-            context,
-            Symbols.public_rounded,
-            AppLocale.raGlobalLeaderboards.getString(context),
-          ),
-          _buildInfoItem(
-            context,
-            Symbols.history_rounded,
-            AppLocale.raGameplayHistory.getString(context),
-          ),
-          SizedBox(height: 6.r),
-          RichText(
-            softWrap: true,
-            text: TextSpan(
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 8.r,
-              ),
-              children: [
-                TextSpan(text: AppLocale.raCreateAccountAt.getString(context)),
-                TextSpan(
-                  text: 'retroachievements.org',
-                  style: TextStyle(
-                    color: theme.colorScheme.primary,
-                    decoration: TextDecoration.underline,
-                  ),
-                  recognizer: TapGestureRecognizer()
-                    ..onTap = () async {
-                      final url = Uri.parse('https://retroachievements.org');
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(
-                          url,
-                          mode: LaunchMode.externalApplication,
-                        );
-                      }
-                    },
-                ),
-                TextSpan(text: AppLocale.raToStartEarning.getString(context)),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -481,8 +430,8 @@ extension _LoginForm on _RAContentState {
         children: [
           Icon(
             icon,
-            size: 12.r,
-            color: theme.colorScheme.primary.withValues(alpha: 0.7),
+            size: 14.r,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
           ),
           SizedBox(width: 8.r),
           Expanded(
@@ -490,7 +439,7 @@ extension _LoginForm on _RAContentState {
               text,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                fontSize: 8.r,
+                fontSize: 10.r,
               ),
               softWrap: true,
             ),

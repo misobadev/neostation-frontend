@@ -1,4 +1,4 @@
-package com.neogamelab.neostation
+package dev.misoba.neostation
 
 import android.os.Bundle
 import android.util.Log
@@ -29,7 +29,7 @@ class SecondaryAppsPresentation(
 
     companion object {
         private const val TAG = "SecondaryApps"
-        private const val CHANNEL = "com.neogamelab.neostation/secondary_apps"
+        private const val CHANNEL = "dev.misoba.neostation/secondary_apps"
     }
 
     private var appsChannel: MethodChannel? = null

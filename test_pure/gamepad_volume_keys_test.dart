@@ -18,7 +18,7 @@ void main() {
   final pluginClass = File('$plugin/GamepadsAndroidPlugin.kt')
       .readAsStringSync();
   final activity = File(
-    'android/app/src/main/kotlin/com/neogamelab/neostation/MainActivity.kt',
+    'android/app/src/main/kotlin/dev/misoba/neostation/MainActivity.kt',
   ).readAsStringSync();
 
   // From [signature] to the end of its body, at 4-space member indent.

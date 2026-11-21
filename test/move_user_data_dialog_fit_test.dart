@@ -46,10 +46,10 @@ void main() {
   });
 
   const androidPath =
-      '/storage/emulated/0/Android/data/com.neogamelab.neostation/files/'
+      '/storage/emulated/0/Android/data/dev.misoba.neostation/files/'
       'user-data';
   const sdCardPath =
-      '/storage/1A2B-3C4D/Android/data/com.neogamelab.neostation/files/'
+      '/storage/1A2B-3C4D/Android/data/dev.misoba.neostation/files/'
       'user-data';
   // Long enough to take the path boxes' three lines.
   const longFrom =

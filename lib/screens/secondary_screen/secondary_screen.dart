@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:neostation/widgets/brand_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -1216,12 +1217,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   }
 
   Widget _buildDefaultLogo() {
-    return Image.asset(
-      'assets/images/logo_transparent.png',
-      width: 200.r,
-      height: 200.r,
-      fit: BoxFit.contain,
-    );
+    return BrandLogo(width: 380.r);
   }
 
   Widget _buildSystemLogo(SecondaryDisplayStateData value) {

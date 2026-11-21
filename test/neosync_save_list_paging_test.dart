@@ -213,12 +213,13 @@ void main() {
       .widget<OnlineSavesListView>(find.byType(OnlineSavesListView))
       .selectedIndex;
 
-  /// Walks from the search field, over the filter chips, to save [index].
+  /// Walks from the search field, over the filter chips, to save [index]:
+  /// the saves are a grid, so along its first row.
   Future<void> focusSave(WidgetTester tester, int index) async {
     await pressKey(tester, LogicalKeyboardKey.arrowDown); // filters
     await pressKey(tester, LogicalKeyboardKey.arrowDown); // first save
     for (var i = 0; i < index; i++) {
-      await pressKey(tester, LogicalKeyboardKey.arrowDown);
+      await pressKey(tester, LogicalKeyboardKey.arrowRight);
     }
     expect(highlighted(tester), index);
   }
@@ -256,14 +257,44 @@ void main() {
 
     await pull(tester, 'axis_rtrigger');
     expect(service.offsets, [0, 50]);
-    await pressKey(tester, LogicalKeyboardKey.arrowDown);
-    await pressKey(tester, LogicalKeyboardKey.arrowDown);
+    await pressKey(tester, LogicalKeyboardKey.arrowRight);
+    await pressKey(tester, LogicalKeyboardKey.arrowRight);
     expect(highlighted(tester), 2);
 
     await pull(tester, 'axis_rtrigger');
     expect(service.offsets, [0, 50]);
     expect(find.text('Page 2 of 2'), findsOneWidget);
     expect(highlighted(tester), 2);
+  });
+
+  testWidgets('the saves are a grid: Down and Up move a row, Left and Right '
+      'one save', (tester) async {
+    // 12 saves: a full row of OnlineSavesListView.columns and a short one.
+    await pumpSaveList(tester, count: 12);
+    await focusSave(tester, 3);
+
+    await pressKey(tester, LogicalKeyboardKey.arrowDown);
+    expect(highlighted(tester), 3 + OnlineSavesListView.columns);
+
+    await pressKey(tester, LogicalKeyboardKey.arrowUp);
+    expect(highlighted(tester), 3);
+
+    // The row below is shorter than this column: Down lands on the last save.
+    await pressKey(tester, LogicalKeyboardKey.arrowRight);
+    await pressKey(tester, LogicalKeyboardKey.arrowRight);
+    await pressKey(tester, LogicalKeyboardKey.arrowRight);
+    await pressKey(tester, LogicalKeyboardKey.arrowRight);
+    expect(highlighted(tester), 7);
+    await pressKey(tester, LogicalKeyboardKey.arrowDown);
+    expect(highlighted(tester), 11);
+
+    // Nothing below the last row, nothing past the last save.
+    await pressKey(tester, LogicalKeyboardKey.arrowDown);
+    await pressKey(tester, LogicalKeyboardKey.arrowRight);
+    expect(highlighted(tester), 11);
+
+    // The highlighted save is named under the grid.
+    expect(find.text('Game 12'), findsOneWidget);
   });
 
   testWidgets('a trigger pulled while a page loads is ignored', (tester) async {

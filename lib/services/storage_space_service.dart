@@ -46,7 +46,7 @@ class StorageSpaceService {
   /// Android's `File.usableSpace`, on the channel that already carries the
   /// app's other filesystem calls.
   static const MethodChannel _channel = MethodChannel(
-    'com.neogamelab.neostation/game',
+    'dev.misoba.neostation/game',
   );
 
   /// Free bytes on the volume containing [path], or null when it can't be

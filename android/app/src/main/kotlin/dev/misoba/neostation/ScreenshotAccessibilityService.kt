@@ -1,4 +1,4 @@
-package com.neogamelab.neostation
+package dev.misoba.neostation
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent

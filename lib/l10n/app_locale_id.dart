@@ -93,6 +93,9 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.raEvents: 'Acara',
   AppLocale.raAotwYearTitle: 'Pencapaian Minggu Ini ({year})',
   AppLocale.raAotw: 'AOTW',
+  AppLocale.raOverview: 'Ringkasan',
+  AppLocale.raStatPlayed: 'Dimainkan',
+  AppLocale.raStatBeaten: 'Ditamatkan',
   AppLocale.raAwards: 'Penghargaan',
   AppLocale.raSetOrder: 'Urutan set',
   AppLocale.raPointsSort: 'Poin tertinggi',
@@ -129,6 +132,43 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.startupStorageStartEmpty: 'Mulai dengan folder kosong',
   AppLocale.startupStorageCreateFailed:
       'NeoStation tidak dapat membuat folder di sana.',
+  AppLocale.startupBetaImportWrongFolder:
+      'Itu bukan folder yang benar. Pilih NeoStation dengan ikon ini.',
+  AppLocale.startupBetaImportNoLibrary:
+      'Beta tidak punya pustaka untuk diimpor. Mulai dari nol.',
+  AppLocale.startupBetaImportMeasuring:
+      'Memeriksa apa saja yang perlu disalin...',
+  AppLocale.startupBetaImportCopying:
+      'Menyalin data kamu dari beta. Biarkan NeoStation tetap terbuka.',
+  AppLocale.startupBetaImportCancel: 'Batal',
+  AppLocale.startupBetaImportNoSpace: 'Ruang kosong tidak cukup: data beta memakai {needed} dan yang tersedia {free}.',
+  AppLocale.startupBetaImportFailed:
+      'Penyalinan tidak selesai ({error}). Tidak ada yang diubah.',
+  AppLocale.startupBetaImportDone: '{files} file disalin dari beta. Masuk lagi ke NeoSync, RetroAchievements, RomM, dan ScreenScraper, lalu izinkan lagi akses ke file kamu saat diminta: info masuk dan izin tidak bisa dipindahkan. Setelah semuanya ada di sini, kamu bisa mencopot versi beta.',
+  AppLocale.startupBetaImportContinue: 'Lanjutkan',
+  AppLocale.startupBetaImportUninstall: 'Copot versi beta',
+  AppLocale.wizardStepOf: 'Langkah {step} dari {total}',
+  AppLocale.wizardLanguageTitle: 'Pilih bahasamu',
+  AppLocale.wizardLanguageBody: 'Kamu bisa mengubahnya nanti di Pengaturan.',
+  AppLocale.wizardWelcomeBody: 'Frontend gratis dan sumber terbuka untuk semua game retro kamu. Tekan A untuk mulai menyiapkannya.',
+  AppLocale.wizardStartSetup: 'Mulai penyiapan',
+  AppLocale.startupBetaImportChooseTitle: 'NeoStation beta ditemukan',
+  AppLocale.startupBetaImportChooseBody: 'NeoStation beta {version} terpasang di perangkat ini. Versi ini adalah aplikasi baru, jadi dimulai dalam keadaan kosong. Bawa pustaka, pengaturan, media, dan tema dari beta, atau mulai dari nol?',
+  AppLocale.startupBetaImportImportAll: 'Impor semua dari beta',
+  AppLocale.startupBetaImportStartFresh: 'Mulai dari nol',
+  AppLocale.startupBetaImportPrepareTitle: 'Pilih folder beta',
+  AppLocale.startupBetaImportPrepareBody: 'Tutup versi beta dulu. Di layar berikutnya, ketuk "Gunakan folder ini" lalu "Izinkan".',
+  AppLocale.startupBetaImportIconHint: 'Jika yang terbuka tempat lain, buka menu ☰ dan pilih NeoStation dengan ikon ini:',
+  AppLocale.startupBetaImportChooseFolder: 'Pilih folder',
+  AppLocale.startupBetaImportBack: 'Kembali',
+  AppLocale.startupBetaImportCopyTitle: 'Menyalin data kamu',
+  AppLocale.startupBetaImportFoldersTitle: 'Beri akses ke folder ROM kamu',
+  AppLocale.startupBetaImportFoldersBody: 'Android memberikan akses folder untuk setiap aplikasi secara terpisah, jadi NeoStation perlu akses ke folder ini lagi. Di layar berikutnya, biarkan folder yang terbuka dan ketuk "Gunakan folder ini" dan "Izinkan".',
+  AppLocale.startupBetaImportFolderAllow: 'Beri akses',
+  AppLocale.startupBetaImportFolderLater: 'Nanti saja',
+  AppLocale.startupBetaImportFolderWrong:
+      'Itu folder lain. Pilih {folder} agar game kamu tetap berfungsi.',
+  AppLocale.startupBetaImportDoneTitle: 'Semua siap',
   AppLocale.startupLoading:
       'Menyiapkan NeoStation. Menunggu penyimpanan dan layanan...',
 

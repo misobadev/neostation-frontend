@@ -8,7 +8,7 @@ import 'package:neostation/services/logger_service.dart';
 class AndroidService {
   /// The primary communication channel for Android-specific game operations.
   static const MethodChannel _channel = MethodChannel(
-    'com.neogamelab.neostation/game',
+    'dev.misoba.neostation/game',
   );
 
   static final _log = LoggerService.instance;

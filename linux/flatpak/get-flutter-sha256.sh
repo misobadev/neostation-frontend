@@ -8,7 +8,7 @@
 
 set -e
 
-MANIFEST="linux/flatpak/com.neogamelab.neostation.yml"
+MANIFEST="linux/flatpak/dev.misoba.neostation.yml"
 
 # Get Flutter version
 if [ -n "$1" ]; then

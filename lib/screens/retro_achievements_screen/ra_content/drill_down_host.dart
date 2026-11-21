@@ -1,54 +1,69 @@
 part of '../ra_content.dart';
 
-/// The see-all rows open a ROM-independent RetroAchievements game page. The
-/// local library and RomM remain available through the weekly-game card; a
-/// normal RA row is an information request and should never trigger a
-/// download as a side effect.
+/// The panel's sections and the RetroAchievements game page their rows open.
+/// A row is an information request: the page is ROM-independent and never
+/// starts a download. The local library and RomM stay reachable through the
+/// week card.
 extension _DrillDownHost on _RAContentState {
-  Future<void> _openUnlocks({int focusAction = 2}) {
-    _setDashboardAction(focusAction);
-    return _openRaPage(
-      RaUnlocksPage(onActivate: (item) => _activateUnlock(item)),
-    );
-  }
-
-  Future<void> _openGames({int focusAction = 3}) {
-    _setDashboardAction(focusAction);
-    return _openRaPage(RaGamesPage(onActivate: (item) => _activateGame(item)));
-  }
-
-  Future<void> _openEvents() {
-    _setDashboardAction(1);
-    return _openRaPage(
-      RaCollectionPage(
-        events: true,
-        onOpenGame: (id, title) {
-          _openRaGameAchievements(gameId: id, gameTitle: title);
-        },
-      ),
-    );
-  }
-
-  Future<void> _openAwards() {
-    _setDashboardAction(4);
-    return _openRaPage(
-      RaCollectionPage(
-        events: false,
-        onOpenGame: (id, title) {
-          _openRaGameAchievements(gameId: id, gameTitle: title);
-        },
-      ),
-    );
-  }
-
-  Future<void> _openRaPage(Widget page) async {
-    if (_raPageInFlight || !mounted) return;
-    _raPageInFlight = true;
-    try {
-      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
-    } finally {
-      _raPageInFlight = false;
+  /// The panel's content for every section but the overview. Each section is
+  /// built the first time it is shown and kept after, so going back to one is
+  /// instant; only the one on show is active and fetches.
+  Widget _buildSectionContent() {
+    if (_section != RaDashboardSection.overview) {
+      _visitedSections.add(_section);
     }
+    final panelFocused = !_menuFocused;
+    bool shows(RaDashboardSection section) => _section == section;
+    Widget slot(RaDashboardSection section, Widget Function() build) =>
+        _visitedSections.contains(section) ? build() : const SizedBox.shrink();
+    return IndexedStack(
+      index: shows(RaDashboardSection.overview) ? 0 : _section.index - 1,
+      sizing: StackFit.expand,
+      children: [
+        slot(
+          RaDashboardSection.aotw,
+          () => RaCollectionTab(
+            key: _eventsKey,
+            events: true,
+            active: shows(RaDashboardSection.aotw),
+            focused: panelFocused && shows(RaDashboardSection.aotw),
+            onOpenGame: (id, title) =>
+                _openRaGameAchievements(gameId: id, gameTitle: title),
+          ),
+        ),
+        slot(
+          RaDashboardSection.unlocks,
+          () => RaUnlocksTab(
+            key: _unlocksKey,
+            embedded: true,
+            active: shows(RaDashboardSection.unlocks),
+            focused: panelFocused && shows(RaDashboardSection.unlocks),
+            onActivate: _activateUnlock,
+          ),
+        ),
+        slot(
+          RaDashboardSection.games,
+          () => RaGamesTab(
+            key: _gamesKey,
+            embedded: true,
+            active: shows(RaDashboardSection.games),
+            focused: panelFocused && shows(RaDashboardSection.games),
+            onActivate: _activateGame,
+          ),
+        ),
+        slot(
+          RaDashboardSection.awards,
+          () => RaCollectionTab(
+            key: _awardsKey,
+            events: false,
+            active: shows(RaDashboardSection.awards),
+            focused: panelFocused && shows(RaDashboardSection.awards),
+            onOpenGame: (id, title) =>
+                _openRaGameAchievements(gameId: id, gameTitle: title),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _activateUnlock(RetroAchievementRecentUnlockItem item) {

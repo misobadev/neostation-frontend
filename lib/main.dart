@@ -1,4 +1,8 @@
+import 'package:neostation/widgets/brand_logo.dart';
+import 'package:neostation/widgets/wizard_frame.dart';
+import 'package:neostation/services/startup_language.dart';
 import 'package:neostation/widgets/west_button_glyph.dart';
+import 'package:neostation/widgets/core_footer.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/utils/user_data_startup_check.dart';
 import 'package:neostation/providers/menu_app_provider.dart';
@@ -40,6 +44,8 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/themes/anta_text_theme.dart';
 import 'package:neostation/services/config_service.dart';
+import 'package:neostation/services/legacy_install_import.dart';
+import 'package:neostation/utils/rom_folder_path.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/image_cache_budget.dart';
 import 'package:neostation/services/sfx_service.dart';
@@ -209,6 +215,10 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Before anything reads preferences or data: a NeoStation beta's folders
+  // (com.neogamelab.neostation) are moved to this build's on the desktop.
+  final legacyNotes = LegacyInstallImport.migrateDesktopFolders();
+
   // Render immediately. Cold boots can wait for removable storage before the
   // database opens, and without this lightweight root Android shows only a
   // blank launch surface for that entire interval.
@@ -221,6 +231,10 @@ void main() async {
   // anything (app.log first of all) could create it empty.
   final storageNotes = await _awaitUserDataStorage();
 
+  // First start beside a NeoStation beta on Android: offer to copy its data
+  // into the folder just resolved, before app.log opens in it.
+  final importNotes = await _offerBetaImport();
+
   // After the check: app.log lives in the user-data folder, and a logger
   // opened before it was usable stayed off the file for the whole session.
   final log = LoggerService.instance;
@@ -228,6 +242,9 @@ void main() async {
   log.i('Starting NeoStation...');
   for (final note in storageNotes) {
     log.w(note);
+  }
+  for (final note in [...legacyNotes, ...importNotes]) {
+    log.i(note);
   }
 
   // After log.init(): this used to run before it, so the budget it picked was
@@ -518,8 +535,9 @@ void main() async {
 /// missing keys degrade to an empty string rather than crashing the very
 /// first frame.
 Map<String, dynamic> _startupStrings() {
-  final locale = WidgetsBinding.instance.platformDispatcher.locale;
-  final languageTag = locale.toLanguageTag().replaceAll('-', '_');
+  final language = supportedLanguageFor(
+    WidgetsBinding.instance.platformDispatcher.locale,
+  );
   const translations = <String, Map<String, dynamic>>{
     'en': appLocaleEn,
     'es': appLocaleEs,
@@ -534,9 +552,7 @@ Map<String, dynamic> _startupStrings() {
     'ja': appLocaleJa,
     'ko': appLocaleKo,
   };
-  return translations[languageTag] ??
-      translations[locale.languageCode] ??
-      appLocaleEn;
+  return translations[language] ?? appLocaleEn;
 }
 
 String _startupString(String key) {
@@ -553,10 +569,14 @@ String _startupString(String key) {
 /// intro in the user's theme rather than always-dark chrome.
 class _StartupScaffold extends StatefulWidget {
   const _StartupScaffold({
-    required this.childrenBuilder,
+    this.childrenBuilder = _noChildren,
+    this.bodyBuilder,
     this.onKeyEvent,
     this.animatedLogo = false,
   });
+
+  static List<Widget> _noChildren(BuildContext _, StartupThemeColors _) =>
+      const [];
 
   /// Builds the status area, given the resolved startup palette.
   ///
@@ -565,6 +585,11 @@ class _StartupScaffold extends StatefulWidget {
   /// so `.r` is not available to them.
   final List<Widget> Function(BuildContext context, StartupThemeColors colors)
   childrenBuilder;
+
+  /// Builds the whole screen instead, inside the startup theme: for a wizard,
+  /// which lays out its own logo ([WizardFrame]).
+  final Widget Function(BuildContext context, StartupThemeColors colors)?
+  bodyBuilder;
 
   /// Show the shimmering logo instead of the static one. Used by the loading
   /// screen, where the shine doubles as the activity indicator; the error
@@ -600,10 +625,8 @@ class _StartupScaffoldState extends State<_StartupScaffold> {
   Widget build(BuildContext context) {
     // Same factor the shimmering splash uses, so the logo and the spacing
     // around it grow instead of being stranded at design size on a desktop
-    // window. The wordmark takes the damped text scale — grown by the full
-    // factor it reads as a banner rather than a caption under the glyph.
+    // window.
     final scale = SplashStatusLayout.scaleOf(context);
-    final textScale = SplashStatusLayout.textScaleOf(context);
     final children = widget.childrenBuilder(context, _colors);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -623,7 +646,13 @@ class _StartupScaffoldState extends State<_StartupScaffold> {
           // never move the logo. Shared with the scan splash so the
           // text/progress zone is one fixed place all intro. The error screen
           // keeps the simpler centred column with the wordmark.
-          child: widget.animatedLogo
+          child: widget.bodyBuilder != null
+              ? SafeArea(
+                  child: Builder(
+                    builder: (context) => widget.bodyBuilder!(context, _colors),
+                  ),
+                )
+              : widget.animatedLogo
               ? SplashStatusLayout(children: children)
               : Center(
                   // Scaled down, never up, when the screen is too short for
@@ -636,22 +665,11 @@ class _StartupScaffoldState extends State<_StartupScaffold> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.asset(
-                            'assets/images/logo_transparent.png',
-                            width: 112 * scale,
-                            height: 112 * scale,
+                          BrandLogo(
+                            width: 300 * scale,
+                            brightness: _colors.brightness,
                           ),
-                          SizedBox(height: 24 * scale),
-                          Text(
-                            'NeoStation',
-                            style: TextStyle(
-                              color: _colors.foreground,
-                              fontSize: 28 * textScale,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          SizedBox(height: 24 * scale),
+                          SizedBox(height: 28 * scale),
                           ...children,
                         ],
                       ),
@@ -936,6 +954,674 @@ class _StartupStorageErrorAppState extends State<StartupStorageErrorApp> {
       },
     );
   }
+}
+
+/// A step-by-step welcome, on Android, for the first start beside a NeoStation
+/// beta. The betas were a different app (`com.neogamelab.neostation`), so
+/// without it the release candidate opens empty beside a beta that still has
+/// the user's whole library.
+///
+/// 1. Import everything from the beta, or start from zero.
+/// 2. Close the beta and pick its folder in the system picker.
+/// 3. Copy, with progress.
+/// 4. Give this app access to the library's ROM folders again: Android grants
+///    folder access per app, so the beta's grants don't carry over.
+/// 5. Done: what has to be done again (sign-ins), and the beta can go.
+///
+/// A goes forward and B goes back a step (or stops a copy), as in the setup
+/// wizard. The step's other action is on the West face button: start from
+/// zero, leave the ROM folders for later, or open the beta's uninstall
+/// prompt. Once the copy is done there is no way back to the steps before
+/// it. The buttons take no focus, as on [StartupStorageErrorApp].
+class StartupBetaImportApp extends StatefulWidget {
+  const StartupBetaImportApp({
+    super.key,
+    required this.userDataPath,
+    required this.beta,
+    required this.onFinished,
+  });
+
+  final String userDataPath;
+  final LegacyBetaInfo beta;
+
+  /// Called once with a line for app.log.
+  final void Function(String note) onFinished;
+
+  @override
+  State<StartupBetaImportApp> createState() => _StartupBetaImportAppState();
+}
+
+enum _BetaImportStep { welcome, choose, prepare, copy, folders, done }
+
+class _StartupBetaImportAppState extends State<StartupBetaImportApp> {
+  static const _stepCount = 6;
+
+  late final GamepadNavigation _gamepad;
+  late final bool _sfxWasEnabled;
+
+  _BetaImportStep _step = _BetaImportStep.welcome;
+
+  /// The step is busy (measuring, copying, or a picker is open).
+  bool _busy = false;
+
+  /// Shown under the step after a try that didn't work.
+  String? _problem;
+  LegacyCopyTotals? _total;
+  LegacyCopyTotals _copied = const LegacyCopyTotals(files: 0, bytes: 0);
+
+  /// The library's ROM folders that need access again, and those given it.
+  List<String> _folders = const [];
+  final Set<String> _granted = {};
+  bool _finished = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sfxWasEnabled = SfxService().isEnabled;
+    SfxService().setEnabled(false);
+    _gamepad = GamepadNavigation(
+      onSelectItem: _forward,
+      onBack: _backward,
+      onSettings: _backward,
+      onWestButton: _west,
+      playSelectSound: false,
+      allowRepeat: false,
+    );
+    _gamepad.initialize();
+    _gamepad.activate();
+  }
+
+  @override
+  void dispose() {
+    _gamepad.dispose();
+    SfxService().setEnabled(_sfxWasEnabled);
+    super.dispose();
+  }
+
+  void _finish(String note) {
+    if (_finished) return;
+    _finished = true;
+    widget.onFinished(note);
+  }
+
+  void _goTo(_BetaImportStep step) => setState(() {
+    _step = step;
+    _problem = null;
+  });
+
+  String? get _nextFolder {
+    for (final folder in _folders) {
+      if (!_granted.contains(folder)) return folder;
+    }
+    return null;
+  }
+
+  void _forward() {
+    if (_busy) return;
+    switch (_step) {
+      case _BetaImportStep.welcome:
+        _goTo(_BetaImportStep.choose);
+      case _BetaImportStep.choose:
+        _goTo(_BetaImportStep.prepare);
+      case _BetaImportStep.prepare:
+        _import();
+      case _BetaImportStep.copy:
+        break;
+      case _BetaImportStep.folders:
+        _grantNext();
+      case _BetaImportStep.done:
+        _finish('Imported the beta\'s data');
+    }
+  }
+
+  void _backward() {
+    switch (_step) {
+      case _BetaImportStep.welcome:
+      case _BetaImportStep.folders:
+        break;
+      case _BetaImportStep.choose:
+        if (!_busy) _goTo(_BetaImportStep.welcome);
+      case _BetaImportStep.prepare:
+        if (!_busy) _goTo(_BetaImportStep.choose);
+      case _BetaImportStep.copy:
+        LegacyInstallImport.cancel();
+      case _BetaImportStep.done:
+        if (_folders.isNotEmpty) _goTo(_BetaImportStep.folders);
+    }
+  }
+
+  void _west() {
+    switch (_step) {
+      case _BetaImportStep.choose:
+        if (_busy) return;
+        _busy = true;
+        LegacyInstallImport.markAnswered(imported: false)
+            .whenComplete(() => _finish('Started from zero beside the beta'));
+      case _BetaImportStep.folders:
+        if (!_busy) _goTo(_BetaImportStep.done);
+      case _BetaImportStep.done:
+        LegacyInstallImport.uninstallBeta();
+      case _BetaImportStep.welcome:
+      case _BetaImportStep.prepare:
+      case _BetaImportStep.copy:
+        break;
+    }
+  }
+
+  void _fail(String message) {
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _problem = message;
+    });
+  }
+
+  Future<void> _import() async {
+    setState(() {
+      _busy = true;
+      _problem = null;
+    });
+    final LegacyPick? pick;
+    try {
+      pick = await LegacyInstallImport.pickBetaFolder();
+    } catch (e) {
+      _fail('$e');
+      return;
+    }
+    if (!mounted) return;
+    if (pick == null) {
+      setState(() => _busy = false);
+      return;
+    }
+    // Only the beta's own user-data folder, holding its library, lets the
+    // wizard go on: another app's folder, a folder inside the beta's or a beta
+    // that was never set up each say why and stay on this step.
+    if (!pick.isBetaLibrary) {
+      _fail(
+        _startupString(
+          !pick.isBeta || !pick.isRoot
+              ? AppLocale.startupBetaImportWrongFolder
+              : AppLocale.startupBetaImportNoLibrary,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _step = _BetaImportStep.copy;
+      _total = null;
+      _copied = const LegacyCopyTotals(files: 0, bytes: 0);
+    });
+    try {
+      final total = await LegacyInstallImport.measure(pick.treeUri);
+      final free = await LegacyInstallImport.freeBytes(widget.userDataPath);
+      if (!LegacyInstallImport.fits(needed: total.bytes, free: free)) {
+        if (!mounted) return;
+        setState(() => _step = _BetaImportStep.prepare);
+        _fail(
+          _startupString(AppLocale.startupBetaImportNoSpace)
+              .replaceAll('{needed}', _formatBytes(total.bytes))
+              .replaceAll('{free}', _formatBytes(free ?? 0)),
+        );
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _total = total);
+      final copied = await LegacyInstallImport.importInto(
+        treeUri: pick.treeUri,
+        userDataPath: widget.userDataPath,
+        onProgress: (progress) {
+          if (mounted) setState(() => _copied = progress);
+        },
+      );
+      await LegacyInstallImport.markAnswered(imported: true);
+      final folders = LegacyInstallImport.safRomFolders(widget.userDataPath);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _copied = copied;
+        _folders = folders;
+        _step = folders.isEmpty
+            ? _BetaImportStep.done
+            : _BetaImportStep.folders;
+      });
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      setState(() => _step = _BetaImportStep.prepare);
+      if (e.code == 'CANCELLED') {
+        setState(() => _busy = false);
+      } else {
+        _fail(
+          _startupString(AppLocale.startupBetaImportFailed)
+              .replaceAll('{error}', e.message ?? e.code),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _step = _BetaImportStep.prepare);
+      _fail(
+        _startupString(AppLocale.startupBetaImportFailed)
+            .replaceAll('{error}', '$e'),
+      );
+    }
+  }
+
+  Future<void> _grantNext() async {
+    final folder = _nextFolder;
+    if (folder == null) {
+      _goTo(_BetaImportStep.done);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _problem = null;
+    });
+    try {
+      final grant = await LegacyInstallImport.grantFolder(folder);
+      if (!mounted) return;
+      if (grant == null) {
+        setState(() => _busy = false);
+        return;
+      }
+      if (!grant.granted) {
+        _fail(
+          _startupString(AppLocale.startupBetaImportFolderWrong)
+              .replaceAll('{folder}', romFolderLabel(folder)),
+        );
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _granted.add(folder);
+        if (_nextFolder == null) _step = _BetaImportStep.done;
+      });
+    } catch (e) {
+      _fail('$e');
+    }
+  }
+
+  static String _formatBytes(int bytes) {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var value = bytes.toDouble();
+    var unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+      value /= 1024;
+      unit++;
+    }
+    final digits = unit == 0 || value >= 100 ? 0 : 1;
+    return '${value.toStringAsFixed(digits)} ${units[unit]}';
+  }
+
+  KeyEventResult _handleKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.gameButtonA ||
+        key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.space ||
+        key == LogicalKeyboardKey.enter) {
+      _forward();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.gameButtonB ||
+        key == LogicalKeyboardKey.escape) {
+      _backward();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.gameButtonX ||
+        key == LogicalKeyboardKey.keyX) {
+      _west();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _StartupScaffold(
+      onKeyEvent: _handleKey,
+      bodyBuilder: (context, colors) {
+        final scale = SplashStatusLayout.scaleOf(context);
+        final textScale = SplashStatusLayout.textScaleOf(context);
+        const a = 'assets/images/gamepad/Xbox_A_button.png';
+        const b = 'assets/images/gamepad/Xbox_B_button.png';
+        final title = TextStyle(
+          color: colors.foreground,
+          fontSize: 19 * textScale,
+          fontWeight: FontWeight.w600,
+        );
+        final body = TextStyle(
+          color: colors.foreground.withValues(alpha: 0.8),
+          fontSize: 15 * textScale,
+          height: 1.35,
+        );
+        final detail = TextStyle(
+          color: colors.foreground.withValues(alpha: 0.55),
+          fontSize: 13 * textScale,
+        );
+        Text say(String key, TextStyle style) => Text(
+          _startupString(key),
+          textAlign: TextAlign.center,
+          style: style,
+        );
+        Widget bar(double? value) => SizedBox(
+          width: 340 * scale,
+          child: LinearProgressIndicator(value: value),
+        );
+
+        final stepNumber = _step.index + 1;
+
+        final List<Widget> content;
+        final List<_WizardButton> buttons;
+        switch (_step) {
+          case _BetaImportStep.welcome:
+            content = [
+              say(AppLocale.welcomeNeoStation, title),
+              SizedBox(height: 12 * scale),
+              say(AppLocale.wizardWelcomeBody, body),
+            ];
+            buttons = [
+              _WizardButton(
+                a,
+                AppLocale.wizardStartSetup,
+                _forward,
+                primary: true,
+              ),
+            ];
+          case _BetaImportStep.choose:
+            content = [
+              say(AppLocale.startupBetaImportChooseTitle, title),
+              SizedBox(height: 12 * scale),
+              Text(
+                _startupString(AppLocale.startupBetaImportChooseBody)
+                    .replaceAll('{version}', widget.beta.versionName ?? ''),
+                textAlign: TextAlign.center,
+                style: body,
+              ),
+            ];
+            buttons = [
+              _WizardButton(b, AppLocale.back, _backward),
+              _WizardButton(
+                null,
+                AppLocale.startupBetaImportStartFresh,
+                _busy ? null : _west,
+              ),
+              _WizardButton(
+                a,
+                AppLocale.startupBetaImportImportAll,
+                _forward,
+                primary: true,
+              ),
+            ];
+          case _BetaImportStep.prepare:
+            content = [
+              say(AppLocale.startupBetaImportPrepareTitle, title),
+              SizedBox(height: 12 * scale),
+              // A folder that was turned down says why in place of the
+              // instructions, so it fits beside the icon to look for.
+              if (_problem == null)
+                say(AppLocale.startupBetaImportPrepareBody, body)
+              else
+                Text(
+                  _problem!,
+                  textAlign: TextAlign.center,
+                  style: body.copyWith(color: Colors.redAccent),
+                ),
+              SizedBox(height: 16 * scale),
+              // In case the picker opens elsewhere: the beta's folder is
+              // listed as "NeoStation" beside this app's, and only the old
+              // icon tells them apart.
+              // The error already points at the icon.
+              if (_problem == null) ...[
+                say(AppLocale.startupBetaImportIconHint, detail),
+                SizedBox(height: 8 * scale),
+              ],
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/images/legacy_beta_icon.png',
+                    width: 32 * scale,
+                    height: 32 * scale,
+                  ),
+                  SizedBox(width: 10 * scale),
+                  Text(
+                    'NeoStation',
+                    style: body.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ];
+            buttons = [
+              _WizardButton(
+                b,
+                AppLocale.startupBetaImportBack,
+                _busy ? null : _backward,
+              ),
+              _WizardButton(
+                a,
+                AppLocale.startupBetaImportChooseFolder,
+                _busy ? null : _forward,
+                primary: true,
+                busy: _busy,
+              ),
+            ];
+          case _BetaImportStep.copy:
+            final total = _total?.bytes ?? 0;
+            content = [
+              say(AppLocale.startupBetaImportCopyTitle, title),
+              SizedBox(height: 12 * scale),
+              say(
+                _total == null
+                    ? AppLocale.startupBetaImportMeasuring
+                    : AppLocale.startupBetaImportCopying,
+                body,
+              ),
+              SizedBox(height: 16 * scale),
+              bar(
+                _total == null || total == 0
+                    ? null
+                    : (_copied.bytes / total).clamp(0.0, 1.0),
+              ),
+              if (_total != null) ...[
+                SizedBox(height: 8 * scale),
+                Text(
+                  '${_formatBytes(_copied.bytes)} / ${_formatBytes(total)}',
+                  textAlign: TextAlign.center,
+                  style: detail,
+                ),
+              ],
+            ];
+            buttons = [
+              _WizardButton(b, AppLocale.startupBetaImportCancel, _backward),
+            ];
+          case _BetaImportStep.folders:
+            content = [
+              say(AppLocale.startupBetaImportFoldersTitle, title),
+              SizedBox(height: 12 * scale),
+              say(AppLocale.startupBetaImportFoldersBody, body),
+              SizedBox(height: 12 * scale),
+              for (final folder in _folders)
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 2 * scale),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _granted.contains(folder)
+                            ? Icons.check_circle
+                            : Icons.folder_outlined,
+                        size: 18 * textScale,
+                        color: _granted.contains(folder)
+                            ? Colors.greenAccent
+                            : colors.foreground.withValues(alpha: 0.6),
+                      ),
+                      SizedBox(width: 8 * scale),
+                      Text(romFolderLabel(folder), style: body),
+                    ],
+                  ),
+                ),
+            ];
+            buttons = [
+              _WizardButton(
+                null,
+                AppLocale.startupBetaImportFolderLater,
+                _busy ? null : _west,
+              ),
+              _WizardButton(
+                a,
+                AppLocale.startupBetaImportFolderAllow,
+                _busy ? null : _forward,
+                primary: true,
+                busy: _busy,
+              ),
+            ];
+          case _BetaImportStep.done:
+            content = [
+              say(AppLocale.startupBetaImportDoneTitle, title),
+              SizedBox(height: 12 * scale),
+              Text(
+                _startupString(AppLocale.startupBetaImportDone)
+                    .replaceAll('{files}', '${_copied.files}'),
+                textAlign: TextAlign.center,
+                style: body,
+              ),
+            ];
+            buttons = [
+              if (_folders.isNotEmpty)
+                _WizardButton(b, AppLocale.startupBetaImportBack, _backward),
+              _WizardButton(null, AppLocale.startupBetaImportUninstall, _west),
+              _WizardButton(
+                a,
+                AppLocale.startupBetaImportContinue,
+                _forward,
+                primary: true,
+              ),
+            ];
+        }
+
+        return WizardFrame(
+          step: stepNumber,
+          total: _stepCount,
+          stepLabel: _startupString(AppLocale.wizardStepOf)
+              .replaceAll('{step}', '$stepNumber')
+              .replaceAll('{total}', '$_stepCount'),
+          color: colors.foreground,
+          brightness: colors.brightness,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ...content,
+                if (_problem != null && _step != _BetaImportStep.prepare) ...[
+                  SizedBox(height: 12 * scale),
+                  Text(
+                    _problem!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 14 * textScale,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          buttons: // The app's own GamepadControl, sized with ScreenUtil like
+              // the rest of the app: this screen runs before MyApp sets it
+              // up, so it gets the same design size here.
+              ExcludeFocus(
+                child: ScreenUtilInit(
+                  designSize: const Size(640, 480),
+                  minTextAdapt: true,
+                  splitScreenMode: true,
+                  builder: (context, _) {
+                    final theme = Theme.of(context);
+                    Widget control(_WizardButton button, String iconPath) =>
+                        GamepadControl(
+                          iconPath: iconPath,
+                          label: _startupString(button.labelKey),
+                          onTap: button.onTap,
+                          busy: button.busy,
+                          backgroundColor: button.primary
+                              ? theme.colorScheme.tertiary
+                              : theme.colorScheme.tertiaryFixed,
+                          textColor: button.primary
+                              ? theme.colorScheme.onTertiary
+                              : theme.colorScheme.onTertiaryFixed,
+                        );
+                    return Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 12.r,
+                      runSpacing: 8.r,
+                      children: [
+                        for (final button in buttons)
+                          button.iconPath == null
+                              ? WestButtonGlyph(
+                                  builder: (context, asset) =>
+                                      control(button, asset),
+                                )
+                              : control(button, button.iconPath!),
+                      ],
+                    );
+                  },
+                ),
+              ),
+        );
+      },
+    );
+  }
+}
+
+/// One of the wizard's buttons: its controller glyph ([iconPath], or the West
+/// face button's when null), label and action.
+class _WizardButton {
+  const _WizardButton(
+    this.iconPath,
+    this.labelKey,
+    this.onTap, {
+    this.primary = false,
+    this.busy = false,
+  });
+
+  final String? iconPath;
+  final String labelKey;
+  final VoidCallback? onTap;
+  final bool primary;
+  final bool busy;
+}
+
+/// Offers the beta import (see [StartupBetaImportApp]) when this is the first
+/// start of an Android install beside a beta. Runs after the user-data folder
+/// is known to be usable and before app.log opens in it: the import fills
+/// that folder.
+Future<List<String>> _offerBetaImport() async {
+  final notes = <String>[];
+  if (!Platform.isAndroid) return notes;
+  try {
+    final userDataPath = await ConfigService.getUserDataPath();
+    final beta = await LegacyInstallImport.betaToOffer(userDataPath);
+    if (beta == null) return notes;
+    notes.add(
+      'NeoStation beta ${beta.versionName ?? '?'} (${beta.versionCode ?? '?'}) '
+      'found; offered to import its data',
+    );
+    final done = Completer<void>();
+    runApp(
+      StartupBetaImportApp(
+        userDataPath: userDataPath,
+        beta: beta,
+        onFinished: (note) {
+          notes.add(note);
+          if (!done.isCompleted) done.complete();
+        },
+      ),
+    );
+    await done.future;
+    runApp(const StartupLoadingApp());
+  } catch (e) {
+    notes.add('Beta import could not be offered: $e');
+  }
+  return notes;
 }
 
 /// Resolves the user-data location once, up front, while the loading screen is

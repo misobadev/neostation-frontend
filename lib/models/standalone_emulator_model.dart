@@ -161,7 +161,7 @@ class StandaloneEmulatorModel {
     }
 
     try {
-      const platform = MethodChannel('com.neogamelab.neostation/game');
+      const platform = MethodChannel('dev.misoba.neostation/game');
       final result = await platform.invokeMethod('isPackageInstalled', {
         'packageName': androidPackageName,
       });

@@ -23,6 +23,8 @@ import 'package:neostation/widgets/notification_bell.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/utils/header_layout.dart';
 import 'package:neostation/utils/nav_tabs.dart';
+import 'package:neostation/sync/sync_manager.dart';
+import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:neostation/utils/time_format.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 
@@ -238,6 +240,13 @@ class HeaderState extends State<Header> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    try {
+      _saveProviderId = context.select<SyncManager, String>(
+        (manager) => manager.activeProviderId,
+      );
+    } on ProviderNotFoundException {
+      _saveProviderId = null;
+    }
     final customColors = AppThemes.getCustomColors(context);
     // Soft horizontal gradient derived from headerColors.background (left->right)
 
@@ -456,7 +465,7 @@ class HeaderState extends State<Header> with WidgetsBindingObserver {
                                                   child: _buildTabButton(
                                                     context,
                                                     tab.index,
-                                                    navTabSpec(tab).icon,
+                                                    _tabIconPath(tab),
                                                     navTabSpec(tab).labelKey
                                                         .getString(context),
                                                     iconData: navTabSpec(tab)
@@ -657,6 +666,23 @@ class HeaderState extends State<Header> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  /// Who keeps the saves (SyncManager's provider id), read at the top of
+  /// [build] so the saves tab's icon follows it. Null without a SyncManager
+  /// above the header (a test or preview).
+  String? _saveProviderId;
+
+  /// The tab's icon. The saves tab wears NeoSync's isotype while NeoSync
+  /// keeps the saves; with RomM keeping them it keeps the generic cloud, as
+  /// the tab then shows RomM's saves.
+  String _tabIconPath(NavTab tab) {
+    final spec = navTabSpec(tab);
+    if (tab != NavTab.sync) return spec.icon;
+    final provider = _saveProviderId;
+    return provider == null || provider == RomMSyncProvider.kProviderId
+        ? spec.icon
+        : 'assets/images/neosync/neosync_isotype.svg';
   }
 
   // Steam-style tab button.

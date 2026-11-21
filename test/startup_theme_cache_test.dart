@@ -8,6 +8,7 @@ import 'package:neostation/services/config_service.dart';
 import 'package:neostation/repositories/config_repository.dart';
 import 'package:neostation/services/startup_theme_cache.dart';
 import 'package:neostation/themes/app_themes.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'database_test_helper.dart';
@@ -73,6 +74,50 @@ void main() {
         expect(colors.background, StartupThemeColors.fallback.background);
       },
     );
+
+    test('keeps the panel, button colours and corners of the theme', () async {
+      // The beta import wizard runs before the database: it draws its NeoGlass
+      // panel and buttons from this cache, as the app's footers do.
+      await StartupThemeCache.save(AppThemes.lightTheme);
+
+      final chrome = (await StartupThemeCache.load()).chrome!;
+      final scheme = AppThemes.lightTheme.colorScheme;
+      final radii = AppThemes.lightTheme.extension<CornerRadii>()!;
+
+      expect(chrome.surface, scheme.surface);
+      expect(chrome.tertiary, scheme.tertiary);
+      expect(chrome.onTertiary, scheme.onTertiary);
+      expect(chrome.tertiaryFixed, scheme.tertiaryFixed);
+      expect(chrome.onTertiaryFixed, scheme.onTertiaryFixed);
+      expect(chrome.radiusExternal, radii.radiusExternalRaw);
+      expect(chrome.radiusInternal, radii.radiusInternalRaw);
+    });
+
+    test('a cache from before the chrome still draws a whole theme', () async {
+      SharedPreferences.setMockInitialValues({
+        'flutter.startup_theme_background': 0xFFEEEEEE,
+        'flutter.startup_theme_foreground': 0xFF14161A,
+        'flutter.startup_theme_primary': 0xFF605DFF,
+      });
+
+      final colors = await StartupThemeCache.load();
+
+      expect(colors.chrome, isNull);
+      expect(colors.effectiveChrome.tertiary, const Color(0xFF605DFF));
+      expect(colors.effectiveChrome.onTertiaryFixed, const Color(0xFF14161A));
+      expect(colors.themeData.colorScheme.tertiary, const Color(0xFF605DFF));
+    });
+
+    test('the first launch paints the default dark theme', () {
+      expect(
+        StartupThemeColors.fallback.background,
+        AppThemes.darkTheme.scaffoldBackgroundColor,
+      );
+      expect(
+        StartupThemeColors.fallback.chrome!.surface,
+        AppThemes.darkTheme.colorScheme.surface,
+      );
+    });
 
     test(
       'brightness follows the cached background, not the theme flag',

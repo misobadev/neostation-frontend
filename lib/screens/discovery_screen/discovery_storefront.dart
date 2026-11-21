@@ -81,7 +81,7 @@ class DiscoveryStorefront extends StatelessWidget {
           child: Padding(
             padding: viewMode == 'carousel'
                 ? EdgeInsets.only(top: 56.0.r)
-                : EdgeInsets.only(left: 6.0.r, right: 6.0.r, top: 46.0.r),
+                : EdgeInsets.only(left: 16.r, right: 16.r, top: 52.r),
             child: viewMode == 'carousel'
                 ? _buildCarousel(context, cards)
                 : _buildGrid(context, config, cards),

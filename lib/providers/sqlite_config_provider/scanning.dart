@@ -746,6 +746,15 @@ extension SqliteConfigScanning on SqliteConfigProvider {
     return rows.isNotEmpty && rows.first.values.first == 1;
   }
 
+  /// A SAF root this app holds no grant for. It will not come up however long
+  /// the start-up waits: the grant is gone (revoked, or the library came from
+  /// another install, such as a NeoStation beta) rather than the card still
+  /// mounting. [_ensureAndroidSafPermissions] has already told the user, and
+  /// the scan keeps its games as for any root it can't read.
+  Future<bool> _lacksSafGrant(String root) async =>
+      root.startsWith('content://') &&
+      !await SafDirectoryService.hasPermission(root);
+
   /// Waits briefly for configured Android ROM roots to expose their
   /// directories. SAF can report a valid persisted permission while the
   /// physical SD volume is still mounting, so [canAccessDirectory] alone is
@@ -762,7 +771,9 @@ extension SqliteConfigScanning on SqliteConfigProvider {
 
     final rootsWithGames = <String>{
       for (final root in _config.romFolders)
-        if (await GameRepository.hasRomsUnderFolder(root)) root,
+        if (await GameRepository.hasRomsUnderFolder(root) &&
+            !await _lacksSafGrant(root))
+          root,
     };
     // Nothing under a ROM root to protect: a library of installed Android apps
     // alone (stored as ROM rows, so it counts as a library), or roots that hold

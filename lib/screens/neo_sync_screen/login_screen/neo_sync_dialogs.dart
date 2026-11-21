@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -159,7 +160,7 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
     return AlertDialog(
       backgroundColor: Theme.of(context).colorScheme.surface,
       surfaceTintColor: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+      shape: neoSyncDialogShape(context),
       title: Row(
         children: [
           Icon(
@@ -361,7 +362,7 @@ class _DeleteCloudSaveDialogState extends State<DeleteCloudSaveDialog> {
               elevation: 0,
               padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.r),
+                borderRadius: _neoSyncRadii(context).radiusInternal,
               ),
             ),
             child: Row(
@@ -454,7 +455,7 @@ class _SuccessDialogState extends State<SuccessDialog> {
     return AlertDialog(
       backgroundColor: theme.colorScheme.surface,
       surfaceTintColor: theme.colorScheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+      shape: neoSyncDialogShape(context),
       title: Row(
         children: [
           Icon(Symbols.check_circle_rounded, color: Colors.green, size: 24.r),
@@ -488,12 +489,12 @@ class _SuccessDialogState extends State<SuccessDialog> {
           autofocus: true,
           onPressed: _close,
           style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: theme.colorScheme.onPrimary,
+            backgroundColor: theme.colorScheme.tertiary,
+            foregroundColor: theme.colorScheme.onTertiary,
             elevation: 0,
             padding: EdgeInsets.symmetric(horizontal: 24.r, vertical: 12.r),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.r),
+              borderRadius: _neoSyncRadii(context).radiusInternal,
             ),
           ),
           child: Row(
@@ -587,7 +588,7 @@ class _ErrorDialogState extends State<ErrorDialog> {
     return AlertDialog(
       backgroundColor: theme.colorScheme.surface,
       surfaceTintColor: theme.colorScheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+      shape: neoSyncDialogShape(context),
       title: Row(
         children: [
           Icon(
@@ -625,12 +626,12 @@ class _ErrorDialogState extends State<ErrorDialog> {
           autofocus: true,
           onPressed: _close,
           style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: theme.colorScheme.onPrimary,
+            backgroundColor: theme.colorScheme.tertiary,
+            foregroundColor: theme.colorScheme.onTertiary,
             elevation: 0,
             padding: EdgeInsets.symmetric(horizontal: 24.r, vertical: 12.r),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.r),
+              borderRadius: _neoSyncRadii(context).radiusInternal,
             ),
           ),
           child: Row(
@@ -660,3 +661,16 @@ class _ErrorDialogState extends State<ErrorDialog> {
     );
   }
 }
+
+/// The NeoSync tab's dialogs share its panels' look: the theme's outer corner
+/// radius and the same faint outline as its NeoGlass surfaces.
+ShapeBorder neoSyncDialogShape(BuildContext context) {
+  final theme = Theme.of(context);
+  return RoundedRectangleBorder(
+    borderRadius: _neoSyncRadii(context).radiusExternal,
+    side: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.15)),
+  );
+}
+
+CornerRadii _neoSyncRadii(BuildContext context) =>
+    Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m();

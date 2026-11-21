@@ -94,6 +94,9 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.raEvents: 'Events',
   AppLocale.raAotwYearTitle: 'Achievement of the Week ({year})',
   AppLocale.raAotw: 'AOTW',
+  AppLocale.raOverview: 'Overview',
+  AppLocale.raStatPlayed: 'Played',
+  AppLocale.raStatBeaten: 'Beaten',
   AppLocale.raAwards: 'Awards',
   AppLocale.raSetOrder: 'Set order',
   AppLocale.raPointsSort: 'Points: high to low',
@@ -130,6 +133,42 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.startupStorageStartEmpty: 'Start with an empty folder',
   AppLocale.startupStorageCreateFailed:
       'NeoStation could not create the folder there.',
+  AppLocale.startupBetaImportWrongFolder:
+      'That\'s not the right folder. Choose the NeoStation with this icon.',
+  AppLocale.startupBetaImportNoLibrary:
+      'The beta has no library to import. Start from zero instead.',
+  AppLocale.startupBetaImportMeasuring: 'Checking what there is to copy...',
+  AppLocale.startupBetaImportCopying:
+      'Copying your data from the beta. Keep NeoStation open.',
+  AppLocale.startupBetaImportCancel: 'Cancel',
+  AppLocale.startupBetaImportNoSpace: 'There isn\'t enough free space: the beta\'s data takes {needed} and {free} is free.',
+  AppLocale.startupBetaImportFailed:
+      'The copy didn\'t finish ({error}). Nothing was changed.',
+  AppLocale.startupBetaImportDone: 'Copied {files} files from the beta. Sign in again to NeoSync, RetroAchievements, RomM and ScreenScraper, and allow access to your files again when asked: sign-ins and permissions can\'t be carried over. Once everything is here, you can uninstall the beta.',
+  AppLocale.startupBetaImportContinue: 'Continue',
+  AppLocale.startupBetaImportUninstall: 'Uninstall the beta',
+  AppLocale.wizardStepOf: 'Step {step} of {total}',
+  AppLocale.wizardLanguageTitle: 'Choose your language',
+  AppLocale.wizardLanguageBody: 'You can change it later in Settings.',
+  AppLocale.wizardWelcomeBody: 'The free and open-source frontend for all your retro games. Press A to start setting it up.',
+  AppLocale.wizardStartSetup: 'Start setup',
+  AppLocale.startupBetaImportChooseTitle: 'NeoStation beta found',
+  AppLocale.startupBetaImportChooseBody: 'NeoStation beta {version} is installed on this device. This version is a new app, so it starts empty. Bring over your library, settings, media and themes from the beta, or start from zero?',
+  AppLocale.startupBetaImportImportAll: 'Import everything from the beta',
+  AppLocale.startupBetaImportStartFresh: 'Start from zero',
+  AppLocale.startupBetaImportPrepareTitle: 'Choose the beta\'s folder',
+  AppLocale.startupBetaImportPrepareBody: 'Close the beta first. In the next screen, tap "Use this folder" and then "Allow".',
+  AppLocale.startupBetaImportIconHint: 'If it opens somewhere else, open the ☰ menu and choose the NeoStation with this icon:',
+  AppLocale.startupBetaImportChooseFolder: 'Choose the folder',
+  AppLocale.startupBetaImportBack: 'Back',
+  AppLocale.startupBetaImportCopyTitle: 'Copying your data',
+  AppLocale.startupBetaImportFoldersTitle: 'Give access to your ROM folders',
+  AppLocale.startupBetaImportFoldersBody: 'Android gives folder access to each app separately, so NeoStation needs access to these folders again. In the next screen, keep the folder it opens and tap "Use this folder" and "Allow".',
+  AppLocale.startupBetaImportFolderAllow: 'Give access',
+  AppLocale.startupBetaImportFolderLater: 'Do it later',
+  AppLocale.startupBetaImportFolderWrong:
+      'That\'s a different folder. Choose {folder} so your games keep working.',
+  AppLocale.startupBetaImportDoneTitle: 'All set',
   AppLocale.startupLoading:
       'Preparing NeoStation. Waiting for storage and services...',
 

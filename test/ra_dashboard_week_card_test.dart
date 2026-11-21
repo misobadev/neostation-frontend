@@ -139,7 +139,10 @@ void main() {
     await tester.pump();
 
     final selectedCard = find.byWidgetPredicate(
-      (widget) => widget is Semantics && widget.properties.selected == true,
+      (widget) =>
+          widget is Semantics &&
+          widget.properties.selected == true &&
+          (widget.properties.label ?? '').startsWith('ACHIEVEMENT OF THE WEEK'),
     );
     expect(selectedCard, findsOneWidget);
 
@@ -234,7 +237,10 @@ void main() {
     await tester.pump();
 
     final selected = find.byWidgetPredicate(
-      (widget) => widget is Semantics && widget.properties.selected == true,
+      (widget) =>
+          widget is Semantics &&
+          widget.properties.selected == true &&
+          (widget.properties.label ?? '').startsWith('ACHIEVEMENT OF THE WEEK'),
     );
     expect(selected, findsOneWidget);
     expect(tester.widget<Semantics>(selected).properties.button, isTrue);
@@ -272,7 +278,7 @@ void main() {
     expect(find.text('No current Achievement of the Week'), findsOneWidget);
   });
 
-  testWidgets('shows the mode-appropriate games beaten pill', (tester) async {
+  testWidgets('shows the mode-appropriate games beaten count', (tester) async {
     final awards = RetroAchievementsUserAwards(
       totalAwardsCount: 0,
       hiddenAwardsCount: 0,
@@ -313,7 +319,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('7 games beaten'), findsOneWidget);
+    expect(find.bySemanticsLabel('7 Beaten'), findsOneWidget);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -343,6 +349,6 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('11 games beaten'), findsOneWidget);
+    expect(find.bySemanticsLabel('11 Beaten'), findsOneWidget);
   });
 }
