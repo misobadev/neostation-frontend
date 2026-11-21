@@ -14,6 +14,7 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
 
 import '../../../utils/gamepad_nav.dart';
+import '../../../utils/spring_scroller.dart';
 import '../../../services/game_service.dart';
 import '../../../utils/game_launch_utils.dart';
 import 'system_card.dart';
@@ -800,8 +801,16 @@ class SystemCardGridView extends StatefulWidget {
   State<SystemCardGridView> createState() => _SystemCardGridViewState();
 }
 
-class _SystemCardGridViewState extends State<SystemCardGridView> {
+class _SystemCardGridViewState extends State<SystemCardGridView>
+    with SingleTickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
+
+  /// Keeps a card in view as the selection moves, on a spring that carries
+  /// its speed from one press to the next (see [SpringScroller]).
+  late final SpringScroller _springScroller = SpringScroller(
+    _scrollController,
+    this,
+  );
 
   /// Orchestrator for hardware input.
   late GamepadNavigation _gamepadNav;
@@ -960,6 +969,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
     // Shared singleton — detach our listener, never dispose the instance.
     _secondaryDisplayState?.removeListener(_onSecondaryStateChanged);
     _cleanupGamepad();
+    _springScroller.dispose();
     _scrollController.dispose();
     _gooeyMotion.dispose();
     super.dispose();
@@ -1078,6 +1088,14 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
             child: grid,
           );
         }
+
+        // A finger on the grid takes the scroll over from the spring at once,
+        // before it has moved anything, so the two never fight over it.
+        grid = Listener(
+          onPointerDown: (_) => _springScroller.stop(),
+          behavior: HitTestBehavior.translucent,
+          child: grid,
+        );
 
         // The pointer listener drives both gestures: the pinch directly, and
         // the pull's release edge (the pull only ever arms itself through the

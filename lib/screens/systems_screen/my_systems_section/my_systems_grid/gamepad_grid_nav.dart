@@ -264,7 +264,11 @@ extension _GamepadGridNav on _SystemCardGridViewState {
     final viewportHeight = _scrollController.position.viewportDimension;
     final maxScrollExtent = _scrollController.position.maxScrollExtent;
     final minScrollExtent = _scrollController.position.minScrollExtent;
-    final currentOffset = _scrollController.offset;
+    // While the spring is still scrolling, measure from where it is heading,
+    // so a run of presses chains into one smooth scroll.
+    final currentOffset = !_performanceMode && _springScroller.isAnimating
+        ? _springScroller.target
+        : _scrollController.offset;
 
     // Keep a fifth of the viewport clear at each edge. A card already inside
     // this band is left alone; moving one row no longer animates the whole
@@ -284,6 +288,11 @@ extension _GamepadGridNav on _SystemCardGridViewState {
 
     targetOffset = targetOffset.clamp(minScrollExtent, maxScrollExtent);
     if ((targetOffset - currentOffset).abs() < 1) return;
+
+    if (!_performanceMode) {
+      _springScroller.animateTo(targetOffset);
+      return;
+    }
 
     final distance = (targetOffset - currentOffset).abs();
     final duration = _isNavigatingFast
