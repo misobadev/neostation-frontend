@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/discovery_models.dart';
@@ -32,26 +34,58 @@ class DiscoveryProvider extends ChangeNotifier {
   /// Whether a board has been produced at least once this session.
   bool get hasBoard => _board != null;
 
+  /// The systems hidden in Settings, as the tab last reported them.
+  Set<String> _hiddenSystems = const {};
+
+  /// The hidden systems the board in memory was built under.
+  ///
+  /// The candidate query leaves hidden systems out, but the board is kept for
+  /// the week, so without this a system hidden after the board was built kept
+  /// its games on it until the week rolled over.
+  Set<String> _boardHiddenSystems = const {};
+
+  /// Whether the board has to be built again at the next chance: it was asked
+  /// for while a load or a re-roll was running, or the library changed in a
+  /// way the hidden systems don't show (see [markStale]).
+  bool _stale = false;
+
   /// Loads the board, reusing the one already in memory when it is still for
-  /// the current week.
+  /// the current week, was built under the same hidden systems and hasn't been
+  /// marked stale.
   ///
   /// [force] re-reads regardless, which is what a returning launch needs: play
   /// time changed while the game was running, and the hero's eligibility and
-  /// the hidden gem's "never played" rule both depend on it.
-  Future<void> load({bool force = false}) async {
+  /// the hidden gem's "never played" rule both depend on it. Asked for while a
+  /// board is being built, it runs once that one is done.
+  ///
+  /// [hiddenSystems] is the set of system folders hidden in Settings. Passing
+  /// a set that differs from the one the board was built under rebuilds it;
+  /// leaving it out keeps the last set passed.
+  Future<void> load({bool force = false, Set<String>? hiddenSystems}) async {
+    if (hiddenSystems != null) _hiddenSystems = Set.of(hiddenSystems);
+    if (force) _stale = true;
     if (_loading) return;
-    if (!force &&
+    final hiddenChanged = !setEquals(_boardHiddenSystems, _hiddenSystems);
+    if (!_stale &&
+        !hiddenChanged &&
         _board != null &&
         _board!.weekKey == _service.currentWeekKey) {
       return;
     }
 
+    _stale = false;
+    // The board in memory may hold games of a system hidden since: the tab
+    // would show them, and push them to the second screen, until the new board
+    // is ready. Dropping it shows the loading state instead.
+    if (hiddenChanged) _board = null;
     _loading = true;
     _failed = false;
     notifyListeners();
 
+    final buildingUnder = _hiddenSystems;
     try {
       _board = await _service.loadBoard();
+      _boardHiddenSystems = buildingUnder;
     } catch (e, stackTrace) {
       _failed = true;
       _log.e('DiscoveryProvider: failed to load the board: $e');
@@ -60,6 +94,32 @@ class DiscoveryProvider extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+
+    await _catchUp();
+  }
+
+  /// Rebuilds the board because the library changed in a way the hidden
+  /// systems don't show: a game was hidden, or shown again.
+  ///
+  /// A board already built is rebuilt straight away, since the Discovery tab
+  /// can stay mounted under a route where the game was hidden (Search, for
+  /// one) and would otherwise keep recommending it. When the tab isn't mounted
+  /// that rebuild is not needed yet, but hiding a game is rare enough not to
+  /// track which. With no board yet there is nothing to correct: the tab's
+  /// first load reads the library afresh.
+  void markStale() {
+    _stale = true;
+    if (_board != null && !_loading) unawaited(load());
+  }
+
+  /// Builds the board again when it was asked for while a load or a re-roll
+  /// was running: that call returned early, and the board just built may still
+  /// hold games hidden in the meantime. Not after a failure, which the tab
+  /// offers to retry rather than retrying on its own.
+  Future<void> _catchUp() async {
+    if (_failed) return;
+    if (!_stale && setEquals(_boardHiddenSystems, _hiddenSystems)) return;
+    await load();
   }
 
   /// Games each slot has already shown and rolled away from this session.
@@ -86,12 +146,14 @@ class DiscoveryProvider extends ChangeNotifier {
     notifyListeners();
 
     final replaced = _pathOf(slotId);
+    final buildingUnder = _hiddenSystems;
 
     try {
       _board = await _service.reroll(
         slotId,
         alsoExclude: {..._rolledAway[slotId] ?? const []},
       );
+      _boardHiddenSystems = buildingUnder;
       if (replaced != null) _remember(slotId, replaced);
       _failed = false;
     } catch (e, stackTrace) {
@@ -101,6 +163,8 @@ class DiscoveryProvider extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+
+    await _catchUp();
   }
 
   /// The game currently in [slotId], or null when the slot is empty.

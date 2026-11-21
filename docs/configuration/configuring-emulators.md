@@ -12,6 +12,9 @@ NeoStation uses the bundled system definitions to decide which emulators are ava
 
 If you use RetroArch, configure it as the emulator for a system and make sure the required core is installed. When a launch fails, NeoStation can report that RetroArch, its executable, core directory, or selected core is missing.
 
+![System settings with the Emulators tab open and a RetroArch core selected](/screenshots/system-emulators.webp)
+*Choosing the emulator and core for a system.*
+
 ## Standalone Emulators
 
 On desktop platforms, NeoStation can ask you to select the executable for a standalone emulator.

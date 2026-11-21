@@ -185,6 +185,93 @@ void main() {
       expect(rows.map((r) => r['rom_path']), ['/roms/snes/game.sfc']);
     });
 
+    group('hidden systems and games', () {
+      Future<void> addSystem(String id) => db.execute(
+        'INSERT INTO app_systems (id, real_name, folder_name) VALUES (?, ?, ?)',
+        [id, id, id],
+      );
+
+      Future<void> detect(
+        String systemId, {
+        String? folderName,
+        bool hidden = false,
+      }) => db.execute(
+        'INSERT INTO user_detected_systems '
+        '(app_system_id, actual_folder_name, is_hidden) VALUES (?, ?, ?)',
+        [systemId, folderName ?? systemId, hidden ? 1 : 0],
+      );
+
+      test('a hidden system\'s games are left out', () async {
+        await addSystem('amiga');
+        await detect('snes');
+        await detect('amiga', hidden: true);
+        await insertRom('game.sfc');
+        await insertRom('flood.adf', systemId: 'amiga');
+
+        final rows = await DiscoveryRepository.getCandidates();
+
+        expect(rows.map((r) => r['rom_path']), ['/roms/snes/game.sfc']);
+      });
+
+      test('the hidden flag is matched by system, whatever folder name its row holds', () async {
+        // Scans write the system's own folder name, but rows written by
+        // older builds' migrations can hold another one.
+        await addSystem('amiga');
+        await detect('amiga', folderName: 'Amiga500', hidden: true);
+        await insertRom('game.sfc');
+        await insertRom('xenon.adf', systemId: 'amiga');
+
+        final rows = await DiscoveryRepository.getCandidates();
+
+        expect(rows.map((r) => r['rom_path']), ['/roms/snes/game.sfc']);
+      });
+
+      test('a shown system\'s games stay in', () async {
+        await addSystem('amiga');
+        await detect('snes');
+        await detect('amiga');
+        await insertRom('game.sfc');
+        await insertRom('flood.adf', systemId: 'amiga');
+
+        final rows = await DiscoveryRepository.getCandidates();
+
+        expect(
+          rows.map((r) => r['rom_path']),
+          unorderedEquals(['/roms/snes/game.sfc', '/roms/amiga/flood.adf']),
+        );
+      });
+
+      test('a system with no detection row stays in', () async {
+        // Nothing has hidden it, so it is not hidden.
+        await insertRom('game.sfc');
+
+        final rows = await DiscoveryRepository.getCandidates();
+
+        expect(rows.map((r) => r['rom_path']), ['/roms/snes/game.sfc']);
+      });
+
+      test('a hidden game is left out', () async {
+        await insertRom('game.sfc');
+        await insertRom('secret.sfc');
+        await db.execute(
+          "UPDATE user_roms SET is_hidden = 1 WHERE filename = 'secret.sfc'",
+        );
+
+        final rows = await DiscoveryRepository.getCandidates();
+
+        expect(rows.map((r) => r['rom_path']), ['/roms/snes/game.sfc']);
+      });
+
+      test('a game with no hidden flag stays in', () async {
+        await insertRom('game.sfc');
+        await db.execute('UPDATE user_roms SET is_hidden = NULL');
+
+        final rows = await DiscoveryRepository.getCandidates();
+
+        expect(rows.map((r) => r['rom_path']), ['/roms/snes/game.sfc']);
+      });
+    });
+
     test(
       'playtime and last played come through for the never-played rules',
       () async {

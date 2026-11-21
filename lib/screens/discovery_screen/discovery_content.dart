@@ -100,8 +100,16 @@ class DiscoveryContentState extends State<DiscoveryContent> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Start as soon as the tab is on screen. The board is read
       // asynchronously, so there is no reason to make the first visit wait for
-      // an animation before the database work even begins.
-      if (mounted) context.read<DiscoveryProvider>().load();
+      // an animation before the database work even begins. The hidden
+      // systems go with it: the tab is built afresh on every visit, so a
+      // system hidden in Settings since the board was built rebuilds it here.
+      if (mounted) {
+        context.read<DiscoveryProvider>().load(
+          hiddenSystems: context
+              .read<SqliteConfigProvider>()
+              .hiddenSystemFolders,
+        );
+      }
     });
   }
 
@@ -256,6 +264,10 @@ class DiscoveryContentState extends State<DiscoveryContent> {
     return Consumer<DiscoveryProvider>(
       builder: (context, provider, _) {
         final board = provider.board;
+        // Every branch below that returns before the board is laid out leaves
+        // no tiles: stale ones would let the second screen and the header's
+        // Re-roll pill act on a board that is no longer shown.
+        if (board == null || board.libraryIsEmpty) _tiles = const [];
 
         if (provider.loading && board == null) {
           return const Center(child: CircularProgressIndicator());
@@ -322,6 +334,9 @@ class DiscoveryContentState extends State<DiscoveryContent> {
   void _syncSecondaryDisplay() {
     final state = _secondaryDisplayState;
     if (state == null || !mounted) return;
+    // Queued while an old board was still laid out, but the provider has since
+    // dropped it (a system was hidden): don't push a pick that is gone.
+    if (context.read<DiscoveryProvider>().board == null) return;
     final game = _selectedEntry?.game;
     if (game == null || game.romPath == _secondaryRomPath) return;
     _secondaryRomPath = game.romPath;
