@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -100,6 +101,8 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
               : widget.app.realname)
         : widget.app.name;
 
+    final liquid = GooeyCardChrome.maybeOf(context)?.liquid ?? false;
+
     return Padding(
       padding: EdgeInsets.all(2.r),
       child: MouseRegion(
@@ -108,9 +111,15 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
           cornerRadius: outerRadiusPx,
           child: Container(
             decoration: BoxDecoration(
-              color: widget.isSelected ? scheme.secondary : scheme.surface,
+              // Transparent while the grid's liquid selection draws the
+              // frame behind the card; a shadow would then darken the liquid.
+              color: liquid
+                  ? Colors.transparent
+                  : widget.isSelected
+                  ? scheme.secondary
+                  : scheme.surface,
               borderRadius: outerRadius,
-              boxShadow: context.performanceMode
+              boxShadow: context.performanceMode || liquid
                   ? null
                   : [
                       BoxShadow(
@@ -192,18 +201,22 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
                               ),
                               child: FittedBox(
                                 fit: BoxFit.contain,
-                                child: Text(
-                                  appName,
-                                  maxLines: 1,
-                                  softWrap: false,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: widget.isSelected
-                                        ? scheme.onSecondary
-                                        : scheme.onSurface,
-                                    fontSize: 14.r,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.4.r,
+                                child: GooeyCardChrome.fadeColor(
+                                  context,
+                                  color: widget.isSelected
+                                      ? scheme.onSecondary
+                                      : scheme.onSurface,
+                                  builder: (color) => Text(
+                                    appName,
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: color,
+                                      fontSize: 14.r,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.4.r,
+                                    ),
                                   ),
                                 ),
                               ),

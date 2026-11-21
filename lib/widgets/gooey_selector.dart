@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' show FragmentProgram, FragmentShader;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -180,6 +181,44 @@ class GooeyMotion extends ChangeNotifier {
   }
 }
 
+/// Runs a [GooeyMotion]'s springs on a ticker while it moves, and stops
+/// ticking once it settles.
+class GooeyMotionTicker {
+  GooeyMotionTicker(this.motion, TickerProvider vsync) {
+    _ticker = vsync.createTicker(_tick);
+    motion.addListener(sync);
+    GooeySelectorRing.loadProgram();
+  }
+
+  final GooeyMotion motion;
+  late final Ticker _ticker;
+  Duration _last = Duration.zero;
+
+  /// Starts the ticker if the motion has somewhere to go, or stops it if not.
+  /// Call after [GooeyMotion.retarget], which does not notify.
+  void sync() {
+    if (motion.moving && !_ticker.isActive) {
+      _last = Duration.zero;
+      _ticker.start();
+    } else if (!motion.moving && _ticker.isActive) {
+      _ticker.stop();
+    }
+  }
+
+  void _tick(Duration elapsed) {
+    final dt = _last == Duration.zero
+        ? 1 / 60
+        : (elapsed - _last).inMicroseconds / 1e6;
+    _last = elapsed;
+    motion.advance(dt);
+  }
+
+  void dispose() {
+    motion.removeListener(sync);
+    _ticker.dispose();
+  }
+}
+
 /// The layer behind the cards: the frames of the cards the liquid sits
 /// behind, the frame being left emptying and the next one filling as the
 /// liquid travels, and the frame itself at rest.
@@ -216,53 +255,32 @@ class GooeySelector extends StatefulWidget {
 
 class _GooeySelectorState extends State<GooeySelector>
     with SingleTickerProviderStateMixin {
-  late final Ticker _ticker;
-  Duration _last = Duration.zero;
+  late GooeyMotionTicker _ticker;
 
   @override
   void initState() {
     super.initState();
-    _ticker = createTicker(_tick);
-    widget.motion.addListener(_onMotion);
+    _ticker = GooeyMotionTicker(widget.motion, this);
     widget.motion.retarget(widget.selection, widget.target);
-    _onMotion();
-    GooeySelectorRing.loadProgram();
+    _ticker.sync();
   }
 
   @override
   void didUpdateWidget(GooeySelector oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.motion, widget.motion)) {
-      oldWidget.motion.removeListener(_onMotion);
-      widget.motion.addListener(_onMotion);
+      _ticker.dispose();
+      _ticker = GooeyMotionTicker(widget.motion, this);
     }
     if (widget.selection != oldWidget.selection ||
         widget.target != oldWidget.target) {
       widget.motion.retarget(widget.selection, widget.target);
-      _onMotion();
+      _ticker.sync();
     }
-  }
-
-  void _onMotion() {
-    if (widget.motion.moving && !_ticker.isActive) {
-      _last = Duration.zero;
-      _ticker.start();
-    } else if (!widget.motion.moving && _ticker.isActive) {
-      _ticker.stop();
-    }
-  }
-
-  void _tick(Duration elapsed) {
-    final dt = _last == Duration.zero
-        ? 1 / 60
-        : (elapsed - _last).inMicroseconds / 1e6;
-    _last = elapsed;
-    widget.motion.advance(dt);
   }
 
   @override
   void dispose() {
-    widget.motion.removeListener(_onMotion);
     _ticker.dispose();
     super.dispose();
   }
@@ -352,6 +370,7 @@ class GooeySelectorRing extends StatelessWidget {
     required this.color,
     required this.radius,
     required this.ringWidth,
+    this.offset,
   });
 
   final GooeyMotion motion;
@@ -360,6 +379,11 @@ class GooeySelectorRing extends StatelessWidget {
 
   /// The ring's thickness: the selected card's visible frame.
   final double ringWidth;
+
+  /// Where the motion's coordinates sit in this widget, when they are not its
+  /// own: a grid whose cards scroll under a fixed ring passes the scroll
+  /// position here (and it repaints as it changes).
+  final ValueListenable<Offset>? offset;
 
   /// The shader, shared by every grid; null until loaded, and for good if it
   /// fails to (the ring is then drawn without its liquid joins).
@@ -380,6 +404,7 @@ class GooeySelectorRing extends StatelessWidget {
           color: color,
           radius: radius,
           ringWidth: ringWidth,
+          offset: offset,
         ),
       ),
     );
@@ -392,12 +417,16 @@ class _RingPainter extends CustomPainter {
     required this.color,
     required this.radius,
     required this.ringWidth,
-  }) : super(repaint: motion);
+    this.offset,
+  }) : super(
+         repaint: offset == null ? motion : Listenable.merge([motion, offset]),
+       );
 
   final GooeyMotion motion;
   final Color color;
   final double radius;
   final double ringWidth;
+  final ValueListenable<Offset>? offset;
 
   static const int _maxShapes = 8;
   FragmentShader? _shader;
@@ -408,7 +437,7 @@ class _RingPainter extends CustomPainter {
     if (!motion.moving || from == null) return;
     // The ring keeps the selector's size and shape the whole way; only its
     // place moves, on the spring.
-    final body = motion.body;
+    final body = motion.body.shift(offset?.value ?? Offset.zero);
     final shapes = <(Rect, double)>[(body, radius)];
     final reach = math.max(6.0, radius * 0.9);
     final program = GooeySelectorRing._program;
@@ -467,7 +496,10 @@ class _RingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RingPainter old) =>
-      old.color != color || old.radius != radius || old.ringWidth != ringWidth;
+      old.color != color ||
+      old.radius != radius ||
+      old.ringWidth != ringWidth ||
+      old.offset != offset;
 }
 
 /// Moves a card with the liquid's drag (see [GooeyMotion.dragOf]). Wraps

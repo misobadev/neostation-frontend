@@ -25,7 +25,9 @@ import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/widgets/game_view_footer.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
 import 'package:neostation/widgets/spring_selected_card.dart';
+import 'package:neostation/utils/spring_scroller.dart';
 import 'package:neostation/utils/performance_mode.dart';
 import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/models/retro_achievements_game_info.dart';
@@ -140,9 +142,30 @@ class GamesGrid extends StatefulWidget {
   State<GamesGrid> createState() => _GamesGridState();
 }
 
-class _GamesGridState extends State<GamesGrid> {
+class _GamesGridState extends State<GamesGrid> with TickerProviderStateMixin {
   late GamepadNavigation _gamepadNav;
   final ScrollController _scrollController = ScrollController();
+
+  /// Keeps the selected game in view on a spring that carries its speed from
+  /// one press to the next (see [SpringScroller]).
+  late final SpringScroller _springScroller = SpringScroller(
+    _scrollController,
+    this,
+  );
+
+  /// The liquid ring the selection travels as between games: the same motion
+  /// as the systems grid's. It lives in the scroll content's coordinates and
+  /// is drawn on top of the list, shifted by [_ringOffset] as it scrolls.
+  final GooeyMotion _gooeyMotion = GooeyMotion();
+  late final GooeyMotionTicker _gooeyTicker = GooeyMotionTicker(
+    _gooeyMotion,
+    this,
+  );
+  final ValueNotifier<Offset> _ringOffset = ValueNotifier(const Offset(16, 12));
+
+  /// Whether the ring was travelling at the last build: the selected card
+  /// hides its own border while it does.
+  bool _ringWasMoving = false;
   int _selectedIndex = 0;
   int? _previousSelectedIndex;
   late int _lastRenderedSelectedIndex;
@@ -578,6 +601,8 @@ class _GamesGridState extends State<GamesGrid> {
     _lastRenderedSelectedIndex = _selectedIndex;
     _updateCrossAxisCount();
     _initializeGamepad();
+    _scrollController.addListener(_syncRingOffset);
+    _gooeyMotion.addListener(_onRingMotion);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -656,6 +681,8 @@ class _GamesGridState extends State<GamesGrid> {
   }
 
   void _handlePointerDown(PointerDownEvent event) {
+    // A finger on the grid takes the scroll over from the spring at once.
+    _springScroller.stop();
     _activePointers[event.pointer] = event.position;
   }
 
@@ -799,6 +826,10 @@ class _GamesGridState extends State<GamesGrid> {
     final pos = _scrollController.position;
     final target = _centerTargetFor(rect, pos.viewportDimension);
     if ((pos.pixels - target).abs() <= 1.0) return;
+    if (!_performanceMode) {
+      _springScroller.animateTo(target);
+      return;
+    }
     _scrollController.animateTo(
       target,
       duration: const Duration(milliseconds: 350),
@@ -814,6 +845,10 @@ class _GamesGridState extends State<GamesGrid> {
     _cardSizeLabel.dispose();
     GamepadNavigationManager.popLayer(widget.navLayerId);
     _gamepadNav.dispose();
+    _springScroller.dispose();
+    _gooeyTicker.dispose();
+    _gooeyMotion.dispose();
+    _ringOffset.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -1052,6 +1087,12 @@ class _GamesGridState extends State<GamesGrid> {
     // selection by many rows; a synchronous jump keeps the selected card centred
     // every frame. The trailing (settled) move still animates smoothly.
     // Exact model offsets (SliverVariedExtentList) make both land correctly.
+    if (!_performanceMode) {
+      // The spring keeps its speed through a burst of presses, so it follows
+      // the selection without restarting on each one.
+      _springScroller.animateTo(target);
+      return;
+    }
     if (_isNavigatingFast) {
       _scrollController.jumpTo(target);
       return;
@@ -1060,6 +1101,33 @@ class _GamesGridState extends State<GamesGrid> {
       target,
       duration: const Duration(milliseconds: 500),
       curve: Curves.easeOutQuart,
+    );
+  }
+
+  /// Where the scroll content's origin sits in the grid's box: the list's
+  /// padding, less how far it has scrolled.
+  void _syncRingOffset() {
+    final scrolled = _scrollController.hasClients
+        ? _scrollController.offset
+        : 0.0;
+    _ringOffset.value = Offset(16, 12 - scrolled);
+  }
+
+  /// Rebuilds once when the ring starts or stops travelling, so the selected
+  /// card hides or shows its own border.
+  void _onRingMotion() {
+    if (_gooeyMotion.moving != _ringWasMoving && mounted) setState(() {});
+  }
+
+  /// The selected card's frame in the scroll content, raised the way
+  /// [SpringSelectedCard] raises the card.
+  Rect? _ringTarget() {
+    if (_cardRects.isEmpty) return null;
+    final rect = _cardRects[_selectedIndex.clamp(0, _cardRects.length - 1)];
+    return Rect.fromCenter(
+      center: Offset(rect.left + rect.width / 2, rect.top + rect.height / 2),
+      width: rect.width * SpringSelectedCard.raisedScale,
+      height: rect.height * SpringSelectedCard.raisedScale,
     );
   }
 
@@ -1123,6 +1191,17 @@ class _GamesGridState extends State<GamesGrid> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   _computeLayout(constraints.maxWidth);
+
+                  // Point the ring at the selected card. Done here, after the
+                  // layout and before the rows are built, so the rows know
+                  // whether it is travelling.
+                  final ringTarget = _performanceMode ? null : _ringTarget();
+                  if (ringTarget != null) {
+                    _gooeyMotion.retarget(_selectedIndex, ringTarget);
+                    _gooeyTicker.sync();
+                  }
+                  final ringMoving = ringTarget != null && _gooeyMotion.moving;
+                  _ringWasMoving = ringMoving;
 
                   // The layout just changed for a non-scroll reason (card
                   // size cycle, fanart↔box2d). Once this new layout is
@@ -1198,7 +1277,9 @@ class _GamesGridState extends State<GamesGrid> {
                         targetWidth,
                         theme,
                       );
-                      if (idx == _selectedIndex) {
+                      // While the ring travels it is the selection; the card
+                      // shows its own border again once the ring lands.
+                      if (idx == _selectedIndex && !ringMoving) {
                         cell = Stack(
                           children: [
                             cell,
@@ -1230,6 +1311,20 @@ class _GamesGridState extends State<GamesGrid> {
                         selected: idx == _selectedIndex,
                         previouslySelected: idx == _previousSelectedIndex,
                         animate: !_performanceMode,
+                        child: cell,
+                      );
+                      // Every card gets the same wrapper so the subtree keeps
+                      // its shape; only the selected card and the one just
+                      // left are dragged by the ring.
+                      cell = GooeyCardDrag(
+                        motion: _gooeyMotion,
+                        role: _performanceMode
+                            ? null
+                            : idx == _selectedIndex
+                            ? true
+                            : idx == _previousSelectedIndex
+                            ? false
+                            : null,
                         child: cell,
                       );
                       if (!_performanceMode) {
@@ -1310,7 +1405,18 @@ class _GamesGridState extends State<GamesGrid> {
                             ],
                           ),
                         ),
-                        // Selection cursor is drawn in-cell (see buildRow).
+                        // Selection cursor is drawn in-cell (see buildRow); the
+                        // ring only while it travels between cards.
+                        if (!_performanceMode)
+                          Positioned.fill(
+                            child: GooeySelectorRing(
+                              motion: _gooeyMotion,
+                              color: borderColor,
+                              radius: 12.r * SpringSelectedCard.raisedScale,
+                              ringWidth: 4.r * SpringSelectedCard.raisedScale,
+                              offset: _ringOffset,
+                            ),
+                          ),
                         ValueListenableBuilder<String?>(
                           valueListenable: _cardSizeLabel,
                           builder: (context, label, child) => AnimatedOpacity(
