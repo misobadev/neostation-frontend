@@ -72,4 +72,47 @@ void main() {
     expect(find.byType(RecentCardDots), findsNothing);
     expect(find.byKey(const ValueKey('card-a')), findsOneWidget);
   });
+
+  testWidgets('tapping the LT and RT glyphs steps the card', (tester) async {
+    cycler.pick(['a', 'b', 'c']);
+    await tester.pumpWidget(host('a'));
+
+    await tester.tap(find.byKey(const ValueKey('recent_card_rt')));
+    expect(cycler.index, 1);
+    expect(cycler.direction, 1);
+
+    await tester.tap(find.byKey(const ValueKey('recent_card_lt')));
+    await tester.tap(find.byKey(const ValueKey('recent_card_lt')));
+    expect(cycler.index, 2, reason: 'LT wraps back past the newest game');
+    expect(cycler.direction, -1);
+  });
+
+  testWidgets('swiping across the card steps it', (tester) async {
+    cycler.pick(['a', 'b', 'c']);
+    await tester.pumpWidget(host('a'));
+
+    // Toward the start brings in the next game, like RT.
+    await tester.fling(
+      find.byKey(const ValueKey('card-a')),
+      const Offset(-200, 0),
+      1000,
+    );
+    expect(cycler.index, 1);
+
+    // A slow drag counts once it crosses a fifth of the card.
+    await tester.drag(
+      find.byType(RecentCardCycle),
+      const Offset(150, 0),
+      warnIfMissed: false,
+    );
+    expect(cycler.index, 0);
+
+    // A short, slow drag does not.
+    await tester.drag(
+      find.byType(RecentCardCycle),
+      const Offset(30, 0),
+      warnIfMissed: false,
+    );
+    expect(cycler.index, 0);
+  });
 }

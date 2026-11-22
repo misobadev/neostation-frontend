@@ -1177,10 +1177,14 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                           // The recent card slides between the last few played
                           // games. Always wrapped (never only when centred), so
                           // the subtree keeps its shape as selection travels.
-                          if (system.isGame && widget.items == null)
+                          if (system.isGame &&
+                              widget.items == null &&
+                              widget.onRightTrigger != null)
                             RecentCardCycle(
                               gameKey: system.gameModel?.romPath,
                               card: card,
+                              // Off centre, a swipe on it scrolls the carousel.
+                              swipeEnabled: isSelected,
                             )
                           else
                             card,
