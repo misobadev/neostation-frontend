@@ -7845,6 +7845,10 @@ class SqliteMigrations {
   static Future<void> _migrateToVersion194(Database db) async {
     _log.i('Migration v194: Adding swap_screens to user_config');
     try {
+      // A device that ran main at v193 skips v192, so its table is created
+      // here. Idempotent (`CREATE TABLE IF NOT EXISTS`).
+      await _migrateToVersion192(db);
+
       final columns = db
           .select('PRAGMA table_info(user_config)')
           .map((c) => c['name'].toString())

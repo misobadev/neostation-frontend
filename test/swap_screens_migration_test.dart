@@ -52,6 +52,29 @@ void main() {
     expect(columns(), isEmpty);
   });
 
+  // A device that ran main at v193 never saw v192, so v194 creates the
+  // launch-screen table too, and keeps rows that are already there.
+  test('creates user_launch_display when v192 was skipped', () async {
+    db.execute('CREATE TABLE user_config (id INTEGER PRIMARY KEY)');
+
+    await SqliteMigrations.migrateToVersion(db, 194);
+
+    final tables = db
+        .select("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .map((r) => r['name'].toString());
+    expect(tables, contains('user_launch_display'));
+
+    db.execute(
+      "INSERT INTO user_launch_display (scope, target, display) "
+      "VALUES ('system', 'nds', 'secondary')",
+    );
+    await SqliteMigrations.migrateToVersion(db, 194);
+    expect(
+      db.select('SELECT display FROM user_launch_display').single['display'],
+      'secondary',
+    );
+  });
+
   test('ConfigModel reads both spellings and defaults to off', () {
     expect(ConfigModel.fromJson(const {}).swapScreens, isFalse);
     expect(ConfigModel.fromJson(const {'swap_screens': 1}).swapScreens, isTrue);
