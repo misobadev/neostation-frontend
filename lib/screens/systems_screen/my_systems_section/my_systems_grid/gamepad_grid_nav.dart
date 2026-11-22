@@ -51,6 +51,14 @@ extension _GamepadGridNav on _SystemCardGridViewState {
       // null onBack also leaves the keyboard's Backspace unhandled, as it was.
       onBack: widget.onBackPressed,
       onXButton: widget.onXPressed,
+      // Bound only for a host that supplies them (the systems screen's recent
+      // card), so the collections browser's triggers stay silent.
+      onLeftTrigger: widget.onLeftTrigger == null
+          ? null
+          : () => widget.onLeftTrigger?.call(),
+      onRightTrigger: widget.onRightTrigger == null
+          ? null
+          : () => widget.onRightTrigger?.call(),
       onWestButton: widget.onWestPressed,
       // A pushed host is not part of the tab strip, so its shoulder buttons
       // must not cycle tabs out from under it.
