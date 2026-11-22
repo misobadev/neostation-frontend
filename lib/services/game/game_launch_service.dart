@@ -2192,6 +2192,8 @@ class GameLaunchService {
   static Future<void> handleAppResumed() async {
     if (GameSessionManager.isGameLaunched) {
       if (Platform.isLinux) return;
+      // The game runs on the other screen and the native side reports its end.
+      if (GameSessionManager.gameOnOtherScreen) return;
 
       final isDesktop =
           Platform.isWindows || Platform.isLinux || Platform.isMacOS;

@@ -271,9 +271,6 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.nowPlayingDimOff: '关闭',
   AppLocale.secondarySectionNowPlaying: 'Now Playing 面板',
   AppLocale.secondarySectionDock: '应用坞',
-  AppLocale.screenshotAccess: '界面返回与截图',
-  AppLocale.screenshotAccessSubtitle:
-      '关闭从应用坞打开的应用后恢复 Now Playing 界面，并让截图按钮可以截取屏幕（将打开 Android 无障碍设置）',
   AppLocale.scanOnStartupSubtitle: '应用程序启动时自动扫描 ROM 文件夹',
   AppLocale.ignoreHiddenFiles: '忽略隐藏项目',
   AppLocale.ignoreHiddenFilesSubtitle: 'ROM 扫描期间隐藏隐藏文件和文件夹',
@@ -312,6 +309,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.setAsDefaultLauncher: '将 NeoStation 设置为默认启动器',
   AppLocale.disableSecondaryScreen: '在副屏幕上禁用',
   AppLocale.disableSecondaryScreenSub: '在副屏幕上关闭应用',
+  AppLocale.swapScreens: '交换屏幕',
+  AppLocale.swapScreensSub: '在下屏显示 NeoStation，在上屏显示 Now Playing 和程序坞',
   AppLocale.bartopShutdown: '退出时关闭 BarTOP',
   AppLocale.bartopShutdownSubtitle: '退出应用时关闭计算机',
 
@@ -882,15 +881,6 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.storagePermission: '存储权限',
   AppLocale.storagePermissionDesc:
       'NeoStation 需要“所有文件访问权限”来管理 RetroArch 配置并同步游戏存档。',
-  AppLocale.screenReturnAccess: '界面返回权限',
-  AppLocale.screenReturnAccessDesc:
-      '关闭从应用坞打开的应用后返回 Now Playing 界面，并启用系统截图。仅读取前台应用的名称，不会收集任何屏幕内容。',
-  AppLocale.screenReturnAccessHint: '开启 NeoStation，然后点按“允许”',
-  AppLocale.screenReturnDialogTitle: '启用界面返回',
-  AppLocale.screenReturnDialogBody:
-      '要从应用坞启动应用，NeoStation 需要“界面返回”无障碍服务。它会在你关闭所打开的应用后带你回到这里。没有它，你可能无法返回。',
-  AppLocale.screenReturnDialogSteps: '在下一个界面中，从服务列表里找到 NeoStation 并将其开启。',
-  AppLocale.openSettings: '打开设置',
   AppLocale.selectRomFolder: '选择 ROM 文件夹',
   AppLocale.romFolderSelected: 'ROM 文件夹已选择！',
   AppLocale.chooseRomFolderDesc: '选择存储 ROM 文件的文件夹。NeoStation 将扫描其中的游戏。',

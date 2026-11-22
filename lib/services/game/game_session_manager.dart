@@ -31,6 +31,14 @@ class GameSessionManager {
   static bool _isGameLaunched = false;
   static bool get isGameLaunched => _isGameLaunched;
 
+  /// Android: the running game opened on the bottom screen of a dual-screen
+  /// handheld, where the native side tracks it and sends `onGameReturned` the
+  /// moment it closes. NeoStation's own window keeps running beside the game,
+  /// so regaining focus (the user tapping it) must not end the session then.
+  static bool _gameOnOtherScreen = false;
+  static bool get gameOnOtherScreen => _gameOnOtherScreen;
+  static void markGameOnOtherScreen() => _gameOnOtherScreen = true;
+
   /// True from the moment a launch is initiated (Now Playing pushed) until the
   /// launch resolves — i.e. [registerGameLaunch] flips [_isGameLaunched], or
   /// the launch fails. Covers the ~2s dialog+handoff window during which
@@ -47,6 +55,7 @@ class GameSessionManager {
   /// the emulator handoff. Cleared by [registerGameLaunch] on success or
   /// [clearLaunchPending] on failure.
   static void beginLaunchPending() {
+    _gameOnOtherScreen = false;
     _launchPending = true;
     _pauseBackgroundHashing();
   }
@@ -343,6 +352,7 @@ class GameSessionManager {
       }
 
       _isGameLaunched = false;
+      _gameOnOtherScreen = false;
       _gameLaunchTime = null;
       _launchedEmulatorExe = null;
       _currentGameSystem = null;

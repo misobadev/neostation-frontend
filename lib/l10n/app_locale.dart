@@ -274,8 +274,6 @@ mixin AppLocale {
   static const String secondarySectionNowPlaying =
       'secondary_section_now_playing';
   static const String secondarySectionDock = 'secondary_section_dock';
-  static const String screenshotAccess = 'screenshot_access';
-  static const String screenshotAccessSubtitle = 'screenshot_access_subtitle';
   static const String ignoreHiddenFiles = 'ignore_hidden_files';
   static const String ignoreHiddenFilesSubtitle =
       'ignore_hidden_files_subtitle';
@@ -318,6 +316,8 @@ mixin AppLocale {
   static const String disableSecondaryScreen = 'disable_secondary_screen';
   static const String disableSecondaryScreenSub =
       'disable_secondary_screen_sub';
+  static const String swapScreens = 'swap_screens';
+  static const String swapScreensSub = 'swap_screens_sub';
   static const String bartopShutdown = 'bartop_shutdown';
   static const String bartopShutdownSubtitle = 'bartop_shutdown_subtitle';
   static const String showSyncTab = 'show_sync_tab';
@@ -919,13 +919,6 @@ mixin AppLocale {
   static const String letsGetSetup = 'lets_get_setup';
   static const String storagePermission = 'storage_permission';
   static const String storagePermissionDesc = 'storage_permission_desc';
-  static const String screenReturnAccess = 'screen_return_access';
-  static const String screenReturnAccessDesc = 'screen_return_access_desc';
-  static const String screenReturnAccessHint = 'screen_return_access_hint';
-  static const String screenReturnDialogTitle = 'screen_return_dialog_title';
-  static const String screenReturnDialogBody = 'screen_return_dialog_body';
-  static const String screenReturnDialogSteps = 'screen_return_dialog_steps';
-  static const String openSettings = 'open_settings';
   static const String selectRomFolder = 'select_rom_folder';
   static const String romFolderSelected = 'rom_folder_selected';
   static const String chooseRomFolderDesc = 'choose_rom_folder_desc';

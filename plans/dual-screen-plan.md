@@ -1,6 +1,6 @@
 # Plan: intercambio de pantallas en handhelds de doble pantalla
 
-Estado: investigación y plan. La fase 2 está implementada (ver su sección); el resto, no. Rama: `feat/dual-screen-swap` (desde `origin/main`, `a91f2f0b`).
+Estado: las fases 2 y 3 y el `SECONDARY_HOME` de la fase 4 están implementados (ver sus secciones), con un enfoque distinto del planeado para la fase 3. Además, se quitó el servicio de accesibilidad. Rama: `feat/dual-screen-swap` (desde `origin/main`, `a91f2f0b`).
 
 Dispositivos objetivo: AYN Thor, Retroid Pocket 6 y "AYN 2 Portal" (ver 1.3: no existe con dos pantallas).
 
@@ -182,25 +182,33 @@ Diseño original:
   - `lib/l10n/app_locale*.dart`: textos en los 12 idiomas.
 - Más adelante, si se pide: un override por sistema (`system_emulator_settings_dialog`), como ES-DE 3.5.
 
-### Fase 3: "Intercambiar pantallas" dentro de la app (esfuerzo M-L, con riesgo)
+### Fase 3: "Intercambiar pantallas" — implementada, con otro enfoque
 
-- Preferencia persistente `main_ui_display`: `auto` o `large` (arriba en el Thor) / `small` (abajo). Se guarda **por rol, no por id**, porque los ids cambian.
-- Acción "Intercambiar pantallas", en Ajustes → Pantalla secundaria, y quizá en el menú rápido:
-  1. Solo en reposo: sin juego, scraping ni sync activos.
-  2. Confirmación del tipo "La interfaz se reiniciará en la otra pantalla".
-  3. Guardar la preferencia, cerrar la Presentation, `startActivity(intent propio, setLaunchDisplayId(otro))` y `finish()`.
-- En `MainActivity.onCreate` y `onNewIntent`: si la preferencia indica otro display y ese display existe, relanzar **una vez**, con un guardia por extra del intent o un timestamp, para cubrir HOME y los arranques en frío.
-- La Presentation se crea siempre en el display que deja libre la actividad (gracias a la fase 1). Se mantiene `FLAG_NOT_FOCUSABLE`.
-- Layout:
-  - Revisar la UI principal a 1240x1080 / 3.92": rejillas, cabecera, diálogos. Valorar un factor de escala de UI propio para pantallas pequeñas.
-  - Revisar el panel secundario a 1920x1080: `lib/screens/secondary_screen/background_builders.dart`, `widgets/now_playing_panel.dart`, `widgets/app_dock.dart`.
-- Si el display preferido desaparece (RP6 + accesorio), volver solos a `auto` sin relanzar.
+El plan original era relanzar `MainActivity` en el otro display. No hizo falta. En Android 10+ la pantalla de abajo pasó de `Presentation` a una actividad propia, `SecondaryDisplayActivity`. Con dos actividades, el swap intercambia los dos engines de Flutter entre los dos `FlutterView`. Ningún engine se reinicia y no se pierde estado.
+
+Lo que salió del spike en el AVD `NeoStation_Thor`:
+- **Mover las tareas de display no sirve.** Android crea una segunda `MainActivity`, con un segundo engine, en vez de mover la existente.
+- **Una actividad en el display 2 recibe `onResume` y `onTopResumedActivityChanged(true)` en cuanto se cierra la app o el juego que la tapaba.** Pasa con BACK y con force-stop. Esto reemplaza al servicio de accesibilidad, que Play Protect usaba para bloquear instalaciones. El botón de captura de pantalla, que dependía de ese servicio, se quitó.
+- **El foco del gamepad tiene que volver a la actividad que muestra la UI principal.** Se devuelve con `ActivityManager.moveTaskToFront` (permiso `REORDER_TASKS`), que no pausa la actividad. La ventana que muestra la UI secundaria es `FLAG_NOT_FOCUSABLE`.
+
+Cómo quedó:
+- **Ajuste:** General → "Intercambiar pantallas" (`user_config.swap_screens`, migración v194). Solo aparece en Android 10+ con una segunda pantalla. El lado nativo lo lee de la base al arrancar.
+- **Juegos en la otra pantalla:** la sesión termina cuando la actividad de abajo vuelve al frente. Que el usuario toque NeoStation a mitad de partida ya no la termina (`GameSessionManager.gameOnOtherScreen`).
+- **Dock:** sin ocultar ni restaurar nada; la app tapa la actividad y, al cerrarse, la actividad vuelve. Con las pantallas intercambiadas, las apps del dock se abren en la pantalla del dock.
+- **Android 9 y anteriores:** se mantiene la `Presentation`, sin swap.
+- **Detalle técnico:** `android/CLAUDE.md`.
+
+Pendiente de probar en un Thor real:
+- Display 4 con el firmware de AYN.
+- El IME fijado abajo.
+- Apagar y encender la pantalla.
+- Un juego abierto abajo de principio a fin; el AVD no tiene juegos configurados.
+- El layout de la UI principal a 3.92" y del panel secundario a 16:9.
 
 ### Fase 4 (opcional): integración más profunda
 
 - Un tile de ajustes rápidos para intercambiar, como Loki.
-- Declarar `SECONDARY_HOME` para ser launcher también en la pantalla de abajo. Requiere una segunda actividad y engine, y cambia mucho el modelo actual de Presentation.
-- Pantalla de destino por juego.
+- `SECONDARY_HOME`: **implementado**, como `activity-alias` de `SecondaryDisplayActivity`. Con NeoStation como launcher, la pantalla de abajo vuelve en el arranque y al pulsar HOME en ella. Se desactiva mientras el usuario oculta la pantalla de abajo.
 
 ### Archivos que se tocarían
 

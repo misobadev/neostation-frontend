@@ -42,6 +42,8 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Hands focus between the two screens of dual-screen handhelds. -->
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     
@@ -137,22 +139,35 @@
             </intent-filter>
         </provider>
         
-        <!-- Accessibility service: takes the system screenshot and watches the
-             bottom display so Now Playing is restored when a dock-launched app
-             is closed. Must be declared here or Android never registers it and
-             it can't be enabled in Settings > Accessibility. -->
-        <service
-            android:name=".ScreenshotAccessibilityService"
-            android:exported="true"
-            android:label="${appName}"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+        <!-- The bottom screen of dual-screen handhelds on Android 10+, started
+             on the secondary display by MainActivity. A real activity, so
+             Android reports when an app or game on that display closes. -->
+        <activity
+            android:name=".SecondaryDisplayActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:taskAffinity="${applicationId}.secondary"
+            android:excludeFromRecents="true"
+            android:resizeableActivity="true"
+            android:theme="@style/NormalTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true" />
+
+        <!-- With NeoStation as the default launcher, Android uses this as the
+             secondary display's home, so the bottom screen comes back on boot
+             and on Home pressed there. Not singleInstance/singleTask: Android
+             refuses those as a secondary home. Disabled while the user hides
+             the bottom screen. -->
+        <activity-alias
+            android:name=".SecondaryHome"
+            android:targetActivity=".SecondaryDisplayActivity"
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.SECONDARY_HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/screenshot_accessibility_config" />
-        </service>
+        </activity-alias>
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

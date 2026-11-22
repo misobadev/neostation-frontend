@@ -273,8 +273,6 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.nowPlayingDimOff: 'オフ',
   AppLocale.secondarySectionNowPlaying: 'Now Playingパネル',
   AppLocale.secondarySectionDock: 'アプリドック',
-  AppLocale.screenshotAccess: '画面復帰とスクリーンショット',
-  AppLocale.screenshotAccessSubtitle: 'ドックから開いたアプリを閉じたときにNow Playing画面に戻し、スクリーンショットボタンで画面を撮影できるようにします（Androidのユーザー補助設定が開きます）',
   AppLocale.scanOnStartupSubtitle: 'アプリ起動時にROMフォルダを自動的にスキャン',
   AppLocale.ignoreHiddenFiles: '隠しアイテムを無視',
   AppLocale.ignoreHiddenFilesSubtitle: 'ROMスキャン中に隠しファイルとフォルダを非表示にする',
@@ -313,6 +311,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.setAsDefaultLauncher: 'NeoStationをホーム画面として設定',
   AppLocale.disableSecondaryScreen: 'セカンダリ画面で無効化',
   AppLocale.disableSecondaryScreenSub: 'セカンダリ画面のアプリを閉じる',
+  AppLocale.swapScreens: '画面を入れ替え',
+  AppLocale.swapScreensSub: 'NeoStation を下の画面に、Now Playing とドックを上の画面に表示します',
   AppLocale.bartopShutdown: '終了時にBarTOPをシャットダウン',
   AppLocale.bartopShutdownSubtitle: 'アプリ終了時にコンピュータをシャットダウン',
 
@@ -902,14 +902,6 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.letsGetSetup: 'セットアップを始めましょう',
   AppLocale.storagePermission: 'ストレージの許可',
   AppLocale.storagePermissionDesc: 'NeoStationがRetroArchの設定を管理し、セーブデータを正しく同期するには「すべてのファイルへのアクセス」が必要です。\n\n次の画面でこの許可を与えてください。',
-  AppLocale.screenReturnAccess: '画面復帰のアクセス許可',
-  AppLocale.screenReturnAccessDesc: 'ドックから開いたアプリを閉じるとNow Playing画面に戻り、システムのスクリーンショットが使えるようになります。読み取るのは前面に表示中のアプリ名だけで、画面の内容は収集しません。',
-  AppLocale.screenReturnAccessHint: 'NeoStationをオンにして、「許可」をタップしてください',
-  AppLocale.screenReturnDialogTitle: '画面復帰を有効にする',
-  AppLocale.screenReturnDialogBody: 'ドックからアプリを起動するには、画面復帰のユーザー補助サービスが必要です。開いたアプリを閉じたあと、この画面に戻れるようにします。これがないと、戻る手段がなくなることがあります。',
-  AppLocale.screenReturnDialogSteps:
-      '次の画面で、サービスの一覧から NeoStation を探してオンにしてください。',
-  AppLocale.openSettings: '設定を開く',
   AppLocale.selectRomFolder: 'ROMフォルダを選択',
   AppLocale.romFolderSelected: 'ROMフォルダが選択されました！',
   AppLocale.chooseRomFolderDesc:

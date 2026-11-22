@@ -153,10 +153,6 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   /// Whether the app picker overlay is currently visible in either mode.
   bool get _pickerVisible => _pickerSlot != null || _launcherOpen;
 
-  /// Whether the "enable Screen Return" explainer dialog is showing. Raised
-  /// when the launcher is tapped while the accessibility service is off.
-  bool _accessDialogVisible = false;
-
   /// Installed-app list backing the picker; null until first loaded.
   List<Map<String, dynamic>>? _pickerApps;
   bool _loadingPickerApps = false;
@@ -799,18 +795,6 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     }
   }
 
-  /// Asks the main engine to take a system screenshot of the main screen by
-  /// bumping the shared trigger; the main engine watches for the increment.
-  void _requestScreenshot() {
-    final state = _secondaryDisplayState?.value;
-    if (state != null) {
-      _wakeInGamePanel();
-      _secondaryDisplayState?.updateState(
-        screenshotTrigger: state.screenshotTrigger + 1,
-      );
-    }
-  }
-
   /// Current dock slot assignments, always [ConfigModel.dockMaxSlots] long.
   List<String> get _dockApps {
     final apps = _secondaryDisplayState?.value?.dockApps;
@@ -1200,11 +1184,6 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                             // all-apps launcher). Top-most so it covers the dock
                             // and any panel; available in every state.
                             if (_pickerVisible) _buildAppPickerOverlay(),
-
-                            // Accessibility explainer, top-most so it sits over
-                            // the dock and picker.
-                            if (_accessDialogVisible)
-                              _buildAccessibilityDialog(value),
                           ],
                         ),
                 );
@@ -1363,7 +1342,7 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   Widget _buildDockOverlay(SecondaryDisplayStateData value) {
     // `appReady` is a one-way "main UI has painted" latch, but the shared state
     // is written by BOTH engines: the secondary's own pushes (isSecondaryActive,
-    // mute/screenshot toggles) copyWith from a local snapshot that may still
+    // mute toggle) copyWith from a local snapshot that may still
     // carry appReady=false, so the incoming flag oscillates. Latch it locally on
     // first true and ignore later falses, so the dock slides up once and stays.
     if (value.appReady && !_dockRevealed) {
@@ -1428,7 +1407,6 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                     onLaunchApp: _launchDockApp,
                     onPickSlot: _openAppPicker,
                     onClearSlot: _clearSlot,
-                    onOpenAccessibilitySettings: _showAccessibilityDialog,
                   ),
                 ),
                 Positioned(
@@ -1437,7 +1415,6 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                   child: DockLauncherButton(
                     value: value,
                     onOpenLauncher: _openAppLauncher,
-                    onOpenAccessibilitySettings: _showAccessibilityDialog,
                   ),
                 ),
               ],
@@ -1561,7 +1538,6 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                       ),
                       use12HourClock:
                           value.use12HourClock ?? widget.initialUse12HourClock,
-                      onRequestScreenshot: _requestScreenshot,
                     ),
             ),
           ),
@@ -1609,168 +1585,6 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
               color: Colors.white,
               size: 30.r,
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Opens Android accessibility settings from the secondary engine so the user
-  /// can enable the Screen Return service.
-  void _openAccessibilitySettings() {
-    _wakeInGamePanel();
-    SfxService().playNavSound();
-    SecondaryAppsService.openAccessibilitySettings();
-  }
-
-  /// Shows the explainer dialog raised when the launcher is tapped while the
-  /// Screen Return accessibility service is off.
-  void _showAccessibilityDialog() {
-    _wakeInGamePanel();
-    SfxService().playNavSound();
-    setState(() => _accessDialogVisible = true);
-  }
-
-  void _dismissAccessibilityDialog() {
-    SfxService().playNavSound();
-    setState(() => _accessDialogVisible = false);
-  }
-
-  /// Accepts the explainer: closes it and jumps to accessibility settings.
-  void _confirmAccessibilityDialog() {
-    setState(() => _accessDialogVisible = false);
-    _openAccessibilitySettings();
-  }
-
-  /// Modal explainer shown before sending the user to accessibility settings.
-  /// Tells them why the Screen Return service is needed and what to do once the
-  /// settings screen opens. Tapping the backdrop or Cancel dismisses; Open
-  /// settings jumps to the accessibility settings.
-  Widget _buildAccessibilityDialog(SecondaryDisplayStateData value) {
-    final scheme = panelScheme(value);
-    final l10n = _l10nContext ?? context;
-    return Positioned.fill(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _dismissAccessibilityDialog,
-        child: ColoredBox(
-          color: Colors.black.withValues(alpha: 0.72),
-          child: Center(
-            child: GestureDetector(
-              // Swallow taps on the card so they don't dismiss via the backdrop.
-              onTap: () {},
-              child: Container(
-                width: 480.r,
-                padding: EdgeInsets.all(28.r),
-                decoration: BoxDecoration(
-                  color: scheme.surface,
-                  borderRadius: BorderRadius.circular(20.r),
-                  border: Border.all(
-                    color: scheme.onSurface.withValues(alpha: 0.15),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      blurRadius: 24.r,
-                      offset: Offset(0, 8.r),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Symbols.accessibility_new_rounded,
-                          color: scheme.primary,
-                          size: 30.r,
-                        ),
-                        SizedBox(width: 12.r),
-                        Expanded(
-                          child: Text(
-                            AppLocale.screenReturnDialogTitle.getString(l10n),
-                            style: TextStyle(
-                              color: scheme.onSurface,
-                              fontSize: 20.r,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 18.r),
-                    Text(
-                      '${AppLocale.screenReturnDialogBody.getString(l10n)}\n\n'
-                      '${AppLocale.screenReturnDialogSteps.getString(l10n)}',
-                      style: TextStyle(
-                        color: scheme.onSurface.withValues(alpha: 0.8),
-                        fontSize: 14.r,
-                        height: 1.45,
-                      ),
-                    ),
-                    SizedBox(height: 26.r),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _buildDialogButton(
-                          label: AppLocale.cancel.getString(l10n).toUpperCase(),
-                          onTap: _dismissAccessibilityDialog,
-                          scheme: scheme,
-                          filled: false,
-                        ),
-                        SizedBox(width: 12.r),
-                        _buildDialogButton(
-                          label: AppLocale.openSettings
-                              .getString(l10n)
-                              .toUpperCase(),
-                          onTap: _confirmAccessibilityDialog,
-                          scheme: scheme,
-                          filled: true,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// A flat dialog action button — filled with the accent for the primary
-  /// action, outlined for the secondary. Custom (not a Material button) to match
-  /// the rest of the secondary screen, which has no Material ancestor.
-  Widget _buildDialogButton({
-    required String label,
-    required VoidCallback onTap,
-    required ColorScheme scheme,
-    required bool filled,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 20.r, vertical: 12.r),
-        decoration: BoxDecoration(
-          color: filled ? scheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: filled
-                ? scheme.primary
-                : scheme.onSurface.withValues(alpha: 0.30),
-            width: 1.5.r,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: filled ? scheme.onPrimary : scheme.onSurface,
-            fontSize: 13.r,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.r,
           ),
         ),
       ),

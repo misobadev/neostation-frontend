@@ -471,7 +471,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 193;
+  static const int _databaseVersion = 194;
 
   /// SQL predicate (over `user_roms` aliased `ur`) for an installed app the
   /// user marked as a game. See migration v191.
@@ -1983,6 +1983,7 @@ class SqliteService {
         ignore_hidden_files INTEGER DEFAULT 1,
         setup_completed INTEGER DEFAULT 0,
         hide_bottom_screen INTEGER DEFAULT 0,
+        swap_screens INTEGER DEFAULT 0,
         sfx_enabled INTEGER DEFAULT 1,
         sfx_volume REAL DEFAULT 0.75,
         custom_sfx TEXT,
@@ -2994,6 +2995,7 @@ class SqliteService {
     int? videoPreviewDelay,
     int? setupCompleted,
     int? hideBottomScreen,
+    int? swapScreens,
     int? sfxEnabled,
     double? sfxVolume,
     String? customSfx,
@@ -3081,6 +3083,9 @@ class SqliteService {
     }
     if (hideBottomScreen != null) {
       updates['hide_bottom_screen'] = hideBottomScreen;
+    }
+    if (swapScreens != null) {
+      updates['swap_screens'] = swapScreens;
     }
     if (sfxEnabled != null) {
       updates['sfx_enabled'] = sfxEnabled;
