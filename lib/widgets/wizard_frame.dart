@@ -1,20 +1,22 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../themes/corner_radii.dart';
 import 'brand_logo.dart';
 import 'neo_glass.dart';
-import 'splash_status_layout.dart';
 import 'wizard_step_dots.dart';
 
-/// The layout every wizard in the app shares (first-run setup, beta import),
-/// so they look alike and nothing moves between their steps: the logo and the
-/// step dots at fixed places at the top, and the step with its buttons right
-/// under it, centred in the space left, on a NeoGlass panel like the app's
-/// header and footer pills.
+/// The setup wizard's layout: the logo, the step dots and the step with its
+/// buttons on a NeoGlass panel (like the app's header and footer pills),
+/// centred on the screen together.
 ///
-/// Sized with [SplashStatusLayout]'s scale rather than ScreenUtil, so the
-/// screens that run before ScreenUtil is set up (the beta import) put
-/// everything exactly where the setup wizard does.
+/// Sized with ScreenUtil like the rest of the app, through [unitOf]: `1.r`,
+/// capped by the screen's real height. ScreenUtil's split-screen mode treats
+/// any screen as at least 700 tall, so on a short, wide one (a phone or a
+/// 16:9 handheld in landscape) `.r` follows the width and the wizard grew
+/// taller than the screen, cutting off its text and buttons.
 class WizardFrame extends StatelessWidget {
   const WizardFrame({
     super.key,
@@ -47,53 +49,73 @@ class WizardFrame extends StatelessWidget {
   /// null.
   final Brightness? brightness;
 
+  /// The wizard's unit: `1.r` on a screen at least as tall as the 640×480
+  /// design (a 4:3 handheld gets exactly `1.r`), and smaller on a shorter one
+  /// so everything still fits.
+  static double unitOf(BuildContext context) =>
+      math.min(1.r, MediaQuery.sizeOf(context).height / 480);
+
+  /// A font size in the wizard: [size] in [unitOf], but never under 80% of
+  /// [size], so a short screen scrolls a little rather than shrinking text
+  /// past reading.
+  static double fontOf(BuildContext context, double size) =>
+      math.max(size * unitOf(context), size * 0.8);
+
   @override
   Widget build(BuildContext context) {
-    final scale = SplashStatusLayout.scaleOf(context);
-    final textScale = SplashStatusLayout.textScaleOf(context);
+    final u = unitOf(context);
     final theme = Theme.of(context);
     final radius =
-        (theme.extension<CornerRadii>()?.radiusExternalRaw ?? 14) * scale;
+        (theme.extension<CornerRadii>()?.radiusExternalRaw ?? 14) * u;
+    final height = MediaQuery.sizeOf(context).height;
+    // On a short screen the top gives up room first: the logo and the gaps
+    // around it take a share of the height rather than a fixed size, so the
+    // panel keeps enough for its text and buttons.
+    final logoWidth = math.min(260 * u, height * 0.1 * BrandLogo.aspectRatio);
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        32 * scale,
-        44 * scale,
-        32 * scale,
-        24 * scale,
+        32 * u,
+        math.min(24 * u, height * 0.04),
+        32 * u,
+        math.min(24 * u, height * 0.04),
       ),
+      // The logo, the dots and the panel are centred together, so the
+      // screen reads as one block rather than a logo pinned to the top.
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          BrandLogo(width: 260 * scale, brightness: brightness),
-          SizedBox(height: 24 * scale),
+          BrandLogo(width: logoWidth, brightness: brightness),
+          SizedBox(height: math.min(24 * u, height * 0.035)),
           WizardStepDots(
             step: step,
             total: total,
             label: stepLabel,
             color: color,
-            unit: scale,
-            fontSize: 13 * textScale / scale,
+            unit: u,
+            fontSize: fontOf(context, 13) / u,
           ),
-          SizedBox(height: 16 * scale),
-          Expanded(
+          SizedBox(height: math.min(16 * u, height * 0.03)),
+          // Loose, so the panel takes only the height its step needs and the
+          // column centres what is left; on a short screen it gets all the
+          // room there is and its step scrolls.
+          Flexible(
             child: Center(
+              // As tall as the panel, not the room left, or there is nothing
+              // for the column to centre.
+              heightFactor: 1,
               // One width for every step, so the panel doesn't resize (and
-              // its buttons don't move) as the steps change.
+              // its buttons don't move sideways) as the steps change.
               child: SizedBox(
-                width: 640 * scale,
+                width: 640 * u,
                 child: NeoGlass(
                   cornerRadius: radius,
                   tint: theme.colorScheme.surface,
-                  padding: EdgeInsets.fromLTRB(
-                    24 * scale,
-                    20 * scale,
-                    24 * scale,
-                    20 * scale,
-                  ),
+                  padding: EdgeInsets.fromLTRB(24 * u, 16 * u, 24 * u, 16 * u),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Flexible(child: content),
-                      SizedBox(height: 20 * scale),
+                      SizedBox(height: 16 * u),
                       buttons,
                     ],
                   ),

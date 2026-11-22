@@ -41,6 +41,10 @@ class SystemArtPackTile extends StatelessWidget {
   /// the NeoGlass rim is the only border; the setup wizard keeps it.
   final bool showBorder;
 
+  /// Just the mosaic, the name and the author: no stats and no arrow. The
+  /// setup wizard lays the packs out two a row, where those don't fit.
+  final bool compact;
+
   const SystemArtPackTile({
     super.key,
     required this.pack,
@@ -52,6 +56,7 @@ class SystemArtPackTile extends StatelessWidget {
     this.backgroundColor,
     this.margin,
     this.showBorder = true,
+    this.compact = false,
   });
 
   @override
@@ -68,7 +73,7 @@ class SystemArtPackTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: margin ?? EdgeInsets.symmetric(vertical: 2.r),
-        padding: EdgeInsets.all(6.r),
+        padding: EdgeInsets.all(compact ? 3.r : 6.r),
         decoration: BoxDecoration(
           color: highlighted
               ? scheme.onSurface
@@ -89,7 +94,7 @@ class SystemArtPackTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SystemArtPackMosaic(images: pack.mosaicImages, size: mosaicSize),
-            SizedBox(width: 10.r),
+            SizedBox(width: compact ? 6.r : 10.r),
             Expanded(
               child: _buildDetails(
                 context,
@@ -99,11 +104,12 @@ class SystemArtPackTile extends StatelessWidget {
                 highlighted: highlighted,
               ),
             ),
-            Icon(
-              Symbols.chevron_right_rounded,
-              size: 18.r,
-              color: foreground.withValues(alpha: 0.45),
-            ),
+            if (!compact)
+              Icon(
+                Symbols.chevron_right_rounded,
+                size: 18.r,
+                color: foreground.withValues(alpha: 0.45),
+              ),
           ],
         ),
       ),
@@ -189,29 +195,31 @@ class SystemArtPackTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 9.r, color: mutedForeground),
         ),
-        SizedBox(height: 4.r),
-        Wrap(
-          spacing: 5.r,
-          runSpacing: 3.r,
-          children: [
-            if (pack.systemsCovered > 0)
-              SystemArtPackChip(
-                icon: Symbols.devices_rounded,
-                label: AppLocale.systemArtSystemsCovered
-                    .getString(context)
-                    .replaceAll('{count}', '${pack.systemsCovered}'),
-                foreground: foreground,
-              ),
-            if (pack.downloads > 0)
-              SystemArtPackChip(
-                icon: Symbols.download_rounded,
-                label: AppLocale.systemArtDownloads
-                    .getString(context)
-                    .replaceAll('{count}', '${pack.downloads}'),
-                foreground: foreground,
-              ),
-          ],
-        ),
+        if (!compact) ...[
+          SizedBox(height: 4.r),
+          Wrap(
+            spacing: 5.r,
+            runSpacing: 3.r,
+            children: [
+              if (pack.systemsCovered > 0)
+                SystemArtPackChip(
+                  icon: Symbols.devices_rounded,
+                  label: AppLocale.systemArtSystemsCovered
+                      .getString(context)
+                      .replaceAll('{count}', '${pack.systemsCovered}'),
+                  foreground: foreground,
+                ),
+              if (pack.downloads > 0)
+                SystemArtPackChip(
+                  icon: Symbols.download_rounded,
+                  label: AppLocale.systemArtDownloads
+                      .getString(context)
+                      .replaceAll('{count}', '${pack.downloads}'),
+                  foreground: foreground,
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }

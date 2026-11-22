@@ -61,11 +61,15 @@ class _PermissionCheckWrapperState extends State<PermissionCheckWrapper> {
         await configProvider.initialize();
       }
 
-      final hasRomFolder = configProvider.config.romFolder?.isNotEmpty == true;
+      // Only the wizard's own finish marks setup as done. Having a ROM folder
+      // used to count too, but the folder is picked halfway through: an app
+      // closed or restarted after that step skipped the scan, the ES-DE
+      // import and the art pack, and opened on an empty library. Every
+      // released version saves this flag when the wizard finishes.
       final setupCompleted = configProvider.config.setupCompleted;
 
-      if (hasRomFolder || setupCompleted) {
-        // Backfill the SharedPreferences flag for existing users upgrading.
+      if (setupCompleted) {
+        // Backfill the SharedPreferences flag, which this check reads first.
         await prefs.setBool(PermissionCheckWrapper.setupCompletedKey, true);
         _pushWizardActive(false);
         setState(() {

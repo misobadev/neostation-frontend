@@ -14,6 +14,7 @@ class WizardLanguagePicker extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.unit = 1,
+    this.dense = false,
     this.fontSize = 14,
   });
 
@@ -36,6 +37,9 @@ class WizardLanguagePicker extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelected;
   final double unit;
+
+  /// Tighter tiles and gaps, so the three rows fit on a short screen.
+  final bool dense;
   final double fontSize;
 
   @override
@@ -45,7 +49,7 @@ class WizardLanguagePicker extends StatelessWidget {
     final radius = BorderRadius.circular(
       (theme.extension<CornerRadii>()?.radiusInternalRaw ?? 10) * unit,
     );
-    final spacing = 8 * unit;
+    final spacing = (dense ? 6 : 8) * unit;
     // Always [columns] tiles a row, sized to the space there is: the D-pad
     // moves by [columns] up and down, so the grid must not reflow.
     return LayoutBuilder(
@@ -90,7 +94,7 @@ class WizardLanguagePicker extends StatelessWidget {
                       width: tileWidth,
                       padding: EdgeInsets.symmetric(
                         horizontal: 6 * unit,
-                        vertical: 8 * unit,
+                        vertical: (dense ? 5 : 8) * unit,
                       ),
                       decoration: BoxDecoration(
                         borderRadius: radius,
