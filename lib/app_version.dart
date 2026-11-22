@@ -6,4 +6,4 @@
 /// there, and a release candidate read through package_info would look like
 /// the release and never be offered it. Kept in step with `pubspec.yaml` by
 /// `test_pure/app_version_test.dart`: change both together.
-const String appVersion = '1.0.0-rc.1';
+const String appVersion = '1.0.0-rc.2';
