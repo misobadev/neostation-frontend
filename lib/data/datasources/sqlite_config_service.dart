@@ -405,12 +405,12 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['dock_enabled']?.toString() ?? '1') ??
                 1) ==
             1,
-        // Missing column/row => 0 => logo shown (the default).
+        // Missing column/row => 1 => logo hidden (the default).
         secondaryHideSystemLogo:
             (int.tryParse(
-                  userConfig?['secondary_hide_system_logo']?.toString() ?? '0',
+                  userConfig?['secondary_hide_system_logo']?.toString() ?? '1',
                 ) ??
-                0) ==
+                1) ==
             1,
         dockSlotCount:
             (int.tryParse(userConfig?['dock_slot_count']?.toString() ?? '3') ??

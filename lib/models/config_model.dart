@@ -369,7 +369,7 @@ class ConfigModel {
     this.fanartDimLevel = 25,
     this.dockApps = const ['', '', '', '', ''],
     this.dockEnabled = true,
-    this.secondaryHideSystemLogo = false,
+    this.secondaryHideSystemLogo = true,
     this.dockSlotCount = 3,
     this.esdeFolderPath = '',
     this.showAchievementsBadge = false,
@@ -594,14 +594,14 @@ class ConfigModel {
       dockEnabled:
           (json['dockEnabled'] ?? true).toString().toLowerCase() == 'true' ||
           (json['dock_enabled'] ?? 1).toString() == '1',
-      // Absent => 0 => logo shown (the default).
+      // Absent => 1 => logo hidden (the default).
       secondaryHideSystemLogo:
           (json['secondaryHideSystemLogo'] ??
                       json['secondary_hide_system_logo'] ??
-                      0)
+                      1)
                   .toString() ==
               '1' ||
-          (json['secondaryHideSystemLogo'] ?? false).toString().toLowerCase() ==
+          (json['secondaryHideSystemLogo'] ?? true).toString().toLowerCase() ==
               'true',
       dockSlotCount:
           (int.tryParse(
