@@ -44,14 +44,13 @@ class GameListService {
     required bool hideBrackets,
   }) {
     String name = filename;
-    if (hideExtension) {
-      final extWithDot = path.extension(name).toLowerCase();
-      if (extWithDot.isNotEmpty) {
-        final ext = extWithDot.substring(1);
-        if (validExtensionsSet.contains(ext)) {
-          name = name.substring(0, name.length - extWithDot.length);
-        }
+    while (hideExtension) {
+      final extension = path.extension(name);
+      if (extension.isEmpty ||
+          !validExtensionsSet.contains(extension.substring(1).toLowerCase())) {
+        break;
       }
+      name = name.substring(0, name.length - extension.length);
     }
     if (hideParentheses) {
       name = name.replaceAll(_parenthesesRegex, '');
