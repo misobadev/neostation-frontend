@@ -202,6 +202,13 @@ extension _GamepadNav on _RAContentState {
 
   // --- D-pad -----------------------------------------------------------------
 
+  /// Up/Down on the Unlocks grid: a whole row of badges.
+  bool _moveUnlocks({required int rows}) {
+    final unlocks = _unlocksKey.currentState;
+    if (unlocks == null) return false;
+    return unlocks.moveSelection(rows * unlocks.columns);
+  }
+
   bool _handleNavigateUp() {
     if (!_signedIn) return moveSelection(-1);
     if (_menuFocused) return _setMenuIndex(_menuIndex - 1);
@@ -212,8 +219,7 @@ extension _GamepadNav on _RAContentState {
         _ => false,
       },
       RaDashboardSection.aotw => _eventsKey.currentState?.move(0, -1) ?? false,
-      RaDashboardSection.unlocks =>
-        _unlocksKey.currentState?.moveSelection(-1) ?? false,
+      RaDashboardSection.unlocks => _moveUnlocks(rows: -1),
       RaDashboardSection.games =>
         _gamesKey.currentState?.handleNavigateUp() ?? false,
       RaDashboardSection.awards =>
@@ -231,8 +237,7 @@ extension _GamepadNav on _RAContentState {
         _ => false,
       },
       RaDashboardSection.aotw => _eventsKey.currentState?.move(0, 1) ?? false,
-      RaDashboardSection.unlocks =>
-        _unlocksKey.currentState?.moveSelection(1) ?? false,
+      RaDashboardSection.unlocks => _moveUnlocks(rows: 1),
       RaDashboardSection.games =>
         _gamesKey.currentState?.handleNavigateDown() ?? false,
       RaDashboardSection.awards => _awardsKey.currentState?.move(0, 1) ?? false,
@@ -248,7 +253,9 @@ extension _GamepadNav on _RAContentState {
         }
         return _focusMenu();
       case RaDashboardSection.unlocks:
-        return _focusMenu();
+        final unlocks = _unlocksKey.currentState;
+        if (unlocks == null || unlocks.atRowStart) return _focusMenu();
+        return unlocks.moveSelection(-1);
       case RaDashboardSection.games:
         return (_gamesKey.currentState?.handleNavigateLeft() ?? false) ||
             _focusMenu();
@@ -275,7 +282,8 @@ extension _GamepadNav on _RAContentState {
             ? _setDashboardAction(7)
             : false,
       RaDashboardSection.aotw => _eventsKey.currentState?.move(1, 0) ?? false,
-      RaDashboardSection.unlocks => false,
+      RaDashboardSection.unlocks =>
+        _unlocksKey.currentState?.moveSelection(1) ?? false,
       RaDashboardSection.games =>
         _gamesKey.currentState?.handleNavigateRight() ?? false,
       RaDashboardSection.awards => _awardsKey.currentState?.move(1, 0) ?? false,

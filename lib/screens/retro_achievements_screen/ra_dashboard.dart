@@ -1,5 +1,3 @@
-import '../../widgets/ra_earned_badge.dart';
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';

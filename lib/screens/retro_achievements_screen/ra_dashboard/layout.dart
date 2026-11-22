@@ -12,10 +12,10 @@ extension _Layout on RADashboardHubState {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          width: 220.r,
+          width: 190.r,
           child: _glassPanel(
             context,
-            padding: EdgeInsets.all(12.r),
+            padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 12.r),
             child: _buildSidebar(context, raProvider),
           ),
         ),
@@ -59,21 +59,12 @@ extension _Layout on RADashboardHubState {
     RetroAchievementsProvider raProvider,
   ) {
     final theme = Theme.of(context);
-    return Column(
+    final menu = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildHeader(context, raProvider),
-        Padding(
-          padding: EdgeInsets.symmetric(vertical: 10.r),
-          child: Divider(
-            height: 1,
-            thickness: 1,
-            color: theme.colorScheme.outline.withValues(alpha: 0.15),
-          ),
-        ),
         for (final section in RaDashboardSection.values)
           Padding(
-            padding: EdgeInsets.only(bottom: 4.r),
+            padding: EdgeInsets.only(bottom: 2.r),
             child: _menuItem(
               context,
               icon: section.icon,
@@ -93,6 +84,33 @@ extension _Layout on RADashboardHubState {
         ),
       ],
     );
+    // The profile stays put; only the menu scrolls, on a screen too short
+    // for all of it (a phone, a 16:9 handheld), and the D-pad keeps the
+    // highlighted item in view. When it fits, Logout sits at the foot.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildHeader(context, raProvider),
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.r),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: theme.colorScheme.outline.withValues(alpha: 0.15),
+          ),
+        ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(child: menu),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   /// A menu row. The section on show is filled with the theme's accent while
@@ -109,7 +127,10 @@ extension _Layout on RADashboardHubState {
     final theme = Theme.of(context);
     final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     final scheme = theme.colorScheme;
-    final filled = current && widget.menuFocused;
+    // One filled row at a time: with the cursor on Logout the section on
+    // show drops to its tint, as it does while the panel has the D-pad.
+    final filled =
+        current && widget.menuFocused && (danger || !widget.logoutSelected);
     final background = filled
         ? scheme.tertiary
         : current
@@ -120,42 +141,45 @@ extension _Layout on RADashboardHubState {
         : danger
         ? scheme.error
         : scheme.onSurface.withValues(alpha: current ? 1 : 0.75);
-    return Semantics(
-      button: true,
-      selected: current,
-      label: label,
-      excludeSemantics: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          canRequestFocus: false,
-          borderRadius: radii.radiusInternal,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            height: 30.r,
-            padding: EdgeInsets.symmetric(horizontal: 10.r),
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: radii.radiusInternal,
-            ),
-            child: Row(
-              children: [
-                Icon(icon, size: 15.r, color: foreground),
-                SizedBox(width: 10.r),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: foreground,
-                      fontSize: 10.r,
-                      fontWeight: current ? FontWeight.w700 : FontWeight.w500,
+    return _KeepVisible(
+      active: current && widget.menuFocused,
+      child: Semantics(
+        button: true,
+        selected: current,
+        label: label,
+        excludeSemantics: true,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            canRequestFocus: false,
+            borderRadius: radii.radiusInternal,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              height: 32.r,
+              padding: EdgeInsets.symmetric(horizontal: 10.r),
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: radii.radiusInternal,
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, size: 18.r, color: foreground),
+                  SizedBox(width: 10.r),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: 12.r,
+                        fontWeight: current ? FontWeight.w700 : FontWeight.w500,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -264,10 +288,9 @@ extension _Layout on RADashboardHubState {
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Side by side once each column fits a row's thumbnail, title and
-        // date; the rows are sized in .r, so the breakpoint is too.
-        final twoColumn = constraints.maxWidth >= 320.r;
-        _previewsStacked = !twoColumn;
+        // The week on top, then a row of recent unlock badges and a row of
+        // recently played games, stacked, as in the D-pad's order.
+        _previewsStacked = true;
         final weekCard = KeyedSubtree(
           key: widget.aotwFocusKey,
           child: _buildWeekCard(context, raProvider),
@@ -287,22 +310,9 @@ extension _Layout on RADashboardHubState {
             children: [
               weekCard,
               SizedBox(height: 8.r),
-              if (twoColumn)
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(child: unlocksCard),
-                      SizedBox(width: 8.r),
-                      Expanded(child: playedCard),
-                    ],
-                  ),
-                )
-              else ...[
-                unlocksCard,
-                SizedBox(height: 8.r),
-                playedCard,
-              ],
+              unlocksCard,
+              SizedBox(height: 8.r),
+              playedCard,
             ],
           ),
         );
@@ -348,4 +358,44 @@ enum RaDashboardSection {
     unlocks => AppLocale.raSubtabUnlocks.getString(context),
     _ => title(context),
   };
+}
+
+/// Scrolls its child into view when it becomes [active]: the RA sidebar's
+/// highlighted menu item, on a screen too short to show the whole menu.
+class _KeepVisible extends StatefulWidget {
+  const _KeepVisible({required this.active, required this.child});
+
+  final bool active;
+  final Widget child;
+
+  @override
+  State<_KeepVisible> createState() => _KeepVisibleState();
+}
+
+class _KeepVisibleState extends State<_KeepVisible> {
+  @override
+  void didUpdateWidget(_KeepVisible oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        // One after the other: below the view it scrolls up to show the
+        // item's foot, above it scrolls down to show its top.
+        await Scrollable.ensureVisible(
+          context,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+          duration: const Duration(milliseconds: 160),
+        );
+        if (!mounted) return;
+        await Scrollable.ensureVisible(
+          context,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+          duration: const Duration(milliseconds: 160),
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

@@ -11,6 +11,7 @@ import '../../models/ra_cabinet.dart';
 import '../../models/ra_event_calendar.dart';
 import '../../models/retro_achievements_dashboard_models.dart';
 import '../../providers/retro_achievements_provider.dart';
+import '../../themes/corner_radii.dart';
 import '../../widgets/ra_earned_badge.dart';
 import '../../utils/custom_scroll_behavior.dart';
 
@@ -296,6 +297,206 @@ class RaCollectionTabState extends State<RaCollectionTab> {
     return '$weekLabel: $title';
   }
 
+  /// The selected award, under the grid: its icon, the game, and what was
+  /// earned (mastery, completion or beaten), in which mode, and when.
+  Widget _awardDetails(BuildContext context, RaCabinetAward award) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final medal = award.hardcore ? RaEarnedBadge.gold : RaEarnedBadge.silver;
+    final kind = _s(
+      award.kind == 'mastered'
+          ? AppLocale.raMasteryLabel
+          : award.kind == 'completed'
+          ? AppLocale.raCompletionLabel
+          : AppLocale.raFilterBeaten,
+    );
+    final date = award.date?.toLocal().toString().split(' ').first;
+    Widget pill(String text, {Color? color}) => Container(
+      padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 1.r),
+      decoration: BoxDecoration(
+        color: (color ?? scheme.onSurface).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: (color ?? scheme.onSurface).withValues(alpha: 0.35),
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 8.r,
+          fontWeight: FontWeight.w600,
+          color: scheme.onSurface.withValues(alpha: 0.85),
+        ),
+      ),
+    );
+    final icon = award.icon;
+    return Container(
+      padding: EdgeInsets.all(6.r),
+      decoration: BoxDecoration(
+        color: scheme.onSurface.withValues(alpha: 0.05),
+        borderRadius: radii.radiusInternal,
+        border: Border.all(color: scheme.onSurface.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34.r,
+            height: 34.r,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6.r),
+              border: Border.all(color: medal, width: 2.r),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: icon.isEmpty
+                ? Icon(Icons.emoji_events_outlined, size: 22.r)
+                : Image.network(
+                    icon.startsWith('http')
+                        ? icon
+                        : 'https://media.retroachievements.org$icon',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        Icon(Icons.emoji_events_outlined, size: 22.r),
+                  ),
+          ),
+          SizedBox(width: 8.r),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  award.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.r,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                SizedBox(height: 3.r),
+                Wrap(
+                  spacing: 5.r,
+                  runSpacing: 4.r,
+                  children: [
+                    pill(kind, color: medal),
+                    pill(
+                      _s(
+                        award.hardcore
+                            ? AppLocale.raHardcore
+                            : AppLocale.raCasual,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8.r),
+          Text(
+            date ?? _s(AppLocale.unknown),
+            style: TextStyle(
+              fontSize: 8.r,
+              color: scheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The selected week, under the grid: its badge, the week and its
+  /// achievement, the status as a pill, and the dates on the right.
+  Widget _weekDetails(BuildContext context, RaEventWeek week, DateTime now) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final status = week.statusAt(now);
+    final color = _statusColor(status);
+    final badge = week.achievement?.badgeName ?? '';
+    final upcoming = status == RaEventStatus.upcoming;
+    String day(DateTime d) => d.toIso8601String().substring(0, 10);
+    return Container(
+      padding: EdgeInsets.all(6.r),
+      decoration: BoxDecoration(
+        color: scheme.onSurface.withValues(alpha: 0.05),
+        borderRadius: radii.radiusInternal,
+        border: Border.all(color: scheme.onSurface.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34.r,
+            height: 34.r,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6.r),
+              border: Border.all(color: color, width: 2.r),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: badge.isEmpty || upcoming
+                ? Icon(
+                    upcoming
+                        ? Icons.question_mark
+                        : Icons.emoji_events_outlined,
+                    size: 18.r,
+                  )
+                : Image.network(
+                    'https://media.retroachievements.org/Badge/$badge.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        Icon(Icons.emoji_events_outlined, size: 18.r),
+                  ),
+          ),
+          SizedBox(width: 8.r),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _weekFooterLabel(week, now),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.r,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                SizedBox(height: 3.r),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 1.r),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: color.withValues(alpha: 0.45)),
+                  ),
+                  child: Text(
+                    _status(status),
+                    style: TextStyle(
+                      fontSize: 8.r,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurface.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8.r),
+          Text(
+            '${day(week.start)} – ${day(week.end.subtract(const Duration(seconds: 1)))}',
+            style: TextStyle(
+              fontSize: 8.r,
+              color: scheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _awardLabel(RaCabinetAward a) =>
       '${_s(a.kind == 'mastered'
           ? AppLocale.raMasteryLabel
@@ -306,7 +507,6 @@ class RaCollectionTabState extends State<RaCollectionTab> {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now().toUtc();
-    final current = _provider?.gotw;
     final earned = _weeks
         .where(
           (week) =>
@@ -322,12 +522,6 @@ class RaCollectionTabState extends State<RaCollectionTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (widget.events && current != null)
-            Text(
-              '${_s(AppLocale.raAotw)}: ${current.achievement.title} · ${current.game.title}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
           if (_loading) const LinearProgressIndicator(),
           if (_failed)
             Text(
@@ -357,19 +551,17 @@ class RaCollectionTabState extends State<RaCollectionTab> {
                 ],
               ),
             ),
+            // One quiet line under the strip: the year so far, and the
+            // weeks missed. The strip's colours carry the rest.
             Text(
               '${_s(AppLocale.raAchievementProgress).replaceFirst('{earned}', '$earned').replaceFirst('{total}', '${_weeks.length}')} · ${_s(AppLocale.raMissed)}: $missed',
-              textAlign: TextAlign.left,
+              style: TextStyle(
+                fontSize: 8.r,
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.6),
+              ),
             ),
-            Wrap(
-              spacing: 12.r,
-              children: [
-                for (final status in RaEventStatus.values)
-                  Text(
-                    '${_status(status)}: ${_weeks.where((w) => w.statusAt(now) == status).length}',
-                  ),
-              ],
-            ),
+            SizedBox(height: 4.r),
           ],
           Expanded(
             child: _count == 0
@@ -386,22 +578,29 @@ class RaCollectionTabState extends State<RaCollectionTab> {
                   )
                 : LayoutBuilder(
                     builder: (context, constraints) {
-                      _columns = (constraints.maxWidth / 72.r).floor().clamp(
+                      // Awards show just their icons, smaller and closer;
+                      // the selected one is named in the card below. Event
+                      // weeks keep their date under the badge.
+                      // Just the icons, like Games and Unlocks; the
+                      // selected one is named in the card below.
+                      final gap = 6.r;
+                      const labelHeight = 0.0;
+                      _columns = (constraints.maxWidth / 42.r).floor().clamp(
                         3,
-                        14,
+                        18,
                       );
                       final tile =
-                          (constraints.maxWidth - (_columns - 1) * 8.r) /
+                          (constraints.maxWidth - (_columns - 1) * gap) /
                           _columns;
-                      _rowExtent = tile + 28.r + 8.r;
+                      _rowExtent = tile + labelHeight + gap;
                       return GridView.builder(
                         controller: _scroll,
                         padding: EdgeInsets.symmetric(vertical: 8.r),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: _columns,
-                          mainAxisExtent: tile + 28.r,
-                          crossAxisSpacing: 8.r,
-                          mainAxisSpacing: 8.r,
+                          mainAxisExtent: tile + labelHeight,
+                          crossAxisSpacing: gap,
+                          mainAxisSpacing: gap,
                         ),
                         itemCount: _count,
                         itemBuilder: (context, index) {
@@ -436,7 +635,7 @@ class RaCollectionTabState extends State<RaCollectionTab> {
                                 _open();
                               },
                               child: Padding(
-                                padding: EdgeInsets.all(4.r),
+                                padding: EdgeInsets.all(1.r),
                                 child: Column(
                                   children: [
                                     AspectRatio(
@@ -491,26 +690,27 @@ class RaCollectionTabState extends State<RaCollectionTab> {
                                         ),
                                       ),
                                     ),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        if (status == RaEventStatus.missed)
-                                          Icon(Icons.close, size: 12.r),
-                                        Expanded(
-                                          child: Text(
-                                            label,
-                                            textAlign: TextAlign.center,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .labelSmall
-                                                ?.copyWith(fontSize: 10.r),
+                                    if (labelHeight > 0)
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          if (status == RaEventStatus.missed)
+                                            Icon(Icons.close, size: 12.r),
+                                          Expanded(
+                                            child: Text(
+                                              label,
+                                              textAlign: TextAlign.center,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelSmall
+                                                  ?.copyWith(fontSize: 10.r),
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
+                                        ],
+                                      ),
                                   ],
                                 ),
                               ),
@@ -523,18 +723,12 @@ class RaCollectionTabState extends State<RaCollectionTab> {
           ),
           if (_count > 0)
             Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.r),
+              // No gap under it, so the card sits at the foot like the
+              // Games and Unlocks ones.
+              padding: EdgeInsets.only(top: 8.r),
               child: widget.events
-                  ? Text(
-                      '${_weekFooterLabel(_weeks[_selected], now)}\n${_weeks[_selected].start.toIso8601String().substring(0, 10)} – ${_weeks[_selected].end.subtract(const Duration(seconds: 1)).toIso8601String().substring(0, 10)} · ${_status(_weeks[_selected].statusAt(now))}',
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    )
-                  : Text(
-                      '${_awards[_selected].title}\n${_awardLabel(_awards[_selected])} · ${_awards[_selected].date?.toLocal().toString().split(' ').first ?? _s(AppLocale.unknown)}',
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  ? _weekDetails(context, _weeks[_selected], now)
+                  : _awardDetails(context, _awards[_selected]),
             ),
         ],
       ),
