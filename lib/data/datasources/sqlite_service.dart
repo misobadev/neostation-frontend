@@ -471,7 +471,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 192;
+  static const int _databaseVersion = 193;
 
   /// SQL predicate (over `user_roms` aliased `ur`) for an installed app the
   /// user marked as a game. See migration v191.
@@ -2028,7 +2028,7 @@ class SqliteService {
         use_12_hour_clock INTEGER DEFAULT 0,
         dock_apps TEXT,
         dock_enabled INTEGER DEFAULT 1,
-        secondary_hide_system_logo INTEGER DEFAULT 0,
+        secondary_hide_system_logo INTEGER DEFAULT 1,
         dock_slot_count INTEGER DEFAULT 3,
         now_playing_dim_delay INTEGER DEFAULT 3,
         now_playing_dim_level INTEGER DEFAULT 100,

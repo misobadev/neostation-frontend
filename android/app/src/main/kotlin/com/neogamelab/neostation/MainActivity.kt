@@ -51,6 +51,9 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     // Focus/resume edges this soon after a game launch on the other screen are
     // the handoff, not the user returning (same 5 s as onGameReturned uses).
     private val OTHER_DISPLAY_HANDOFF_MS = 5_000L
+    // onUserLeaveHint runs while the activity pauses for a launch it just
+    // made, well inside this window.
+    private val OUTBOUND_LAUNCH_GRACE_MS = 2_000L
     var keyListener: ((KeyEvent) -> Boolean)? = null
     var motionListener: ((MotionEvent) -> Boolean)? = null
     // A launched game still owns the foreground: set when Flutter starts a
@@ -80,6 +83,15 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     // True while the Now Playing presentation is hidden to reveal a dock-launched
     // app on the secondary display; restored when that app is dismissed.
     private var presentationHiddenForApp = false
+    // True while the bottom-screen presentation is hidden because the user left
+    // NeoStation with Home/Recents. A Presentation is a window of its own and
+    // outlives the activity going to the background, so without this the
+    // panel stays drawn over the device launcher's bottom screen.
+    private var presentationHiddenForHome = false
+    // Uptime of the last activity this one started (games, apps, settings,
+    // pickers). onUserLeaveHint also fires for those, and they must keep the
+    // bottom screen (Now Playing) instead of being mistaken for Home.
+    private var lastOutboundLaunchAt = 0L
     // Brings the panel back if a dock launch never puts its app on the bottom
     // display (a silently failed launch), so the panel can't stay hidden. One
     // handler instance: removeCallbacks only matches the handler that posted.
@@ -678,7 +690,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             // bottom screen dead until the whole app is restarted. Anything
             // that is no longer showing, and isn't merely hidden to reveal a
             // dock-launched app, is dead: drop it so the branch below rebuilds.
-            if (subScreenPresentation?.isShowing == false && !presentationHiddenForApp) {
+            if (subScreenPresentation?.isShowing == false && !presentationHiddenForApp && !presentationHiddenForHome) {
                 onCloseSubScreen()
             }
             if (subScreenPresentation == null) {
@@ -1050,6 +1062,47 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         }
     }
 
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        // Every startActivity overload (ours and the plugins') ends up here.
+        lastOutboundLaunchAt = android.os.SystemClock.uptimeMillis()
+        super.startActivityForResult(intent, requestCode, options)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Reaching here without a launch of ours means the user pressed Home
+        // (or Recents): the bottom screen belongs to the device launcher now.
+        if (isGameActive || gamepadBlocked || presentationHiddenForApp) return
+        if (android.os.SystemClock.uptimeMillis() - lastOutboundLaunchAt < OUTBOUND_LAUNCH_GRACE_MS) return
+        try {
+            subScreenPresentation?.let {
+                if (it.isShowing) {
+                    it.hide()
+                    presentationHiddenForHome = true
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Hiding secondary on leave failed: ${e.message}")
+        }
+    }
+
+    override fun onCloseSubScreen() {
+        // A closed presentation has nothing left to restore on return.
+        presentationHiddenForHome = false
+        super.onCloseSubScreen()
+    }
+
+    /** Brings back the bottom screen hidden when the user left with Home. */
+    private fun restoreSecondaryAfterHome() {
+        if (!presentationHiddenForHome) return
+        presentationHiddenForHome = false
+        try {
+            subScreenPresentation?.show()
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Restoring secondary after Home failed: ${e.message}")
+        }
+    }
+
     override fun onPause() {
         super.onPause()
         // Cuando la app va a segundo plano (RetroArch se abre), registrar el timestamp si no existe
@@ -1060,6 +1113,8 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
 
     override fun onResume() {
         super.onResume()
+
+        restoreSecondaryAfterHome()
 
         // Bring back the Now Playing panel if it was hidden for a dock-launched
         // app. Only when no watch is armed: a dock app lives on the *other*

@@ -737,6 +737,9 @@ class SqliteMigrations {
       case 192:
         await _migrateToVersion192(db);
         break;
+      case 193:
+        await _migrateToVersion193(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7794,6 +7797,41 @@ class SqliteMigrations {
       _log.i('Migration v191 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v191: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v193: the secondary display hides the system logo by default.
+  ///
+  /// Flips `user_config.secondary_hide_system_logo` to 1 on every existing
+  /// row, so upgraded devices match fresh installs and show only the
+  /// background art. Users who want the logo back turn the setting off.
+  /// v192 is claimed by the dual-screen swap branch, so this takes v193.
+  ///
+  /// A database that never got the column (skipped v174/v179) gains it here
+  /// with the new default.
+  static Future<void> _migrateToVersion193(Database db) async {
+    _log.i('Migration v193: Hiding the secondary system logo by default');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i('v193: user_config is not present, nothing to do');
+        return;
+      }
+      if (!columns.contains('secondary_hide_system_logo')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN secondary_hide_system_logo '
+          'INTEGER DEFAULT 1',
+        );
+      }
+      db.execute('UPDATE user_config SET secondary_hide_system_logo = 1');
+      _log.i('Migration v193 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v193: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }
