@@ -131,13 +131,15 @@ extension _Layout on RADashboardHubState {
     // show drops to its tint, as it does while the panel has the D-pad.
     final filled =
         current && widget.menuFocused && (danger || !widget.logoutSelected);
+    // The app's selection everywhere: the theme's text colour as the fill,
+    // its surface as the text (the NeoSync menu, the option rows).
     final background = filled
-        ? scheme.tertiary
+        ? scheme.onSurface
         : current
-        ? scheme.tertiary.withValues(alpha: 0.16)
+        ? scheme.onSurface.withValues(alpha: 0.10)
         : Colors.transparent;
     final foreground = filled
-        ? scheme.onTertiary
+        ? scheme.surface
         : danger
         ? scheme.error
         : scheme.onSurface.withValues(alpha: current ? 1 : 0.75);

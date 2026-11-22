@@ -35,7 +35,11 @@ enum _SaveRegion { search, filters, results, menu }
 class SaveListView extends StatefulWidget {
   final VoidCallback onBack;
 
-  const SaveListView({super.key, required this.onBack});
+  const SaveListView({super.key, required this.onBack, this.embedded = false});
+
+  /// Shown inside the NeoSync dashboard's panel, beside its sidebar: no room
+  /// left for the top dock, which the panel already clears.
+  final bool embedded;
 
   @override
   State<SaveListView> createState() => _SaveListViewState();
@@ -68,7 +72,9 @@ class _SaveListViewState extends State<SaveListView> {
 
   // ── Region-based focus (mirrors the search tab) ─────────────────────────
   _SaveRegion _region = _SaveRegion.search;
-  bool _filtersExpanded = true;
+
+  /// The filters sit beside the search field; there is no second row.
+  static const bool _filtersExpanded = false;
   int _searchIndex = 0;
   int _barIndex = 0;
   String? _menuKey;
@@ -78,7 +84,10 @@ class _SaveListViewState extends State<SaveListView> {
   final ScrollController _chipScroll = ScrollController();
   final Map<int, GlobalKey> _chipKeys = {};
   final ScrollController _menuScroll = ScrollController();
-  static const double _menuExtent = 44;
+  static const double _menuExtent = 26;
+
+  /// The search band's height: the field and the filter chips alike.
+  double get _bandHeight => 22.r;
 
   @override
   void initState() {
@@ -138,6 +147,9 @@ class _SaveListViewState extends State<SaveListView> {
       _savesGamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
         'neo_sync_save_list',
+        // In the NeoSync dashboard's panel the sidebar's menu keeps the
+        // D-pad until the panel is entered: slot in beneath it.
+        background: widget.embedded,
         onActivate: () {
           _savesGamepadNav.activate();
           if (_keepSelectionOnActivate) {
@@ -153,11 +165,16 @@ class _SaveListViewState extends State<SaveListView> {
 
   // ── Region helpers ──────────────────────────────────────────────────────
 
-  /// Focusable items in the search band, left to right.
+  /// The filters shown beside the search field: system, emulator and sort.
+  /// Scope stays on its default (all saves).
+  static const List<String> _filterKeys = ['system', 'emulator', 'sort'];
+
+  /// Focusable items in the search band, left to right: the field, its
+  /// clear button while there is a query, and the filters.
   List<String> get _searchItems => [
     'field',
     if (_onlineSearchController.text.isNotEmpty) 'clearQuery',
-    'filters',
+    ..._filterKeys,
   ];
 
   int get _lastSearchIndex => _searchItems.length - 1;
@@ -169,22 +186,7 @@ class _SaveListViewState extends State<SaveListView> {
       _region == _SaveRegion.search && _focusedSearchItem == key;
 
   /// Focusable filter chips, left to right.
-  List<String> get _barItems => ['scope', 'system', 'emulator', 'sort'];
-
-  void _toggleFilters() {
-    setState(() {
-      _onlineSearchFocus.unfocus();
-      _filtersExpanded = !_filtersExpanded;
-      if (_filtersExpanded) {
-        _region = _SaveRegion.filters;
-        _barIndex = 0;
-      } else {
-        _region = _SaveRegion.search;
-        _searchIndex = _searchItems.indexOf('filters');
-      }
-    });
-    SfxService().playNavSound();
-  }
+  List<String> get _barItems => _filterKeys;
 
   void _clearQuery() {
     setState(() {
@@ -325,10 +327,10 @@ class _SaveListViewState extends State<SaveListView> {
         switch (_focusedSearchItem) {
           case 'clearQuery':
             _clearQuery();
-          case 'filters':
-            _toggleFilters();
-          default:
+          case 'field':
             _onlineSearchFocus.requestFocus();
+          default:
+            _openFilterMenu(_focusedSearchItem);
         }
       case _SaveRegion.filters:
         _openFilterMenu(_barItems[_barIndex]);
@@ -372,10 +374,17 @@ class _SaveListViewState extends State<SaveListView> {
   }
 
   void _cancelMenu() {
-    setState(() {
-      _menuKey = null;
-      _region = _SaveRegion.filters;
-    });
+    setState(_returnFromMenu);
+  }
+
+  /// Back on the chip the menu was opened from, in the search band.
+  void _returnFromMenu() {
+    final key = _menuKey;
+    _menuKey = null;
+    _region = _SaveRegion.search;
+    if (key != null && _searchItems.contains(key)) {
+      _searchIndex = _searchItems.indexOf(key);
+    }
   }
 
   void _moveMenuSelection(int delta) {
@@ -424,8 +433,7 @@ class _SaveListViewState extends State<SaveListView> {
           );
         }
     }
-    setState(() => _menuKey = null);
-    _region = _SaveRegion.filters;
+    setState(_returnFromMenu);
     SfxService().playNavSound();
   }
 
@@ -832,12 +840,9 @@ class _SaveListViewState extends State<SaveListView> {
     return Stack(
       children: [
         Padding(
-          padding: EdgeInsets.only(
-            top: 52.r,
-            left: 8.r,
-            right: 8.r,
-            bottom: 8.r,
-          ),
+          padding: widget.embedded
+              ? EdgeInsets.zero
+              : EdgeInsets.only(top: 52.r, left: 8.r, right: 8.r, bottom: 8.r),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -855,7 +860,7 @@ class _SaveListViewState extends State<SaveListView> {
                           (theme.extension<CornerRadii>() ?? CornerRadii.m())
                               .radiusExternalRadius,
                       child: Container(
-                        padding: EdgeInsets.all(6.r),
+                        padding: EdgeInsets.all(4.r),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.surface,
                           borderRadius:
@@ -943,104 +948,68 @@ class _SaveListViewState extends State<SaveListView> {
     );
   }
 
+  /// The search field with the filters beside it, on one row.
   Widget _buildSearchRow(ThemeData theme) {
     return Row(
       children: [
         Expanded(child: _buildNameField(theme, _searchFocused('field'))),
-        SizedBox(width: 10.r),
-        _buildAdvancedToggle(theme, _searchFocused('filters')),
+        for (final key in _filterKeys) ...[
+          SizedBox(width: 6.r),
+          _buildFilterChip(theme, key, _searchFocused(key)),
+        ],
       ],
-    );
-  }
-
-  Widget _buildAdvancedToggle(ThemeData theme, bool focused) {
-    final palette = _selectionPalette(
-      theme,
-      focused: focused,
-      selected: _filtersExpanded,
-    );
-    final foreground = palette.foreground;
-    return GestureDetector(
-      onTap: _toggleFilters,
-      child: NeoGlassRim(
-        cornerRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
-            .radiusInternalRadius,
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 5.r),
-          decoration: BoxDecoration(
-            color: palette.background,
-            borderRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
-                .radiusInternal,
-            border: Border.all(color: Colors.transparent, width: 2.r),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Symbols.tune_rounded, size: 14.r, color: foreground),
-              SizedBox(width: 6.r),
-              Text(
-                AppLocale.searchFilters.getString(context),
-                style: TextStyle(
-                  fontSize: 11.r,
-                  fontWeight: FontWeight.w700,
-                  color: foreground,
-                ),
-              ),
-              SizedBox(width: 4.r),
-              Icon(
-                _filtersExpanded
-                    ? Symbols.expand_less_rounded
-                    : Symbols.expand_more_rounded,
-                size: 16.r,
-                color: foreground.withValues(alpha: 0.75),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
   Widget _buildNameField(ThemeData theme, bool focused) {
     final scheme = theme.colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: focused ? scheme.primary : Colors.transparent,
-          width: 2.r,
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    // The filter chips' box: the same glass rim, corners, fill and height,
+    // so the row reads as one band. Focus is the field's own edge.
+    final palette = _selectionPalette(theme, focused: false);
+    return NeoGlassRim(
+      cornerRadius: radii.radiusInternalRadius,
+      child: Container(
+        height: _bandHeight,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: palette.background,
+          borderRadius: radii.radiusInternal,
+          border: Border.all(
+            color: focused ? scheme.onSurface : Colors.transparent,
+            width: 2.r,
+          ),
         ),
-      ),
-      child: TextField(
-        controller: _onlineSearchController,
-        focusNode: _onlineSearchFocus,
-        textInputAction: TextInputAction.done,
-        onTap: _focusNameField,
-        onChanged: (value) {
-          setState(() {}); // refresh the clear/filters band items
-          _onOnlineSearchChanged(value);
-        },
-        onSubmitted: (_) => _onlineSearchFocus.unfocus(),
-        style: TextStyle(fontSize: 11.r, color: scheme.onSurface),
-        decoration: InputDecoration(
-          hintText: AppLocale.searchSavesHint.getString(context),
-          hintStyle: TextStyle(
-            fontSize: 11.r,
-            color: scheme.onSurface.withValues(alpha: 0.5),
+        child: TextField(
+          controller: _onlineSearchController,
+          focusNode: _onlineSearchFocus,
+          textInputAction: TextInputAction.done,
+          onTap: _focusNameField,
+          onChanged: (value) {
+            setState(() {}); // refresh the clear/filters band items
+            _onOnlineSearchChanged(value);
+          },
+          onSubmitted: (_) => _onlineSearchFocus.unfocus(),
+          style: TextStyle(fontSize: 9.r, color: scheme.onSurface),
+          decoration: InputDecoration(
+            hintText: AppLocale.searchSavesHint.getString(context),
+            hintStyle: TextStyle(
+              fontSize: 9.r,
+              color: scheme.onSurface.withValues(alpha: 0.5),
+            ),
+            prefixIcon: Icon(Symbols.search_rounded, size: 12.r),
+            prefixIconConstraints: BoxConstraints(minWidth: 24.r, minHeight: 0),
+            suffixIcon: _onlineSearchController.text.isEmpty
+                ? null
+                : _buildClearQueryButton(theme, _searchFocused('clearQuery')),
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 6.r),
+            filled: false,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
           ),
-          prefixIcon: Icon(Symbols.search_rounded, size: 14.r),
-          prefixIconConstraints: BoxConstraints(minWidth: 30.r),
-          suffixIcon: _onlineSearchController.text.isEmpty
-              ? null
-              : _buildClearQueryButton(theme, _searchFocused('clearQuery')),
-          isDense: true,
-          contentPadding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 6.r),
-          filled: true,
-          fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.r),
-            borderSide: BorderSide.none,
-          ),
+          textAlignVertical: TextAlignVertical.center,
         ),
       ),
     );
@@ -1124,9 +1093,12 @@ class _SaveListViewState extends State<SaveListView> {
       child: NeoGlassRim(
         cornerRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
             .radiusInternalRadius,
+        // No margin inside the rim: the rim traces this box, so a margin
+        // here drew the outline wider than the fill. The row spaces the
+        // chips.
         child: Container(
-          margin: EdgeInsets.only(right: 6.r),
-          padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 4.r),
+          height: _bandHeight,
+          padding: EdgeInsets.symmetric(horizontal: 8.r),
           decoration: BoxDecoration(
             color: palette.background,
             borderRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
@@ -1139,7 +1111,7 @@ class _SaveListViewState extends State<SaveListView> {
               Text(
                 _barLabel(key),
                 style: TextStyle(
-                  fontSize: 10.r,
+                  fontSize: 8.r,
                   fontWeight: FontWeight.w600,
                   color: foreground,
                 ),
@@ -1147,7 +1119,7 @@ class _SaveListViewState extends State<SaveListView> {
               SizedBox(width: 4.r),
               Icon(
                 Symbols.expand_more_rounded,
-                size: 13.r,
+                size: 11.r,
                 color: foreground.withValues(alpha: 0.75),
               ),
             ],
@@ -1169,10 +1141,12 @@ class _SaveListViewState extends State<SaveListView> {
             child: GestureDetector(
               onTap: () {},
               child: Container(
-                width: 340.r,
+                width: 180.r,
                 decoration: BoxDecoration(
                   color: scheme.surface,
-                  borderRadius: BorderRadius.circular(16.r),
+                  borderRadius:
+                      (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                          .radiusExternal,
                   border: Border.all(
                     color: scheme.primary.withValues(alpha: 0.4),
                     width: 1.r,
@@ -1183,11 +1157,12 @@ class _SaveListViewState extends State<SaveListView> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: EdgeInsets.all(12.r),
+                      padding: EdgeInsets.fromLTRB(10.r, 8.r, 10.r, 6.r),
                       child: Text(
                         key.toUpperCase(),
                         style: TextStyle(
-                          fontSize: 13.r,
+                          fontSize: 9.r,
+                          letterSpacing: 1.2.r,
                           fontWeight: FontWeight.w700,
                           color: scheme.onSurface,
                         ),
@@ -1195,7 +1170,10 @@ class _SaveListViewState extends State<SaveListView> {
                     ),
                     Divider(height: 1.r),
                     SizedBox(
-                      height: 260.r,
+                      // As tall as its options, up to six of them.
+                      height:
+                          _menuExtent.r *
+                          (options.length < 6 ? options.length : 6),
                       child: ListView.builder(
                         controller: _menuScroll,
                         itemExtent: _menuExtent.r,
@@ -1210,8 +1188,8 @@ class _SaveListViewState extends State<SaveListView> {
                             },
                             child: Container(
                               padding: EdgeInsets.symmetric(
-                                horizontal: 16.r,
-                                vertical: 8.r,
+                                horizontal: 10.r,
+                                vertical: 2.r,
                               ),
                               decoration: BoxDecoration(
                                 color: isSelected
@@ -1234,7 +1212,7 @@ class _SaveListViewState extends State<SaveListView> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        fontSize: 13.r,
+                                        fontSize: 10.r,
                                         fontWeight: isSelected
                                             ? FontWeight.w700
                                             : FontWeight.w500,
@@ -1247,7 +1225,7 @@ class _SaveListViewState extends State<SaveListView> {
                                   if (isSelected)
                                     Icon(
                                       Symbols.check_rounded,
-                                      size: 16.r,
+                                      size: 12.r,
                                       color: scheme.surface,
                                     ),
                                 ],
@@ -1310,10 +1288,10 @@ class _SaveListViewState extends State<SaveListView> {
   Widget _buildCardHeader(ThemeData theme, NeoSyncProvider provider) {
     final color = theme.colorScheme.onSurface;
     return Padding(
-      padding: EdgeInsets.fromLTRB(6.r, 2.r, 2.r, 4.r),
+      padding: EdgeInsets.fromLTRB(4.r, 0, 0, 2.r),
       child: Row(
         children: [
-          NeoSyncLogo.isotype(height: 13.r),
+          NeoSyncLogo.isotype(height: 10.r),
           SizedBox(width: 8.r),
           Expanded(
             child: Text(
@@ -1321,7 +1299,7 @@ class _SaveListViewState extends State<SaveListView> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11.r,
+                fontSize: 9.r,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.5.r,
                 color: color,
@@ -1346,13 +1324,30 @@ class _SaveListViewState extends State<SaveListView> {
     // with it when there is no page to turn to.
     Widget trigger(String iconPath, {required bool enabled}) => SizedBox(
       width: 14.r,
-      height: 14.r,
+      height: 12.r,
       child: Image.asset(
         iconPath,
         color: enabled
             ? textColor
             : theme.colorScheme.onSurface.withValues(alpha: 0.3),
         colorBlendMode: BlendMode.srcIn,
+      ),
+    );
+    // The arrows at their icon's size: an IconButton's minimum touch target
+    // made this header twice as tall as its text.
+    Widget arrow(IconData icon, VoidCallback? onTap) => InkWell(
+      onTap: onTap,
+      canRequestFocus: false,
+      borderRadius: BorderRadius.circular(6.r),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 4.r, vertical: 1.r),
+        child: Icon(
+          icon,
+          size: 13.r,
+          color: onTap == null
+              ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+              : theme.colorScheme.onSurface,
+        ),
       ),
     );
     return Padding(
@@ -1364,24 +1359,20 @@ class _SaveListViewState extends State<SaveListView> {
             'assets/images/gamepad/Xbox_LT_trigger.png',
             enabled: canGoBack,
           ),
-          IconButton(
-            onPressed: canGoBack ? () => _changePage(forward: false) : null,
-            icon: Icon(Symbols.chevron_left_rounded, size: 16.r),
-            visualDensity: VisualDensity.compact,
-            color: theme.colorScheme.onSurface,
+          arrow(
+            Symbols.chevron_left_rounded,
+            canGoBack ? () => _changePage(forward: false) : null,
           ),
           Text(
             AppLocale.pageOf
                 .getString(context)
                 .replaceFirst('{current}', '${provider.onlinePage}')
                 .replaceFirst('{total}', '${provider.onlineTotalPages}'),
-            style: TextStyle(fontSize: 10.r, color: textColor),
+            style: TextStyle(fontSize: 8.r, color: textColor),
           ),
-          IconButton(
-            onPressed: canGoOn ? () => _changePage(forward: true) : null,
-            icon: Icon(Symbols.chevron_right_rounded, size: 16.r),
-            visualDensity: VisualDensity.compact,
-            color: theme.colorScheme.onSurface,
+          arrow(
+            Symbols.chevron_right_rounded,
+            canGoOn ? () => _changePage(forward: true) : null,
           ),
           trigger(
             'assets/images/gamepad/Xbox_RT_trigger.png',
@@ -1514,7 +1505,7 @@ class OnlineSavesListViewState extends State<OnlineSavesListView> {
   Widget build(BuildContext context) {
     const columns = OnlineSavesListView.columns;
     final spacing = 6.r;
-    final padding = 4.r;
+    final padding = 2.r;
     return LayoutBuilder(
       builder: (context, constraints) {
         final tile =
@@ -1738,65 +1729,41 @@ class SaveDetailPanel extends StatelessWidget {
       _date(file.fileModifiedAt ?? file.uploadedAt),
     ].join('  ·  ');
     final muted = scheme.onSurface.withValues(alpha: 0.6);
+    // Two small lines, the card header's size, so the grid above keeps the
+    // room: the game, then where and when, with the kind and size on the
+    // right. The full path is in the file's dialog.
     return Padding(
-      padding: EdgeInsets.fromLTRB(8.r, 8.r, 8.r, 4.r),
+      padding: EdgeInsets.fromLTRB(6.r, 4.r, 6.r, 2.r),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   file.gameName.isNotEmpty ? file.gameName : fileName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12.r,
+                    fontSize: 10.r,
                     fontWeight: FontWeight.w700,
                     color: scheme.onSurface,
                   ),
                 ),
-                SizedBox(height: 3.r),
-                Text(
-                  file.filePath.isNotEmpty ? file.filePath : fileName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 9.r,
-                    color: muted,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-                SizedBox(height: 2.r),
                 Text(
                   meta,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 9.r, color: muted),
+                  style: TextStyle(fontSize: 8.r, color: muted),
                 ),
               ],
             ),
           ),
-          SizedBox(width: 12.r),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                file.type.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 10.r,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5.r,
-                  color: scheme.onSurface,
-                ),
-              ),
-              SizedBox(height: 6.r),
-              Text(
-                file.fileSizeFormatted,
-                style: TextStyle(fontSize: 11.r, color: muted),
-              ),
-            ],
+          SizedBox(width: 8.r),
+          Text(
+            '${file.type.toUpperCase()}  ·  ${file.fileSizeFormatted}',
+            style: TextStyle(fontSize: 8.r, color: muted),
           ),
         ],
       ),

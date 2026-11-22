@@ -41,7 +41,12 @@ class PlanSelectionView extends StatefulWidget {
     required this.onCancel,
     required this.getPlanIcon,
     required this.onBack,
+    this.embedded = false,
   });
+
+  /// Shown inside the NeoSync dashboard's panel, beside its sidebar: no room
+  /// left for the top dock, which the panel already clears.
+  final bool embedded;
 
   @override
   State<PlanSelectionView> createState() => _PlanSelectionViewState();
@@ -183,6 +188,9 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
       _gamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
         'neo_sync_plans',
+        // In the NeoSync dashboard's panel the sidebar's menu keeps the
+        // D-pad until the panel is entered: slot in beneath it.
+        background: widget.embedded,
         onActivate: () => _gamepadNav.activate(),
         onDeactivate: () => _gamepadNav.deactivate(),
       );
@@ -258,7 +266,9 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
     final user = context.watch<AuthService>().currentUser;
 
     return Padding(
-      padding: EdgeInsets.only(top: 52.r, left: 8.r, right: 8.r, bottom: 8.r),
+      padding: widget.embedded
+          ? EdgeInsets.zero
+          : EdgeInsets.only(top: 52.r, left: 8.r, right: 8.r, bottom: 8.r),
       child: Column(
         children: [
           NeoSyncSectionHeader(

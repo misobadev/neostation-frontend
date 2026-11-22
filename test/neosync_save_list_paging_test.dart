@@ -204,19 +204,15 @@ void main() {
       tester.widget<Image>(trigger(name)).color!.a;
 
   bool arrowEnabled(WidgetTester tester, IconData icon) =>
-      tester
-          .widget<IconButton>(find.widgetWithIcon(IconButton, icon))
-          .onPressed !=
-      null;
+      tester.widget<InkWell>(find.widgetWithIcon(InkWell, icon)).onTap != null;
 
   int highlighted(WidgetTester tester) => tester
       .widget<OnlineSavesListView>(find.byType(OnlineSavesListView))
       .selectedIndex;
 
-  /// Walks from the search field, over the filter chips, to save [index]:
-  /// the saves are a grid, so along its first row.
+  /// Walks from the search band (the field with the filters beside it) to
+  /// save [index]: the saves are a grid, so along its first row.
   Future<void> focusSave(WidgetTester tester, int index) async {
-    await pressKey(tester, LogicalKeyboardKey.arrowDown); // filters
     await pressKey(tester, LogicalKeyboardKey.arrowDown); // first save
     for (var i = 0; i < index; i++) {
       await pressKey(tester, LogicalKeyboardKey.arrowRight);
@@ -319,14 +315,15 @@ void main() {
     tester,
   ) async {
     await pumpSaveList(tester);
-    await pressKey(tester, LogicalKeyboardKey.arrowDown); // filters
+    // The filters sit beside the search field: Right reaches System.
+    await pressKey(tester, LogicalKeyboardKey.arrowRight);
     await pressKey(tester, LogicalKeyboardKey.enter); // open its menu
-    expect(find.text('SCOPE'), findsOneWidget);
+    expect(find.text('SYSTEM'), findsOneWidget);
 
     await pull(tester, 'axis_rtrigger');
 
     expect(service.offsets, [0]);
-    expect(find.text('SCOPE'), findsOneWidget);
+    expect(find.text('SYSTEM'), findsOneWidget);
     expect(find.text('Page 1 of 2'), findsOneWidget);
   });
 
