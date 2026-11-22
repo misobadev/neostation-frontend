@@ -36,6 +36,9 @@ double _controlSize(double value) {
 /// against the visible list, not against [DetailTab.values].
 class GameDetailsTabsHeader extends StatelessWidget {
   final bool isScreenshotVideoHidden;
+
+  /// The cover tab is left out (installed Android apps have no box art).
+  final bool isBox2dHidden;
   final bool hasRetroAchievements;
   final DetailTab currentTab;
   final ValueChanged<DetailTab> onTabChanged;
@@ -43,6 +46,7 @@ class GameDetailsTabsHeader extends StatelessWidget {
   const GameDetailsTabsHeader({
     super.key,
     required this.isScreenshotVideoHidden,
+    this.isBox2dHidden = false,
     required this.hasRetroAchievements,
     required this.currentTab,
     required this.onTabChanged,
@@ -61,7 +65,9 @@ class GameDetailsTabsHeader extends StatelessWidget {
     // Dynamically calculate the active tab count for layout arbitration.
     final List<DetailTab> visibleTabs = [
       ..._baseTabs.where(
-        (t) => t != DetailTab.screenshotVideo || !isScreenshotVideoHidden,
+        (t) =>
+            (t != DetailTab.screenshotVideo || !isScreenshotVideoHidden) &&
+            (t != DetailTab.box2d || !isBox2dHidden),
       ),
       if (hasRetroAchievements) ...[DetailTab.achievements],
     ];
