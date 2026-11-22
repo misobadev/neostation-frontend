@@ -55,6 +55,8 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     // onUserLeaveHint runs while the activity pauses for a launch it just
     // made, well inside this window.
     private val OUTBOUND_LAUNCH_GRACE_MS = 2_000L
+    // When focusMainUi checks again that the main UI got focus (see there).
+    private val FOCUS_RETRY_DELAYS_MS = longArrayOf(200L, 600L, 1_500L)
     var keyListener: ((KeyEvent) -> Boolean)? = null
     var motionListener: ((MotionEvent) -> Boolean)? = null
     // A launched game still owns the foreground: set when Flutter starts a
@@ -1016,7 +1018,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             finishGameOnOtherDisplay()
         }
         // Swapped, the main UI and so the gamepad live on the bottom screen.
-        if (screensSwapped) SecondaryDisplayActivity.instance?.let { focusTaskOf(it) }
+        if (screensSwapped) focusMainUi("top resumed while swapped")
     }
 
     // --- Bottom-screen activity (Android 10+) ---
@@ -1024,7 +1026,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     /** The bottom screen just created its view: apply the swap and focus roles. */
     internal fun onBottomScreenReady(bottom: SecondaryDisplayActivity) {
         applyScreenSwap()
-        if (!screensSwapped) focusTaskOf(this)
+        if (!screensSwapped) focusMainUi("bottom screen ready")
     }
 
     /**
@@ -1043,7 +1045,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
      * swapped, or the gamepad would stay on the bottom screen.
      */
     internal fun onBottomScreenTopResumed(bottom: SecondaryDisplayActivity) {
-        if (!screensSwapped && !isTopCovered) focusTaskOf(this)
+        if (!screensSwapped && !isTopCovered) focusMainUi("bottom screen top resumed")
     }
 
     /** The bottom screen is going away: take the main engine back if it had it. */
@@ -1060,6 +1062,50 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     // This activity is behind another app on its own display (a game, a
     // dock app or Settings), so it must not pull itself to the front.
     private var isTopCovered = false
+
+    private val focusRetryHandler = Handler(Looper.getMainLooper())
+    private var focusRetry: Runnable? = null
+
+    /**
+     * Gives the focused display back to the screen showing the main UI (the
+     * top one, or the bottom one while swapped), so the gamepad drives it.
+     *
+     * The bottom window is not focusable while it shows the secondary UI, so
+     * if focus stays on its display, gamepad keys have no window to go to and
+     * Android reports NeoStation as not responding after 5 s. Some firmware
+     * (seen on the AYN Thor) keeps focus there after the first
+     * [focusTaskOf] that runs during the bottom screen's own start or return,
+     * so it is checked again shortly after and retried. A retry never runs
+     * while something covers either screen (a game or a dock app the user
+     * just opened owns focus then).
+     */
+    private fun focusMainUi(reason: String) {
+        val target: android.app.Activity =
+            if (screensSwapped) SecondaryDisplayActivity.instance ?: return else this
+        focusTaskOf(target)
+        focusRetry?.let { focusRetryHandler.removeCallbacks(it) }
+        var attempt = 0
+        val retry = object : Runnable {
+            override fun run() {
+                val bottom = SecondaryDisplayActivity.instance
+                val wanted: android.app.Activity =
+                    if (screensSwapped) bottom ?: return else this@MainActivity
+                if (wanted.hasWindowFocus()) return
+                if (isTopCovered || bottom?.isCovered == true || gameOnOtherDisplay) return
+                attempt++
+                android.util.Log.i(
+                    "MainActivity",
+                    "focus not on the main UI after $reason, retry $attempt"
+                )
+                focusTaskOf(wanted)
+                if (attempt < FOCUS_RETRY_DELAYS_MS.size) {
+                    focusRetryHandler.postDelayed(this, FOCUS_RETRY_DELAYS_MS[attempt])
+                }
+            }
+        }
+        focusRetry = retry
+        focusRetryHandler.postDelayed(retry, FOCUS_RETRY_DELAYS_MS[0])
+    }
 
     /**
      * Brings [activity]'s task to the front of its display, which also makes
@@ -1083,7 +1129,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         screensSwapped = swapped
         applyScreenSwap()
         val bottom = SecondaryDisplayActivity.instance
-        if (bottom != null) focusTaskOf(if (swapped) bottom else this)
+        if (bottom != null) focusMainUi(if (swapped) "swap on" else "swap off")
     }
 
     /**
@@ -1217,7 +1263,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             bottomScreenHiddenForHome = false
             SecondaryDisplayActivity.instance?.let { bottom ->
                 focusTaskOf(bottom)
-                if (!screensSwapped) focusTaskOf(this)
+                focusMainUi("back from Home")
             }
         }
         if (!presentationHiddenForHome) return
@@ -1250,7 +1296,9 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         restoreSecondaryAfterApp()
 
         if (gameOnOtherDisplay) {
-            finishGameOnOtherDisplay()
+            // The bottom screen reports that game's close exactly. Resuming
+            // here (screen back on, a tap on this screen) is not a close.
+            if (!bottomScreenTracksGame) finishGameOnOtherDisplay()
         } else {
             reportGameReturned()
         }
