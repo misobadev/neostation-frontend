@@ -725,7 +725,13 @@ class _SystemOptionsDialogState extends State<SystemOptionsDialog> {
               padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 5.r),
               decoration: BoxDecoration(
                 borderRadius: radius,
-                border: Border.all(color: Colors.transparent, width: 1),
+                // A visible edge: the glass rim alone only lights the
+                // rows' top and bottom curves on a light theme.
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.12),
+                  width: 1,
+                ),
               ),
               child: Row(
                 children: [
@@ -885,7 +891,13 @@ class _SystemOptionsDialogState extends State<SystemOptionsDialog> {
               ),
               decoration: BoxDecoration(
                 borderRadius: radius,
-                border: Border.all(color: Colors.transparent, width: 1),
+                // A visible edge: the glass rim alone only lights the
+                // rows' top and bottom curves on a light theme.
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.12),
+                  width: 1,
+                ),
               ),
               child: Row(
                 children: [

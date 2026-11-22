@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -369,6 +370,12 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     }
   }
 
+  /// Installed Android apps have no box art (ScreenScraper has none for
+  /// them, and the app icon already stands in for the wheel), so their card
+  /// leaves the cover tab out: wheel, screenshots and video, and the info.
+  bool get _isBox2dHidden =>
+      SystemFolderNames.isAndroidApps(_effectiveSystem.folderName);
+
   /// Predicate indicating if RetroAchievements integration is technically feasible for this hardware.
   bool get _hasRetroAchievements =>
       _effectiveSystem.raId != null &&
@@ -634,6 +641,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     }
 
     if ((_isGameInfoHidden && _currentTab == DetailTab.screenshotVideo) ||
+        (_isBox2dHidden && _currentTab == DetailTab.box2d) ||
         (!_hasRetroAchievements && _currentTab == DetailTab.achievements)) {
       _currentTab = DetailTab.wheel;
       // A tab yanked away isn't a navigation the user made, so nothing slides:
@@ -1007,6 +1015,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
             top: 0.r,
             child: GameDetailsTabsHeader(
               isScreenshotVideoHidden: _isGameInfoHidden,
+              isBox2dHidden: _isBox2dHidden,
               hasRetroAchievements: _hasRetroAchievements,
               currentTab: _currentTab,
               onTabChanged: _setTab,
@@ -1381,6 +1390,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
   /// Whether [tab] can be shown for the current game and display setup.
   bool _isTabAvailable(DetailTab tab) {
     if (tab == DetailTab.screenshotVideo && _isGameInfoHidden) return false;
+    if (tab == DetailTab.box2d && _isBox2dHidden) return false;
     if (tab == DetailTab.achievements && !_hasRetroAchievements) {
       return false;
     }

@@ -2,13 +2,11 @@ import 'dart:io';
 
 import 'package:neostation/widgets/wizard_frame.dart';
 import 'package:neostation/widgets/wizard_language_picker.dart';
-import 'package:neostation/widgets/splash_status_layout.dart';
 import 'package:neostation/services/startup_language.dart';
 import 'package:neostation/widgets/west_button_glyph.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/permission_service.dart';
@@ -39,13 +37,26 @@ import '../models/secondary_display_state.dart';
 class SetupWizard extends StatefulWidget {
   final Future<void> Function() onComplete;
 
-  const SetupWizard({super.key, required this.onComplete});
+  /// The step to open on, so the layout tests can check every step at every
+  /// screen size without walking through folder pickers and a scan.
+  @visibleForTesting
+  final int initialStep;
+
+  const SetupWizard({
+    super.key,
+    required this.onComplete,
+    this.initialStep = 0,
+  });
 
   @override
   State<SetupWizard> createState() => _SetupWizardState();
 }
 
 class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
+  /// The wizard's size unit and font sizes, shared with [WizardFrame].
+  double get _u => WizardFrame.unitOf(context);
+  double _font(double size) => WizardFrame.fontOf(context, size);
+
   int _currentStep = 0;
   bool _isSelectingFolder = false;
   bool _isSelectingUserDataFolder = false;
@@ -134,6 +145,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _currentStep = widget.initialStep;
     WidgetsBinding.instance.addObserver(this);
     _initLanguage();
     _initializeSteps();
@@ -237,23 +249,27 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       },
       onNavigateUp: () => _currentStep == _stepLanguage
           ? _moveLanguage(-WizardLanguagePicker.columns)
-          : _moveArtPackSelection(-1),
+          : _moveArtPackSelection(-_artPackColumns),
       onNavigateDown: () => _currentStep == _stepLanguage
           ? _moveLanguage(WizardLanguagePicker.columns)
+          : _moveArtPackSelection(_artPackColumns),
+      onNavigateLeft: () => _currentStep == _stepLanguage
+          ? _moveLanguage(-1)
+          : _moveArtPackSelection(-1),
+      onNavigateRight: () => _currentStep == _stepLanguage
+          ? _moveLanguage(1)
           : _moveArtPackSelection(1),
-      onNavigateLeft: () {
-        if (_currentStep == _stepLanguage) _moveLanguage(-1);
-      },
-      onNavigateRight: () {
-        if (_currentStep == _stepLanguage) _moveLanguage(1);
-      },
     );
     _gamepadNav?.initialize();
     _gamepadNav?.activate();
   }
 
-  /// Moves the art-pack list selection by [delta] (D-pad up/down). A no-op on
-  /// every other wizard step.
+  /// Packs a row on the art-pack step.
+  static const int _artPackColumns = 2;
+
+  /// Moves the art-pack selection by [delta]: ±1 across a row (D-pad
+  /// left/right), ±[_artPackColumns] down a column (up/down). A no-op on every
+  /// other wizard step.
   void _moveArtPackSelection(int delta) {
     if (_currentStep != _stepArtPack) return;
     final neoAssets = context.read<NeoAssetsProvider>();
@@ -565,8 +581,6 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
   /// The first step: what NeoStation is, and A to start.
   Widget _buildWelcomeStep(ThemeData theme) {
-    // Sized as the beta import wizard's welcome, so the two read the same.
-    final textScale = SplashStatusLayout.textScaleOf(context);
     return SingleChildScrollView(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -574,17 +588,17 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           Text(
             AppLocale.welcomeNeoStation.getString(context),
             style: TextStyle(
-              fontSize: 19 * textScale,
+              fontSize: _font(19),
               fontWeight: FontWeight.w600,
               color: theme.colorScheme.onSurface,
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 12 * SplashStatusLayout.scaleOf(context)),
+          SizedBox(height: 12 * _u),
           Text(
             AppLocale.wizardWelcomeBody.getString(context),
             style: TextStyle(
-              fontSize: 15 * textScale,
+              fontSize: _font(15),
               height: 1.35,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
             ),
@@ -598,8 +612,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   Widget _buildLanguageStep(ThemeData theme) {
     // The welcome's text sizes: twelve languages have to fit under the
     // title on a handheld's short screen.
-    final scale = SplashStatusLayout.scaleOf(context);
-    final textScale = SplashStatusLayout.textScaleOf(context);
+    final scale = _u;
+    // A landscape phone or 16:9 handheld: shorter than the 640×480 design.
+    final short = MediaQuery.sizeOf(context).height < 480;
 
     return SingleChildScrollView(
       child: Column(
@@ -612,7 +627,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             children: [
               Icon(
                 Symbols.translate_rounded,
-                size: 24 * textScale,
+                size: 24 * _u,
                 color: theme.colorScheme.onSurface,
               ),
               SizedBox(width: 10 * scale),
@@ -620,7 +635,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                 child: Text(
                   AppLocale.wizardLanguageTitle.getString(context),
                   style: TextStyle(
-                    fontSize: 19 * textScale,
+                    fontSize: _font(19),
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.onSurface,
                   ),
@@ -633,17 +648,18 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           Text(
             AppLocale.wizardLanguageBody.getString(context),
             style: TextStyle(
-              fontSize: 13 * textScale,
+              fontSize: _font(13),
               color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 20 * scale),
+          SizedBox(height: (short ? 12 : 20) * scale),
           WizardLanguagePicker(
             selected: _language,
             onSelected: _selectLanguage,
             unit: scale,
-            fontSize: 14 * textScale / scale,
+            dense: short,
+            fontSize: _font(14) / scale,
           ),
         ],
       ),
@@ -651,11 +667,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   }
 
   Widget _buildUserDataLocationStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-    final iconSize = isLandscape ? 48.r : 80.r;
-    final titleSize = isLandscape ? 14.r : 24.r;
-    final textSize = isLandscape ? 10.r : 14.r;
+    final iconSize = 40 * _u;
+    final titleSize = _font(19);
+    final textSize = _font(14);
 
     return SingleChildScrollView(
       child: Column(
@@ -668,7 +682,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                 ? theme.colorScheme.primary
                 : theme.colorScheme.primary.withValues(alpha: 0.6),
           ),
-          SizedBox(height: isLandscape ? 16.r : 24.r),
+          SizedBox(height: 16 * _u),
 
           Text(
             AppLocale.userDataLocation.getString(context),
@@ -679,7 +693,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: isLandscape ? 8.r : 16.r),
+          SizedBox(height: 8 * _u),
 
           Text(
             AppLocale.userDataLocationSubtitle.getString(context),
@@ -692,12 +706,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           ),
 
           if (_selectedUserDataPath != null) ...[
-            SizedBox(height: isLandscape ? 8.r : 16.r),
+            SizedBox(height: 8 * _u),
             Container(
-              padding: EdgeInsets.all(10.r),
+              padding: EdgeInsets.all(10 * _u),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8.r),
+                borderRadius: BorderRadius.circular(8 * _u),
                 border: Border.all(
                   color: theme.colorScheme.primary.withValues(alpha: 0.2),
                 ),
@@ -706,15 +720,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                 children: [
                   Icon(
                     Symbols.folder_rounded,
-                    size: 16.r,
+                    size: 16 * _u,
                     color: theme.colorScheme.primary,
                   ),
-                  SizedBox(width: 8.r),
+                  SizedBox(width: 8 * _u),
                   Expanded(
                     child: Text(
                       _selectedUserDataPath!,
                       style: TextStyle(
-                        fontSize: 11.r,
+                        fontSize: _font(11),
                         color: theme.colorScheme.onSurface,
                         fontFamily: 'monospace',
                       ),
@@ -917,9 +931,6 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   /// accessibility (Screen Return) service, each with a live granted/pending
   /// status. The main action button grants the next pending one, then advances.
   Widget _buildPermissionStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-
     return SingleChildScrollView(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -931,18 +942,16 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             title: AppLocale.storagePermission.getString(context),
             description: AppLocale.storagePermissionDesc.getString(context),
             granted: _storageGranted,
-            isLandscape: isLandscape,
           ),
           // Screen Return access only applies to dual-screen devices.
           if (_needsAccessibility) ...[
-            SizedBox(height: isLandscape ? 12.r : 20.r),
+            SizedBox(height: 12 * _u),
             _buildPermissionRow(
               theme,
               icon: Symbols.settings_accessibility_rounded,
               title: AppLocale.screenReturnAccess.getString(context),
               description: AppLocale.screenReturnAccessDesc.getString(context),
               granted: _accessibilityGranted,
-              isLandscape: isLandscape,
               hint: AppLocale.screenReturnAccessHint.getString(context),
             ),
           ],
@@ -959,18 +968,17 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     required String title,
     required String description,
     required bool granted,
-    required bool isLandscape,
     String? hint,
   }) {
-    final iconSize = isLandscape ? 28.r : 40.r;
-    final titleSize = isLandscape ? 13.r : 18.r;
-    final textSize = isLandscape ? 9.r : 13.r;
+    final iconSize = 28 * _u;
+    final titleSize = _font(15);
+    final textSize = _font(12);
 
     return Container(
-      padding: EdgeInsets.all(isLandscape ? 12.r : 16.r),
+      padding: EdgeInsets.all(12 * _u),
       decoration: BoxDecoration(
         color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(16.r),
+        borderRadius: BorderRadius.circular(16 * _u),
         border: Border.all(
           color: granted
               ? Colors.green.withValues(alpha: 0.5)
@@ -985,7 +993,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             size: iconSize,
             color: granted ? Colors.green : theme.colorScheme.primary,
           ),
-          SizedBox(width: isLandscape ? 12.r : 16.r),
+          SizedBox(width: 12 * _u),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -998,7 +1006,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     color: theme.colorScheme.onSurface,
                   ),
                 ),
-                SizedBox(height: 4.r),
+                SizedBox(height: 4 * _u),
                 Text(
                   granted ? AppLocale.enabled.getString(context) : description,
                   style: TextStyle(
@@ -1010,7 +1018,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                   ),
                 ),
                 if (!granted && hint != null) ...[
-                  SizedBox(height: 6.r),
+                  SizedBox(height: 6 * _u),
                   Text(
                     hint,
                     style: TextStyle(
@@ -1024,12 +1032,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               ],
             ),
           ),
-          SizedBox(width: isLandscape ? 8.r : 12.r),
+          SizedBox(width: 8 * _u),
           Icon(
             granted
                 ? Symbols.check_circle_rounded
                 : Symbols.radio_button_unchecked_rounded,
-            size: isLandscape ? 20.r : 26.r,
+            size: 20 * _u,
             color: granted
                 ? Colors.green
                 : theme.colorScheme.onSurface.withValues(alpha: 0.3),
@@ -1040,11 +1048,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   }
 
   Widget _buildFolderSelectionStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-    final iconSize = isLandscape ? 48.r : 80.r;
-    final titleSize = isLandscape ? 14.r : 24.r;
-    final textSize = isLandscape ? 10.r : 14.r;
+    final iconSize = 40 * _u;
+    final titleSize = _font(19);
+    final textSize = _font(14);
 
     return SingleChildScrollView(
       child: Column(
@@ -1057,7 +1063,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                 ? Colors.green
                 : theme.colorScheme.primary,
           ),
-          SizedBox(height: isLandscape ? 16.r : 24.r),
+          SizedBox(height: 16 * _u),
 
           Text(
             AppLocale.selectRomFolder.getString(context),
@@ -1067,7 +1073,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               color: theme.colorScheme.onSurface,
             ),
           ),
-          SizedBox(height: isLandscape ? 8.r : 16.r),
+          SizedBox(height: 8 * _u),
 
           Text(
             _selectedFolder != null
@@ -1092,12 +1098,10 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       !provider.isScanning && !provider.scanCompleted && provider.error != null;
 
   Widget _buildScanningStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-    final containerSize = isLandscape ? 48.r : 80.r;
-    final iconSize = isLandscape ? 24.r : 48.r;
-    final titleSize = isLandscape ? 16.r : 24.r;
-    final textSize = isLandscape ? 12.r : 14.r;
+    final containerSize = 56 * _u;
+    final iconSize = 28 * _u;
+    final titleSize = _font(19);
+    final textSize = _font(14);
 
     return Consumer<SqliteConfigProvider>(
       builder: (context, provider, child) {
@@ -1132,12 +1136,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                           height: iconSize,
                           child: CircularProgressIndicator(
                             color: theme.colorScheme.primary,
-                            strokeWidth: 3.r,
+                            strokeWidth: 3 * _u,
                           ),
                         ),
                 ),
               ),
-              SizedBox(height: isLandscape ? 4.r : 24.r),
+              SizedBox(height: 4 * _u),
 
               Text(
                 provider.scanCompleted
@@ -1149,7 +1153,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                   color: theme.colorScheme.onSurface,
                 ),
               ),
-              SizedBox(height: isLandscape ? 4.r : 16.r),
+              SizedBox(height: 4 * _u),
 
               Text(
                 failed
@@ -1176,12 +1180,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               if (provider.totalSystemsToScan > 0 &&
                   !provider.scanCompleted &&
                   !failed) ...[
-                SizedBox(height: isLandscape ? 4.r : 32.r),
+                SizedBox(height: 4 * _u),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8.r),
+                  borderRadius: BorderRadius.circular(8 * _u),
                   child: LinearProgressIndicator(
                     value: provider.scanProgress,
-                    minHeight: 8.r,
+                    minHeight: 8 * _u,
                     backgroundColor: theme.colorScheme.primary.withValues(
                       alpha: 0.1,
                     ),
@@ -1190,7 +1194,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-                SizedBox(height: 8.r),
+                SizedBox(height: 8 * _u),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1206,7 +1210,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                             provider.totalSystemsToScan.toString(),
                           ),
                       style: TextStyle(
-                        fontSize: textSize - 2.r,
+                        fontSize: textSize - 2 * _u,
                         color: theme.colorScheme.onSurface.withValues(
                           alpha: 0.6,
                         ),
@@ -1215,7 +1219,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     Text(
                       '${(provider.scanProgress * 100).toInt()}%',
                       style: TextStyle(
-                        fontSize: textSize - 2.r,
+                        fontSize: textSize - 2 * _u,
                         color: theme.colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1225,15 +1229,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               ],
 
               if (provider.scanCompleted) ...[
-                SizedBox(height: isLandscape ? 4.r : 32.r),
+                SizedBox(height: 4 * _u),
                 Container(
-                  padding: EdgeInsets.all(isLandscape ? 12.r : 16.r),
+                  padding: EdgeInsets.all(12 * _u),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12.r),
+                    borderRadius: BorderRadius.circular(12 * _u),
                     border: Border.all(
                       color: Colors.green.withValues(alpha: 0.3),
-                      width: 1.r,
+                      width: 1 * _u,
                     ),
                   ),
                   child: Row(
@@ -1241,9 +1245,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                       Icon(
                         Symbols.check_circle_rounded,
                         color: Colors.green,
-                        size: isLandscape ? 20.r : 24.r,
+                        size: 20 * _u,
                       ),
-                      SizedBox(width: 12.r),
+                      SizedBox(width: 12 * _u),
                       Expanded(
                         child: Text(
                           '${AppLocale.foundSystemsWithGames.getString(context).replaceFirst('{count}', provider.detectedRealSystems.length.toString())}\n${AppLocale.wizardTapNextToContinue.getString(context)}',
@@ -1269,11 +1273,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   Widget _buildEsdeStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-    final iconSize = isLandscape ? 48.r : 80.r;
-    final titleSize = isLandscape ? 16.r : 24.r;
-    final textSize = isLandscape ? 12.r : 14.r;
+    final iconSize = 40 * _u;
+    final titleSize = _font(19);
+    final textSize = _font(14);
     final result = _esdeResult;
 
     return SingleChildScrollView(
@@ -1287,7 +1289,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             size: iconSize,
             color: result != null ? Colors.green : theme.colorScheme.primary,
           ),
-          SizedBox(height: isLandscape ? 16.r : 24.r),
+          SizedBox(height: 16 * _u),
 
           Text(
             AppLocale.wizardEsdeStepTitle.getString(context),
@@ -1298,7 +1300,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: isLandscape ? 8.r : 16.r),
+          SizedBox(height: 8 * _u),
 
           Text(
             AppLocale.wizardEsdeStepDesc.getString(context),
@@ -1312,14 +1314,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
           // Live progress while importing.
           if (_isImportingEsde) ...[
-            SizedBox(height: isLandscape ? 12.r : 28.r),
+            SizedBox(height: 12 * _u),
             SizedBox(
-              width: 220.r,
+              width: 220 * _u,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8.r),
+                borderRadius: BorderRadius.circular(8 * _u),
                 child: LinearProgressIndicator(
                   value: _esdeProgress > 0 ? _esdeProgress : null,
-                  minHeight: 8.r,
+                  minHeight: 8 * _u,
                   backgroundColor: theme.colorScheme.primary.withValues(
                     alpha: 0.1,
                   ),
@@ -1330,11 +1332,11 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               ),
             ),
             if (_esdeLabel.isNotEmpty) ...[
-              SizedBox(height: 8.r),
+              SizedBox(height: 8 * _u),
               Text(
                 _esdeLabel,
                 style: TextStyle(
-                  fontSize: textSize - 2.r,
+                  fontSize: textSize - 2 * _u,
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
                 textAlign: TextAlign.center,
@@ -1344,15 +1346,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
           // Import result summary.
           if (result != null) ...[
-            SizedBox(height: isLandscape ? 12.r : 28.r),
+            SizedBox(height: 12 * _u),
             Container(
-              padding: EdgeInsets.all(isLandscape ? 12.r : 16.r),
+              padding: EdgeInsets.all(12 * _u),
               decoration: BoxDecoration(
                 color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12.r),
+                borderRadius: BorderRadius.circular(12 * _u),
                 border: Border.all(
                   color: Colors.green.withValues(alpha: 0.3),
-                  width: 1.r,
+                  width: 1 * _u,
                 ),
               ),
               child: Row(
@@ -1361,9 +1363,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                   Icon(
                     Symbols.check_circle_rounded,
                     color: Colors.green,
-                    size: isLandscape ? 20.r : 24.r,
+                    size: 20 * _u,
                   ),
-                  SizedBox(width: 12.r),
+                  SizedBox(width: 12 * _u),
                   Flexible(
                     child: Text(
                       '${AppLocale.esdeImportComplete.getString(context)}\n'
@@ -1391,11 +1393,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   Widget _buildArtPackStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-    final iconSize = isLandscape ? 48.r : 80.r;
-    final titleSize = isLandscape ? 16.r : 24.r;
-    final textSize = isLandscape ? 12.r : 14.r;
+    final titleSize = _font(19);
+    final textSize = _font(13);
 
     return Consumer<NeoAssetsProvider>(
       builder: (context, neoAssets, child) {
@@ -1416,76 +1415,66 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             ..clear()
             ..addAll(List.generate(themes.length, (_) => GlobalKey()));
         }
-        return SingleChildScrollView(
+        // The text on the left and the packs on the right (the app runs in
+        // landscape), so the packs get the panel's whole height and only
+        // they scroll.
+        final packs = SingleChildScrollView(
           controller: _artPackScrollController,
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Smaller icon + tighter spacing so the compact thumbnail below
-              // fits without scrolling.
-              Icon(
-                hasTheme
-                    ? Symbols.check_circle_rounded
-                    : Symbols.palette_rounded,
-                size: iconSize * 0.7,
-                color: hasTheme ? Colors.green : theme.colorScheme.primary,
-              ),
-              SizedBox(height: isLandscape ? 10.r : 16.r),
-
-              Text(
-                AppLocale.wizardArtPackTitle.getString(context),
-                style: TextStyle(
-                  fontSize: titleSize,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: isLandscape ? 6.r : 12.r),
-
-              Text(
-                hasTheme
-                    ? AppLocale.wizardArtPackInstalled.getString(context)
-                    : unavailable
-                    ? AppLocale.wizardArtPackUnavailable.getString(context)
-                    : AppLocale.wizardArtPackDesc.getString(context),
-                style: TextStyle(
-                  fontSize: textSize,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  height: 1.3,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
               // The pack list. Tapping a row selects it; the main button
               // downloads the selected pack.
               if (!unavailable && !neoAssets.downloading) ...[
-                SizedBox(height: isLandscape ? 10.r : 16.r),
-                for (int i = 0; i < themes.length; i++)
-                  SystemArtPackTile(
-                    key: _artPackKeys[i],
-                    pack: themes[i],
-                    mosaicSize: isLandscape ? 48 : 56,
-                    isSelected: themes[i].folder == selectedFolder,
-                    isActive: neoAssets.isThemeActive(themes[i].folder),
-                    onTap: () => setState(
-                      () => _selectedArtPackFolder = themes[i].folder,
-                    ),
-                  ),
+                SizedBox(height: 10 * _u),
+                // Two packs a row, so a short screen shows several at
+                // once; the D-pad moves across and down the grid.
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final gap = 6 * _u;
+                    final tileWidth =
+                        (constraints.maxWidth - gap * (_artPackColumns - 1)) /
+                        _artPackColumns;
+                    return Wrap(
+                      spacing: gap,
+                      runSpacing: gap,
+                      children: [
+                        for (int i = 0; i < themes.length; i++)
+                          SizedBox(
+                            width: tileWidth,
+                            child: SystemArtPackTile(
+                              key: _artPackKeys[i],
+                              pack: themes[i],
+                              mosaicSize: 32 * _u,
+                              margin: EdgeInsets.zero,
+                              compact: true,
+                              isSelected: themes[i].folder == selectedFolder,
+                              isActive: neoAssets.isThemeActive(
+                                themes[i].folder,
+                              ),
+                              onTap: () => setState(
+                                () => _selectedArtPackFolder = themes[i].folder,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
               ],
 
               // Live download progress.
               if (neoAssets.downloading) ...[
-                SizedBox(height: isLandscape ? 12.r : 28.r),
+                SizedBox(height: 12 * _u),
                 SizedBox(
-                  width: 220.r,
+                  width: 220 * _u,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8.r),
+                    borderRadius: BorderRadius.circular(8 * _u),
                     child: LinearProgressIndicator(
                       value: neoAssets.downloadProgress > 0
                           ? neoAssets.downloadProgress
                           : null,
-                      minHeight: 8.r,
+                      minHeight: 8 * _u,
                       backgroundColor: theme.colorScheme.primary.withValues(
                         alpha: 0.1,
                       ),
@@ -1495,7 +1484,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-                SizedBox(height: 8.r),
+                SizedBox(height: 8 * _u),
                 Text(
                   '${(neoAssets.downloadProgress * 100).toInt()}%',
                   style: TextStyle(
@@ -1507,6 +1496,61 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               ],
             ],
           ),
+        );
+        final heading = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  hasTheme
+                      ? Symbols.check_circle_rounded
+                      : Symbols.palette_rounded,
+                  size: 24 * _u,
+                  color: hasTheme ? Colors.green : theme.colorScheme.primary,
+                ),
+                SizedBox(width: 10 * _u),
+                Flexible(
+                  child: Text(
+                    AppLocale.wizardArtPackTitle.getString(context),
+                    style: TextStyle(
+                      fontSize: titleSize,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    textAlign: TextAlign.start,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 6 * _u),
+            Text(
+              hasTheme
+                  ? AppLocale.wizardArtPackInstalled.getString(context)
+                  : unavailable
+                  ? AppLocale.wizardArtPackUnavailable.getString(context)
+                  : AppLocale.wizardArtPackDesc.getString(context),
+              style: TextStyle(
+                fontSize: textSize,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                height: 1.3,
+              ),
+              textAlign: TextAlign.start,
+            ),
+          ],
+        );
+        return Row(
+          children: [
+            // Scrolls only on a screen too short for the text.
+            Expanded(
+              flex: 2,
+              child: Center(child: SingleChildScrollView(child: heading)),
+            ),
+            SizedBox(width: 16 * _u),
+            Expanded(flex: 3, child: packs),
+          ],
         );
       },
     );
@@ -1882,8 +1926,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   /// main action (A).
   Widget _buttonRow(List<Widget> buttons) => Wrap(
     alignment: WrapAlignment.center,
-    spacing: 12.r,
-    runSpacing: 8.r,
+    spacing: 12 * _u,
+    runSpacing: 8 * _u,
     children: buttons,
   );
 

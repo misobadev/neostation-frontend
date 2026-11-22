@@ -194,13 +194,16 @@ void main() {
     String two(int v) => v.toString().padLeft(2, '0');
 
     expect(find.text('Earned this week · Hardcore'), findsOneWidget);
-    expect(find.text('12 True Ratio'), findsOneWidget);
-    expect(find.text('4 of 10 players · 40%'), findsOneWidget);
+    // The facts share one line under the achievement.
+    final facts = find.textContaining('12 True Ratio');
+    expect(facts, findsOneWidget);
+    final line = tester.widget<Text>(facts).data!;
+    expect(line, contains('4 of 10 players · 40%'));
     expect(
-      find.text(
+      line,
+      contains(
         'Week started ${weekStart.year}-${two(weekStart.month)}-${two(weekStart.day)}',
       ),
-      findsOneWidget,
     );
     // A game that is nowhere to be had leaves the card without a line saying
     // so, and without a RomM sign-in button.

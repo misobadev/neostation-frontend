@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/data/datasources/sqlite_service.dart';
 import 'package:neostation/repositories/system_repository.dart';
 import 'package:path/path.dart' as path;
@@ -326,19 +327,17 @@ class FileProvider extends ChangeNotifier {
     String extension,
   ) {
     final baseName = _stripRomExtension(romName, systemFolderName);
+    // "Android Games" are the android rows marked as games: their art is
+    // scraped into, and read from, the android folder.
+    final folder = SystemFolderNames.rowSystemFolder(systemFolderName);
 
     if (!_isInitialized || _mediaPath == null) {
-      return path.join(
-        mediaFolder,
-        systemFolderName,
-        imageType,
-        '$baseName.$extension',
-      );
+      return path.join(mediaFolder, folder, imageType, '$baseName.$extension');
     }
     return path.join(
       _mediaPath!,
       mediaFolder,
-      systemFolderName,
+      folder,
       imageType,
       '$baseName.$extension',
     );
@@ -557,7 +556,8 @@ class FileProvider extends ChangeNotifier {
   ]) {
     final mediaRoot = _esdeMediaRoot;
     if (mediaRoot == null) return const [];
-    final esdeDir = _esdeSystemDirs[systemFolderName];
+    final esdeDir =
+        _esdeSystemDirs[SystemFolderNames.rowSystemFolder(systemFolderName)];
     if (esdeDir == null) return const [];
     final categories = _esdeMediaCategories[imageType];
     if (categories == null) return const [];

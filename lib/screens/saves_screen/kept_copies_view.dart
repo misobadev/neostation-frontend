@@ -32,7 +32,12 @@ class KeptCopiesView extends StatefulWidget {
     required this.onBack,
     this.copies,
     this.inDialog = false,
+    this.embedded = false,
   });
+
+  /// Shown inside the NeoSync dashboard's panel, beside its sidebar: no room
+  /// left for the top dock, which the panel already clears.
+  final bool embedded;
 
   /// The game whose copies are listed, or null for every game's.
   final GameModel? game;
@@ -98,6 +103,9 @@ class _KeptCopiesViewState extends State<KeptCopiesView> {
       _gamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
         _layerId,
+        // In the NeoSync dashboard's panel the sidebar's menu keeps the
+        // D-pad until the panel is entered: slot in beneath it.
+        background: widget.embedded,
         onActivate: () => _gamepadNav.activate(),
         onDeactivate: () => _gamepadNav.deactivate(),
       );
@@ -290,7 +298,9 @@ class _KeptCopiesViewState extends State<KeptCopiesView> {
 
     if (!widget.inDialog) {
       return Padding(
-        padding: EdgeInsets.only(top: 52.r, left: 8.r, right: 8.r, bottom: 8.r),
+        padding: widget.embedded
+            ? EdgeInsets.zero
+            : EdgeInsets.only(top: 52.r, left: 8.r, right: 8.r, bottom: 8.r),
         child: content,
       );
     }

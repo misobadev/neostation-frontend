@@ -446,7 +446,7 @@ class GameModel {
     for (final extension in _mediaExtensions) {
       yield path.join(
         fileProvider.getMediaDirectoryPath(),
-        systemFolderName,
+        SystemFolderNames.rowSystemFolder(systemFolderName),
         imageType,
         '$romname.$extension',
       );
@@ -509,10 +509,12 @@ class GameModel {
   /// Resolves inside NeoStation's `media/` folder only.
   String _manualImagePath(String systemFolderName, String imageType) {
     final baseName = _stripRomExtension(romname);
+    // Android Games' art is the android rows' art.
+    final folder = SystemFolderNames.rowSystemFolder(systemFolderName);
 
     final pngRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$baseName.png',
     );
@@ -520,7 +522,7 @@ class GameModel {
 
     final jpgRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$baseName.jpg',
     );
@@ -528,7 +530,7 @@ class GameModel {
 
     final pngFullRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$romname.png',
     );
@@ -536,7 +538,7 @@ class GameModel {
 
     final jpgFullRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$romname.jpg',
     );
@@ -586,7 +588,12 @@ class GameModel {
       return master;
     }
     final baseName = _stripRomExtension(romname);
-    return path.join('media', systemFolderName, 'videos', '$baseName.mp4');
+    return path.join(
+      'media',
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+      'videos',
+      '$baseName.mp4',
+    );
   }
 
   /// Verifies if a preview video exists for this game.

@@ -19,7 +19,10 @@ import '../../sync/sync_manager.dart';
 import '../../utils/gamepad_nav.dart';
 import '../../utils/login_form_selection.dart';
 import '../../utils/romm_failure_message.dart';
+import '../../themes/corner_radii.dart';
+import '../../widgets/core_footer.dart';
 import '../../widgets/custom_notification.dart';
+import '../../widgets/neo_glass.dart';
 import '../app_screen.dart';
 
 /// Self-contained RomM connect / account panel for the top-level RomM tab.
@@ -351,199 +354,189 @@ class _RommConnectContentState extends State<RommConnectContent>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final provider = context.watch<RommProvider>();
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final line = theme.colorScheme.outline.withValues(alpha: 0.15);
+    final connected = provider.isConnected;
 
-    // Match the ScreenScraper / RetroAchievements login layout: a top-anchored,
-    // horizontally-scrollable row with the credential card on the left and an
-    // explanatory info box on the right (info box shown only when disconnected).
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12.r),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(height: 64.r), // Space for the top navigation dock.
-          // Vertical too: the reason a saved account was turned away puts a
-          // line above the form, and on a short screen (the AYN Thor's) that
-          // pushed Sign in off the bottom. Moving through the form with the
-          // D-pad scrolls the selected row into view (see _scrollToIndex).
-          Expanded(
+    // The NeoSync sign-in layout: one NeoGlass panel, RomM introduced on the
+    // left and the form on the right; once connected, the panel holds just
+    // the library's actions. Moving through the form with the D-pad scrolls
+    // the selected row into view on a short screen (see _scrollToIndex).
+    return Column(
+      children: [
+        // Clears the top dock: the same 52.r as the other sign-in panels.
+        SizedBox(height: 52.r),
+        // Anchored to the top, like the NeoSync and RetroAchievements
+        // sign-in panels, so the three start at the same height.
+        Expanded(
+          child: Align(
+            alignment: Alignment.topCenter,
             child: SingleChildScrollView(
-              child: Center(
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  physics: const ClampingScrollPhysics(),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.r),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          constraints: BoxConstraints(maxWidth: 260.r),
-                          child: _buildFormCard(theme, provider),
-                        ),
-                        if (!provider.isConnected) ...[
-                          SizedBox(width: 16.r),
-                          SizedBox(width: 300.r, child: _buildInfoBox(theme)),
-                        ],
-                      ],
+              controller: _scrollController,
+              padding: EdgeInsets.fromLTRB(16.r, 0, 16.r, 10.r),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: connected ? 320.r : 600.r,
+                ),
+                child: NeoGlassRim(
+                  cornerRadius: radii.radiusExternalRadius,
+                  child: Container(
+                    padding: EdgeInsets.all(14.r),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: radii.radiusExternal,
+                      border: Border.all(color: line),
                     ),
+                    child: connected
+                        ? _buildFormCard(theme, provider)
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: _buildInfoBox(theme)),
+                              Container(
+                                width: 1,
+                                height: 200.r,
+                                margin: EdgeInsets.symmetric(horizontal: 16.r),
+                                color: line,
+                              ),
+                              Expanded(child: _buildFormCard(theme, provider)),
+                            ],
+                          ),
                   ),
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildFormCard(ThemeData theme, RommProvider provider) {
     final connected = provider.isConnected;
-    return Container(
-      padding: EdgeInsets.all(16.r),
-      decoration: BoxDecoration(
-        color: theme.cardColor.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  (connected ? AppLocale.rommLibrary : AppLocale.rommLogin)
-                      .getString(context),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                    fontSize: 14.r,
-                  ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                (connected ? AppLocale.rommLibrary : AppLocale.rommLogin)
+                    .getString(context),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                  fontSize: 14.r,
                 ),
               ),
-            ],
-          ),
-          // The status line is redundant on the login form (you are visibly
-          // disconnected); show it only once connected, mirroring the peers —
-          // or when the saved account was turned away, to say why the form is
-          // back.
-          if (connected || _rejectedAtRestore(provider) != null) ...[
-            SizedBox(height: 8.r),
-            _buildStatusLine(theme, provider),
+            ),
           ],
-          SizedBox(height: 12.r),
-          if (connected)
-            ..._buildConnectedRows(theme)
-          else
-            ..._buildCredentialRows(theme),
+        ),
+        // The status line is redundant on the login form (you are visibly
+        // disconnected); show it only once connected, mirroring the peers —
+        // or when the saved account was turned away, to say why the form is
+        // back.
+        if (connected || _rejectedAtRestore(provider) != null) ...[
+          SizedBox(height: 8.r),
+          _buildStatusLine(theme, provider),
         ],
-      ),
+        SizedBox(height: 10.r),
+        if (connected)
+          ..._buildConnectedRows(theme)
+        else
+          ..._buildCredentialRows(theme),
+      ],
     );
   }
 
   Widget _buildInfoBox(ThemeData theme) {
-    return Container(
-      padding: EdgeInsets.all(16.r),
-      decoration: BoxDecoration(
-        color: theme.cardColor.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SvgPicture.asset(
-                'assets/images/icons/romm-light.svg',
-                width: 24.r,
-                height: 24.r,
-                colorFilter: ColorFilter.mode(
-                  theme.colorScheme.primary,
-                  BlendMode.srcIn,
-                ),
-                fit: BoxFit.contain,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SvgPicture.asset(
+              'assets/images/icons/romm-light.svg',
+              width: 24.r,
+              height: 24.r,
+              colorFilter: ColorFilter.mode(
+                theme.colorScheme.onSurface,
+                BlendMode.srcIn,
               ),
-              SizedBox(width: 12.r),
-              Expanded(
-                child: Text(
-                  AppLocale.rommWhatIs.getString(context),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                    fontSize: 14.r,
-                  ),
+              fit: BoxFit.contain,
+            ),
+            SizedBox(width: 12.r),
+            Expanded(
+              child: Text(
+                // The service's name beside its logo, as the NeoSync and
+                // RetroAchievements panels do.
+                'RomM',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                  fontSize: 14.r,
                 ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 14.r),
+        Text(
+          AppLocale.rommDescription.getString(context),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
+            fontSize: 10.r,
+          ),
+          softWrap: true,
+        ),
+        SizedBox(height: 6.r),
+        _buildInfoItem(
+          theme,
+          Symbols.grid_view_rounded,
+          AppLocale.rommInfoBrowse.getString(context),
+        ),
+        _buildInfoItem(
+          theme,
+          Symbols.cloud_sync_rounded,
+          AppLocale.rommInfoSaveSync.getString(context),
+        ),
+        _buildInfoItem(
+          theme,
+          Symbols.dns_rounded,
+          AppLocale.rommInfoSelfHosted.getString(context),
+        ),
+        SizedBox(height: 6.r),
+        RichText(
+          softWrap: true,
+          text: TextSpan(
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 10.r,
+            ),
+            children: [
+              TextSpan(text: AppLocale.rommLearnMoreAt.getString(context)),
+              TextSpan(
+                text: 'romm.app',
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
+                recognizer: TapGestureRecognizer()
+                  ..onTap = () async {
+                    final url = Uri.parse('https://romm.app');
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(
+                        url,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    }
+                  },
               ),
             ],
           ),
-          SizedBox(height: 6.r),
-          Text(
-            AppLocale.rommDescription.getString(context),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
-              fontSize: 8.r,
-            ),
-            softWrap: true,
-          ),
-          SizedBox(height: 6.r),
-          _buildInfoItem(
-            theme,
-            Symbols.grid_view_rounded,
-            AppLocale.rommInfoBrowse.getString(context),
-          ),
-          _buildInfoItem(
-            theme,
-            Symbols.cloud_sync_rounded,
-            AppLocale.rommInfoSaveSync.getString(context),
-          ),
-          _buildInfoItem(
-            theme,
-            Symbols.dns_rounded,
-            AppLocale.rommInfoSelfHosted.getString(context),
-          ),
-          SizedBox(height: 6.r),
-          RichText(
-            softWrap: true,
-            text: TextSpan(
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 8.r,
-              ),
-              children: [
-                TextSpan(text: AppLocale.rommLearnMoreAt.getString(context)),
-                TextSpan(
-                  text: 'romm.app',
-                  style: TextStyle(
-                    color: theme.colorScheme.primary,
-                    decoration: TextDecoration.underline,
-                  ),
-                  recognizer: TapGestureRecognizer()
-                    ..onTap = () async {
-                      final url = Uri.parse('https://romm.app');
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(
-                          url,
-                          mode: LaunchMode.externalApplication,
-                        );
-                      }
-                    },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -554,7 +547,7 @@ class _RommConnectContentState extends State<RommConnectContent>
         children: [
           Icon(
             icon,
-            size: 12.r,
+            size: 14.r,
             color: theme.colorScheme.primary.withValues(alpha: 0.7),
           ),
           SizedBox(width: 8.r),
@@ -563,7 +556,7 @@ class _RommConnectContentState extends State<RommConnectContent>
               text,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                fontSize: 8.r,
+                fontSize: 10.r,
               ),
               softWrap: true,
             ),
@@ -641,9 +634,9 @@ class _RommConnectContentState extends State<RommConnectContent>
         controller: _urlController,
         focusNode: _urlFocus,
       ),
-      SizedBox(height: 10.r),
+      SizedBox(height: 6.r),
       _buildAuthModeRow(theme),
-      SizedBox(height: 10.r),
+      SizedBox(height: 6.r),
       if (_useApiKey) ...[
         _buildFieldRow(
           theme,
@@ -663,7 +656,7 @@ class _RommConnectContentState extends State<RommConnectContent>
           controller: _userController,
           focusNode: _userFocus,
         ),
-        SizedBox(height: 8.r),
+        SizedBox(height: 6.r),
         _buildFieldRow(
           theme,
           index: 3,
@@ -674,7 +667,7 @@ class _RommConnectContentState extends State<RommConnectContent>
           obscure: true,
         ),
       ],
-      SizedBox(height: 12.r),
+      SizedBox(height: 8.r),
       _buildConnectButton(theme),
     ];
   }
@@ -693,26 +686,18 @@ class _RommConnectContentState extends State<RommConnectContent>
     final borderWidth = selected ? 2.r : 1.r;
     return Container(
       key: _itemKeys[_authModeSlot],
-      constraints: BoxConstraints(maxWidth: 220.r),
+      constraints: BoxConstraints(maxWidth: 240.r),
       padding: EdgeInsets.all(4.r - borderWidth),
       decoration: BoxDecoration(
-        color: scheme.onSurface.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8.r),
+        color: theme.scaffoldBackgroundColor,
+        borderRadius:
+            (theme.extension<CornerRadii>() ?? CornerRadii.m()).radiusInternal,
         border: Border.all(
           color: selected
-              ? scheme.primary
-              : scheme.primary.withValues(alpha: 0.1),
+              ? scheme.onSurface
+              : scheme.outline.withValues(alpha: 0.15),
           width: borderWidth,
         ),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: scheme.primary.withValues(alpha: 0.35),
-                  blurRadius: 6.r,
-                  spreadRadius: 1.r,
-                ),
-              ]
-            : null,
       ),
       child: Row(
         children: [
@@ -748,17 +733,18 @@ class _RommConnectContentState extends State<RommConnectContent>
           child: Container(
             padding: EdgeInsets.symmetric(vertical: 6.r),
             decoration: BoxDecoration(
-              color: active ? scheme.primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(6.r),
+              color: active ? scheme.onSurface : Colors.transparent,
+              borderRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                  .radiusInternal,
             ),
             child: Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 9.r,
+                fontSize: 10.r,
                 fontWeight: active ? FontWeight.bold : FontWeight.normal,
                 color: active
-                    ? scheme.onPrimary
+                    ? scheme.surface
                     : scheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
@@ -847,68 +833,59 @@ class _RommConnectContentState extends State<RommConnectContent>
     bool obscure = false,
   }) {
     final selected = isSelected(index);
-    // Mirror the ScreenScraper / RetroAchievements field: a filled input with
-    // the label floating inside it, constrained to 220.r, plus a soft primary
-    // glow when the gamepad cursor is on this row.
+    final radius =
+        (theme.extension<CornerRadii>() ?? CornerRadii.m()).radiusInternal;
+    final scheme = theme.colorScheme;
+    // The NeoSync field: sunk into the panel (the screen's background with
+    // the panel's faint outline), the label inside as its placeholder, and
+    // the selection ring drawn as the field's own border, solid, no glow.
     return Container(
       key: _itemKeys[index],
-      constraints: BoxConstraints(maxWidth: 220.r),
-      decoration: selected
-          ? BoxDecoration(
-              borderRadius: BorderRadius.circular(8.r),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.35),
-                  blurRadius: 6.r,
-                  spreadRadius: 1.r,
-                ),
-              ],
-            )
-          : null,
+      constraints: BoxConstraints(maxWidth: 240.r),
       child: SizedBox(
-        height: 32.r,
+        height: 34.r,
         child: TextField(
           controller: controller,
           focusNode: focusNode,
           obscureText: obscure,
           enabled: !_busy,
-          style: TextStyle(fontSize: 11.r),
+          style: TextStyle(fontSize: 12.r),
           decoration: InputDecoration(
             labelText: label,
+            floatingLabelBehavior: FloatingLabelBehavior.never,
             labelStyle: TextStyle(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-              fontSize: 10.r,
-            ),
-            floatingLabelStyle: TextStyle(
-              color: theme.colorScheme.primary,
-              fontSize: 10.r,
-              fontWeight: FontWeight.bold,
+              color: scheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 11.r,
             ),
             hintText: hint,
             hintStyle: TextStyle(
               fontSize: 10.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              color: scheme.onSurface.withValues(alpha: 0.4),
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 12.r,
+              vertical: 8.r,
             ),
             filled: true,
-            fillColor: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+            fillColor: theme.scaffoldBackgroundColor,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.r),
+              borderRadius: radius,
               borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.r),
+              borderRadius: radius,
               borderSide: BorderSide(
                 color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.primary.withValues(alpha: 0.1),
+                    ? scheme.onSurface
+                    : scheme.outline.withValues(alpha: 0.15),
                 width: selected ? 2.r : 1.r,
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.r),
+              borderRadius: radius,
               borderSide: BorderSide(
-                color: theme.colorScheme.primary,
-                width: 1.r,
+                color: selected ? scheme.onSurface : scheme.primary,
+                width: selected ? 2.r : 1.r,
               ),
             ),
           ),
@@ -917,60 +894,39 @@ class _RommConnectContentState extends State<RommConnectContent>
     );
   }
 
-  /// Primary "Save & Connect" button, matching the RetroAchievements connect
-  /// button (full-width elevated button with a gamepad-selection glow).
+  /// The form's main action, as NeoSync's Login: the app's own button in
+  /// the theme's accent, with the A glyph and a solid ring while the D-pad is
+  /// on it.
   Widget _buildConnectButton(ThemeData theme) {
     // Last slot either way, and which number that is depends on the mode.
     final index = submitSlot;
     final selected = isSelected(index);
+    final radius =
+        (theme.extension<CornerRadii>() ?? CornerRadii.m()).radiusInternal;
+    final button = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: GamepadControl(
+        iconPath: selected ? 'assets/images/gamepad/Xbox_A_button.png' : null,
+        // Same label the RetroAchievements and ScreenScraper login buttons
+        // use, so the forms read as one family.
+        label: AppLocale.login.getString(context),
+        onTap: _busy ? null : _connect,
+        busy: _busy,
+        backgroundColor: theme.colorScheme.tertiary,
+        textColor: theme.colorScheme.onTertiary,
+      ),
+    );
     return Container(
       key: _itemKeys[index],
-      constraints: BoxConstraints(maxWidth: 320.r),
-      decoration: selected
-          ? BoxDecoration(
-              borderRadius: BorderRadius.circular(8.r),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                  blurRadius: 8.r,
-                  spreadRadius: 2.r,
-                ),
-              ],
-            )
-          : null,
-      child: SizedBox(
-        width: double.infinity,
-        height: 32.r,
-        child: ElevatedButton(
-          onPressed: _busy ? null : _connect,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: theme.colorScheme.onPrimary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            elevation: 0,
-            padding: EdgeInsets.zero,
-          ),
-          child: _busy
-              ? SizedBox(
-                  width: 16.r,
-                  height: 16.r,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      theme.colorScheme.onPrimary,
-                    ),
-                  ),
-                )
-              : Text(
-                  // Same label the RetroAchievements and ScreenScraper login
-                  // buttons use, so the three forms read as one family.
-                  AppLocale.login.getString(context),
-                  style: TextStyle(fontSize: 14.r, fontWeight: FontWeight.bold),
-                ),
+      padding: EdgeInsets.all(2.r),
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        border: Border.all(
+          color: selected ? theme.colorScheme.onSurface : Colors.transparent,
+          width: 2.r,
         ),
       ),
+      child: button,
     );
   }
 

@@ -16,7 +16,7 @@ extension _SharedHelpers on RADashboardHubState {
     final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 18.r, color: theme.colorScheme.primary),
+        Icon(icon, size: 15.r, color: theme.colorScheme.primary),
         SizedBox(width: 8.r),
         Expanded(
           child: Text(
@@ -24,7 +24,7 @@ extension _SharedHelpers on RADashboardHubState {
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.primary,
-              fontSize: 11.r,
+              fontSize: 10.r,
             ),
           ),
         ),
@@ -37,37 +37,6 @@ extension _SharedHelpers on RADashboardHubState {
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildPill(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999.r),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 10.r, color: color),
-          SizedBox(width: 4.r),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 8.r,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -127,44 +96,22 @@ extension _SharedHelpers on RADashboardHubState {
     );
   }
 
-  Widget _networkThumb(String url, {required IconData icon}) {
-    return Builder(
-      builder: (context) {
-        final theme = Theme.of(context);
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8.r),
-          child: SizedBox(
-            width: 34.r,
-            height: 34.r,
-            child: Image.network(
-              url,
-              fit: BoxFit.cover,
-              cacheWidth: (34 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-              cacheHeight: (34 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-              errorBuilder: (context, error, stackTrace) => Container(
-                color: theme.colorScheme.surface,
-                child: Icon(icon, color: theme.colorScheme.primary, size: 18.r),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   BoxDecoration _cardDecoration(
     ThemeData theme, {
     Color? background,
     Color? borderColor,
     double? borderWidth,
   }) {
+    // The overview's sections sit straight on the panel: no fill and no
+    // edge at rest (a card inside the panel's card read as boxed in), and
+    // only the selected one is outlined.
     return BoxDecoration(
-      color: background ?? theme.colorScheme.onSurface.withValues(alpha: 0.04),
+      color: background ?? Colors.transparent,
       borderRadius:
           theme.extension<CornerRadii>()?.radiusInternal ??
           BorderRadius.circular(10.r),
       border: Border.all(
-        color: borderColor ?? theme.colorScheme.outline.withValues(alpha: 0.15),
+        color: borderColor ?? Colors.transparent,
         width: borderWidth ?? 1.r,
       ),
     );

@@ -76,10 +76,20 @@ class RaUnlocksTabState extends State<RaUnlocksTab> {
   /// network — the fetch lands while the cursor is still walking.
   static const int _loadMoreMargin = 8;
 
-  /// Row height, in design units. Uniform on purpose: [CenteredScrollController]
-  /// centers by arithmetic (`index × extent`), so a list where every row —
-  /// data or footer — is exactly this tall needs no measurement pass.
-  double get _rowExtent => 52.r;
+  /// The unlocks show as a grid of their badges, like the awards; the
+  /// selected one is described in the card under it. Set by the grid's
+  /// layout.
+  int _columns = 8;
+
+  /// A grid row's height (tile and gap), for keeping the cursor in view.
+  double _rowExtent = 60;
+
+  /// Badges a row, for the dashboard's D-pad (up and down move a row).
+  int get columns => _columns;
+
+  /// Whether the cursor is in the first column, where Left goes back to the
+  /// menu.
+  bool get atRowStart => _selectedIndex % _columns == 0;
 
   @override
   void initState() {
@@ -140,12 +150,20 @@ class RaUnlocksTabState extends State<RaUnlocksTab> {
     // Clamp from the stored value: a reload can shorten the list under a
     // cursor that was parked deep in it.
     final current = _selectedIndex.clamp(0, items.length - 1);
-    final target = current + delta;
+    var target = current + delta;
     if (target < 0) return false;
-    if (target >= items.length) return _requestNextPage(provider);
+    if (target >= items.length) {
+      // Down onto a short last row lands on its last badge; past the very
+      // end asks for the next page.
+      if (delta > 1 && current ~/ _columns < (items.length - 1) ~/ _columns) {
+        target = items.length - 1;
+      } else {
+        return _requestNextPage(provider);
+      }
+    }
     _selectedIndex = target;
     _scrollController.updateSelectedIndex(target);
-    _scrollController.scrollToIndex(target);
+    _reveal(target);
     setState(() {});
     if (target >= items.length - _loadMoreMargin &&
         provider.unlocksListHasMore &&
@@ -153,6 +171,29 @@ class RaUnlocksTabState extends State<RaUnlocksTab> {
       unawaited(provider.loadUnlocksPage());
     }
     return true;
+  }
+
+  /// Scrolls the grid so the row holding [index] is in view.
+  void _reveal(int index) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final controller = _scrollController.scrollController;
+      if (!mounted || !controller.hasClients) return;
+      final position = controller.position;
+      final top = (index ~/ _columns) * _rowExtent;
+      final bottom = top + _rowExtent;
+      double? to;
+      if (top < position.pixels) {
+        to = top;
+      } else if (bottom > position.pixels + position.viewportDimension) {
+        to = bottom - position.viewportDimension;
+      }
+      if (to == null) return;
+      controller.animateTo(
+        to.clamp(0, position.maxScrollExtent),
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   bool _requestNextPage(RetroAchievementsProvider provider) {
@@ -225,8 +266,7 @@ class RaUnlocksTabState extends State<RaUnlocksTab> {
       child: Consumer<RetroAchievementsProvider>(
         builder: (context, provider, child) {
           final items = provider.unlocksListItems;
-          _scrollController.updateTotalItems(items.length + 1);
-          _scrollController.setItemExtent(_rowExtent);
+          _scrollController.updateTotalItems(items.length);
           final theme = Theme.of(context);
           final body = items.isEmpty
               ? _buildPendingArea(context, provider)
@@ -347,29 +387,54 @@ class RaUnlocksTabState extends State<RaUnlocksTab> {
     List<RetroAchievementRecentUnlockItem> items,
   ) {
     final selected = _selectedIndex.clamp(0, items.length - 1);
-    return ListView.builder(
-      controller: _scrollController.scrollController,
-      itemExtent: _rowExtent,
-      itemCount: items.length + 1,
-      itemBuilder: (context, index) {
-        if (index == items.length) return _buildFooter(context, provider);
-        return _buildUnlockRow(
-          context,
-          items[index],
-          selected: widget.focused && index == selected,
-          onTap: () => _tapRow(index, items[index]),
-        );
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final gap = 6.r;
+              _columns = (constraints.maxWidth / 42.r).floor().clamp(3, 18);
+              final tile =
+                  (constraints.maxWidth - (_columns - 1) * gap) / _columns;
+              _rowExtent = tile + gap;
+              return GridView.builder(
+                controller: _scrollController.scrollController,
+                padding: EdgeInsets.symmetric(vertical: 2.r),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: _columns,
+                  mainAxisExtent: tile,
+                  crossAxisSpacing: gap,
+                  mainAxisSpacing: gap,
+                ),
+                itemCount: items.length,
+                itemBuilder: (context, index) => _buildUnlockTile(
+                  context,
+                  items[index],
+                  selected: index == selected,
+                  focused: widget.focused && index == selected,
+                  onTap: () => _tapRow(index, items[index]),
+                ),
+              );
+            },
+          ),
+        ),
+        if (provider.unlocksListLoading || provider.unlocksListError != null)
+          SizedBox(height: 24.r, child: _buildFooter(context, provider)),
+        SizedBox(height: 8.r),
+        _unlockDetails(context, items[selected]),
+      ],
     );
   }
 
+  /// A tap selects the badge; a tap on the selected one opens its game.
   void _tapRow(int index, RetroAchievementRecentUnlockItem item) {
     SfxService().playNavSound();
+    final alreadySelected = _selectedIndex == index;
     _selectedIndex = index;
     _scrollController.updateSelectedIndex(index);
-    _scrollController.scrollToIndex(index);
     setState(() {});
-    widget.onActivate(item);
+    if (alreadySelected) widget.onActivate(item);
   }
 
   /// The row after the last one: what "keep going" means at the bottom of the
@@ -434,134 +499,62 @@ class RaUnlocksTabState extends State<RaUnlocksTab> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildUnlockRow(
+  Color _hardcoreColor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.light
+      ? const Color(0xFFB8860B)
+      : const Color(0xFFFFD700);
+
+  String _badgeUrl(RetroAchievementRecentUnlockItem item) => _raMediaUrl(
+    item.badgeUrl.isNotEmpty ? item.badgeUrl : '/Badge/${item.badgeName}.png',
+  );
+
+  /// An unlock in the grid: its badge, edged in gold when earned in
+  /// hardcore, and in the accent while the D-pad is on it.
+  Widget _buildUnlockTile(
     BuildContext context,
     RetroAchievementRecentUnlockItem item, {
     required bool selected,
+    required bool focused,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
-    final isLightTheme = theme.brightness == Brightness.light;
-    // The mastery/award gold, darkened on light themes for legibility (the
-    // dashboard's award rows use the same pair).
-    final hardcoreColor = isLightTheme
-        ? const Color(0xFFB8860B)
-        : const Color(0xFFFFD700);
+    final scheme = Theme.of(context).colorScheme;
+    final edge = focused
+        ? scheme.primary
+        : selected
+        ? scheme.primary.withValues(alpha: 0.6)
+        : item.hardcoreMode
+        ? _hardcoreColor(context)
+        : scheme.onSurface.withValues(alpha: 0.12);
     return Semantics(
+      key: ValueKey('ra-unlock-tile-${item.achievementId}-${item.date}'),
       selected: selected,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          // Rows are driven by the tab's gamepad layer, not the focus system;
-          // keeping them out of focus traversal is also what makes the
-          // keyboard-driven input tests honest.
-          canRequestFocus: false,
-          focusColor: Colors.transparent,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            decoration: BoxDecoration(
-              // Transparent rather than absent so arming a row doesn't shift
-              // the layout by a border width — the strip's border plays the
-              // same trick.
-              color: selected
-                  ? theme.colorScheme.primary.withValues(alpha: 0.10)
-                  : Colors.transparent,
-              borderRadius:
-                  theme.extension<CornerRadii>()?.radiusInternal ??
-                  BorderRadius.circular(10.r),
-              border: Border.all(
-                color: selected
-                    ? theme.colorScheme.primary.withValues(alpha: 0.85)
-                    : Colors.transparent,
-                width: 1.5.r,
-              ),
+      button: true,
+      label: item.title,
+      child: InkWell(
+        onTap: onTap,
+        canRequestFocus: false,
+        focusColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(6.r),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6.r),
+            border: Border.all(
+              color: edge,
+              width: focused
+                  ? 3.r
+                  : (item.hardcoreMode || selected ? 2.r : 1.r),
             ),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 6.r),
-              child: Row(
-                children: [
-                  _badge(context, item),
-                  SizedBox(width: 10.r),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 10.r,
-                          ),
-                        ),
-                        SizedBox(height: 3.r),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                '${item.gameTitle} • ${item.consoleName}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontSize: 8.r,
-                                  color: theme.colorScheme.onSurface.withValues(
-                                    alpha: 0.65,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (item.hardcoreMode) ...[
-                              SizedBox(width: 6.r),
-                              Icon(
-                                Symbols.bolt_rounded,
-                                size: 10.r,
-                                color: hardcoreColor,
-                              ),
-                              SizedBox(width: 2.r),
-                              Text(
-                                AppLocale.raHardcore.getString(context),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontSize: 8.r,
-                                  color: hardcoreColor,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: 8.r),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '${item.points} ${AppLocale.raPointsAbbrev.getString(context)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 9.r,
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 3.r),
-                      Text(
-                        '${_formatDate(item.date)} · ×${item.trueRatio}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 8.r,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.network(
+            _badgeUrl(item),
+            fit: BoxFit.cover,
+            cacheWidth: (48.r * MediaQuery.devicePixelRatioOf(context)).ceil(),
+            errorBuilder: (_, _, _) => Icon(
+              Symbols.emoji_events_rounded,
+              size: 20.r,
+              color: scheme.primary,
             ),
           ),
         ),
@@ -569,31 +562,119 @@ class RaUnlocksTabState extends State<RaUnlocksTab> {
     );
   }
 
-  Widget _badge(BuildContext context, RetroAchievementRecentUnlockItem item) {
+  /// The selected unlock, under the grid: its badge, title and game, the
+  /// points and mode as pills, and the date on the right.
+  Widget _unlockDetails(
+    BuildContext context,
+    RetroAchievementRecentUnlockItem item,
+  ) {
     final theme = Theme.of(context);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8.r),
-      child: SizedBox(
-        width: 40.r,
-        height: 40.r,
-        child: Image.network(
-          _raMediaUrl(
-            item.badgeUrl.isNotEmpty
-                ? item.badgeUrl
-                : '/Badge/${item.badgeName}.png',
-          ),
-          fit: BoxFit.cover,
-          cacheWidth: (40 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-          cacheHeight: (40 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-          errorBuilder: (context, error, stackTrace) => Container(
-            color: theme.colorScheme.surface,
-            child: Icon(
-              Symbols.emoji_events_rounded,
-              color: theme.colorScheme.primary,
-              size: 18.r,
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    Widget pill(String text, {Color? color, bool strong = false}) => Container(
+      padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 1.r),
+      decoration: BoxDecoration(
+        color: (color ?? scheme.onSurface).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: (color ?? scheme.onSurface).withValues(alpha: 0.35),
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 8.r,
+          fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+          color: scheme.onSurface.withValues(alpha: 0.85),
+        ),
+      ),
+    );
+    return Container(
+      padding: EdgeInsets.all(6.r),
+      decoration: BoxDecoration(
+        color: scheme.onSurface.withValues(alpha: 0.05),
+        borderRadius: radii.radiusInternal,
+        border: Border.all(color: scheme.onSurface.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34.r,
+            height: 34.r,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6.r),
+              border: Border.all(
+                color: item.hardcoreMode
+                    ? _hardcoreColor(context)
+                    : scheme.onSurface.withValues(alpha: 0.12),
+                width: item.hardcoreMode ? 2.r : 1.r,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Image.network(
+              _badgeUrl(item),
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Icon(
+                Symbols.emoji_events_rounded,
+                size: 18.r,
+                color: scheme.primary,
+              ),
             ),
           ),
-        ),
+          SizedBox(width: 8.r),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.r,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                Text(
+                  item.gameTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 8.r,
+                    color: scheme.onSurface.withValues(alpha: 0.65),
+                  ),
+                ),
+                SizedBox(height: 3.r),
+                Wrap(
+                  spacing: 5.r,
+                  runSpacing: 4.r,
+                  children: [
+                    pill(
+                      '${item.points} ${AppLocale.raPointsAbbrev.getString(context)}',
+                      color: scheme.primary,
+                      strong: true,
+                    ),
+                    if (item.hardcoreMode)
+                      pill(
+                        AppLocale.raHardcore.getString(context),
+                        color: _hardcoreColor(context),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8.r),
+          Text(
+            _formatDate(item.date),
+            style: TextStyle(
+              fontSize: 8.r,
+              color: scheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -735,7 +735,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
               ),
             ],
           ),
-          SizedBox(height: 12.r),
+          SizedBox(height: 10.r),
 
           if (_showResetPassword) ...[
             _buildResetPasswordForm(context),
@@ -802,7 +802,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
             // Login / Register Form
             if (!_isLogin) ...[
               SizedBox(
-                height: 38.r,
+                height: 34.r,
                 child: _buildFieldHighlight(
                   slot: 0,
                   child: TextFormField(
@@ -830,7 +830,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
               SizedBox(height: 6.r),
             ],
             SizedBox(
-              height: 38.r,
+              height: 34.r,
               child: _buildFieldHighlight(
                 slot: _isLogin ? 0 : 1,
                 child: TextFormField(
@@ -860,7 +860,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
             ),
             SizedBox(height: 6.r),
             SizedBox(
-              height: 38.r,
+              height: 34.r,
               child: _buildFieldHighlight(
                 slot: _isLogin ? 1 : 2,
                 child: TextFormField(
