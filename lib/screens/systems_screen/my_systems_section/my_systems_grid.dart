@@ -1498,8 +1498,11 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
                       ? null
                       : () => _openMenuFor(cardIdx),
                 );
-            // The recent card slides between the last few played games.
-            final Widget shownCard = card.isGame
+            // The recent card slides between the last few played games. Only
+            // on the systems screen, the one host that binds the triggers:
+            // other hosts (Discovery's Game of the Week) also have game cards.
+            final Widget shownCard =
+                card.isGame && widget.onRightTrigger != null
                 ? RecentCardCycle(
                     gameKey: card.gameModel?.romPath,
                     card: cardWidget,
