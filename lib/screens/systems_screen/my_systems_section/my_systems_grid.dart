@@ -23,6 +23,7 @@ import 'system_card.dart';
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../providers/file_provider.dart';
+import '../../../providers/recent_games_cycler.dart';
 import '../../../widgets/system_scan_progress_widget.dart';
 import '../../game_screen/my_games_list.dart';
 
@@ -35,6 +36,9 @@ import 'widgets/grid_empty_state.dart';
 
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/gooey_selector.dart';
+
+import 'widgets/recent_card_cycle.dart';
+
 import 'package:neostation/widgets/spring_selected_card.dart';
 
 import 'my_systems_carousel.dart';
@@ -107,6 +111,10 @@ class MySystems extends StatelessWidget {
       canPop: false, // Maintain application flow by preventing raw hardware back navigation.
       child: Consumer2<SqliteConfigProvider, SqliteDatabaseProvider>(
         builder: (context, configProvider, dbProvider, child) {
+          // The recent card's game comes from the shared cycler, so this host
+          // (and the footer it builds) repaints whenever the card moves on.
+          final cycler = context.watch<RecentGamesCycler?>();
+
           // PHASE 1: Blocking Initialization.
           // If a high-priority system scan is active (e.g., first run), show a blocking status.
           if (configProvider.isGlobalScanning) {
@@ -126,6 +134,7 @@ class MySystems extends StatelessWidget {
             final currentSystem = selectedIndex < allSystems.length
                 ? allSystems[selectedIndex]
                 : allSystems[0];
+            cycler?.setFocused(currentSystem.isGame);
 
             systemsWidget = Column(
               children: [
@@ -135,6 +144,10 @@ class MySystems extends StatelessWidget {
                     child: MySystemsCarousel(
                       selectedIndex: selectedIndex,
                       onCardTapped: onCardTapped,
+                      onLeftTrigger: () =>
+                          _cycleRecent(cycler, currentSystem, -1),
+                      onRightTrigger: () =>
+                          _cycleRecent(cycler, currentSystem, 1),
                       hideSystemLogos: configProvider.config.hideSystemLogos,
                       bindYButton: false,
                       onOptions: (index) {
@@ -215,6 +228,8 @@ class MySystems extends StatelessWidget {
     final currentSystem = selectedIndex < allSystems.length
         ? allSystems[selectedIndex]
         : allSystems[0];
+    final cycler = Provider.of<RecentGamesCycler?>(context, listen: false);
+    cycler?.setFocused(currentSystem.isGame);
 
     return Column(
       children: [
@@ -235,6 +250,8 @@ class MySystems extends StatelessWidget {
               onCardTapped: onCardTapped,
               systems: allSystems,
               bindYButton: false,
+              onLeftTrigger: () => _cycleRecent(cycler, currentSystem, -1),
+              onRightTrigger: () => _cycleRecent(cycler, currentSystem, 1),
               onYPressed: () =>
                   _openSystemOptions(context, currentSystem, configProvider),
               onWestPressed: () => _openSearch(context),
@@ -265,6 +282,18 @@ class MySystems extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// LT/RT: steps the recent card through the last few played games, but only
+  /// while it is the focused card. Elsewhere the triggers do nothing, as they
+  /// did before the card cycled.
+  static void _cycleRecent(
+    RecentGamesCycler? cycler,
+    SystemInfo current,
+    int delta,
+  ) {
+    if (!current.isGame) return;
+    cycler?.step(delta);
   }
 
   /// Opens the centered Options dialog for [system].
@@ -679,6 +708,8 @@ class SystemCardGridView extends StatefulWidget {
     this.selectedIndex = 0,
     this.onCardTapped,
     this.onEnterPressed,
+    this.onLeftTrigger,
+    this.onRightTrigger,
     this.onEscapePressed,
     this.onYPressed,
     this.onBackPressed,
@@ -716,6 +747,11 @@ class SystemCardGridView extends StatefulWidget {
   final int selectedIndex;
   final Function(int index)? onCardTapped;
   final VoidCallback? onEnterPressed;
+
+  /// LT and RT. Read on every press, like [onYPressed], so the host can rebind
+  /// them around the currently selected card.
+  final VoidCallback? onLeftTrigger;
+  final VoidCallback? onRightTrigger;
 
   /// Start. Opens the centered Options dialog on the systems screen; the
   /// collections browser opens its card menu with it.
@@ -966,7 +1002,18 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
         _ensureSelectedItemVisibleUniversal();
       }
       _updateSecondaryScreenName();
+    } else if (_selectedGamePath(oldWidget) != _selectedGamePath(widget)) {
+      // Same slot, different game: the recent card cycled while focused.
+      _updateSecondaryScreenName();
     }
+  }
+
+  /// ROM path of the game on the selected card, or null for a system card.
+  static String? _selectedGamePath(SystemCardGridView view) {
+    final i = view.selectedIndex;
+    if (i < 0 || i >= view.systems.length) return null;
+    final item = view.systems[i];
+    return item is SystemInfo ? item.gameModel?.romPath : null;
   }
 
   @override
@@ -1451,6 +1498,16 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
                       ? null
                       : () => _openMenuFor(cardIdx),
                 );
+            // The recent card slides between the last few played games. Only
+            // on the systems screen, the one host that binds the triggers:
+            // other hosts (Discovery's Game of the Week) also have game cards.
+            final Widget shownCard =
+                card.isGame && widget.onRightTrigger != null
+                ? RecentCardCycle(
+                    gameKey: card.gameModel?.romPath,
+                    card: cardWidget,
+                  )
+                : cardWidget;
 
             slots[cardIdx] = Rect.fromLTWH(left, top, width, cardHeight);
             cardWidgets.add(
@@ -1461,7 +1518,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
                 height: cardHeight,
                 child: _performanceMode
                     ? _buildCardNode(
-                        cardWidget: cardWidget,
+                        cardWidget: shownCard,
                         card: card,
                         cardIdx: cardIdx,
                         cardIsSelected: cardIsSelected,
@@ -1478,7 +1535,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
                             child: ScaleAnimation(
                               scale: 0.97,
                               child: _buildCardNode(
-                                cardWidget: cardWidget,
+                                cardWidget: shownCard,
                                 card: card,
                                 cardIdx: cardIdx,
                                 cardIsSelected: cardIsSelected,

@@ -13,6 +13,7 @@ import 'package:neostation/providers/discovery_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
+import 'package:neostation/providers/recent_games_cycler.dart';
 import 'package:neostation/screens/main_screen.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
@@ -1199,6 +1200,7 @@ class _MyAppState extends State<MyApp> {
         // Lazy: the board is a full library scan, and it must not run at
         // startup for the many users who never open the tab.
         ChangeNotifierProvider(create: (context) => DiscoveryProvider()),
+        ChangeNotifierProvider(create: (context) => RecentGamesCycler()),
         ChangeNotifierProvider(
           // Eager: the systems carousel/grid paints the Collections card's game
           // count on the first frame it builds, and that card is on the very
