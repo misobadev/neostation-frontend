@@ -1376,6 +1376,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.rommNoSystemMatch:
       'Nessun sistema locale corrispondente a questa piattaforma',
   AppLocale.rommPlatformUnsupported: 'Non supportata',
+  AppLocale.rommNotEnoughSpace: 'Spazio libero insufficiente per estrarre questo gioco. Libera spazio nella cartella delle ROM e riprova.',
   AppLocale.rommNoWritableFolder: 'Impossibile scrivere nella cartella delle ROM. Concedi l’"Accesso a Tutti i File" a NeoStation e riprova.',
   AppLocale.rommNotConnected:
       'Collegati prima a un server RomM nelle Impostazioni',

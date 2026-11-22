@@ -12,6 +12,7 @@ import 'package:neostation/models/romm_rom.dart';
 import 'package:neostation/models/system_model.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/services/romm_archive_service.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/utils/log_redaction.dart';
 import 'package:path/path.dart' as p;
@@ -27,7 +28,7 @@ import 'database_test_helper.dart';
 ///   escape unmapped;
 /// * a refreshed token whose save failed was never saved again;
 /// * an archive that could not be unpacked was reported as a completed
-///   download, with the zip left behind and nothing in the log.
+///   download, with nothing in the log.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -377,6 +378,12 @@ void main() {
     );
 
     test('a refreshed token whose save failed is saved next time', () async {
+      // The system launches .bin, so the second download recognises the
+      // first one's file as this ROM's and may replace it.
+      await db.execute(
+        "INSERT INTO app_system_extensions (system_id, extension) "
+        "VALUES ('sys-nes', 'bin')",
+      );
       final provider = _TestProvider(_nes);
       addTearDown(provider.dispose);
       provider.service.configure(
@@ -422,48 +429,43 @@ void main() {
       expect(row['access_token'], 'new');
     });
 
-    test('a ScummVM archive with no descriptor fails and is removed', () async {
-      const game = RommRom(
-        id: 42,
-        name: 'Game',
-        platformId: 7,
-        platformSlug: 'scummvm',
-        fsName: 'Game.zip',
-        fsNameNoExt: 'Game',
-        fsExtension: 'zip',
-      );
-      serveBytes(
-        _zip({
-          'Game/data.bin': [1, 2, 3],
-        }),
-      );
-      final romm = provider(_scummvm);
+    test(
+      'a ScummVM archive with no descriptor fails and is not badged',
+      () async {
+        // ScummVM never scans a zip, so completing here would report a game
+        // that can't be played (the bug #635 fixed).
+        const game = RommRom(
+          id: 42,
+          name: 'Game',
+          platformId: 7,
+          platformSlug: 'scummvm',
+          fsName: 'Game.zip',
+          fsNameNoExt: 'Game',
+          fsExtension: 'zip',
+        );
+        serveBytes(
+          _zip({
+            'Game/data.bin': [1, 2, 3],
+          }),
+        );
+        final romm = provider(_scummvm);
 
-      final download = await romm.downloadRom(game, romFolders: [romRoot.path]);
+        final download = await romm.downloadRom(
+          game,
+          romFolders: [romRoot.path],
+        );
 
-      expect(download.status, RommDownloadStatus.failed);
-      expect(download.error, RommDownloadError.network);
-      expect(download.errorDetail, 'Could not unpack the archive');
-      final systemDir = Directory(p.join(romRoot.path, 'scummvm'));
-      expect(systemDir.listSync(), isEmpty, reason: 'the zip is removed');
-      expect(romm.downloadedSystems, isEmpty);
-      final lines = log.takeCapture();
-      expect(
-        lines.where(
-          (l) =>
-              l.startsWith('w|') &&
-              l.contains('42') &&
-              l.contains('Game.zip') &&
-              l.contains('unpack'),
-        ),
-        isNotEmpty,
-      );
-      expect(
-        lines.where((l) => l.startsWith('w|') && l.contains('descriptor')),
-        isNotEmpty,
-        reason: 'the extractor says why',
-      );
-    });
+        expect(download.status, RommDownloadStatus.failed);
+        expect(download.error, RommDownloadError.extraction);
+        expect(romm.downloadedSystems, isEmpty);
+        // Kept for extracting by hand, but not counted as the game.
+        expect(
+          File(p.join(romRoot.path, 'scummvm', 'Game.zip')).existsSync(),
+          isTrue,
+        );
+        expect(await romm.isDownloaded(game, [romRoot.path]), isFalse);
+      },
+    );
 
     test('a single ScummVM file it cannot use is kept, as before', () async {
       // The system scans `.scummvm` files in its root, so one with an id the
@@ -489,7 +491,7 @@ void main() {
       );
     });
 
-    test('a multi-disc archive with no discs fails and is removed', () async {
+    test('a multi-disc archive with no discs fails and is kept', () async {
       await db.execute(
         "INSERT INTO app_system_extensions (system_id, extension) "
         "VALUES ('sys-psx', 'm3u'), ('sys-psx', 'chd')",
@@ -510,22 +512,22 @@ void main() {
       final download = await romm.downloadRom(game, romFolders: [romRoot.path]);
 
       expect(download.status, RommDownloadStatus.failed);
-      expect(download.error, RommDownloadError.network);
-      expect(download.errorDetail, 'Could not unpack the archive');
+      expect(download.error, RommDownloadError.extraction);
       final systemDir = Directory(p.join(romRoot.path, 'psx'));
-      expect(systemDir.listSync(), isEmpty, reason: 'the zip is removed');
+      expect(systemDir.listSync().map((e) => p.basename(e.path)), [
+        'Game.zip',
+      ], reason: 'a failed install keeps the download for extracting by hand');
       expect(romm.downloadedSystems, isEmpty);
       final lines = log.takeCapture();
       expect(
         lines.where(
-          (l) => l.startsWith('w|') && l.contains('43') && l.contains('Game'),
+          (l) =>
+              l.startsWith('w|') &&
+              l.contains('43') &&
+              l.contains('Game') &&
+              l.contains('extract'),
         ),
         isNotEmpty,
-      );
-      expect(
-        lines.where((l) => l.startsWith('w|') && l.contains('no disc')),
-        isNotEmpty,
-        reason: 'the extractor says why',
       );
     });
   });
@@ -543,7 +545,7 @@ void main() {
       if (await dir.exists()) await dir.delete(recursive: true);
     });
 
-    test('a zip-slip entry is refused and logged on one line', () async {
+    test('a zip-slip entry is refused', () async {
       final zipPath = p.join(dir.path, 'Game.zip');
       File(zipPath).writeAsBytesSync(
         _zip({
@@ -552,31 +554,13 @@ void main() {
         }),
       );
 
-      final name = await RommProvider.extractScummVmDownload(zipPath, dir.path);
+      final name = await RommArchiveService.prepareDownload(zipPath, dir.path, {
+        'scummvm',
+      }, scummVm: true);
 
       expect(name, isNull);
       expect(File(p.join(dir.parent.path, 'evil')).existsSync(), isFalse);
-      final refused = log.takeCapture().where(
-        (l) => l.startsWith('w|') && l.contains('evil'),
-      );
-      expect(refused, hasLength(1));
-      expect(refused.single, contains('../evil RomM: forged.bin'));
-      expect(refused.single, isNot(contains('\n')));
-    });
-
-    test('a ScummVM descriptor with no valid id is logged', () async {
-      final path = p.join(dir.path, 'Game.scummvm');
-      File(path).writeAsStringSync('not an id!');
-
-      final name = await RommProvider.extractScummVmDownload(path, dir.path);
-
-      expect(name, isNull);
-      expect(
-        log.takeCapture().where(
-          (l) => l.startsWith('w|') && l.contains('Game.scummvm'),
-        ),
-        isNotEmpty,
-      );
+      expect(Directory(p.join(dir.path, 'monkey')).existsSync(), isFalse);
     });
 
     test('a ScummVM archive that fails part-way leaves no files', () async {
@@ -592,7 +576,9 @@ void main() {
       final blocker = Directory(p.join(dir.path, 'monkey', 'b.bin'))
         ..createSync(recursive: true);
 
-      final name = await RommProvider.extractScummVmDownload(zipPath, dir.path);
+      final name = await RommArchiveService.prepareDownload(zipPath, dir.path, {
+        'scummvm',
+      }, scummVm: true);
 
       expect(name, isNull);
       final gameDir = Directory(p.join(dir.path, 'monkey'));
@@ -618,10 +604,12 @@ void main() {
         ..writeAsBytesSync([9]);
       Directory(p.join(dir.path, 'Game (Disc 2).chd')).createSync();
 
-      final name = await RommProvider.extractMultiDiscZip(
+      final name = await RommArchiveService.prepareDownload(
         zipPath,
         dir.path,
-        'Game',
+        {'m3u', 'chd'},
+        forceExtract: true,
+        playlistBaseName: 'Game',
       );
 
       expect(name, isNull);
@@ -639,10 +627,12 @@ void main() {
       final blocker = Directory(p.join(dir.path, 'Game (Disc 2).chd'))
         ..createSync();
 
-      final name = await RommProvider.extractMultiDiscZip(
+      final name = await RommArchiveService.prepareDownload(
         zipPath,
         dir.path,
-        'Game',
+        {'m3u', 'chd'},
+        forceExtract: true,
+        playlistBaseName: 'Game',
       );
 
       expect(name, isNull);

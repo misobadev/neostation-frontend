@@ -1271,6 +1271,54 @@ void _preflightTests() {
       },
     );
 
+    test('a single-file zip or 7z gets headroom too', () async {
+      // Single-file archives are unpacked after download as well, so they
+      // briefly need room for both the archive and its contents.
+      RommRom archived(int id, String ext) => RommRom(
+        id: id,
+        name: 'Game $id',
+        platformId: 1,
+        platformSlug: 'ps2',
+        fsName: 'game$id.$ext',
+        fsNameNoExt: 'game$id',
+        fsExtension: ext,
+        fsSizeBytes: 100,
+      );
+      final all = [
+        archived(1, 'zip'),
+        archived(2, '7z'),
+        _rom(3, sizeBytes: 100),
+        // #788: a folder ROM RomM serves as a ZIP, but which it reports with
+        // no extension and has_multiple_files false.
+        RommRom(
+          id: 4,
+          name: 'Game 4',
+          platformId: 1,
+          platformSlug: 'ps2',
+          fsName: 'Game 4',
+          fsNameNoExt: 'Game 4',
+          fsExtension: '',
+          fsSizeBytes: 100,
+        ),
+      ];
+      RommBulkSyncPlan? seen;
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'PS2',
+        fetchPage: _pagesOver(all),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+        confirm: (plan) async {
+          seen = plan;
+          return false;
+        },
+        concurrency: 4,
+      );
+
+      expect(seen!.requiredBytes, 400 + 100 + 100 + 100);
+    });
+
     test('the headroom never exceeds what the queue holds', () async {
       final all = [
         _rom(1, sizeBytes: 100, multiFile: true),

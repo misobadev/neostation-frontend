@@ -1350,6 +1350,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.rommLoadMore: 'Load more',
   AppLocale.rommNoSystemMatch: 'No matching local system for this platform',
   AppLocale.rommPlatformUnsupported: 'Unsupported',
+  AppLocale.rommNotEnoughSpace: 'Not enough free space to unpack this game. Free up space in your ROM folder and try again.',
   AppLocale.rommNoWritableFolder: 'Could not write to your ROM folder. Grant "All files access" to NeoStation and try again.',
   AppLocale.rommNotConnected: 'Connect to a RomM server in Settings first',
   // Bulk "sync a whole platform/collection".

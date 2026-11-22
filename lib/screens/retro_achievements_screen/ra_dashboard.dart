@@ -15,6 +15,8 @@ import '../../providers/file_provider.dart';
 import '../../providers/retro_achievements_provider.dart';
 import '../../providers/romm_provider.dart';
 import '../../providers/sqlite_config_provider.dart';
+import '../../repositories/romm_save_map_repository.dart'
+    show RommMappingWriteResult;
 import '../../themes/corner_radii.dart';
 import '../../widgets/custom_notification.dart';
 import '../../widgets/neo_glass.dart';

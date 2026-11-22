@@ -1252,6 +1252,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.rommLoadMore: '載入更多',
   AppLocale.rommNoSystemMatch: '沒有與此平台相符的本機系統',
   AppLocale.rommPlatformUnsupported: '不支援',
+  AppLocale.rommNotEnoughSpace: '可用空間不足，無法解壓縮此遊戲。請清出 ROM 資料夾所在的空間後再試一次。',
   AppLocale.rommNoWritableFolder:
       '無法寫入你的 ROM 資料夾。請授予 NeoStation「所有檔案存取權限」後再試一次。',
   AppLocale.rommNotConnected: '請先在設定中連線到 RomM 伺服器',

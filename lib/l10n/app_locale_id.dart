@@ -1360,6 +1360,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.rommNoSystemMatch:
       'Tidak ada sistem lokal yang cocok untuk platform ini',
   AppLocale.rommPlatformUnsupported: 'Tidak didukung',
+  AppLocale.rommNotEnoughSpace: 'Ruang kosong tidak cukup untuk mengekstrak game ini. Kosongkan ruang di folder ROM Anda lalu coba lagi.',
   AppLocale.rommNoWritableFolder: 'Tidak dapat menulis ke folder ROM Anda. Berikan "Akses Semua File" ke NeoStation lalu coba lagi.',
   AppLocale.rommNotConnected:
       'Hubungkan ke server RomM di Pengaturan terlebih dahulu',

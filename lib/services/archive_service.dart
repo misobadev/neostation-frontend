@@ -165,43 +165,48 @@ class ArchiveService {
       }
 
       final archive = f7z.SZArchive.open(pathToExtract);
+      // Disposed in `finally`: a throwing extract used to leak the native
+      // archive and its buffers.
       String? largestFilePath;
-      int largestSize = -1;
-      int largestIndex = -1;
+      try {
+        int largestSize = -1;
+        int largestIndex = -1;
 
-      for (int i = 0; i < archive.numFiles; i++) {
-        final file = archive.getFile(i);
-        if (!file.isDirectory) {
-          if (file.size > largestSize) {
-            largestSize = file.size;
-            largestIndex = i;
+        for (int i = 0; i < archive.numFiles; i++) {
+          final file = archive.getFile(i);
+          if (!file.isDirectory) {
+            if (file.size > largestSize) {
+              largestSize = file.size;
+              largestIndex = i;
+            }
           }
         }
-      }
 
-      if (largestIndex != -1) {
-        final file = archive.getFile(largestIndex);
-        final outPath = safeOutputPath(tempDirPath, file.name);
+        if (largestIndex != -1) {
+          final file = archive.getFile(largestIndex);
+          final outPath = safeOutputPath(tempDirPath, file.name);
 
-        if (outPath == null) {
-          // Leaves largestFilePath null, so this returns failure below after
-          // the archive and the staged copy have been cleaned up as usual.
-          _log.e('Refusing 7z entry outside the temp directory: ${file.name}');
-        } else {
-          final outFile = File(outPath);
-          if (!await outFile.parent.exists()) {
-            await outFile.parent.create(recursive: true);
+          if (outPath == null) {
+            // Leaves largestFilePath null, so this returns failure below after
+            // the archive and the staged copy have been cleaned up as usual.
+            _log.e(
+              'Refusing 7z entry outside the temp directory: ${file.name}',
+            );
+          } else {
+            final outFile = File(outPath);
+            if (!await outFile.parent.exists()) {
+              await outFile.parent.create(recursive: true);
+            }
+
+            archive.extractToFile(largestIndex, outPath);
+            largestFilePath = outPath;
           }
-
-          archive.extractToFile(largestIndex, outPath);
-          largestFilePath = outPath;
         }
-      }
-
-      archive.dispose();
-
-      if (isTempFile) {
-        await File(pathToExtract).delete();
+      } finally {
+        archive.dispose();
+        if (isTempFile) {
+          await File(pathToExtract).delete();
+        }
       }
 
       return largestFilePath;
