@@ -282,6 +282,55 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         screenStateReceiver = null
     }
 
+    /**
+     * Why the previous process of this app ended, as Android recorded it
+     * (API 30+), or null when it can't say.
+     *
+     * A native crash or a low-memory kill leaves nothing in app.log, so the
+     * Dart side logs this on startup. Only an ANR trace is text; a native
+     * crash's trace is a binary tombstone and is left out.
+     */
+    private fun lastExitInfo(): Map<String, Any?>? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        return try {
+            val am = getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val info = am.getHistoricalProcessExitReasons(packageName, 0, 1).firstOrNull()
+                ?: return null
+            val reason = when (info.reason) {
+                android.app.ApplicationExitInfo.REASON_ANR -> "ANR"
+                android.app.ApplicationExitInfo.REASON_CRASH -> "CRASH"
+                android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "CRASH_NATIVE"
+                android.app.ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "DEPENDENCY_DIED"
+                android.app.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "EXCESSIVE_RESOURCE_USAGE"
+                android.app.ApplicationExitInfo.REASON_EXIT_SELF -> "EXIT_SELF"
+                android.app.ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> "INITIALIZATION_FAILURE"
+                android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
+                android.app.ApplicationExitInfo.REASON_OTHER -> "OTHER"
+                android.app.ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "PERMISSION_CHANGE"
+                android.app.ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
+                android.app.ApplicationExitInfo.REASON_USER_REQUESTED -> "USER_REQUESTED"
+                android.app.ApplicationExitInfo.REASON_USER_STOPPED -> "USER_STOPPED"
+                else -> "UNKNOWN(${info.reason})"
+            }
+            var trace: String? = null
+            if (info.reason == android.app.ApplicationExitInfo.REASON_ANR) {
+                trace = info.traceInputStream?.bufferedReader()?.use { reader ->
+                    reader.lineSequence().take(60).joinToString("\n")
+                }
+            }
+            mapOf(
+                "reason" to reason,
+                "timestamp" to info.timestamp,
+                "description" to info.description,
+                "status" to info.status,
+                "pssKb" to info.pss,
+                "trace" to trace,
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
@@ -365,6 +414,9 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                     } else {
                         result.error("INVALID_ARGUMENTS", "Package name is required", null)
                     }
+                }
+                "getLastExitInfo" -> {
+                    result.success(lastExitInfo())
                 }
                 "isTelevision" -> {
                     val uiModeManager = getSystemService(android.content.Context.UI_MODE_SERVICE) as android.app.UiModeManager
