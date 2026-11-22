@@ -18,6 +18,7 @@ import '../themes/corner_radii.dart';
 import 'neo_glass.dart';
 import 'system_emulator_settings_dialog/models/emulator_list_item.dart';
 import '../models/system_model.dart';
+import '../providers/discovery_provider.dart';
 import '../providers/sqlite_config_provider.dart';
 import '../providers/sqlite_database_provider.dart';
 import '../repositories/system_repository.dart';
@@ -390,7 +391,8 @@ class _SystemEmulatorSettingsDialogState
   /// to reach — a Hidden tab there could only ever be empty. Everything else
   /// (music included) goes through the games list, where START opens the game
   /// settings dialog.
-  bool get _systemSupportsHiding => _system.folderName != 'android';
+  bool get _systemSupportsHiding =>
+      _system.folderName != SystemFolderNames.android;
 
   /// Whether the Hidden tab is offered. Kept visible whenever games *are*
   /// hidden even if the system can't hide them, so a row can never end up with
@@ -405,7 +407,7 @@ class _SystemEmulatorSettingsDialogState
     // Emulators belong to a hardware system. An aggregate library has none of
     // its own, so the tab could only ever render empty.
     if (!SystemFolderNames.isAggregate(_system.folderName) &&
-        _system.folderName != 'android')
+        !SystemFolderNames.isAndroidApps(_system.folderName))
       1,
     2,
     if (_showHiddenTab) 3,
@@ -444,8 +446,13 @@ class _SystemEmulatorSettingsDialogState
   Future<void> _unhideGame(DatabaseGameModel game) async {
     final folderName = game.systemFolderName ?? _system.folderName;
     final displayName = game.realName ?? game.filename;
+    // Nullable: not every widget tree provides it (tests, for one).
+    final discoveryProvider = context.read<DiscoveryProvider?>();
     try {
       await GameRepository.setGameHidden(folderName, game.filename, false);
+      // Told straight after the write, so closing the dialog during the
+      // refreshes below can't leave the game off Discovery for the week.
+      discoveryProvider?.markStale();
     } catch (e) {
       _log.e('Error unhiding ${game.filename}: $e');
       return;
@@ -470,6 +477,8 @@ class _SystemEmulatorSettingsDialogState
     final affectedFolders = _hiddenGames
         .map((g) => g.systemFolderName ?? _system.folderName)
         .toSet();
+    // Nullable: not every widget tree provides it (tests, for one).
+    final discoveryProvider = context.read<DiscoveryProvider?>();
     try {
       final scopeId = _hiddenScopeSystemId;
       if (scopeId == null) {
@@ -477,6 +486,8 @@ class _SystemEmulatorSettingsDialogState
       } else {
         await GameRepository.unhideAllGamesForSystem(scopeId);
       }
+      // Told straight after the write, as in [_unhideGame].
+      discoveryProvider?.markStale();
     } catch (e) {
       _log.e('Error unhiding all games: $e');
       return;

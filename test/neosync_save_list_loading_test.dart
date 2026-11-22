@@ -169,12 +169,12 @@ void main() {
       .widget<OnlineSavesListView>(find.byType(OnlineSavesListView))
       .selectedIndex;
 
-  /// Walks from the search field, over the filter chips, to save [index].
+  /// Walks from the search field, over the filter chips, to save [index]:
+  /// the saves are a grid, so along its first row.
   Future<void> focusSave(WidgetTester tester, int index) async {
-    await pressKey(tester, LogicalKeyboardKey.arrowDown); // filters
     await pressKey(tester, LogicalKeyboardKey.arrowDown); // first save
     for (var i = 0; i < index; i++) {
-      await pressKey(tester, LogicalKeyboardKey.arrowDown);
+      await pressKey(tester, LogicalKeyboardKey.arrowRight);
     }
     expect(highlighted(tester), index);
   }
@@ -253,11 +253,10 @@ void main() {
     await finish(tester);
   });
 
-  testWidgets('down from the filters doesn\'t enter the hidden rows', (
+  testWidgets('down from the search band doesn\'t enter the hidden rows', (
     tester,
   ) async {
     await pumpSaveList(tester);
-    await pressKey(tester, LogicalKeyboardKey.arrowDown); // filters
     neoSync.setLoading(true);
     await tester.pump();
 
@@ -265,14 +264,16 @@ void main() {
     neoSync.setLoading(false);
     await tester.pump();
 
-    // Still on the filters: A opens a filter's menu, not the delete prompt.
+    // Still on the search band: Right reaches the System filter, whose menu
+    // A opens, not the delete prompt.
+    await pressKey(tester, LogicalKeyboardKey.arrowRight);
     await press(tester, _a);
     expect(deletePrompt(), findsNothing);
-    expect(find.text(AppLocale.en[AppLocale.filterPerGameSaves]!), findsOne);
+    expect(find.text('SYSTEM'), findsOne);
     await finish(tester);
   });
 
-  testWidgets('up from the hidden rows goes back to the filters', (
+  testWidgets('up from the hidden rows goes back to the search band', (
     tester,
   ) async {
     await pumpSaveList(tester);
@@ -284,27 +285,10 @@ void main() {
     neoSync.setLoading(false);
     await tester.pump();
 
+    await pressKey(tester, LogicalKeyboardKey.arrowRight);
     await press(tester, _a);
     expect(deletePrompt(), findsNothing);
-    expect(find.text(AppLocale.en[AppLocale.filterPerGameSaves]!), findsOne);
-    await finish(tester);
-  });
-
-  testWidgets('down from the search field, filters hidden, doesn\'t enter the '
-      'hidden rows', (tester) async {
-    await pumpSaveList(tester);
-    await tester.tap(find.text(AppLocale.en[AppLocale.searchFilters]!));
-    await tester.pump();
-    neoSync.setLoading(true);
-    await tester.pump();
-
-    await pressKey(tester, LogicalKeyboardKey.arrowDown);
-    neoSync.setLoading(false);
-    await tester.pump();
-
-    // Still in the search field: Down now enters the rows at the first save.
-    await pressKey(tester, LogicalKeyboardKey.arrowDown);
-    expect(highlighted(tester), 0);
+    expect(find.text('SYSTEM'), findsOne);
     await finish(tester);
   });
 }

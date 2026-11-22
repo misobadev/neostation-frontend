@@ -11,12 +11,14 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/widgets/context_menu/game_context_menu.dart';
+import 'package:neostation/utils/grid_sizes.dart';
 
 /// Actions the game Options panel can hand back to the games screen.
 enum GameOptionsAction {
   settings,
   scrape,
   identify,
+  markAsApp,
   search,
   random,
   newCollection,
@@ -36,6 +38,7 @@ Future<GameOptionsAction?> showGameOptionsDialog({
   required bool canScrape,
   required bool canIdentify,
   required String? createTargetLabel,
+  bool canMarkAsApp = false,
 }) async {
   final navigator = Navigator.of(context, rootNavigator: true);
   if (_gameOptionsDialogs[navigator] == true) return null;
@@ -54,6 +57,7 @@ Future<GameOptionsAction?> showGameOptionsDialog({
             canScrape: canScrape,
             canIdentify: canIdentify,
             createTargetLabel: createTargetLabel,
+            canMarkAsApp: canMarkAsApp,
           ),
       transitionBuilder: (context, animation, secondaryAnimation, child) {
         final curved = CurvedAnimation(
@@ -87,6 +91,7 @@ class GameOptionsDialog extends StatefulWidget {
     required this.canScrape,
     required this.canIdentify,
     required this.createTargetLabel,
+    this.canMarkAsApp = false,
   });
 
   final String gameTitle;
@@ -94,6 +99,10 @@ class GameOptionsDialog extends StatefulWidget {
   final bool canScrape;
   final bool canIdentify;
   final String? createTargetLabel;
+
+  /// Android Games only: offers "Mark as App", which sends the game back to
+  /// the Android tab.
+  final bool canMarkAsApp;
 
   @override
   State<GameOptionsDialog> createState() => _GameOptionsDialogState();
@@ -179,6 +188,15 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
             id: 'identify',
             label: AppLocale.identifyGame.getString(context),
             icon: Symbols.manage_search_rounded,
+            action: true,
+          ),
+        ),
+      if (widget.canMarkAsApp)
+        _MenuEntry.row(
+          _OptionRow(
+            id: 'mark_as_app',
+            label: AppLocale.androidGameMarkApp.getString(context),
+            icon: Symbols.apps_rounded,
             action: true,
           ),
         ),
@@ -386,6 +404,9 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
         return;
       case 'identify':
         Navigator.of(context).pop(GameOptionsAction.identify);
+        return;
+      case 'mark_as_app':
+        Navigator.of(context).pop(GameOptionsAction.markAsApp);
         return;
       case 'search':
         Navigator.of(context).pop(GameOptionsAction.search);
@@ -865,7 +886,7 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
     ConfigModel config,
     String id,
   ) {
-    const sizes = ['S', 'M', 'L', 'XL'];
+    const sizes = GridSizes.values;
     switch (id) {
       case 'card_size':
         return _SegmentSpec(

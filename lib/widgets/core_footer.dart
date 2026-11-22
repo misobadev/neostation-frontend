@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/utils/color.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/app_version.dart';
 
 import '../themes/corner_radii.dart';
 
@@ -34,25 +32,13 @@ abstract class CoreFooter extends StatefulWidget {
 }
 
 class _CoreFooterState extends State<CoreFooter> {
-  String _appVersion = '';
+  /// From pubspec.yaml ([appVersion]): macOS keeps only numbers in its own
+  /// version string, so a release candidate would show as `1.0.0.1`.
+  final String _appVersion = 'v$appVersion';
 
   @override
   void initState() {
     super.initState();
-    _loadAppVersion();
-  }
-
-  Future<void> _loadAppVersion() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      setState(() {
-        _appVersion = 'v${packageInfo.version}';
-      });
-    } catch (e) {
-      setState(() {
-        _appVersion = 'v1.0.0'; // Fallback
-      });
-    }
   }
 
   @override
@@ -89,7 +75,7 @@ class _CoreFooterState extends State<CoreFooter> {
             bottom: 0,
             child: Center(
               child: Text(
-                '${AppLocale.beta.getString(context)} $_appVersion',
+                _appVersion,
                 style: TextStyle(
                   fontSize: 12.r,
                   color: Theme.of(context).colorScheme.onSurface,

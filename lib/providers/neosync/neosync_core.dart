@@ -7,6 +7,22 @@ part of '../neo_sync_provider.dart';
 bool _sharesMemoryCards(String? systemFolderName) =>
     systemFolderName == 'ps2' || systemFolderName == 'dc';
 
+/// Which sync of a game is running: when a memory card this device has never
+/// synced may be acted on depends on it (see [NeoSyncCore.detectGameSaveFiles]).
+enum _GameSyncPass {
+  /// A game highlighted in a list (or its cloud sync turned on): the cloud
+  /// list may be a minute old, and on Android an emulator may still have the
+  /// card open in the background.
+  selection,
+
+  /// Just before a launch: a fresh cloud list, and the emulator not started.
+  preLaunch,
+
+  /// Just after a game closed: a fresh cloud list, but on Android the
+  /// emulator may only be paused, with the card open.
+  postClose,
+}
+
 extension NeoSyncCore on NeoSyncProvider {
   Future<void> updateSelectedGame(
     String romname,
@@ -379,7 +395,17 @@ extension NeoSyncCore on NeoSyncProvider {
 
   /// Detecta automáticamente archivos de guardado para un juego específico
   /// y realiza sincronización automática cuando es apropiado
-  Future<void> detectGameSaveFiles(GameModel game) async {
+  Future<void> detectGameSaveFiles(GameModel game) =>
+      _detectGameSaveFiles(game, _GameSyncPass.selection);
+
+  /// [detectGameSaveFiles] for the sync [pass] of [game].
+  ///
+  /// A memory card every game of its system shares that this device has
+  /// never synced is only written in the pre-launch sync: there the cloud's
+  /// card is taken if it differs ([_takeCloudCardKeepingLocal]). Its upload,
+  /// when the cloud has none, waits for a sync with a fresh cloud list
+  /// (pre-launch or post-close): another device may have just uploaded one.
+  Future<void> _detectGameSaveFiles(GameModel game, _GameSyncPass pass) async {
     if (!isNeoSyncAuthenticated) {
       return;
     }
@@ -493,6 +519,10 @@ extension NeoSyncCore on NeoSyncProvider {
       }
 
       // Hay archivos locales, verificar sincronización para cada uno
+      // A card never synced here that this pass left for a launch: the game
+      // isn't shown as up to date.
+      var takeLeftForLaunch = false;
+      var uploadLeftForLaunch = false;
       bool allUploadsSucceeded = true; // Track if any uploads failed
       bool quotaExceededDuringProcessing = false;
       bool allCloudDownloadsSucceeded = true;
@@ -524,6 +554,9 @@ extension NeoSyncCore on NeoSyncProvider {
           _sharedCardsInFlight.add(localFile.filePath);
         }
         var transferFailed = false;
+        // Left for a launch: released, so the next game of the system shows
+        // it as waiting too rather than skipping it as done.
+        var leftForLaunch = false;
         try {
           // Encontrar archivo correspondiente en la nube (comparación canónica
           // independiente del OS: sin prefijo saves/states y case-insensitive)
@@ -541,7 +574,18 @@ extension NeoSyncCore on NeoSyncProvider {
             ),
           );
 
-          if (cloudFile.fileName.isEmpty) {
+          if (cloudFile.fileName.isEmpty &&
+              isSharedSystem &&
+              pass == _GameSyncPass.selection &&
+              await _neverSynced(localFile.filePath)) {
+            // A card never synced here waits for a fresh cloud list.
+            uploadLeftForLaunch = true;
+            leftForLaunch = true;
+            NeoSyncProvider._log.i(
+              'Not uploading ${localFile.filePath} yet: never synced here; '
+              'left for a launch',
+            );
+          } else if (cloudFile.fileName.isEmpty) {
             // No existe en la nube, subir
             try {
               final uploadSuccess = await _autoUploadLocalSave(game, localFile);
@@ -557,8 +601,51 @@ extension NeoSyncCore on NeoSyncProvider {
             // Ambos existen, comparar
             final comparison = await _compareWithCloud(localFile, cloudFile);
             final syncStatus = comparison.status;
+            // A shared card this device has never synced: the cloud's wins
+            // (see [_takeCloudCardKeepingLocal]); one that is the same is
+            // recorded, so a change made here later uploads as usual.
+            final neverSynced =
+                isSharedSystem && await _neverSynced(localFile.filePath);
 
-            if (syncStatus == neo_sync.GameSyncStatus.localOnly) {
+            if (syncStatus == neo_sync.GameSyncStatus.upToDate && neverSynced) {
+              // The same card as the cloud's (copied across, or synced before
+              // the record was lost): recorded as synced, so the next change
+              // made here is uploaded rather than taken for a first sync.
+              await _recordInSync(localFile, cloudFile);
+            } else if (syncStatus != neo_sync.GameSyncStatus.upToDate &&
+                neverSynced &&
+                pass != _GameSyncPass.preLaunch) {
+              // Taken only just before a launch: an emulator may still have
+              // the card open (on Android it may only be paused).
+              takeLeftForLaunch = true;
+              leftForLaunch = true;
+              NeoSyncProvider._log.i(
+                'Not taking the cloud card over ${localFile.filePath} yet: '
+                'never synced here; left for a launch',
+              );
+            } else if (syncStatus != neo_sync.GameSyncStatus.upToDate &&
+                neverSynced) {
+              try {
+                final kept = await _takeCloudCardKeepingLocal(
+                  game,
+                  localFile,
+                  cloudFile,
+                );
+                if (kept == null) {
+                  allCloudDownloadsSucceeded = false;
+                  transferFailed = true;
+                } else {
+                  keptThisPass[localFile.filePath] = {kept};
+                  reportFirstCardSyncTookCloud(
+                    gameName: game.name,
+                    savePath: localFile.filePath,
+                  );
+                }
+              } on QuotaExceededException {
+                quotaExceededDuringProcessing = true;
+                allCloudDownloadsSucceeded = false;
+              }
+            } else if (syncStatus == neo_sync.GameSyncStatus.localOnly) {
               try {
                 // Changed on another device too: keep the cloud's copy beside
                 // this one before replacing it, and upload nothing until it
@@ -609,7 +696,12 @@ extension NeoSyncCore on NeoSyncProvider {
                 final success = await _autoDownloadCloudSave(
                   game,
                   cloudFile,
-                  target: localFile.cloudPath != null
+                  // Also a custom folder's file matched with its own
+                  // emulator's row, one from before rows named one, or a
+                  // card of an emulator writing the same card format.
+                  target:
+                      localFile.cloudPath != null ||
+                          _sameCustomSave(cloudFile, localFile)
                       ? localFile.filePath
                       : null,
                 );
@@ -626,7 +718,7 @@ extension NeoSyncCore on NeoSyncProvider {
         } finally {
           if (isSharedSystem) {
             _sharedCardsInFlight.remove(localFile.filePath);
-            if (transferFailed) {
+            if (transferFailed || leftForLaunch) {
               _processedMultiEmulatorFilesInSession.remove(localFile.filePath);
             }
           }
@@ -656,8 +748,13 @@ extension NeoSyncCore on NeoSyncProvider {
           continue;
         }
 
+        // Also a row that would land on a card listed here (another
+        // emulator's, with both emulators set to one folder): that card was
+        // synced above, and is never written over from here.
         final existsLocally = localSaveFiles.any(
-          (lf) => _cloudMatchesLocal(cloudFile, lf),
+          (lf) =>
+              _cloudMatchesLocal(cloudFile, lf) ||
+              localPaths.any((target) => path.equals(target, lf.filePath)),
         );
 
         if (!existsLocally) {
@@ -703,6 +800,10 @@ extension NeoSyncCore on NeoSyncProvider {
       } else if (!allUploadsSucceeded || !allCloudDownloadsSucceeded) {
         NeoSyncProvider._log.w('Sync had errors for ${game.name}');
         finalStatus = neo_sync.GameSyncStatus.error;
+      } else if (takeLeftForLaunch) {
+        finalStatus = neo_sync.GameSyncStatus.cloudOnly;
+      } else if (uploadLeftForLaunch) {
+        finalStatus = neo_sync.GameSyncStatus.localOnly;
       } else {
         finalStatus = neo_sync.GameSyncStatus.upToDate;
       }
@@ -776,6 +877,126 @@ extension NeoSyncCore on NeoSyncProvider {
     } catch (e) {
       NeoSyncProvider._log.w('Error auto-uploading save for ${game.name}: $e');
       return notUploaded;
+    }
+  }
+
+  /// The first sync from this device of [local], a memory card every game of
+  /// its system shares (in RetroArch's saves or system folder, or a
+  /// standalone emulator's custom folder), when it differs from [cloud], the
+  /// cloud's: the cloud's card is downloaded over it, and this device's is
+  /// first kept beside it as its own dated copy ([keepLocalCopy]), listed in
+  /// Save history. Newer can't win here: a card an emulator has just created
+  /// on a new device is newer than the cloud's but holds nothing, and
+  /// uploaded it would replace every other device's card.
+  ///
+  /// Returns the kept copy's path, or null when nothing was written: the copy
+  /// couldn't be kept, or the download failed or was abandoned (the copy is
+  /// then removed again).
+  Future<String?> _takeCloudCardKeepingLocal(
+    GameModel game,
+    LocalSaveFile local,
+    NeoSyncFile cloud,
+  ) async {
+    final String kept;
+    try {
+      kept = await keepLocalCopy(local.filePath);
+    } catch (e) {
+      NeoSyncProvider._log.w(
+        'Not taking the cloud card over ${local.filePath}: could not keep '
+        "this device's: $e",
+      );
+      return null;
+    }
+    var wrote = false;
+    try {
+      // The dated copy is this device's card: no second copy in the single
+      // before-download slot.
+      wrote = await _autoDownloadCloudSave(
+        game,
+        cloud,
+        target: local.filePath,
+        backUpFirst: false,
+      );
+    } finally {
+      // Only while the card is as it was: a write that failed part way has
+      // changed it, and the copy is then all that holds this device's card.
+      if (!wrote && await _sameBytes(kept, local.filePath)) {
+        try {
+          await File(kept).delete();
+        } on FileSystemException {
+          // Left for the tidy; the card itself wasn't written.
+        }
+      }
+    }
+    if (!wrote) return null;
+    NeoSyncProvider._log.i(
+      '${local.filePath} synced here for the first time: took the cloud card, '
+      "kept this device's as $kept",
+    );
+    return kept;
+  }
+
+  /// Whether [cloud] is the same save as [local], a file in a custom folder:
+  /// its emulator's own row, one uploaded before rows named an emulator, or,
+  /// for a memory card, a row of an emulator writing the same card format.
+  bool _sameCustomSave(NeoSyncFile cloud, LocalSaveFile local) {
+    final emulator = local.customFolderEmulator;
+    if (emulator == null) return false;
+    final other = cloud.emulator;
+    return other == null ||
+        other == emulator ||
+        (isSharedMemoryCard(local.filePath) &&
+            CloudPathBuilder.sameMemoryCardFormat(other, emulator));
+  }
+
+  /// Whether this device has no NeoSync record of the save at [filePath],
+  /// under its path as listed or as a download records it (normalised).
+  /// True when the record can't be read, which keeps this device's copy.
+  Future<bool> _neverSynced(String filePath) async =>
+      await _syncRecord(filePath) == null;
+
+  /// This device's NeoSync record of the save at [filePath], kept under its
+  /// path as listed or, by a download placed by the resolver, normalised.
+  Future<Map<String, dynamic>?> _syncRecord(String filePath) async {
+    final normalised = path.normalize(path.absolute(filePath));
+    for (final key in {filePath, normalised}) {
+      final record = await SyncRepository.getSyncState(
+        NeoSyncProvider.kSyncProviderId,
+        key,
+      );
+      if (record != null) return record;
+    }
+    return null;
+  }
+
+  /// Whether the files at [a] and [b] hold the same bytes; false when either
+  /// can't be read.
+  Future<bool> _sameBytes(String a, String b) async {
+    try {
+      return listEquals(
+        await File(a).readAsBytes(),
+        await File(b).readAsBytes(),
+      );
+    } on FileSystemException {
+      return false;
+    }
+  }
+
+  /// Records [local] as in sync with [cloud], which holds the same bytes.
+  Future<void> _recordInSync(LocalSaveFile local, NeoSyncFile cloud) async {
+    try {
+      await SyncRepository.saveSyncState(
+        NeoSyncProvider.kSyncProviderId,
+        local.filePath,
+        local.lastModified.millisecondsSinceEpoch,
+        cloud.fileModifiedAtTimestamp ?? 0,
+        local.fileSize,
+        fileHash: cloud.checksum,
+      );
+    } catch (e) {
+      NeoSyncProvider._log.w(
+        'Could not record ${local.filePath} as synced: $e',
+      );
     }
   }
 
@@ -1005,10 +1226,14 @@ extension NeoSyncCore on NeoSyncProvider {
   /// Also returns false when a download was abandoned at the deadline of a
   /// launch of [game] (or, on a system whose games share memory cards, of
   /// any of its games) still running, so it is never taken for a synced save.
+  ///
+  /// With [backUpFirst] false the file isn't first copied to the single
+  /// before-download slot: the caller has kept it already.
   Future<bool> _autoDownloadCloudSave(
     GameModel game,
     NeoSyncFile cloudSave, {
     String? target,
+    bool backUpFirst = true,
   }) async {
     try {
       // 1. Resolve the local path universally, unless the local file the
@@ -1054,6 +1279,7 @@ extension NeoSyncCore on NeoSyncProvider {
           cloudSave,
           localFile,
           deadline: () => _launchDeadlineFor(game.romname, sharedCardsSystem),
+          backUpFirst: backUpFirst,
         );
         if (!wrote) allWritten = false;
       }
@@ -1101,7 +1327,27 @@ extension NeoSyncCore on NeoSyncProvider {
   ///
   /// The `type` is cross-checked against the local `saves/`/`states/` root so a
   /// save and a save state that share a basename never match each other.
+  ///
+  /// A card in RetroArch's system folder never matches another emulator's
+  /// card of the same name (type custom).
+  ///
+  /// A shared memory card in a standalone emulator's custom folder only
+  /// matches cards of emulators that write the same card format
+  /// ([CloudPathBuilder.sameMemoryCardFormat]), or one uploaded before saves
+  /// named an emulator: an AetherSX2 card is a PCSX2 card, but another
+  /// format's card of the same name is a different card.
   bool _cloudMatchesLocal(NeoSyncFile cloudFile, LocalSaveFile localFile) {
+    if (localFile.inRetroArchSystemFolder && cloudFile.type == 'custom') {
+      return false;
+    }
+    final emulator = localFile.customFolderEmulator;
+    if (emulator != null &&
+        cloudFile.type == 'custom' &&
+        cloudFile.emulator != null &&
+        !CloudPathBuilder.sameMemoryCardFormat(cloudFile.emulator!, emulator) &&
+        isSharedMemoryCard(localFile.filePath)) {
+      return false;
+    }
     final cloudPath = cloudFile.filePath.isNotEmpty
         ? cloudFile.filePath
         : cloudFile.fileName;
@@ -1119,10 +1365,14 @@ extension NeoSyncCore on NeoSyncProvider {
   /// there, unless [includeCardCopies] (RomM pairs files by name and keeps
   /// them all). With [includeGoneSaves], a save that is gone but has kept
   /// copies is included too, with a size of -1 (see [locateKeptCopySaves]).
+  ///
+  /// Cards a RetroArch core keeps in RetroArch's system folder are included
+  /// unless [includeSystemCards] is false: RomM doesn't sync them yet.
   Future<List<LocalSaveFile>> _findGameSaveFiles(
     GameModel game, {
     bool includeCardCopies = false,
     bool includeGoneSaves = false,
+    bool includeSystemCards = true,
   }) async {
     try {
       // 1. Obtener el sistema para resolver sus rutas JSON
@@ -1160,6 +1410,32 @@ extension NeoSyncCore on NeoSyncProvider {
 
       allFiles.addAll(listing.paths.map((path) => File(path)));
       allFiles.addAll(listing.gone.map((path) => File(path)));
+
+      // The cards a RetroArch core keeps in RetroArch's system folder. One a
+      // listing above found already (a system folder inside the saves folder,
+      // or a custom folder set to the card folder) is still marked as one; a
+      // custom folder's claim wins below.
+      final systemCards = <String>{};
+      if (includeSystemCards && _sharesMemoryCards(system.folderName)) {
+        final cardFolder = await _retroArchSystemCardFolder(system.folderName);
+        final cards = [
+          if (cardFolder != null) ...[
+            ...await _listRetroArchSystemCards(
+              system,
+              cardFolder,
+              maxFileSize: maxFileSize,
+            ),
+            if (includeGoneSaves)
+              ...await goneSavesWithKeptCopies([cardFolder], recursive: false),
+          ],
+        ];
+        for (final card in cards) {
+          systemCards.add(card);
+          if (!allFiles.any((file) => path.equals(file.path, card))) {
+            allFiles.add(File(card));
+          }
+        }
+      }
 
       // 4. Filtrar archivos según el sistema
       final List<LocalSaveFile> matchingFiles = [];
@@ -1229,15 +1505,25 @@ extension NeoSyncCore on NeoSyncProvider {
             // root, and that same relative path is what the cloud keeps, so the
             // local/cloud match must use it too (never the default parent dir).
             final customRoot = customRootForPath(customFolders, file.path);
+            final customEmulator = customFolderEmulator(
+              customFolders,
+              customRoot,
+            );
             final relativePath = customRoot != null
                 ? path
                       .relative(file.path, from: customRoot)
                       .replaceAll('\\', '/')
                 : _calculateRelativePath(file, basePath, isState: isState);
-            // A card in the RetroArch saves folder goes to the cloud under its
-            // system's fixed path, so it is matched by that path.
+            // A card in the RetroArch saves folder, or in RetroArch's system
+            // folder, goes to the cloud under its system's fixed path, so it
+            // is matched by that path.
+            final inSystemFolder =
+                customRoot == null &&
+                systemCards.any((card) => path.equals(card, file.path));
             final cloudPath =
-                isSharedSystem && customRoot == null && basePath == savesPath
+                isSharedSystem &&
+                    customRoot == null &&
+                    (basePath == savesPath || inSystemFolder)
                 ? CloudPathBuilder.sharedCardPath(
                     system.folderName,
                     path.basename(file.path),
@@ -1256,6 +1542,8 @@ extension NeoSyncCore on NeoSyncProvider {
                 isSynced: false,
                 relativePath: relativePath,
                 cloudPath: cloudPath,
+                inRetroArchSystemFolder: inSystemFolder,
+                customFolderEmulator: customEmulator,
               ),
             );
           }
@@ -1273,7 +1561,10 @@ extension NeoSyncCore on NeoSyncProvider {
         // Exactly the folder NeoStation created, case included, so a real card
         // in a `ps2` folder (sorted by content directory) is never taken for
         // a copy.
+        // Never a card in RetroArch's system folder: with the system folder
+        // set to the saves folder, Flycast's card folder is `<saves>/dc`.
         bool atOwnCloudPath(LocalSaveFile file) =>
+            !file.inRetroArchSystemFolder &&
             file.cloudPath != null &&
             path.normalize(file.filePath) ==
                 path.normalize(
@@ -1302,6 +1593,33 @@ extension NeoSyncCore on NeoSyncProvider {
           );
         }
         matchingFiles.removeWhere(extras.contains);
+
+        // Where the RetroArch core is set up, its shared cards live in the
+        // system folder: a file named like one elsewhere in the saves folder
+        // (a copy an older NeoStation downloaded into `<saves>/PS2/`) isn't
+        // synced, so the cloud card goes into the system folder before the
+        // game starts, not into a copy the core never reads.
+        if (includeSystemCards &&
+            await _retroArchSystemCardHome(system.folderName) != null) {
+          final elsewhere = matchingFiles
+              .where(
+                (file) =>
+                    !file.inRetroArchSystemFolder &&
+                    file.cloudPath != null &&
+                    CloudPathBuilder.isRetroArchSystemCardName(
+                      system.folderName,
+                      file.fileName,
+                    ),
+              )
+              .toList();
+          for (final file in elsewhere) {
+            NeoSyncProvider._log.d(
+              'Not syncing ${file.filePath}: the core keeps this card in '
+              'the system folder',
+            );
+          }
+          matchingFiles.removeWhere(elsewhere.contains);
+        }
       }
 
       return matchingFiles;
@@ -1322,8 +1640,15 @@ extension NeoSyncCore on NeoSyncProvider {
   /// Locates local save/state files for [game], reusing NeoSync's path
   /// resolution and filename matching. Each [LocalSaveFile.relativePath] is
   /// prefixed with `saves/` or `states/` so callers can tell them apart.
+  ///
+  /// Not the cards a RetroArch core keeps in RetroArch's system folder: RomM
+  /// would place them in the saves folder.
   Future<List<LocalSaveFile>> locateGameSaveFiles(GameModel game) =>
-      _findGameSaveFiles(game, includeCardCopies: true);
+      _findGameSaveFiles(
+        game,
+        includeCardCopies: true,
+        includeSystemCards: false,
+      );
 
   /// [game]'s saves, as [locateGameSaveFiles] finds them, plus those that are
   /// gone but have kept copies beside where they were, so one can be put
@@ -1334,7 +1659,9 @@ extension NeoSyncCore on NeoSyncProvider {
 
   /// Every folder saves are synced from: RetroArch's save and state folders
   /// and each system's custom save folders. Kept copies of saves sit beside
-  /// the saves, so this is where all of them are found.
+  /// the saves, so this is where all of them are found, in subfolders too;
+  /// those beside the cards in RetroArch's system folder are in
+  /// [keptCopyCardFolders].
   Future<List<String>> keptCopyFolders() async {
     final folders = <String>{};
     final saves = await _getRetroArchSavesPath();
@@ -1353,6 +1680,12 @@ extension NeoSyncCore on NeoSyncProvider {
     return folders.toList();
   }
 
+  /// The folders of RetroArch's system folder holding the memory cards its
+  /// cores share between a system's games. Kept copies of those cards sit
+  /// directly in them; their subfolders hold other files (Flycast's
+  /// textures), so only their top level is looked in.
+  Future<List<String>> keptCopyCardFolders() => _retroArchSystemCardFolders();
+
   /// Resolves candidate local destination paths for a cloud file named
   /// [relativeName] (e.g. `saves/Game.srm` or `states/Game.state`) belonging to
   /// [game]. Returns an empty list if no destination can be resolved.
@@ -1362,6 +1695,7 @@ extension NeoSyncCore on NeoSyncProvider {
   ) => resolveCloudFileToLocalPath(
     game,
     localTargetCloudFile(game, relativeName),
+    includeSystemCards: false,
   );
 
   /// Every save in the cloud for this account: the list fetched within the
@@ -1467,7 +1801,11 @@ extension NeoSyncCore on NeoSyncProvider {
       // first match always get the most recent version of the save.
       final byKey = <String, NeoSyncFile>{};
       for (final file in matchingFiles) {
-        final key = '${_canonicalSaveKey(file.filePath)}|${file.type}';
+        // Two emulators' custom saves of the same name are different saves,
+        // unless they are memory cards of the same format (matched in
+        // [_cloudMatchesLocal]).
+        final emulator = file.type == 'custom' ? '|${file.emulator}' : '';
+        final key = '${_canonicalSaveKey(file.filePath)}|${file.type}$emulator';
         final current = byKey[key];
         if (current == null ||
             (file.fileModifiedAtTimestamp ?? 0) >
@@ -1549,10 +1887,7 @@ extension NeoSyncCore on NeoSyncProvider {
       }
 
       // 2. Si los hashes NO coinciden (contenido diferente), evaluar el estado guardado.
-      final syncState = await SyncRepository.getSyncState(
-        NeoSyncProvider.kSyncProviderId,
-        localSave.filePath,
-      );
+      final syncState = await _syncRecord(localSave.filePath);
 
       final cloudTime = cloudSave.fileModifiedAtTimestamp ?? 0;
       final localTime = localSave.lastModified.millisecondsSinceEpoch;
@@ -1728,8 +2063,13 @@ extension NeoSyncCore on NeoSyncProvider {
         }
       }
 
-      // Detectar saves actuales
-      await detectGameSaveFiles(game);
+      // Detectar saves actuales. Only a launch passes a deadline: called
+      // without one (turning a game's cloud sync on), nothing is about to
+      // start and an emulator may still have a card open.
+      await _detectGameSaveFiles(
+        game,
+        deadline != null ? _GameSyncPass.preLaunch : _GameSyncPass.selection,
+      );
 
       final gameState = _gameSyncStates[game.romname];
       if (gameState == null) return;
@@ -1745,7 +2085,7 @@ extension NeoSyncCore on NeoSyncProvider {
           final result = await _uploadLocalFileForGame(game, file);
           if (result['success'] == true) {
             // Actualizar estado después del sync
-            await detectGameSaveFiles(game);
+            await _detectGameSaveFiles(game, _GameSyncPass.preLaunch);
           }
         }
       } else if (gameState.status == neo_sync.GameSyncStatus.cloudOnly &&
@@ -1753,7 +2093,7 @@ extension NeoSyncCore on NeoSyncProvider {
         // Descargar save de la nube
         await _autoDownloadCloudSave(game, gameState.cloudSave!);
         // Actualizar estado
-        await detectGameSaveFiles(game);
+        await _detectGameSaveFiles(game, _GameSyncPass.preLaunch);
       }
     } on QuotaExceededException {
       NeoSyncProvider._log.e(
@@ -1795,7 +2135,7 @@ extension NeoSyncCore on NeoSyncProvider {
       _processedMultiEmulatorFilesInSession.clear();
 
       // Detectar saves actuales (pueden haber cambiado durante el juego)
-      await detectGameSaveFiles(game);
+      await _detectGameSaveFiles(game, _GameSyncPass.postClose);
 
       final gameState = _gameSyncStates[game.romname];
       if (gameState == null || gameState.localSave == null) return;
@@ -1806,7 +2146,7 @@ extension NeoSyncCore on NeoSyncProvider {
         final result = await _uploadLocalFileForGame(game, file);
         if (result['success'] == true) {
           // Actualizar estado después del sync
-          await detectGameSaveFiles(game);
+          await _detectGameSaveFiles(game, _GameSyncPass.postClose);
         }
       }
     } on QuotaExceededException {

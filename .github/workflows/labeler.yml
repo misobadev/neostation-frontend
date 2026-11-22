@@ -13,8 +13,11 @@ permissions:
   contents: read
   pull-requests: write
 
+# One group per pull request. Under `pull_request_target`, `github.ref` is the
+# base branch, so grouping by it made PRs pushed close together cancel each
+# other's runs; a new push to the same PR still cancels its own older run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:

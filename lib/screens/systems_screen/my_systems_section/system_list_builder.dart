@@ -45,11 +45,9 @@ List<SystemInfo> buildSystemsList({
 
   final detectedSystems = configProvider.detectedSystems
       .where((s) => !hiddenFolders.contains(s.folderName))
-      .where(
-        (s) =>
-            !(configProvider.config.androidAppsAsTab &&
-                s.folderName == SystemFolderNames.android),
-      )
+      // Installed apps live only in the Android tab; the Systems grid shows
+      // just the Android Games card, once the user has marked a game.
+      .where((s) => s.folderName != SystemFolderNames.android)
       .where(
         (s) =>
             !(s.folderName == SystemFolderNames.favorites &&

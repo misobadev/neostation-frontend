@@ -295,7 +295,8 @@ extension NeoSyncUpload on NeoSyncProvider {
           isSynced: false,
           relativePath: relativePath,
         );
-        // This file's entry: one under its emulator over one under none
+        // This file's entry: one under its emulator (or, for a memory card,
+        // under one writing the same card format) over one under none
         // (uploaded before saves named one), then, of duplicates, the newest,
         // as a game's own sync takes the newest.
         NeoSyncFile? cloud;
@@ -316,6 +317,21 @@ extension NeoSyncUpload on NeoSyncProvider {
         }
         if (cloud != null) {
           final comparison = await _compareWithCloud(local, cloud);
+          // A memory card every game of its system shares that this device
+          // has never synced, and that isn't the same as the cloud's: a
+          // game's own sync takes the cloud's card and keeps this one. Sent
+          // from here, a blank card an emulator just created would replace
+          // every other device's card.
+          if (comparison.status != neo_sync.GameSyncStatus.upToDate &&
+              isSharedMemoryCard(file.path) &&
+              await _neverSynced(file.path)) {
+            _leftForLaunchFiles++;
+            _processedItems.add(
+              "Left for the game's next launch: $relativePath (never synced "
+              'here)',
+            );
+            return;
+          }
           if (comparison.bothChanged) {
             final kept = await _keepCloudCopy(local, cloud);
             if (!kept.ok) {
@@ -441,6 +457,7 @@ extension NeoSyncUpload on NeoSyncProvider {
     _processedFiles = 0;
     _uploadedFiles = 0;
     _skippedFiles = 0;
+    _leftForLaunchFiles = 0;
     _downloadedFiles = 0;
     _processedItems = [];
     notify();
@@ -467,12 +484,20 @@ extension NeoSyncUpload on NeoSyncProvider {
         return CustomFolderUploadOutcome.failed;
       }
       // This folder's saves in the cloud: kept as `custom` files under its
-      // emulator (or, uploaded before saves named one, under none).
+      // emulator (or, uploaded before saves named one, under none). A memory
+      // card of an emulator writing the same card format is the same card:
+      // the cloud keeps one card of a name whichever emulator sent it.
       final cloudFiles = [
         for (final cloud in allCloudFiles)
           if (!_isKeptCopyInCloud(cloud) &&
               cloud.type == 'custom' &&
-              (cloud.emulator == null || cloud.emulator == emulatorSlug))
+              (cloud.emulator == null ||
+                  cloud.emulator == emulatorSlug ||
+                  (isSharedMemoryCard(cloud.filePath) &&
+                      CloudPathBuilder.sameMemoryCardFormat(
+                        cloud.emulator!,
+                        emulatorSlug,
+                      ))))
             cloud,
       ];
 
@@ -514,11 +539,15 @@ extension NeoSyncUpload on NeoSyncProvider {
       }
 
       // A save that neither uploaded nor was already in sync failed.
-      final failed = _processedFiles - _uploadedFiles - _skippedFiles;
+      final failed =
+          _processedFiles -
+          _uploadedFiles -
+          _skippedFiles -
+          _leftForLaunchFiles;
       _syncProgress = 1.0;
       _syncStatus =
           'Upload complete: $_uploadedFiles uploaded, $_skippedFiles already '
-          'synced, $failed failed';
+          'synced, $_leftForLaunchFiles left for a launch, $failed failed';
       _processedItems.add(_syncStatus);
       return failed > 0
           ? CustomFolderUploadOutcome.failed

@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:neostation/services/update_service.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 
 /// The app update was installed without checking it was the file the release
@@ -227,13 +226,8 @@ void main() {
 
     setUp(() {
       requests.clear();
-      PackageInfo.setMockInitialValues(
-        appName: 'NeoStation',
-        packageName: 'neostation',
-        version: '0.1.0',
-        buildNumber: '1',
-        buildSignature: '',
-      );
+      UpdateService.debugInstalledVersion = '0.1.0';
+      addTearDown(() => UpdateService.debugInstalledVersion = null);
       UpdateService.debugUseHttpClient(
         MockClient((request) async {
           requests.add(request.url);

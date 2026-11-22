@@ -196,11 +196,21 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
-  /// Chooses whether Android apps are opened from Systems or their own tab.
-  Future<void> updateAndroidAppsAsTab(bool value) async {
-    final previous = _config;
-    _config = _config.copyWith(androidAppsAsTab: value);
-    await _saveOrRevert(previous);
+  /// Re-evaluates the "Android Games" system after the user (un)marks an app.
+  ///
+  /// The system appears once the user has marked at least one app and
+  /// disappears with the last one, so its detected row is added or removed to match, and
+  /// the systems list is reloaded for the new count.
+  Future<void> refreshAndroidGamesSystem() async {
+    if (!Platform.isAndroid) return;
+    const id = SystemFolderNames.androidGames;
+    final games = await SystemRepository.getRomCountForSystem(id);
+    if (games > 0) {
+      await SystemRepository.addDetectedSystem(id, id);
+    } else {
+      await SystemRepository.removeDetectedSystem(id);
+    }
+    await _loadDetectedSystems();
     _notify();
   }
 
@@ -639,6 +649,16 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     if (_config.neoglassBorderWidth == clamped) return;
     final previous = _config;
     _config = _config.copyWith(neoglassBorderWidth: clamped);
+    await _saveOrRevert(previous);
+    _notify();
+  }
+
+  /// Sets how round every theme's corners are (0 square to 5 the roundest).
+  Future<void> updateCornerRadius(int value) async {
+    final clamped = value.clamp(0, 5);
+    if (_config.cornerRadius == clamped) return;
+    final previous = _config;
+    _config = _config.copyWith(cornerRadius: clamped);
     await _saveOrRevert(previous);
     _notify();
   }

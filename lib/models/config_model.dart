@@ -6,6 +6,8 @@ import 'package:neostation/constants/recent_card_sizes.dart';
 
 import 'emulator_model.dart';
 
+import 'package:neostation/utils/grid_sizes.dart';
+
 String _normalizeGameListSize(String value) =>
     const {'S', 'M', 'L', 'XL'}.contains(value) ? value : 'S';
 
@@ -37,10 +39,8 @@ class ConfigModel {
   static const int dockMaxSlots = 5;
 
   /// Normalizes a persisted grid size, defaulting to M.
-  static String normalizeGridColumns(Object? value) {
-    final size = value?.toString() ?? 'M';
-    return const {'S', 'M', 'L', 'XL'}.contains(size) ? size : 'M';
-  }
+  static String normalizeGridColumns(Object? value) =>
+      GridSizes.normalize(value);
 
   /// Smallest and largest number of dock slots the user may choose to show.
   static const int dockMinSlotCount = 0;
@@ -183,8 +183,6 @@ class ConfigModel {
   /// migration v158); search stays reachable from every card's Y menu.
   final bool hideSearchCard;
 
-  final bool androidAppsAsTab;
-
   /// Whether the Discovery navigation tab is hidden. See [hideTabSync].
   final bool hideTabDiscovery;
 
@@ -226,21 +224,21 @@ class ConfigModel {
   /// Whether to automatically check and prompt for system/emulator config updates on startup.
   final bool autoUpdateSystems;
 
-  /// Preferred grid column density for the systems grid ('S', 'M', 'L', 'XL').
+  /// Preferred grid column density for the systems grid (see [GridSizes]).
   final String systemGridColumns;
 
-  /// Preferred grid column density for the Discovery board ('S', 'M', 'L',
-  /// 'XL'). Discovery uses the same scale as the systems grid.
+  /// Preferred grid column density for the Discovery board (see
+  /// [GridSizes]). Discovery uses the same scale as the systems grid.
   final String discoveryGridColumns;
 
   /// Discovery layout: `'grid'` or `'carousel'`.
   final String discoveryViewMode;
 
-  /// Preferred grid column density for the Android apps board ('S', 'M', 'L',
-  /// 'XL').
+  /// Preferred grid column density for the Android apps board (see
+  /// [GridSizes]).
   final String androidGridColumns;
 
-  /// Preferred grid column density for the games grid ('S', 'M', 'L', 'XL').
+  /// Preferred grid column density for the games grid (see [GridSizes]).
   final String gameGridColumns;
 
   /// Preferred text and row size for the game list ('S', 'M', 'L', 'XL').
@@ -317,6 +315,10 @@ class ConfigModel {
   /// glass border.
   final double neoglassBorderWidth;
 
+  /// How round corners are drawn in every theme: 0 square, then
+  /// extra small, small, medium (the default), large and extra large.
+  final int cornerRadius;
+
   const ConfigModel({
     this.romFolders = const [],
     this.detectedSystems = const [],
@@ -344,14 +346,13 @@ class ConfigModel {
     this.collectionSortOrder = 'asc',
     this.appLanguage = 'es',
     this.hideRecentCard = false,
-    this.recentCardSize = RecentCardSizes.defaultSize,
+    this.recentCardSize = RecentCardSizes.twoByOne,
     this.gameDetailsTab = 'wheel',
     this.hideTabSync = false,
     this.hideTabAchievements = false,
     this.hideTabScraper = false,
     this.hideTabRomm = false,
     this.hideSearchCard = true,
-    this.androidAppsAsTab = false,
     this.hideTabDiscovery = false,
     this.activeSyncProvider = 'neosync',
     this.autoUpdateApp = true,
@@ -368,7 +369,7 @@ class ConfigModel {
     this.fanartDimLevel = 25,
     this.dockApps = const ['', '', '', '', ''],
     this.dockEnabled = true,
-    this.secondaryHideSystemLogo = false,
+    this.secondaryHideSystemLogo = true,
     this.dockSlotCount = 3,
     this.esdeFolderPath = '',
     this.showAchievementsBadge = false,
@@ -380,6 +381,7 @@ class ConfigModel {
     this.neoglassBlur = 0,
     this.neoglassTransparency = 10,
     this.neoglassBorderWidth = 2,
+    this.cornerRadius = 3,
   });
 
   /// Convenience getter that returns the primary ROM folder, if any are configured.
@@ -492,7 +494,7 @@ class ConfigModel {
       recentCardSize:
           (json['recentCardSize'] ??
                   json['recent_card_size'] ??
-                  RecentCardSizes.defaultSize)
+                  RecentCardSizes.twoByOne)
               .toString(),
       gameDetailsTab:
           (json['gameDetailsTab'] ?? json['game_details_tab'] ?? 'wheel')
@@ -523,12 +525,6 @@ class ConfigModel {
                   .toString() ==
               '1' ||
           (json['hideSearchCard'] ?? false).toString().toLowerCase() == 'true',
-      androidAppsAsTab:
-          (json['androidAppsAsTab'] ?? json['android_apps_as_tab'] ?? 0)
-                  .toString() ==
-              '1' ||
-          (json['androidAppsAsTab'] ?? false).toString().toLowerCase() ==
-              'true',
       hideTabDiscovery:
           (json['hideTabDiscovery'] ?? json['hide_tab_discovery'] ?? 0)
                   .toString() ==
@@ -598,14 +594,14 @@ class ConfigModel {
       dockEnabled:
           (json['dockEnabled'] ?? true).toString().toLowerCase() == 'true' ||
           (json['dock_enabled'] ?? 1).toString() == '1',
-      // Absent => 0 => logo shown (the default).
+      // Absent => 1 => logo hidden (the default).
       secondaryHideSystemLogo:
           (json['secondaryHideSystemLogo'] ??
                       json['secondary_hide_system_logo'] ??
-                      0)
+                      1)
                   .toString() ==
               '1' ||
-          (json['secondaryHideSystemLogo'] ?? false).toString().toLowerCase() ==
+          (json['secondaryHideSystemLogo'] ?? true).toString().toLowerCase() ==
               'true',
       dockSlotCount:
           (int.tryParse(
@@ -681,6 +677,13 @@ class ConfigModel {
                   ) ??
                   2)
               .clamp(0.0, 2.0),
+      cornerRadius:
+          (int.tryParse(
+                    (json['cornerRadius'] ?? json['corner_radius'] ?? 3)
+                        .toString(),
+                  ) ??
+                  3)
+              .clamp(0, 5),
     );
   }
 
@@ -746,7 +749,6 @@ class ConfigModel {
       'hideTabScraper': hideTabScraper,
       'hideTabRomm': hideTabRomm,
       'hideSearchCard': hideSearchCard,
-      'androidAppsAsTab': androidAppsAsTab,
       'hideTabDiscovery': hideTabDiscovery,
       'activeSyncProvider': activeSyncProvider,
       'autoUpdateApp': autoUpdateApp,
@@ -775,6 +777,7 @@ class ConfigModel {
       'neoglassBlur': neoglassBlur,
       'neoglassTransparency': neoglassTransparency,
       'neoglassBorderWidth': neoglassBorderWidth,
+      'cornerRadius': cornerRadius,
     };
   }
 
@@ -813,7 +816,6 @@ class ConfigModel {
     bool? hideTabScraper,
     bool? hideTabRomm,
     bool? hideSearchCard,
-    bool? androidAppsAsTab,
     bool? hideTabDiscovery,
     String? activeSyncProvider,
     bool? autoUpdateApp,
@@ -842,6 +844,7 @@ class ConfigModel {
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
+    int? cornerRadius,
   }) {
     return ConfigModel(
       romFolders: romFolders ?? this.romFolders,
@@ -878,7 +881,6 @@ class ConfigModel {
       hideTabScraper: hideTabScraper ?? this.hideTabScraper,
       hideTabRomm: hideTabRomm ?? this.hideTabRomm,
       hideSearchCard: hideSearchCard ?? this.hideSearchCard,
-      androidAppsAsTab: androidAppsAsTab ?? this.androidAppsAsTab,
       hideTabDiscovery: hideTabDiscovery ?? this.hideTabDiscovery,
       activeSyncProvider: activeSyncProvider ?? this.activeSyncProvider,
       autoUpdateApp: autoUpdateApp ?? this.autoUpdateApp,
@@ -910,6 +912,7 @@ class ConfigModel {
       neoglassBlur: neoglassBlur ?? this.neoglassBlur,
       neoglassTransparency: neoglassTransparency ?? this.neoglassTransparency,
       neoglassBorderWidth: neoglassBorderWidth ?? this.neoglassBorderWidth,
+      cornerRadius: cornerRadius ?? this.cornerRadius,
     );
   }
 

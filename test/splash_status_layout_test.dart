@@ -100,26 +100,28 @@ void main() {
       tester,
     ) async {
       // 640x480 is the app's ScreenUtil design space, so the scale is 1 there
-      // and the logo lands on the 280 the splash has always used.
+      // and the logo lands on its design width.
       await pumpAt(tester, const Size(640, 480), const [Text('x')]);
-      expect(tester.getRect(find.byType(ShimmeringLogo)).width, 280);
-    });
-
-    testWidgets('a short panel is capped by its height, not the width', (
-      tester,
-    ) async {
-      // The Thor is 467dp tall, so the height fraction sets the size — landing
-      // within a few pixels of the 280 it rendered at before the splash
-      // started scaling with the screen.
-      await pumpAt(tester, const Size(831, 467), const [Text('x')]);
       expect(
         tester.getRect(find.byType(ShimmeringLogo)).width,
-        moreOrLessEquals(280, epsilon: 4),
+        SplashStatusLayout.logoWidth,
       );
     });
 
+    testWidgets('a short handheld panel keeps the logo inside its caps', (
+      tester,
+    ) async {
+      // The Thor is 467dp tall. The logo (badge and wordmark) is wide and
+      // short, so the width fraction is the cap that matters there.
+      await pumpAt(tester, const Size(831, 467), const [Text('x')]);
+      final logo = tester.getRect(find.byType(ShimmeringLogo));
+      expect(logo.width, lessThanOrEqualTo(831 * 0.55 + 0.5));
+      expect(logo.height, lessThanOrEqualTo(467 * 0.40));
+      expect(logo.width, greaterThanOrEqualTo(SplashStatusLayout.logoWidth));
+    });
+
     testWidgets('the logo scales up with a desktop window', (tester) async {
-      // A fixed 280px logo is stranded in the middle of a 1920x1080 window
+      // A fixed-size logo is stranded in the middle of a 1920x1080 window
       // while the rest of the app scales up around it (everything else sizes
       // off ScreenUtil's 640x480 design space). The splash follows the same
       // scale, still inside the width and height caps.
@@ -193,7 +195,7 @@ void main() {
         await pumpAt(tester, size, const [Text('x')]);
         expect(
           tester.getRect(find.byType(ShimmeringLogo)).width,
-          lessThanOrEqualTo(280),
+          lessThanOrEqualTo(SplashStatusLayout.logoWidth),
         );
       }
     });

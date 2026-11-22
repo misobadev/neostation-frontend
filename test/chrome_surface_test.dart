@@ -23,6 +23,12 @@ void main() {
     'aqua': AppThemes.aquaTheme,
     'palenight': AppThemes.palenightTheme,
     'horizon': AppThemes.horizonTheme,
+    'sixteenBit': AppThemes.sixteenBitTheme,
+    'sunset': AppThemes.sunsetTheme,
+    'neon_arcade': AppThemes.neonArcadeTheme,
+    'deep_sea': AppThemes.deepSeaTheme,
+    'matcha': AppThemes.matchaTheme,
+    'famicom': AppThemes.famicomTheme,
   };
 
   group('ChromeSurface', () {

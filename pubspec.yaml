@@ -14,7 +14,7 @@ workspace:
   - packages/gamepads_windows
   - packages/sub_screen
 
-version: 0.16.1+2134
+version: 1.0.0-rc.2+3002
 
 environment:
   sdk: '>=3.13.0 <4.0.0'
@@ -46,6 +46,11 @@ dependencies:
   fvp: ^0.40.0
   flutter_secure_storage: ^11.2.0
   shared_preferences: ^2.5.6
+  # Held on the 2.4 line: 2.5.0-2.5.4 break preferences when the bottom-screen
+  # engine is destroyed, and 2.5.5 only fixes that on Flutter 3.50 (NEO-249,
+  # GitHub #829). Lift with the Flutter 3.50 upgrade (NEO-242); Dependabot
+  # ignores 2.5+ until then.
+  shared_preferences_android: ">=2.4.27 <2.5.0"
   http: ^1.6.0
   flutter_svg: ^2.3.2
   crypto: ^3.0.8
@@ -93,7 +98,7 @@ flutter_launcher_icons:
   windows:
     generate: true
     image_path: "assets/images/logo.png"
-    icon_size: 48
+    icon_size: 256
   macos:
     generate: true
     image_path: "assets/images/logo.png"
@@ -106,6 +111,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/logos/
+    - assets/images/neosync/
     - assets/images/emulators/
     - assets/images/gamepad/
     - assets/images/icons/
@@ -115,6 +121,7 @@ flutter:
     - assets/systems/
     - assets/sounds/
   shaders:
+    - assets/shaders/gooey_selector.frag
     - assets/shaders/stripes.frag
     - assets/shaders/fluid.frag
     - assets/shaders/gif_player.frag

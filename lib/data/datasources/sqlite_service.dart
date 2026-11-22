@@ -471,7 +471,31 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 188;
+  static const int _databaseVersion = 193;
+
+  /// SQL predicate (over `user_roms` aliased `ur`) for an installed app the
+  /// user marked as a game. See migration v191.
+  static const String androidGameFlagSql =
+      'COALESCE(ur.is_android_game, 0) = 1';
+
+  /// WHERE clause (over `user_roms` aliased `ur`) selecting the rows listed
+  /// under [systemId], with its arguments.
+  ///
+  /// "Android Games" owns no rows: its games are the `android` system's apps
+  /// the user marked, and "Android" lists only the rest.
+  static (String, List<Object?>) _systemRowsFilter(String systemId) =>
+      switch (systemId) {
+        SystemFolderNames.androidGames => (
+          "ur.app_system_id = 'android' AND $androidGameFlagSql",
+          const [],
+        ),
+        SystemFolderNames.android => (
+          "ur.app_system_id = 'android' AND NOT ($androidGameFlagSql)",
+          const [],
+        ),
+        _ => ('ur.app_system_id = ?', [systemId]),
+      };
+
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -1972,7 +1996,7 @@ class SqliteService {
         app_language TEXT DEFAULT 'en',
         active_theme TEXT DEFAULT '',
         hide_recent_card INTEGER DEFAULT 0,
-        recent_card_size TEXT DEFAULT 'default',
+        recent_card_size TEXT DEFAULT '2x1',
         -- Unused since the vertical action rail was removed. Kept so a fresh
         -- install matches the schema migration v103 left on upgraded devices.
         legend_hidden INTEGER DEFAULT 0,
@@ -2004,7 +2028,7 @@ class SqliteService {
         use_12_hour_clock INTEGER DEFAULT 0,
         dock_apps TEXT,
         dock_enabled INTEGER DEFAULT 1,
-        secondary_hide_system_logo INTEGER DEFAULT 0,
+        secondary_hide_system_logo INTEGER DEFAULT 1,
         dock_slot_count INTEGER DEFAULT 3,
         now_playing_dim_delay INTEGER DEFAULT 3,
         now_playing_dim_level INTEGER DEFAULT 100,
@@ -2018,7 +2042,8 @@ class SqliteService {
         performance_mode INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
-        neoglass_border_width REAL DEFAULT 2
+        neoglass_border_width REAL DEFAULT 2,
+        corner_radius INTEGER DEFAULT 3
       );
       ''',
       '''
@@ -2069,6 +2094,9 @@ class SqliteService {
         -- ScreenScraper game the user picked by hand (Identify…); NULL means
         -- match automatically. See migration v165.
         ss_manual_game_id INTEGER,
+        -- Android apps only: 1 = the user marked it a game, listed under
+        -- "Android Games" instead of the Android tab. See migration v191.
+        is_android_game INTEGER DEFAULT 0,
         id_ra INTEGER,
         ra_match_source TEXT,
         ra_hash_skipped TEXT,
@@ -2933,8 +2961,9 @@ class SqliteService {
   }
 
   /// Permanently deletes a single game and its metadata from the database.
-  static Future<void> deleteGame(String appSystemId, String filename) async {
+  static Future<void> deleteGame(String systemId, String filename) async {
     final db = await instance.database;
+    final appSystemId = SystemFolderNames.rowSystemFolder(systemId);
     await db.delete(
       'user_screenscraper_metadata',
       where: 'app_system_id = ? AND filename = ?',
@@ -2982,7 +3011,6 @@ class SqliteService {
     int? hideTabScraper,
     int? hideTabRomm,
     int? hideSearchCard,
-    int? androidAppsAsTab,
     int? hideTabDiscovery,
     String? activeSyncProvider,
     String? systemsVersion,
@@ -3014,6 +3042,7 @@ class SqliteService {
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
+    int? cornerRadius,
   }) async {
     final db = await instance.database;
 
@@ -3111,9 +3140,6 @@ class SqliteService {
     if (hideSearchCard != null) {
       updates['hide_search_card'] = hideSearchCard;
     }
-    if (androidAppsAsTab != null) {
-      updates['android_apps_as_tab'] = androidAppsAsTab;
-    }
     if (hideTabDiscovery != null) {
       updates['hide_tab_discovery'] = hideTabDiscovery;
     }
@@ -3200,6 +3226,9 @@ class SqliteService {
     }
     if (neoglassBorderWidth != null) {
       updates['neoglass_border_width'] = neoglassBorderWidth;
+    }
+    if (cornerRadius != null) {
+      updates['corner_radius'] = cornerRadius;
     }
 
     if (showAchievementsBadge != null) {
@@ -3635,6 +3664,31 @@ class SqliteService {
   ) async {
     if (results.isEmpty) return [];
 
+    // "Android Games" owns no rows and "Android" lists only the apps that are
+    // not games, so the per-system `rom_count` subquery is wrong for both. Count
+    // the marked apps instead. Kept out of the shared SELECTs so they never
+    // reference the v191 column for other systems.
+    if (results.any(
+      (r) => SystemFolderNames.isAndroidApps(r['folder_name']?.toString()),
+    )) {
+      final counts = await db.rawQuery(
+        "SELECT SUM(CASE WHEN $androidGameFlagSql THEN 1 ELSE 0 END) AS games, "
+        "SUM(CASE WHEN NOT ($androidGameFlagSql) THEN 1 ELSE 0 END) AS apps "
+        "FROM user_roms ur WHERE ur.app_system_id = 'android' "
+        "AND ur.is_hidden = 0",
+      );
+      final games = int.tryParse(counts.first['games'].toString()) ?? 0;
+      final apps = int.tryParse(counts.first['apps'].toString()) ?? 0;
+      results = [
+        for (final r in results)
+          switch (r['folder_name']) {
+            SystemFolderNames.androidGames => {...r, 'rom_count': games},
+            SystemFolderNames.android => {...r, 'rom_count': apps},
+            _ => r,
+          },
+      ];
+    }
+
     // 1. Fetch all folder mappings in a single query to minimize IO overhead.
     final folderResults = await db.query('app_system_folders');
     final Map<String, List<String>> folderMap = {};
@@ -3831,9 +3885,10 @@ class SqliteService {
   /// Calculates the total number of ROMs registered for a specific system.
   static Future<int> getRomCountForSystem(String systemId) async {
     final db = await instance.database;
+    final (where, args) = _systemRowsFilter(systemId);
     final results = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM user_roms WHERE app_system_id = ?',
-      [systemId],
+      'SELECT COUNT(*) as count FROM user_roms ur WHERE $where',
+      args,
     );
     if (results.isEmpty) return 0;
     return int.tryParse(results.first['count']?.toString() ?? '0') ?? 0;
@@ -3847,10 +3902,11 @@ class SqliteService {
   /// it. Gate existence on [getRomCountForSystem].
   static Future<int> getVisibleRomCountForSystem(String systemId) async {
     final db = await instance.database;
+    final (where, args) = _systemRowsFilter(systemId);
     final results = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM user_roms '
-      'WHERE app_system_id = ? AND is_hidden = 0',
-      [systemId],
+      'SELECT COUNT(*) as count FROM user_roms ur '
+      'WHERE $where AND ur.is_hidden = 0',
+      args,
     );
     if (results.isEmpty) return 0;
     return int.tryParse(results.first['count']?.toString() ?? '0') ?? 0;
@@ -4741,14 +4797,18 @@ class SqliteService {
     String systemId,
   ) async {
     final db = await instance.database;
-    final results = await db.rawQuery(
-      '''
+    // "Android Games" games are `android` rows reported under the games system,
+    // so every view, launch and setting resolves against it. `s` stays the
+    // row's own system, which the title/description fallbacks below key on.
+    final isAndroidGames = systemId == SystemFolderNames.androidGames;
+    final (where, args) = _systemRowsFilter(systemId);
+    final results = await db.rawQuery('''
       SELECT
         ur.filename, ur.rom_path, ur.is_favorite, ur.is_hidden, ur.play_time, ur.last_played,
         ur.cloud_sync_enabled, ur.title_id, ur.title_name,
         ur.app_emulator_unique_id as emulator_name,
-        s.id as system_id, s.real_name as system_real_name, s.folder_name as system_folder_name,
-        s.short_name as system_short_name,
+        ${isAndroidGames ? 'g' : 's'}.id as system_id, ${isAndroidGames ? 'g' : 's'}.real_name as system_real_name, ${isAndroidGames ? 'g' : 's'}.folder_name as system_folder_name,
+        ${isAndroidGames ? 'g' : 's'}.short_name as system_short_name,
         COALESCE(usm.real_name, CASE WHEN s.folder_name IN ('android') THEN ur.title_name END, ur.filename) as game_display_name,
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
@@ -4768,12 +4828,11 @@ class SqliteService {
         usm.is_fully_scraped
       FROM user_roms ur
       JOIN app_systems s ON ur.app_system_id = s.id
+      ${isAndroidGames ? "JOIN app_systems g ON g.id = 'android_games'" : ''}
       LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-      WHERE ur.app_system_id = ?
+      WHERE $where
       ORDER BY ur.is_favorite DESC, LOWER(game_display_name) ASC
-''',
-      [systemId],
-    );
+''', args);
 
     return results.map((row) => DatabaseGameModel.fromJson(row)).toList();
   }
@@ -5281,6 +5340,13 @@ class SqliteService {
   ///
   /// `android` and `music` are excluded exactly as [getFavoriteGames] and the
   /// "all systems" game list do: neither holds games worth recommending.
+  ///
+  /// So are hidden games and every game of a system hidden in Settings: the
+  /// board recommends games, and a system the user has hidden is one they don't
+  /// want offered. The flag is written by folder name, but a system has one
+  /// detection row, so it is matched by system id and doesn't depend on which
+  /// folder name that row holds. A system with no detection row has not been
+  /// hidden, so `NOT EXISTS` rather than a join that would drop it.
   static Future<List<Map<String, Object?>>> getDiscoveryCandidates() async {
     final db = await instance.database;
     return db.rawQuery('''
@@ -5308,6 +5374,11 @@ class SqliteService {
                  GROUP BY game_id) ra
              ON ra.game_id = ur.id_ra
       WHERE s.folder_name NOT IN ('android', 'music')
+        AND COALESCE(ur.is_hidden, 0) = 0
+        AND NOT EXISTS (
+          SELECT 1 FROM user_detected_systems uds
+          WHERE uds.app_system_id = ur.app_system_id AND uds.is_hidden = 1
+        )
     ''');
   }
 
@@ -5429,19 +5500,25 @@ class SqliteService {
   }
 
   /// Retrieves a single game record based on its system and filename.
+  ///
+  /// [systemId] may be `android_games`: the game is then its `android` row,
+  /// found only while marked, and reported under the games system as
+  /// [getGamesBySystem] lists it.
   static Future<DatabaseGameModel?> getSingleGame(
     String systemId,
     String filename,
   ) async {
     final db = await instance.database;
+    final isAndroidGames = systemId == SystemFolderNames.androidGames;
+    final (where, args) = _systemRowsFilter(systemId);
     final results = await db.rawQuery(
       '''
       SELECT
         ur.filename, ur.rom_path, ur.is_favorite, ur.is_hidden, ur.play_time, ur.last_played,
         ur.cloud_sync_enabled, ur.title_id, ur.title_name,
         ur.app_emulator_unique_id as emulator_name,
-        s.id as system_id, s.real_name as system_real_name, s.folder_name as system_folder_name,
-        s.short_name as system_short_name,
+        ${isAndroidGames ? 'g' : 's'}.id as system_id, ${isAndroidGames ? 'g' : 's'}.real_name as system_real_name, ${isAndroidGames ? 'g' : 's'}.folder_name as system_folder_name,
+        ${isAndroidGames ? 'g' : 's'}.short_name as system_short_name,
         COALESCE(usm.real_name, CASE WHEN s.folder_name IN ('android') THEN ur.title_name END, ur.filename) as game_display_name,
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
@@ -5461,11 +5538,12 @@ class SqliteService {
         usm.is_fully_scraped
       FROM user_roms ur
       JOIN app_systems s ON ur.app_system_id = s.id
+      ${isAndroidGames ? "JOIN app_systems g ON g.id = 'android_games'" : ''}
       LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-      WHERE ur.app_system_id = ? AND ur.filename = ?
+      WHERE $where AND ur.filename = ?
       LIMIT 1
       ''',
-      [systemId, filename],
+      [...args, filename],
     );
 
     if (results.isNotEmpty) {
@@ -5614,7 +5692,9 @@ class SqliteService {
     String systemFolderName,
     String filename,
   ) async {
-    final system = await getSystemByFolderName(systemFolderName);
+    final system = await getSystemByFolderName(
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+    );
     final db = await instance.database;
     final results = await db.query(
       'user_roms',
@@ -5635,7 +5715,9 @@ class SqliteService {
     bool enabled,
   ) async {
     final db = await instance.database;
-    final system = await getSystemByFolderName(systemFolderName);
+    final system = await getSystemByFolderName(
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+    );
     await db.update(
       'user_roms',
       {'cloud_sync_enabled': enabled ? 1 : 0},
@@ -5655,7 +5737,9 @@ class SqliteService {
     bool hidden,
   ) async {
     final db = await instance.database;
-    final system = await getSystemByFolderName(systemFolderName);
+    final system = await getSystemByFolderName(
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+    );
     await db.update(
       'user_roms',
       {'is_hidden': hidden ? 1 : 0},
@@ -5667,11 +5751,11 @@ class SqliteService {
   /// Restores every hidden game of [systemId] in one shot.
   static Future<void> unhideAllRomsForSystem(String systemId) async {
     final db = await instance.database;
-    await db.update(
-      'user_roms',
-      {'is_hidden': 0},
-      where: 'app_system_id = ? AND is_hidden = 1',
-      whereArgs: [systemId],
+    final (where, args) = _systemRowsFilter(systemId);
+    await db.rawUpdate(
+      'UPDATE user_roms AS ur SET is_hidden = 0 '
+      'WHERE $where AND ur.is_hidden = 1',
+      args,
     );
   }
 
@@ -5689,8 +5773,10 @@ class SqliteService {
     String? systemId,
   }) async {
     final db = await instance.database;
-    final results = await db.rawQuery(
-      '''
+    final (where, args) = systemId == null
+        ? ('1 = 1', const <Object?>[])
+        : _systemRowsFilter(systemId);
+    final results = await db.rawQuery('''
       SELECT
         ur.filename, ur.rom_path, ur.is_favorite, ur.is_hidden, ur.play_time, ur.last_played,
         ur.cloud_sync_enabled, ur.title_id, ur.title_name,
@@ -5704,12 +5790,9 @@ class SqliteService {
       FROM user_roms ur
       JOIN app_systems s ON ur.app_system_id = s.id
       LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-      WHERE ur.is_hidden = 1
-        ${systemId == null ? '' : 'AND ur.app_system_id = ?'}
+      WHERE ur.is_hidden = 1 AND $where
       ORDER BY LOWER(system_real_name) ASC, LOWER(game_display_name) ASC
-    ''',
-      [?systemId],
-    );
+    ''', args);
 
     return results.map((row) => DatabaseGameModel.fromJson(row)).toList();
   }
@@ -5724,11 +5807,46 @@ class SqliteService {
       'SELECT app_system_id, COUNT(*) as count FROM user_roms '
       'WHERE is_hidden = 1 GROUP BY app_system_id',
     );
+    // "Android Games" owns no rows, so its hidden games are counted apart.
+    final (gamesWhere, gamesArgs) = _systemRowsFilter(
+      SystemFolderNames.androidGames,
+    );
+    final hiddenGames = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM user_roms ur '
+      'WHERE ur.is_hidden = 1 AND $gamesWhere',
+      gamesArgs,
+    );
+    final hiddenGameCount =
+        int.tryParse(hiddenGames.first['count']?.toString() ?? '0') ?? 0;
     return {
       for (final row in results)
         row['app_system_id'].toString():
             int.tryParse(row['count']?.toString() ?? '0') ?? 0,
+      if (hiddenGameCount > 0) SystemFolderNames.androidGames: hiddenGameCount,
     };
+  }
+
+  /// Marks the installed app [packageName] as a game ([isGame] true), which
+  /// lists it under "Android Games" instead of the Android tab, or sends it
+  /// back.
+  static Future<void> setAndroidGame(String packageName, bool isGame) async {
+    final db = await instance.database;
+    await db.update(
+      'user_roms',
+      {'is_android_game': isGame ? 1 : 0},
+      where: "rom_path = ? AND app_system_id = 'android'",
+      whereArgs: [packageName],
+    );
+  }
+
+  /// The packages of the installed apps the user marked as games.
+  static Future<List<String>> getAndroidGamePackages() async {
+    final db = await instance.database;
+    final rows = await db.rawQuery(
+      "SELECT ur.rom_path FROM user_roms ur WHERE ur.app_system_id = 'android' "
+      'AND $androidGameFlagSql',
+    );
+    return [for (final row in rows) row['rom_path'].toString()];
   }
 
   /// Resets a game's play statistics (time and last played) to zero.
@@ -5737,7 +5855,9 @@ class SqliteService {
     String filename,
   ) async {
     final db = await instance.database;
-    final system = await getSystemByFolderName(systemFolderName);
+    final system = await getSystemByFolderName(
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+    );
     await db.update(
       'user_roms',
       {'play_time': 0, 'last_played': null},
@@ -5754,7 +5874,9 @@ class SqliteService {
     int? emulatorOsId,
   ) async {
     final db = await instance.database;
-    final system = await getSystemByFolderName(systemFolderName);
+    final system = await getSystemByFolderName(
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+    );
     await db.update(
       'user_roms',
       {
@@ -5866,7 +5988,7 @@ class SqliteService {
     final db = await instance.database;
     await db.rawUpdate(
       'UPDATE user_roms SET box2d_aspect_ratio = ? WHERE app_system_id = ? AND filename = ?',
-      [ratio, systemId, filename],
+      [ratio, SystemFolderNames.rowSystemFolder(systemId), filename],
     );
   }
 

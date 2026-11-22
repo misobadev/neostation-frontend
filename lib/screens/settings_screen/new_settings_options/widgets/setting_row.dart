@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/widgets/custom_toggle_switch.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/neo_glass.dart';
 
 import 'settings_action_button.dart';
@@ -86,19 +87,22 @@ class SettingRow extends StatelessWidget {
     );
 
     final trailingTheme = _settingsTrailingTheme(context, focused: focused);
+    final radius =
+        (Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m())
+            .radiusInternalRadius;
     final row = Container(
       decoration: BoxDecoration(
         color: focused
             ? theme.colorScheme.onSurface
             : theme.colorScheme.surface.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: Colors.transparent, width: 2),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8.r),
+          borderRadius: BorderRadius.circular(radius),
           canRequestFocus: false,
           focusColor: Colors.transparent,
           hoverColor: Colors.transparent,
@@ -135,7 +139,11 @@ class SettingRow extends StatelessWidget {
     if (rimWidth <= 0) return row;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: (rimWidth / 2 + 0.5).r),
-      child: NeoGlassRim(cornerRadius: 8.r, borderWidth: rimWidth, child: row),
+      child: NeoGlassRim(
+        cornerRadius: radius,
+        borderWidth: rimWidth,
+        child: row,
+      ),
     );
   }
 }

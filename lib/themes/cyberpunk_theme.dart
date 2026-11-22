@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 
-const Color _primaryColor = Color(0xFFff6596);
-const Color _onPrimaryColor = Color(0xFF180408);
-const Color _secondaryColor = Color(0xFF00e8ff);
-const Color _onSecondaryColor = Color(0xFF001316);
+const Color _primaryColor = Color(0xFFD1005A);
+const Color _onPrimaryColor = Color(0xFFFFFFFF);
+const Color _secondaryColor = Color(0xFF006B7A);
+const Color _onSecondaryColor = Color(0xFFFFFFFF);
 const Color _surfaceColor = Color(0xFFe3d40e);
 const Color _onSurfaceColor = Color(0xFF111a3b);
 
@@ -14,19 +14,19 @@ const Color _shadowColor = Color(0xFF111a3b);
 
 const Color _backgroundColor = Color(0xFFfff248);
 
-const Color _batteryFull = Color(0xFF00a96e);
-const Color _batteryMedium = Color(0xFFffbe00);
-const Color _batteryLow = Color(0xFFff5861);
-const Color _batteryPower = Color(0xFF00b5ff);
+const Color _batteryFull = Color(0xFF00704A);
+const Color _batteryMedium = Color(0xFF9A5B00);
+const Color _batteryLow = Color(0xFFC4002B);
+const Color _batteryPower = Color(0xFF005FA3);
 
-const Color _errorColor = Color(0xFFff5861);
-const Color _onErrorColor = Color(0xFF000000);
-const Color _warningColor = Color(0xFFffbe00);
-const Color _onWarningColor = Color(0xFF000000);
-const Color _successColor = Color(0xFF00a96e);
-const Color _onSuccessColor = Color(0xFF000000);
-const Color _infoColor = Color(0xFF00b5ff);
-const Color _onInfoColor = Color(0xFF000000);
+const Color _errorColor = Color(0xFFC4002B);
+const Color _onErrorColor = Color(0xFFFFFFFF);
+const Color _warningColor = Color(0xFF9A5B00);
+const Color _onWarningColor = Color(0xFFFFFFFF);
+const Color _successColor = Color(0xFF00704A);
+const Color _onSuccessColor = Color(0xFFFFFFFF);
+const Color _infoColor = Color(0xFF005FA3);
+const Color _onInfoColor = Color(0xFFFFFFFF);
 
 final ThemeData cyberpunkTheme = ThemeData(
   useMaterial3: true,

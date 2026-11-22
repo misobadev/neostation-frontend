@@ -1,7 +1,7 @@
 part of '../ra_dashboard.dart';
 
-/// The profile hero: identity and standing first, with supporting lifetime
-/// stats kept in a quieter rail beneath it.
+/// The profile at the top of the sidebar: identity and standing first, then
+/// the lifetime stats as one row of numbers.
 ///
 /// All state lives on the host [State]; this extension only moves the
 /// methods out of the monolith — behaviour is unchanged.
@@ -43,148 +43,169 @@ extension _ProfileHeader on RADashboardHubState {
               .getString(context)
               .replaceFirst('{rank}', _formatRank(rank));
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(16.r, 14.r, 10.r, 12.r),
-      decoration: _cardDecoration(theme),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 56.r,
-                height: 56.r,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.35),
-                    width: 2.r,
-                  ),
-                ),
-                child: ClipOval(
-                  child: user.userPic.isNotEmpty
-                      ? Image.network(
-                          'https://retroachievements.org${user.userPic}',
-                          fit: BoxFit.cover,
-                          cacheWidth:
-                              (56 * MediaQuery.devicePixelRatioOf(context))
-                                  .ceil(),
-                          cacheHeight:
-                              (56 * MediaQuery.devicePixelRatioOf(context))
-                                  .ceil(),
-                          errorBuilder: (context, error, stackTrace) => Icon(
-                            Symbols.account_circle_rounded,
-                            color: theme.colorScheme.primary,
-                            size: 32.r,
-                          ),
-                        )
-                      : Icon(
-                          Symbols.account_circle_rounded,
-                          color: theme.colorScheme.primary,
-                          size: 32.r,
-                        ),
+    final avatarSize = 40.r;
+    final avatarFallback = Icon(
+      Symbols.account_circle_rounded,
+      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+      size: 26.r,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: avatarSize,
+              height: avatarSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                  width: 1.5.r,
                 ),
               ),
-              SizedBox(width: 12.r),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user.user,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18.r,
-                      ),
-                    ),
-                    SizedBox(height: 3.r),
-                    Text(
-                      standingLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.secondary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11.r,
-                      ),
-                    ),
-                    SizedBox(height: 3.r),
-                    Text(
-                      '${user.totalPoints} ${AppLocale.raPointsAbbrev.getString(context)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.68,
-                        ),
-                        fontSize: 10.r,
-                      ),
-                    ),
-                  ],
-                ),
+              child: ClipOval(
+                child: user.userPic.isNotEmpty
+                    ? Image.network(
+                        'https://retroachievements.org${user.userPic}',
+                        fit: BoxFit.cover,
+                        cacheWidth:
+                            (40 * MediaQuery.devicePixelRatioOf(context))
+                                .ceil(),
+                        cacheHeight:
+                            (40 * MediaQuery.devicePixelRatioOf(context))
+                                .ceil(),
+                        errorBuilder: (context, error, stackTrace) =>
+                            avatarFallback,
+                      )
+                    : avatarFallback,
               ),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8.r),
-                  border: Border.all(
-                    color: widget.logoutSelected
-                        ? theme.colorScheme.primary
-                        : Colors.transparent,
-                    width: 2.r,
+            ),
+            SizedBox(width: 10.r),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.user,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.r,
+                    ),
                   ),
-                ),
-                child: IconButton(
-                  onPressed: widget.onDisconnectRequested,
-                  icon: Icon(
-                    Symbols.logout_rounded,
-                    color: theme.colorScheme.error,
-                    size: 20.r,
+                  SizedBox(height: 2.r),
+                  Text(
+                    standingLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.secondary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 9.r,
+                    ),
                   ),
-                  tooltip: AppLocale.logout.getString(context),
-                ),
+                  SizedBox(height: 1.r),
+                  Text(
+                    '${user.totalPoints} ${AppLocale.raPointsAbbrev.getString(context)} · ${user.userType}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.68,
+                      ),
+                      fontSize: 9.r,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
+          ],
+        ),
+        SizedBox(height: 10.r),
+        Container(
+          padding: EdgeInsets.symmetric(vertical: 6.r),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
+            borderRadius:
+                theme.extension<CornerRadii>()?.radiusInternal ??
+                BorderRadius.circular(8.r),
           ),
-          SizedBox(height: 12.r),
-          Wrap(
-            spacing: 8.r,
-            runSpacing: 6.r,
-            children: [
-              _buildPill(
-                context,
-                icon: Symbols.shield_rounded,
-                label: user.userType,
-                color: theme.colorScheme.primary,
-              ),
-              _buildPill(
-                context,
-                icon: Symbols.sports_esports_rounded,
-                label: AppLocale.raGamesPlayed
-                    .getString(context)
-                    .replaceFirst('{count}', '$trackedGames'),
-                color: theme.colorScheme.primary,
-              ),
-              _buildPill(
-                context,
-                icon: Symbols.flag_rounded,
-                label: AppLocale.raGamesBeaten
-                    .getString(context)
-                    .replaceFirst('{count}', '$beatenGames'),
-                color: theme.colorScheme.secondary,
-              ),
-              _buildPill(
-                context,
-                icon: Symbols.workspace_premium_rounded,
-                label: '$highlightCount $highlightLabel',
-                color: highlightColor,
-              ),
-            ],
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                _profileStat(
+                  context,
+                  '$trackedGames',
+                  AppLocale.raStatPlayed.getString(context),
+                ),
+                _statDivider(theme),
+                _profileStat(
+                  context,
+                  '$beatenGames',
+                  AppLocale.raStatBeaten.getString(context),
+                ),
+                _statDivider(theme),
+                _profileStat(
+                  context,
+                  '$highlightCount',
+                  highlightLabel,
+                  color: highlightColor,
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
+      ],
+    );
+  }
+
+  Widget _profileStat(
+    BuildContext context,
+    String value,
+    String label, {
+    Color? color,
+  }) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Semantics(
+        label: '$value $label',
+        excludeSemantics: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 13.r,
+                fontWeight: FontWeight.w800,
+                color: color ?? theme.colorScheme.onSurface,
+              ),
+            ),
+            SizedBox(height: 1.r),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 7.5.r,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  Widget _statDivider(ThemeData theme) => VerticalDivider(
+    width: 1,
+    thickness: 1,
+    indent: 4.r,
+    endIndent: 4.r,
+    color: theme.colorScheme.outline.withValues(alpha: 0.2),
+  );
 
   String _formatRank(int rank) => rank.toString().replaceAllMapped(
     RegExp(r'\B(?=(\d{3})+(?!\d))'),

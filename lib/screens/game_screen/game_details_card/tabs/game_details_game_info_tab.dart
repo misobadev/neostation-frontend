@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -11,7 +12,6 @@ import '../../../../models/system_model.dart';
 import '../../../../models/game_model.dart';
 import '../../../../providers/file_provider.dart';
 import '../../../../services/screenscraper_service.dart';
-import '../../../../themes/chrome_surface.dart';
 import '../../../../themes/corner_radii.dart';
 import '../../../../utils/game_utils.dart';
 import '../widgets/panel_gate_highlight.dart';
@@ -250,7 +250,7 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
           duration: PanelGateHighlight.duration,
           curve: Curves.easeOut,
           decoration: BoxDecoration(
-            color: ChromeSurface.fill(context),
+            // The glass inside draws the fill.
             borderRadius:
                 Theme.of(context).extension<CornerRadii>()?.radiusExternal ??
                 BorderRadius.circular(14.r),
@@ -271,75 +271,81 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
               ),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(8.r, 8.r, 8.r, 0.r),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Symbols.info_rounded,
-                          color: Theme.of(context).colorScheme.onSurface,
-                          size: 13.r,
-                        ),
-                        // No title: the selected tab in the card's header strip
-                        // is already this icon, so naming the panel again only
-                        // costs the row room. Everything packs to the left into
-                        // the space it used to take.
-                        SizedBox(width: 8.r),
-                        // No gate chip: the panel's own edge carries that now, so
-                        // the row neither spends a slot on it nor re-packs itself
-                        // on the frame the drivability answer lands. The facts
-                        // strip starts at the same x on every game.
-                        // The facts take the rest of the row. A long publisher
-                        // name (or a system whose scrape fills every field) can
-                        // outrun it, so the strip marquees when it genuinely
-                        // overflows and sits still when it does not — the same
-                        // treatment the footer's metadata line gets, rather than
-                        // an overflow stripe or a truncated name.
-                        if (headerFacts.isNotEmpty)
-                          Expanded(
-                            child: SizedBox(
-                              height: _headerFactsHeight,
-                              child: ScrollingStatusLine(
-                                resetKey: widget.game.romname,
-                                children: headerFacts,
+          child: NeoGlass(
+            // Frosted like the game list beside it.
+            cornerRadius:
+                (Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m())
+                    .radiusExternalRadius,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(8.r, 8.r, 8.r, 0.r),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Symbols.info_rounded,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            size: 13.r,
+                          ),
+                          // No title: the selected tab in the card's header strip
+                          // is already this icon, so naming the panel again only
+                          // costs the row room. Everything packs to the left into
+                          // the space it used to take.
+                          SizedBox(width: 8.r),
+                          // No gate chip: the panel's own edge carries that now, so
+                          // the row neither spends a slot on it nor re-packs itself
+                          // on the frame the drivability answer lands. The facts
+                          // strip starts at the same x on every game.
+                          // The facts take the rest of the row. A long publisher
+                          // name (or a system whose scrape fills every field) can
+                          // outrun it, so the strip marquees when it genuinely
+                          // overflows and sits still when it does not — the same
+                          // treatment the footer's metadata line gets, rather than
+                          // an overflow stripe or a truncated name.
+                          if (headerFacts.isNotEmpty)
+                            Expanded(
+                              child: SizedBox(
+                                height: _headerFactsHeight,
+                                child: ScrollingStatusLine(
+                                  resetKey: widget.game.romname,
+                                  children: headerFacts,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                    Divider(
-                      color: Theme.of(context).colorScheme.onSurface
-                          .withValues(alpha: 0.1),
-                      height: 10.r,
-                    ),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.all(8.r),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // While scraping, the card lays ScrapingProgressPanel over
-                      // this whole region — every tab gets the same feedback, so
-                      // this tab no longer draws its own copy.
-                      return showScrapeView
-                          ? _buildNonScrapedView()
-                          : _buildScrapedView();
-                    },
+                        ],
+                      ),
+                      Divider(
+                        color: Theme.of(context).colorScheme.onSurface
+                            .withValues(alpha: 0.1),
+                        height: 10.r,
+                      ),
+                    ],
                   ),
                 ),
-              ),
 
-              _buildIdentityFooter(),
-            ],
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.all(8.r),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // While scraping, the card lays ScrapingProgressPanel over
+                        // this whole region — every tab gets the same feedback, so
+                        // this tab no longer draws its own copy.
+                        return showScrapeView
+                            ? _buildNonScrapedView()
+                            : _buildScrapedView();
+                      },
+                    ),
+                  ),
+                ),
+
+                _buildIdentityFooter(),
+              ],
+            ),
           ),
         ),
       ),

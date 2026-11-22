@@ -12,13 +12,13 @@ import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/sfx_service.dart';
-import 'package:neostation/utils/centered_scroll_controller.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/widgets/custom_notification.dart' as custom;
 import 'package:neostation/widgets/core_footer.dart';
 import 'package:neostation/widgets/neo_glass.dart';
+import 'package:neostation/widgets/neosync_logo.dart';
 
 import '../../app_screen.dart';
 import 'neo_sync_dialogs.dart';
@@ -35,7 +35,11 @@ enum _SaveRegion { search, filters, results, menu }
 class SaveListView extends StatefulWidget {
   final VoidCallback onBack;
 
-  const SaveListView({super.key, required this.onBack});
+  const SaveListView({super.key, required this.onBack, this.embedded = false});
+
+  /// Shown inside the NeoSync dashboard's panel, beside its sidebar: no room
+  /// left for the top dock, which the panel already clears.
+  final bool embedded;
 
   @override
   State<SaveListView> createState() => _SaveListViewState();
@@ -68,7 +72,9 @@ class _SaveListViewState extends State<SaveListView> {
 
   // ── Region-based focus (mirrors the search tab) ─────────────────────────
   _SaveRegion _region = _SaveRegion.search;
-  bool _filtersExpanded = true;
+
+  /// The filters sit beside the search field; there is no second row.
+  static const bool _filtersExpanded = false;
   int _searchIndex = 0;
   int _barIndex = 0;
   String? _menuKey;
@@ -78,7 +84,10 @@ class _SaveListViewState extends State<SaveListView> {
   final ScrollController _chipScroll = ScrollController();
   final Map<int, GlobalKey> _chipKeys = {};
   final ScrollController _menuScroll = ScrollController();
-  static const double _menuExtent = 44;
+  static const double _menuExtent = 26;
+
+  /// The search band's height: the field and the filter chips alike.
+  double get _bandHeight => 22.r;
 
   @override
   void initState() {
@@ -138,6 +147,9 @@ class _SaveListViewState extends State<SaveListView> {
       _savesGamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
         'neo_sync_save_list',
+        // In the NeoSync dashboard's panel the sidebar's menu keeps the
+        // D-pad until the panel is entered: slot in beneath it.
+        background: widget.embedded,
         onActivate: () {
           _savesGamepadNav.activate();
           if (_keepSelectionOnActivate) {
@@ -153,11 +165,16 @@ class _SaveListViewState extends State<SaveListView> {
 
   // ── Region helpers ──────────────────────────────────────────────────────
 
-  /// Focusable items in the search band, left to right.
+  /// The filters shown beside the search field: system, emulator and sort.
+  /// Scope stays on its default (all saves).
+  static const List<String> _filterKeys = ['system', 'emulator', 'sort'];
+
+  /// Focusable items in the search band, left to right: the field, its
+  /// clear button while there is a query, and the filters.
   List<String> get _searchItems => [
     'field',
     if (_onlineSearchController.text.isNotEmpty) 'clearQuery',
-    'filters',
+    ..._filterKeys,
   ];
 
   int get _lastSearchIndex => _searchItems.length - 1;
@@ -169,22 +186,7 @@ class _SaveListViewState extends State<SaveListView> {
       _region == _SaveRegion.search && _focusedSearchItem == key;
 
   /// Focusable filter chips, left to right.
-  List<String> get _barItems => ['scope', 'system', 'emulator', 'sort'];
-
-  void _toggleFilters() {
-    setState(() {
-      _onlineSearchFocus.unfocus();
-      _filtersExpanded = !_filtersExpanded;
-      if (_filtersExpanded) {
-        _region = _SaveRegion.filters;
-        _barIndex = 0;
-      } else {
-        _region = _SaveRegion.search;
-        _searchIndex = _searchItems.indexOf('filters');
-      }
-    });
-    SfxService().playNavSound();
-  }
+  List<String> get _barItems => _filterKeys;
 
   void _clearQuery() {
     setState(() {
@@ -201,16 +203,6 @@ class _SaveListViewState extends State<SaveListView> {
     setState(() {
       _region = _SaveRegion.search;
       _searchIndex = 0;
-    });
-    SfxService().playNavSound();
-  }
-
-  void _jumpToSearchItem(String item) {
-    final index = _searchItems.indexOf(item);
-    if (index < 0) return;
-    setState(() {
-      _region = _SaveRegion.search;
-      _searchIndex = index;
     });
     SfxService().playNavSound();
   }
@@ -232,7 +224,7 @@ class _SaveListViewState extends State<SaveListView> {
         _scrollChipIntoView();
         SfxService().playNavSound();
       case _SaveRegion.results:
-        _jumpToSearchItem('field');
+        _moveInGrid(-1);
     }
   }
 
@@ -250,7 +242,7 @@ class _SaveListViewState extends State<SaveListView> {
         _scrollChipIntoView();
         SfxService().playNavSound();
       case _SaveRegion.results:
-        _jumpToSearchItem('filters');
+        _moveInGrid(1);
     }
   }
 
@@ -263,7 +255,9 @@ class _SaveListViewState extends State<SaveListView> {
           context,
           listen: false,
         );
-        if (_selectedSaveIndex == 0 || !_rowsShown(neoSyncProvider)) {
+        // From the card's first row, Up goes back to the filters.
+        if (_selectedSaveIndex < OnlineSavesListView.columns ||
+            !_rowsShown(neoSyncProvider)) {
           setState(() {
             _region = _filtersExpanded
                 ? _SaveRegion.filters
@@ -333,10 +327,10 @@ class _SaveListViewState extends State<SaveListView> {
         switch (_focusedSearchItem) {
           case 'clearQuery':
             _clearQuery();
-          case 'filters':
-            _toggleFilters();
-          default:
+          case 'field':
             _onlineSearchFocus.requestFocus();
+          default:
+            _openFilterMenu(_focusedSearchItem);
         }
       case _SaveRegion.filters:
         _openFilterMenu(_barItems[_barIndex]);
@@ -380,10 +374,17 @@ class _SaveListViewState extends State<SaveListView> {
   }
 
   void _cancelMenu() {
-    setState(() {
-      _menuKey = null;
-      _region = _SaveRegion.filters;
-    });
+    setState(_returnFromMenu);
+  }
+
+  /// Back on the chip the menu was opened from, in the search band.
+  void _returnFromMenu() {
+    final key = _menuKey;
+    _menuKey = null;
+    _region = _SaveRegion.search;
+    if (key != null && _searchItems.contains(key)) {
+      _searchIndex = _searchItems.indexOf(key);
+    }
   }
 
   void _moveMenuSelection(int delta) {
@@ -432,8 +433,7 @@ class _SaveListViewState extends State<SaveListView> {
           );
         }
     }
-    setState(() => _menuKey = null);
-    _region = _SaveRegion.filters;
+    setState(_returnFromMenu);
     SfxService().playNavSound();
   }
 
@@ -603,29 +603,46 @@ class _SaveListViewState extends State<SaveListView> {
     _resetSelection();
   }
 
+  /// Up a row on the card ([_navigateUp] leaves it from the first row).
   void _navigateSavesUp() {
     final neoSyncProvider = Provider.of<NeoSyncProvider>(
       context,
       listen: false,
     );
-    if (neoSyncProvider.onlineFiles.isNotEmpty) {
-      final newIndex = _selectedSaveIndex > 0
-          ? _selectedSaveIndex - 1
-          : neoSyncProvider.onlineFiles.length - 1;
-      _updateSelectionIndex(newIndex);
-    }
+    if (!_rowsShown(neoSyncProvider)) return;
+    final up = _selectedSaveIndex - OnlineSavesListView.columns;
+    if (up >= 0) _updateSelectionIndex(up);
   }
 
+  /// Down a row on the card: onto the save below, or the last one when the
+  /// row below is shorter. Nothing below the last row.
   void _navigateSavesDown() {
     final neoSyncProvider = Provider.of<NeoSyncProvider>(
       context,
       listen: false,
     );
-    if (_rowsShown(neoSyncProvider)) {
-      final newIndex =
-          (_selectedSaveIndex + 1) % neoSyncProvider.onlineFiles.length;
-      _updateSelectionIndex(newIndex);
+    if (!_rowsShown(neoSyncProvider)) return;
+    final count = neoSyncProvider.onlineFiles.length;
+    const columns = OnlineSavesListView.columns;
+    final down = _selectedSaveIndex + columns;
+    if (down < count) {
+      _updateSelectionIndex(down);
+    } else if (_selectedSaveIndex ~/ columns < (count - 1) ~/ columns) {
+      _updateSelectionIndex(count - 1);
     }
+  }
+
+  /// Left or right along the card, row to row, stopping at either end.
+  void _moveInGrid(int delta) {
+    final neoSyncProvider = Provider.of<NeoSyncProvider>(
+      context,
+      listen: false,
+    );
+    if (!_rowsShown(neoSyncProvider)) return;
+    final next = _selectedSaveIndex + delta;
+    if (next < 0 || next >= neoSyncProvider.onlineFiles.length) return;
+    _updateSelectionIndex(next);
+    SfxService().playNavSound();
   }
 
   void _updateSelectionIndex(int newIndex) {
@@ -823,21 +840,18 @@ class _SaveListViewState extends State<SaveListView> {
     return Stack(
       children: [
         Padding(
-          padding: EdgeInsets.only(
-            top: 52.r,
-            left: 8.r,
-            right: 8.r,
-            bottom: 8.r,
-          ),
+          padding: widget.embedded
+              ? EdgeInsets.zero
+              : EdgeInsets.only(top: 52.r, left: 8.r, right: 8.r, bottom: 8.r),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildSearchRow(theme),
               if (_filtersExpanded) ...[
-                SizedBox(height: 6.r),
+                SizedBox(height: 4.r),
                 _buildFilterChips(theme),
               ],
-              SizedBox(height: 8.r),
+              SizedBox(height: 6.r),
               Expanded(
                 child: Consumer<NeoSyncProvider>(
                   builder: (context, neoSyncProvider, child) {
@@ -846,7 +860,7 @@ class _SaveListViewState extends State<SaveListView> {
                           (theme.extension<CornerRadii>() ?? CornerRadii.m())
                               .radiusExternalRadius,
                       child: Container(
-                        padding: EdgeInsets.all(6.r),
+                        padding: EdgeInsets.all(4.r),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.surface,
                           borderRadius:
@@ -860,8 +874,9 @@ class _SaveListViewState extends State<SaveListView> {
                           ),
                         ),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            _buildCardHeader(theme, neoSyncProvider),
                             Expanded(
                               child: neoSyncProvider.isLoadingOnlineFiles
                                   ? const Center(
@@ -879,7 +894,22 @@ class _SaveListViewState extends State<SaveListView> {
                                       },
                                     ),
                             ),
-                            _buildPagination(context, neoSyncProvider),
+                            if (_rowsShown(neoSyncProvider)) ...[
+                              Divider(
+                                height: 1,
+                                color: theme.colorScheme.outline.withValues(
+                                  alpha: 0.2,
+                                ),
+                              ),
+                              SaveDetailPanel(
+                                file:
+                                    neoSyncProvider
+                                        .onlineFiles[_selectedSaveIndex.clamp(
+                                      0,
+                                      neoSyncProvider.onlineFiles.length - 1,
+                                    )],
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -918,106 +948,68 @@ class _SaveListViewState extends State<SaveListView> {
     );
   }
 
+  /// The search field with the filters beside it, on one row.
   Widget _buildSearchRow(ThemeData theme) {
     return Row(
       children: [
         Expanded(child: _buildNameField(theme, _searchFocused('field'))),
-        SizedBox(width: 10.r),
-        _buildAdvancedToggle(theme, _searchFocused('filters')),
+        for (final key in _filterKeys) ...[
+          SizedBox(width: 6.r),
+          _buildFilterChip(theme, key, _searchFocused(key)),
+        ],
       ],
-    );
-  }
-
-  Widget _buildAdvancedToggle(ThemeData theme, bool focused) {
-    final palette = _selectionPalette(
-      theme,
-      focused: focused,
-      selected: _filtersExpanded,
-    );
-    final foreground = palette.foreground;
-    return GestureDetector(
-      onTap: _toggleFilters,
-      child: NeoGlassRim(
-        cornerRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
-            .radiusInternalRadius,
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 9.r),
-          decoration: BoxDecoration(
-            color: palette.background,
-            borderRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
-                .radiusInternal,
-            border: Border.all(color: Colors.transparent, width: 2.r),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Symbols.tune_rounded, size: 18.r, color: foreground),
-              SizedBox(width: 6.r),
-              Text(
-                AppLocale.searchFilters.getString(context),
-                style: TextStyle(
-                  fontSize: 13.r,
-                  fontWeight: FontWeight.w700,
-                  color: foreground,
-                ),
-              ),
-              SizedBox(width: 4.r),
-              Icon(
-                _filtersExpanded
-                    ? Symbols.expand_less_rounded
-                    : Symbols.expand_more_rounded,
-                size: 16.r,
-                color: foreground.withValues(alpha: 0.75),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
   Widget _buildNameField(ThemeData theme, bool focused) {
     final scheme = theme.colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: focused ? scheme.primary : Colors.transparent,
-          width: 2.r,
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    // The filter chips' box: the same glass rim, corners, fill and height,
+    // so the row reads as one band. Focus is the field's own edge.
+    final palette = _selectionPalette(theme, focused: false);
+    return NeoGlassRim(
+      cornerRadius: radii.radiusInternalRadius,
+      child: Container(
+        height: _bandHeight,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: palette.background,
+          borderRadius: radii.radiusInternal,
+          border: Border.all(
+            color: focused ? scheme.onSurface : Colors.transparent,
+            width: 2.r,
+          ),
         ),
-      ),
-      child: TextField(
-        controller: _onlineSearchController,
-        focusNode: _onlineSearchFocus,
-        textInputAction: TextInputAction.done,
-        onTap: _focusNameField,
-        onChanged: (value) {
-          setState(() {}); // refresh the clear/filters band items
-          _onOnlineSearchChanged(value);
-        },
-        onSubmitted: (_) => _onlineSearchFocus.unfocus(),
-        style: TextStyle(fontSize: 13.r, color: scheme.onSurface),
-        decoration: InputDecoration(
-          hintText: AppLocale.searchSavesHint.getString(context),
-          hintStyle: TextStyle(
-            fontSize: 13.r,
-            color: scheme.onSurface.withValues(alpha: 0.5),
+        child: TextField(
+          controller: _onlineSearchController,
+          focusNode: _onlineSearchFocus,
+          textInputAction: TextInputAction.done,
+          onTap: _focusNameField,
+          onChanged: (value) {
+            setState(() {}); // refresh the clear/filters band items
+            _onOnlineSearchChanged(value);
+          },
+          onSubmitted: (_) => _onlineSearchFocus.unfocus(),
+          style: TextStyle(fontSize: 9.r, color: scheme.onSurface),
+          decoration: InputDecoration(
+            hintText: AppLocale.searchSavesHint.getString(context),
+            hintStyle: TextStyle(
+              fontSize: 9.r,
+              color: scheme.onSurface.withValues(alpha: 0.5),
+            ),
+            prefixIcon: Icon(Symbols.search_rounded, size: 12.r),
+            prefixIconConstraints: BoxConstraints(minWidth: 24.r, minHeight: 0),
+            suffixIcon: _onlineSearchController.text.isEmpty
+                ? null
+                : _buildClearQueryButton(theme, _searchFocused('clearQuery')),
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 6.r),
+            filled: false,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
           ),
-          prefixIcon: Icon(Symbols.search_rounded, size: 18.r),
-          suffixIcon: _onlineSearchController.text.isEmpty
-              ? null
-              : _buildClearQueryButton(theme, _searchFocused('clearQuery')),
-          isDense: true,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: 12.r,
-            vertical: 10.r,
-          ),
-          filled: true,
-          fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.r),
-            borderSide: BorderSide.none,
-          ),
+          textAlignVertical: TextAlignVertical.center,
         ),
       ),
     );
@@ -1101,9 +1093,12 @@ class _SaveListViewState extends State<SaveListView> {
       child: NeoGlassRim(
         cornerRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
             .radiusInternalRadius,
+        // No margin inside the rim: the rim traces this box, so a margin
+        // here drew the outline wider than the fill. The row spaces the
+        // chips.
         child: Container(
-          margin: EdgeInsets.only(right: 8.r),
-          padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
+          height: _bandHeight,
+          padding: EdgeInsets.symmetric(horizontal: 8.r),
           decoration: BoxDecoration(
             color: palette.background,
             borderRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
@@ -1116,7 +1111,7 @@ class _SaveListViewState extends State<SaveListView> {
               Text(
                 _barLabel(key),
                 style: TextStyle(
-                  fontSize: 13.r,
+                  fontSize: 8.r,
                   fontWeight: FontWeight.w600,
                   color: foreground,
                 ),
@@ -1124,7 +1119,7 @@ class _SaveListViewState extends State<SaveListView> {
               SizedBox(width: 4.r),
               Icon(
                 Symbols.expand_more_rounded,
-                size: 16.r,
+                size: 11.r,
                 color: foreground.withValues(alpha: 0.75),
               ),
             ],
@@ -1146,10 +1141,12 @@ class _SaveListViewState extends State<SaveListView> {
             child: GestureDetector(
               onTap: () {},
               child: Container(
-                width: 340.r,
+                width: 180.r,
                 decoration: BoxDecoration(
                   color: scheme.surface,
-                  borderRadius: BorderRadius.circular(16.r),
+                  borderRadius:
+                      (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                          .radiusExternal,
                   border: Border.all(
                     color: scheme.primary.withValues(alpha: 0.4),
                     width: 1.r,
@@ -1160,11 +1157,12 @@ class _SaveListViewState extends State<SaveListView> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: EdgeInsets.all(12.r),
+                      padding: EdgeInsets.fromLTRB(10.r, 8.r, 10.r, 6.r),
                       child: Text(
                         key.toUpperCase(),
                         style: TextStyle(
-                          fontSize: 13.r,
+                          fontSize: 9.r,
+                          letterSpacing: 1.2.r,
                           fontWeight: FontWeight.w700,
                           color: scheme.onSurface,
                         ),
@@ -1172,7 +1170,10 @@ class _SaveListViewState extends State<SaveListView> {
                     ),
                     Divider(height: 1.r),
                     SizedBox(
-                      height: 260.r,
+                      // As tall as its options, up to six of them.
+                      height:
+                          _menuExtent.r *
+                          (options.length < 6 ? options.length : 6),
                       child: ListView.builder(
                         controller: _menuScroll,
                         itemExtent: _menuExtent.r,
@@ -1187,8 +1188,8 @@ class _SaveListViewState extends State<SaveListView> {
                             },
                             child: Container(
                               padding: EdgeInsets.symmetric(
-                                horizontal: 16.r,
-                                vertical: 8.r,
+                                horizontal: 10.r,
+                                vertical: 2.r,
                               ),
                               decoration: BoxDecoration(
                                 color: isSelected
@@ -1211,7 +1212,7 @@ class _SaveListViewState extends State<SaveListView> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        fontSize: 13.r,
+                                        fontSize: 10.r,
                                         fontWeight: isSelected
                                             ? FontWeight.w700
                                             : FontWeight.w500,
@@ -1224,7 +1225,7 @@ class _SaveListViewState extends State<SaveListView> {
                                   if (isSelected)
                                     Icon(
                                       Symbols.check_rounded,
-                                      size: 16.r,
+                                      size: 12.r,
                                       color: scheme.surface,
                                     ),
                                 ],
@@ -1282,6 +1283,35 @@ class _SaveListViewState extends State<SaveListView> {
     );
   }
 
+  /// The card's title row: NeoSync's isotype, "Online saves", and the page
+  /// controls on the right.
+  Widget _buildCardHeader(ThemeData theme, NeoSyncProvider provider) {
+    final color = theme.colorScheme.onSurface;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(4.r, 0, 0, 2.r),
+      child: Row(
+        children: [
+          NeoSyncLogo.isotype(height: 10.r),
+          SizedBox(width: 8.r),
+          Expanded(
+            child: Text(
+              AppLocale.onlineSaves.getString(context).toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 9.r,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5.r,
+                color: color,
+              ),
+            ),
+          ),
+          _buildPagination(context, provider),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPagination(BuildContext context, NeoSyncProvider provider) {
     if (provider.onlineTotalPages <= 1) return const SizedBox.shrink();
     final theme = Theme.of(context);
@@ -1294,7 +1324,7 @@ class _SaveListViewState extends State<SaveListView> {
     // with it when there is no page to turn to.
     Widget trigger(String iconPath, {required bool enabled}) => SizedBox(
       width: 14.r,
-      height: 14.r,
+      height: 12.r,
       child: Image.asset(
         iconPath,
         color: enabled
@@ -1303,33 +1333,46 @@ class _SaveListViewState extends State<SaveListView> {
         colorBlendMode: BlendMode.srcIn,
       ),
     );
+    // The arrows at their icon's size: an IconButton's minimum touch target
+    // made this header twice as tall as its text.
+    Widget arrow(IconData icon, VoidCallback? onTap) => InkWell(
+      onTap: onTap,
+      canRequestFocus: false,
+      borderRadius: BorderRadius.circular(6.r),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 4.r, vertical: 1.r),
+        child: Icon(
+          icon,
+          size: 13.r,
+          color: onTap == null
+              ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+              : theme.colorScheme.onSurface,
+        ),
+      ),
+    );
     return Padding(
-      padding: EdgeInsets.only(top: 2.r),
+      padding: EdgeInsets.zero,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           trigger(
             'assets/images/gamepad/Xbox_LT_trigger.png',
             enabled: canGoBack,
           ),
-          IconButton(
-            onPressed: canGoBack ? () => _changePage(forward: false) : null,
-            icon: Icon(Symbols.chevron_left_rounded, size: 16.r),
-            visualDensity: VisualDensity.compact,
-            color: theme.colorScheme.onSurface,
+          arrow(
+            Symbols.chevron_left_rounded,
+            canGoBack ? () => _changePage(forward: false) : null,
           ),
           Text(
             AppLocale.pageOf
                 .getString(context)
                 .replaceFirst('{current}', '${provider.onlinePage}')
                 .replaceFirst('{total}', '${provider.onlineTotalPages}'),
-            style: TextStyle(fontSize: 10.r, color: textColor),
+            style: TextStyle(fontSize: 8.r, color: textColor),
           ),
-          IconButton(
-            onPressed: canGoOn ? () => _changePage(forward: true) : null,
-            icon: Icon(Symbols.chevron_right_rounded, size: 16.r),
-            visualDensity: VisualDensity.compact,
-            color: theme.colorScheme.onSurface,
+          arrow(
+            Symbols.chevron_right_rounded,
+            canGoOn ? () => _changePage(forward: true) : null,
           ),
           trigger(
             'assets/images/gamepad/Xbox_RT_trigger.png',
@@ -1381,12 +1424,18 @@ class _FilterOption {
   const _FilterOption({required this.label, this.value});
 }
 
-/// Gamepad-navigable, centered list of online saves.
+/// The online saves as a memory card: each save a square block with its game's
+/// art (or its system, without art), the highlighted one ringed, and the rest
+/// of the card's slots drawn empty. The name, path and size of the highlighted
+/// save show under the grid ([SaveDetailPanel]), not on the blocks.
 class OnlineSavesListView extends StatefulWidget {
   final List<NeoSyncFile> files;
   final int selectedIndex;
   final Function(int) onSelectionChanged;
   final bool isNavigatingFast;
+
+  /// Blocks per row; the D-pad moves a row up or down by this many.
+  static const int columns = 8;
 
   const OnlineSavesListView({
     super.key,
@@ -1400,371 +1449,321 @@ class OnlineSavesListView extends StatefulWidget {
   State<OnlineSavesListView> createState() => OnlineSavesListViewState();
 }
 
-class OnlineSavesListViewState extends State<OnlineSavesListView>
-    with TickerProviderStateMixin {
-  late final CenteredScrollController _centeredScrollController;
-  late AnimationController _selectionController;
-  late Animation<double> _selectionAnimation;
+class OnlineSavesListViewState extends State<OnlineSavesListView> {
+  final ScrollController _scroll = ScrollController();
 
-  @override
-  void initState() {
-    super.initState();
-
-    _centeredScrollController = CenteredScrollController(centerPosition: 0.5);
-
-    _selectionController = AnimationController(
-      duration: const Duration(milliseconds: 120),
-      vsync: this,
-    );
-    _selectionAnimation = AlwaysStoppedAnimation(
-      widget.selectedIndex.toDouble(),
-    );
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _centeredScrollController.initialize(
-          context: context,
-          initialIndex: widget.selectedIndex,
-          totalItems: widget.files.length,
-        );
-        _centeredScrollController.scrollToIndex(
-          widget.selectedIndex,
-          immediate: true,
-        );
-      }
-    });
-  }
+  /// One block plus the gap under it, and the grid's visible height, as laid
+  /// out last: what keeping the highlighted row on screen needs.
+  double _rowExtent = 0;
+  double _viewport = 0;
 
   @override
   void didUpdateWidget(OnlineSavesListView oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    if (oldWidget.files.length != widget.files.length) {
-      _centeredScrollController.updateTotalItems(widget.files.length);
-    }
-
     if (oldWidget.selectedIndex != widget.selectedIndex) {
-      final animationDuration = widget.isNavigatingFast
-          ? const Duration(milliseconds: 120)
-          : const Duration(milliseconds: 250);
-
-      final scrollDuration = widget.isNavigatingFast
-          ? const Duration(milliseconds: 180)
-          : const Duration(milliseconds: 360);
-
-      const curve = Curves.easeOutQuart;
-
-      final double begin = _selectionAnimation.value;
-      final double end = widget.selectedIndex.toDouble();
-
-      _selectionController.duration = animationDuration;
-      _selectionAnimation = Tween<double>(
-        begin: begin,
-        end: end,
-      ).animate(CurvedAnimation(parent: _selectionController, curve: curve));
-
-      _selectionController.forward(from: 0);
-
-      _centeredScrollController.updateSelectedIndex(widget.selectedIndex);
-      if (_centeredScrollController.scrollController.hasClients) {
-        _centeredScrollController.scrollToIndex(
-          widget.selectedIndex,
-          duration: scrollDuration,
-          curve: curve,
-        );
-      }
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => scrollToIndex(widget.selectedIndex),
+      );
     }
   }
 
   @override
   void dispose() {
-    _centeredScrollController.dispose();
-    _selectionController.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
+  /// Scrolls just enough to show [index]'s row.
   void scrollToIndex(int index, {bool immediate = false}) {
-    if (_centeredScrollController.scrollController.hasClients) {
-      _centeredScrollController.scrollToIndex(index, immediate: immediate);
+    if (!_scroll.hasClients || _rowExtent <= 0) return;
+    final row = index ~/ OnlineSavesListView.columns;
+    final top = row * _rowExtent;
+    final bottom = top + _rowExtent;
+    final offset = _scroll.offset;
+    double? target;
+    if (top < offset) {
+      target = top;
+    } else if (bottom > offset + _viewport) {
+      target = bottom - _viewport;
+    }
+    if (target == null) return;
+    target = target.clamp(0.0, _scroll.position.maxScrollExtent);
+    if (immediate) {
+      _scroll.jumpTo(target);
+    } else {
+      _scroll.animateTo(
+        target,
+        duration: widget.isNavigatingFast
+            ? const Duration(milliseconds: 120)
+            : const Duration(milliseconds: 220),
+        curve: Curves.easeOutQuart,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final double itemHeight = 56.r;
-    final double marginBottom = 4.r;
-    final double totalItemHeight = itemHeight + marginBottom;
-
-    return Stack(
-      children: [
-        AnimatedBuilder(
-          animation: Listenable.merge([
-            _selectionController,
-            _centeredScrollController.scrollController,
-          ]),
-          builder: (context, child) {
-            final double scrollOffset =
-                _centeredScrollController.scrollController.hasClients
-                ? _centeredScrollController.scrollController.offset
-                : 0.0;
-
-            final double currentSelection = _selectionAnimation.value;
-
-            final double topPosition =
-                (currentSelection * totalItemHeight) + 4.r - scrollOffset;
-
-            return Positioned(
-              top: topPosition,
-              left: 4.r,
-              right: 4.r,
-              height: itemHeight,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurface,
-                  borderRadius: BorderRadius.circular(12.r),
-                ),
+    const columns = OnlineSavesListView.columns;
+    final spacing = 6.r;
+    final padding = 2.r;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tile =
+            (constraints.maxWidth - padding * 2 - spacing * (columns - 1)) /
+            columns;
+        _rowExtent = tile + spacing;
+        _viewport = constraints.maxHeight;
+        final rows = (widget.files.length / columns).ceil();
+        // The card's empty slots finish the last row and fill the space left,
+        // as on a memory card.
+        final visibleRows = ((constraints.maxHeight - padding) / _rowExtent)
+            .floor();
+        final totalRows = rows > visibleRows ? rows : visibleRows;
+        return GridView.builder(
+          controller: _scroll,
+          padding: EdgeInsets.all(padding),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisSpacing: spacing,
+            crossAxisSpacing: spacing,
+          ),
+          itemCount: totalRows * columns,
+          itemBuilder: (context, index) {
+            if (index >= widget.files.length) return const _EmptySaveSlot();
+            return GestureDetector(
+              onTap: () {
+                SfxService().playNavSound();
+                widget.onSelectionChanged(index);
+              },
+              child: _SaveBlock(
+                key: ValueKey('save_item_$index'),
+                file: widget.files[index],
+                selected: index == widget.selectedIndex,
               ),
             );
           },
-        ),
-        ValueListenableBuilder<int>(
-          valueListenable: _centeredScrollController.rebuildNotifier,
-          builder: (context, rebuildCount, _) {
-            return ListView.builder(
-              key: ValueKey('online_saves_list_$rebuildCount'),
-              controller: _centeredScrollController.scrollController,
-              padding: EdgeInsets.symmetric(vertical: 4.r, horizontal: 4.w),
-              itemCount: widget.files.length,
-              itemBuilder: (context, index) {
-                return GestureDetector(
-                  onTap: () {
-                    SfxService().playNavSound();
-                    widget.onSelectionChanged(index);
-                  },
-                  child: _buildOnlineSaveItem(
-                    context,
-                    widget.files[index],
-                    index,
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      ],
+        );
+      },
     );
   }
+}
 
-  Widget _buildSaveThumb(NeoSyncFile file, bool isSelected) {
-    final gameHash = file.gameHash;
-    if (gameHash == null || gameHash.isEmpty) {
-      return _buildSaveThumbIcon(isSelected);
-    }
+/// One save on the card: its game's art, or its system's name without art.
+class _SaveBlock extends StatelessWidget {
+  const _SaveBlock({super.key, required this.file, required this.selected});
 
-    final imageUrl = 'https://media.neosync.cloud/games/$gameHash.webp';
-    return Container(
-      width: 44.r,
-      height: 44.r,
+  final NeoSyncFile file;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radius =
+        (theme.extension<CornerRadii>() ?? CornerRadii.m()).radiusInternal;
+    final hash = file.gameHash;
+    final fallback = _SystemLabel(file: file);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      padding: EdgeInsets.all(selected ? 2.r : 0),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10.r),
+        borderRadius: radius,
+        // The highlight is a solid ring, as everywhere in the app: no glow.
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.25),
-          width: 0.5.r,
+          color: selected ? scheme.onSurface : Colors.transparent,
+          width: 2.r,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 2.r,
-            offset: Offset(1.0.r, 1.0.r),
-          ),
-        ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.network(
-        imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
-            _buildSaveThumbIcon(isSelected),
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Container(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-            child: Center(
-              child: SizedBox(
-                width: 14.r,
-                height: 14.r,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.r,
-                  color: Theme.of(context).colorScheme.primary,
+      child: ClipRRect(
+        borderRadius: radius,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.2)),
+            borderRadius: radius,
+          ),
+          child: hash == null || hash.isEmpty
+              ? fallback
+              : Image.network(
+                  'https://media.neosync.cloud/games/$hash.webp',
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  errorBuilder: (context, error, stackTrace) => fallback,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A block without art: the save's system in short, or a save icon.
+class _SystemLabel extends StatelessWidget {
+  const _SystemLabel({required this.file});
+
+  final NeoSyncFile file;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.onSurface
+        .withValues(alpha: 0.7);
+    final system = file.systemName;
+    return Center(
+      child: system == null || system.isEmpty
+          ? Icon(Symbols.save_rounded, size: 18.r, color: color)
+          : Padding(
+              padding: EdgeInsets.all(4.r),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  system.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10.r,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.r,
+                    color: color,
+                  ),
                 ),
               ),
             ),
-          );
-        },
-      ),
     );
   }
+}
 
-  Widget _buildSaveThumbIcon(bool isSelected) {
-    return Container(
-      width: 44.r,
-      height: 44.r,
-      decoration: BoxDecoration(
-        color: isSelected
-            ? Theme.of(context).colorScheme.surface.withValues(alpha: 0.12)
-            : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10.r),
-      ),
-      child: Icon(
-        Symbols.save_rounded,
-        color: isSelected
-            ? Theme.of(context).colorScheme.surface
-            : Theme.of(context).colorScheme.primary,
-        size: 22.r,
-      ),
-    );
-  }
+/// A free slot on the card, drawn dashed.
+class _EmptySaveSlot extends StatelessWidget {
+  const _EmptySaveSlot();
 
-  Widget _buildOnlineSaveItem(
-    BuildContext context,
-    NeoSyncFile file,
-    int index,
-  ) {
-    final isSelected = index == widget.selectedIndex;
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final radius = (theme.extension<CornerRadii>() ?? CornerRadii.m())
+        .radiusInternalRadius;
+    return CustomPaint(
+      painter: _DashedSlotPainter(
+        color: theme.colorScheme.outline.withValues(alpha: 0.35),
+        radius: radius,
+        dash: 5.r,
+        gap: 4.r,
+        stroke: 1.5.r,
+      ),
+    );
+  }
+}
 
-    // File name without the cloud path (v2/saves/system/emulator/.../game.ext).
+class _DashedSlotPainter extends CustomPainter {
+  _DashedSlotPainter({
+    required this.color,
+    required this.radius,
+    required this.dash,
+    required this.gap,
+    required this.stroke,
+  });
+
+  final Color color;
+  final double radius;
+  final double dash;
+  final double gap;
+  final double stroke;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+    final inset = stroke / 2;
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            inset,
+            inset,
+            size.width - stroke,
+            size.height - stroke,
+          ),
+          Radius.circular(radius),
+        ),
+      );
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(metric.extractPath(distance, distance + dash), paint);
+        distance += dash + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedSlotPainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.radius != radius ||
+      oldDelegate.stroke != stroke;
+}
+
+/// Under the card: the highlighted save's name, where it is kept on disk, its
+/// size, system and emulator, and whether it is a save or a state.
+class SaveDetailPanel extends StatelessWidget {
+  const SaveDetailPanel({super.key, required this.file});
+
+  final NeoSyncFile file;
+
+  static String _date(DateTime date) {
+    final local = date.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final fileName = file.fileName.contains('/') || file.fileName.contains('\\')
         ? p.basename(file.fileName.replaceAll('\\', '/'))
         : file.fileName;
-
-    return Container(
-      key: ValueKey('save_item_$index'),
-      height: 56.r,
-      margin: EdgeInsets.only(bottom: 4.r),
-      padding: EdgeInsets.all(6.r),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: isSelected
-              ? Colors.transparent
-              : theme.colorScheme.outline.withValues(alpha: 0.2),
-          width: 0.5.r,
-        ),
-      ),
+    final meta = [
+      if (file.systemName != null && file.systemName!.isNotEmpty)
+        file.systemName!,
+      if (file.emulator != null && file.emulator!.isNotEmpty) file.emulator!,
+      _date(file.fileModifiedAt ?? file.uploadedAt),
+    ].join('  ·  ');
+    final muted = scheme.onSurface.withValues(alpha: 0.6);
+    // Two small lines, the card header's size, so the grid above keeps the
+    // room: the game, then where and when, with the kind and size on the
+    // right. The full path is in the file's dialog.
+    return Padding(
+      padding: EdgeInsets.fromLTRB(6.r, 4.r, 6.r, 2.r),
       child: Row(
         children: [
-          _buildSaveThumb(file, isSelected),
-          SizedBox(width: 8.r),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Game name
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  style: TextStyle(
-                    fontSize: 10.r,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                    color: isSelected
-                        ? theme.colorScheme.surface
-                        : theme.colorScheme.onSurface,
-                    fontFamily: theme.textTheme.bodyMedium?.fontFamily,
-                  ),
-                  child: Text(
-                    file.gameName.isNotEmpty ? file.gameName : fileName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                SizedBox(height: 2.r),
-                // Real on-disk path (file_path) + size
                 Text(
-                  '${file.filePath.isNotEmpty ? file.filePath : fileName} • ${file.fileSizeFormatted}',
+                  file.gameName.isNotEmpty ? file.gameName : fileName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 8.r,
-                    color: isSelected
-                        ? theme.colorScheme.surface.withValues(alpha: 0.8)
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                    fontSize: 10.r,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
                   ),
                 ),
-                if (file.systemName != null || file.emulator != null) ...[
-                  SizedBox(height: 3.r),
-                  Row(
-                    children: [
-                      if (file.systemName != null &&
-                          file.systemName!.isNotEmpty) ...[
-                        _buildMetaBadge(
-                          theme,
-                          file.systemName!,
-                          isSelected,
-                          Symbols.videogame_asset_rounded,
-                        ),
-                        SizedBox(width: 4.r),
-                      ],
-                      if (file.emulator != null &&
-                          file.emulator!.isNotEmpty) ...[
-                        _buildMetaBadge(
-                          theme,
-                          file.emulator!,
-                          isSelected,
-                          Symbols.memory_rounded,
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
+                Text(
+                  meta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 8.r, color: muted),
+                ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetaBadge(
-    ThemeData theme,
-    String label,
-    bool isSelected,
-    IconData icon,
-  ) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 5.r, vertical: 1.r),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? theme.colorScheme.surface.withValues(alpha: 0.12)
-            : theme.colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4.r),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 8.r,
-            color: isSelected
-                ? theme.colorScheme.surface
-                : theme.colorScheme.primary,
-          ),
-          SizedBox(width: 3.r),
+          SizedBox(width: 8.r),
           Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 7.r,
-              fontWeight: FontWeight.w600,
-              color: isSelected
-                  ? theme.colorScheme.surface
-                  : theme.colorScheme.primary,
-            ),
+            '${file.type.toUpperCase()}  ·  ${file.fileSizeFormatted}',
+            style: TextStyle(fontSize: 8.r, color: muted),
           ),
         ],
       ),

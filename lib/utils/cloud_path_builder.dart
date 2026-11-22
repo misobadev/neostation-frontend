@@ -1,3 +1,5 @@
+import 'package:path/path.dart' as p;
+
 import '../models/neo_sync_models.dart';
 
 /// Builds and parses the canonical NeoSync cloud paths.
@@ -146,6 +148,67 @@ class CloudPathBuilder {
     }
     return null;
   }
+
+  /// The folder of RetroArch's system folder [systemDirectory] that the
+  /// RetroArch core of [systemFolder] keeps its own folder in: LRPS2's
+  /// `pcsx2` (its BIOS goes there), Flycast's `dc`. Its being there shows the
+  /// core is set up on this device. Null for any other system.
+  static String? retroArchSystemCoreFolder(
+    String? systemFolder,
+    String systemDirectory,
+  ) => switch (systemFolder) {
+    'ps2' => p.join(systemDirectory, 'pcsx2'),
+    'dc' => p.join(systemDirectory, 'dc'),
+    _ => null,
+  };
+
+  /// The folder of RetroArch's system folder [systemDirectory] where the
+  /// RetroArch core of [systemFolder] keeps the memory cards every game of
+  /// the system shares: LRPS2's `pcsx2/memcards`, Flycast's `dc` (which also
+  /// holds the console's BIOS, flash and textures). Null for any other
+  /// system.
+  static String? retroArchSystemCardFolder(
+    String? systemFolder,
+    String systemDirectory,
+  ) => switch (systemFolder) {
+    'ps2' => p.join(systemDirectory, 'pcsx2', 'memcards'),
+    'dc' => p.join(systemDirectory, 'dc'),
+    _ => null,
+  };
+
+  /// Whether [fileName] is named like a card the RetroArch core of
+  /// [systemFolder] keeps in its system folder ([retroArchSystemCardFolder]):
+  /// LRPS2's `Mcd001.ps2`, `Mcd002.ps2`, ...; Flycast's `vmu_save_A1.bin`,
+  /// ... A per-game card (`<game>.ps2`), which the core keeps in the saves
+  /// folder, is not.
+  static bool isRetroArchSystemCardName(String? systemFolder, String fileName) {
+    final lower = fileName.toLowerCase();
+    return switch (systemFolder) {
+      'ps2' => RegExp(r'^mcd\d+\.ps2$').hasMatch(lower),
+      'dc' => RegExp(r'^vmu_save_[a-d]\d\.bin$').hasMatch(lower),
+      _ => false,
+    };
+  }
+
+  /// The memory-card format of the emulator [emulator] (an emulator slug or
+  /// unique id) writes, for emulators known to share one: the PCSX2 family
+  /// (PCSX2, AetherSX2 and its forks, NetherSX2, ARMSX2, RetroArch's LRPS2
+  /// and pcsx2 cores) writes PCSX2 `.ps2` cards, and Flycast (standalone or
+  /// RetroArch's core) and Reicast, which Flycast was forked from, the same
+  /// VMUs. Any other emulator is its own format (EmuCoreX's lineage is
+  /// unknown, so it is kept apart).
+  static String memoryCardFormat(String emulator) {
+    final id = emulator.toLowerCase();
+    const pcsx2 = ['pcsx2', 'aethersx2', 'nethersx2', 'armsx2', 'lrps2'];
+    if (pcsx2.any(id.contains)) return 'pcsx2';
+    if (id.contains('flycast') || id.contains('reicast')) return 'flycast';
+    return id;
+  }
+
+  /// Whether emulators [a] and [b] write memory cards in the same format, so
+  /// a card of one is the same card for the other ([memoryCardFormat]).
+  static bool sameMemoryCardFormat(String a, String b) =>
+      memoryCardFormat(a) == memoryCardFormat(b);
 
   /// Whether [cloudPath] refers to the same save as the local [localPath].
   ///

@@ -92,6 +92,9 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.raEvents: 'События',
   AppLocale.raAotwYearTitle: 'Достижение недели ({year})',
   AppLocale.raAotw: 'AOTW',
+  AppLocale.raOverview: 'Обзор',
+  AppLocale.raStatPlayed: 'Сыграно',
+  AppLocale.raStatBeaten: 'Пройдено',
   AppLocale.raAwards: 'Награды',
   AppLocale.raSetOrder: 'Порядок набора',
   AppLocale.raPointsSort: 'По убыванию очков',
@@ -128,6 +131,11 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.startupStorageStartEmpty: 'Начать с пустой папки',
   AppLocale.startupStorageCreateFailed:
       'NeoStation не удалось создать там папку.',
+  AppLocale.wizardStepOf: 'Шаг {step} из {total}',
+  AppLocale.wizardLanguageTitle: 'Выберите язык',
+  AppLocale.wizardLanguageBody: 'Его можно изменить позже в настройках.',
+  AppLocale.wizardWelcomeBody: 'Бесплатный фронтенд с открытым исходным кодом для всех ваших ретро-игр. Нажмите A, чтобы начать настройку.',
+  AppLocale.wizardStartSetup: 'Начать настройку',
   AppLocale.startupLoading:
       'Подготовка NeoStation. Ожидание хранилища и служб...',
 
@@ -183,7 +191,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.recentCardSize: 'Размер карточки',
   AppLocale.recentCardSizeSubtitle:
       'Размер карточки недавних игр в сетке систем',
-  AppLocale.recentCardSizeDefault: 'По умолчанию',
+  AppLocale.recentCardSizeDefault: 'Большая',
   AppLocale.recentCardSize2x1: 'Компактно',
   AppLocale.themesSubtitle: 'Персонализируйте внешний вид вашей NeoStation',
   AppLocale.neoglassGroup: 'NeoGlass',
@@ -196,6 +204,8 @@ const Map<String, dynamic> appLocaleRu = {
       '0 = без прозрачности, 30 = 50% прозрачности',
   AppLocale.neoglassBorderWidth: 'Рамка стекла',
   AppLocale.neoglassBorderWidthSubtitle: 'Толщина края стекла',
+  AppLocale.cornerRadius: 'Углы',
+  AppLocale.cornerRadiusSubtitle: 'Насколько скруглены карточки и панели',
   AppLocale.systemTheme: 'Системная',
   AppLocale.importTheme: 'Импорт темы',
   AppLocale.importThemeSuccess: 'Тема «%s» импортирована',
@@ -254,11 +264,6 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.androidSystemSettings: 'Настройки системы',
   AppLocale.androidSystemSettingsSubtitle: 'Открыть настройки системы Android',
   AppLocale.androidApps: 'Приложения Android',
-  AppLocale.androidAppLayout: 'Расположение приложений Android',
-  AppLocale.androidAppLayoutSubtitle:
-      'Выберите, где показывать установленные приложения Android',
-  AppLocale.androidAppLayoutSystem: 'Система',
-  AppLocale.androidAppLayoutTab: 'Вкладка',
   AppLocale.scanOnStartup: 'Сканировать папки при запуске',
   AppLocale.performanceMode: 'Режим производительности',
   AppLocale.performanceModeSubtitle: 'Снижает визуальные эффекты и анимации для плавной работы на слабом оборудовании',
@@ -735,6 +740,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.hintSelect: 'Выбрать',
   AppLocale.hintSettings: 'Настройки',
   AppLocale.hintBack: 'Назад',
+  AppLocale.androidGameMarkApp: 'Отметить как приложение',
+  AppLocale.androidGameHint: 'Игра',
   AppLocale.hintPlay: 'Играть',
   AppLocale.hintFavorite: 'Избранное',
   AppLocale.hintRandom: 'Случайно',
@@ -1048,6 +1055,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Только облачные сохранения',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Конфликт сохранений',
   AppLocale.neoSyncNewerCloudCopy: 'В облаке была более новая копия этого сохранения, поэтому она скачана. Копия с этого устройства хранится в Истории сохранений, откуда её можно восстановить.',
+  AppLocale.neoSyncFirstCardSyncTookCloud: "Эта карта памяти ещё не синхронизировалась с этого устройства и отличалась от карты в облаке, поэтому скачана карта из облака. Карта с этого устройства хранится в Истории сохранений, откуда её можно восстановить.",
   AppLocale.neoSyncKeptCloudCopy: "Это сохранение изменилось и на другом устройстве. Копия с этого устройства загружена, а другая сохранена рядом как {file}.",
   AppLocale.keptCopiesTitle: 'История сохранений',
   AppLocale.keptCopiesSubtitle:
@@ -1482,7 +1490,6 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.raAotwEarnedPreviously: 'Получено до этой недели',
   AppLocale.raAotwNotEarned: 'Не получено на этой неделе',
   AppLocale.raAotwStatusUnavailable: 'Личный статус недоступен',
-  AppLocale.raAotwNotInLibrary: 'Нет в вашей библиотеке',
   AppLocale.raAotwWeekStarted: 'Неделя началась {date}',
   AppLocale.raAotwTrueRatio: 'True Ratio',
   AppLocale.raAotwParticipation: '{unlocks} из {players} игроков · {percent}%',
@@ -1532,6 +1539,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.removeCustomFolderConfirm: 'Удалить эту пользовательскую папку сохранений? Локальные файлы не будут удалены, только отключены от синхронизации.',
   AppLocale.uploadingCustomFolder: 'Загрузка сохранений из {folder}...',
   AppLocale.customFolderUploadComplete: 'Пользовательская папка синхронизирована: {uploaded} загружено, {skipped} уже актуальны',
+  AppLocale.customFolderUploadLeftForLaunch: "Карты памяти, ещё не синхронизировавшиеся с этого устройства, отложены до следующего запуска игры, которая их использует: будет использована карта из облака, а карта с этого устройства сохранится в Истории сохранений: {left}",
   AppLocale.customFolderUploadFailed:
       'Не удалось синхронизировать пользовательскую папку',
   AppLocale.customFolderUploadConfirm:

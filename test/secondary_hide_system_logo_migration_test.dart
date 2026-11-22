@@ -5,8 +5,8 @@ import 'package:neostation/data/datasources/sqlite_migrations.dart';
 /// Tests for migration v174, which adds `secondary_hide_system_logo` to
 /// `user_config`, and v179, which backfills it for main builds already past v174.
 ///
-/// The default is the point: `0` (logo shown) must match [ConfigModel]'s
-/// default, so the secondary display keeps its previous look on upgrade.
+/// v174/v179 add it as `0` (logo shown); v193 then flips every existing row
+/// to `1`, matching [ConfigModel]'s current default (logo hidden).
 void main() {
   late Database db;
 
@@ -81,4 +81,47 @@ void main() {
       });
     });
   }
+
+  group('migration v193', () {
+    Future<void> runMigration() => SqliteMigrations.migrateToVersion(db, 193);
+
+    test('hides the logo on a device that had it shown', () async {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN secondary_hide_system_logo '
+        'INTEGER DEFAULT 0',
+      );
+      db.execute('INSERT INTO user_config (id) VALUES (1)');
+
+      await runMigration();
+
+      final rows = db.select(
+        'SELECT secondary_hide_system_logo FROM user_config WHERE id = 1',
+      );
+      expect(rows.first['secondary_hide_system_logo'], 1);
+    });
+
+    test('adds the column with the new default when it is missing', () async {
+      db.execute('INSERT INTO user_config (id) VALUES (1)');
+
+      await runMigration();
+      await runMigration();
+
+      expect(
+        configColumns().where((c) => c == 'secondary_hide_system_logo').length,
+        1,
+      );
+      final rows = db.select(
+        'SELECT secondary_hide_system_logo FROM user_config WHERE id = 1',
+      );
+      expect(rows.first['secondary_hide_system_logo'], 1);
+    });
+
+    test('is a no-op without a user_config table', () async {
+      db.execute('DROP TABLE user_config');
+
+      await runMigration();
+
+      expect(configColumns(), isEmpty);
+    });
+  });
 }

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../constants/system_folder_names.dart';
 import '../models/system_model.dart';
 import '../data/datasources/sqlite_service.dart';
 
@@ -13,7 +14,9 @@ class SystemRepository {
   static bool isSystemAvailableOnPlatform(String folderName, {bool? android}) {
     final isAndroid = android ?? Platform.isAndroid;
     if (folderName == 'ports' && isAndroid) return false;
-    if (folderName == 'android' && !isAndroid) return false;
+    if (SystemFolderNames.isAndroidApps(folderName) && !isAndroid) {
+      return false;
+    }
     return true;
   }
 

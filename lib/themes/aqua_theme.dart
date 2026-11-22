@@ -4,8 +4,8 @@ import 'package:neostation/themes/chrome_surface.dart';
 
 const Color _primaryColor = Color(0xFF13ecf3);
 const Color _onPrimaryColor = Color(0xFF015355);
-const Color _secondaryColor = Color(0xFF966fb3);
-const Color _onSecondaryColor = Color(0xFFf2f0fc);
+const Color _secondaryColor = Color(0xFFC0A0DD);
+const Color _onSecondaryColor = Color(0xFF1E0F2E);
 const Color _surfaceColor = Color(0xFF1a368b);
 const Color _onSurfaceColor = Color(0xFFb8e6fe);
 
@@ -17,7 +17,7 @@ const Color _backgroundColor = Color(0xFF162455);
 const Color _batteryFull = Color(0xFF18a34a);
 const Color _batteryMedium = Color(0xFFd97708);
 const Color _batteryLow = Color(0xFFff7265);
-const Color _batteryPower = Color(0xFF2563eb);
+const Color _batteryPower = Color(0xFF6B98F7);
 
 const Color _errorColor = Color(0xFFff7265);
 const Color _onErrorColor = Color(0xFF180403);
@@ -25,8 +25,8 @@ const Color _warningColor = Color(0xFFd97708);
 const Color _onWarningColor = Color(0xFF431700);
 const Color _successColor = Color(0xFF18a34a);
 const Color _onSuccessColor = Color(0xFF000a02);
-const Color _infoColor = Color(0xFF2563eb);
-const Color _onInfoColor = Color(0xFFd2e2ff);
+const Color _infoColor = Color(0xFF6B98F7);
+const Color _onInfoColor = Color(0xFF051233);
 
 final ThemeData aquaTheme = ThemeData(
   useMaterial3: true,

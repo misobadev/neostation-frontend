@@ -130,8 +130,10 @@ typedef _GameSync = ({GameSyncStatus status, _Pending uploads});
 
 /// What became of one [RomMSyncProvider._download]: whether it wrote, whether
 /// it refused a state written by a different core, and whether it failed (the
-/// server's copy could not be fetched or written). A routine refusal (no
-/// target, an expired launch deadline, a newer local copy) is none of these.
+/// server's copy could not be fetched or written, or this device's copy of a
+/// save changed here could not be kept first, or would be read through a
+/// link). A routine refusal (no target, an expired launch deadline, a newer
+/// local copy) is none of these.
 typedef _DownloadOutcome = ({bool wrote, bool coreMismatch, bool failed});
 
 /// Identifies a game in the library. Two systems can each hold a `Same.zip`.
@@ -840,8 +842,9 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     );
 
     // A save this pass kept a conflict copy of now has one more copy; at most
-    // a few stay. Only the post-close pass keeps any, so the pre-launch pass
-    // reads nothing here.
+    // a few stay. Only the post-close pass keeps conflict copies, so the
+    // pre-launch pass reads nothing here (a copy of this device's save kept
+    // before a download is tidied where it is kept, in [_download]).
     for (final MapEntry(key: save, value: copy) in keptThisPass.entries) {
       await tidyKeptCopies(
         save,
@@ -952,12 +955,13 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       final name = path.basename(f.filePath);
       final lower = name.toLowerCase();
 
-      // Our own conflict backups. They begin with the game's name and continue
-      // with a dot, so every other rule here reads them as ordinary save data —
-      // and uploading a copy kept precisely because it was *not* this device's
-      // truth would undo the point of keeping it.
-      if (lower.contains(conflictBackupMarker)) {
-        _log.i('RomM: skipping conflict backup $name');
+      // Kept copies of saves (our conflict backups, this device's copies kept
+      // before a download, NeoSync's). They begin with the game's name and
+      // continue with a dot, so every other rule here reads them as ordinary
+      // save data — and uploading a copy kept precisely because it was *not*
+      // the save to sync would undo the point of keeping it.
+      if (isKeptCopyPath(name)) {
+        _log.i('RomM: skipping kept copy $name');
         return false;
       }
 
@@ -1024,30 +1028,34 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       ? asset.fileName
       : asset.fileName.replaceAll(_datetimeTag, '');
 
-  /// Drops remote assets that are conflict backups.
+  /// Drops remote assets that are kept copies of saves, or whose names are
+  /// unsafe.
   ///
-  /// [syncableSaves] refuses to *upload* a local file carrying
-  /// [conflictBackupMarker]. Without the same rule on the way down the guard is
-  /// one-directional: an asset named `<game>.state.romm-conflict-<stamp>` has no
-  /// local counterpart to pair with, so the remote-only pass downloads it, and
-  /// every device that syncs the game acquires a permanent copy the upload side
-  /// then refuses to touch — unreconcilable and unremovable from the app.
+  /// [syncableSaves] refuses to *upload* a kept copy of a save
+  /// ([isKeptCopyPath]: a conflict backup under [conflictBackupMarker], this
+  /// device's copy kept before a download, NeoSync's copies). Without the same
+  /// rule on the way down the guard is one-directional: an asset named
+  /// `<game>.state.romm-conflict-<stamp>` has no local counterpart to pair
+  /// with, so the remote-only pass downloads it, and every device that syncs
+  /// the game acquires a permanent copy the upload side then refuses to touch —
+  /// unreconcilable and unremovable from the app.
   ///
-  /// A backup is by definition a copy this system kept for a person to inspect
-  /// *locally*, never something to distribute, so its own marker is the whole
-  /// test. Deliberately checked against the raw `file_name` rather than
-  /// [localNameForAsset]: the marker survives tag-stripping, but the point is to
-  /// reject the asset before anything derives a local name from it.
+  /// A copy is by definition kept for a person to inspect *locally*, never
+  /// something to distribute, so its name is the whole test. Both the raw
+  /// `file_name` and the [localNameForAsset] it becomes are checked: stripping
+  /// a datetime tag can join a name into a kept copy's (`Game.srm.romm
+  /// [2026-01-01_00-00-00]-local-…`) or into an unsafe one.
   @visibleForTesting
   static List<RommAsset> syncableRemote(List<RommAsset> remote) {
     return remote.where((a) {
-      if (a.fileName.toLowerCase().contains(conflictBackupMarker)) {
-        _log.i('RomM: skipping remote conflict backup ${a.fileName}');
+      final localName = localNameForAsset(a);
+      if (isKeptCopyPath(a.fileName) || isKeptCopyPath(localName)) {
+        _log.i('RomM: skipping remote kept copy ${a.fileName}');
         return false;
       }
       // The name becomes a local file name; the server must not be able to
       // point it anywhere but the save/state folder.
-      if (!isSafeFileName(a.fileName)) {
+      if (!isSafeFileName(a.fileName) || !isSafeFileName(localName)) {
         _log.w('RomM: skipping remote asset with unsafe name ${a.fileName}');
         return false;
       }
@@ -1206,6 +1214,53 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     } catch (e) {
       _log.w('RomM: could not compare $filePath with its last sync: $e');
       return false;
+    }
+  }
+
+  /// Whether the save at [filePath], whose bytes hash to [digest] and whose
+  /// time is [localMs], changed on this device since its last sync: its bytes
+  /// differ from the ones recorded then, or nothing was recorded (never
+  /// synced). A record from before hashes were kept goes by its time. True on
+  /// any doubt, since the answer decides whether a copy is kept before the
+  /// save is written over.
+  static Future<bool> _changedHereSinceLastSync(
+    String filePath,
+    Digest digest,
+    int localMs,
+  ) async {
+    try {
+      final recorded = await SyncRepository.getSyncState(kProviderId, filePath);
+      if (recorded == null) return true;
+      final hash = recorded['file_hash'] as String?;
+      if (hash != null && hash.isNotEmpty) return digest.toString() != hash;
+      final recordedMs = recorded['local_modified_at'] as int?;
+      return recordedMs == null || localMs > recordedMs + _mtimeToleranceMs;
+    } catch (e) {
+      _log.w('RomM: could not compare $filePath with its last sync: $e');
+      return true;
+    }
+  }
+
+  /// Removes a copy [_download] kept and then didn't need.
+  static Future<void> _deleteKeptCopy(String copyPath) async {
+    try {
+      await File(copyPath).delete();
+    } catch (e) {
+      _log.w('RomM: could not remove $copyPath: $e');
+    }
+  }
+
+  /// Keeps at most [maxKeptCopiesPerSave] copies of [savePath], [justKept]
+  /// among them.
+  static Future<void> _tidyQuietly(String savePath, String justKept) async {
+    try {
+      await tidyKeptCopies(
+        savePath,
+        sources: rommKeptCopySources,
+        justKept: {justKept},
+      );
+    } catch (e) {
+      _log.w('RomM: could not tidy the kept copies of $savePath: $e');
     }
   }
 
@@ -1493,8 +1548,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// distinguish from an ordinary no-op: the transfer was declined because the
   /// remote state was written by a different core (see the guard below).
   /// [_DownloadOutcome.failed] reports that the server's copy could not be
-  /// fetched or written. Everything else (no target, an expired deadline, a
-  /// newer local copy) is a routine `wrote: false`.
+  /// fetched or written, or that this device's copy of a save changed here
+  /// could not be kept first, or would be read through a link (that target is
+  /// then left as it was). Everything else (no target, an expired deadline,
+  /// a newer local copy) is a routine `wrote: false`.
   Future<_DownloadOutcome> _download(
     GameModel game,
     RommAsset asset, {
@@ -1549,9 +1606,24 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         return (wrote: false, coreMismatch: false, failed: false);
       }
 
+      // Hashed once: compared with each target's bytes, and recorded as the
+      // hash of what each target now holds.
+      final serverDigest = md5.convert(bytes);
       var wroteAny = false;
+      var failedAny = false;
       for (final target in targets) {
         final f = File(target);
+        String? keptHere;
+        List<int>? localBytes;
+        int? localMsHere;
+        // A save that is a link (single saves are linked in from elsewhere on
+        // desktops) is written through, as it always was. Only its copy is
+        // refused: one at a save's place may point anywhere, and the copy
+        // would read through it. A link swapped in after this look is still
+        // followed; dart:io can't open a file without following links.
+        final isLink =
+            await FileSystemEntity.type(target, followLinks: false) ==
+            FileSystemEntityType.link;
         // Per-target guard (mirrors NeoSync): never overwrite a copy that is
         // newer than the remote asset, unless its bytes are still the ones
         // recorded at the last sync (only its time moved, as when an emulator
@@ -1560,11 +1632,14 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         // a different folder may hold newer local progress we must not clobber.
         if (await f.exists()) {
           final localMs = (await f.stat()).modified.millisecondsSinceEpoch;
+          localMsHere = localMs;
           if (localMs > asset.updatedAtMs + _mtimeToleranceMs &&
               !await _unchangedSinceLastSync(target)) {
             _log.i('RomM download: skip $target (local newer than remote)');
             continue;
           }
+          final current = await f.readAsBytes();
+          localBytes = current;
           // Core guard. A save state only loads in the core that wrote it, and
           // RetroArch fails silently when it doesn't — so replacing a local
           // state with another device's incompatible one destroys a working
@@ -1583,8 +1658,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           // [RetroArchStateSignature.differ] answers false whenever either side
           // is unidentifiable, so states from cores without a magic, and
           // standalone emulators' own formats, keep syncing exactly as before.
-          if (asset.isState &&
-              RetroArchStateSignature.differ(await f.readAsBytes(), bytes)) {
+          if (asset.isState && RetroArchStateSignature.differ(current, bytes)) {
             _log.w(
               'RomM download: skip $target — the remote state was written by a '
               'different core and would not load here',
@@ -1592,9 +1666,98 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
             skippedCoreMismatch = true;
             continue;
           }
+          // A save changed here since the last sync, or never synced, holds
+          // progress the server's copy doesn't: the server's is only newer by
+          // the clock, which says nothing about this device's last session
+          // (played offline, say). It is kept as its own copy, listed in Save
+          // history, before the server's is written over it; if it can't be
+          // kept, this target is left as it was. A save already holding the
+          // server's bytes loses nothing.
+          final localDigest = md5.convert(current);
+          if (localDigest != serverDigest &&
+              await _changedHereSinceLastSync(target, localDigest, localMs)) {
+            if (isLink) {
+              _log.w(
+                'RomM download: skip $target — it changed here, and no copy is '
+                'made through a link',
+              );
+              failedAny = true;
+              continue;
+            }
+            try {
+              keptHere = await keepRommLocalCopy(target, bytes: current);
+            } catch (e) {
+              _log.e(
+                'RomM download: could not keep this device\'s $target before '
+                'writing the server\'s copy over it — left as it was: $e',
+              );
+              failedAny = true;
+              continue;
+            }
+          }
         }
-        await f.parent.create(recursive: true);
-        await f.writeAsBytes(bytes, flush: true);
+        // Asked again right before the write: everything above takes time on
+        // the launch path, and a launch that went ahead meanwhile has the save
+        // open, so it is left as it was.
+        if (deadline?.isExpired ?? false) {
+          if (keptHere != null) await _deleteKeptCopy(keptHere);
+          _log.i(
+            'RomM download: abandon ${asset.fileName} (launch deadline passed '
+            'before writing $target)',
+          );
+          return (
+            wrote: wroteAny,
+            coreMismatch: skippedCoreMismatch,
+            failed: failedAny,
+          );
+        }
+        try {
+          await f.parent.create(recursive: true);
+          await f.writeAsBytes(bytes, flush: true);
+        } catch (_) {
+          // A write cut short can leave the save truncated: this device's
+          // bytes are put back, with their time, so the next pass sees the
+          // save as it was. If even that fails, a kept copy stays, listed in
+          // Save history.
+          if (localBytes != null) {
+            try {
+              await f.writeAsBytes(localBytes, flush: true);
+              if (localMsHere != null) {
+                try {
+                  await f.setLastModified(
+                    DateTime.fromMillisecondsSinceEpoch(localMsHere),
+                  );
+                } catch (e) {
+                  _log.w(
+                    'RomM download: could not restore the time of $target: $e',
+                  );
+                }
+              }
+              if (keptHere != null) await _deleteKeptCopy(keptHere);
+            } catch (e) {
+              final kept = keptHere == null
+                  ? ''
+                  : '; this device\'s copy is kept as '
+                        '${path.basename(keptHere)}';
+              _log.e(
+                'RomM download: $target could not be written or put back'
+                '$kept: $e',
+              );
+              if (keptHere != null) await _tidyQuietly(target, keptHere);
+            }
+          }
+          rethrow;
+        }
+        wroteAny = true;
+        if (keptHere != null) {
+          _log.w(
+            'RomM download: $target had changed here too — kept this '
+            'device\'s copy as ${path.basename(keptHere)} before writing the '
+            'server\'s newer one',
+          );
+          reportNewerCloudCopy(gameName: game.name, savePath: target);
+          await _tidyQuietly(target, keptHere);
+        }
         final stat = await f.stat();
         await SyncRepository.saveSyncState(
           kProviderId,
@@ -1604,14 +1767,13 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           bytes.length,
           // Ours, for the reason given in [_upload] — and free here, since the
           // bytes are already in memory.
-          fileHash: md5.convert(bytes).toString(),
+          fileHash: serverDigest.toString(),
         );
-        wroteAny = true;
       }
       return (
         wrote: wroteAny,
         coreMismatch: skippedCoreMismatch,
-        failed: false,
+        failed: failedAny,
       );
     } catch (e) {
       if (isPermissionDenied(e)) rethrow;

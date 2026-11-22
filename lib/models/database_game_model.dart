@@ -171,13 +171,15 @@ class DatabaseGameModel {
       }
     }
 
-    // Fallback for generic 'description' fields.
-    if (json['description'] != null &&
+    // The generic 'description' only when no language was scraped. For an
+    // installed app it is the package's own text ("Android Application"),
+    // and filed under 'en' it hid a scraped description in another
+    // language from the language fallback.
+    if (!hasAnyDescription &&
+        json['description'] != null &&
         json['description'].toString().isNotEmpty) {
-      if (!descriptions.containsKey('en')) {
-        descriptions['en'] = json['description'].toString();
-        hasAnyDescription = true;
-      }
+      descriptions['en'] = json['description'].toString();
+      hasAnyDescription = true;
     }
 
     return hasAnyDescription ? descriptions : null;

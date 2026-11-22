@@ -94,6 +94,9 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.raEvents: 'Eventos',
   AppLocale.raAotwYearTitle: 'Logro de la semana ({year})',
   AppLocale.raAotw: 'AOTW',
+  AppLocale.raOverview: 'Resumen',
+  AppLocale.raStatPlayed: 'Jugados',
+  AppLocale.raStatBeaten: 'Completados',
   AppLocale.raAwards: 'Premios',
   AppLocale.raSetOrder: 'Orden del conjunto',
   AppLocale.raPointsSort: 'Puntos: de mayor a menor',
@@ -130,6 +133,11 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.startupStorageStartEmpty: 'Empezar con una carpeta vacía',
   AppLocale.startupStorageCreateFailed:
       'NeoStation no pudo crear la carpeta ahí.',
+  AppLocale.wizardStepOf: 'Paso {step} de {total}',
+  AppLocale.wizardLanguageTitle: 'Elige tu idioma',
+  AppLocale.wizardLanguageBody: 'Puedes cambiarlo más tarde en Ajustes.',
+  AppLocale.wizardWelcomeBody: 'El frontend gratuito y de código abierto para todos tus juegos retro. Presiona A para comenzar la configuración.',
+  AppLocale.wizardStartSetup: 'Comenzar la configuración',
   AppLocale.startupLoading:
       'Preparando NeoStation. Esperando al almacenamiento y los servicios...',
 
@@ -184,7 +192,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.recentCardSize: 'Tamaño de la tarjeta',
   AppLocale.recentCardSizeSubtitle:
       'Tamaño de la tarjeta de jugados recientemente en la grilla',
-  AppLocale.recentCardSizeDefault: 'Predeterminado',
+  AppLocale.recentCardSizeDefault: 'Grande',
   AppLocale.recentCardSize2x1: 'Compacto',
   AppLocale.themesSubtitle: 'Personaliza la apariencia de tu NeoStation',
   AppLocale.neoglassGroup: 'NeoGlass',
@@ -197,6 +205,9 @@ const Map<String, dynamic> appLocaleEs = {
       '0 = sin transparencia, 30 = 50% de transparencia',
   AppLocale.neoglassBorderWidth: 'Borde del cristal',
   AppLocale.neoglassBorderWidthSubtitle: 'Grosor del borde del cristal',
+  AppLocale.cornerRadius: 'Esquinas',
+  AppLocale.cornerRadiusSubtitle:
+      'Qué tan redondeadas son las tarjetas y los paneles',
   AppLocale.systemTheme: 'Sistema',
   AppLocale.importTheme: 'Importar tema',
   AppLocale.importThemeSuccess: 'Tema "%s" importado',
@@ -254,11 +265,6 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.androidSystemSettings: 'Ajustes del Sistema',
   AppLocale.androidSystemSettingsSubtitle: 'Abrir ajustes del sistema Android',
   AppLocale.androidApps: 'Apps de Android',
-  AppLocale.androidAppLayout: 'Diseño de apps de Android',
-  AppLocale.androidAppLayoutSubtitle:
-      'Elige dónde aparecen las apps de Android instaladas',
-  AppLocale.androidAppLayoutSystem: 'Sistema',
-  AppLocale.androidAppLayoutTab: 'Pestaña',
   AppLocale.scanOnStartup: 'Escanear al Iniciar',
   AppLocale.performanceMode: 'Modo rendimiento',
   AppLocale.performanceModeSubtitle: 'Reduce efectos visuales y animaciones para mantener la app fluida en hardware modesto',
@@ -733,6 +739,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.hintSelect: 'Seleccionar',
   AppLocale.hintSettings: 'Ajustes',
   AppLocale.hintBack: 'Volver',
+  AppLocale.androidGameMarkApp: 'Marcar como app',
+  AppLocale.androidGameHint: 'Juego',
   AppLocale.hintPlay: 'Jugar',
   AppLocale.hintFavorite: 'Favorito',
   AppLocale.hintRandom: 'Random',
@@ -1051,6 +1059,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Solo partidas en la nube',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Conflicto de guardado detectado',
   AppLocale.neoSyncNewerCloudCopy: 'La nube tenía una copia más reciente de esta partida, así que se descargó. La copia de este dispositivo está en el Historial de partidas, desde donde puedes restaurarla.',
+  AppLocale.neoSyncFirstCardSyncTookCloud: "Esta tarjeta de memoria no se había sincronizado antes desde este dispositivo y era distinta de la de la nube, así que se descargó la de la nube. La tarjeta de este dispositivo está en el Historial de partidas, desde donde puedes restaurarla.",
   AppLocale.neoSyncKeptCloudCopy: "Esta partida también cambió en otro dispositivo. Se subió la copia de este dispositivo y la otra se guarda al lado como {file}.",
   AppLocale.keptCopiesTitle: 'Historial de partidas',
   AppLocale.keptCopiesSubtitle: 'Versiones anteriores de tus partidas, de sincronizaciones y restauraciones',
@@ -1491,7 +1500,6 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.raAotwEarnedPreviously: 'Conseguido antes de esta semana',
   AppLocale.raAotwNotEarned: 'No conseguido esta semana',
   AppLocale.raAotwStatusUnavailable: 'Estado personal no disponible',
-  AppLocale.raAotwNotInLibrary: 'No está en tu biblioteca',
   AppLocale.raAotwWeekStarted: 'La semana empezó el {date}',
   AppLocale.raAotwTrueRatio: 'Proporción real',
   AppLocale.raAotwParticipation:
@@ -1546,6 +1554,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.removeCustomFolderConfirm: '¿Eliminar esta carpeta de guardado standalone? Sus archivos locales no se borrarán, solo se desvinculará de la sincronización.',
   AppLocale.uploadingCustomFolder: 'Subiendo guardados de {folder}...',
   AppLocale.customFolderUploadComplete: 'Carpeta standalone sincronizada: {uploaded} subidos, {skipped} ya actualizados',
+  AppLocale.customFolderUploadLeftForLaunch: "Tarjetas de memoria nunca sincronizadas desde este dispositivo, pendientes para el próximo inicio de un juego que las use, que usará la de la nube y guardará la de este dispositivo en el Historial de partidas: {left}",
   AppLocale.customFolderUploadFailed:
       'Error al sincronizar la carpeta standalone',
   AppLocale.customFolderUploadConfirm:

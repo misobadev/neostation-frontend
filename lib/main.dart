@@ -1,3 +1,5 @@
+import 'package:neostation/widgets/brand_logo.dart';
+import 'package:neostation/services/startup_language.dart';
 import 'package:neostation/widgets/west_button_glyph.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/utils/user_data_startup_check.dart';
@@ -39,6 +41,7 @@ import 'package:neostation/utils/display_metrics_log.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/themes/anta_text_theme.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/image_cache_budget.dart';
@@ -518,8 +521,9 @@ void main() async {
 /// missing keys degrade to an empty string rather than crashing the very
 /// first frame.
 Map<String, dynamic> _startupStrings() {
-  final locale = WidgetsBinding.instance.platformDispatcher.locale;
-  final languageTag = locale.toLanguageTag().replaceAll('-', '_');
+  final language = supportedLanguageFor(
+    WidgetsBinding.instance.platformDispatcher.locale,
+  );
   const translations = <String, Map<String, dynamic>>{
     'en': appLocaleEn,
     'es': appLocaleEs,
@@ -534,9 +538,7 @@ Map<String, dynamic> _startupStrings() {
     'ja': appLocaleJa,
     'ko': appLocaleKo,
   };
-  return translations[languageTag] ??
-      translations[locale.languageCode] ??
-      appLocaleEn;
+  return translations[language] ?? appLocaleEn;
 }
 
 String _startupString(String key) {
@@ -553,10 +555,13 @@ String _startupString(String key) {
 /// intro in the user's theme rather than always-dark chrome.
 class _StartupScaffold extends StatefulWidget {
   const _StartupScaffold({
-    required this.childrenBuilder,
+    this.childrenBuilder = _noChildren,
     this.onKeyEvent,
     this.animatedLogo = false,
   });
+
+  static List<Widget> _noChildren(BuildContext _, StartupThemeColors _) =>
+      const [];
 
   /// Builds the status area, given the resolved startup palette.
   ///
@@ -600,10 +605,8 @@ class _StartupScaffoldState extends State<_StartupScaffold> {
   Widget build(BuildContext context) {
     // Same factor the shimmering splash uses, so the logo and the spacing
     // around it grow instead of being stranded at design size on a desktop
-    // window. The wordmark takes the damped text scale — grown by the full
-    // factor it reads as a banner rather than a caption under the glyph.
+    // window.
     final scale = SplashStatusLayout.scaleOf(context);
-    final textScale = SplashStatusLayout.textScaleOf(context);
     final children = widget.childrenBuilder(context, _colors);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -636,22 +639,11 @@ class _StartupScaffoldState extends State<_StartupScaffold> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.asset(
-                            'assets/images/logo_transparent.png',
-                            width: 112 * scale,
-                            height: 112 * scale,
+                          BrandLogo(
+                            width: 300 * scale,
+                            brightness: _colors.brightness,
                           ),
-                          SizedBox(height: 24 * scale),
-                          Text(
-                            'NeoStation',
-                            style: TextStyle(
-                              color: _colors.foreground,
-                              fontSize: 28 * textScale,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          SizedBox(height: 24 * scale),
+                          SizedBox(height: 28 * scale),
                           ...children,
                         ],
                       ),
@@ -1239,6 +1231,9 @@ class _MyAppState extends State<MyApp> {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
+          final cornerStep = context.select<SqliteConfigProvider, int>(
+            (config) => config.config.cornerRadius,
+          );
           return ScreenUtilInit(
             designSize: const Size(640, 480),
             minTextAdapt: true,
@@ -1293,28 +1288,33 @@ class _MyAppState extends State<MyApp> {
                           ),
                         );
                       },
-                      theme: themeProvider.currentTheme.copyWith(
-                        textTheme: antaTextTheme(
-                          themeProvider.currentTheme.textTheme,
-                        ),
-                        iconTheme: const IconThemeData(fill: 1.0),
-                        visualDensity: VisualDensity.adaptivePlatformDensity,
-                        materialTapTargetSize: MaterialTapTargetSize.padded,
-                        pageTransitionsTheme: PageTransitionsTheme(
-                          builders: {
-                            TargetPlatform.android:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.iOS:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.windows:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.macOS:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.linux:
-                                FadeUpwardsPageTransitionsBuilder(),
-                          },
-                        ),
-                      ),
+                      theme:
+                          CornerRadii.applyStep(
+                            themeProvider.currentTheme,
+                            cornerStep,
+                          ).copyWith(
+                            textTheme: antaTextTheme(
+                              themeProvider.currentTheme.textTheme,
+                            ),
+                            iconTheme: const IconThemeData(fill: 1.0),
+                            visualDensity:
+                                VisualDensity.adaptivePlatformDensity,
+                            materialTapTargetSize: MaterialTapTargetSize.padded,
+                            pageTransitionsTheme: PageTransitionsTheme(
+                              builders: {
+                                TargetPlatform.android:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.iOS:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.windows:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.macOS:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.linux:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                              },
+                            ),
+                          ),
                       home: PermissionCheckWrapper(
                         child: AppLifecycleHandler(child: MainScreen()),
                       ),

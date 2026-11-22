@@ -648,6 +648,8 @@ class SqliteMigrations {
         // Backfill for installs that reached v165 without this PR’s v164.
         await _migrateToVersion164(db);
         break;
+      // 167 was reserved for smart collections, which moved to 170; it stays
+      // empty. 168 is main's custom navigation sounds backfill.
       case 168:
         await _migrateToVersion168(db);
         break;
@@ -701,6 +703,18 @@ class SqliteMigrations {
         break;
       case 188:
         await _migrateToVersion188(db);
+        break;
+      case 189:
+        await _migrateToVersion189(db);
+        break;
+      case 190:
+        await _migrateToVersion190(db);
+        break;
+      case 191:
+        await _migrateToVersion191(db);
+        break;
+      case 193:
+        await _migrateToVersion193(db);
         break;
       default:
         _log.w('No migration defined for version $version');
@@ -7650,6 +7664,137 @@ class SqliteMigrations {
       _log.i('Migration v188 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v188: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v189: adds `user_config.corner_radius`, the corner rounding the
+  /// user picks for every theme (0 square to 5 the roundest, 3 by default).
+  static Future<void> _migrateToVersion189(Database db) async {
+    _log.i('Migration v189: Adding corner_radius to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('corner_radius')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN corner_radius INTEGER DEFAULT 3',
+        );
+        _log.i('v189: corner_radius column added');
+      } else {
+        _log.i('v189: corner_radius already present, nothing to do');
+      }
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v189: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v190: the compact Recently Played card becomes the default.
+  ///
+  /// The large card was stored as 'default' by the column's own default, not
+  /// by a choice, so those rows move to the compact card once; anyone who
+  /// wants the large one picks it again in Settings › Systems.
+  static Future<void> _migrateToVersion190(Database db) async {
+    _log.i('Migration v190: Compact Recently Played card by default');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('recent_card_size')) {
+        _log.i('v190: recent_card_size is not present, nothing to do');
+        return;
+      }
+      db.execute(
+        "UPDATE user_config SET recent_card_size = '2x1' "
+        "WHERE recent_card_size IS NULL OR recent_card_size = 'default'",
+      );
+      _log.i('Migration v190 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v190: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v191: the "Android Games" virtual system.
+  ///
+  /// Adds `user_roms.is_android_game`, the user's own choice of which
+  /// installed apps are games (0/1, default 0: nothing is classified
+  /// automatically), and registers the `android_games` system. The system owns
+  /// no rows: its games are the `android` system's rows with the flag set.
+  ///
+  /// Test devices that ran this branch at v169/v171 skipped main's v170, so it
+  /// is re-run first. Every step is guarded, so a device that skipped a
+  /// neighbouring slot, or re-runs this, ends in the same state.
+  static Future<void> _migrateToVersion191(Database db) async {
+    _log.i('Migration v191: Adding Android Games system');
+    try {
+      await _migrateToVersion170(db);
+
+      final columns = db
+          .select('PRAGMA table_info(user_roms)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isNotEmpty && !columns.contains('is_android_game')) {
+        db.execute(
+          'ALTER TABLE user_roms ADD COLUMN is_android_game INTEGER DEFAULT 0',
+        );
+      }
+
+      final tables = db
+          .select("SELECT name FROM sqlite_master WHERE type = 'table'")
+          .map((r) => r['name'].toString())
+          .toSet();
+      if (tables.contains('app_systems')) {
+        db.execute('''
+          INSERT OR IGNORE INTO app_systems (id, screenscraper_id, ra_id, real_name, folder_name, launch_date, description)
+          VALUES ('android_games', 135, 0, 'Android Games', 'android_games', '2008-09-23',
+                  'Installed Android games, launched directly.')
+        ''');
+      }
+      _log.i('Migration v191 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v191: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v193: the secondary display hides the system logo by default.
+  ///
+  /// Flips `user_config.secondary_hide_system_logo` to 1 on every existing
+  /// row, so upgraded devices match fresh installs and show only the
+  /// background art. Users who want the logo back turn the setting off.
+  /// v192 is claimed by the dual-screen swap branch, so this takes v193.
+  ///
+  /// A database that never got the column (skipped v174/v179) gains it here
+  /// with the new default.
+  static Future<void> _migrateToVersion193(Database db) async {
+    _log.i('Migration v193: Hiding the secondary system logo by default');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i('v193: user_config is not present, nothing to do');
+        return;
+      }
+      if (!columns.contains('secondary_hide_system_logo')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN secondary_hide_system_logo '
+          'INTEGER DEFAULT 1',
+        );
+      }
+      db.execute('UPDATE user_config SET secondary_hide_system_logo = 1');
+      _log.i('Migration v193 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v193: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

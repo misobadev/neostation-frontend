@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/neo_glass.dart';
+import 'package:neostation/widgets/core_footer.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -18,7 +21,11 @@ import 'package:neostation/services/logger_service.dart';
 class AuthForm extends StatefulWidget {
   final VoidCallback onLoginSuccess;
 
-  const AuthForm({super.key, required this.onLoginSuccess});
+  /// Draws the form on its own NeoGlass panel. False when the screen already
+  /// puts it inside one (the NeoSync tab's single panel).
+  final bool framed;
+
+  const AuthForm({super.key, required this.onLoginSuccess, this.framed = true});
 
   @override
   AuthFormState createState() => AuthFormState();
@@ -661,7 +668,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
         children: [
           Center(
             child: Container(
-              constraints: BoxConstraints(maxWidth: 260.r),
+              constraints: BoxConstraints(maxWidth: 280.r),
               child: _buildAuthForm(context),
             ),
           ),
@@ -670,170 +677,150 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
     );
   }
 
+  /// The theme's corner radii, for the panel (external) and the fields and
+  /// buttons inside it (internal).
+  CornerRadii _radii(BuildContext context) =>
+      Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m();
+
   Widget _buildAuthForm(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: EdgeInsets.all(16.r),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1,
+    final radii = _radii(context);
+    // The same NeoGlass panel as the "What is NeoSync" box beside it and the
+    // rest of the NeoSync tab.
+    final form = _buildFormBody(context, theme);
+    if (!widget.framed) return form;
+    return NeoGlassRim(
+      cornerRadius: radii.radiusExternalRadius,
+      child: Container(
+        padding: EdgeInsets.all(16.r),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: radii.radiusExternal,
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.15),
+          ),
         ),
+        child: form,
       ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _showVerification
-                        ? AppLocale.verifyEmail.getString(context)
-                        : _showForgotPassword
-                        ? AppLocale.forgotPassword.getString(context)
-                        : _showResetPassword
-                        ? AppLocale.resetPassword.getString(context)
-                        : (_isLogin
-                              ? AppLocale.neoSyncLogin.getString(context)
-                              : AppLocale.joinNeoSync.getString(context)),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                      fontSize: 14.r,
-                    ),
+    );
+  }
+
+  Widget _buildFormBody(BuildContext context, ThemeData theme) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _showVerification
+                      ? AppLocale.verifyEmail.getString(context)
+                      : _showForgotPassword
+                      ? AppLocale.forgotPassword.getString(context)
+                      : _showResetPassword
+                      ? AppLocale.resetPassword.getString(context)
+                      : (_isLogin
+                            ? AppLocale.neoSyncLogin.getString(context)
+                            : AppLocale.joinNeoSync.getString(context)),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                    fontSize: 14.r,
                   ),
                 ),
-              ],
-            ),
-            SizedBox(height: 12.r),
+              ),
+            ],
+          ),
+          SizedBox(height: 10.r),
 
-            if (_showResetPassword) ...[
-              _buildResetPasswordForm(context),
-            ] else if (_showForgotPassword) ...[
-              _buildForgotPasswordForm(context),
-            ] else if (_showVerification || _showEmailVerification) ...[
-              if (!_showEmailVerification) ...[
-                _buildFieldHighlight(
+          if (_showResetPassword) ...[
+            _buildResetPasswordForm(context),
+          ] else if (_showForgotPassword) ...[
+            _buildForgotPasswordForm(context),
+          ] else if (_showVerification || _showEmailVerification) ...[
+            if (!_showEmailVerification) ...[
+              _buildFieldHighlight(
+                slot: 0,
+                child: TextFormField(
+                  controller: _verificationTokenController,
+                  focusNode: _verificationTokenFocus,
+                  style: TextStyle(fontSize: 12.r),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _verifyEmail(),
+                  decoration: _buildInputDecoration(
+                    context,
+                    AppLocale.verificationToken.getString(context),
+                    AppLocale.enterTokenFromEmail.getString(context),
+                    Symbols.mark_email_read_rounded,
+                    isHighlighted: isSelected(0),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocale.enterTokenFromEmailShort.getString(
+                        context,
+                      );
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              SizedBox(height: 6.r),
+            ],
+
+            if (_message != null) ...[
+              _buildMessageBox(context),
+              SizedBox(height: 6.r),
+            ],
+
+            if (!_showEmailVerification)
+              _buildActionButton(
+                context: context,
+                slot: 1,
+                onPressed: _isLoading ? null : _verifyEmail,
+                label: AppLocale.verifyEmail.getString(context),
+              ),
+            SizedBox(height: 8.r),
+
+            // Email verification buttons
+            _buildSecondaryButton(
+              context: context,
+              slot: _showEmailVerification ? 0 : -1,
+              onPressed: _isLoading ? null : _resendVerification,
+              label: AppLocale.resendVerificationEmail.getString(context),
+            ),
+            _buildSecondaryButton(
+              context: context,
+              slot: _showEmailVerification ? 1 : -1,
+              onPressed: () => _goBackToLogin(),
+              label: AppLocale.backToLogin.getString(context),
+            ),
+          ] else ...[
+            // Login / Register Form
+            if (!_isLogin) ...[
+              SizedBox(
+                height: 34.r,
+                child: _buildFieldHighlight(
                   slot: 0,
                   child: TextFormField(
-                    controller: _verificationTokenController,
-                    focusNode: _verificationTokenFocus,
-                    style: TextStyle(fontSize: 11.r),
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _verifyEmail(),
+                    controller: _usernameController,
+                    focusNode: _usernameFocus,
+                    style: TextStyle(fontSize: 12.r),
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => _emailFocus.requestFocus(),
                     decoration: _buildInputDecoration(
                       context,
-                      AppLocale.verificationToken.getString(context),
-                      AppLocale.enterTokenFromEmail.getString(context),
-                      Symbols.mark_email_read_rounded,
+                      AppLocale.username.getString(context),
+                      AppLocale.chooseUsername.getString(context),
+                      Symbols.person_outline_rounded,
                       isHighlighted: isSelected(0),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return AppLocale.enterTokenFromEmailShort.getString(
-                          context,
-                        );
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                SizedBox(height: 6.r),
-              ],
-
-              if (_message != null) ...[
-                _buildMessageBox(context),
-                SizedBox(height: 6.r),
-              ],
-
-              if (!_showEmailVerification)
-                _buildActionButton(
-                  context: context,
-                  slot: 1,
-                  onPressed: _isLoading ? null : _verifyEmail,
-                  label: AppLocale.verifyEmail.getString(context),
-                ),
-              SizedBox(height: 8.r),
-
-              // Email verification buttons
-              _buildSecondaryButton(
-                context: context,
-                slot: _showEmailVerification ? 0 : -1,
-                onPressed: _isLoading ? null : _resendVerification,
-                label: AppLocale.resendVerificationEmail.getString(context),
-                fontSize: 10.r,
-              ),
-              _buildSecondaryButton(
-                context: context,
-                slot: _showEmailVerification ? 1 : -1,
-                onPressed: () => _goBackToLogin(),
-                label: AppLocale.backToLogin.getString(context),
-                fontSize: 10.r,
-              ),
-            ] else ...[
-              // Login / Register Form
-              if (!_isLogin) ...[
-                SizedBox(
-                  height: 32.r,
-                  child: _buildFieldHighlight(
-                    slot: 0,
-                    child: TextFormField(
-                      controller: _usernameController,
-                      focusNode: _usernameFocus,
-                      style: TextStyle(fontSize: 11.r),
-                      textInputAction: TextInputAction.next,
-                      onFieldSubmitted: (_) => _emailFocus.requestFocus(),
-                      decoration: _buildInputDecoration(
-                        context,
-                        AppLocale.username.getString(context),
-                        AppLocale.chooseUsername.getString(context),
-                        Symbols.person_outline_rounded,
-                        isHighlighted: isSelected(0),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return AppLocale.pleaseEnterUsername.getString(
-                            context,
-                          );
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                ),
-                SizedBox(height: 6.r),
-              ],
-              SizedBox(
-                height: 32.r,
-                child: _buildFieldHighlight(
-                  slot: _isLogin ? 0 : 1,
-                  child: TextFormField(
-                    controller: _emailController,
-                    focusNode: _emailFocus,
-                    style: TextStyle(fontSize: 11.r),
-                    textInputAction: TextInputAction.next,
-                    onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
-                    decoration: _buildInputDecoration(
-                      context,
-                      AppLocale.email.getString(context),
-                      'you@example.com',
-                      Symbols.email_rounded,
-                      isHighlighted: isSelected(_isLogin ? 0 : 1),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return AppLocale.pleaseEnterEmail.getString(context);
-                      }
-                      if (!value.contains('@')) {
-                        return AppLocale.pleaseEnterValidEmail.getString(
-                          context,
-                        );
+                        return AppLocale.pleaseEnterUsername.getString(context);
                       }
                       return null;
                     },
@@ -841,148 +828,183 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
                 ),
               ),
               SizedBox(height: 6.r),
-              SizedBox(
-                height: 32.r,
-                child: _buildFieldHighlight(
-                  slot: _isLogin ? 1 : 2,
-                  child: TextFormField(
-                    controller: _passwordController,
-                    focusNode: _passwordFocus,
-                    style: TextStyle(fontSize: 11.r),
-                    obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _submitForm(),
-                    decoration:
-                        _buildInputDecoration(
-                          context,
-                          AppLocale.password.getString(context),
-                          AppLocale.enterPassword.getString(context),
-                          Symbols.lock_outline_rounded,
-                          isHighlighted: isSelected(_isLogin ? 1 : 2),
-                        ).copyWith(
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Symbols.visibility_rounded
-                                  : Symbols.visibility_off_rounded,
-                              size: 18.r,
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: 0.5,
-                              ),
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
-                        ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return AppLocale.pleaseEnterPassword.getString(context);
-                      }
-                      if (!_isLogin && value.length < 8) {
-                        return AppLocale.passwordTooShort.getString(context);
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ),
-              SizedBox(height: 6.r),
-
-              if (_message != null) ...[
-                _buildMessageBox(context),
-                SizedBox(height: 8.r),
-              ],
-
-              _buildActionButton(
-                context: context,
-                slot: _isLogin ? 2 : 3,
-                onPressed: _isLoading ? null : _submitForm,
-                label: _isLogin
-                    ? AppLocale.login.getString(context)
-                    : AppLocale.signUp.getString(context),
-              ),
             ],
-
+            SizedBox(
+              height: 34.r,
+              child: _buildFieldHighlight(
+                slot: _isLogin ? 0 : 1,
+                child: TextFormField(
+                  controller: _emailController,
+                  focusNode: _emailFocus,
+                  style: TextStyle(fontSize: 12.r),
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
+                  decoration: _buildInputDecoration(
+                    context,
+                    AppLocale.email.getString(context),
+                    'you@example.com',
+                    Symbols.email_rounded,
+                    isHighlighted: isSelected(_isLogin ? 0 : 1),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocale.pleaseEnterEmail.getString(context);
+                    }
+                    if (!value.contains('@')) {
+                      return AppLocale.pleaseEnterValidEmail.getString(context);
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ),
+            SizedBox(height: 6.r),
+            SizedBox(
+              height: 34.r,
+              child: _buildFieldHighlight(
+                slot: _isLogin ? 1 : 2,
+                child: TextFormField(
+                  controller: _passwordController,
+                  focusNode: _passwordFocus,
+                  style: TextStyle(fontSize: 12.r),
+                  obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _submitForm(),
+                  decoration:
+                      _buildInputDecoration(
+                        context,
+                        AppLocale.password.getString(context),
+                        AppLocale.enterPassword.getString(context),
+                        Symbols.lock_outline_rounded,
+                        isHighlighted: isSelected(_isLogin ? 1 : 2),
+                      ).copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Symbols.visibility_rounded
+                                : Symbols.visibility_off_rounded,
+                            size: 18.r,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                      ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocale.pleaseEnterPassword.getString(context);
+                    }
+                    if (!_isLogin && value.length < 8) {
+                      return AppLocale.passwordTooShort.getString(context);
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ),
             SizedBox(height: 6.r),
 
-            if (!_showVerification &&
-                !_showForgotPassword &&
-                !_showResetPassword &&
-                !_showEmailVerification) ...[
-              SizedBox(
-                height: 24.r,
-                child: _buildSecondaryButton(
+            if (_message != null) ...[
+              _buildMessageBox(context),
+              SizedBox(height: 8.r),
+            ],
+
+            _buildActionButton(
+              context: context,
+              slot: _isLogin ? 2 : 3,
+              onPressed: _isLoading ? null : _submitForm,
+              label: _isLogin
+                  ? AppLocale.login.getString(context)
+                  : AppLocale.signUp.getString(context),
+            ),
+          ],
+
+          SizedBox(height: 6.r),
+
+          if (!_showVerification &&
+              !_showForgotPassword &&
+              !_showResetPassword &&
+              !_showEmailVerification) ...[
+            SizedBox(height: 4.r),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8.r,
+              runSpacing: 8.r,
+              children: [
+                _buildSecondaryButton(
                   context: context,
                   slot: _isLogin ? 3 : 4,
                   onPressed: _toggleMode,
+                  // Beside the main button, a short "Sign up" / "Login"
+                  // says it all.
                   label: _isLogin
-                      ? AppLocale.dontHaveAccount.getString(context)
-                      : AppLocale.alreadyHaveAccount.getString(context),
-                  fontSize: 8.r,
-                  color: theme.colorScheme.secondary.withValues(alpha: 0.9),
+                      ? AppLocale.signUp.getString(context)
+                      : AppLocale.login.getString(context),
                 ),
-              ),
-              SizedBox(height: 6.r),
-              if (_isLogin)
-                SizedBox(
-                  height: 24.r,
-                  child: _buildSecondaryButton(
+                if (_isLogin)
+                  _buildSecondaryButton(
                     context: context,
                     slot: 4,
                     onPressed: _openForgotPassword,
                     label: AppLocale.forgotPasswordQuestion.getString(context),
-                    fontSize: 8.r,
-                    color: theme.colorScheme.secondary.withValues(alpha: 0.9),
                   ),
-                ),
-            ] else if (_showForgotPassword || _showResetPassword) ...[
-              SizedBox(
-                height: 24.r,
-                child: _buildSecondaryButton(
-                  context: context,
-                  slot: _showForgotPassword ? 2 : 3,
-                  onPressed: _goBackToLogin,
-                  label: AppLocale.backToLogin.getString(context),
-                  fontSize: 8.r,
-                ),
-              ),
-            ],
+              ],
+            ),
+          ] else if (_showForgotPassword || _showResetPassword) ...[
+            SizedBox(height: 4.r),
+            _buildSecondaryButton(
+              context: context,
+              slot: _showForgotPassword ? 2 : 3,
+              onPressed: _goBackToLogin,
+              label: AppLocale.backToLogin.getString(context),
+            ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // Wraps a field with the gamepad selection highlight border
-  Widget _buildFieldHighlight({required int slot, required Widget child}) {
-    // 220.r is the field width shared with the RetroAchievements, ScreenScraper
-    // and RomM login forms, which constrain each field container individually.
-    // Applying it here covers every field in this form from one place.
-    final field = ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: 220.r),
-      child: child,
-    );
-    if (!isSelected(slot)) return field;
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8.r),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.35),
-            blurRadius: 6.r,
-            spreadRadius: 1.r,
-          ),
         ],
       ),
-      child: field,
     );
   }
 
-  // Submit button carrying the gamepad selection glow
+  // Wraps a field with the gamepad selection highlight: a solid ring, no glow
+  Widget _buildFieldHighlight({required int slot, required Widget child}) {
+    // 240.r is the field width; the panel around it is NeoGlass.
+    final field = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: 240.r),
+      child: child,
+    );
+    // The selection ring is the field's own border (see
+    // [_buildInputDecoration]): a ring drawn around this box instead sat
+    // below the field on macOS, where the box is taller than the border.
+    return field;
+  }
+
+  /// The ring a selected button wears, the fields' own: solid, no glow. The
+  /// button shrinks rather than overflow a narrow panel (GamepadControl
+  /// doesn't wrap its label).
+  Widget _selectionRing(BuildContext context, bool selected, Widget button) {
+    final child = FittedBox(fit: BoxFit.scaleDown, child: button);
+    if (!selected) return child;
+    return Container(
+      padding: EdgeInsets.all(2.r),
+      decoration: BoxDecoration(
+        borderRadius: _radii(context).radiusInternal,
+        border: Border.all(
+          color: Theme.of(context).colorScheme.onSurface,
+          width: 2.r,
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  static const _aButton = 'assets/images/gamepad/Xbox_A_button.png';
+
+  // The form's main action, as the app's own buttons (GamepadControl): the
+  // A glyph shows on whichever button the cursor is on, since A presses it.
   Widget _buildActionButton({
     required BuildContext context,
     required int slot,
@@ -991,106 +1013,59 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
   }) {
     final theme = Theme.of(context);
     final selected = isSelected(slot);
-    return Container(
-      decoration: selected
-          ? BoxDecoration(
-              borderRadius: BorderRadius.circular(8.r),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                  blurRadius: 8.r,
-                  spreadRadius: 2.r,
-                ),
-              ],
-            )
-          : null,
-      child: SizedBox(
-        width: double.infinity,
-        height: 32.r,
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: theme.colorScheme.onPrimary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            elevation: 0,
-          ),
-          child: _isLoading
-              ? SizedBox(
-                  width: 16.r,
-                  height: 16.r,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      theme.colorScheme.onPrimary.withValues(alpha: 0.8),
-                    ),
-                  ),
-                )
-              : Text(
-                  label,
-                  style: TextStyle(fontSize: 14.r, fontWeight: FontWeight.bold),
-                ),
-        ),
+    return _selectionRing(
+      context,
+      selected,
+      GamepadControl(
+        iconPath: selected ? _aButton : null,
+        label: label,
+        onTap: onPressed,
+        busy: _isLoading,
+        backgroundColor: theme.colorScheme.tertiary,
+        textColor: theme.colorScheme.onTertiary,
       ),
     );
   }
 
-  // Secondary action button; slot = -1 means it is not gamepad-selectable
+  // The form's other actions (sign up, forgot password, back), the app's
+  // secondary buttons. slot = -1 means it is not gamepad-selectable.
   Widget _buildSecondaryButton({
     required BuildContext context,
     required int slot,
     required VoidCallback? onPressed,
     required String label,
-    required double fontSize,
-    Color? color,
   }) {
     final theme = Theme.of(context);
     final selected = slot >= 0 && isSelected(slot);
-    return Container(
-      decoration: selected
-          ? BoxDecoration(
-              borderRadius: BorderRadius.circular(6.r),
-              border: Border.all(
-                color: theme.colorScheme.primary.withValues(alpha: 0.6),
-                width: 1.r,
-              ),
-            )
-          : null,
-      child: TextButton(
-        onPressed: onPressed,
-        // Callers box these at 24.r. A TextButton's default 8+8 padding and
-        // 36px minimum leave less than a line of room inside that at RG DS
-        // scale (where .r is 1.0), which clipped the glyphs top and bottom;
-        // the Thor's ~3x scale hid it. Shrink the chrome so the label fits at
-        // every scale.
-        style: TextButton.styleFrom(
-          padding: EdgeInsets.zero,
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(fontSize: fontSize, color: color),
-        ),
+    return _selectionRing(
+      context,
+      selected,
+      GamepadControl(
+        iconPath: selected ? _aButton : null,
+        label: label,
+        onTap: onPressed,
+        backgroundColor: theme.colorScheme.tertiaryFixed,
+        textColor: theme.colorScheme.onTertiaryFixed,
       ),
     );
   }
 
+  // A message under the fields (a failed sign-in, a sent reset token):
+  // plain text as wide as the fields, so it doesn't read as another field.
   Widget _buildMessageBox(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(10.r),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8.r),
-      ),
-      child: Text(
-        _message!,
-        style: TextStyle(color: theme.colorScheme.primary, fontSize: 9.r),
-        textAlign: TextAlign.center,
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: 240.r),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 2.r),
+        child: Text(
+          _message!,
+          style: TextStyle(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
+            fontSize: 10.r,
+          ),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
@@ -1103,11 +1078,18 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
     bool isHighlighted = false,
   }) {
     final theme = Theme.of(context);
+    final radius = _radii(context).radiusInternal;
+    // Fields sit sunk into the glass panel: the screen's own background,
+    // with the panel's faint outline.
     return InputDecoration(
       labelText: label,
+      // The label stays inside the field, as its placeholder, and goes once
+      // something is typed: floated, it sat on the field's edge, where the
+      // selection ring crossed it out.
+      floatingLabelBehavior: FloatingLabelBehavior.never,
       labelStyle: TextStyle(
         color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-        fontSize: 10.r,
+        fontSize: 11.r,
       ),
       floatingLabelStyle: TextStyle(
         color: theme.colorScheme.primary,
@@ -1121,23 +1103,30 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
       ),
       contentPadding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
       filled: true,
-      fillColor: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+      fillColor: theme.scaffoldBackgroundColor,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: radius,
         borderSide: BorderSide.none,
       ),
+      // The selection ring: a solid line in the text colour, the same while
+      // typing, drawn as the field's own border so it always hugs the field.
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: radius,
         borderSide: BorderSide(
           color: isHighlighted
-              ? theme.colorScheme.primary
-              : theme.colorScheme.primary.withValues(alpha: 0.1),
+              ? theme.colorScheme.onSurface
+              : theme.colorScheme.outline.withValues(alpha: 0.15),
           width: isHighlighted ? 2.r : 1.r,
         ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8.r),
-        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.r),
+        borderRadius: radius,
+        borderSide: BorderSide(
+          color: isHighlighted
+              ? theme.colorScheme.onSurface
+              : theme.colorScheme.primary,
+          width: isHighlighted ? 2.r : 1.r,
+        ),
       ),
     );
   }
@@ -1150,7 +1139,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
           child: TextFormField(
             controller: _emailController,
             focusNode: _emailFocus,
-            style: TextStyle(fontSize: 11.r),
+            style: TextStyle(fontSize: 12.r),
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _sendForgotPasswordEmail(),
             decoration: _buildInputDecoration(
@@ -1210,7 +1199,7 @@ class AuthFormState extends State<AuthForm> with LoginFormSelection<AuthForm> {
           child: TextFormField(
             controller: _newPasswordController,
             focusNode: _newPasswordFocus,
-            style: TextStyle(fontSize: 11.r),
+            style: TextStyle(fontSize: 12.r),
             obscureText: _obscurePassword,
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _resetPassword(),

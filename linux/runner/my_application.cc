@@ -25,11 +25,18 @@ static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
-  // set icon 
-  GdkPixbuf* icon = gdk_pixbuf_new_from_file("/home/miguel/Workspaces/neostation-app/build/linux/x64/release/bundle/data/flutter_assets/assets/images/logo.png", NULL);
-  if (icon != NULL) {
-    gtk_window_set_icon(GTK_WINDOW(window), icon);
-    g_object_unref(icon);
+  // The window icon, from the app's own assets next to the executable.
+  g_autofree gchar* exe = g_file_read_link("/proc/self/exe", nullptr);
+  if (exe != nullptr) {
+    g_autofree gchar* bundle = g_path_get_dirname(exe);
+    g_autofree gchar* icon_path = g_build_filename(
+        bundle, "data", "flutter_assets", "assets", "images", "logo.png",
+        nullptr);
+    GdkPixbuf* icon = gdk_pixbuf_new_from_file(icon_path, nullptr);
+    if (icon != nullptr) {
+      gtk_window_set_icon(GTK_WINDOW(window), icon);
+      g_object_unref(icon);
+    }
   }
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu

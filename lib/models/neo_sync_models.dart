@@ -370,6 +370,15 @@ class LocalSaveFile {
   /// system goes up under its system's fixed path. Null otherwise.
   final String? cloudPath;
 
+  /// Whether this is a memory card a RetroArch core keeps in RetroArch's
+  /// system folder (LRPS2's `pcsx2/memcards`, Flycast's `dc`), rather than in
+  /// the saves folder.
+  final bool inRetroArchSystemFolder;
+
+  /// The emulator whose custom save folder this file is in (the folder's
+  /// emulator slug), or null outside custom folders.
+  final String? customFolderEmulator;
+
   LocalSaveFile({
     required this.filePath,
     required this.fileName,
@@ -379,6 +388,8 @@ class LocalSaveFile {
     required this.isSynced,
     required this.relativePath,
     this.cloudPath,
+    this.inRetroArchSystemFolder = false,
+    this.customFolderEmulator,
   });
 
   /// Returns formatted file size string.

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../constants/system_folder_names.dart';
 import '../data/datasources/sqlite_service.dart';
 import '../models/rom_fingerprint.dart';
 import '../services/credential_store.dart';
@@ -634,6 +635,8 @@ class ScraperRepository {
     String appSystemId,
     String filename,
   ) async {
+    // "Android Games" rows, and so their metadata, live under `android`.
+    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
     try {
       final db = await SqliteService.getDatabase();
       final rows = await db.query(
@@ -657,6 +660,8 @@ class ScraperRepository {
     String filename,
     Map<String, dynamic> fields,
   ) async {
+    // "Android Games" rows, and so their metadata, live under `android`.
+    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
     if (fields.isEmpty) return false;
     try {
       final db = await SqliteService.getDatabase();
@@ -705,6 +710,8 @@ class ScraperRepository {
     String appSystemId, {
     bool isFullyScraped = false,
   }) async {
+    // "Android Games" rows, and so their metadata, live under `android`.
+    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
     try {
       final db = await SqliteService.getDatabase();
       metadata['app_system_id'] = appSystemId;
@@ -746,6 +753,8 @@ class ScraperRepository {
     Map<String, dynamic> metadata,
     String appSystemId,
   ) async {
+    // "Android Games" rows, and so their metadata, live under `android`.
+    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
     try {
       final db = await SqliteService.getDatabase();
       final filename = metadata['filename'];
@@ -943,6 +952,8 @@ class ScraperRepository {
     String filename, {
     bool metadataOnly = false,
   }) async {
+    // "Android Games" rows, and so their metadata, live under `android`.
+    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
     final db = await SqliteService.getDatabase();
     await db.update(
       'user_screenscraper_metadata',
@@ -962,6 +973,8 @@ class ScraperRepository {
     String appSystemId,
     String filename,
   ) async {
+    // "Android Games" rows, and so their metadata, live under `android`.
+    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
     final db = await SqliteService.getDatabase();
     await db.update(
       'user_screenscraper_metadata',

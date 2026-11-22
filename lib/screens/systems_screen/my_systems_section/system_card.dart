@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -59,6 +60,7 @@ class SystemCard extends StatefulWidget {
     this.isCompact = false,
     this.artworkInset = 4,
     this.showShadow = true,
+    this.highlightSelected = true,
   });
 
   /// The system or game metadata resolved for this card.
@@ -108,11 +110,19 @@ class SystemCard extends StatefulWidget {
   /// Whether the card casts its drop shadow.
   final bool showShadow;
 
+  /// Whether a selected card switches its frame and footer to the selection
+  /// colour. The carousel turns it off: its centred card already stands out
+  /// by its place and size, so it keeps the same colours as the others.
+  final bool highlightSelected;
+
   @override
   State<SystemCard> createState() => _SystemCardState();
 }
 
 class _SystemCardState extends State<SystemCard> {
+  /// Whether the card wears the selection colours.
+  bool get _highlighted => widget.isSelected && widget.highlightSelected;
+
   late final FocusNode _focusNode;
   late final GlobalKey _contentStackKey;
   final MusicPlayerService _musicPlayerService = MusicPlayerService();
@@ -318,7 +328,11 @@ class _SystemCardState extends State<SystemCard> {
             decoration: BoxDecoration(
               // The chrome (the frame around the artwork and the footer)
               // switches to secondary on selection; the artwork itself stays.
-              color: widget.isSelected
+              // Transparent while the grid's liquid selection draws the
+              // frame behind the card.
+              color: (GooeyCardChrome.maybeOf(context)?.liquid ?? false)
+                  ? Colors.transparent
+                  : _highlighted
                   ? Theme.of(context).colorScheme.secondary
                   : Theme.of(context).colorScheme.surface,
               borderRadius: outerRadius,
@@ -723,18 +737,41 @@ class _SystemCardState extends State<SystemCard> {
                         ? math.min(maxInset, shortestSide * insetFactor)
                         : maxInset;
 
+                    final cacheWidth = performanceCacheWidth(
+                      512,
+                      performanceMode: _performanceMode,
+                    );
+                    // The same drop shadow as the game list's wheel: a copy
+                    // in the theme's shadow colour, offset down and right,
+                    // scaled to the card.
+                    final shadowOffset = widget.isCompact ? 3.r : 5.r;
                     return Padding(
                       padding: EdgeInsets.all(inset),
-                      child: Image.file(
-                        _cachedWheelFile!,
-                        height: 256.r,
-                        fit: BoxFit.contain,
-                        cacheWidth: performanceCacheWidth(
-                          512,
-                          performanceMode: _performanceMode,
-                        ),
-                        errorBuilder: (context, error, stackTrace) =>
-                            const SizedBox.shrink(),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Transform.translate(
+                            offset: Offset(shadowOffset, shadowOffset),
+                            child: Image.file(
+                              _cachedWheelFile!,
+                              height: 256.r,
+                              fit: BoxFit.contain,
+                              cacheWidth: cacheWidth,
+                              color: Theme.of(context).colorScheme.shadow
+                                  .withValues(alpha: 0.5),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const SizedBox.shrink(),
+                            ),
+                          ),
+                          Image.file(
+                            _cachedWheelFile!,
+                            height: 256.r,
+                            fit: BoxFit.contain,
+                            cacheWidth: cacheWidth,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -754,25 +791,34 @@ class _SystemCardState extends State<SystemCard> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            AppLocale.timePlayedLabel
-                .getString(context)
-                .replaceFirst(
-                  '{time}',
-                  _formatPlayTimeLocalized(
-                    widget.info.gameModel?.playTime ?? 0,
-                  ),
-                )
-                .toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: widget.isSelected
-                  ? Theme.of(context).colorScheme.onSecondary
-                  : Theme.of(context).colorScheme.onSurface,
-              fontSize: 10.r,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
+          GooeyCardChrome.fadeColor(
+            context,
+            color: _highlighted
+                ? Theme.of(context).colorScheme.onSecondary
+                : Theme.of(context).colorScheme.onSurface,
+            // Shrinks rather than cuts off on the narrow cards of the
+            // smallest sizes.
+            builder: (color) => FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                AppLocale.timePlayedLabel
+                    .getString(context)
+                    .replaceFirst(
+                      '{time}',
+                      _formatPlayTimeLocalized(
+                        widget.info.gameModel?.playTime ?? 0,
+                      ),
+                    )
+                    .toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10.r,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                ),
+              ),
             ),
           ),
         ],
@@ -787,18 +833,19 @@ class _SystemCardState extends State<SystemCard> {
   /// it into a gradient) is both simpler to reason about and cheaper to paint.
   Widget _buildSystemFooter(BuildContext context) {
     final assetLogoPath = _resolveSystemLogoPath();
-    final selected = widget.isSelected;
+    final selected = _highlighted;
 
     return Padding(
       padding: EdgeInsets.only(bottom: 2.r, left: 4.r, right: 4.r),
       child: FittedBox(
         fit: BoxFit.contain,
-        child: _buildSystemLogo(
-          assetLogoPath,
-          height: 128.r,
+        child: GooeyCardChrome.fadeColor(
+          context,
           color: selected
               ? Theme.of(context).colorScheme.onSecondary
               : Theme.of(context).colorScheme.onSurface,
+          builder: (color) =>
+              _buildSystemLogo(assetLogoPath, height: 128.r, color: color),
         ),
       ),
     );

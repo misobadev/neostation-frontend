@@ -388,7 +388,8 @@ void main() {
         find.text(AppLocale.en[AppLocale.noOnlineSavesFound]),
         findsNothing,
       );
-      expect(find.textContaining('ONLINE SAVES'), findsNothing);
+      // No save count in the sidebar until a listing has worked.
+      expect(_countPill(), findsNothing);
     });
 
     testWidgets('shows the saves and their count once listed', (tester) async {
@@ -414,12 +415,14 @@ void main() {
 
       await pumpHome(tester);
 
-      expect(find.text(AppLocale.en[AppLocale.loading]), findsOne);
+      // The Save List beside the menu spins while the first listing runs.
+      expect(find.byType(CircularProgressIndicator), findsWidgets);
       expect(
         find.text(AppLocale.en[AppLocale.noOnlineSavesFound]),
         findsNothing,
       );
-      expect(find.textContaining('ONLINE SAVES'), findsNothing);
+      // No save count in the sidebar until a listing has worked.
+      expect(_countPill(), findsNothing);
 
       gate.complete();
       await tester.pump();
@@ -435,15 +438,23 @@ void main() {
       expect(await provider.loadFiles(), isTrue);
       await tester.pump();
 
-      expect(find.text(AppLocale.en[AppLocale.loading]), findsOne);
+      // The Save List beside the menu spins while the first listing runs.
+      expect(find.byType(CircularProgressIndicator), findsWidgets);
       expect(
         find.text(AppLocale.en[AppLocale.noOnlineSavesFound]),
         findsNothing,
       );
-      expect(find.textContaining('ONLINE SAVES'), findsNothing);
+      // No save count in the sidebar until a listing has worked.
+      expect(_countPill(), findsNothing);
 
       gate.complete();
       await tester.pump();
     });
   });
 }
+
+/// The sidebar's "N ONLINE SAVES" pill (the Save List's own "ONLINE SAVES"
+/// title carries no count).
+Finder _countPill() => find.byWidgetPredicate(
+  (w) => w is Text && RegExp(r'^\d+ ONLINE SAVES$').hasMatch(w.data ?? ''),
+);

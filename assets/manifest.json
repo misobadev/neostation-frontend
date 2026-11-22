@@ -1,5 +1,5 @@
 {
-  "latest_version": "0.3.43",
+  "latest_version": "0.3.47",
   "systems": [
     "2600",
     "32x",
@@ -13,9 +13,11 @@
     "amazon",
     "amiga",
     "android",
+    "android_games",
     "arc",
     "ard",
     "ast",
+    "atari800",
     "aw",
     "bbcmicro",
     "c64",
@@ -60,6 +62,7 @@
     "md-hacks",
     "mini",
     "mo2",
+    "model2",
     "model3",
     "msx",
     "music",

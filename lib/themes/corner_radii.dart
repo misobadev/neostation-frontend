@@ -52,6 +52,32 @@ class CornerRadii extends ThemeExtension<CornerRadii> {
     return const CornerRadii(radiusExternal: 24, radiusInternal: 20);
   }
 
+  /// The user's corner setting: 0 square, then extra small, small, medium
+  /// (the default), large and extra large.
+  factory CornerRadii.step(int step) => switch (step) {
+    <= 0 => CornerRadii.zero(),
+    1 => CornerRadii.xs(),
+    2 => CornerRadii.s(),
+    3 => CornerRadii.m(),
+    4 => CornerRadii.l(),
+    _ => CornerRadii.xl(),
+  };
+
+  /// Steps of [CornerRadii.step].
+  static const int stepCount = 6;
+  static const int defaultStep = 3;
+
+  /// [theme] with its corners replaced by the user's [step], so the rounding
+  /// is the user's choice rather than the theme's.
+  static ThemeData applyStep(ThemeData theme, int step) {
+    return theme.copyWith(
+      extensions: [
+        ...theme.extensions.values.where((e) => e is! CornerRadii),
+        CornerRadii.step(step),
+      ],
+    );
+  }
+
   /// Scaled [BorderRadius] tokens (uses flutter_screenutil).
   BorderRadius get radiusExternal => BorderRadius.circular(_radiusExternal.r);
   BorderRadius get radiusInternal => BorderRadius.circular(_radiusInternal.r);

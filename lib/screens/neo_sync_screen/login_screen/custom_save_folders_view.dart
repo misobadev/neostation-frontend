@@ -56,7 +56,12 @@ class CustomSaveFoldersView extends StatefulWidget {
     super.key,
     required this.onBack,
     this.onConfigured,
+    this.embedded = false,
   });
+
+  /// Shown inside the NeoSync dashboard's panel, beside its sidebar: no room
+  /// left for the top dock, which the panel already clears.
+  final bool embedded;
 
   @override
   State<CustomSaveFoldersView> createState() => _CustomSaveFoldersViewState();
@@ -109,6 +114,9 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
       _gamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
         'neo_sync_custom_folders',
+        // In the NeoSync dashboard's panel the sidebar's menu keeps the
+        // D-pad until the panel is entered: slot in beneath it.
+        background: widget.embedded,
         onActivate: () => _gamepadNav.activate(),
         onDeactivate: () => _gamepadNav.deactivate(),
       );
@@ -346,11 +354,18 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
           case CustomFolderUploadOutcome.uploaded:
             // Went through: the automatic upload's failure entry is stale.
             clearAutoFolderUploadNotice(system, emulatorSlug);
+            final left = provider.leftForLaunchFiles;
             show(
-              AppLocale.customFolderUploadComplete
-                  .getString(context)
-                  .replaceFirst('{uploaded}', '${provider.uploadedFiles}')
-                  .replaceFirst('{skipped}', '${provider.skippedFiles}'),
+              [
+                AppLocale.customFolderUploadComplete
+                    .getString(context)
+                    .replaceFirst('{uploaded}', '${provider.uploadedFiles}')
+                    .replaceFirst('{skipped}', '${provider.skippedFiles}'),
+                if (left > 0)
+                  AppLocale.customFolderUploadLeftForLaunch
+                      .getString(context)
+                      .replaceFirst('{left}', '$left'),
+              ].join('\n'),
               custom.NotificationType.success,
             );
           case CustomFolderUploadOutcome.cancelled:
@@ -474,7 +489,9 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
     final busy = _syncing;
 
     return Padding(
-      padding: EdgeInsets.only(top: 52.r, left: 8.r, right: 8.r, bottom: 8.r),
+      padding: widget.embedded
+          ? EdgeInsets.zero
+          : EdgeInsets.only(top: 52.r, left: 8.r, right: 8.r, bottom: 8.r),
       child: Column(
         children: [
           NeoSyncSectionHeader(

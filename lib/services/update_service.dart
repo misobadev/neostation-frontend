@@ -5,7 +5,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:neostation/app_version.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -23,9 +23,16 @@ import 'package:neostation/utils/version_compare.dart';
 /// host architecture/OS, secure downloading, and platform-specific installation
 /// procedures (including multi-stage self-replacement on Desktop).
 class UpdateService {
-  /// GitHub Releases API endpoint for the latest production build.
+  /// GitHub Releases API endpoint for the latest stable release. GitHub
+  /// leaves pre-releases out of it, so a stable install is only ever offered
+  /// a stable release.
   static const String _githubApiUrl =
       'https://api.github.com/repos/misobadev/neostation-frontend/releases/latest';
+
+  /// Every recent release, pre-releases included: what a release candidate
+  /// checks, so it is offered the next candidate and then the release.
+  static const String _githubReleasesUrl =
+      'https://api.github.com/repos/misobadev/neostation-frontend/releases?per_page=30';
 
   static final _log = LoggerService.instance;
 
@@ -65,37 +72,33 @@ class UpdateService {
       // 1. Resolve local versioning from the application manifest.
       final currentVersion = await _getAppVersion();
 
-      // 2. Poll GitHub API for the latest release metadata. A bounded timeout
-      // keeps an offline/unreachable network from stalling the startup
-      // sequence, which defers the ROM scan until the update checks finish.
-      final response =
-          await (_httpClientOverride?.get(Uri.parse(_githubApiUrl)) ??
-                  http.get(Uri.parse(_githubApiUrl)))
-              .timeout(const Duration(seconds: 10));
+      // 2. Poll GitHub for the releases this install may move to. A bounded
+      // timeout keeps an offline/unreachable network from stalling the
+      // startup sequence, which defers the ROM scan until the update checks
+      // finish. A release candidate follows the pre-release channel: it
+      // reads every release, since /latest never names a pre-release.
+      final preReleaseChannel = isPreReleaseVersion(currentVersion);
+      final url = Uri.parse(
+        preReleaseChannel ? _githubReleasesUrl : _githubApiUrl,
+      );
+      final response = await (_httpClientOverride?.get(url) ?? http.get(url))
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
         _log.e('UpdateService: API failure (Status: ${response.statusCode})');
         return null;
       }
 
-      final releaseData = json.decode(response.body) as Map<String, dynamic>;
+      final decoded = json.decode(response.body);
+      final releases = preReleaseChannel
+          ? (decoded as List<dynamic>).cast<Map<String, dynamic>>()
+          : [decoded as Map<String, dynamic>];
 
-      // Standardize the tag for display: strip a leading 'v' and the build
-      // metadata. replaceFirst('v', '') would have removed a 'v' anywhere in
-      // the string, so only a genuine prefix is dropped here. The comparison
-      // below normalizes independently and tolerates either form.
-      final rawTag = releaseData['tag_name'].toString().trim();
-      final latestVersion =
-          (rawTag.startsWith('v') || rawTag.startsWith('V')
-                  ? rawTag.substring(1)
-                  : rawTag)
-              .split('+')
-              .first;
-
-      // 3. Perform semantic version comparison.
-      if (_isNewerVersion(currentVersion, latestVersion)) {
-        // Resolve the specific binary asset compatible with the host OS and architecture.
-        final assets = releaseData['assets'] as List<dynamic>;
+      // 3. The newest release first, by semantic version, then the next one
+      // down if it has no build for this platform.
+      for (final releaseData in newerReleases(releases, currentVersion)) {
+        final latestVersion = releaseVersion(releaseData);
+        final assets = releaseData['assets'] as List<dynamic>? ?? const [];
         final platformAsset = await _findPlatformAsset(assets);
 
         if (platformAsset != null) {
@@ -123,6 +126,41 @@ class UpdateService {
     }
   }
 
+  /// A release's version for display and comparison: its tag without the
+  /// `v` prefix and the build metadata (`v1.0.0-rc.1+3001` → `1.0.0-rc.1`).
+  /// replaceFirst('v', '') would have removed a 'v' anywhere in the string,
+  /// so only a genuine prefix is dropped.
+  @visibleForTesting
+  static String releaseVersion(Map<String, dynamic> release) {
+    final rawTag = (release['tag_name'] ?? '').toString().trim();
+    return (rawTag.startsWith('v') || rawTag.startsWith('V')
+            ? rawTag.substring(1)
+            : rawTag)
+        .split('+')
+        .first;
+  }
+
+  /// The [releases] newer than [currentVersion], newest first by semantic
+  /// version (GitHub lists them by date, and a hotfix to an older line can
+  /// be published after a newer one). Drafts and tags that can't be read as
+  /// a version are left out.
+  @visibleForTesting
+  static List<Map<String, dynamic>> newerReleases(
+    List<Map<String, dynamic>> releases,
+    String currentVersion,
+  ) {
+    final newer = <(SemVersion, Map<String, dynamic>)>[];
+    for (final release in releases) {
+      if (release['draft'] == true) continue;
+      final tag = releaseVersion(release);
+      final version = parseSemVersion(tag);
+      if (version == null || !_isNewerVersion(currentVersion, tag)) continue;
+      newer.add((version, release));
+    }
+    newer.sort((a, b) => b.$1.compareTo(a.$1));
+    return [for (final entry in newer) entry.$2];
+  }
+
   /// The SHA-256 in a GitHub asset's `digest` (`sha256:<hex>`), in lower case,
   /// or null when there is none.
   @visibleForTesting
@@ -133,16 +171,15 @@ class UpdateService {
     return RegExp(r'^[0-9a-f]{64}$').hasMatch(hex) ? hex : null;
   }
 
-  /// Extracts the application version string from the platform package info.
-  static Future<String> _getAppVersion() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      return packageInfo.version;
-    } catch (e) {
-      _log.e('UpdateService: Failed to read app version', error: e);
-      return '0.0.0';
-    }
-  }
+  /// The installed version, replaceable so a test can pose as any version.
+  @visibleForTesting
+  static String? debugInstalledVersion;
+
+  /// The installed version, pre-release suffix included. Read from
+  /// [appVersion] rather than package_info: macOS keeps only numbers, so a
+  /// release candidate would read there as the release itself.
+  static Future<String> _getAppVersion() async =>
+      debugInstalledVersion ?? appVersion;
 
   /// Performs a semantic comparison between two version strings.
   ///
@@ -699,20 +736,222 @@ rm -f "$scriptPath"
     '-macos-',
   ];
 
-  /// Handles updates on macOS by invoking the system handler for the downloaded payload.
+  /// The `.app` bundle [executablePath] runs from
+  /// (`…/NeoStation.app/Contents/MacOS/neostation` → `…/NeoStation.app`), or
+  /// null when it isn't inside one.
+  @visibleForTesting
+  static String? macAppBundlePath(String executablePath) {
+    var dir = path.dirname(executablePath);
+    while (dir != path.dirname(dir)) {
+      if (dir.endsWith('.app')) return dir;
+      dir = path.dirname(dir);
+    }
+    return null;
+  }
+
+  /// [value] as one single-quoted shell word.
+  static String _shellQuote(String value) =>
+      "'${value.replaceAll("'", r"'\''")}'";
+
+  /// The script that swaps the installed app for the new one once NeoStation
+  /// (process [pid]) has quit, then opens it.
+  ///
+  /// The old app is moved aside rather than deleted first, and put back if
+  /// the new one can't take its place, so a failed swap never leaves the user
+  /// without NeoStation. Whatever happens, the update's disk image is ejected
+  /// and the app at [bundlePath] is opened.
+  @visibleForTesting
+  static String macUpdateScript({
+    required int pid,
+    required String sourceApp,
+    required String bundlePath,
+    required String mountPoint,
+  }) {
+    final parent = path.dirname(bundlePath);
+    final staged = path.join(parent, '.neostation-update.app');
+    final backup = path.join(parent, '.neostation-previous.app');
+    final q = _shellQuote;
+    return """#!/bin/bash
+PID=$pid
+SOURCE=${q(sourceApp)}
+TARGET=${q(bundlePath)}
+STAGED=${q(staged)}
+BACKUP=${q(backup)}
+MOUNT=${q(mountPoint)}
+
+# Wait for NeoStation to quit, at most a minute.
+for _ in \$(seq 1 300); do
+  kill -0 "\$PID" 2>/dev/null || break
+  sleep 0.2
+done
+
+rm -rf "\$STAGED" "\$BACKUP"
+if ditto "\$SOURCE" "\$STAGED"; then
+  if mv "\$TARGET" "\$BACKUP"; then
+    if mv "\$STAGED" "\$TARGET"; then
+      rm -rf "\$BACKUP"
+    else
+      mv "\$BACKUP" "\$TARGET"
+    fi
+  fi
+fi
+rm -rf "\$STAGED"
+
+hdiutil detach "\$MOUNT" -quiet || hdiutil detach "\$MOUNT" -force -quiet
+rmdir "\$MOUNT" 2>/dev/null
+open -n "\$TARGET"
+rm -f "\$0"
+""";
+  }
+
+  /// Installs the downloaded disk image over the running app and reopens it.
+  ///
+  /// It used to only open the image and quit: macOS mounted it and showed the
+  /// app inside, nothing copied it over the installed one, and NeoStation
+  /// neither reopened nor changed version. Now the image is mounted quietly, a
+  /// script waits for NeoStation to quit, swaps the app and opens it. When the
+  /// app can't be replaced where it runs (from the disk image itself, a
+  /// translocated copy or a folder the user can't write to) the image is
+  /// opened for a manual install, as before.
   static Future<bool> _installMacOS(File file) async {
     try {
-      _log.i(
-        'UpdateService: Delegating macOS installation to system handler...',
-      );
+      final bundle = macAppBundlePath(Platform.resolvedExecutable);
+      final parent = bundle == null ? null : Directory(path.dirname(bundle));
+      final replaceable =
+          bundle != null &&
+          !bundle.contains('/AppTranslocation/') &&
+          !bundle.startsWith('/Volumes/') &&
+          await _isWritable(parent!);
+      if (!replaceable) {
+        _log.w(
+          'UpdateService: $bundle cannot be replaced; opening the disk image '
+          'for a manual install',
+        );
+        await Process.run('open', [file.path]);
+        await Future.delayed(const Duration(milliseconds: 500));
+        exit(0);
+      }
 
-      // macOS handles DMG/PKG/ZIP payloads natively via the 'open' command.
-      await Process.run('open', [file.path]);
+      final mountPoint = path.join(file.parent.path, 'mount');
+      await Directory(mountPoint).create(recursive: true);
+      final attach = await Process.run('hdiutil', [
+        'attach',
+        '-nobrowse',
+        '-readonly',
+        '-noautoopen',
+        '-mountpoint',
+        mountPoint,
+        file.path,
+      ]);
+      if (attach.exitCode != 0) {
+        _log.e('UpdateService: Could not mount the update: ${attach.stderr}');
+        return false;
+      }
+
+      final source = Directory(mountPoint)
+          .listSync(followLinks: false)
+          .whereType<Directory>()
+          .where((d) => d.path.endsWith('.app'))
+          .firstOrNull;
+      if (source == null) {
+        _log.e('UpdateService: No app found in the update');
+        await Process.run('hdiutil', ['detach', mountPoint, '-quiet']);
+        return false;
+      }
+
+      final rejection = await macSignatureProblem(
+        newApp: source.path,
+        installedApp: bundle,
+      );
+      if (rejection != null) {
+        _log.e('UpdateService: Refusing the update: $rejection');
+        await Process.run('hdiutil', ['detach', mountPoint, '-quiet']);
+        return false;
+      }
+
+      final scriptPath = path.join(file.parent.path, 'install.sh');
+      await File(scriptPath).writeAsString(
+        macUpdateScript(
+          pid: pid,
+          sourceApp: source.path,
+          bundlePath: bundle,
+          mountPoint: mountPoint,
+        ),
+      );
+      await Process.run('chmod', ['700', scriptPath]);
+      _log.i('UpdateService: Installing the update over $bundle');
+      await Process.start('/bin/bash', [
+        scriptPath,
+      ], mode: ProcessStartMode.detached);
 
       await Future.delayed(const Duration(milliseconds: 500));
       exit(0);
     } catch (e) {
       _log.e('UpdateService: macOS installation failure', error: e);
+      return false;
+    }
+  }
+
+  /// The Team ID [app] is signed with, or null when it isn't signed by a
+  /// developer (unsigned, ad hoc or unreadable).
+  static Future<String?> _macTeamId(String app) async {
+    final result = await Process.run('codesign', ['-dv', '--verbose=2', app]);
+    if (result.exitCode != 0) return null;
+    final match = RegExp(
+      r'^TeamIdentifier=(\S+)$',
+      multiLine: true,
+    ).firstMatch('${result.stderr}');
+    final team = match?.group(1);
+    return team == null || team == 'not set' ? null : team;
+  }
+
+  /// Why [newApp] must not replace [installedApp], or null when it may.
+  ///
+  /// Like Sparkle, the new app must carry an intact signature that
+  /// Gatekeeper accepts (signed and notarized), from the same developer as
+  /// the installed one, so a tampered or foreign download is never installed.
+  /// A build without a developer signature (a local one) only needs the new
+  /// app to pass.
+  @visibleForTesting
+  static Future<String?> macSignatureProblem({
+    required String newApp,
+    required String installedApp,
+  }) async {
+    final verify = await Process.run('codesign', [
+      '--verify',
+      '--deep',
+      '--strict',
+      newApp,
+    ]);
+    if (verify.exitCode != 0) {
+      return 'the signature is broken: ${verify.stderr}'.trim();
+    }
+    final gatekeeper = await Process.run('spctl', [
+      '--assess',
+      '--type',
+      'execute',
+      newApp,
+    ]);
+    if (gatekeeper.exitCode != 0) {
+      return 'Gatekeeper rejects it: ${gatekeeper.stderr}'.trim();
+    }
+    final installedTeam = await _macTeamId(installedApp);
+    if (installedTeam == null) return null;
+    final newTeam = await _macTeamId(newApp);
+    if (newTeam != installedTeam) {
+      return 'it is signed by $newTeam, not $installedTeam';
+    }
+    return null;
+  }
+
+  /// Whether this user can create files in [dir].
+  static Future<bool> _isWritable(Directory dir) async {
+    try {
+      final probe = File(path.join(dir.path, '.neostation-write-test'));
+      await probe.writeAsString('');
+      await probe.delete();
+      return true;
+    } catch (_) {
       return false;
     }
   }

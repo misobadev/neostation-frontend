@@ -6,6 +6,7 @@ import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/repositories/neosync_save_folder_repository.dart';
+import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/retroarch_config_service.dart';
@@ -115,6 +116,30 @@ void main() {
     type: 'shared',
   );
 
+  /// Records [file] as synced when the cloud held [inCloud], so it now counts
+  /// as changed here: a card never synced here takes the cloud's instead
+  /// (NEO-266).
+  Future<void> syncedBefore(File file) => SyncRepository.saveSyncState(
+    NeoSyncProvider.kSyncProviderId,
+    file.path,
+    DateTime(2026, 1, 1).millisecondsSinceEpoch,
+    cloudTime.millisecondsSinceEpoch,
+    inCloud.length,
+    fileHash: service.calculateFileHash(inCloud),
+  );
+
+  /// Records [file] as synced back when it held [older] and the cloud's
+  /// copy was older than [cloudTime]: unchanged here since, while the cloud's
+  /// moved on.
+  Future<void> unchangedSinceSync(File file) => SyncRepository.saveSyncState(
+    NeoSyncProvider.kSyncProviderId,
+    file.path,
+    file.lastModifiedSync().millisecondsSinceEpoch,
+    DateTime(2026, 1, 1).millisecondsSinceEpoch,
+    older.length,
+    fileHash: service.calculateFileHash(older),
+  );
+
   File card(String relative, List<int> bytes, DateTime modified) =>
       File(p.joinAll([saves, ...relative.split('/')]))
         ..createSync(recursive: true)
@@ -196,7 +221,9 @@ void main() {
         'sent during a launch, is handed that launch\'s deadline, so a newer '
         'cloud copy its upload finds is not written late',
         () async {
-          card('$cloudFolder/$cardName', newer, DateTime(2026, 9, 1));
+          await syncedBefore(
+            card('$cloudFolder/$cardName', newer, DateTime(2026, 9, 1)),
+          );
           service.cloud = [cloudCard(cloudPath, inCloud)];
           final deadline = SyncDeadline(const Duration(minutes: 1));
 
@@ -219,6 +246,7 @@ void main() {
           newer,
           DateTime(2026, 9, 1),
         );
+        await syncedBefore(only);
         service.cloud = [cloudCard(cloudPath, inCloud)];
 
         await provider.detectGameSaveFiles(_game('GameA.iso', system));
@@ -230,6 +258,7 @@ void main() {
 
       test('takes a newer cloud copy into the card the core uses', () async {
         final real = card('$coreFolder/$cardName', older, DateTime(2026, 1, 1));
+        await unchangedSinceSync(real);
         service
           ..cloud = [cloudCard(cloudPath, inCloud)]
           ..cloudBytes = inCloud;
@@ -245,6 +274,7 @@ void main() {
       test('syncs the real card, not a copy NeoStation downloaded into a '
           'second folder before', () async {
         final real = card('$coreFolder/$cardName', older, DateTime(2026, 1, 1));
+        await unchangedSinceSync(real);
         // The stale copy was written when it was downloaded, so it looks
         // newer than the cloud.
         final extra = card(
@@ -295,7 +325,9 @@ void main() {
       test(
         'never leaves out every copy in the folder its cloud path names',
         () async {
-          card('$cloudFolder/$cardName', newer, DateTime(2026, 9, 1));
+          await syncedBefore(
+            card('$cloudFolder/$cardName', newer, DateTime(2026, 9, 1)),
+          );
           card(
             '$cloudFolder/${cardName.toUpperCase()}',
             older,

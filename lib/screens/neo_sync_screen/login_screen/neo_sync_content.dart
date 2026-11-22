@@ -14,7 +14,6 @@ import 'package:neostation/widgets/auth_form.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/services/neosync/billing_service.dart';
 import 'package:neostation/models/billing_models.dart';
-import 'package:neostation/models/neo_sync_models.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/gestures.dart';
@@ -24,13 +23,13 @@ import 'package:neostation/utils/neosync_failure_message.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/neo_glass.dart';
+import 'package:neostation/widgets/neosync_logo.dart';
 import 'package:neostation/widgets/plan_change_notice.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/sync/providers/neo_sync_adapter.dart';
 
 import '../../app_screen.dart';
 import 'save_list_view.dart';
-import 'neo_sync_shared.dart';
 import 'custom_save_folders_view.dart';
 import 'plan_selection_view.dart';
 import 'neo_sync_dialogs.dart';
@@ -55,9 +54,18 @@ class NeoSyncContentState extends State<NeoSyncContent>
     with TickerProviderStateMixin {
   static bool _dataLoadedThisSession = false;
   bool _isInitialLoadInProgress = false;
-  NeoSyncSection _section = NeoSyncSection.dashboard;
   late GamepadNavigation _dashboardGamepadNav;
   int _selectedMenuIndex = 0;
+
+  /// The cursor is on Logout, past the last menu section.
+  bool get _logoutSelected => _selectedMenuIndex == _menuSections.length;
+
+  /// The section on show in the panel beside the sidebar: the one the menu
+  /// cursor is on (Logout keeps the last).
+  NeoSyncSection _shownSection = NeoSyncSection.saveList;
+
+  /// Whether the D-pad drives the panel's section rather than the menu.
+  bool _panelFocused = false;
 
   // Variables para billing
   List<PlanInfo> _plans = [];
@@ -288,8 +296,69 @@ class NeoSyncContentState extends State<NeoSyncContent>
 
   IconData _getPlanIcon(String planName) => Symbols.storage_rounded;
 
+  /// [NeoSyncSection.dashboard] hands the D-pad back to the menu; any other
+  /// section is shown in the panel and given the D-pad.
   void _goToSection(NeoSyncSection section) {
-    setState(() => _section = section);
+    if (section == NeoSyncSection.dashboard) {
+      _backToMenu();
+      return;
+    }
+    setState(() {
+      _shownSection = section;
+      _selectedMenuIndex = _menuSections.indexOf(section);
+    });
+    _afterSectionBuilt(_focusPanel);
+  }
+
+  /// Runs [action] once a newly shown section has pushed its own gamepad
+  /// layer (beneath the menu's), which it does after its first frame.
+  void _afterSectionBuilt(VoidCallback action) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) action();
+      });
+    });
+  }
+
+  void _pushMenuLayer() {
+    GamepadNavigationManager.pushLayer(
+      'neo_sync_content',
+      onActivate: () {
+        _dashboardGamepadNav.activate();
+        if (_panelFocused && mounted) setState(() => _panelFocused = false);
+      },
+      onDeactivate: () => _dashboardGamepadNav.deactivate(),
+    );
+  }
+
+  /// → or A on a section: the panel takes the D-pad (the section's own layer,
+  /// under the menu's, becomes the active one).
+  void _focusPanel() {
+    if (!mounted) return;
+    setState(() => _panelFocused = true);
+    GamepadNavigationManager.popLayer('neo_sync_content');
+  }
+
+  /// B in a section: back to the menu, the section still on show.
+  void _backToMenu() {
+    // A field the section left focused (its search) would keep the keys.
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _panelFocused = false;
+    });
+    GamepadNavigationManager.popLayer('neo_sync_content');
+    _pushMenuLayer();
+  }
+
+  /// The menu cursor moved: show its section in the panel, keep the D-pad.
+  void _moveMenu(int delta) {
+    final stops = _menuSections.length + 1;
+    setState(() {
+      _selectedMenuIndex = (_selectedMenuIndex + delta + stops) % stops;
+      if (!_logoutSelected) {
+        _shownSection = _menuSections[_selectedMenuIndex];
+      }
+    });
   }
 
   // ── Dashboard navigation ────────────────────────────────────────────────
@@ -303,22 +372,22 @@ class NeoSyncContentState extends State<NeoSyncContent>
 
   void _initializeDashboardGamepad() {
     _dashboardGamepadNav = GamepadNavigation(
-      onNavigateUp: (isRepeat) {
-        if (_selectedMenuIndex > 0) {
-          setState(() => _selectedMenuIndex = _selectedMenuIndex - 1);
-        } else {
-          setState(() => _selectedMenuIndex = _menuSections.length - 1);
-        }
-      },
-      onNavigateDown: (isRepeat) {
-        setState(
-          () => _selectedMenuIndex =
-              (_selectedMenuIndex + 1) % _menuSections.length,
-        );
+      // The menu's stops are its sections and, last, Logout at the foot of
+      // the sidebar (index == the section count).
+      onNavigateUp: (isRepeat) => _moveMenu(-1),
+      onNavigateDown: (isRepeat) => _moveMenu(1),
+      onNavigateRight: (isRepeat) {
+        if (_logoutSelected) return;
+        SfxService().playNavSound();
+        _focusPanel();
       },
       onSelectItem: () {
         SfxService().playNavSound();
-        _goToSection(_menuSections[_selectedMenuIndex]);
+        if (_logoutSelected) {
+          _onLogout();
+          return;
+        }
+        _focusPanel();
       },
       onPreviousTab: () => AppNavigation.previousTab(),
       onNextTab: () => AppNavigation.nextTab(),
@@ -328,7 +397,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
         _goToSection(NeoSyncSection.plans);
       },
       onXButton: () {
-        // X button logs out.
+        // X is a shortcut to Logout, which also sits at the sidebar's foot.
         _onLogout();
       },
       onSettings: () {},
@@ -336,11 +405,9 @@ class NeoSyncContentState extends State<NeoSyncContent>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _dashboardGamepadNav.initialize();
-      GamepadNavigationManager.pushLayer(
-        'neo_sync_content',
-        onActivate: () => _dashboardGamepadNav.activate(),
-        onDeactivate: () => _dashboardGamepadNav.deactivate(),
-      );
+      // The section on show pushes its layer beneath this one (it is
+      // embedded), so the menu has the D-pad from the start.
+      _pushMenuLayer();
     });
   }
 
@@ -435,30 +502,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
         }
 
         if (!authService.isLoggedIn) {
-          return Column(
-            children: [
-              SizedBox(height: 64.r),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.r),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        constraints: BoxConstraints(maxWidth: 260.r),
-                        child: AuthForm(onLoginSuccess: _onLoginSuccess),
-                      ),
-                      SizedBox(width: 16.r),
-                      SizedBox(width: 300.r, child: _buildInfoBox(context)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
+          return _buildSignedOutLayout(context);
         }
 
         return Scaffold(
@@ -469,31 +513,37 @@ class NeoSyncContentState extends State<NeoSyncContent>
     );
   }
 
-  Widget _buildActiveView() {
-    switch (_section) {
-      case NeoSyncSection.saveList:
-        return SaveListView(
-          onBack: () => _goToSection(NeoSyncSection.dashboard),
-        );
-      case NeoSyncSection.keptCopies:
-        return KeptCopiesView(
-          onBack: () => _goToSection(NeoSyncSection.dashboard),
-        );
-      case NeoSyncSection.customFolders:
-        return CustomSaveFoldersView(
-          onBack: () => _goToSection(NeoSyncSection.dashboard),
-        );
-      case NeoSyncSection.plans:
-        return PlanSelectionView(
-          initialPlans: _plans,
-          onUpgrade: _upgradePlan,
-          onCancel: _cancelSubscription,
-          getPlanIcon: _getPlanIcon,
-          onBack: () => _goToSection(NeoSyncSection.dashboard),
-        );
-      case NeoSyncSection.dashboard:
-        return _buildDashboard();
-    }
+  Widget _buildActiveView() => _buildDashboard();
+
+  /// The section on show in the panel, laid out to fit beside the sidebar.
+  Widget _buildSectionPanel() {
+    void back() => _goToSection(NeoSyncSection.dashboard);
+    return switch (_shownSection) {
+      NeoSyncSection.keptCopies => KeptCopiesView(
+        key: const ValueKey('kept-copies'),
+        embedded: true,
+        onBack: back,
+      ),
+      NeoSyncSection.customFolders => CustomSaveFoldersView(
+        key: const ValueKey('custom-folders'),
+        embedded: true,
+        onBack: back,
+      ),
+      NeoSyncSection.plans => PlanSelectionView(
+        key: const ValueKey('plans'),
+        embedded: true,
+        initialPlans: _plans,
+        onUpgrade: _upgradePlan,
+        onCancel: _cancelSubscription,
+        getPlanIcon: _getPlanIcon,
+        onBack: back,
+      ),
+      _ => SaveListView(
+        key: const ValueKey('save-list'),
+        embedded: true,
+        onBack: back,
+      ),
+    };
   }
 
   Widget _buildDashboard() {
@@ -513,17 +563,13 @@ class NeoSyncContentState extends State<NeoSyncContent>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(width: 240.w, child: _buildDashboardHeader()),
+                    SizedBox(width: 190.r, child: _buildDashboardHeader()),
                     SizedBox(width: 12.r),
-                    Expanded(child: _buildMenuList()),
+                    // The section the menu is on, as RetroAchievements shows
+                    // its sections beside its sidebar.
+                    Expanded(child: _buildSectionPanel()),
                   ],
                 ),
-              ),
-              SizedBox(height: 8.r),
-              // Dedicated footer spanning the full dashboard width
-              Align(
-                alignment: Alignment.centerRight,
-                child: NeoSyncLogoutButton(onTap: _onLogout),
               ),
             ],
           );
@@ -607,7 +653,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
     return NeoGlassRim(
       cornerRadius: radii.radiusExternalRadius,
       child: Container(
-        padding: EdgeInsets.all(10.r),
+        padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 12.r),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: radii.radiusExternal,
@@ -619,16 +665,25 @@ class NeoSyncContentState extends State<NeoSyncContent>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Identity: name + plan ──
-            Text(
-              AppLocale.helloUser
-                  .getString(context)
-                  .replaceFirst('{name}', user?.username ?? ''),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 13.r,
-                color: theme.colorScheme.onSurface,
-              ),
-              overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                // NeoSync's isotype, in the theme's colour.
+                NeoSyncLogo.isotype(height: 16.r),
+                SizedBox(width: 8.r),
+                Expanded(
+                  child: Text(
+                    AppLocale.helloUser
+                        .getString(context)
+                        .replaceFirst('{name}', user?.username ?? ''),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.r,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 3.r),
             // Plan + online save count.
@@ -733,13 +788,40 @@ class NeoSyncContentState extends State<NeoSyncContent>
                 ),
               ),
             ],
-            SizedBox(height: 10.r),
+            // The RetroAchievements sidebar's format: the account above a
+            // line, then the menu and Logout at the foot. Only the menu
+            // scrolls, on a screen too short for it.
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 8.r),
+              child: Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outline.withValues(alpha: 0.15),
+              ),
+            ),
             Expanded(
-              child: _buildLatestSavesList(
-                context,
-                neoSyncProvider.onlineFiles.take(10).toList(),
-                loading: neoSyncProvider.isLoadingOnlineFiles,
-                loadFailed: neoSyncProvider.onlineFilesLoadFailed,
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0; i < _menuSections.length; i++)
+                            Padding(
+                              padding: EdgeInsets.only(bottom: 2.r),
+                              child: _buildMenuRow(theme, i),
+                            ),
+                          const Spacer(),
+                          _buildLogoutRow(theme),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -781,356 +863,232 @@ class NeoSyncContentState extends State<NeoSyncContent>
     );
   }
 
-  Widget _buildLatestSavesList(
-    BuildContext context,
-    List<NeoSyncFile> latestSaves, {
-    bool loading = false,
-    bool loadFailed = false,
-  }) {
-    final theme = Theme.of(context);
-    if (latestSaves.isEmpty) {
-      return Center(
-        child: Text(
-          (loading
-                  ? AppLocale.loading
-                  : loadFailed
-                  ? AppLocale.failedToRefreshCloud
-                  : AppLocale.noOnlineSavesFound)
-              .getString(context),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 8.r,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+  /// A menu entry in the sidebar, the RetroAchievements menu's row: filled
+  /// with the app's selection colour while the D-pad is on it, tinted while
+  /// its section has the D-pad in the panel.
+  Widget _buildMenuRow(ThemeData theme, int index) {
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final section = _menuSections[index];
+    final current = _shownSection == section;
+    final filled = index == _selectedMenuIndex && !_panelFocused;
+    final background = filled
+        ? scheme.onSurface
+        : current
+        ? scheme.onSurface.withValues(alpha: 0.10)
+        : Colors.transparent;
+    final foreground = filled
+        ? scheme.surface
+        : scheme.onSurface.withValues(alpha: current ? 1 : 0.75);
+    final (icon, label) = switch (section) {
+      NeoSyncSection.keptCopies => (
+        Symbols.history_rounded,
+        AppLocale.keptCopiesTitle,
+      ),
+      NeoSyncSection.customFolders => (
+        Symbols.folder_special_rounded,
+        AppLocale.customSaveFoldersMenu,
+      ),
+      NeoSyncSection.plans => (
+        Symbols.payment_rounded,
+        AppLocale.updateYourPlanMenu,
+      ),
+      _ => (Symbols.cloud_rounded, AppLocale.saveListMenu),
+    };
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          SfxService().playNavSound();
+          _goToSection(section);
+        },
+        canRequestFocus: false,
+        borderRadius: radii.radiusInternal,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          height: 32.r,
+          padding: EdgeInsets.symmetric(horizontal: 10.r),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: radii.radiusInternal,
           ),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 2.r),
-      physics: const ClampingScrollPhysics(),
-      itemCount: latestSaves.length,
-      separatorBuilder: (_, _) => SizedBox(height: 9.r),
-      itemBuilder: (context, index) =>
-          _buildLatestSaveRow(theme, latestSaves[index]),
-    );
-  }
-
-  Widget _buildLatestSaveRow(ThemeData theme, NeoSyncFile file) {
-    final gameHash = file.gameHash;
-    final imageUrl = gameHash != null && gameHash.isNotEmpty
-        ? 'https://media.neosync.cloud/games/$gameHash.webp'
-        : null;
-    final name = file.gameName.isNotEmpty ? file.gameName : file.fileName;
-
-    return NeoGlassRim(
-      cornerRadius: 8.r,
-      child: Container(
-        height: 42.r,
-        padding: EdgeInsets.symmetric(horizontal: 7.r, vertical: 5.r),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.16,
-          ),
-          borderRadius: BorderRadius.circular(8.r),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(5.r),
-              child: Container(
-                width: 28.r,
-                height: 28.r,
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                child: imageUrl == null
-                    ? _buildLatestSaveIcon(theme)
-                    : Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => _buildLatestSaveIcon(theme),
-                        loadingBuilder: (_, child, progress) => progress == null
-                            ? child
-                            : _buildLatestSaveIcon(theme),
-                      ),
-              ),
-            ),
-            SizedBox(width: 6.r),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 8.5.r,
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  SizedBox(height: 1.r),
-                  Text(
-                    [
-                      if (file.systemName != null &&
-                          file.systemName!.isNotEmpty)
-                        file.systemName!,
-                      file.fileSizeFormatted,
-                    ].join('  ·  '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 7.r,
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.55,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLatestSaveIcon(ThemeData theme) {
-    return Center(
-      child: Icon(
-        Symbols.videogame_asset_rounded,
-        size: 12.r,
-        color: theme.colorScheme.primary,
-      ),
-    );
-  }
-
-  Widget _buildMenuList() {
-    final theme = Theme.of(context);
-    final entries = <_MenuEntry>[
-      _MenuEntry(
-        icon: Symbols.cloud_rounded,
-        title: AppLocale.saveListMenu.getString(context),
-        subtitle: AppLocale.onlineSaves.getString(context),
-      ),
-      _MenuEntry(
-        icon: Symbols.history_rounded,
-        title: AppLocale.keptCopiesTitle.getString(context),
-        subtitle: AppLocale.keptCopiesSubtitle.getString(context),
-      ),
-      _MenuEntry(
-        icon: Symbols.folder_special_rounded,
-        title: AppLocale.customSaveFoldersMenu.getString(context),
-        subtitle: AppLocale.customSaveFoldersTitle.getString(context),
-      ),
-      _MenuEntry(
-        icon: Symbols.payment_rounded,
-        title: AppLocale.updateYourPlanMenu.getString(context),
-        subtitle: AppLocale.manageYourPlan
-            .getString(context)
-            .replaceFirst('{plan}', ''),
-      ),
-    ];
-
-    return ListView.builder(
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        final isSelected = index == _selectedMenuIndex;
-        final cornerRadii = theme.extension<CornerRadii>() ?? CornerRadii.m();
-        final radii = cornerRadii.radiusExternal;
-        final foreground = isSelected
-            ? theme.colorScheme.surface
-            : theme.colorScheme.onSurface;
-        final mutedForeground = foreground.withValues(alpha: 0.65);
-
-        return Padding(
-          padding: EdgeInsets.only(bottom: 6.r),
-          child: NeoGlassRim(
-            cornerRadius: cornerRadii.radiusExternalRadius,
-            child: Material(
-              color: isSelected
-                  ? theme.colorScheme.onSurface
-                  : theme.colorScheme.surface,
-              borderRadius: radii,
-              child: InkWell(
-                onTap: () {
-                  SfxService().playNavSound();
-                  setState(() => _selectedMenuIndex = index);
-                  _goToSection(_menuSections[index]);
-                },
-                borderRadius: radii,
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 12.r,
-                    vertical: 8.r,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: radii,
-                    border: Border.all(color: Colors.transparent, width: 2.r),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(6.r),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? theme.colorScheme.surface.withValues(
-                                  alpha: 0.12,
-                                )
-                              : theme.colorScheme.primary.withValues(
-                                  alpha: 0.1,
-                                ),
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                        child: Icon(
-                          entry.icon,
-                          color: isSelected
-                              ? foreground
-                              : theme.colorScheme.primary,
-                          size: 18.r,
-                        ),
-                      ),
-                      SizedBox(width: 10.r),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              entry.title,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12.r,
-                                color: foreground,
-                              ),
-                            ),
-                            SizedBox(height: 1.r),
-                            Text(
-                              entry.subtitle,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontSize: 9.r,
-                                color: mutedForeground,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Symbols.chevron_right_rounded,
-                        size: 16.r,
-                        color: mutedForeground,
-                      ),
-                    ],
+          child: Row(
+            children: [
+              Icon(icon, size: 18.r, color: foreground),
+              SizedBox(width: 10.r),
+              Expanded(
+                child: Text(
+                  label.getString(context),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 12.r,
+                    fontWeight: current ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  Widget _buildInfoBox(BuildContext context) {
+  /// Logout at the sidebar's foot, the RetroAchievements one: red at rest,
+  /// filled with the app's selection colour while the D-pad is on it.
+  Widget _buildLogoutRow(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    final selected = _logoutSelected;
+    final foreground = selected ? scheme.surface : scheme.error;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _onLogout,
+        canRequestFocus: false,
+        borderRadius: radii.radiusInternal,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          height: 32.r,
+          padding: EdgeInsets.symmetric(horizontal: 10.r),
+          decoration: BoxDecoration(
+            color: selected ? scheme.onSurface : Colors.transparent,
+            borderRadius: radii.radiusInternal,
+          ),
+          child: Row(
+            children: [
+              Icon(Symbols.logout_rounded, size: 18.r, color: foreground),
+              SizedBox(width: 10.r),
+              Text(
+                AppLocale.logout.getString(context),
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 12.r,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Signed out: one NeoGlass panel, NeoSync introduced on the left (its
+  /// logo from the neosync.cloud brand kit, in the theme's colour) and the
+  /// sign-in form on the right.
+  Widget _buildSignedOutLayout(BuildContext context) {
     final theme = Theme.of(context);
     final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
-    return NeoGlassRim(
-      cornerRadius: radii.radiusExternalRadius,
-      child: Container(
-        padding: EdgeInsets.all(16.r),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: radii.radiusExternal,
-          border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.15),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Symbols.cloud_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 24.r,
-                ),
-                SizedBox(width: 12.r),
-                Expanded(
-                  child: Text(
-                    AppLocale.whatIsNeoSync.getString(context),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                      fontSize: 14.r,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 6.r),
-            Text(
-              AppLocale.neoSyncDescription.getString(context),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
-                fontSize: 8.r,
+    final line = theme.colorScheme.outline.withValues(alpha: 0.15);
+    // Anchored to the top, like the RetroAchievements and RomM sign-in
+    // panels, so the three start at the same height.
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        // 52.r clears the top dock, the same as the other sign-in panels.
+        padding: EdgeInsets.fromLTRB(16.r, 52.r, 16.r, 16.r),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 600.r),
+          child: NeoGlassRim(
+            cornerRadius: radii.radiusExternalRadius,
+            child: Container(
+              padding: EdgeInsets.all(14.r),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: radii.radiusExternal,
+                border: Border.all(color: line),
               ),
-              softWrap: true,
-            ),
-            SizedBox(height: 6.r),
-            _buildInfoItem(
-              context,
-              Symbols.cloud_upload_rounded,
-              AppLocale.neoSyncSavesSync.getString(context),
-            ),
-            _buildInfoItem(
-              context,
-              Symbols.devices_rounded,
-              AppLocale.crossPlatformDesc.getString(context),
-            ),
-            _buildInfoItem(
-              context,
-              Symbols.security_rounded,
-              AppLocale.securePrivateDesc.getString(context),
-            ),
-            SizedBox(height: 6.r),
-            RichText(
-              softWrap: true,
-              text: TextSpan(
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontStyle: FontStyle.italic,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  fontSize: 8.r,
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextSpan(
-                    text: AppLocale.learnMoreEcosystem.getString(context),
+                  Expanded(child: _buildInfoBox(context)),
+                  Container(
+                    width: 1,
+                    height: 200.r,
+                    margin: EdgeInsets.symmetric(horizontal: 16.r),
+                    color: line,
                   ),
-                  TextSpan(
-                    text: 'neosync.cloud',
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      decoration: TextDecoration.underline,
+                  Expanded(
+                    child: AuthForm(
+                      onLoginSuccess: _onLoginSuccess,
+                      framed: false,
                     ),
-                    recognizer: TapGestureRecognizer()
-                      ..onTap = () async {
-                        final url = Uri.parse('https://neosync.cloud');
-                        if (await canLaunchUrl(url)) {
-                          await launchUrl(
-                            url,
-                            mode: LaunchMode.externalApplication,
-                          );
-                        }
-                      },
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  /// NeoSync introduced: its logo, what it does and where to learn more.
+  Widget _buildInfoBox(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        NeoSyncLogo(height: 26.r),
+        SizedBox(height: 14.r),
+        Text(
+          AppLocale.neoSyncDescription.getString(context),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
+            fontSize: 10.r,
+          ),
+          softWrap: true,
+        ),
+        SizedBox(height: 6.r),
+        _buildInfoItem(
+          context,
+          Symbols.cloud_upload_rounded,
+          AppLocale.neoSyncSavesSync.getString(context),
+        ),
+        _buildInfoItem(
+          context,
+          Symbols.devices_rounded,
+          AppLocale.crossPlatformDesc.getString(context),
+        ),
+        _buildInfoItem(
+          context,
+          Symbols.security_rounded,
+          AppLocale.securePrivateDesc.getString(context),
+        ),
+        SizedBox(height: 6.r),
+        RichText(
+          softWrap: true,
+          text: TextSpan(
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 10.r,
+            ),
+            children: [
+              TextSpan(text: AppLocale.learnMoreEcosystem.getString(context)),
+              TextSpan(
+                text: 'neosync.cloud',
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
+                recognizer: TapGestureRecognizer()
+                  ..onTap = () async {
+                    final url = Uri.parse('https://neosync.cloud');
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(
+                        url,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    }
+                  },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1145,8 +1103,8 @@ class NeoSyncContentState extends State<NeoSyncContent>
         children: [
           Icon(
             icon,
-            size: 12.r,
-            color: theme.colorScheme.primary.withValues(alpha: 0.7),
+            size: 14.r,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
           ),
           SizedBox(width: 8.r),
           Expanded(
@@ -1154,7 +1112,7 @@ class NeoSyncContentState extends State<NeoSyncContent>
               text,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                fontSize: 8.r,
+                fontSize: 10.r,
               ),
               softWrap: true,
             ),
@@ -1163,16 +1121,4 @@ class NeoSyncContentState extends State<NeoSyncContent>
       ),
     );
   }
-}
-
-class _MenuEntry {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  const _MenuEntry({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
 }

@@ -106,6 +106,11 @@ mixin AppLocale {
   static const String startupStorageStartEmpty = 'startup_storage_start_empty';
   static const String startupStorageCreateFailed =
       'startup_storage_create_failed';
+  static const String wizardStepOf = 'wizard_step_of';
+  static const String wizardLanguageTitle = 'wizard_language_title';
+  static const String wizardLanguageBody = 'wizard_language_body';
+  static const String wizardWelcomeBody = 'wizard_welcome_body';
+  static const String wizardStartSetup = 'wizard_start_setup';
 
   // ---------------------------------------------------------------------------
   // Game / Playback
@@ -165,6 +170,8 @@ mixin AppLocale {
   static const String neoglassBorderWidth = 'neoglass_border_width';
   static const String neoglassBorderWidthSubtitle =
       'neoglass_border_width_subtitle';
+  static const String cornerRadius = 'corner_radius';
+  static const String cornerRadiusSubtitle = 'corner_radius_subtitle';
   static const String systemTheme = 'system_theme';
   static const String importTheme = 'import_theme';
   static const String importThemeSuccess = 'import_theme_success';
@@ -233,10 +240,6 @@ mixin AppLocale {
   static const String androidSystemSettingsSubtitle =
       'android_system_settings_subtitle';
   static const String androidApps = 'android_apps';
-  static const String androidAppLayout = 'android_app_layout';
-  static const String androidAppLayoutSubtitle = 'android_app_layout_subtitle';
-  static const String androidAppLayoutSystem = 'android_app_layout_system';
-  static const String androidAppLayoutTab = 'android_app_layout_tab';
   static const String scanOnStartup = 'scan_on_startup';
   static const String scanOnStartupSubtitle = 'scan_on_startup_subtitle';
   static const String performanceMode = 'performance_mode';
@@ -1021,6 +1024,8 @@ mixin AppLocale {
   static const String hintSelect = 'hint_select';
   static const String hintSettings = 'hint_settings';
   static const String hintBack = 'hint_back';
+  static const String androidGameHint = 'androidGameHint';
+  static const String androidGameMarkApp = 'androidGameMarkApp';
   static const String hintPlay = 'hint_play';
   static const String hintFavorite = 'hint_favorite';
   static const String hintRandom = 'hint_random';
@@ -1101,6 +1106,8 @@ mixin AppLocale {
   static const String neoSyncSaveConflict = 'neo_sync_save_conflict';
   static const String neoSyncKeptCloudCopy = 'neo_sync_kept_cloud_copy';
   static const String neoSyncNewerCloudCopy = 'neo_sync_newer_cloud_copy';
+  static const String neoSyncFirstCardSyncTookCloud =
+      'neo_sync_first_card_sync_took_cloud';
   static const String keptCopiesTitle = 'kept_copies_title';
   static const String keptCopiesSubtitle = 'kept_copies_subtitle';
   static const String keptCopiesCount = 'kept_copies_count';
@@ -1558,6 +1565,9 @@ mixin AppLocale {
   static const String raEvents = 'raEvents';
   static const String raAotwYearTitle = 'ra_aotw_year_title';
   static const String raAotw = 'raAotw';
+  static const String raOverview = 'raOverview';
+  static const String raStatPlayed = 'raStatPlayed';
+  static const String raStatBeaten = 'raStatBeaten';
   static const String raAwards = 'raAwards';
   static const String raSetOrder = 'raSetOrder';
   static const String raPointsSort = 'raPointsSort';
@@ -1633,7 +1643,6 @@ mixin AppLocale {
   static const String raAotwEarnedPreviously = 'ra_aotw_earned_previously';
   static const String raAotwNotEarned = 'ra_aotw_not_earned';
   static const String raAotwStatusUnavailable = 'ra_aotw_status_unavailable';
-  static const String raAotwNotInLibrary = 'ra_aotw_not_in_library';
   static const String raAotwWeekStarted = 'ra_aotw_week_started';
   static const String raAotwTrueRatio = 'ra_aotw_true_ratio';
   static const String raAotwParticipation = 'ra_aotw_participation';
@@ -1690,6 +1699,8 @@ mixin AppLocale {
   static const String uploadingCustomFolder = 'uploading_custom_folder';
   static const String customFolderUploadComplete =
       'custom_folder_upload_complete';
+  static const String customFolderUploadLeftForLaunch =
+      'custom_folder_upload_left_for_launch';
   static const String customFolderUploadFailed = 'custom_folder_upload_failed';
   static const String customFolderUploadConfirm =
       'custom_folder_upload_confirm';

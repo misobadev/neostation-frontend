@@ -60,13 +60,19 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       system.folderName,
     );
     final root = customRootForPath(folders, file.path);
+    final emulator = customFolderEmulator(folders, root);
+    if (root == null || emulator == null) return null;
+    return (root: root, emulatorUniqueId: emulator);
+  }
+
+  /// The emulator whose custom folder in [folders] is [root] (the first of
+  /// them, should two emulators share one folder), or null for no [root].
+  String? customFolderEmulator(Map<String, String> folders, String? root) {
     if (root == null) return null;
     for (final entry in folders.entries) {
-      if (entry.value == root) {
-        return (root: root, emulatorUniqueId: entry.key);
-      }
+      if (entry.value == root) return entry.key;
     }
-    return (root: root, emulatorUniqueId: folders.keys.first);
+    return folders.keys.first;
   }
 
   /// Returns the custom folder root from [folders] that contains [filePath],
@@ -167,6 +173,12 @@ extension NeoSyncPathResolver on NeoSyncProvider {
     bool isState = false,
     String? explicitSystemFolder,
   }) async {
+    // A card RetroArch keeps in its system folder goes up under the same
+    // fixed path as one in the saves folder, so every device's copy of the
+    // card is one cloud file, wherever its core keeps it.
+    final systemCard = await _retroArchSystemCardCloudPath(game, file);
+    if (systemCard != null) return systemCard;
+
     // Try the NeoSync v2 standard path first. It carries system + emulator, so
     // the cloud always knows which emulator produced the save.
     final v2Path = await _buildV2CloudPath(
@@ -593,10 +605,14 @@ extension NeoSyncPathResolver on NeoSyncProvider {
   /// Resuelve la ruta local para un archivo de la nube para un juego específico
   /// Resuelve la ruta local para un archivo de la nube para un juego específico
   /// Puede retornar múltiples rutas si el sistema lo requiere (ej. múltiples emuladores Switch)
+  ///
+  /// With [includeSystemCards] false, a card never goes into RetroArch's
+  /// system folder: RomM doesn't sync the cards there.
   Future<List<String>> resolveCloudFileToLocalPath(
     GameModel game,
-    NeoSyncFile cloudFile,
-  ) async {
+    NeoSyncFile cloudFile, {
+    bool includeSystemCards = true,
+  }) async {
     final system = await _getSystemForGame(game);
     if (system == null) return [];
 
@@ -655,6 +671,28 @@ extension NeoSyncPathResolver on NeoSyncProvider {
         );
         return [target];
       }
+    }
+
+    // A standalone emulator's save belongs in that emulator's custom folder.
+    // Without one here it stays in the cloud: placed in RetroArch's saves
+    // folder, it was uploaded again as RetroArch's, and RetroArch got a save
+    // it never asked for.
+    if (cloudFile.type == 'custom') {
+      NeoSyncProvider._log.d(
+        'Download: not placing ${cloudFile.filePath}: no custom folder here '
+        'for ${cloudFile.emulator ?? 'its emulator'}',
+      );
+      return const [];
+    }
+
+    // A card every game of the system shares goes where the RetroArch core
+    // keeps it, in the system folder, on a device where that core is set up.
+    if (includeSystemCards && !isState) {
+      final systemCard = await _retroArchSystemCardTarget(
+        system.folderName,
+        relativeName,
+      );
+      if (systemCard != null) return systemCard;
     }
 
     if (isState) {
@@ -730,6 +768,150 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       NeoSyncProvider._log.e('Error getting RetroArch system path: $e');
       return null;
     }
+  }
+
+  /// The folder of RetroArch's system folder where the RetroArch core of
+  /// [systemFolder] keeps the memory cards its games share
+  /// ([CloudPathBuilder.retroArchSystemCardFolder]), normalised so the
+  /// listing, placement and sync records all name a card the same way. Null
+  /// when RetroArch's system folder isn't known (`system_directory` unset or
+  /// "default", or no retroarch.cfg found), or for a system whose games don't
+  /// share cards.
+  Future<String?> _retroArchSystemCardFolder(String? systemFolder) async {
+    if (!_sharesMemoryCards(systemFolder)) return null;
+    final systemDirectory = await _getRetroArchSystemPath();
+    if (systemDirectory == null || systemDirectory.isEmpty) return null;
+    final folder = CloudPathBuilder.retroArchSystemCardFolder(
+      systemFolder,
+      systemDirectory,
+    );
+    return folder == null ? null : path.normalize(path.absolute(folder));
+  }
+
+  /// [systemFolder]'s card folder ([_retroArchSystemCardFolder]) when the
+  /// RetroArch core that uses it is set up on this device (its own folder is
+  /// in the system folder): there, the system folder is where the system's
+  /// shared cards live. Null otherwise.
+  Future<String?> _retroArchSystemCardHome(String? systemFolder) async {
+    final folder = await _retroArchSystemCardFolder(systemFolder);
+    final systemDirectory = await _getRetroArchSystemPath();
+    if (folder == null || systemDirectory == null) return null;
+    final core = CloudPathBuilder.retroArchSystemCoreFolder(
+      systemFolder,
+      systemDirectory,
+    );
+    try {
+      if (core == null || !await Directory(core).exists()) return null;
+    } on FileSystemException catch (e) {
+      // e.g. a system folder in another app's private storage.
+      NeoSyncProvider._log.w('Could not check $core: $e');
+      return null;
+    }
+    return folder;
+  }
+
+  /// The folders of RetroArch's system folder that hold cards shared by a
+  /// system's games, whether or not they exist yet. Only their top level
+  /// holds cards: Flycast keeps textures in subfolders of its own.
+  Future<List<String>> _retroArchSystemCardFolders() async => [
+    for (final system in const ['ps2', 'dc'])
+      ?await _retroArchSystemCardFolder(system),
+  ];
+
+  /// The cards directly in [folder], [system]'s card folder of RetroArch's
+  /// system folder, named like the cards the core keeps there
+  /// ([CloudPathBuilder.isRetroArchSystemCardName]). Not its subfolders, nor
+  /// a link, which would point the sync at a file elsewhere.
+  Future<List<String>> _listRetroArchSystemCards(
+    SystemModel system,
+    String folder, {
+    required int maxFileSize,
+  }) async {
+    final cards = <String>[];
+    try {
+      if (!await Directory(folder).exists()) return const [];
+      await for (final entity in Directory(folder).list(followLinks: false)) {
+        if (entity is! File ||
+            !CloudPathBuilder.isRetroArchSystemCardName(
+              system.folderName,
+              path.basename(entity.path),
+            )) {
+          continue;
+        }
+        try {
+          if (await entity.length() > maxFileSize) continue;
+        } on FileSystemException {
+          continue;
+        }
+        cards.add(entity.path);
+      }
+    } on FileSystemException catch (e) {
+      NeoSyncProvider._log.w('Could not list the cards in $folder: $e');
+    }
+    return cards;
+  }
+
+  /// The cloud path of [file] when it is a card in its system's card folder
+  /// of RetroArch's system folder: the same fixed path as a card in the
+  /// saves folder ([CloudPathBuilder.sharedCardPath]). Null otherwise.
+  Future<String?> _retroArchSystemCardCloudPath(
+    GameModel game,
+    File file,
+  ) async {
+    final fileName = path.basename(file.path);
+    // Most uploads are of other files: no lookup for those.
+    if (!CloudPathBuilder.isRetroArchSystemCardName('ps2', fileName) &&
+        !CloudPathBuilder.isRetroArchSystemCardName('dc', fileName)) {
+      return null;
+    }
+    final system = await _getSystemForGame(game);
+    final folder = await _retroArchSystemCardFolder(system?.folderName);
+    if (folder == null ||
+        !path.equals(path.normalize(path.absolute(file.parent.path)), folder)) {
+      return null;
+    }
+    return CloudPathBuilder.sharedCardPath(system!.folderName, fileName);
+  }
+
+  /// Where a cloud card at [cloudPath] goes in RetroArch's system folder: the
+  /// card folder of [systemFolder]'s core, when the card is named like the
+  /// cards the core keeps there and the core is set up on this device
+  /// ([_retroArchSystemCardHome]). Null when it doesn't go there. Empty when
+  /// it does but something is already in its place: a card the sync didn't
+  /// list (too large, unreadable) is never written over, nor is a link
+  /// written through.
+  Future<List<String>?> _retroArchSystemCardTarget(
+    String systemFolder,
+    String cloudPath,
+  ) async {
+    final fileName = path.basename(cloudPath);
+    final fixedPath = CloudPathBuilder.sharedCardPath(systemFolder, fileName);
+    if (fixedPath == null ||
+        !CloudPathBuilder.isRetroArchSystemCardName(systemFolder, fileName) ||
+        CloudPathBuilder.canonicalSaveKey(cloudPath) !=
+            CloudPathBuilder.canonicalSaveKey(fixedPath)) {
+      return null;
+    }
+    final folder = await _retroArchSystemCardHome(systemFolder);
+    if (folder == null) return null;
+    final target = safeJoin(folder, fileName);
+    if (target == null) return const [];
+    try {
+      if (await FileSystemEntity.type(target, followLinks: false) !=
+          FileSystemEntityType.notFound) {
+        // Every sync asks this for each cloud card, the cards already here
+        // included, so not a warning.
+        NeoSyncProvider._log.d(
+          'Download: not placing $cloudPath: $target is already there',
+        );
+        return const [];
+      }
+    } on FileSystemException catch (e) {
+      NeoSyncProvider._log.w('Download: not placing $cloudPath: $e');
+      return const [];
+    }
+    NeoSyncProvider._log.i('Download: $cloudPath -> system folder $target');
+    return [target];
   }
 
   // =========================================

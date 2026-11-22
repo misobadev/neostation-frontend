@@ -16,26 +16,26 @@ void main() {
   tearDown(() async => dbHelper.tearDown());
 
   group('recent card size setting', () {
-    test('a fresh config uses the 3x2 card', () {
-      expect(const ConfigModel().recentCardSize, RecentCardSizes.defaultSize);
+    test('a fresh config uses the compact card', () {
+      expect(const ConfigModel().recentCardSize, RecentCardSizes.twoByOne);
     });
 
-    test('a row written before the setting existed reads as 3x2', () async {
+    test('a row written before the setting existed reads as compact', () async {
       await SqliteService.saveUserConfig(appLanguage: 'en');
 
       final loaded = await SqliteConfigService.loadConfig();
 
-      expect(loaded.recentCardSize, RecentCardSizes.defaultSize);
+      expect(loaded.recentCardSize, RecentCardSizes.twoByOne);
     });
 
-    test('picking the compact card survives a save and reload', () async {
+    test('picking the large card survives a save and reload', () async {
       await SqliteConfigService.saveConfig(
-        const ConfigModel(recentCardSize: RecentCardSizes.twoByOne),
+        const ConfigModel(recentCardSize: RecentCardSizes.defaultSize),
       );
 
       final loaded = await SqliteConfigService.loadConfig();
 
-      expect(loaded.recentCardSize, RecentCardSizes.twoByOne);
+      expect(loaded.recentCardSize, RecentCardSizes.defaultSize);
     });
 
     test('going back to the 3x2 card survives a save and reload', () async {

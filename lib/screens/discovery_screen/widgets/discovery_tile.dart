@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -27,6 +28,7 @@ class DiscoveryCard extends StatelessWidget {
     required this.fileProvider,
     this.onTap,
     this.heroFooterUsesHalfWidth = true,
+    this.highlightSelected = true,
   });
 
   final DiscoveryTile tile;
@@ -39,6 +41,11 @@ class DiscoveryCard extends StatelessWidget {
   /// carousel every page is one card wide, so this is false.
   final bool heroFooterUsesHalfWidth;
 
+  /// Whether a selected card switches its frame and footer to the selection
+  /// colour. The carousel turns it off: its centred card already stands out
+  /// by its place and size, so it keeps the same colours as the others.
+  final bool highlightSelected;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -49,6 +56,7 @@ class DiscoveryCard extends StatelessWidget {
     final innerRadius = radii?.radiusInternal ?? BorderRadius.circular(9.r);
     const artworkInset = 4.0;
     final performanceMode = context.performanceMode;
+    final liquid = GooeyCardChrome.maybeOf(context)?.liquid ?? false;
 
     return Padding(
       padding: EdgeInsets.all(2.r),
@@ -58,9 +66,15 @@ class DiscoveryCard extends StatelessWidget {
           cornerRadius: outerRadiusPx,
           child: Container(
             decoration: BoxDecoration(
-              color: isSelected ? scheme.secondary : scheme.surface,
+              // Transparent while the grid's liquid selection draws the
+              // frame behind the card; a shadow would then darken the liquid.
+              color: liquid
+                  ? Colors.transparent
+                  : isSelected && highlightSelected
+                  ? scheme.secondary
+                  : scheme.surface,
               borderRadius: outerRadius,
-              boxShadow: performanceMode
+              boxShadow: performanceMode || liquid
                   ? null
                   : [
                       BoxShadow(
@@ -141,7 +155,7 @@ class DiscoveryCard extends StatelessWidget {
                             width: double.infinity,
                             child: _DiscoveryFooter(
                               tile: tile,
-                              isSelected: isSelected,
+                              isSelected: isSelected && highlightSelected,
                             ),
                           ),
                         ],
@@ -173,18 +187,25 @@ class _DiscoveryFooter extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
+      // Shrinks a long name to fit, but never grows a short one past its
+      // size: filling the strip made "Game of the Week" and short names like
+      // "RPG" far larger than the rest.
       child: FittedBox(
-        fit: BoxFit.contain,
-        child: Text(
-          tile.labelKey.getString(context).toUpperCase(),
-          maxLines: 1,
-          softWrap: false,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: color,
-            fontSize: 18.r,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.6.r,
+        fit: BoxFit.scaleDown,
+        child: GooeyCardChrome.fadeColor(
+          context,
+          color: color,
+          builder: (color) => Text(
+            tile.labelKey.getString(context).toUpperCase(),
+            maxLines: 1,
+            softWrap: false,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: color,
+              fontSize: 15.r,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.6.r,
+            ),
           ),
         ),
       ),

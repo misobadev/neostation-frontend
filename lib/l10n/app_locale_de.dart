@@ -94,6 +94,9 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.raEvents: 'Events',
   AppLocale.raAotwYearTitle: 'Achievement der Woche ({year})',
   AppLocale.raAotw: 'AOTW',
+  AppLocale.raOverview: 'Übersicht',
+  AppLocale.raStatPlayed: 'Gespielt',
+  AppLocale.raStatBeaten: 'Abgeschlossen',
   AppLocale.raAwards: 'Auszeichnungen',
   AppLocale.raSetOrder: 'Set-Reihenfolge',
   AppLocale.raPointsSort: 'Punkte: absteigend',
@@ -130,6 +133,12 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.startupStorageStartEmpty: 'Mit leerem Ordner beginnen',
   AppLocale.startupStorageCreateFailed:
       'NeoStation konnte den Ordner dort nicht erstellen.',
+  AppLocale.wizardStepOf: 'Schritt {step} von {total}',
+  AppLocale.wizardLanguageTitle: 'Wähle deine Sprache',
+  AppLocale.wizardLanguageBody:
+      'Du kannst sie später in den Einstellungen ändern.',
+  AppLocale.wizardWelcomeBody: 'Das kostenlose Open-Source-Frontend für all deine Retro-Spiele. Drücke A, um mit der Einrichtung zu beginnen.',
+  AppLocale.wizardStartSetup: 'Einrichtung starten',
   AppLocale.startupLoading:
       'NeoStation wird vorbereitet. Warte auf Speicher und Dienste…',
 
@@ -184,7 +193,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.recentCardSize: 'Größe der Karte',
   AppLocale.recentCardSizeSubtitle:
       'Größe der Karte für zuletzt gespielte Spiele im Raster',
-  AppLocale.recentCardSizeDefault: 'Standard',
+  AppLocale.recentCardSizeDefault: 'Groß',
   AppLocale.recentCardSize2x1: 'Kompakt',
   AppLocale.themesSubtitle: 'Personalisiere das Design von NeoStation',
   AppLocale.neoglassGroup: 'NeoGlass',
@@ -197,6 +206,8 @@ const Map<String, dynamic> appLocaleDe = {
       '0 = keine Transparenz, 30 = 50 % Transparenz',
   AppLocale.neoglassBorderWidth: 'Glas-Rahmen',
   AppLocale.neoglassBorderWidthSubtitle: 'Breite des Glasrands',
+  AppLocale.cornerRadius: 'Ecken',
+  AppLocale.cornerRadiusSubtitle: 'Wie rund Karten und Felder sind',
   AppLocale.systemTheme: 'Systemdesign',
   AppLocale.importTheme: 'Theme importieren',
   AppLocale.importThemeSuccess: 'Theme „%s“ importiert',
@@ -255,11 +266,6 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.androidSystemSettings: 'Systemeinstellungen',
   AppLocale.androidSystemSettingsSubtitle: 'Android-Systemeinstellungen öffnen',
   AppLocale.androidApps: 'Android-Apps',
-  AppLocale.androidAppLayout: 'Android-App-Layout',
-  AppLocale.androidAppLayoutSubtitle:
-      'Lege fest, wo installierte Android-Apps angezeigt werden',
-  AppLocale.androidAppLayoutSystem: 'System',
-  AppLocale.androidAppLayoutTab: 'Tab',
   AppLocale.scanOnStartup: 'Ordner beim Start scannen',
   AppLocale.performanceMode: 'Leistungsmodus',
   AppLocale.performanceModeSubtitle: 'Reduziert visuelle Effekte und Animationen für flüssigere Bedienung auf schwacher Hardware',
@@ -743,6 +749,8 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.hintSelect: 'Auswählen',
   AppLocale.hintSettings: 'Einstellungen',
   AppLocale.hintBack: 'Zurück',
+  AppLocale.androidGameMarkApp: 'Als App markieren',
+  AppLocale.androidGameHint: 'Spiel',
   AppLocale.hintPlay: 'Spielen',
   AppLocale.hintFavorite: 'Favorit',
   AppLocale.hintRandom: 'Zufällig',
@@ -1060,6 +1068,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync: Nur Cloud-Spielstände',
   AppLocale.neoSyncSaveConflict: 'NeoSync: Spielstand-Konflikt erkannt',
   AppLocale.neoSyncNewerCloudCopy: 'In der Cloud gab es eine neuere Kopie dieses Spielstands, deshalb wurde sie heruntergeladen. Die Kopie dieses Geräts liegt im Spielstand-Verlauf und kann dort wiederhergestellt werden.',
+  AppLocale.neoSyncFirstCardSyncTookCloud: "Diese Speicherkarte wurde von diesem Gerät noch nie synchronisiert und unterschied sich von der in der Cloud, deshalb wurde die Karte aus der Cloud heruntergeladen. Die Karte dieses Geräts liegt im Spielstand-Verlauf und kann dort wiederhergestellt werden.",
   AppLocale.neoSyncKeptCloudCopy: "Dieser Spielstand wurde auch auf einem anderen Gerät geändert. Die Kopie dieses Geräts wurde hochgeladen, die andere liegt daneben als {file}.",
   AppLocale.keptCopiesTitle: 'Spielstand-Verlauf',
   AppLocale.keptCopiesSubtitle: 'Frühere Versionen deiner Spielstände, aus Synchronisierungen und Wiederherstellungen',
@@ -1503,7 +1512,6 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.raAotwEarnedPreviously: 'Vor dieser Woche verdient',
   AppLocale.raAotwNotEarned: 'Diese Woche nicht verdient',
   AppLocale.raAotwStatusUnavailable: 'Persönlicher Status nicht verfügbar',
-  AppLocale.raAotwNotInLibrary: 'Nicht in deiner Bibliothek',
   AppLocale.raAotwWeekStarted: 'Woche begann am {date}',
   AppLocale.raAotwTrueRatio: 'True Ratio',
   AppLocale.raAotwParticipation:
@@ -1561,6 +1569,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.uploadingCustomFolder:
       'Spielstände aus {folder} werden hochgeladen...',
   AppLocale.customFolderUploadComplete: 'Standaloner Ordner synchronisiert: {uploaded} hochgeladen, {skipped} bereits aktuell',
+  AppLocale.customFolderUploadLeftForLaunch: "Von diesem Gerät noch nie synchronisierte Speicherkarten, zurückgestellt bis zum nächsten Start eines Spiels, das sie verwendet. Dabei wird die Karte aus der Cloud verwendet und die dieses Geräts im Spielstand-Verlauf aufbewahrt: {left}",
   AppLocale.customFolderUploadFailed:
       'Synchronisierung des benutzerdefinierten Ordners fehlgeschlagen',
   AppLocale.customFolderUploadConfirm: 'Dateien, die aus {folder} zu NeoSync hochgeladen werden: {count} ({size}).',

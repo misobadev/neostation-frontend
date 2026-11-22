@@ -117,6 +117,7 @@ void main() {
       write('Zelda.sav.cloud-20261108-130405.neosync.bak', [2]);
       write('Zelda.sav.neosync.bak', [3]);
       write('Zelda.sav.romm-conflict-2026-11-06_18-32-44', [4]);
+      write('Zelda.sav.romm-local-2026-11-07_09-00-00', [8]);
       write('Zelda.sav.replaced-20261109-110000.neosync.bak', [7]);
       // Three copies a save, within the cap; the restored-over copy belongs
       // to a save that is gone.
@@ -155,15 +156,18 @@ void main() {
       });
     });
 
-    test('RomM lists its conflict copies and restored-over saves', () async {
+    test('RomM lists its conflict copies, this device\'s copies kept before '
+        'a download, and restored-over saves', () async {
       providerId = RomMSyncProvider.kProviderId;
       expect(sourcesIn(await copies().forGame(game)), {
         KeptCopySource.serverConflict,
+        KeptCopySource.rommBeforeDownload,
         KeptCopySource.replaced,
       });
       final all = await copies().all();
       expect(sourcesIn(all), {
         KeptCopySource.serverConflict,
+        KeptCopySource.rommBeforeDownload,
         KeptCopySource.replaced,
       });
       expect(all.map((g) => p.basename(g.savePath)), ['Gone.sav', 'Zelda.sav']);
@@ -186,6 +190,36 @@ void main() {
 
     // The whole list also covers saves no game's list has located, so it
     // tidies them itself.
+    test('the whole list looks only at the top of the memory-card folders '
+        'in RetroArch\'s system folder', () async {
+      final cards = await Directory.systemTemp.createTemp('kept_copies_cards_');
+      addTearDown(() => cards.delete(recursive: true));
+      File(p.join(cards.path, 'vmu_save_A1.bin')).writeAsBytesSync([1]);
+      File(p.join(cards.path, 'vmu_save_A1.bin.neosync.bak'))
+          .writeAsBytesSync([2]);
+      // Flycast keeps textures in subfolders of the same folder.
+      File(p.join(cards.path, 'textures', 'T1', 'tex.png.neosync.bak'))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync([3]);
+
+      final all = await KeptSaveCopies(
+        NeoSyncProvider(NeoSyncService()),
+        activeProviderId: () => providerId,
+        locateSaves: (_) async => [save.path],
+        saveFolders: () async => [root.path],
+        cardFolders: () async => [cards.path],
+        gameRunning: () => false,
+        syncing: (_, _) => false,
+      ).all();
+
+      final saves = all.map((g) => g.savePath).toSet();
+      expect(saves, contains(p.join(cards.path, 'vmu_save_A1.bin')));
+      expect(
+        saves,
+        isNot(contains(p.join(cards.path, 'textures', 'T1', 'tex.png'))),
+      );
+    });
+
     test('the whole list tidies saves no game\'s list has shown', () async {
       write('Other.sav', [7]);
       final same = write('Other.sav.cloud-20261101-000000.neosync.bak', [7])

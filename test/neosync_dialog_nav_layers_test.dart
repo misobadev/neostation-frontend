@@ -776,8 +776,9 @@ void main() {
     Future<void> focusSave(WidgetTester tester, int index) async {
       await pressKey(tester, LogicalKeyboardKey.arrowDown); // filters
       await pressKey(tester, LogicalKeyboardKey.arrowDown); // first save
+      // The saves are a grid: along its first row.
       for (var i = 0; i < index; i++) {
-        await pressKey(tester, LogicalKeyboardKey.arrowDown);
+        await pressKey(tester, LogicalKeyboardKey.arrowRight);
       }
       expect(highlighted(tester), index);
     }
@@ -805,7 +806,7 @@ void main() {
       // The list has the controller again, from where it was. (A reset made
       // while the prompt's layer pops can't rebuild the list, so it would only
       // show here, as the step down landing on the second save again.)
-      await pressKey(tester, LogicalKeyboardKey.arrowDown);
+      await pressKey(tester, LogicalKeyboardKey.arrowRight);
       expect(highlighted(tester), 2, reason: 'the selection was reset');
     });
 
@@ -827,7 +828,7 @@ void main() {
         expect(find.byType(DeleteCloudSaveDialog), findsNothing);
         // The save after the deleted one moved up into the highlight.
         expect(highlighted(tester), 1);
-        await pressKey(tester, LogicalKeyboardKey.arrowDown);
+        await pressKey(tester, LogicalKeyboardKey.arrowRight);
         expect(highlighted(tester), 2, reason: 'the selection was reset');
       },
     );

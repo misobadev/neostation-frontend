@@ -95,6 +95,9 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.raEvents: 'Événements',
   AppLocale.raAotwYearTitle: 'Succès de la semaine ({year})',
   AppLocale.raAotw: 'AOTW',
+  AppLocale.raOverview: 'Aperçu',
+  AppLocale.raStatPlayed: 'Joués',
+  AppLocale.raStatBeaten: 'Terminés',
   AppLocale.raAwards: 'Récompenses',
   AppLocale.raSetOrder: 'Ordre du jeu',
   AppLocale.raPointsSort: 'Points décroissants',
@@ -131,6 +134,12 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.startupStorageStartEmpty: 'Commencer avec un dossier vide',
   AppLocale.startupStorageCreateFailed:
       'NeoStation n\'a pas pu créer le dossier à cet endroit.',
+  AppLocale.wizardStepOf: 'Étape {step} sur {total}',
+  AppLocale.wizardLanguageTitle: 'Choisissez votre langue',
+  AppLocale.wizardLanguageBody:
+      'Vous pourrez la changer plus tard dans les Réglages.',
+  AppLocale.wizardWelcomeBody: 'Le frontend gratuit et open source pour tous vos jeux rétro. Appuyez sur A pour commencer la configuration.',
+  AppLocale.wizardStartSetup: 'Commencer la configuration',
   AppLocale.startupLoading:
       'Préparation de NeoStation. En attente du stockage et des services…',
 
@@ -185,7 +194,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.recentCardSize: 'Taille de la carte',
   AppLocale.recentCardSizeSubtitle:
       'Taille de la carte des jeux récents dans la grille',
-  AppLocale.recentCardSizeDefault: 'Par défaut',
+  AppLocale.recentCardSizeDefault: 'Grande',
   AppLocale.recentCardSize2x1: 'Compact',
   AppLocale.themesSubtitle: 'Personnalisez le look de NeoStation',
   AppLocale.neoglassGroup: 'NeoGlass',
@@ -198,6 +207,8 @@ const Map<String, dynamic> appLocaleFr = {
       '0 = aucune transparence, 30 = 50 % de transparence',
   AppLocale.neoglassBorderWidth: 'Bordure du verre',
   AppLocale.neoglassBorderWidthSubtitle: 'Épaisseur du bord du verre',
+  AppLocale.cornerRadius: 'Coins',
+  AppLocale.cornerRadiusSubtitle: 'Arrondi des cartes et des panneaux',
   AppLocale.systemTheme: 'Thème du Système',
   AppLocale.importTheme: 'Importer un thème',
   AppLocale.importThemeSuccess: 'Thème « %s » importé',
@@ -260,11 +271,6 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.androidSystemSettingsSubtitle:
       'Ouvrir les paramètres système Android',
   AppLocale.androidApps: 'Applications Android',
-  AppLocale.androidAppLayout: 'Disposition des applications Android',
-  AppLocale.androidAppLayoutSubtitle:
-      'Choisissez où afficher les applications Android installées',
-  AppLocale.androidAppLayoutSystem: 'Système',
-  AppLocale.androidAppLayoutTab: 'Onglet',
   AppLocale.scanOnStartup: 'Analyser les dossiers au démarrage',
   AppLocale.performanceMode: 'Mode performance',
   AppLocale.performanceModeSubtitle: "Réduit les effets visuels et les animations pour garder l'application fluide sur du matériel modeste",
@@ -746,6 +752,8 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.hintSelect: 'Sélectionner',
   AppLocale.hintSettings: 'Paramètres',
   AppLocale.hintBack: 'Retour',
+  AppLocale.androidGameMarkApp: 'Marquer comme application',
+  AppLocale.androidGameHint: 'Jeu',
   AppLocale.hintPlay: 'Jouer',
   AppLocale.hintFavorite: 'Favori',
   AppLocale.hintRandom: 'Aléatoire',
@@ -1063,6 +1071,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.neoSyncCloudSavesOnly: 'NeoSync : Sauvegardes cloud uniquement',
   AppLocale.neoSyncSaveConflict: 'NeoSync : Conflit de sauvegarde détecté',
   AppLocale.neoSyncNewerCloudCopy: "Le cloud avait une copie plus récente de cette sauvegarde : elle a donc été téléchargée. La copie de cet appareil est conservée dans l'Historique des sauvegardes, d'où vous pouvez la restaurer.",
+  AppLocale.neoSyncFirstCardSyncTookCloud: "Cette carte mémoire n'avait encore jamais été synchronisée depuis cet appareil et différait de celle du cloud : celle du cloud a donc été téléchargée. La carte de cet appareil est conservée dans l'Historique des sauvegardes, d'où vous pouvez la restaurer.",
   AppLocale.neoSyncKeptCloudCopy: "Cette sauvegarde a aussi changé sur un autre appareil. La copie de cet appareil a été envoyée, l'autre est conservée à côté sous le nom {file}.",
   AppLocale.keptCopiesTitle: 'Historique des sauvegardes',
   AppLocale.keptCopiesSubtitle: 'Versions précédentes de vos sauvegardes, issues des synchronisations et des restaurations',
@@ -1506,7 +1515,6 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.raAotwEarnedPreviously: 'Obtenu avant cette semaine',
   AppLocale.raAotwNotEarned: 'Non obtenu cette semaine',
   AppLocale.raAotwStatusUnavailable: 'Statut personnel indisponible',
-  AppLocale.raAotwNotInLibrary: 'Absent de votre bibliothèque',
   AppLocale.raAotwWeekStarted: 'Semaine commencée le {date}',
   AppLocale.raAotwTrueRatio: 'True Ratio',
   AppLocale.raAotwParticipation:
@@ -1564,6 +1572,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.uploadingCustomFolder:
       'Téléversement des sauvegardes de {folder}...',
   AppLocale.customFolderUploadComplete: 'Dossier standalone synchronisé : {uploaded} téléversés, {skipped} déjà à jour',
+  AppLocale.customFolderUploadLeftForLaunch: "Cartes mémoire jamais synchronisées depuis cet appareil, laissées pour le prochain lancement d'un jeu qui les utilise, qui utilisera celle du cloud et conservera celle de cet appareil dans l'Historique des sauvegardes : {left}",
   AppLocale.customFolderUploadFailed:
       'Échec de la synchronisation du dossier personnalisé',
   AppLocale.customFolderUploadConfirm:

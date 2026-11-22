@@ -84,6 +84,7 @@ class DatabaseTestHelper {
         rom_size INTEGER,
         rom_fingerprint_skipped TEXT,
         ss_manual_game_id INTEGER,
+        is_android_game INTEGER DEFAULT 0,
         id_ra INTEGER,
         ra_match_source TEXT,
         ra_hash_skipped TEXT,
@@ -134,7 +135,7 @@ class DatabaseTestHelper {
         app_language TEXT DEFAULT 'en',
         active_theme TEXT DEFAULT '',
         hide_recent_card INTEGER DEFAULT 0,
-        recent_card_size TEXT DEFAULT 'default',
+        recent_card_size TEXT DEFAULT '2x1',
         active_sync_provider TEXT DEFAULT 'neosync',
         game_view_mode TEXT DEFAULT 'list',
         rom_folders TEXT,
@@ -165,7 +166,7 @@ class DatabaseTestHelper {
         game_carousel_card_style TEXT DEFAULT 'fanart',
         dock_apps TEXT,
         dock_enabled INTEGER DEFAULT 1,
-        secondary_hide_system_logo INTEGER DEFAULT 0,
+        secondary_hide_system_logo INTEGER DEFAULT 1,
         dock_slot_count INTEGER DEFAULT 3,
         now_playing_dim_delay INTEGER DEFAULT 3,
         now_playing_dim_level INTEGER DEFAULT 100,
@@ -178,7 +179,8 @@ class DatabaseTestHelper {
         performance_mode INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
-        neoglass_border_width REAL DEFAULT 2
+        neoglass_border_width REAL DEFAULT 2,
+        corner_radius INTEGER DEFAULT 3
       )
     ''');
 

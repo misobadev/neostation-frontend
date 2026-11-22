@@ -86,17 +86,20 @@ void main() {
       'NeoSyncSection.saveList,NeoSyncSection.keptCopies,'
       'NeoSyncSection.customFolders,NeoSyncSection.plans,',
     );
-    final entries = method(dashboard, 'Widget _buildMenuList() {');
-    final saveList = entries.indexOf('AppLocale.saveListMenu');
-    final kept = entries.indexOf('AppLocale.keptCopiesTitle');
-    final folders = entries.indexOf('AppLocale.customSaveFoldersMenu');
-    expect(saveList, lessThan(kept));
-    expect(kept, lessThan(folders));
+    // The sidebar menu names it, and the panel beside it shows the view.
+    final row = method(dashboard, 'Widget _buildMenuRow(');
     expect(
-      dashboard,
+      row,
       matches(
-        RegExp(r'case NeoSyncSection\.keptCopies:\s*return KeptCopiesView\('),
+        RegExp(
+          r'NeoSyncSection\.keptCopies => \(\s*Symbols\.\w+,\s*'
+          r'AppLocale\.keptCopiesTitle',
+        ),
       ),
+    );
+    expect(
+      method(dashboard, 'Widget _buildSectionPanel() {'),
+      matches(RegExp(r'NeoSyncSection\.keptCopies => KeptCopiesView\(')),
     );
   });
 

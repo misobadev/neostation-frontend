@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -21,12 +22,20 @@ class AndroidAppCard extends StatefulWidget {
     super.key,
     required this.app,
     required this.isSelected,
+    this.isGame = false,
     required this.onTap,
+    this.onLongPress,
   });
 
   final GameModel app;
   final bool isSelected;
+
+  /// Marked as a game during this visit; shown with a badge.
+  final bool isGame;
   final VoidCallback onTap;
+
+  /// Touch route to the Y action (mark or unmark as a game).
+  final VoidCallback? onLongPress;
 
   @override
   State<AndroidAppCard> createState() => _AndroidAppCardState();
@@ -100,6 +109,8 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
               : widget.app.realname)
         : widget.app.name;
 
+    final liquid = GooeyCardChrome.maybeOf(context)?.liquid ?? false;
+
     return Padding(
       padding: EdgeInsets.all(2.r),
       child: MouseRegion(
@@ -108,9 +119,15 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
           cornerRadius: outerRadiusPx,
           child: Container(
             decoration: BoxDecoration(
-              color: widget.isSelected ? scheme.secondary : scheme.surface,
+              // Transparent while the grid's liquid selection draws the
+              // frame behind the card; a shadow would then darken the liquid.
+              color: liquid
+                  ? Colors.transparent
+                  : widget.isSelected
+                  ? scheme.secondary
+                  : scheme.surface,
               borderRadius: outerRadius,
-              boxShadow: context.performanceMode
+              boxShadow: context.performanceMode || liquid
                   ? null
                   : [
                       BoxShadow(
@@ -133,6 +150,7 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
                   }
                   widget.onTap();
                 },
+                onLongPress: widget.onLongPress,
                 canRequestFocus: false,
                 focusColor: Colors.transparent,
                 hoverColor: Colors.transparent,
@@ -176,6 +194,14 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
                                           iconSize: iconSize,
                                         ),
                                       ),
+                                      // Marks an app filed under Android
+                                      // Games during this visit.
+                                      if (widget.isGame)
+                                        Positioned(
+                                          top: 6.r,
+                                          right: 6.r,
+                                          child: _buildGameBadge(scheme),
+                                        ),
                                     ],
                                   );
                                 },
@@ -192,18 +218,22 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
                               ),
                               child: FittedBox(
                                 fit: BoxFit.contain,
-                                child: Text(
-                                  appName,
-                                  maxLines: 1,
-                                  softWrap: false,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: widget.isSelected
-                                        ? scheme.onSecondary
-                                        : scheme.onSurface,
-                                    fontSize: 14.r,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.4.r,
+                                child: GooeyCardChrome.fadeColor(
+                                  context,
+                                  color: widget.isSelected
+                                      ? scheme.onSecondary
+                                      : scheme.onSurface,
+                                  builder: (color) => Text(
+                                    appName,
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: color,
+                                      fontSize: 14.r,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.4.r,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -218,6 +248,21 @@ class _AndroidAppCardState extends State<AndroidAppCard> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildGameBadge(ColorScheme scheme) {
+    return Container(
+      padding: EdgeInsets.all(3.r),
+      decoration: BoxDecoration(
+        color: scheme.secondary,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Symbols.sports_esports_rounded,
+        size: 12.r,
+        color: scheme.onSecondary,
       ),
     );
   }

@@ -38,3 +38,21 @@ void reportNewerCloudCopy({
     message: AppLocale.neoSyncNewerCloudCopy.getStringForCurrentLocale(),
   );
 }
+
+/// Tells the user, in the notification bell, that a memory card of [gameName]
+/// that every game of its system shares was synced from this device for the
+/// first time and wasn't the same as the cloud's, so the cloud's card was
+/// downloaded over it; this device's is kept in Save history. The same entry
+/// as [reportKeptCloudCopy]'s, updated in place.
+void reportFirstCardSyncTookCloud({
+  required String gameName,
+  required String savePath,
+  GlobalNotificationService? notifications,
+}) {
+  (notifications ?? GlobalNotificationService()).show(
+    id: 'neosync-kept-cloud-copy-$savePath',
+    title: gameName,
+    message: AppLocale.neoSyncFirstCardSyncTookCloud
+        .getStringForCurrentLocale(),
+  );
+}

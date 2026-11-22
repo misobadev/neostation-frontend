@@ -1,3 +1,4 @@
+import 'package:neostation/utils/resolved_path.dart';
 import 'package:path/path.dart' as p;
 
 /// What Settings does with a folder picked for NeoStation's user data; see
@@ -40,18 +41,19 @@ final class UnwritableUserDataFolder extends UserDataFolderChoice {
 /// written; that one is offered instead ([userDataFolderOnSameCard]).
 /// [appDirs] lists NeoStation's storage folders, and is only read when the
 /// folder picked was refused. Folders are compared as normalised paths, so
-/// a trailing separator doesn't make the same folder look like another.
+/// a trailing separator doesn't make the same folder look like another, and
+/// with their symbolic links resolved, so neither does a link to it.
 Future<UserDataFolderChoice> chooseUserDataFolder({
   required String picked,
   required String current,
   required Future<bool> Function(String folder) canUse,
   required Future<Iterable<String>> Function() appDirs,
 }) async {
-  if (_samePath(picked, current)) return const SameUserDataFolder();
+  if (await _samePath(picked, current)) return const SameUserDataFolder();
   if (await canUse(picked)) return PickedUserDataFolder(picked);
   final cardFolder = userDataFolderOnSameCard(picked, await appDirs());
   if (cardFolder == null ||
-      _samePath(cardFolder, current) ||
+      await _samePath(cardFolder, current) ||
       !await canUse(cardFolder)) {
     return const UnwritableUserDataFolder();
   }
@@ -59,9 +61,10 @@ Future<UserDataFolderChoice> chooseUserDataFolder({
 }
 
 /// The same folder as the move sees it (`migrateData` compares canonical
-/// paths): a trailing separator, or letter case on Windows, doesn't make it
-/// another.
-bool _samePath(String a, String b) => p.equals(a, b);
+/// paths, links resolved): a trailing separator, letter case on Windows, or
+/// a link to it, a bind mount or another letter case on a card doesn't make
+/// it another.
+Future<bool> _samePath(String a, String b) => isSameFolder(a, b);
 
 /// NeoStation's own folder for its user data on the SD card [pickedPath] is
 /// on: `<card>/Android/data/<package>/files/user-data`, from [appDirs],

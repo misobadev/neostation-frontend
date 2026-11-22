@@ -45,11 +45,12 @@ void main() {
     bool scraped = true,
     int? idRa,
     int numAchievements = 0,
+    String system = 'snes',
   }) async {
     await db.execute(
       'INSERT INTO user_roms (filename, rom_path, app_system_id, id_ra, '
       'play_time, last_played) VALUES (?, ?, ?, ?, ?, ?)',
-      [filename, '/roms/snes/$filename', 'snes', idRa, playTime, lastPlayed],
+      [filename, '/roms/$system/$filename', system, idRa, playTime, lastPlayed],
     );
     // An unscraped ROM has no metadata row at all — which is what the coverage
     // gate is really asking about. `is_fully_scraped` is a separate axis: it
@@ -59,7 +60,7 @@ void main() {
         'INSERT INTO user_screenscraper_metadata (app_system_id, filename, rating, '
         'genre, is_fully_scraped, real_name) VALUES (?, ?, ?, ?, ?, ?)',
         [
-          'snes',
+          system,
           filename,
           rating,
           genre,
@@ -477,6 +478,134 @@ void main() {
         expect(after.heroEntry!.pick.romPath, before.heroEntry!.pick.romPath);
       },
     );
+  });
+
+  group('hidden systems', () {
+    setUp(() async {
+      await db.execute(
+        "INSERT INTO app_systems (id, real_name, folder_name, short_name) "
+        "VALUES ('amiga', 'Commodore Amiga', 'amiga', 'Amiga')",
+      );
+      await db.execute(
+        'INSERT INTO user_detected_systems (app_system_id, actual_folder_name) '
+        "VALUES ('snes', 'snes'), ('amiga', 'amiga')",
+      );
+    });
+
+    Future<void> setAmigaHidden(bool hidden) => db.execute(
+      'UPDATE user_detected_systems SET is_hidden = ? '
+      "WHERE app_system_id = 'amiga'",
+      [hidden ? 1 : 0],
+    );
+
+    /// Amiga games for every section, with racing games only the Amiga has.
+    Future<void> seedAmiga() async {
+      for (var i = 0; i < 6; i++) {
+        await insertGame(
+          'amiga$i.adf',
+          rating: 17 + i / 10,
+          genre: 'Platform',
+          system: 'amiga',
+        );
+      }
+      for (var i = 0; i < 4; i++) {
+        await insertGame(
+          'race$i.adf',
+          rating: 14 + i / 10,
+          genre: 'Racing',
+          system: 'amiga',
+        );
+      }
+    }
+
+    bool isAmiga(String romPath) => romPath.startsWith('/roms/amiga/');
+
+    test(
+      'picks from a system hidden since they were made are replaced',
+      () async {
+        // An Amiga-only library, so the first board is made of Amiga games.
+        await seedAmiga();
+        final service = serviceAt(monday);
+        final first = await service.loadBoard();
+        expect(first.entries, isNotEmpty);
+        expect(first.entries.map((e) => e.pick.romPath), everyElement(isAmiga));
+
+        await seedLibrary();
+        await setAmigaHidden(true);
+        final second = await service.loadBoard();
+
+        expect(second.heroEntry, isNotNull);
+        expect(
+          second.entries.map((e) => e.pick.romPath).where(isAmiga),
+          isEmpty,
+        );
+        expect(
+          second.shufflePool.map((g) => g.romPath).where(isAmiga),
+          isEmpty,
+        );
+        final stored = await db.rawQuery(
+          'SELECT rom_path FROM user_discovery_picks',
+        );
+        expect(
+          stored.map<String>((r) => r['rom_path'] as String).where(isAmiga),
+          isEmpty,
+        );
+      },
+    );
+
+    test('a genre only a hidden system has drops out of the board', () async {
+      await seedLibrary();
+      await seedAmiga();
+      final service = serviceAt(monday);
+
+      final shown = await service.loadBoard();
+      expect(
+        shown.genreEntries.map((e) => e.pick.genre?.name),
+        contains('racing'),
+      );
+
+      await setAmigaHidden(true);
+      final hidden = await service.loadBoard();
+
+      expect(
+        hidden.genreEntries.map((e) => e.pick.genre?.name),
+        isNot(contains('racing')),
+      );
+    });
+
+    test('a re-roll never picks a hidden system\'s game', () async {
+      await seedLibrary();
+      await seedAmiga();
+      await setAmigaHidden(true);
+      final service = serviceAt(monday);
+      await service.loadBoard();
+
+      for (var i = 0; i < 8; i++) {
+        final board = await service.reroll(kSlotGameOfTheWeek);
+        expect(isAmiga(board.heroEntry!.pick.romPath), isFalse);
+        expect(board.shufflePool.map((g) => g.romPath).where(isAmiga), isEmpty);
+      }
+    });
+
+    test('showing the system again lets its games back in', () async {
+      await seedLibrary();
+      await seedAmiga();
+      await setAmigaHidden(true);
+      final service = serviceAt(monday);
+      final hidden = await service.loadBoard();
+      expect(
+        hidden.genreEntries.map((e) => e.pick.genre?.name),
+        isNot(contains('racing')),
+      );
+
+      await setAmigaHidden(false);
+      final shown = await service.loadBoard();
+
+      expect(
+        shown.genreEntries.map((e) => e.pick.genre?.name),
+        contains('racing'),
+      );
+    });
   });
 }
 

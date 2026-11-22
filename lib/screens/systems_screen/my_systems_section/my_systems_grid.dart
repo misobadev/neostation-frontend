@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:async';
 
+import 'package:flutter/gestures.dart'
+    show PointerPanZoomStartEvent, PointerPanZoomUpdateEvent;
 import 'package:flutter/material.dart';
 import 'package:neostation/constants/recent_card_sizes.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -14,6 +16,7 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
 
 import '../../../utils/gamepad_nav.dart';
+import '../../../utils/spring_scroller.dart';
 import '../../../services/game_service.dart';
 import '../../../utils/game_launch_utils.dart';
 import 'system_card.dart';
@@ -30,6 +33,8 @@ import 'grid_geometry.dart';
 import 'widgets/grid_loading_state.dart';
 import 'widgets/grid_empty_state.dart';
 
+import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
 import 'package:neostation/widgets/spring_selected_card.dart';
 
 import 'my_systems_carousel.dart';
@@ -55,6 +60,8 @@ import 'package:neostation/services/secondary_achievements_controller.dart';
 
 import 'system_list_builder.dart';
 import '../../../utils/user_data_move_guard.dart';
+
+import 'package:neostation/utils/grid_sizes.dart';
 
 part 'my_systems_grid/gamepad_grid_nav.dart';
 part 'my_systems_grid/theme_background.dart';
@@ -213,12 +220,9 @@ class MySystems extends StatelessWidget {
       children: [
         Expanded(
           child: Padding(
-            padding: EdgeInsets.only(
-              left: 6.0.r,
-              right: 6.0.r,
-              top: 46.r,
-              bottom: 0.r,
-            ),
+            // Room for the selected card, which grows past its slot, to
+            // stay clear of the screen's edges and the header dock.
+            padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 52.r),
             child: SystemCardGridView(
               crossAxisCount: Responsive.getSystemsCrossAxisCountFromSize(
                 configProvider.config.systemGridColumns,
@@ -688,7 +692,7 @@ class SystemCardGridView extends StatefulWidget {
     this.enableTabBumpers = true,
     this.enablePullToRescan = true,
     this.enablePinchResize = true,
-    this.pinchSizes = const ['S', 'M', 'L', 'XL'],
+    this.pinchSizes = GridSizes.values,
     this.pinchSize,
     this.onPinchSizeChanged,
     this.crossAxisCountForSize,
@@ -801,8 +805,16 @@ class SystemCardGridView extends StatefulWidget {
   State<SystemCardGridView> createState() => _SystemCardGridViewState();
 }
 
-class _SystemCardGridViewState extends State<SystemCardGridView> {
+class _SystemCardGridViewState extends State<SystemCardGridView>
+    with SingleTickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
+
+  /// Keeps a card in view as the selection moves, on a spring that carries
+  /// its speed from one press to the next (see [SpringScroller]).
+  late final SpringScroller _springScroller = SpringScroller(
+    _scrollController,
+    this,
+  );
 
   /// Orchestrator for hardware input.
   late GamepadNavigation _gamepadNav;
@@ -824,6 +836,9 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   final Map<int, Offset> _activePointers = {};
   double? _lastPinchDistance;
   DateTime? _lastPinchTime;
+
+  /// The trackpad pinch's scale at its last size step.
+  double _panZoomBase = 1.0;
 
   /// Pull-to-refresh progress notifier (0.0 to 1.0).
   final ValueNotifier<double> _pullProgress = ValueNotifier(0.0);
@@ -853,6 +868,10 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
 
   /// Set from the config in build; disables decorative effects at render time.
   bool _performanceMode = false;
+
+  /// The liquid selection's motion, shared by its layers behind and on top of
+  /// the cards.
+  final GooeyMotion _gooeyMotion = GooeyMotion();
 
   /// Cached ThemeData with scrollbar overrides — rebuilt only in didChangeDependencies.
   ThemeData? _cachedThemeData;
@@ -957,7 +976,9 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
     // Shared singleton — detach our listener, never dispose the instance.
     _secondaryDisplayState?.removeListener(_onSecondaryStateChanged);
     _cleanupGamepad();
+    _springScroller.dispose();
     _scrollController.dispose();
+    _gooeyMotion.dispose();
     super.dispose();
   }
 
@@ -1075,19 +1096,45 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
           );
         }
 
+        // A finger on the grid takes the scroll over from the spring at once,
+        // before it has moved anything, so the two never fight over it.
+        grid = Listener(
+          onPointerDown: (_) => _springScroller.stop(),
+          behavior: HitTestBehavior.translucent,
+          child: grid,
+        );
+
         // The pointer listener drives both gestures: the pinch directly, and
         // the pull's release edge (the pull only ever arms itself through the
         // scroll notifier above, so a host with rescan off can keep the pinch
         // without the pull arming).
-        if (Platform.isAndroid &&
-            (widget.enablePinchResize || widget.enablePullToRescan)) {
-          grid = Listener(
-            onPointerDown: _handlePointerDown,
-            onPointerMove: _handlePointerMove,
-            onPointerUp: _handlePointerUp,
-            onPointerCancel: _handlePointerCancel,
-            behavior: HitTestBehavior.translucent,
-            child: grid,
+        // The pinch works wherever there is a touchscreen or a trackpad; the
+        // pull to rescan stays on Android.
+        if (widget.enablePinchResize ||
+            (Platform.isAndroid && widget.enablePullToRescan)) {
+          final cards = grid;
+          // The whole space the grid is given takes the gesture, not only
+          // its rows: with a few cards (a new collection list) those are one
+          // strip at the top, and a pinch below them did nothing.
+          grid = LayoutBuilder(
+            builder: (context, constraints) => Listener(
+              onPointerDown: _handlePointerDown,
+              onPointerMove: _handlePointerMove,
+              onPointerUp: _handlePointerUp,
+              onPointerCancel: _handlePointerCancel,
+              onPointerPanZoomStart: _handlePanZoomStart,
+              onPointerPanZoomUpdate: _handlePanZoomUpdate,
+              behavior: HitTestBehavior.translucent,
+              child: constraints.hasBoundedWidth && constraints.hasBoundedHeight
+                  ? ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: constraints.maxWidth,
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: cards,
+                    )
+                  : cards,
+            ),
           );
         }
 
@@ -1171,32 +1218,102 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
     required int cardIdx,
     required bool cardIsSelected,
   }) {
-    return SpringSelectedCard(
-      key: ValueKey('spring_card_${card.title}_$cardIdx'),
-      selected: cardIsSelected,
-      previouslySelected: cardIdx == _previousSelectedIndex,
-      animate: !_performanceMode,
-      child: RepaintBoundary(
-        // The anchor is a sibling overlay, never a wrapper around the card.
-        // Wrapping only the selected card changes that card's subtree shape as
-        // the selection travels, which remounts `SystemCard` and reloads its
-        // artwork — a visible flicker on every D-pad press. Here the tree is
-        // identical for every card and only the `SizedBox`'s key moves; a
-        // `SizedBox` has no state to lose. `passthrough` hands the card exactly
-        // the constraints it had before the Stack existed.
-        child: Stack(
-          fit: StackFit.passthrough,
-          children: [
-            cardWidget,
-            Positioned.fill(
-              child: IgnorePointer(
-                child: SizedBox.expand(
-                  key: cardIsSelected ? widget.selectedItemKey : null,
+    // The liquid selector draws the frame of the selected card, and of the
+    // card it is leaving, behind them; everywhere else the card draws its own.
+    final liquid =
+        !_performanceMode &&
+        (cardIsSelected || cardIdx == _previousSelectedIndex);
+    final drag = _performanceMode
+        ? null
+        : cardIsSelected
+        ? true
+        : cardIdx == _previousSelectedIndex
+        ? false
+        : null;
+    return GooeyCardDrag(
+      motion: _gooeyMotion,
+      role: drag,
+      child: GooeyCardChrome(
+        enabled: !_performanceMode,
+        liquid: liquid,
+        selected: cardIsSelected,
+        child: SpringSelectedCard(
+          key: ValueKey('spring_card_${card.title}_$cardIdx'),
+          selected: cardIsSelected,
+          previouslySelected: cardIdx == _previousSelectedIndex,
+          animate: !_performanceMode,
+          child: RepaintBoundary(
+            // The anchor is a sibling overlay, never a wrapper around the card.
+            // Wrapping only the selected card changes that card's subtree shape as
+            // the selection travels, which remounts `SystemCard` and reloads its
+            // artwork — a visible flicker on every D-pad press. Here the tree is
+            // identical for every card and only the `SizedBox`'s key moves; a
+            // `SizedBox` has no state to lose. `passthrough` hands the card exactly
+            // the constraints it had before the Stack existed.
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                cardWidget,
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: SizedBox.expand(
+                      key: cardIsSelected ? widget.selectedItemKey : null,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  /// The liquid selection behind the cards. Each card sits in its slot inside
+  /// a 2.r padding, and the selected one is raised by [SpringSelectedCard], so
+  /// the frames are the slots inset by that padding, the selected one scaled
+  /// up the same way.
+  Widget _buildGooeySelector(BuildContext context, Map<int, Rect> slots) {
+    final slot = slots[widget.selectedIndex];
+    if (slot == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final radius = theme.extension<CornerRadii>()?.radiusExternalRadius ?? 14.r;
+    Rect frame(Rect slot) => slot.deflate(2.r);
+    Rect raised(Rect rect) => Rect.fromCenter(
+      center: rect.center,
+      width: rect.width * SpringSelectedCard.raisedScale,
+      height: rect.height * SpringSelectedCard.raisedScale,
+    );
+    final previous = _previousSelectedIndex == null
+        ? null
+        : slots[_previousSelectedIndex];
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: GooeySelector(
+          motion: _gooeyMotion,
+          selection: widget.selectedIndex,
+          target: raised(frame(slot)),
+          color: theme.colorScheme.secondary,
+          baseColor: theme.colorScheme.surface,
+          radius: radius * SpringSelectedCard.raisedScale,
+          baseRects: [frame(slot), if (previous != null) frame(previous)],
+        ),
+      ),
+    );
+  }
+
+  /// The liquid ring on top of the cards while the selection travels. Its
+  /// width is the selected card's visible frame: the card's inset around its
+  /// artwork.
+  Widget _buildGooeyRing(BuildContext context) {
+    final theme = Theme.of(context);
+    final radius = theme.extension<CornerRadii>()?.radiusExternalRadius ?? 14.r;
+    return Positioned.fill(
+      child: GooeySelectorRing(
+        motion: _gooeyMotion,
+        color: theme.colorScheme.secondary,
+        radius: radius * SpringSelectedCard.raisedScale,
+        ringWidth: 4.r * SpringSelectedCard.raisedScale,
       ),
     );
   }
@@ -1258,6 +1375,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
         final (recentW, recentH) = recentCardSpan(widget.recentCardSize, cols);
 
         final List<Widget> cardWidgets = [];
+        final Map<int, Rect> slots = {};
         final Set<int> placedIndices = {};
         var animationPosition = 0;
 
@@ -1334,6 +1452,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
                       : () => _openMenuFor(cardIdx),
                 );
 
+            slots[cardIdx] = Rect.fromLTWH(left, top, width, cardHeight);
             cardWidgets.add(
               Positioned(
                 left: left,
@@ -1385,7 +1504,14 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
             ),
             child: SizedBox(
               height: totalHeight,
-              child: Stack(clipBehavior: Clip.none, children: cardWidgets),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  if (!_performanceMode) _buildGooeySelector(context, slots),
+                  ...cardWidgets,
+                  if (!_performanceMode) _buildGooeyRing(context),
+                ],
+              ),
             ),
           ),
         );

@@ -316,7 +316,10 @@ void main() {
     await tester.pump();
   }
 
-  Finder loginButton() => find.byType(ElevatedButton);
+  /// The form's main button (a GamepadControl, as the app's own buttons).
+  Finder loginButton() => find.byWidgetPredicate(
+    (w) => w is GamepadControl && w.label == AppLocale.en[AppLocale.login],
+  );
 
   /// Types the e-mail and password. The password goes first: typed after the
   /// e-mail, the test's text input loses it to the rebuild the selection
@@ -342,7 +345,7 @@ void main() {
 
     expect(find.text(unreachable), findsOneWidget);
     expect(find.textContaining('Network error'), findsNothing);
-    expect(tester.widget<ElevatedButton>(loginButton()).onPressed, isNotNull);
+    expect(tester.widget<GamepadControl>(loginButton()).onTap, isNotNull);
   });
 
   testWidgets('A while a sign-in is out sends no second request', (
@@ -387,7 +390,7 @@ void main() {
     await press(tester, LogicalKeyboardKey.backspace);
 
     expect(find.text(en(AppLocale.login)), findsOneWidget);
-    expect(tester.widget<ElevatedButton>(loginButton()).onPressed, isNotNull);
+    expect(tester.widget<GamepadControl>(loginButton()).onTap, isNotNull);
 
     await tester.pump(limit * 2);
     await tester.pump();
@@ -426,7 +429,7 @@ void main() {
     await tester.pump(limit * 3 ~/ 4);
 
     expect(
-      tester.widget<ElevatedButton>(loginButton()).onPressed,
+      tester.widget<GamepadControl>(loginButton()).onTap,
       isNull,
       reason: 'the sign-in is still running',
     );

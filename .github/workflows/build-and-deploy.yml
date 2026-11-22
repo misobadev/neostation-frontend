@@ -211,8 +211,49 @@ jobs:
         shell: pwsh
         run: .\build-utils\build-windows.ps1
 
+      - name: Import Apple signing certificate
+        if: matrix.target == 'macos'
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+        run: |
+          if [ -z "$MACOS_CERTIFICATE_P12_BASE64" ]; then
+            if [ "${{ github.event_name }}" = "push" ] && [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
+              echo "::error::MACOS_CERTIFICATE_P12_BASE64 is required for tagged releases."
+              exit 1
+            fi
+            echo "No Developer ID certificate: the macOS build is signed ad-hoc."
+            exit 0
+          fi
+          # A throwaway keychain for this job only, holding the Developer ID
+          # Application certificate and its private key.
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+          # The App Store Connect API key used to notarize, when given.
+          if [ -n "$APPLE_API_KEY_P8_BASE64" ]; then
+            echo "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+            echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+          fi
+
       - name: Build macOS
         if: matrix.target == 'macos'
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: bash build-utils/build-macos.sh
 
       - name: Setup Android Keystore
@@ -312,12 +353,30 @@ jobs:
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}' | tr -d '\r')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # 1.0.0-rc.2+3002 -> "NeoStation 1.0.0 RC 2", published as a
+          # pre-release: stable installs (which read /releases/latest) never
+          # see it, release candidates do. 1.0.0+3010 -> "NeoStation 1.0.0".
+          NAME_VERSION="${VERSION%%+*}"
+          CORE="${NAME_VERSION%%-*}"
+          if [ "$NAME_VERSION" != "$CORE" ]; then
+            PRE="${NAME_VERSION#*-}"
+            case "$PRE" in
+              rc.*) LABEL="RC ${PRE#rc.}" ;;
+              *) LABEL="$PRE" ;;
+            esac
+            echo "name=NeoStation $CORE $LABEL" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "name=NeoStation $CORE" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          name: NeoStation Beta ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.name }}
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
           body: ${{ steps.build_changelog.outputs.changelog }}
           files: release-artifacts/*
           draft: true

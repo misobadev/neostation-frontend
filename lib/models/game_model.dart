@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:path/path.dart' as path;
 
+import '../constants/system_folder_names.dart';
 import '../providers/file_provider.dart';
+import '../utils/android_app_icon_paths.dart';
 import '../utils/ra_coverage.dart';
 import 'database_game_model.dart';
 
@@ -345,6 +347,15 @@ class GameModel {
         }
       }
 
+      // An installed app with no art of its own shows its cached icon.
+      final icon = _cachedAppIconPath(
+        fileProvider,
+        romname,
+        systemFolderName,
+        imageType,
+      );
+      if (icon != null && File(icon).existsSync()) return icon;
+
       return fileProvider.getMediaPath(
         systemFolderName,
         imageType,
@@ -435,7 +446,7 @@ class GameModel {
     for (final extension in _mediaExtensions) {
       yield path.join(
         fileProvider.getMediaDirectoryPath(),
-        systemFolderName,
+        SystemFolderNames.rowSystemFolder(systemFolderName),
         imageType,
         '$romname.$extension',
       );
@@ -466,20 +477,44 @@ class GameModel {
         imageType,
         romname,
       ),
+      ?_cachedAppIconPath(fileProvider, romname, systemFolderName, imageType),
     ]) {
       if (await fileProvider.fileExists(candidate)) return candidate;
     }
     return null;
   }
 
+  /// Where the cached icon of the installed app [romname] (its package name)
+  /// stands in for [imageType] art, or null when no icon applies. Icons fill
+  /// in only box art and wheels, and only for installed apps; the file is not
+  /// checked here.
+  static String? _cachedAppIconPath(
+    FileProvider fileProvider,
+    String romname,
+    String systemFolderName,
+    String imageType,
+  ) {
+    if (!SystemFolderNames.isAndroidApps(systemFolderName) ||
+        !AndroidAppIconPaths.artTypes.contains(imageType) ||
+        romname.isEmpty) {
+      return null;
+    }
+    return AndroidAppIconPaths.iconPath(
+      fileProvider.getMediaDirectoryPath(),
+      romname,
+    );
+  }
+
   /// Relative-path lookup used when no initialized [FileProvider] is available.
   /// Resolves inside NeoStation's `media/` folder only.
   String _manualImagePath(String systemFolderName, String imageType) {
     final baseName = _stripRomExtension(romname);
+    // Android Games' art is the android rows' art.
+    final folder = SystemFolderNames.rowSystemFolder(systemFolderName);
 
     final pngRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$baseName.png',
     );
@@ -487,7 +522,7 @@ class GameModel {
 
     final jpgRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$baseName.jpg',
     );
@@ -495,7 +530,7 @@ class GameModel {
 
     final pngFullRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$romname.png',
     );
@@ -503,7 +538,7 @@ class GameModel {
 
     final jpgFullRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$romname.jpg',
     );
@@ -553,7 +588,12 @@ class GameModel {
       return master;
     }
     final baseName = _stripRomExtension(romname);
-    return path.join('media', systemFolderName, 'videos', '$baseName.mp4');
+    return path.join(
+      'media',
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+      'videos',
+      '$baseName.mp4',
+    );
   }
 
   /// Verifies if a preview video exists for this game.

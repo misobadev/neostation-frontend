@@ -341,6 +341,8 @@ class GameDetailsFooter extends StatelessWidget {
     final BorderRadius radius =
         Theme.of(context).extension<CornerRadii>()?.radiusExternal ??
         BorderRadius.circular(14.r);
+    // The theme's main action colour, the same as Enter elsewhere.
+    final scheme = Theme.of(context).colorScheme;
 
     return Container(
       // The row gives this button whatever width remains after reserving the
@@ -349,9 +351,8 @@ class GameDetailsFooter extends StatelessWidget {
       width: width,
       height: _controlSize.r,
       decoration: BoxDecoration(
-        color: const Color(0xFF2ECC71),
+        color: scheme.tertiary,
         borderRadius: radius,
-        border: Border.all(color: const Color(0xFF36F184), width: 1.r),
         boxShadow: [
           BoxShadow(
             color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
@@ -367,7 +368,7 @@ class GameDetailsFooter extends StatelessWidget {
           focusColor: Colors.transparent,
           hoverColor: Colors.transparent,
           highlightColor: Colors.transparent,
-          splashColor: Colors.white.withValues(alpha: 0.1),
+          splashColor: scheme.onTertiary.withValues(alpha: 0.1),
           borderRadius: radius,
           onTap: () {
             SfxService().playEnterSound();
@@ -383,7 +384,7 @@ class GameDetailsFooter extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimary,
+                  color: scheme.onTertiary,
                   fontWeight: FontWeight.w900,
                   fontSize: 13.r,
                   letterSpacing: 1.0,
@@ -505,12 +506,12 @@ class GameDetailsFooter extends StatelessWidget {
     final double progress = knowsProgress && total > 0 ? awarded / total : 0.0;
 
     final theme = Theme.of(context);
-    // Orange is for a real, known score. An empty bar that is empty only
-    // because nobody has answered yet stays neutral, so the colour arriving is
-    // itself the signal that the number is real.
+    // The theme's warning colour is for a real, known score. An empty bar
+    // that is empty only because nobody has answered yet stays neutral, so the
+    // colour arriving is itself the signal that the number is real.
     final Color statusColor = noAchievements || awaitingProgress
         ? theme.colorScheme.onSurface
-        : Colors.orange;
+        : AppThemes.getCustomColors(context).warningColor as Color;
 
     final String? gameIconUrl = currentGameInfo?.imageIcon.isNotEmpty == true
         ? 'https://media.retroachievements.org${currentGameInfo!.imageIcon}'
@@ -544,13 +545,10 @@ class GameDetailsFooter extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 4.r),
               child: Row(
                 children: [
-                  // RetroAchievements game icon.
-                  ClipRRect(
-                    borderRadius:
-                        Theme.of(context)
-                            .extension<CornerRadii>()
-                            ?.radiusInternal ??
-                        BorderRadius.circular(14.r),
+                  // RetroAchievements game icon, round like the pill around
+                  // it: the row's controls are circles and stadiums, so a
+                  // square icon with the theme's corners looked out of place.
+                  ClipOval(
                     child: Container(
                       width: _pillIconSize,
                       height: _pillIconSize,

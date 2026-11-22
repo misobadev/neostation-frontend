@@ -324,11 +324,11 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['hide_recent_card']?.toString() ?? '0') ??
                 0) ==
             1,
-        // Missing column/row => the 3x2 block the card has always used.
+        // Missing column/row => the compact card, the default.
         recentCardSize:
             userConfig?['recent_card_size']?.toString().isNotEmpty == true
             ? userConfig!['recent_card_size'].toString()
-            : RecentCardSizes.defaultSize,
+            : RecentCardSizes.twoByOne,
         // Missing column/row => the wheel tab (see migration v110).
         gameDetailsTab:
             userConfig?['game_details_tab']?.toString().isNotEmpty == true
@@ -357,12 +357,6 @@ class SqliteConfigService {
         hideSearchCard:
             (int.tryParse(userConfig?['hide_search_card']?.toString() ?? '1') ??
                 1) ==
-            1,
-        androidAppsAsTab:
-            (int.tryParse(
-                  userConfig?['android_apps_as_tab']?.toString() ?? '0',
-                ) ??
-                0) ==
             1,
         hideTabDiscovery:
             (int.tryParse(
@@ -411,12 +405,12 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['dock_enabled']?.toString() ?? '1') ??
                 1) ==
             1,
-        // Missing column/row => 0 => logo shown (the default).
+        // Missing column/row => 1 => logo hidden (the default).
         secondaryHideSystemLogo:
             (int.tryParse(
-                  userConfig?['secondary_hide_system_logo']?.toString() ?? '0',
+                  userConfig?['secondary_hide_system_logo']?.toString() ?? '1',
                 ) ??
-                0) ==
+                1) ==
             1,
         dockSlotCount:
             (int.tryParse(userConfig?['dock_slot_count']?.toString() ?? '3') ??
@@ -498,6 +492,10 @@ class SqliteConfigService {
                     ) ??
                     2)
                 .clamp(0.0, 2.0),
+        // Missing column/row => 3 => medium corners.
+        cornerRadius:
+            (int.tryParse(userConfig?['corner_radius']?.toString() ?? '3') ?? 3)
+                .clamp(0, 5),
       );
     } catch (e) {
       _log.e('Error applying configuration in loadConfig: $e');
@@ -557,7 +555,6 @@ class SqliteConfigService {
           hideTabScraper: config.hideTabScraper ? 1 : 0,
           hideTabRomm: config.hideTabRomm ? 1 : 0,
           hideSearchCard: config.hideSearchCard ? 1 : 0,
-          androidAppsAsTab: config.androidAppsAsTab ? 1 : 0,
           hideTabDiscovery: config.hideTabDiscovery ? 1 : 0,
           activeSyncProvider: config.activeSyncProvider,
           autoUpdateApp: config.autoUpdateApp ? 1 : 0,
@@ -586,6 +583,7 @@ class SqliteConfigService {
           neoglassBlur: config.neoglassBlur,
           neoglassTransparency: config.neoglassTransparency,
           neoglassBorderWidth: config.neoglassBorderWidth,
+          cornerRadius: config.cornerRadius,
         );
 
         await SqliteService.saveUserRomFolders(config.romFolders);
