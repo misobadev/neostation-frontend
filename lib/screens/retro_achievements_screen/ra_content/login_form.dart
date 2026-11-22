@@ -181,7 +181,10 @@ extension _LoginForm on _RAContentState {
     final theme = Theme.of(context);
     final radii = _raRadii(context);
     final line = theme.colorScheme.outline.withValues(alpha: 0.15);
-    return Center(
+    // Anchored to the top, like the NeoSync and RomM sign-in panels, so the
+    // three start at the same height.
+    return Align(
+      alignment: Alignment.topCenter,
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(16.r, 0, 16.r, 16.r),
         child: ConstrainedBox(
@@ -189,7 +192,7 @@ extension _LoginForm on _RAContentState {
           child: NeoGlassRim(
             cornerRadius: radii.radiusExternalRadius,
             child: Container(
-              padding: EdgeInsets.all(20.r),
+              padding: EdgeInsets.all(14.r),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: radii.radiusExternal,
@@ -202,7 +205,7 @@ extension _LoginForm on _RAContentState {
                   Container(
                     width: 1,
                     height: 200.r,
-                    margin: EdgeInsets.symmetric(horizontal: 20.r),
+                    margin: EdgeInsets.symmetric(horizontal: 16.r),
                     color: line,
                   ),
                   Expanded(
@@ -237,14 +240,14 @@ extension _LoginForm on _RAContentState {
             ),
           ),
         ),
-        SizedBox(height: 12.r),
+        SizedBox(height: 8.r),
         ConstrainedBox(
           constraints: field,
           child: _buildFieldHighlight(
             slot: 0,
             theme: theme,
             child: SizedBox(
-              height: 38.r,
+              height: 34.r,
               child: TextFormField(
                 controller: _usernameController,
                 focusNode: _usernameFocus,
@@ -262,14 +265,14 @@ extension _LoginForm on _RAContentState {
             ),
           ),
         ),
-        SizedBox(height: 8.r),
+        SizedBox(height: 6.r),
         ConstrainedBox(
           constraints: field,
           child: _buildFieldHighlight(
             slot: 1,
             theme: theme,
             child: SizedBox(
-              height: 38.r,
+              height: 34.r,
               child: TextFormField(
                 controller: _apiKeyController,
                 focusNode: _apiKeyFocus,
@@ -305,7 +308,7 @@ extension _LoginForm on _RAContentState {
             ),
           ),
         ),
-        SizedBox(height: 10.r),
+        SizedBox(height: 8.r),
         _raButton(
           theme,
           slot: 2,
@@ -314,7 +317,7 @@ extension _LoginForm on _RAContentState {
           primary: true,
           busy: raProvider.isLoading,
         ),
-        SizedBox(height: 10.r),
+        SizedBox(height: 8.r),
         // Where RetroAchievements shows the personal Web API key, so the app
         // never handles a password.
         _raButton(
