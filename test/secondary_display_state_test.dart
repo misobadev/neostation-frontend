@@ -151,8 +151,9 @@ void main() {
       // applies from the first-launch WELCOME seed, not just after a relaunch.
       expect(restored.fanartDimLevel, 25);
       expect(restored.dockEnabled, isTrue);
-      // A payload predating the setting must keep showing the logo.
-      expect(restored.hideSystemLogo, isFalse);
+      // Mirrors the config default (secondary_hide_system_logo DEFAULT 1) so the
+      // logo never flashes on the secondary display before the seed lands.
+      expect(restored.hideSystemLogo, isTrue);
       expect(restored.dockSlotCount, 3);
       expect(restored.dockApps, const ['', '', '', '', '']);
       // Both latches start off: the main engine hasn't painted, and the dock is
