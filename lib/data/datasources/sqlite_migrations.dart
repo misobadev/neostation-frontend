@@ -164,6 +164,27 @@ class SqliteMigrations {
     );
   ''';
 
+  /// CREATE for the per-system / per-game launch screen (v192).
+  ///
+  /// Which screen of a dual-screen handheld a game opens on. `scope` is
+  /// `'system'` (`target` = the system's folder name) or `'game'` (`target` =
+  /// the ROM's `rom_path`, `COLLATE NOCASE` like the column it mirrors).
+  /// `display` is `'primary'` or `'secondary'`; no row means "inherit" (the
+  /// game falls back to its system, the system to Android's default screen).
+  /// A table of its own rather than columns on `user_system_settings` /
+  /// `user_roms`: it is read once per launch and in two settings rows, so it
+  /// does not need threading through every system- and game-loading query. No
+  /// foreign key on purpose: a rescan that drops a ROM leaves a harmless row.
+  static const String createUserLaunchDisplayTableSql = '''
+    CREATE TABLE IF NOT EXISTS user_launch_display (
+      scope TEXT NOT NULL,
+      target TEXT NOT NULL COLLATE NOCASE,
+      display TEXT NOT NULL,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (scope, target)
+    );
+  ''';
+
   /// CREATE for collection membership (v139).
   ///
   /// `rom_path` is the natural key of `user_roms` and is what the favourite
@@ -712,6 +733,9 @@ class SqliteMigrations {
         break;
       case 191:
         await _migrateToVersion191(db);
+        break;
+      case 192:
+        await _migrateToVersion192(db);
         break;
       default:
         _log.w('No migration defined for version $version');
@@ -7728,6 +7752,19 @@ class SqliteMigrations {
   /// Test devices that ran this branch at v169/v171 skipped main's v170, so it
   /// is re-run first. Every step is guarded, so a device that skipped a
   /// neighbouring slot, or re-runs this, ends in the same state.
+  /// Migration v192: per-system / per-game launch screen for dual-screen
+  /// handhelds. Idempotent (`CREATE TABLE IF NOT EXISTS`).
+  static Future<void> _migrateToVersion192(Database db) async {
+    _log.i('Migration v192: Adding user_launch_display table');
+    try {
+      db.execute(createUserLaunchDisplayTableSql);
+    } catch (e, stackTrace) {
+      _log.e('Migration v192 failed: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
   static Future<void> _migrateToVersion191(Database db) async {
     _log.i('Migration v191: Adding Android Games system');
     try {

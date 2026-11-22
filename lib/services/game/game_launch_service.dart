@@ -6,6 +6,7 @@ import 'package:path/path.dart' as path;
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/services/launch_display_service.dart';
 
 import '../../constants/system_folder_names.dart';
 import '../../models/game_model.dart';
@@ -275,6 +276,10 @@ class GameLaunchService {
                       ? List<String>.from(launchCmd['activity_flags'] as List)
                       : <String>[],
                   'keep_saf_uri': launchCmd['keep_saf_uri'] == true,
+                  'launch_display': await LaunchDisplayService.resolveForLaunch(
+                    system,
+                    game,
+                  ),
                 },
               );
 
@@ -743,6 +748,10 @@ class GameLaunchService {
           },
           {'key': 'LIBRETRO', 'value': coreName, 'type': 'string'},
         ],
+        'launch_display': await LaunchDisplayService.resolveForLaunch(
+          system,
+          game,
+        ),
       });
 
       if (result == true) {
@@ -1703,6 +1712,10 @@ class GameLaunchService {
         'data': dataUri,
         'activity_flags': <String>[],
         'keep_saf_uri': false,
+        'launch_display': await LaunchDisplayService.resolveForLaunch(
+          system,
+          game,
+        ),
       });
 
       if (result == true) {

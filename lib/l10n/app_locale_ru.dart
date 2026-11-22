@@ -236,6 +236,10 @@ const Map<String, dynamic> appLocaleRu = {
       'Рекурсивное сканирование выключено. Сканирование {name}...',
   AppLocale.subfolderView: 'Показывать подпапки',
   AppLocale.subfolderViewSubtitle: 'Группировать ROM в подпапках в виде просматриваемых папок, а не смешивать их с играми',
+  AppLocale.openOnSecondaryScreen: 'Открывать игры на втором экране',
+  AppLocale.openOnSecondaryScreenSubtitle: 'Запускать игры этой системы на другом экране устройства с двумя экранами',
+  AppLocale.launchScreen: 'Экран',
+  AppLocale.mainScreen: 'Основной экран',
   AppLocale.subfolderViewAll: 'Показывать подпапки во всех системах',
   AppLocale.subfolderViewAllSubtitle:
       'Применить настройку «Показывать подпапки» сразу ко всем системам',

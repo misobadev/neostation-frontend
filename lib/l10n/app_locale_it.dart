@@ -236,6 +236,10 @@ const Map<String, dynamic> appLocaleIt = {
       'Scansione ricorsiva disabilitata. Scansione di {name}...',
   AppLocale.subfolderView: 'Mostra sottocartelle',
   AppLocale.subfolderViewSubtitle: 'Raggruppa le ROM nelle sottocartelle in cartelle navigabili invece di mescolarle con i giochi',
+  AppLocale.openOnSecondaryScreen: 'Apri i giochi sullo schermo secondario',
+  AppLocale.openOnSecondaryScreenSubtitle: "Avvia i giochi di questo sistema sull'altro schermo di un dispositivo a doppio schermo",
+  AppLocale.launchScreen: 'Schermo',
+  AppLocale.mainScreen: 'Schermo principale',
   AppLocale.subfolderViewAll: 'Mostra sottocartelle in tutti i sistemi',
   AppLocale.subfolderViewAllSubtitle:
       'Applica in una volta l’opzione Mostra sottocartelle a tutti i sistemi',

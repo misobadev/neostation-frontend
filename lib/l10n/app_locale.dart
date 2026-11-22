@@ -213,6 +213,11 @@ mixin AppLocale {
   static const String recursiveScanDisabled = 'recursive_scan_disabled';
   static const String subfolderView = 'subfolder_view';
   static const String subfolderViewSubtitle = 'subfolder_view_subtitle';
+  static const String openOnSecondaryScreen = 'open_on_secondary_screen';
+  static const String openOnSecondaryScreenSubtitle =
+      'open_on_secondary_screen_subtitle';
+  static const String launchScreen = 'launch_screen';
+  static const String mainScreen = 'main_screen';
   static const String subfolderViewAll = 'subfolder_view_all';
   static const String subfolderViewAllSubtitle = 'subfolder_view_all_subtitle';
   static const String subfolderViewAllOverridesNotice =

@@ -236,6 +236,11 @@ const Map<String, dynamic> appLocaleEn = {
       'Recursive scan disabled. Scanning {name}...',
   AppLocale.subfolderView: 'Show Subfolders',
   AppLocale.subfolderViewSubtitle: 'Group ROMs in subfolders into browsable folders instead of mixing them with games',
+  AppLocale.openOnSecondaryScreen: 'Open Games on Secondary Screen',
+  AppLocale.openOnSecondaryScreenSubtitle:
+      "Launch this system's games on the other screen of a dual-screen device",
+  AppLocale.launchScreen: 'Screen',
+  AppLocale.mainScreen: 'Main Screen',
   AppLocale.subfolderViewAll: 'Show Subfolders in Every System',
   AppLocale.subfolderViewAllSubtitle:
       'Apply the per-system Show Subfolders setting to every system at once',

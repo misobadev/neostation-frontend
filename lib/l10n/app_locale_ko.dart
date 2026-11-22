@@ -225,6 +225,11 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.recursiveScanDisabled: '하위 폴더 검색이 비활성화되었습니다. {name} 검색 중...',
   AppLocale.subfolderView: '하위 폴더 표시',
   AppLocale.subfolderViewSubtitle: '하위 폴더의 ROM을 게임 목록에 섞지 않고 탐색 가능한 폴더로 그룹화합니다',
+  AppLocale.openOnSecondaryScreen: '보조 화면에서 게임 열기',
+  AppLocale.openOnSecondaryScreenSubtitle:
+      '듀얼 스크린 기기에서 이 시스템의 게임을 다른 화면에서 실행합니다',
+  AppLocale.launchScreen: '화면',
+  AppLocale.mainScreen: '기본 화면',
   AppLocale.subfolderViewAll: '모든 시스템에서 하위 폴더 표시',
   AppLocale.subfolderViewAllSubtitle: '‘하위 폴더 표시’ 설정을 모든 시스템에 한 번에 적용합니다',
   AppLocale.subfolderViewAllOverridesNotice: '{count}개 시스템에 자체 ‘하위 폴더 표시’ 설정이 있었습니다. 이제 모든 시스템이 이 스위치를 따릅니다. 각 시스템 설정에서 개별적으로 다시 변경할 수 있습니다.',

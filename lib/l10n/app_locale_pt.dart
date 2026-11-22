@@ -243,6 +243,10 @@ const Map<String, dynamic> appLocalePt = {
       'Varredura recursiva desativada. Varrendo {name}...',
   AppLocale.subfolderView: 'Mostrar subpastas',
   AppLocale.subfolderViewSubtitle: 'Agrupar ROMs em subpastas em pastas navegáveis em vez de misturá-las com os jogos',
+  AppLocale.openOnSecondaryScreen: 'Abrir jogos na tela secundária',
+  AppLocale.openOnSecondaryScreenSubtitle: 'Abre os jogos deste sistema na outra tela de um dispositivo com duas telas',
+  AppLocale.launchScreen: 'Tela',
+  AppLocale.mainScreen: 'Tela principal',
   AppLocale.subfolderViewAll: 'Mostrar subpastas em todos os sistemas',
   AppLocale.subfolderViewAllSubtitle:
       'Aplicar de uma vez a opção Mostrar subpastas a todos os sistemas',

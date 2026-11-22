@@ -236,6 +236,11 @@ const Map<String, dynamic> appLocaleId = {
       'Pemindaian rekursif dinonaktifkan. Memindai {name}...',
   AppLocale.subfolderView: 'Tampilkan Subfolder',
   AppLocale.subfolderViewSubtitle: 'Kelompokkan ROM dalam subfolder menjadi folder yang dapat dijelajahi alih-alih mencampurnya dengan game',
+  AppLocale.openOnSecondaryScreen: 'Buka Game di Layar Sekunder',
+  AppLocale.openOnSecondaryScreenSubtitle:
+      'Jalankan game sistem ini di layar lain pada perangkat dua layar',
+  AppLocale.launchScreen: 'Layar',
+  AppLocale.mainScreen: 'Layar Utama',
   AppLocale.subfolderViewAll: 'Tampilkan Subfolder di Semua Sistem',
   AppLocale.subfolderViewAllSubtitle:
       'Terapkan pengaturan Tampilkan Subfolder ke semua sistem sekaligus',

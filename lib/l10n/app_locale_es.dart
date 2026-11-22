@@ -236,6 +236,10 @@ const Map<String, dynamic> appLocaleEs = {
       'Escaneo recursivo desactivado. Escaneando {name}...',
   AppLocale.subfolderView: 'Mostrar subcarpetas',
   AppLocale.subfolderViewSubtitle: 'Agrupar las ROMs de subcarpetas en carpetas navegables en lugar de mezclarlas con los juegos',
+  AppLocale.openOnSecondaryScreen: 'Abrir juegos en la pantalla secundaria',
+  AppLocale.openOnSecondaryScreenSubtitle: 'Abre los juegos de este sistema en la otra pantalla de un dispositivo con dos pantallas',
+  AppLocale.launchScreen: 'Pantalla',
+  AppLocale.mainScreen: 'Pantalla principal',
   AppLocale.subfolderViewAll: 'Mostrar subcarpetas en todos los sistemas',
   AppLocale.subfolderViewAllSubtitle:
       'Aplicar de una vez la opción Mostrar subcarpetas a todos los sistemas',

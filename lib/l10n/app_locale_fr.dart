@@ -240,6 +240,10 @@ const Map<String, dynamic> appLocaleFr = {
       'Analyse récursive désactivée. Analyse de {name}...',
   AppLocale.subfolderView: 'Afficher les sous-dossiers',
   AppLocale.subfolderViewSubtitle: 'Regrouper les ROMs des sous-dossiers dans des dossiers navigables au lieu de les mélanger avec les jeux',
+  AppLocale.openOnSecondaryScreen: "Ouvrir les jeux sur l'écran secondaire",
+  AppLocale.openOnSecondaryScreenSubtitle: "Lance les jeux de ce système sur l'autre écran d'un appareil à double écran",
+  AppLocale.launchScreen: 'Écran',
+  AppLocale.mainScreen: 'Écran principal',
   AppLocale.subfolderViewAll:
       'Afficher les sous-dossiers dans tous les systèmes',
   AppLocale.subfolderViewAllSubtitle: 'Appliquer d’un coup l’option Afficher les sous-dossiers à tous les systèmes',

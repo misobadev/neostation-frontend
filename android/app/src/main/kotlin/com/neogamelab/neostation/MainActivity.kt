@@ -44,6 +44,13 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     // Now Playing panel comes back. Generous: a cold app start on this hardware
     // can take seconds, and coming back early is the bug this guards against.
     private val DOCK_LAUNCH_TIMEOUT_MS = 10_000L
+    // Same safety net for a game launched onto the Now Playing screen. Longer,
+    // because an emulator's cold start (core load, shader cache) is slower than
+    // an ordinary app's.
+    private val GAME_LAUNCH_TIMEOUT_MS = 30_000L
+    // Focus/resume edges this soon after a game launch on the other screen are
+    // the handoff, not the user returning (same 5 s as onGameReturned uses).
+    private val OTHER_DISPLAY_HANDOFF_MS = 5_000L
     var keyListener: ((KeyEvent) -> Boolean)? = null
     var motionListener: ((MotionEvent) -> Boolean)? = null
     // A launched game still owns the foreground: set when Flutter starts a
@@ -51,6 +58,10 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     // Flutter ends the session. Drives the session bookkeeping below — it must
     // NOT expire on its own, or a session outlives the flag that describes it.
     private var isGameActive = false
+    // The running game was launched on the screen NeoStation is not on, so this
+    // activity stays resumed under it and the session ends on regained focus or
+    // the accessibility watch instead of onResume. See startGameOnOtherDisplay.
+    private var gameOnOtherDisplay = false
     // Gamepad input is swallowed so a stray press during the handoff to the
     // emulator can't leak into the UI behind it. Unlike [isGameActive] this is
     // deliberately short-lived and self-expiring, so a launch that never hands
@@ -291,9 +302,12 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                     val extras = call.argument<List<Map<String, Any>>>("extras")
                     val activityFlags = call.argument<List<String>>("activity_flags") ?: emptyList()
                     val keepSafUri = call.argument<Boolean>("keep_saf_uri") ?: false
+                    // "primary", "secondary" or null (no preference: Android's
+                    // default, which is the screen NeoStation is on).
+                    val launchDisplay = call.argument<String>("launch_display")
 
                     if (packageName != null) {
-                        launchGenericIntent(packageName, activityName, action, category, data, type, extras, activityFlags, keepSafUri, result)
+                        launchGenericIntent(packageName, activityName, action, category, data, type, extras, activityFlags, keepSafUri, launchDisplay, result)
                     } else {
                         result.error("INVALID_ARGUMENTS", "Package name is required", null)
                     }
@@ -872,8 +886,25 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         extras: List<Map<String, Any>>?,
         activityFlags: List<String>,
         keepSafUri: Boolean,
+        launchDisplay: String?,
         result: MethodChannel.Result
     ) {
+        val targetDisplayId = resolveGameLaunchDisplay(launchDisplay)
+        val ownDisplayId = window?.decorView?.display?.displayId ?: Display.DEFAULT_DISPLAY
+        val onOtherScreen = targetDisplayId != null && targetDisplayId != ownDisplayId
+
+        // Wraps the result so the other-screen bookkeeping only starts once the
+        // launch actually went through; a failed launch leaves nothing armed.
+        val wrapped = if (!onOtherScreen) result else object : MethodChannel.Result {
+            override fun success(value: Any?) {
+                if (value == true) startGameOnOtherDisplay(packageName, targetDisplayId!!)
+                result.success(value)
+            }
+            override fun error(code: String, message: String?, details: Any?) =
+                result.error(code, message, details)
+            override fun notImplemented() = result.notImplemented()
+        }
+
         EmulatorLauncher.launchGenericIntent(
             context = this,
             packageName = packageName,
@@ -885,8 +916,93 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             extras = extras,
             activityFlags = activityFlags,
             keepSafUri = keepSafUri,
-            result = result
+            result = wrapped,
+            launchDisplayId = targetDisplayId
         )
+    }
+
+    /**
+     * Maps the per-system/per-game screen setting to a display id.
+     *
+     * Returns null (launch where Android would, as before the setting existed)
+     * when there is no preference or the device has a single screen, so
+     * single-screen handhelds never get a launch display forced on them.
+     * "primary" is the default display (the top screen on the AYN Thor) and
+     * "secondary" the first other display, the same rule the app dock uses.
+     */
+    private fun resolveGameLaunchDisplay(launchDisplay: String?): Int? {
+        if (launchDisplay == null) return null
+        val dm = getSystemService(android.content.Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
+        val secondary = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY } ?: return null
+        return when (launchDisplay) {
+            "primary" -> Display.DEFAULT_DISPLAY
+            "secondary" -> secondary.displayId
+            else -> null
+        }
+    }
+
+    /**
+     * Session bookkeeping for a game launched on the screen NeoStation is not
+     * on. That game never covers this activity, so Android does not pause it
+     * and the usual onPause/onResume pair never brackets the session. Instead:
+     * the launch time is stamped here, and the return is reported when this
+     * activity gets focus back ([onTopResumedActivityChanged]) or, if the
+     * screenshot accessibility service is on, when the game's window leaves its
+     * display — whichever comes first.
+     */
+    private fun startGameOnOtherDisplay(packageName: String, displayId: Int) {
+        gameOnOtherDisplay = true
+        gameLaunchTimestamp = System.currentTimeMillis()
+        val presentationDisplayId = try {
+            subScreenPresentation?.display?.displayId
+        } catch (e: Exception) {
+            null
+        }
+        if (presentationDisplayId == displayId && subScreenPresentation?.isShowing == true) {
+            // Same layering problem as the dock: the Now Playing presentation
+            // sits above the game on that display. A cold emulator start can
+            // take a while, hence the longer watchdog.
+            hideSecondaryForApp(packageName, displayId, GAME_LAUNCH_TIMEOUT_MS) {
+                finishGameOnOtherDisplay(fromWatch = true)
+            }
+        } else {
+            ScreenshotAccessibilityService.startWatch(packageName, displayId) {
+                Handler(Looper.getMainLooper()).post {
+                    ScreenshotAccessibilityService.stopWatch()
+                    finishGameOnOtherDisplay(fromWatch = true)
+                }
+            }
+        }
+    }
+
+    /**
+     * Ends a session started by [startGameOnOtherDisplay]. Idempotent.
+     *
+     * Focus and resume edges in the first seconds after a launch are the
+     * handoff itself (an emulator's splash or a permission prompt can bounce
+     * focus), not the user coming back, so they are ignored unless [fromWatch]:
+     * the accessibility watch only fires once the game's window has actually
+     * come and gone.
+     */
+    private fun finishGameOnOtherDisplay(fromWatch: Boolean = false) {
+        if (!gameOnOtherDisplay) return
+        if (!fromWatch && gameLaunchTimestamp > 0L &&
+            System.currentTimeMillis() - gameLaunchTimestamp < OTHER_DISPLAY_HANDOFF_MS
+        ) return
+        gameOnOtherDisplay = false
+        restoreSecondaryAfterApp()
+        reportGameReturned()
+    }
+
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        // Focus coming back while a game runs on the other screen means the
+        // user is back in NeoStation (or the game closed). Flutter sees the same
+        // edge as AppLifecycleState.resumed; this keeps the native session state
+        // (pad block, launch timestamp, Now Playing panel) in step with it.
+        if (isTopResumedActivity && gameOnOtherDisplay) {
+            finishGameOnOtherDisplay()
+        }
     }
 
 
@@ -954,6 +1070,18 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             restoreSecondaryAfterApp()
         }
 
+        if (gameOnOtherDisplay) {
+            finishGameOnOtherDisplay()
+        } else {
+            reportGameReturned()
+        }
+    }
+
+    /**
+     * Tells Flutter the launched game is over and releases the pad. No-op when
+     * no game session is open.
+     */
+    private fun reportGameReturned() {
         if (isGameActive) {
             // Calcular tiempo transcurrido desde el lanzamiento (si tenemos timestamp)
             var elapsedSeconds = 0
@@ -1193,7 +1321,12 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
      * (if the accessibility service is granted) watches the secondary display so
      * Now Playing is restored the moment the app is dismissed.
      */
-    private fun hideSecondaryForApp(packageName: String, displayId: Int) {
+    private fun hideSecondaryForApp(
+        packageName: String,
+        displayId: Int,
+        timeoutMs: Long = DOCK_LAUNCH_TIMEOUT_MS,
+        onClosed: () -> Unit = {}
+    ) {
         try {
             subScreenPresentation?.let {
                 if (it.isShowing) {
@@ -1206,9 +1339,12 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             // panel onto a running app after its timeout, so arm neither:
             // onResume then restores, as it did before the watch existed.
             val watching = ScreenshotAccessibilityService.startWatch(packageName, displayId) {
-                Handler(Looper.getMainLooper()).post { restoreSecondaryAfterApp() }
+                Handler(Looper.getMainLooper()).post {
+                    restoreSecondaryAfterApp()
+                    onClosed()
+                }
             }
-            if (watching) armDockLaunchWatchdog()
+            if (watching) armDockLaunchWatchdog(timeoutMs)
         } catch (e: Exception) {
             android.util.Log.w("MainActivity", "Hiding secondary for app failed: ${e.message}")
         }
@@ -1220,7 +1356,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
      * so an app that never appears (a launch the system dropped) would otherwise
      * leave the bottom screen showing the device's own launcher for good.
      */
-    private fun armDockLaunchWatchdog() {
+    private fun armDockLaunchWatchdog(timeoutMs: Long = DOCK_LAUNCH_TIMEOUT_MS) {
         dockLaunchWatchdog?.let { dockLaunchHandler.removeCallbacks(it) }
         val watchdog = Runnable {
             dockLaunchWatchdog = null
@@ -1230,7 +1366,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             }
         }
         dockLaunchWatchdog = watchdog
-        dockLaunchHandler.postDelayed(watchdog, DOCK_LAUNCH_TIMEOUT_MS)
+        dockLaunchHandler.postDelayed(watchdog, timeoutMs)
     }
 
     /** Restores the Now Playing presentation hidden by a dock launch. */
