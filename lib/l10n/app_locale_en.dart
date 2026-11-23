@@ -367,6 +367,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.exitConfirmation: 'Are you sure you want to exit NeoStation?',
   AppLocale.confirmExit: 'Confirm Exit',
   AppLocale.rescanAllFolders: 'Rescan All ROM Folders',
+  AppLocale.pullToRescan: 'Pull to rescan',
+  AppLocale.releaseToRescan: 'Release to rescan',
   AppLocale.rescanAllFoldersSubtitle: 'Manually scan for new systems and ROMs',
   AppLocale.organizeMultiDiscGames: 'Organize Multi-Disc Games',
   AppLocale.organizeMultiDiscGamesSubtitle: 'Automatically creates .m3u files for multi disc games and organises them into folders',

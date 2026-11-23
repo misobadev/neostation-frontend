@@ -458,6 +458,8 @@ mixin AppLocale {
   static const String confirmExit = 'confirm_exit';
   static const String rescanAllFolders = 'rescan_all_folders';
   static const String rescanAllFoldersSubtitle = 'rescan_all_folders_subtitle';
+  static const String pullToRescan = 'pull_to_rescan';
+  static const String releaseToRescan = 'release_to_rescan';
 
   static const String romsFolderSubtitle = 'roms_folder_subtitle';
   static const String pressToRemoveFolder = 'press_to_remove_folder';

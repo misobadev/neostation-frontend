@@ -370,6 +370,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.exitConfirmation: 'Вы уверены, что хотите выйти из NeoStation?',
   AppLocale.confirmExit: 'Подтвердить выход',
   AppLocale.rescanAllFolders: 'Пересканировать все папки ROM',
+  AppLocale.pullToRescan: 'Потяните, чтобы пересканировать',
+  AppLocale.releaseToRescan: 'Отпустите, чтобы пересканировать',
   AppLocale.rescanAllFoldersSubtitle: 'Вручную искать новые системы и ROM',
   AppLocale.organizeMultiDiscGames: 'Организовать многодисковые игры',
   AppLocale.organizeMultiDiscGamesSubtitle: 'Автоматически создаёт файлы .m3u для многодисковых игр и организует их по папкам',
