@@ -1366,13 +1366,11 @@ extension NeoSyncCore on NeoSyncProvider {
   /// them all). With [includeGoneSaves], a save that is gone but has kept
   /// copies is included too, with a size of -1 (see [locateKeptCopySaves]).
   ///
-  /// Cards a RetroArch core keeps in RetroArch's system folder are included
-  /// unless [includeSystemCards] is false: RomM doesn't sync them yet.
+  /// Cards a RetroArch core keeps in RetroArch's system folder are included.
   Future<List<LocalSaveFile>> _findGameSaveFiles(
     GameModel game, {
     bool includeCardCopies = false,
     bool includeGoneSaves = false,
-    bool includeSystemCards = true,
   }) async {
     try {
       // 1. Obtener el sistema para resolver sus rutas JSON
@@ -1416,7 +1414,7 @@ extension NeoSyncCore on NeoSyncProvider {
       // or a custom folder set to the card folder) is still marked as one; a
       // custom folder's claim wins below.
       final systemCards = <String>{};
-      if (includeSystemCards && _sharesMemoryCards(system.folderName)) {
+      if (_sharesMemoryCards(system.folderName)) {
         final cardFolder = await _retroArchSystemCardFolder(system.folderName);
         final cards = [
           if (cardFolder != null) ...[
@@ -1599,8 +1597,7 @@ extension NeoSyncCore on NeoSyncProvider {
         // (a copy an older NeoStation downloaded into `<saves>/PS2/`) isn't
         // synced, so the cloud card goes into the system folder before the
         // game starts, not into a copy the core never reads.
-        if (includeSystemCards &&
-            await _retroArchSystemCardHome(system.folderName) != null) {
+        if (await _retroArchSystemCardHome(system.folderName) != null) {
           final elsewhere = matchingFiles
               .where(
                 (file) =>
@@ -1641,14 +1638,11 @@ extension NeoSyncCore on NeoSyncProvider {
   /// resolution and filename matching. Each [LocalSaveFile.relativePath] is
   /// prefixed with `saves/` or `states/` so callers can tell them apart.
   ///
-  /// Not the cards a RetroArch core keeps in RetroArch's system folder: RomM
-  /// would place them in the saves folder.
+  /// The cards a RetroArch core keeps in RetroArch's system folder are among
+  /// them ([LocalSaveFile.inRetroArchSystemFolder]), beside every other file
+  /// named like a save of the game: RomM decides which of them a sync uses.
   Future<List<LocalSaveFile>> locateGameSaveFiles(GameModel game) =>
-      _findGameSaveFiles(
-        game,
-        includeCardCopies: true,
-        includeSystemCards: false,
-      );
+      _findGameSaveFiles(game, includeCardCopies: true);
 
   /// [game]'s saves, as [locateGameSaveFiles] finds them, plus those that are
   /// gone but have kept copies beside where they were, so one can be put

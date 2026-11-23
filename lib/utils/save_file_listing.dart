@@ -9,8 +9,9 @@ import 'kept_save_copy.dart';
 /// would make NeoSync see no local saves at all: a custom folder would upload
 /// nothing, and a game's sync would download its cloud saves over the local
 /// ones. Kept copies of saves ([isKeptCopyPath]: NeoSync's `*.neosync.bak`,
-/// RomM's `.romm-conflict-` and `.romm-local-` copies) are never listed, nor
-/// files over [maxFileSize] bytes. Folders that don't exist are ignored.
+/// RomM's `.romm-conflict-`, `.romm-local-` and `.romm-first-` copies) are
+/// never listed, nor files over [maxFileSize] bytes. Folders that don't exist
+/// are ignored.
 Future<List<String>> listSaveFilePaths(
   List<String> folders, {
   int? maxFileSize,
