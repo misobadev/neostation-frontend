@@ -162,7 +162,11 @@ class MySystems extends StatelessWidget {
                         currentSystem,
                         configProvider,
                       ),
+                      // Search on West, and on the button reported as X: on
+                      // the AYN controller West is the button printed Y, and
+                      // the header shows X for Search.
                       onWestPressed: () => _openSearch(context),
+                      onXPressed: () => _openSearch(context),
                     ),
                   ),
                 ),
@@ -246,7 +250,10 @@ class MySystems extends StatelessWidget {
               onRightTrigger: () => _cycleRecent(cycler, currentSystem, 1),
               onYPressed: () =>
                   _openSystemOptions(context, currentSystem, configProvider),
+              // Search on West, and on the button reported as X (see the
+              // carousel above).
               onWestPressed: () => _openSearch(context),
+              onXPressed: () => _openSearch(context),
               onEnterPressed: () {
                 final current = selectedIndex < allSystems.length
                     ? allSystems[selectedIndex]
@@ -758,8 +765,9 @@ class SystemCardGridView extends StatefulWidget {
   /// go back to. A pushed host (the collections browser) pops itself here.
   final VoidCallback? onBackPressed;
 
-  /// X. Unbound on the systems screen; the collections browser opens its view
-  /// picker with it.
+  /// X. Search on the systems screen (with West, for AYN pads, whose West is
+  /// the button printed Y); the collections browser opens its view picker
+  /// with it.
   final VoidCallback? onXPressed;
 
   /// The West face button (X on an Xbox pad, Y on a Nintendo-style one). The

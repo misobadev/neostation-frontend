@@ -534,10 +534,15 @@ class AppScreenState extends State<AppScreen> with WidgetsBindingObserver {
   }
 
   /// X button: on the Settings tab this deletes the focused item (used to remove
-  /// imported themes). No-op elsewhere.
+  /// imported themes); on the Systems tab it opens Search, as the header's
+  /// button says. That only reaches here while the tab shows no systems view
+  /// (first run, an empty library, or behind the scan splash): the views open
+  /// Search themselves. No-op elsewhere.
   void _handleXButton() {
     if (_selectedTabIndex == AppTabs.settings) {
       NewSettingsScreen.deleteCurrent();
+    } else if (_selectedTabIndex == AppTabs.systems) {
+      unawaited(_openSearchFromHeader());
     }
   }
 
