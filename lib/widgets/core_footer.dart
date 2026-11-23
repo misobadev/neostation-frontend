@@ -126,6 +126,11 @@ class GamepadControl extends StatelessWidget {
   /// visible text.
   final String? semanticLabel;
 
+  /// A widget drawn in place of [icon] or [iconPath], in an 18 box. With an
+  /// empty [label] and no [trailingIcon] the control becomes a square of the
+  /// same height as a labelled one, glyph only.
+  final Widget? glyph;
+
   const GamepadControl({
     super.key,
     this.iconPath,
@@ -138,6 +143,7 @@ class GamepadControl extends StatelessWidget {
     this.busy = false,
     this.trailingIcon,
     this.semanticLabel,
+    this.glyph,
   });
 
   @override
@@ -148,6 +154,8 @@ class GamepadControl extends StatelessWidget {
     final Color buttonBg =
         backgroundColor ?? theme.colorScheme.onSurface.withValues(alpha: 0.1);
     final Color contentColor = textColor ?? theme.colorScheme.onPrimary;
+    final bool glyphOnly =
+        glyph != null && label.isEmpty && trailingIcon == null;
 
     final control = Material(
       color: Colors.transparent,
@@ -161,7 +169,9 @@ class GamepadControl extends StatelessWidget {
             BorderRadius.circular(6.r),
 
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 4.r),
+          padding: glyphOnly
+              ? EdgeInsets.all(4.r)
+              : EdgeInsets.symmetric(horizontal: 6.r, vertical: 4.r),
           decoration: BoxDecoration(
             color: gradient == null ? buttonBg : null,
             gradient: gradient,
@@ -189,6 +199,8 @@ class GamepadControl extends StatelessWidget {
                     valueColor: AlwaysStoppedAnimation<Color>(contentColor),
                   ),
                 )
+              else if (glyph != null)
+                SizedBox(width: 18.r, height: 18.r, child: glyph)
               // Material Design icon
               else if (icon != null)
                 Icon(icon, size: 12.r, color: contentColor)
@@ -220,7 +232,7 @@ class GamepadControl extends StatelessWidget {
                   ),
                 ),
               ],
-              SizedBox(width: 4.r),
+              if (!glyphOnly) SizedBox(width: 4.r),
             ],
           ),
         ),

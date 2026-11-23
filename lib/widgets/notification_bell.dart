@@ -9,6 +9,7 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/app_themes.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/widgets/core_footer.dart';
 
 /// Notification bell icon that opens a dropdown with all active global
 /// notifications, including their progress.
@@ -24,11 +25,6 @@ import 'package:neostation/utils/gamepad_nav.dart';
 /// one and B closes. See [_NotificationsDropdownMenuState].
 class NotificationBell extends StatefulWidget {
   const NotificationBell({super.key});
-
-  /// Side of the square button, before screen scaling. Matches the height of
-  /// the header's search button (an 18 glyph, 4 of padding and a 1 border
-  /// above and below).
-  static const double buttonSize = 28;
 
   @override
   State<NotificationBell> createState() => _NotificationBellState();
@@ -144,70 +140,51 @@ class _NotificationBellState extends State<NotificationBell>
       valueListenable: GlobalNotificationService().notifier,
       builder: (context, notifications, _) {
         final hasNotifications = notifications.isNotEmpty;
-        final radius =
-            Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
-            BorderRadius.circular(6.r);
-        // Same footprint as the header's search button: a square of that
-        // button's height, glyph only.
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _toggleDropdown(context),
-            canRequestFocus: false,
-            borderRadius: radius,
-            child: Container(
-              width: NotificationBell.buttonSize.r,
-              height: NotificationBell.buttonSize.r,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface
-                    .withValues(alpha: 0.1),
-                borderRadius: radius,
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.onSurface
-                      .withValues(alpha: 0.12),
-                  width: 1.r,
+        final colors = Theme.of(context).colorScheme;
+        // The shared footer/header button, in the search button's colours,
+        // glyph only: a square of that button's height.
+        return GamepadControl(
+          label: '',
+          semanticLabel: AppLocale.notifications.getString(context),
+          onTap: () => _toggleDropdown(context),
+          backgroundColor: colors.tertiaryFixed,
+          textColor: colors.onTertiaryFixed,
+          glyph: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              // FadeTransition rather than AnimatedBuilder + Opacity: it
+              // drives the opacity layer directly, so a running pulse
+              // repaints without rebuilding this subtree every frame.
+              // Parked at 1.0 (opaque) whenever the controller is stopped.
+              FadeTransition(
+                opacity: _pulseAnimation,
+                child: Icon(
+                  hasNotifications
+                      ? Symbols.notifications_active_rounded
+                      : Symbols.notifications_rounded,
+                  color: colors.onTertiaryFixed,
+                  size: 18.r,
                 ),
               ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // FadeTransition rather than AnimatedBuilder + Opacity: it
-                  // drives the opacity layer directly, so a running pulse
-                  // repaints without rebuilding this subtree every frame.
-                  // Parked at 1.0 (opaque) whenever the controller is stopped.
-                  FadeTransition(
-                    opacity: _pulseAnimation,
-                    child: Icon(
-                      hasNotifications
-                          ? Symbols.notifications_active_rounded
-                          : Symbols.notifications_rounded,
-                      color: hasNotifications
-                          ? AppThemes.getCustomColors(context).warningColor
-                          : Theme.of(context).colorScheme.onSurface,
-                      size: 18.r,
-                    ),
-                  ),
-                  if (hasNotifications)
-                    Positioned(
-                      top: 4.r,
-                      right: 4.r,
-                      child: Container(
-                        width: 7.r,
-                        height: 7.r,
-                        decoration: BoxDecoration(
-                          color: AppThemes.getCustomColors(context)
-                              .warningColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.surface,
-                            width: 1.r,
-                          ),
-                        ),
+              if (hasNotifications)
+                Positioned(
+                  top: -1.r,
+                  right: -1.r,
+                  child: Container(
+                    width: 7.r,
+                    height: 7.r,
+                    decoration: BoxDecoration(
+                      color: AppThemes.getCustomColors(context).warningColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: colors.tertiaryFixed,
+                        width: 1.r,
                       ),
                     ),
-                ],
-              ),
-            ),
+                  ),
+                ),
+            ],
           ),
         );
       },
