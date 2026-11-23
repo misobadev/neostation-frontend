@@ -107,12 +107,60 @@ void main() {
       bottomActivity,
       'override fun dispatchKeyEvent(event: KeyEvent): Boolean',
     );
+    // Swapped, it shows the main UI: the same handling as the top screen.
     expect(
       dispatch,
       matches(
         RegExp(
-          r'main\?\.let \{ if \(it\.handleGamepadKey\(event\)\) return true \}\s*'
+          r'if \(m\.handleGamepadKey\(event\)\) return true\s*'
           r'return super\.dispatchKeyEvent\(event\)',
+        ),
+      ),
+    );
+    // Showing the secondary UI, it forwards keys to the main UI, but a
+    // volume key the main UI leaves still goes to Android from here.
+    final forwarded = dispatch.indexOf(
+      'if (m.dispatchKeyFromSecondaryUi(event)) return true',
+    );
+    expect(forwarded, isNot(-1));
+    final volume = dispatch.indexOf(
+      'EventListener.isSystemKey(event.keyCode)',
+      forwarded,
+    );
+    expect(volume, isNot(-1));
+    expect(
+      dispatch.indexOf('super.dispatchKeyEvent(event)', volume),
+      isNot(-1),
+    );
+
+    final fromSecondary = body(
+      activity,
+      'internal fun dispatchKeyFromSecondaryUi(event: KeyEvent): Boolean',
+    );
+    final handled = fromSecondary.indexOf(
+      'if (handleGamepadKey(event)) return true',
+    );
+    final passOn = fromSecondary.indexOf(
+      'if (EventListener.isSystemKey(event.keyCode)) return false',
+    );
+    final toMainUi = fromSecondary.indexOf('superDispatchKeyEvent(event)');
+    expect(handled, isNot(-1));
+    expect(passOn, greaterThan(handled));
+    expect(toMainUi, greaterThan(passOn));
+  });
+
+  test('swapped, the top screen hands them to Android too', () {
+    final dispatch = body(
+      activity,
+      'override fun dispatchKeyEvent(keyEvent: KeyEvent): Boolean',
+    );
+    expect(
+      dispatch,
+      matches(
+        RegExp(
+          r'if \(dispatchKeyFromSecondaryUi\(keyEvent\)\) return true\s*'
+          r'return EventListener\.isSystemKey\(keyEvent\.keyCode\) && '
+          r'super\.dispatchKeyEvent\(keyEvent\)',
         ),
       ),
     );
