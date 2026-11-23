@@ -178,12 +178,13 @@ class Player {
   void dispose() => unawaited(disposeAsync());
 
   /// Completes after texture, callbacks and native player have been released.
-  Future<void> disposeAsync() => _disposeFuture ??= _dispose().catchError(
-        (Object error, StackTrace stack) {
-          _disposeFuture = null;
-          Error.throwWithStackTrace(error, stack);
-        },
-      );
+  Future<void> disposeAsync() => _disposeFuture ??= _dispose().catchError((
+    Object error,
+    StackTrace stack,
+  ) {
+    _disposeFuture = null;
+    Error.throwWithStackTrace(error, stack);
+  });
 
   Future<void> _dispose() async {
     if (_pp == nullptr) {
