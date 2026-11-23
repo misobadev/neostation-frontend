@@ -34,12 +34,16 @@ import java.lang.ref.WeakReference
  * closing.
  *
  * Rules this activity keeps:
- * - It never keeps the focused display while it shows the secondary UI. Its
- *   window is FLAG_NOT_FOCUSABLE (taps still work) and, whenever Android makes
- *   it the top resumed activity, focus is handed back to [MainActivity] so the
- *   gamepad keeps driving the top screen. With the screens swapped the roles
- *   flip: this window shows the main UI, takes focus and forwards keys through
- *   [MainActivity]'s gamepad handling.
+ * - The gamepad always drives the main UI. Android keeps one focused display
+ *   and moves it here when this activity starts, when an app on this display
+ *   closes, or on a tap. Keys that reach this window while it shows the
+ *   secondary UI go to the main UI ([MainActivity.dispatchKeyFromSecondaryUi])
+ *   and focus is handed back. With the screens swapped the roles flip: this
+ *   window shows the main UI, and the top one forwards here.
+ * - Its window stays focusable (see [focusFlagsFor]). Android treats the top
+ *   display that has a focused activity as the focused one even when that
+ *   activity's window cannot take focus, and then a key waits for a window
+ *   that never comes: NeoStation is reported as not responding after 5 s.
  * - BACK never finishes it.
  * - Its Flutter engine ([BottomScreenEngine]) outlives it, so a recreate does
  *   not restart the secondary UI.
@@ -62,7 +66,10 @@ class SecondaryDisplayActivity : Activity() {
     }
 
     private var flutterView: FlutterView? = null
-    private var notFocusable = false
+
+    /** Android's top resumed activity: this display is the focused one. */
+    var isTopResumed = false
+        private set
 
     /** True between onPause and the next onResume: something covers this screen. */
     var isCovered = false
@@ -120,21 +127,16 @@ class SecondaryDisplayActivity : Activity() {
         }
     }
 
-    /**
-     * Makes this window focusable only while it shows the main UI.
-     *
-     * Showing the secondary UI it is touch-only. FLAG_NOT_FOCUSABLE keeps a tap
-     * from moving the focused display here (which would take the gamepad away
-     * from the top screen), and FLAG_ALT_FOCUSABLE_IM keeps the window below an
-     * IME that firmware pins to this display (AYN Thor `ime_show_on_second`).
-     */
+    /** This window's side of the focus rule in [focusFlagsFor]. */
     fun applyFocusRole() {
-        val wantNotFocusable = main?.screensSwapped != true
-        if (wantNotFocusable == notFocusable) return
-        notFocusable = wantNotFocusable
-        val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
-        if (wantNotFocusable) window.addFlags(flags) else window.clearFlags(flags)
+        val m = main
+        val engine = m?.mainEngine
+        val showsMainUi = engine != null && flutterView?.attachedFlutterEngine === engine
+        val flags = focusFlagsFor(showsMainUi, mainUiCovered = m?.isMainUiCovered() == true)
+        window.setFlags(
+            flags,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
+        )
     }
 
     /** The view drawing this screen, for [MainActivity]'s screen swap. */
@@ -145,31 +147,58 @@ class SecondaryDisplayActivity : Activity() {
         val wasCovered = isCovered
         isCovered = false
         flutterView?.attachedFlutterEngine?.lifecycleChannel?.appIsResumed()
+        main?.onBottomScreenCoveredChanged()
         main?.onBottomScreenResumed(this, wasCovered)
     }
 
     override fun onPause() {
         super.onPause()
         isCovered = true
+        main?.onBottomScreenCoveredChanged()
     }
 
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
+        isTopResumed = isTopResumedActivity
         if (isTopResumedActivity) main?.onBottomScreenTopResumed(this)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && !showsMainUi()) main?.onSecondaryUiFocused()
+    }
+
+    private fun showsMainUi(): Boolean {
+        val engine = main?.mainEngine ?: return false
+        return flutterView?.attachedFlutterEngine === engine
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_BACK) return true
-        // Only reached while swapped (otherwise this window cannot take focus):
-        // the gamepad drives the main UI here, through the same handling the
-        // top screen uses.
-        main?.let { if (it.handleGamepadKey(event)) return true }
-        return super.dispatchKeyEvent(event)
+        val m = main ?: return super.dispatchKeyEvent(event)
+        if (showsMainUi()) {
+            // Swapped: the gamepad drives the main UI here, through the same
+            // handling the top screen uses.
+            if (m.handleGamepadKey(event)) return true
+            return super.dispatchKeyEvent(event)
+        }
+        if (m.dispatchKeyFromSecondaryUi(event)) return true
+        // Only volume keys and keys the main UI left fall through. The
+        // secondary UI is touch-only, so they never reach its view.
+        return if (org.flame_engine.gamepads_android.EventListener.isSystemKey(event.keyCode)) {
+            super.dispatchKeyEvent(event)
+        } else {
+            false
+        }
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        main?.let { if (it.handleGamepadMotion(event)) return true }
-        return super.dispatchGenericMotionEvent(event)
+        val m = main ?: return super.dispatchGenericMotionEvent(event)
+        if (showsMainUi()) {
+            if (m.handleGamepadMotion(event)) return true
+            return super.dispatchGenericMotionEvent(event)
+        }
+        return m.dispatchMotionFromSecondaryUi(event)
     }
 
     @Deprecated("Still routed on older platforms; BACK must never finish the bottom screen.")
@@ -199,6 +228,23 @@ class SecondaryDisplayActivity : Activity() {
         super.onDestroy()
     }
 }
+
+/**
+ * Window flags for one of the two screens. The window showing the main UI is
+ * plain focusable. The one showing the secondary UI is too, so that a key that
+ * reaches its display always has a window to go to (it forwards it to the main
+ * UI); only while a game or app covers the main UI's screen is it made not
+ * focusable, so a tap on it cannot take the gamepad away from that game.
+ * FLAG_ALT_FOCUSABLE_IM, paired with FLAG_NOT_FOCUSABLE, keeps the window
+ * below an IME that firmware pins to this display (AYN Thor
+ * `ime_show_on_second`); a plain focusable window already stays below it.
+ */
+internal fun focusFlagsFor(showsMainUi: Boolean, mainUiCovered: Boolean): Int =
+    if (!showsMainUi && mainUiCovered) {
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
+    } else {
+        0
+    }
 
 /**
  * The secondary UI's Flutter engine (the `subDisplay` entrypoint), shared by

@@ -15,20 +15,20 @@ Moved out of the root `CLAUDE.md` so it loads when you work under `android/` rat
 
 The secondary UI's engine is `BottomScreenEngine`. It is created from the plugin's `FlutterEngineGroup` with the `subDisplay` entrypoint, so the shared state works as before. It outlives the activity.
 
-**Focus.** Android 10 multi-resume keeps both activities resumed, but only one display is focused, and the focused display is where gamepad keys go. The bottom activity becomes the top resumed one when it starts and whenever an app on its display closes, which moves focus away from the top screen. `MainActivity.onBottomScreenTopResumed` hands focus back with `ActivityManager.moveTaskToFront`. That call needs `REORDER_TASKS`. Unlike `startActivity` with `REORDER_TO_FRONT`, it does not deliver a new intent, so `MainActivity` is not paused and resumed. It is skipped while `MainActivity` is covered on its own display (`isTopCovered`), so a game there is never pulled behind NeoStation.
+**Focus.** Android 10 multi-resume keeps both activities resumed, but only one display is focused, and the focused display is where gamepad keys go. The bottom activity becomes the top resumed one when it starts and whenever an app on its display closes, which moves focus away from the top screen. `MainActivity.focusMainUi` hands focus back with `ActivityManager.moveTaskToFront`. That call needs `REORDER_TASKS`. Unlike `startActivity` with `REORDER_TO_FRONT`, it does not deliver a new intent, so `MainActivity` is not paused and resumed. It is skipped while a game or app covers the main UI's screen, so a game there is never pulled behind NeoStation. Its retry checks whether the main UI's activity is top resumed (`isTopResumed`), not `hasWindowFocus()`: window focus is per display and stays true on a display that is not the focused one.
 
-The bottom window keeps `FLAG_NOT_FOCUSABLE | FLAG_ALT_FOCUSABLE_IM`:
-- A tap on the bottom screen does not move focus there.
-- An IME pinned to the bottom screen (AYN Thor `ime_show_on_second`) stays above the panel.
+**That handoff is best effort, so no window may be unable to take focus while its display can be focused.** On the AYN Thor `moveTaskToFront` often leaves the focused display on the bottom screen (display 4). Android picks the top display that has a focused *activity* as the focused one even when that activity's only window is `FLAG_NOT_FOCUSABLE`; a key then waits for a window that never comes (`InputDispatcher: Waiting because no window has focus but ActivityRecord{…SecondaryDisplayActivity} may eventually add a window`) and after 5 s NeoStation is reported as not responding. The `Presentation` never hit this because a dialog is not an activity. So `focusFlagsFor` keeps both windows focusable, and the window showing the secondary UI forwards every key and motion to the main UI (`MainActivity.dispatchKeyFromSecondaryUi`): `handleGamepadKey`, then the main UI window's `superDispatchKeyEvent`. Only volume keys stay with the window that got them. A key down there also hands focus back, and so does that window gaining focus, so the IME (which needs the focused display) works for the main UI's text fields.
+
+The window showing the secondary UI is made `FLAG_NOT_FOCUSABLE | FLAG_ALT_FOCUSABLE_IM` only while a game or app covers the main UI's screen (`isMainUiCovered`), so a tap on it cannot take the gamepad from that game. The pair keeps it below an IME pinned to its display (AYN Thor `ime_show_on_second`); a plain focusable window stays below it too. The AVD does not reproduce the hang: it always gives focus back to the top display.
 
 BACK is swallowed in both activities.
 
 **Swap screens** (General settings, `user_config.swap_screens`) trades the two Flutter engines between the two `FlutterView`s (`MainActivity.applyScreenSwap`). Both engines keep running; only where they draw changes. Moving the tasks between displays does not work: Android starts a second `MainActivity` with a second engine instead of moving the existing one.
 
 Focus follows the main UI. While swapped:
-- The bottom window is focusable and `MainActivity`'s is not.
+- The roles in `focusFlagsFor` flip: the bottom window shows the main UI, and `MainActivity`'s forwards to it.
 - Focus is handed to the bottom task.
-- The bottom activity forwards keys and motion through `MainActivity.handleGamepadKey`/`handleGamepadMotion`, so BACK swallowing, the launch block and the gamepads plugin behave the same.
+- The bottom activity runs keys and motion through `MainActivity.handleGamepadKey`/`handleGamepadMotion`, so BACK swallowing, the launch block and the gamepads plugin behave the same.
 - Dock apps open on the screen that shows the dock.
 
 `MainActivity` reads the setting from the database before `super.onCreate`, because `super.onCreate` starts the bottom screen.
