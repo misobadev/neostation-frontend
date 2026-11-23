@@ -27,9 +27,10 @@ double navStripWidth({
 
 /// Natural width of the right-hand status pill.
 ///
-/// Mirrors the row in `header.dart`: horizontal padding either side, the
-/// notification bell, a gap, optionally the clock glyph and its gap, the clock
-/// label, and optionally the battery block. Text widths are measured by the
+/// Mirrors the row in `header.dart`: horizontal padding either side,
+/// optionally the clock glyph and its gap, the clock
+/// label, and optionally the battery block. [bell] and [bellGap] cover a
+/// notification bell inside the pill; pass 0 when it lives elsewhere. Text widths are measured by the
 /// caller (they depend on the string, the locale and the text scaler), so this
 /// stays pure.
 ///
