@@ -13,8 +13,9 @@
 ///   inside [chordWindow] of the last one continues the current hold.
 /// * A hold that unlocked a chord must not also fire the tap action when it
 ///   ends, or every scrape would toggle the sound too.
-/// * Because of the pulsing, a tap can only be dispatched once [chordWindow]
-///   has passed with no chord — see [releaseSchedulesTap] and [tapStillValid].
+/// * Because of the pulsing, where chords exist a tap can only be dispatched
+///   once [chordWindow] has passed with no chord — see [releaseSchedulesTap]
+///   and [tapStillValid]. A layer with no chords fires it on release.
 ///
 /// This type is pure: it holds no timers and reads no clock. The caller passes
 /// the current time in and owns the deferred dispatch, which is what makes the
