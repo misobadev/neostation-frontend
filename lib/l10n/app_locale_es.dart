@@ -371,6 +371,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.exitConfirmation: '¿Seguro que quieres salir de NeoStation?',
   AppLocale.confirmExit: 'Confirmar salida',
   AppLocale.rescanAllFolders: 'Reescanear todas las carpetas de ROMs',
+  AppLocale.pullToRescan: 'Desliza para reescanear',
+  AppLocale.releaseToRescan: 'Suelta para reescanear',
   AppLocale.rescanAllFoldersSubtitle:
       'Buscar nuevos sistemas y ROMs manualmente',
   AppLocale.organizeMultiDiscGames: 'Organizar juegos multidisco',

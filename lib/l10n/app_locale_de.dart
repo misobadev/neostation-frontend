@@ -371,6 +371,8 @@ const Map<String, dynamic> appLocaleDe = {
       'Bist du sicher, dass du NeoStation beenden möchtest?',
   AppLocale.confirmExit: 'Beenden bestätigen',
   AppLocale.rescanAllFolders: 'Alle ROM-Ordner erneut scannen',
+  AppLocale.pullToRescan: 'Ziehen zum erneuten Scannen',
+  AppLocale.releaseToRescan: 'Loslassen zum erneuten Scannen',
   AppLocale.rescanAllFoldersSubtitle:
       'Manuell nach neuen Systemen und ROMs suchen',
   AppLocale.organizeMultiDiscGames: 'Mehrdisc-Spiele organisieren',

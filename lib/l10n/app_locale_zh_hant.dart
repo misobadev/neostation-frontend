@@ -334,6 +334,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.exitConfirmation: '您確定要離開 NeoStation 嗎？',
   AppLocale.confirmExit: '確認離開',
   AppLocale.rescanAllFolders: '重新掃描所有 ROM 資料夾',
+  AppLocale.pullToRescan: '下拉重新掃描',
+  AppLocale.releaseToRescan: '放開重新掃描',
   AppLocale.rescanAllFoldersSubtitle: '手動掃描新系統和 ROM',
   AppLocale.organizeMultiDiscGames: '整理多片遊戲',
   AppLocale.organizeMultiDiscGamesSubtitle: '自動為多片遊戲建立 .m3u 檔案，並將其整理到資料夾中',

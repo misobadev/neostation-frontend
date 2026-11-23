@@ -335,6 +335,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.exitConfirmation: 'NeoStationを終了してもよろしいですか？',
   AppLocale.confirmExit: '終了の確認',
   AppLocale.rescanAllFolders: 'すべての ROM フォルダを再スキャン',
+  AppLocale.pullToRescan: '引っ張って再スキャン',
+  AppLocale.releaseToRescan: '離して再スキャン',
   AppLocale.rescanAllFoldersSubtitle: '新しいシステムとROMを手動で検索',
   AppLocale.organizeMultiDiscGames: 'マルチディスクゲームを整理',
   AppLocale.organizeMultiDiscGamesSubtitle:
