@@ -27,6 +27,7 @@
       "nro",
       "nso",
       "nsp",
+      "nup",
       "xci"
     ]
   },
@@ -251,6 +252,17 @@
       "platforms": {
         "android": {
           "launch_arguments": "-n org.benjisc.android/org.kenjinx.android.MainActivity -a org.kenjinx.android.LAUNCH_GAME -e bootPath \"{file.path}\"\n"
+        }
+      }
+    },
+    {
+      "name": "Standalone Peanuts Native",
+      "unique_id": "switch.dev.nxnative.android.peanuts",
+      "description": "Supported extensions: nup.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n dev.nxnative.android.peanuts/dev.nxnative.android.peanuts.Launch -e game \"{file.path}\"\n"
         }
       }
     },
