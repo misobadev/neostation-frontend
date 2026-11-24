@@ -732,8 +732,12 @@ class _SystemEmulatorSettingsDialogState
         );
       }
 
+      if (!mounted) return;
       setState(() {
-        _displayItems = displayItems;
+        _displayItems = groupEmulatorsByAvailability(
+          displayItems,
+          isAndroid: Platform.isAndroid,
+        );
         _totalEmulators = _displayItems.length; // Now strictly UI items
 
         // Find selected index based on default
