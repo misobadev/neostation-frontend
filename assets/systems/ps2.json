@@ -272,7 +272,7 @@
       }
     },
     {
-      "name": "Standalone ARMSX2",
+      "name": "Standalone ARMSX2 (Deprecated)",
       "unique_id": "ps2.come.nanodata.armsx2",
       "description": "Supported extensions: iso, chd, gz, mdf, bin, ciso, img.",
       "is_retroachievements_compatible": false,
@@ -284,7 +284,7 @@
       }
     },
     {
-      "name": "Standalone ARMSX2 Refresh",
+      "name": "Standalone ARMSX2",
       "unique_id": "ps2.com.armsx2",
       "description": "Supported extensions: iso, chd, gz, mdf, bin, ciso, img.",
       "is_retroachievements_compatible": true,
