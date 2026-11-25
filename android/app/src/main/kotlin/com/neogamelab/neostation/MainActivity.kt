@@ -998,14 +998,21 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     /**
      * Maps the per-system/per-game screen setting to a display id.
      *
-     * Returns null (launch where Android would, as before the setting existed)
-     * when there is no preference or the device has a single screen, so
-     * single-screen handhelds never get a launch display forced on them.
      * "primary" is the default display (the top screen on the AYN Thor) and
      * "secondary" the first other display, the same rule the app dock uses.
+     *
+     * With no preference, a game opens where the main UI is: with Swap screens
+     * on that is the bottom screen, so the game takes the main UI's place, as
+     * it does without the swap, instead of covering Now Playing and the dock
+     * on the top one. Otherwise null: launch where Android would, as before
+     * the setting existed, so single-screen handhelds never get a launch
+     * display forced on them.
      */
     private fun resolveGameLaunchDisplay(launchDisplay: String?): Int? {
-        if (launchDisplay == null) return null
+        if (launchDisplay == null) {
+            if (!mainUiOnBottom()) return null
+            return SecondaryDisplayActivity.instance?.displayId?.takeIf { it >= 0 }
+        }
         val dm = getSystemService(android.content.Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
         val secondary = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY } ?: return null
         return when (launchDisplay) {

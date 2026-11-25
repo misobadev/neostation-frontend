@@ -59,4 +59,19 @@ void main() {
     final motion = body(main, 'internal fun dispatchMotionFromSecondaryUi(');
     expect(motion.indexOf('if (isMainUiCovered()) return true'), isNot(-1));
   });
+
+  // With Swap screens on, a game with no screen set opened on the default
+  // (top) display, over Now Playing and the dock, while the main UI below
+  // showed "Game executing" (AYN Thor, PR 855). It follows the main UI now.
+  test('with no launch screen set, a game opens where the main UI is', () {
+    final resolve = body(main, 'private fun resolveGameLaunchDisplay(');
+    final noSetting = resolve.indexOf('if (launchDisplay == null)');
+    expect(noSetting, isNot(-1));
+    final swapped = resolve.indexOf('mainUiOnBottom()', noSetting);
+    expect(swapped, greaterThan(noSetting));
+    expect(
+      resolve.indexOf('SecondaryDisplayActivity.instance?.displayId', swapped),
+      greaterThan(swapped),
+    );
+  });
 }
