@@ -33,7 +33,7 @@ dependencies:
   flutter_chd:
     path: packages/flutter_chd
 
-  file_picker: ^13.3.2
+  file_picker: ^13.4.1
   device_info_plus: ^13.3.0
   package_info_plus: ^10.2.2
   google_fonts: ^9.0.0
@@ -56,14 +56,14 @@ dependencies:
   # ignores 2.5+ until then.
   shared_preferences_android: ">=2.4.27 <2.5.0"
   http: ^1.6.0
-  flutter_svg: ^2.3.2
+  flutter_svg: ^2.5.0
   crypto: ^3.0.8
-  archive: ^4.6.0
+  archive: ^4.7.1
   web_socket_channel: ^3.0.3
   url_launcher: ^6.3.3
   widget_mask: ^1.0.0
   flutter_screenutil: 5.9.3
-  window_manager: ^0.6.0
+  window_manager: ^0.7.1
   permission_handler: ^12.0.3
   pointycastle: ^4.0.0
   sqlite3: ^3.8.0
