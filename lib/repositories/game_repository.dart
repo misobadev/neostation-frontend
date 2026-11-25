@@ -310,6 +310,26 @@ class GameRepository {
   static Future<List<String>> getAndroidGamePackages() =>
       SqliteService.getAndroidGamePackages();
 
+  /// Stores a pinned launcher shortcut as an Android Games entry. Re-pinning
+  /// the same shortcut refreshes the existing row.
+  static Future<void> saveAndroidShortcut({
+    required String romPath,
+    required String label,
+    required String intentJson,
+  }) => SqliteService.saveShortcut(
+    romPath: romPath,
+    label: label,
+    intentJson: intentJson,
+  );
+
+  /// The stored intent of a pinned shortcut row, or null for any other row.
+  static Future<String?> getShortcutIntent(String romPath) =>
+      SqliteService.getShortcutIntent(romPath);
+
+  /// Deletes a pinned shortcut row, leaving installed app rows alone.
+  static Future<void> deleteAndroidShortcut(String romPath) =>
+      SqliteService.deleteShortcut(romPath);
+
   static Future<List<DatabaseGameModel>> getAllGames() =>
       SqliteService.getAllGames();
 

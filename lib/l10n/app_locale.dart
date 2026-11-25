@@ -1028,6 +1028,7 @@ mixin AppLocale {
   static const String hintBack = 'hint_back';
   static const String androidGameHint = 'androidGameHint';
   static const String androidGameMarkApp = 'androidGameMarkApp';
+  static const String androidGameRemoveShortcut = 'androidGameRemoveShortcut';
   static const String hintPlay = 'hint_play';
   static const String hintFavorite = 'hint_favorite';
   static const String hintRandom = 'hint_random';

@@ -415,6 +415,25 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                         result.error("INVALID_ARGUMENTS", "Package name is required", null)
                     }
                 }
+                "launchShortcut" -> {
+                    val action = call.argument<String>("action")
+                    val packageName = call.argument<String>("package")
+                    if (packageName != null) {
+                        launchShortcut(
+                            action,
+                            packageName,
+                            call.argument<String>("shortcut"),
+                            call.argument<String>("component"),
+                            call.argument<String>("data"),
+                            result,
+                        )
+                    } else {
+                        result.error("INVALID_ARGUMENTS", "Package is required", null)
+                    }
+                }
+                "consumePendingShortcuts" -> {
+                    consumePendingShortcuts(result)
+                }
                 "getLastExitInfo" -> {
                     result.success(lastExitInfo())
                 }
@@ -1050,6 +1069,13 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     override fun onResume() {
         super.onResume()
 
+        // A pin can land while the app is already up; drain it now rather than
+        // waiting for the next cold start. The Dart side polls too, so this is
+        // an accelerator rather than the only path.
+        if (PendingShortcuts.hasPending(this)) {
+            methodChannel?.invokeMethod("androidShortcutsChanged", null)
+        }
+
         restoreSecondaryAfterHome()
 
         // Bring back the Now Playing panel if it was hidden for a dock-launched
@@ -1293,6 +1319,79 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         } catch (e: Exception) {
             result.error("LAUNCH_FAILED", e.message, null)
         }
+    }
+
+    /**
+     * Launches a pinned shortcut by [action] and [packageName], optionally with
+     * [data] or an explicit [component].
+     *
+     * A shortcut's target is another app's activity, so it cannot go through
+     * [launchPackage]; the rest matches — NEW_TASK, and the same brief gamepad
+     * block so the button that launched it does not leak into the app that just
+     * came up.
+     *
+     * The component is optional because a pinned shortcut comes back with its
+     * intent sanitised; the package plus the action and data are what route it.
+     */
+    private fun launchShortcut(
+        action: String?,
+        packageName: String,
+        shortcutId: String?,
+        component: String?,
+        data: String?,
+        result: MethodChannel.Result,
+    ) {
+        try {
+            // A pinned shortcut is launched by id: the system owns the intent,
+            // and the copy we were handed has it stripped.
+            if (!shortcutId.isNullOrEmpty() && action.isNullOrEmpty()) {
+                val apps: android.content.pm.LauncherApps? =
+                    getSystemService(android.content.pm.LauncherApps::class.java)
+                if (apps == null) {
+                    result.error("LAUNCH_FAILED", "No LauncherApps service", null)
+                    return
+                }
+                setGamepadBlockInternal(true, 2000, markGameActive = false)
+                apps.startShortcut(
+                    packageName,
+                    shortcutId,
+                    null,
+                    null,
+                    android.os.Process.myUserHandle(),
+                )
+                result.success(true)
+                return
+            }
+            val intent = Intent(action)
+            val explicit = component?.let {
+                android.content.ComponentName.unflattenFromString(it)
+            }
+            if (explicit != null) {
+                intent.component = explicit
+            } else {
+                intent.setPackage(packageName)
+            }
+            if (!data.isNullOrEmpty()) intent.data = android.net.Uri.parse(data)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            setGamepadBlockInternal(true, 2000, markGameActive = false)
+
+            startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("LAUNCH_FAILED", e.message, null)
+        }
+    }
+
+    /** Hands the queued pin requests to Dart and empties the queue. */
+    private fun consumePendingShortcuts(result: MethodChannel.Result) {
+        Thread {
+            val entries = try {
+                PendingShortcuts.consume(this)
+            } catch (e: Exception) {
+                emptyList<Map<String, Any?>>()
+            }
+            runOnUiThread { result.success(entries) }
+        }.start()
     }
 
     /**

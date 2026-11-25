@@ -12,3 +12,4 @@ NeoStation's features for enriching your library and playing games. This section
 - [RetroAchievements](/features/retroachievements/)
 - [Scraping & Metadata](/features/scraping-and-metadata/)
 - [NeoSync](/features/neosync/)
+- [Home screen shortcuts](/features/home-screen-shortcuts/)

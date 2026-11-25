@@ -753,6 +753,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.hintSettings: 'Impostazioni',
   AppLocale.hintBack: 'Indietro',
   AppLocale.androidGameMarkApp: 'Segna come app',
+  AppLocale.androidGameRemoveShortcut: 'Rimuovi scorciatoia',
   AppLocale.androidGameHint: 'Gioco',
   AppLocale.hintPlay: 'Gioca',
   AppLocale.hintFavorite: 'Preferito',

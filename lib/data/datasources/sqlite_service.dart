@@ -471,7 +471,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 193;
+  static const int _databaseVersion = 196;
 
   /// SQL predicate (over `user_roms` aliased `ur`) for an installed app the
   /// user marked as a game. See migration v191.
@@ -2097,6 +2097,10 @@ class SqliteService {
         -- Android apps only: 1 = the user marked it a game, listed under
         -- "Android Games" instead of the Android tab. See migration v191.
         is_android_game INTEGER DEFAULT 0,
+        -- Android rows only: JSON (`action`, `component`, `data`) for a pinned
+        -- launcher shortcut, which is launched by intent rather than by
+        -- package name. NULL on every other row. See migration v196.
+        shortcut_intent TEXT,
         id_ra INTEGER,
         ra_match_source TEXT,
         ra_hash_skipped TEXT,
@@ -5840,13 +5844,92 @@ class SqliteService {
   }
 
   /// The packages of the installed apps the user marked as games.
+  ///
+  /// Pinned shortcuts are excluded: they are rows too, but their `rom_path` is
+  /// a shortcut id rather than a package name, so callers that hand these to
+  /// `PackageManager` would choke on them.
   static Future<List<String>> getAndroidGamePackages() async {
     final db = await instance.database;
     final rows = await db.rawQuery(
       "SELECT ur.rom_path FROM user_roms ur WHERE ur.app_system_id = 'android' "
-      'AND $androidGameFlagSql',
+      'AND $androidGameFlagSql AND ur.shortcut_intent IS NULL',
     );
     return [for (final row in rows) row['rom_path'].toString()];
+  }
+
+  /// Stores a pinned launcher shortcut as an `android` row that is already
+  /// flagged as a game, so it lists under "Android Games" like any other
+  /// entry.
+  ///
+  /// [romPath] is deterministic (see `AndroidShortcutId`), so re-pinning the
+  /// same shortcut refreshes the row instead of duplicating it — and keeps the
+  /// favourite flag and play time the row already carries.
+  static Future<void> saveShortcut({
+    required String romPath,
+    required String label,
+    required String intentJson,
+  }) async {
+    final db = await instance.database;
+    final now = DateTime.now().toIso8601String();
+    final existing = await db.query(
+      'user_roms',
+      columns: ['rom_path'],
+      where: 'rom_path = ?',
+      whereArgs: [romPath],
+      limit: 1,
+    );
+    if (existing.isEmpty) {
+      await db.insert('user_roms', {
+        'app_system_id': SystemFolderNames.android,
+        'filename': romPath,
+        'rom_path': romPath,
+        'title_name': label,
+        'description': 'Android Shortcut',
+        'is_android_game': 1,
+        'shortcut_intent': intentJson,
+        'is_favorite': 0,
+        'play_time': 0,
+        'created_at': now,
+        'updated_at': now,
+      });
+      return;
+    }
+    await db.update(
+      'user_roms',
+      {
+        'title_name': label,
+        'shortcut_intent': intentJson,
+        'is_android_game': 1,
+        'updated_at': now,
+      },
+      where: 'rom_path = ?',
+      whereArgs: [romPath],
+    );
+  }
+
+  /// The stored intent JSON of a pinned shortcut row, or null for any other
+  /// row. This is the single "is a shortcut" test the launch path branches on.
+  static Future<String?> getShortcutIntent(String romPath) async {
+    final db = await instance.database;
+    final rows = await db.query(
+      'user_roms',
+      columns: ['shortcut_intent'],
+      where: 'rom_path = ?',
+      whereArgs: [romPath],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['shortcut_intent']?.toString();
+  }
+
+  /// Deletes a pinned shortcut row, leaving installed app rows alone.
+  static Future<void> deleteShortcut(String romPath) async {
+    final db = await instance.database;
+    await db.delete(
+      'user_roms',
+      where: 'rom_path = ? AND shortcut_intent IS NOT NULL',
+      whereArgs: [romPath],
+    );
   }
 
   /// Resets a game's play statistics (time and last played) to zero.

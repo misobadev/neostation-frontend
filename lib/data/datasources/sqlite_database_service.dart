@@ -808,8 +808,11 @@ class SqliteDatabaseService {
   }) async {
     try {
       final db = await SqliteService.getDatabase();
+      // Pinned shortcuts carry a `shortcut_intent` and are not installed
+      // packages, so the Android rescan must not read them as orphans.
       final existingRoms = await db.rawQuery(
-        'SELECT rom_path FROM user_roms WHERE app_system_id = ?',
+        'SELECT rom_path FROM user_roms WHERE app_system_id = ? '
+        'AND shortcut_intent IS NULL',
         [systemId],
       );
       if (existingRoms.isEmpty) {

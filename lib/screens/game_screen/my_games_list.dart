@@ -23,9 +23,11 @@ import 'dart:async';
 import 'dart:math';
 
 import '../../services/android_games_service.dart';
+import '../../services/android_shortcut_service.dart';
 
 import '../../services/game_service.dart';
 import '../../utils/auto_folder_upload_notice.dart';
+import '../../utils/android_shortcut_id.dart';
 import '../../utils/game_launch_utils.dart';
 import '../../services/music_player_service.dart';
 import '../../repositories/system_repository.dart';

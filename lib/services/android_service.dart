@@ -66,6 +66,60 @@ class AndroidService {
     }
   }
 
+  /// Drains the shortcuts another launcher asked NeoStation to pin.
+  ///
+  /// The queue lives on the Android side and is emptied by this call, so a
+  /// crash between the two halves loses nothing.
+  static Future<List<Map<String, dynamic>>> consumePendingShortcuts() async {
+    try {
+      final List<dynamic> entries = await _channel.invokeMethod(
+        'consumePendingShortcuts',
+      );
+      return [
+        for (final entry in entries)
+          (entry as Map).map((key, value) => MapEntry(key.toString(), value)),
+      ];
+    } on PlatformException catch (e) {
+      _log.e("Failed to read pending shortcuts: '${e.message}'.");
+      return const [];
+    }
+  }
+
+  /// Starts a pinned shortcut's own intent rather than a package launch.
+  ///
+  /// [packageName] routes it: a pinned shortcut comes back with its intent
+  /// sanitised, so the component is usually gone and the package plus the
+  /// action and data are what the target app's filters match on.
+  static Future<bool> launchShortcut({
+    required String packageName,
+    String? shortcutId,
+    String? action,
+    String? component,
+    String? data,
+  }) async {
+    try {
+      final bool result = await _channel.invokeMethod('launchShortcut', {
+        'package': packageName,
+        'shortcut': ?shortcutId,
+        'action': ?action,
+        'component': ?component,
+        'data': ?data,
+      });
+      return result;
+    } on PlatformException catch (e) {
+      _log.e("Failed to launch shortcut: '${e.message}'.");
+      return false;
+    }
+  }
+
+  /// Registers [onChanged] for the platform's "a pin is waiting" announcement.
+  static void setShortcutListener(VoidCallback? onChanged) {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'androidShortcutsChanged') onChanged?.call();
+      return null;
+    });
+  }
+
   /// Verifies whether an application with the given [packageName] is currently installed.
   static Future<bool> isPackageInstalled(String packageName) async {
     try {

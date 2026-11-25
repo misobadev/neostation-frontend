@@ -112,6 +112,29 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Cold-start half of "Add to Home Screen": the system starts this when
+             a launcher pins a shortcut and NeoStation is not running. -->
+        <activity
+            android:name=".PinShortcutActivity"
+            android:exported="true"
+            android:theme="@style/LaunchTheme"
+            android:excludeFromRecents="true"
+            android:noHistory="true">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Legacy add-to-home-screen broadcast, for launchers that never moved
+             to ShortcutManager.requestPinShortcut. -->
+        <receiver
+            android:name=".ShortcutReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.android.launcher.action.INSTALL_SHORTCUT" />
+            </intent-filter>
+        </receiver>
         
         <!-- FileProvider para compartir archivos con otros apps (emuladores standalone) -->
         <provider

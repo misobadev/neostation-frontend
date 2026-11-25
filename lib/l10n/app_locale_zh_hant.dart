@@ -673,6 +673,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.hintSettings: '設定',
   AppLocale.hintBack: '返回',
   AppLocale.androidGameMarkApp: '標記為應用程式',
+  AppLocale.androidGameRemoveShortcut: '移除捷徑',
   AppLocale.androidGameHint: '遊戲',
   AppLocale.hintPlay: '開始遊戲',
   AppLocale.hintFavorite: '收藏',

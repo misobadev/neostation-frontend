@@ -716,6 +716,9 @@ class SqliteMigrations {
       case 193:
         await _migrateToVersion193(db);
         break;
+      case 196:
+        await _migrateToVersion196(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7795,6 +7798,36 @@ class SqliteMigrations {
       _log.i('Migration v193 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v193: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Adds `user_roms.shortcut_intent`, which turns an `android` row into a
+  /// pinned launcher shortcut instead of an installed app.
+  ///
+  /// The value is JSON (`action`, `component`, `data`); NULL means an ordinary
+  /// row, so the column doubles as the "this is a shortcut" test that the
+  /// Android rescan and the launch path branch on.
+  ///
+  /// v194 and v195 are left free for branches already in flight above v193.
+  static Future<void> _migrateToVersion196(Database db) async {
+    _log.i('Migration v196: Adding user_roms.shortcut_intent');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_roms)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i('v196: user_roms is not present, nothing to do');
+        return;
+      }
+      if (!columns.contains('shortcut_intent')) {
+        db.execute('ALTER TABLE user_roms ADD COLUMN shortcut_intent TEXT');
+      }
+      _log.i('Migration v196 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v196: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }
