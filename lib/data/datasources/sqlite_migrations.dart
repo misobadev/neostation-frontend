@@ -740,8 +740,8 @@ class SqliteMigrations {
       case 193:
         await _migrateToVersion193(db);
         break;
-      case 194:
-        await _migrateToVersion194(db);
+      case 197:
+        await _migrateToVersion197(db);
         break;
       default:
         _log.w('No migration defined for version $version');
@@ -7840,10 +7840,15 @@ class SqliteMigrations {
     }
   }
 
-  /// Migration v194: `user_config.swap_screens`, the dual-screen "Swap
+  /// Migration v197: `user_config.swap_screens`, the dual-screen "Swap
   /// screens" setting (main interface on the bottom screen). Off by default.
-  static Future<void> _migrateToVersion194(Database db) async {
-    _log.i('Migration v194: Adding swap_screens to user_config');
+  ///
+  /// First written as v194, which open pull requests also claim (v194, v195
+  /// and v196 are taken by #881, #880 and #883), so it moved above them.
+  /// Idempotent, so a test device that already ran it as v194 gets nothing
+  /// new here, and one that took another branch's v194 still gets the column.
+  static Future<void> _migrateToVersion197(Database db) async {
+    _log.i('Migration v197: Adding swap_screens to user_config');
     try {
       // A device that ran main at v193 skips v192, so its table is created
       // here. Idempotent (`CREATE TABLE IF NOT EXISTS`).
@@ -7854,7 +7859,7 @@ class SqliteMigrations {
           .map((c) => c['name'].toString())
           .toSet();
       if (columns.isEmpty) {
-        _log.i('v194: user_config is not present, nothing to do');
+        _log.i('v197: user_config is not present, nothing to do');
         return;
       }
       if (!columns.contains('swap_screens')) {
@@ -7862,9 +7867,9 @@ class SqliteMigrations {
           'ALTER TABLE user_config ADD COLUMN swap_screens INTEGER DEFAULT 0',
         );
       }
-      _log.i('Migration v194 completed');
+      _log.i('Migration v197 completed');
     } catch (e, stackTrace) {
-      _log.e('Error in migration v194: $e');
+      _log.e('Error in migration v197: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

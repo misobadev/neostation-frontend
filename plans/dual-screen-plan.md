@@ -192,7 +192,7 @@ Lo que salió del spike en el AVD `NeoStation_Thor`:
 - **El foco del gamepad tiene que volver a la actividad que muestra la UI principal.** Se devuelve con `ActivityManager.moveTaskToFront` (permiso `REORDER_TASKS`), que no pausa la actividad. La ventana que muestra la UI secundaria es `FLAG_NOT_FOCUSABLE`.
 
 Cómo quedó:
-- **Ajuste:** General → "Intercambiar pantallas" (`user_config.swap_screens`, migración v194). Solo aparece en Android 10+ con una segunda pantalla. El lado nativo lo lee de la base al arrancar.
+- **Ajuste:** General → "Intercambiar pantallas" (`user_config.swap_screens`, migración v197). Solo aparece en Android 10+ con una segunda pantalla. El lado nativo lo lee de la base al arrancar.
 - **Juegos en la otra pantalla:** la sesión termina cuando la actividad de abajo vuelve al frente. Que el usuario toque NeoStation a mitad de partida ya no la termina (`GameSessionManager.gameOnOtherScreen`).
 - **Dock:** sin ocultar ni restaurar nada; la app tapa la actividad y, al cerrarse, la actividad vuelve. Con las pantallas intercambiadas, las apps del dock se abren en la pantalla del dock.
 - **Android 9 y anteriores:** se mantiene la `Presentation`, sin swap.
