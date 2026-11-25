@@ -65,6 +65,23 @@ Folders that already contain `.m3u` playlists are skipped during the scan.
 
 ## Installation
 
+### Arch Linux (community-maintained AUR packages)
+
+Two independently maintained packages are available from the Arch User Repository:
+
+- [`neostation-bin`](https://aur.archlinux.org/packages/neostation-bin) repackages the official Linux AppImage release.
+- [`neostation`](https://aur.archlinux.org/packages/neostation) builds NeoStation from release source, while retaining some prebuilt third-party components. Integrations that rely on compile-time settings may differ from official builds; see [Build-time Configuration](#build-time-configuration).
+
+Choose one package; they cannot be installed together. Review its PKGBUILD before installing. The AUR packaging is maintained independently of the NeoStation team and is not part of Arch Linux's official repositories.
+
+For example, with the `yay` AUR helper:
+
+```bash
+yay -S neostation-bin
+```
+
+To build the application from source instead, use `neostation` as the package name. Supported architectures and package-specific build requirements are listed on each AUR page.
+
 ### Linux (Flatpak)
 
 ```bash

@@ -372,6 +372,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.exitConfirmation: 'Are you sure you want to exit NeoStation?',
   AppLocale.confirmExit: 'Confirm Exit',
   AppLocale.rescanAllFolders: 'Rescan All ROM Folders',
+  AppLocale.pullToRescan: 'Pull to rescan',
+  AppLocale.releaseToRescan: 'Release to rescan',
   AppLocale.rescanAllFoldersSubtitle: 'Manually scan for new systems and ROMs',
   AppLocale.organizeMultiDiscGames: 'Organize Multi-Disc Games',
   AppLocale.organizeMultiDiscGamesSubtitle: 'Automatically creates .m3u files for multi disc games and organises them into folders',
@@ -1348,6 +1350,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.rommLoadMore: 'Load more',
   AppLocale.rommNoSystemMatch: 'No matching local system for this platform',
   AppLocale.rommPlatformUnsupported: 'Unsupported',
+  AppLocale.rommNotEnoughSpace: 'Not enough free space to unpack this game. Free up space in your ROM folder and try again.',
   AppLocale.rommNoWritableFolder: 'Could not write to your ROM folder. Grant "All files access" to NeoStation and try again.',
   AppLocale.rommNotConnected: 'Connect to a RomM server in Settings first',
   // Bulk "sync a whole platform/collection".

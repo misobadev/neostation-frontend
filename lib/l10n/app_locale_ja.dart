@@ -339,6 +339,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.exitConfirmation: 'NeoStationを終了してもよろしいですか？',
   AppLocale.confirmExit: '終了の確認',
   AppLocale.rescanAllFolders: 'すべての ROM フォルダを再スキャン',
+  AppLocale.pullToRescan: '引っ張って再スキャン',
+  AppLocale.releaseToRescan: '離して再スキャン',
   AppLocale.rescanAllFoldersSubtitle: '新しいシステムとROMを手動で検索',
   AppLocale.organizeMultiDiscGames: 'マルチディスクゲームを整理',
   AppLocale.organizeMultiDiscGamesSubtitle:
@@ -1275,6 +1277,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.rommLoadMore: 'さらに読み込む',
   AppLocale.rommNoSystemMatch: 'このプラットフォームに一致するローカルシステムがありません',
   AppLocale.rommPlatformUnsupported: '非対応',
+  AppLocale.rommNotEnoughSpace:
+      'このゲームを展開するための空き容量が足りません。ROM フォルダーの空き容量を増やしてから、もう一度お試しください。',
   AppLocale.rommNoWritableFolder:
       'ROM フォルダーに書き込めませんでした。NeoStation に「すべてのファイルへのアクセス」を許可してから、もう一度お試しください。',
   AppLocale.rommNotConnected: '先に設定で RomM サーバーに接続してください',

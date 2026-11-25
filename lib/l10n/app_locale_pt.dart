@@ -380,6 +380,8 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.exitConfirmation: 'Tem certeza que deseja sair do NeoStation?',
   AppLocale.confirmExit: 'Confirmar Saída',
   AppLocale.rescanAllFolders: 'Varrer todas as pastas de ROM novamente',
+  AppLocale.pullToRescan: 'Puxe para varrer novamente',
+  AppLocale.releaseToRescan: 'Solte para varrer novamente',
   AppLocale.rescanAllFoldersSubtitle:
       'Procurar novos sistemas e ROMs manualmente',
   AppLocale.organizeMultiDiscGames: 'Organizar jogos multi-disco',
@@ -1369,6 +1371,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.rommNoSystemMatch:
       'Nenhum sistema local corresponde a esta plataforma',
   AppLocale.rommPlatformUnsupported: 'Não compatível',
+  AppLocale.rommNotEnoughSpace: 'Não há espaço livre suficiente para descompactar este jogo. Libere espaço na sua pasta de ROMs e tente novamente.',
   AppLocale.rommNoWritableFolder: 'Não foi possível gravar na sua pasta de ROMs. Conceda "Acesso a Todos os Arquivos" ao NeoStation e tente novamente.',
   AppLocale.rommNotConnected:
       'Conecte-se a um servidor RomM em Configurações primeiro',

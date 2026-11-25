@@ -374,6 +374,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.exitConfirmation: 'Вы уверены, что хотите выйти из NeoStation?',
   AppLocale.confirmExit: 'Подтвердить выход',
   AppLocale.rescanAllFolders: 'Пересканировать все папки ROM',
+  AppLocale.pullToRescan: 'Потяните, чтобы пересканировать',
+  AppLocale.releaseToRescan: 'Отпустите, чтобы пересканировать',
   AppLocale.rescanAllFoldersSubtitle: 'Вручную искать новые системы и ROM',
   AppLocale.organizeMultiDiscGames: 'Организовать многодисковые игры',
   AppLocale.organizeMultiDiscGamesSubtitle: 'Автоматически создаёт файлы .m3u для многодисковых игр и организует их по папкам',
@@ -1350,6 +1352,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.rommNoSystemMatch:
       'Нет подходящей локальной системы для этой платформы',
   AppLocale.rommPlatformUnsupported: 'Не поддерживается',
+  AppLocale.rommNotEnoughSpace: 'Недостаточно свободного места, чтобы распаковать эту игру. Освободите место в папке с ROM и повторите попытку.',
   AppLocale.rommNoWritableFolder: 'Не удалось записать в папку с ROM. Предоставьте NeoStation «Доступ ко всем файлам» и повторите попытку.',
   AppLocale.rommNotConnected:
       'Сначала подключитесь к серверу RomM в Настройках',

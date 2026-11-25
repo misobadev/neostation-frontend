@@ -337,6 +337,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.exitConfirmation: '您确定要退出 NeoStation 吗？',
   AppLocale.confirmExit: '确认退出',
   AppLocale.rescanAllFolders: '重新扫描所有 ROM 文件夹',
+  AppLocale.pullToRescan: '下拉重新扫描',
+  AppLocale.releaseToRescan: '松开重新扫描',
   AppLocale.rescanAllFoldersSubtitle: '手动扫描新系统和 ROM',
   AppLocale.organizeMultiDiscGames: '整理多碟游戏',
   AppLocale.organizeMultiDiscGamesSubtitle: '自动为多碟游戏创建 .m3u 文件，并将其整理到文件夹中',
@@ -1248,6 +1250,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.rommLoadMore: '加载更多',
   AppLocale.rommNoSystemMatch: '没有与该平台匹配的本地系统',
   AppLocale.rommPlatformUnsupported: '不支持',
+  AppLocale.rommNotEnoughSpace: '可用空间不足，无法解压此游戏。请清理 ROM 文件夹所在的空间后重试。',
   AppLocale.rommNoWritableFolder: '无法写入你的 ROM 文件夹。请授予 NeoStation“所有文件访问权限”后重试。',
   AppLocale.rommNotConnected: '请先在设置中连接到 RomM 服务器',
   // Bulk "sync a whole platform/collection".

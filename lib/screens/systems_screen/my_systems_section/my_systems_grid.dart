@@ -23,7 +23,7 @@ import 'system_card.dart';
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../providers/file_provider.dart';
-import '../../../widgets/system_scan_progress_widget.dart';
+import '../../../providers/recent_games_cycler.dart';
 import '../../game_screen/my_games_list.dart';
 
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -34,7 +34,12 @@ import 'widgets/grid_loading_state.dart';
 import 'widgets/grid_empty_state.dart';
 
 import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/neo_glass.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/widgets/gooey_selector.dart';
+
+import 'widgets/recent_card_cycle.dart';
+
 import 'package:neostation/widgets/spring_selected_card.dart';
 
 import 'my_systems_carousel.dart';
@@ -107,6 +112,10 @@ class MySystems extends StatelessWidget {
       canPop: false, // Maintain application flow by preventing raw hardware back navigation.
       child: Consumer2<SqliteConfigProvider, SqliteDatabaseProvider>(
         builder: (context, configProvider, dbProvider, child) {
+          // The recent card's game comes from the shared cycler, so this host
+          // (and the footer it builds) repaints whenever the card moves on.
+          final cycler = context.watch<RecentGamesCycler?>();
+
           // PHASE 1: Blocking Initialization.
           // If a high-priority system scan is active (e.g., first run), show a blocking status.
           if (configProvider.isGlobalScanning) {
@@ -126,6 +135,7 @@ class MySystems extends StatelessWidget {
             final currentSystem = selectedIndex < allSystems.length
                 ? allSystems[selectedIndex]
                 : allSystems[0];
+            cycler?.setFocused(currentSystem.isGame);
 
             systemsWidget = Column(
               children: [
@@ -135,6 +145,10 @@ class MySystems extends StatelessWidget {
                     child: MySystemsCarousel(
                       selectedIndex: selectedIndex,
                       onCardTapped: onCardTapped,
+                      onLeftTrigger: () =>
+                          _cycleRecent(cycler, currentSystem, -1),
+                      onRightTrigger: () =>
+                          _cycleRecent(cycler, currentSystem, 1),
                       hideSystemLogos: configProvider.config.hideSystemLogos,
                       bindYButton: false,
                       onOptions: (index) {
@@ -170,20 +184,11 @@ class MySystems extends StatelessWidget {
             systemsWidget = _buildSystemsGrid(context, configProvider);
           }
 
-          // If a non-blocking background scan is active, overlay a progress
-          // toast above the grid. RetroAchievements matching reports through
-          // the global notification centre instead of adding a second row here.
-          if (!configProvider.isScanning) return systemsWidget;
-
-          return Column(
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: SystemScanProgressWidget(),
-              ),
-              Expanded(child: systemsWidget),
-            ],
-          );
+          // No scan progress of its own here: a scan puts the library back
+          // behind the centred NeoStation splash (see SystemContent), which
+          // already shows the progress. A second panel up here only flashed
+          // over the header while the splash faded in.
+          return systemsWidget;
         },
       ),
     );
@@ -215,6 +220,8 @@ class MySystems extends StatelessWidget {
     final currentSystem = selectedIndex < allSystems.length
         ? allSystems[selectedIndex]
         : allSystems[0];
+    final cycler = Provider.of<RecentGamesCycler?>(context, listen: false);
+    cycler?.setFocused(currentSystem.isGame);
 
     return Column(
       children: [
@@ -235,6 +242,8 @@ class MySystems extends StatelessWidget {
               onCardTapped: onCardTapped,
               systems: allSystems,
               bindYButton: false,
+              onLeftTrigger: () => _cycleRecent(cycler, currentSystem, -1),
+              onRightTrigger: () => _cycleRecent(cycler, currentSystem, 1),
               onYPressed: () =>
                   _openSystemOptions(context, currentSystem, configProvider),
               onWestPressed: () => _openSearch(context),
@@ -265,6 +274,18 @@ class MySystems extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// LT/RT: steps the recent card through the last few played games, but only
+  /// while it is the focused card. Elsewhere the triggers do nothing, as they
+  /// did before the card cycled.
+  static void _cycleRecent(
+    RecentGamesCycler? cycler,
+    SystemInfo current,
+    int delta,
+  ) {
+    if (!current.isGame) return;
+    cycler?.step(delta);
   }
 
   /// Opens the centered Options dialog for [system].
@@ -679,6 +700,8 @@ class SystemCardGridView extends StatefulWidget {
     this.selectedIndex = 0,
     this.onCardTapped,
     this.onEnterPressed,
+    this.onLeftTrigger,
+    this.onRightTrigger,
     this.onEscapePressed,
     this.onYPressed,
     this.onBackPressed,
@@ -716,6 +739,11 @@ class SystemCardGridView extends StatefulWidget {
   final int selectedIndex;
   final Function(int index)? onCardTapped;
   final VoidCallback? onEnterPressed;
+
+  /// LT and RT. Read on every press, like [onYPressed], so the host can rebind
+  /// them around the currently selected card.
+  final VoidCallback? onLeftTrigger;
+  final VoidCallback? onRightTrigger;
 
   /// Start. Opens the centered Options dialog on the systems screen; the
   /// collections browser opens its card menu with it.
@@ -842,6 +870,14 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
 
   /// Pull-to-refresh progress notifier (0.0 to 1.0).
   final ValueNotifier<double> _pullProgress = ValueNotifier(0.0);
+
+  /// How far the grid is pulled past its top, in pixels: the gap the pull
+  /// opens above the cards, which the rescan pill sits in.
+  final ValueNotifier<double> _pullExtent = ValueNotifier(0.0);
+
+  /// Set when a release triggers the rescan, so the pill does not come back
+  /// while the grid springs back to the top. Cleared when that scroll ends.
+  bool _pullTriggered = false;
   static const double _maxPull = 75.0;
   bool _pullReady = false;
 
@@ -966,7 +1002,18 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
         _ensureSelectedItemVisibleUniversal();
       }
       _updateSecondaryScreenName();
+    } else if (_selectedGamePath(oldWidget) != _selectedGamePath(widget)) {
+      // Same slot, different game: the recent card cycled while focused.
+      _updateSecondaryScreenName();
     }
+  }
+
+  /// ROM path of the game on the selected card, or null for a system card.
+  static String? _selectedGamePath(SystemCardGridView view) {
+    final i = view.selectedIndex;
+    if (i < 0 || i >= view.systems.length) return null;
+    final item = view.systems[i];
+    return item is SystemInfo ? item.gameModel?.romPath : null;
   }
 
   @override
@@ -1078,17 +1125,26 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
             onNotification: (notification) {
               if (notification is ScrollUpdateNotification) {
                 final pixels = notification.metrics.pixels;
-                if (pixels < 0) {
-                  _pullProgress.value = (-pixels / _maxPull).clamp(0.0, 1.0);
-                  if (_pullProgress.value >= 1.0) {
-                    _pullReady = true;
+                if (_pullTriggered) {
+                  // Springing back after a rescan was triggered.
+                } else if (pixels < 0) {
+                  final progress = (-pixels / _maxPull).clamp(0.0, 1.0);
+                  if (progress >= 1.0) _pullReady = true;
+                  // Once armed it stays armed until release, so the pill
+                  // keeps saying "release" rather than flipping back.
+                  _pullProgress.value = _pullReady ? 1.0 : progress;
+                  _pullExtent.value = -pixels;
+                } else {
+                  if (_pullProgress.value > 0 && !_pullReady) {
+                    _pullProgress.value = 0.0;
                   }
-                } else if (_pullProgress.value > 0 && !_pullReady) {
-                  _pullProgress.value = 0.0;
+                  _pullExtent.value = 0.0;
                 }
               } else if (notification is ScrollEndNotification) {
                 _pullReady = false;
+                _pullTriggered = false;
                 _pullProgress.value = 0.0;
+                _pullExtent.value = 0.0;
               }
               return false;
             },
@@ -1141,22 +1197,67 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
         return Stack(
           children: [
             grid,
+            // The rescan pill sits centred in the gap the pull opens above
+            // the cards, so it travels with them instead of floating over
+            // them, and fades in only once the gap is tall enough to hold it.
             ValueListenableBuilder<double>(
-              valueListenable: _pullProgress,
-              builder: (context, progress, child) {
-                return AnimatedOpacity(
-                  opacity: progress > 0 ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 150),
+              valueListenable: _pullExtent,
+              builder: (context, extent, child) {
+                if (extent <= 0) return const SizedBox.shrink();
+                final pillHeight = 32.r;
+                final ready = _pullProgress.value >= 1.0;
+                final colors = Theme.of(context).colorScheme;
+                return Positioned(
+                  top: ((extent - pillHeight) / 2).clamp(0.0, double.infinity),
+                  left: 0,
+                  right: 0,
                   child: IgnorePointer(
-                    child: Container(
-                      alignment: Alignment.topCenter,
-                      padding: EdgeInsets.only(top: 16.r),
-                      child: SizedBox(
-                        width: 32.r,
-                        height: 32.r,
-                        child: CircularProgressIndicator(
-                          value: progress >= 1.0 ? null : progress,
-                          strokeWidth: 3,
+                    child: Opacity(
+                      opacity: ((extent - pillHeight) / pillHeight).clamp(
+                        0.0,
+                        1.0,
+                      ),
+                      child: Center(
+                        child: NeoGlass(
+                          cornerRadius:
+                              Theme.of(context)
+                                  .extension<CornerRadii>()
+                                  ?.radiusExternalRadius ??
+                              14.r,
+                          tint: colors.surface,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14.r,
+                            vertical: 6.r,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Turns with the pull, one full turn to armed.
+                              Transform.rotate(
+                                angle: _pullProgress.value * 2 * 3.14159265,
+                                child: Icon(
+                                  Symbols.refresh_rounded,
+                                  size: 16.r,
+                                  color: ready
+                                      ? colors.primary
+                                      : colors.onSurface,
+                                ),
+                              ),
+                              SizedBox(width: 6.r),
+                              Text(
+                                (ready
+                                        ? AppLocale.releaseToRescan
+                                        : AppLocale.pullToRescan)
+                                    .getString(context),
+                                style: TextStyle(
+                                  color: colors.onSurface,
+                                  fontSize: 12.r,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.3.r,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1451,6 +1552,16 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
                       ? null
                       : () => _openMenuFor(cardIdx),
                 );
+            // The recent card slides between the last few played games. Only
+            // on the systems screen, the one host that binds the triggers:
+            // other hosts (Discovery's Game of the Week) also have game cards.
+            final Widget shownCard =
+                card.isGame && widget.onRightTrigger != null
+                ? RecentCardCycle(
+                    gameKey: card.gameModel?.romPath,
+                    card: cardWidget,
+                  )
+                : cardWidget;
 
             slots[cardIdx] = Rect.fromLTWH(left, top, width, cardHeight);
             cardWidgets.add(
@@ -1461,7 +1572,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
                 height: cardHeight,
                 child: _performanceMode
                     ? _buildCardNode(
-                        cardWidget: cardWidget,
+                        cardWidget: shownCard,
                         card: card,
                         cardIdx: cardIdx,
                         cardIsSelected: cardIsSelected,
@@ -1478,7 +1589,7 @@ class _SystemCardGridViewState extends State<SystemCardGridView>
                             child: ScaleAnimation(
                               scale: 0.97,
                               child: _buildCardNode(
-                                cardWidget: cardWidget,
+                                cardWidget: shownCard,
                                 card: card,
                                 cardIdx: cardIdx,
                                 cardIsSelected: cardIsSelected,

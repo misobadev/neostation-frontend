@@ -371,6 +371,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.exitConfirmation: 'Apakah Anda yakin ingin keluar dari NeoStation?',
   AppLocale.confirmExit: 'Konfirmasi Keluar',
   AppLocale.rescanAllFolders: 'Pindai ulang semua folder ROM',
+  AppLocale.pullToRescan: 'Tarik untuk memindai ulang',
+  AppLocale.releaseToRescan: 'Lepas untuk memindai ulang',
   AppLocale.rescanAllFoldersSubtitle: 'Cari sistem dan ROM baru secara manual',
   AppLocale.organizeMultiDiscGames: 'Atur game multi-disk',
   AppLocale.organizeMultiDiscGamesSubtitle: 'Secara otomatis membuat file .m3u untuk game multi-disk dan mengaturnya ke dalam folder',
@@ -1357,6 +1359,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.rommNoSystemMatch:
       'Tidak ada sistem lokal yang cocok untuk platform ini',
   AppLocale.rommPlatformUnsupported: 'Tidak didukung',
+  AppLocale.rommNotEnoughSpace: 'Ruang kosong tidak cukup untuk mengekstrak game ini. Kosongkan ruang di folder ROM Anda lalu coba lagi.',
   AppLocale.rommNoWritableFolder: 'Tidak dapat menulis ke folder ROM Anda. Berikan "Akses Semua File" ke NeoStation lalu coba lagi.',
   AppLocale.rommNotConnected:
       'Hubungkan ke server RomM di Pengaturan terlebih dahulu',

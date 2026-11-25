@@ -9,11 +9,12 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/app_themes.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/widgets/core_footer.dart';
 
 /// Notification bell icon that opens a dropdown with all active global
 /// notifications, including their progress.
 ///
-/// Designed to live in the top header next to the clock.
+/// Lives at the far left of the top header, before the search button.
 ///
 /// The dropdown is rendered through an [OverlayEntry] (not `showMenu`) so the
 /// notification list can rebuild live without `showMenu`'s `IntrinsicWidth`
@@ -39,8 +40,8 @@ class _NotificationBellState extends State<NotificationBell>
   /// Vertical gap between the bell icon and the top of the dropdown.
   static const double _dropdownGap = 14;
 
-  /// Inset of the dropdown from the right edge of the screen.
-  static const double _dropdownRightInset = 8;
+  /// Inset of the dropdown from the left edge of the screen.
+  static const double _dropdownLeftInset = 8;
 
   /// Half cycles the arrival pulse runs for. Six is three round trips.
   static const int _pulseHalfCycles = 6;
@@ -139,40 +140,46 @@ class _NotificationBellState extends State<NotificationBell>
       valueListenable: GlobalNotificationService().notifier,
       builder: (context, notifications, _) {
         final hasNotifications = notifications.isNotEmpty;
-        return GestureDetector(
+        final colors = Theme.of(context).colorScheme;
+        // The shared footer/header button, in the search button's colours,
+        // glyph only: a square of that button's height.
+        return GamepadControl(
+          label: '',
+          semanticLabel: AppLocale.notifications.getString(context),
           onTap: () => _toggleDropdown(context),
-          child: Stack(
+          backgroundColor: colors.tertiaryFixed,
+          textColor: colors.onTertiaryFixed,
+          glyph: Stack(
+            clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              // FadeTransition rather than AnimatedBuilder + Opacity: it drives
-              // the opacity layer directly, so a running pulse repaints without
-              // rebuilding this subtree every frame. Parked at 1.0 (opaque)
-              // whenever the controller is stopped.
+              // FadeTransition rather than AnimatedBuilder + Opacity: it
+              // drives the opacity layer directly, so a running pulse
+              // repaints without rebuilding this subtree every frame.
+              // Parked at 1.0 (opaque) whenever the controller is stopped.
               FadeTransition(
                 opacity: _pulseAnimation,
                 child: Icon(
                   hasNotifications
                       ? Symbols.notifications_active_rounded
                       : Symbols.notifications_rounded,
-                  color: hasNotifications
-                      ? AppThemes.getCustomColors(context).warningColor
-                      : Theme.of(context).colorScheme.onSurface,
-                  size: 14.r,
+                  color: colors.onTertiaryFixed,
+                  size: 18.r,
                 ),
               ),
               if (hasNotifications)
                 Positioned(
-                  top: 0,
-                  right: 0,
+                  top: -1.r,
+                  right: -1.r,
                   child: Container(
-                    width: 5.r,
-                    height: 5.r,
+                    width: 7.r,
+                    height: 7.r,
                     decoration: BoxDecoration(
                       color: AppThemes.getCustomColors(context).warningColor,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Theme.of(context).colorScheme.surface,
-                        width: 0.8.r,
+                        color: colors.tertiaryFixed,
+                        width: 1.r,
                       ),
                     ),
                   ),
@@ -211,7 +218,7 @@ class _NotificationBellState extends State<NotificationBell>
             ),
             Positioned(
               top: offset.dy + size.height + _dropdownGap,
-              right: _dropdownRightInset,
+              left: _dropdownLeftInset,
               child: _NotificationsDropdownMenu(onClose: _closeDropdown),
             ),
           ],

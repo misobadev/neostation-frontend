@@ -61,6 +61,13 @@ void main() {
   setUp(() async {
     db = await helper.setUp();
     await db.execute(SqliteMigrations.createAppRommRomMapTableSql);
+    // A root file only counts as a copy in a format the system launches.
+    for (final ext in ['sfc', 'm3u']) {
+      await db.execute('INSERT INTO app_system_extensions VALUES (?, ?)', [
+        'snes',
+        ext,
+      ]);
+    }
     root = await Directory.systemTemp.createTemp('romm_link_');
     romFolders = [root.path];
   });
@@ -77,6 +84,20 @@ void main() {
   }
 
   group('findLocalCopy', () {
+    test(
+      'a root file in a format the system does not launch is no copy',
+      () async {
+        // An archive kept after a failed install, say: it is not the game.
+        await put('snes', 'a.zip');
+        final provider = _PinnedSystem(_snes);
+        addTearDown(provider.dispose);
+        expect(
+          await provider.findLocalCopy(_rom(1, 'a.zip'), romFolders),
+          isNull,
+        );
+      },
+    );
+
     test('returns the directory and on-disk name of a matching file', () async {
       await put('snes', 'Chrono Trigger (USA).sfc');
       final provider = _PinnedSystem(_snes);

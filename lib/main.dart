@@ -1,3 +1,5 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:neostation/widgets/brand_logo.dart';
 import 'package:neostation/services/startup_language.dart';
 import 'package:neostation/widgets/west_button_glyph.dart';
@@ -13,6 +15,7 @@ import 'package:neostation/providers/discovery_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
+import 'package:neostation/providers/recent_games_cycler.dart';
 import 'package:neostation/screens/main_screen.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
@@ -44,6 +47,7 @@ import 'package:neostation/themes/anta_text_theme.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:neostation/utils/image_cache_budget.dart';
 import 'package:neostation/services/sfx_service.dart';
 
@@ -209,6 +213,76 @@ Future<void> _configureImageCache() async {
 /// created them. Used by [AppNotification] for progress notifications.
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// ` v1.0.0-rc.2+3002`, or empty when the platform can't say. Written on the
+/// startup line so every session in app.log names the build it ran.
+Future<String> _appVersionLabel() async {
+  try {
+    final info = await PackageInfo.fromPlatform();
+    return ' v${info.version}+${info.buildNumber}';
+  } catch (_) {
+    return '';
+  }
+}
+
+/// Sends framework and uncaught async errors to app.log.
+///
+/// They used to reach the console only, so a user's log showed nothing about
+/// an error even when the app misbehaved right after it.
+void _installErrorLogging(LoggerService log) {
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.dumpErrorToConsole(details);
+    log.e(
+      'Flutter error${details.library != null ? ' (${details.library})' : ''}',
+      error: details.exception,
+      stackTrace: details.stack,
+    );
+  };
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    log.e('Uncaught error', error: error, stackTrace: stack);
+    // Handled: an uncaught async error must not take the app down.
+    return true;
+  };
+}
+
+/// Logs why Android ended the previous session (crash, native crash, ANR,
+/// killed for memory, ...).
+///
+/// A native crash or a kill by the system never reaches app.log: the session
+/// just stops. Android keeps the reason, so it is read back here and the log
+/// says what happened to the session above it.
+Future<void> _logPreviousExitReason(LoggerService log) async {
+  if (!Platform.isAndroid) return;
+  try {
+    final info = await const MethodChannel('com.neogamelab.neostation/game')
+        .invokeMapMethod<String, Object?>('getLastExitInfo');
+    if (info == null) return;
+    final reason = info['reason'] as String? ?? 'UNKNOWN';
+    final time = info['timestamp'] is int
+        ? TimestampedPrinter.formatTime(
+            DateTime.fromMillisecondsSinceEpoch(info['timestamp'] as int),
+          )
+        : '?';
+    final description = info['description'] as String?;
+    final pss = info['pssKb'];
+    final message =
+        'Previous session ended: $reason at $time'
+        '${description != null && description.isNotEmpty ? ' ($description)' : ''}'
+        '${pss is int && pss > 0 ? ', memory ${pss ~/ 1024} MB' : ''}';
+    const clean = {'EXIT_SELF', 'USER_REQUESTED', 'USER_STOPPED'};
+    if (clean.contains(reason)) {
+      log.i(message);
+    } else {
+      log.w(message);
+    }
+    final trace = info['trace'] as String?;
+    if (trace != null && trace.isNotEmpty) {
+      log.w('Previous session crash trace:\n$trace');
+    }
+  } catch (e) {
+    log.w('Could not read previous exit reason: $e');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -228,7 +302,9 @@ void main() async {
   // opened before it was usable stayed off the file for the whole session.
   final log = LoggerService.instance;
   await log.init();
-  log.i('Starting NeoStation...');
+  log.i('Starting NeoStation...${await _appVersionLabel()}');
+  _installErrorLogging(log);
+  await _logPreviousExitReason(log);
   for (final note in storageNotes) {
     log.w(note);
   }
@@ -292,14 +368,6 @@ void main() async {
 
   // Inicializar fvp para soporte extendido de video (Windows, Linux, etc.)
   registerWith();
-
-  // Configurar manejo global de errores para evitar crashes
-  FlutterError.onError = (FlutterErrorDetails details) {
-    // Para otros errores, usar el handler por defecto en debug
-    if (details.stack != null) {
-      FlutterError.dumpErrorToConsole(details);
-    }
-  };
 
   // Configure fullscreen for mobile platforms
   if (Platform.isAndroid || Platform.isIOS) {
@@ -1199,6 +1267,7 @@ class _MyAppState extends State<MyApp> {
         // Lazy: the board is a full library scan, and it must not run at
         // startup for the many users who never open the tab.
         ChangeNotifierProvider(create: (context) => DiscoveryProvider()),
+        ChangeNotifierProvider(create: (context) => RecentGamesCycler()),
         ChangeNotifierProvider(
           // Eager: the systems carousel/grid paints the Collections card's game
           // count on the first frame it builds, and that card is on the very

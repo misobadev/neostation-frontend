@@ -341,6 +341,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.exitConfirmation: 'NeoStation을 종료하시겠습니까?',
   AppLocale.confirmExit: '종료',
   AppLocale.rescanAllFolders: '모든 ROM 폴더 다시 검색',
+  AppLocale.pullToRescan: '당겨서 다시 검색',
+  AppLocale.releaseToRescan: '놓아서 다시 검색',
   AppLocale.rescanAllFoldersSubtitle: '새로 추가된 시스템과 ROM을 수동으로 검색합니다',
   AppLocale.organizeMultiDiscGames: '멀티 디스크 게임 정리',
   AppLocale.organizeMultiDiscGamesSubtitle:
@@ -1283,6 +1285,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.rommLoadMore: '더 불러오기',
   AppLocale.rommNoSystemMatch: '이 플랫폼과 일치하는 로컬 시스템이 없습니다',
   AppLocale.rommPlatformUnsupported: '지원되지 않음',
+  AppLocale.rommNotEnoughSpace:
+      '이 게임의 압축을 풀 여유 공간이 부족합니다. ROM 폴더의 공간을 확보한 후 다시 시도하세요.',
   AppLocale.rommNoWritableFolder:
       'ROM 폴더에 쓸 수 없습니다. NeoStation에 "모든 파일 액세스" 권한을 허용한 후 다시 시도하세요.',
   AppLocale.rommNotConnected: '먼저 설정에서 RomM 서버에 연결하세요',

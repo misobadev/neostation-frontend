@@ -337,6 +337,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.exitConfirmation: '您確定要離開 NeoStation 嗎？',
   AppLocale.confirmExit: '確認離開',
   AppLocale.rescanAllFolders: '重新掃描所有 ROM 資料夾',
+  AppLocale.pullToRescan: '下拉重新掃描',
+  AppLocale.releaseToRescan: '放開重新掃描',
   AppLocale.rescanAllFoldersSubtitle: '手動掃描新系統和 ROM',
   AppLocale.organizeMultiDiscGames: '整理多片遊戲',
   AppLocale.organizeMultiDiscGamesSubtitle: '自動為多片遊戲建立 .m3u 檔案，並將其整理到資料夾中',
@@ -1247,6 +1249,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.rommLoadMore: '載入更多',
   AppLocale.rommNoSystemMatch: '沒有與此平台相符的本機系統',
   AppLocale.rommPlatformUnsupported: '不支援',
+  AppLocale.rommNotEnoughSpace: '可用空間不足，無法解壓縮此遊戲。請清出 ROM 資料夾所在的空間後再試一次。',
   AppLocale.rommNoWritableFolder:
       '無法寫入你的 ROM 資料夾。請授予 NeoStation「所有檔案存取權限」後再試一次。',
   AppLocale.rommNotConnected: '請先在設定中連線到 RomM 伺服器',

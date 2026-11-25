@@ -83,7 +83,7 @@ class LoggerService {
 
       _logger = Logger(
         level: Level.info,
-        printer: RedactingPrinter(SimplePrinter(colors: true)),
+        printer: RedactingPrinter(TimestampedPrinter()),
         filter: CustomProductionFilter(),
         output: MultiOutput([
           ConsoleOutput(),
@@ -267,6 +267,63 @@ class RedactingPrinter extends LogPrinter {
   @override
   List<String> log(LogEvent event) =>
       _inner.log(event).map(redactSecrets).toList();
+}
+
+/// One plain line per event for the log file: local date and time, level and
+/// message, then the error and the top of its stack trace when there is one.
+///
+/// No ANSI colors: the file is read in text editors and attached to bug
+/// reports. The date is what lets a user's log be matched against the moment
+/// they saw a crash, and the stack is what makes an error line actionable.
+class TimestampedPrinter extends LogPrinter {
+  TimestampedPrinter({this.maxStackFrames = 12});
+
+  /// How many stack frames an error keeps; the rest is rarely useful and a
+  /// repeated failure would otherwise flood the file.
+  final int maxStackFrames;
+
+  static const _labels = {
+    Level.trace: 'T',
+    Level.debug: 'D',
+    Level.info: 'I',
+    Level.warning: 'W',
+    Level.error: 'E',
+    Level.fatal: 'F',
+  };
+
+  @override
+  List<String> log(LogEvent event) {
+    final label = _labels[event.level] ?? '?';
+    final message = event.message is Function
+        ? (event.message as Function)().toString()
+        : event.message.toString();
+    final error = event.error != null ? '  ERROR: ${event.error}' : '';
+    final lines = ['${formatTime(event.time)} [$label] $message$error'];
+
+    final stack = event.stackTrace;
+    if (stack != null) {
+      final frames = stack
+          .toString()
+          .split('\n')
+          .where((l) => l.trim().isNotEmpty)
+          .toList();
+      for (final frame in frames.take(maxStackFrames)) {
+        lines.add('    $frame');
+      }
+      if (frames.length > maxStackFrames) {
+        lines.add('    ... ${frames.length - maxStackFrames} more frames');
+      }
+    }
+    return lines;
+  }
+
+  /// `2026-11-22 18:13:49.594`, in local time.
+  static String formatTime(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    String three(int n) => n.toString().padLeft(3, '0');
+    return '${t.year}-${two(t.month)}-${two(t.day)} '
+        '${two(t.hour)}:${two(t.minute)}:${two(t.second)}.${three(t.millisecond)}';
+  }
 }
 
 /// Custom log filter that permits INFO level logs even in production/release environments.
