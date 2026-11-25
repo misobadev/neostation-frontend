@@ -743,6 +743,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.hintSettings: 'Настройки',
   AppLocale.hintBack: 'Назад',
   AppLocale.androidGameMarkApp: 'Отметить как приложение',
+  AppLocale.androidGameRemoveShortcut: 'Удалить ярлык',
   AppLocale.androidGameHint: 'Игра',
   AppLocale.hintPlay: 'Играть',
   AppLocale.hintFavorite: 'Избранное',

@@ -25,6 +25,7 @@ import 'package:neostation/sync/providers/neo_sync_adapter.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:neostation/services/notification_service.dart';
 import 'package:neostation/services/game_service.dart';
+import 'package:neostation/services/android_shortcut_service.dart';
 import 'package:neostation/services/secondary_apps_service.dart';
 import 'package:neostation/repositories/config_repository.dart';
 import 'package:neostation/repositories/scraper_repository.dart';
@@ -559,6 +560,14 @@ void main() async {
       neoSyncProvider: neoSyncProvider,
       rommProvider: rommProvider,
       themeProvider: themeProvider,
+    ),
+  );
+
+  // Drain any shortcut a launcher pinned while we were away, and keep listening
+  // for new ones: "Add to Home Screen" from another launcher resolves to us.
+  unawaited(
+    AndroidShortcutService.start(
+      refresh: sqliteConfigProvider.refreshAndroidGamesSystem,
     ),
   );
 

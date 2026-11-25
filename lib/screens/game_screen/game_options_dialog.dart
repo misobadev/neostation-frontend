@@ -19,6 +19,7 @@ enum GameOptionsAction {
   scrape,
   identify,
   markAsApp,
+  removeShortcut,
   search,
   random,
   newCollection,
@@ -39,6 +40,7 @@ Future<GameOptionsAction?> showGameOptionsDialog({
   required bool canIdentify,
   required String? createTargetLabel,
   bool canMarkAsApp = false,
+  bool canRemoveShortcut = false,
 }) async {
   final navigator = Navigator.of(context, rootNavigator: true);
   if (_gameOptionsDialogs[navigator] == true) return null;
@@ -58,6 +60,7 @@ Future<GameOptionsAction?> showGameOptionsDialog({
             canIdentify: canIdentify,
             createTargetLabel: createTargetLabel,
             canMarkAsApp: canMarkAsApp,
+            canRemoveShortcut: canRemoveShortcut,
           ),
       transitionBuilder: (context, animation, secondaryAnimation, child) {
         final curved = CurvedAnimation(
@@ -92,6 +95,7 @@ class GameOptionsDialog extends StatefulWidget {
     required this.canIdentify,
     required this.createTargetLabel,
     this.canMarkAsApp = false,
+    this.canRemoveShortcut = false,
   });
 
   final String gameTitle;
@@ -103,6 +107,10 @@ class GameOptionsDialog extends StatefulWidget {
   /// Android Games only: offers "Mark as App", which sends the game back to
   /// the Android tab.
   final bool canMarkAsApp;
+
+  /// Pinned shortcut rows only: offers "Remove shortcut", which deletes the
+  /// entry and its cached icon.
+  final bool canRemoveShortcut;
 
   @override
   State<GameOptionsDialog> createState() => _GameOptionsDialogState();
@@ -197,6 +205,15 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
             id: 'mark_as_app',
             label: AppLocale.androidGameMarkApp.getString(context),
             icon: Symbols.apps_rounded,
+            action: true,
+          ),
+        ),
+      if (widget.canRemoveShortcut)
+        _MenuEntry.row(
+          _OptionRow(
+            id: 'remove_shortcut',
+            label: AppLocale.androidGameRemoveShortcut.getString(context),
+            icon: Symbols.link_off_rounded,
             action: true,
           ),
         ),
@@ -407,6 +424,8 @@ class _GameOptionsDialogState extends State<GameOptionsDialog> {
         return;
       case 'mark_as_app':
         Navigator.of(context).pop(GameOptionsAction.markAsApp);
+      case 'remove_shortcut':
+        Navigator.of(context).pop(GameOptionsAction.removeShortcut);
         return;
       case 'search':
         Navigator.of(context).pop(GameOptionsAction.search);

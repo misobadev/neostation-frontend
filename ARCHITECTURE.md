@@ -107,6 +107,7 @@ Database migrations are versioned in `lib/data/datasources/sqlite_migrations.dar
 - **Android**: Uses immersive sticky mode, landscape lock, and a custom directory picker for Android TV.
 - **Dual-screen handhelds (Android)**: the secondary display runs a second Flutter engine (`subDisplay()` entrypoint in `main.dart`, via the `sub_screen` package) rendering `lib/screens/secondary_screen/`. It is a separate isolate: no shared memory with the main engine — state is shared only through the SQLite database.
 - **Gamepad input**: Handled via the local `gamepads` plugin with custom navigation logic in `lib/utils/gamepad_nav.dart`.
+- **Home-screen pins (Android)**: NeoStation declares `category.HOME`, so another launcher's "Add to Home Screen" resolves to it. `PinShortcutActivity` (`CONFIRM_PIN_SHORTCUT`) and `ShortcutReceiver` (legacy `INSTALL_SHORTCUT`) queue the request in `PendingShortcuts`; `AndroidShortcutService` drains it into an `android` row whose `rom_path` is a shortcut id and whose `shortcut_intent` holds the launch JSON. Such rows are flagged `is_android_game`, so they list under Android Games, and the Android rescan skips them because they are not installed packages.
 
 ## Local Packages (Vendored)
 

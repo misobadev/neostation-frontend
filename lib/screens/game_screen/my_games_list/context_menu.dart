@@ -119,6 +119,9 @@ extension _ContextMenu on _SystemGamesListState {
       canMarkAsApp:
           widget.system.folderName == SystemFolderNames.androidGames &&
           (game.romPath?.isNotEmpty ?? false),
+      // Pinned shortcut rows only: they are the entries that can be removed
+      // without touching an installed app.
+      canRemoveShortcut: AndroidShortcutId.isShortcut(game.romPath),
     );
 
     _deferFavoriteReseat = false;
@@ -134,6 +137,12 @@ extension _ContextMenu on _SystemGamesListState {
       case GameOptionsAction.markAsApp:
         // The game leaves this list, so the reload below seats the rest.
         if (await _markSelectedAsApp(game)) reloadWhenClosed = true;
+      case GameOptionsAction.removeShortcut:
+        final shortcutPath = game.romPath;
+        if (shortcutPath != null) {
+          await AndroidShortcutService.remove(shortcutPath);
+          reloadWhenClosed = true;
+        }
       case GameOptionsAction.search:
         await _openSearchFromMenu();
       case GameOptionsAction.random:
@@ -156,7 +165,10 @@ extension _ContextMenu on _SystemGamesListState {
       // Marking the last game as an app removes the Android Games card, so
       // there is nothing left here: go back to Systems rather than show the
       // "no ROMs found" empty state.
-      if (mounted && action == GameOptionsAction.markAsApp && _games.isEmpty) {
+      if (mounted &&
+          (action == GameOptionsAction.markAsApp ||
+              action == GameOptionsAction.removeShortcut) &&
+          _games.isEmpty) {
         await _goBack();
       }
       return;

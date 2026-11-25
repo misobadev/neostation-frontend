@@ -686,6 +686,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.hintSettings: '設定',
   AppLocale.hintBack: '戻る',
   AppLocale.androidGameMarkApp: 'アプリとして登録',
+  AppLocale.androidGameRemoveShortcut: 'ショートカットを削除',
   AppLocale.androidGameHint: 'ゲーム',
   AppLocale.hintPlay: 'プレイ',
   AppLocale.hintFavorite: 'お気に入り',

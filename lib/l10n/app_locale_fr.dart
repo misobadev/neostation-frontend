@@ -755,6 +755,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.hintSettings: 'Paramètres',
   AppLocale.hintBack: 'Retour',
   AppLocale.androidGameMarkApp: 'Marquer comme application',
+  AppLocale.androidGameRemoveShortcut: 'Supprimer le raccourci',
   AppLocale.androidGameHint: 'Jeu',
   AppLocale.hintPlay: 'Jouer',
   AppLocale.hintFavorite: 'Favori',

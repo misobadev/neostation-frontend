@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_localization/flutter_localization.dart';
@@ -15,6 +16,7 @@ import '../../models/core_emulator_model.dart';
 import '../../repositories/emulator_repository.dart';
 import '../../repositories/game_repository.dart';
 import '../../utils/emulator_loader.dart';
+import '../../utils/android_shortcut_id.dart';
 import '../config_service.dart';
 import '../android_service.dart';
 import '../launcher_service.dart';
@@ -72,6 +74,45 @@ class GameLaunchService {
     GameModel game,
   ) async {
     try {
+      // A pinned shortcut is an `android` row too, but its `rom_path` is a
+      // shortcut id rather than a package name, so it has to be recognised
+      // before the package branch below tries to hand it to PackageManager.
+      if (Platform.isAndroid && AndroidShortcutId.isShortcut(game.romPath)) {
+        final stored = await GameRepository.getShortcutIntent(game.romPath!);
+        if (!context.mounted) return GameLaunchResult.failure('', '');
+        final intent = stored == null
+            ? null
+            : jsonDecode(stored) as Map<String, dynamic>;
+        final packageName = intent?['package']?.toString();
+        final shortcutId = intent?['shortcut']?.toString();
+        final action = intent?['action']?.toString();
+        if (packageName == null || (shortcutId == null && action == null)) {
+          return GameLaunchResult.failure(
+            AppLocale.failedToLaunchAndroidApp.getString(context),
+            game.romPath,
+          );
+        }
+
+        GameSessionManager.registerGameLaunch(system, game, 'android_shortcut');
+        await FavoritesService.recordGamePlayed(game);
+
+        final success = await AndroidService.launchShortcut(
+          packageName: packageName,
+          shortcutId: shortcutId,
+          action: action,
+          component: intent?['component']?.toString(),
+          data: intent?['data']?.toString(),
+        );
+        if (!context.mounted) return GameLaunchResult.failure('', '');
+        if (success) {
+          return GameLaunchResult.success();
+        }
+        return GameLaunchResult.failure(
+          AppLocale.failedToLaunchAndroidApp.getString(context),
+          game.romPath,
+        );
+      }
+
       if (Platform.isAndroid &&
           SystemFolderNames.isAndroidApps(system.folderName)) {
         if (game.romPath == null) {
