@@ -1063,7 +1063,14 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
         isTopResumed = isTopResumedActivity
+        applyOwnFocusRole()
         if (!isTopResumedActivity) return
+        // Swapped, this window shows the secondary UI: same stranded case as
+        // the bottom screen's in onBottomScreenTopResumed.
+        if (mainUiOnBottom() && isMainUiCovered()) {
+            android.util.Log.i("MainActivity", "focus on the secondary UI while the main UI is covered")
+            BottomScreenEngine.showControllerHint()
+        }
         // Focus coming back while a game runs on the other screen means the
         // user is back in NeoStation (or the game closed) — unless the bottom
         // screen tracks that game, which reports the close exactly.
@@ -1098,6 +1105,13 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
      * swapped, or the gamepad would stay on the bottom screen.
      */
     internal fun onBottomScreenTopResumed(bottom: SecondaryDisplayActivity) {
+        if (!mainUiOnBottom() && isMainUiCovered()) {
+            // A dock app closed while a game covers the top screen: Android
+            // left focus here, and NeoStation cannot give it to the game.
+            android.util.Log.i("MainActivity", "focus on the secondary UI while the main UI is covered")
+            BottomScreenEngine.showControllerHint()
+            return
+        }
         if (!screensSwapped && !isTopCovered) focusMainUi("bottom screen top resumed")
     }
 
@@ -1150,6 +1164,15 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
      * target, and Android reports the app as not responding after 5 s.
      */
     internal fun dispatchKeyFromSecondaryUi(event: KeyEvent): Boolean {
+        if (isMainUiCovered()) {
+            // The main UI is behind a game or app: driving it would move a
+            // screen nobody sees. Drop the key and point at the game's screen.
+            if (EventListener.isSystemKey(event.keyCode)) return false
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                BottomScreenEngine.showControllerHint()
+            }
+            return true
+        }
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
             handBackFocus("key on the secondary UI")
         }
@@ -1161,6 +1184,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
 
     /** Motion counterpart of [dispatchKeyFromSecondaryUi]. */
     internal fun dispatchMotionFromSecondaryUi(event: MotionEvent): Boolean {
+        if (isMainUiCovered()) return true
         if (handleGamepadMotion(event)) return true
         return mainUiWindow()?.superDispatchGenericMotionEvent(event) ?: false
     }
@@ -1281,7 +1305,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     /** This window's side of the focus rule in [focusFlagsFor]. */
     private fun applyOwnFocusRole() {
         val showsMainUi = !mainUiOnBottom()
-        val flags = focusFlagsFor(showsMainUi, mainUiCovered = isMainUiCovered())
+        val flags = focusFlagsFor(showsMainUi, mainUiCovered = isMainUiCovered(), focusedHere = isTopResumed)
         val all = android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             android.view.WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
         window.setFlags(flags, all)

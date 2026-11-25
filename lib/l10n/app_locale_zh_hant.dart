@@ -311,6 +311,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.disableSecondaryScreenSub: '在副螢幕上關閉應用程式',
   AppLocale.swapScreens: '交換螢幕',
   AppLocale.swapScreensSub: '在下螢幕顯示 NeoStation，在上螢幕顯示 Now Playing 與 Dock',
+  AppLocale.controllerHintTapGame: '輕觸遊戲所在的螢幕，將手把交還給遊戲',
   AppLocale.bartopShutdown: '離開時關閉 BarTOP',
   AppLocale.bartopShutdownSubtitle: '離開應用程式時關閉電腦',
 

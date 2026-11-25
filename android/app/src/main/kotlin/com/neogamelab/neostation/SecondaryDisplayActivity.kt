@@ -132,7 +132,11 @@ class SecondaryDisplayActivity : Activity() {
         val m = main
         val engine = m?.mainEngine
         val showsMainUi = engine != null && flutterView?.attachedFlutterEngine === engine
-        val flags = focusFlagsFor(showsMainUi, mainUiCovered = m?.isMainUiCovered() == true)
+        val flags = focusFlagsFor(
+            showsMainUi,
+            mainUiCovered = m?.isMainUiCovered() == true,
+            focusedHere = isTopResumed,
+        )
         window.setFlags(
             flags,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
@@ -160,6 +164,7 @@ class SecondaryDisplayActivity : Activity() {
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
         isTopResumed = isTopResumedActivity
+        applyFocusRole()
         if (isTopResumedActivity) main?.onBottomScreenTopResumed(this)
     }
 
@@ -235,12 +240,20 @@ class SecondaryDisplayActivity : Activity() {
  * reaches its display always has a window to go to (it forwards it to the main
  * UI); only while a game or app covers the main UI's screen is it made not
  * focusable, so a tap on it cannot take the gamepad away from that game.
+ * The exception to that exception is [focusedHere]: once Android has made
+ * this display the focused one anyway (an app opened from the dock on it
+ * closed while a game covers the main UI), the window must take focus, or a
+ * key waits for a window that never comes and NeoStation is reported as not
+ * responding. Keys that reach it then are dropped and a hint asks the user to
+ * tap the game's screen (see MainActivity.dispatchKeyFromSecondaryUi): only a
+ * touch gives the game the controller back, since NeoStation cannot move
+ * another app's task.
  * FLAG_ALT_FOCUSABLE_IM, paired with FLAG_NOT_FOCUSABLE, keeps the window
  * below an IME that firmware pins to this display (AYN Thor
  * `ime_show_on_second`); a plain focusable window already stays below it.
  */
-internal fun focusFlagsFor(showsMainUi: Boolean, mainUiCovered: Boolean): Int =
-    if (!showsMainUi && mainUiCovered) {
+internal fun focusFlagsFor(showsMainUi: Boolean, mainUiCovered: Boolean, focusedHere: Boolean): Int =
+    if (!showsMainUi && mainUiCovered && !focusedHere) {
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
     } else {
         0
@@ -311,6 +324,15 @@ object BottomScreenEngine {
             dm.getDisplay(id)?.state?.let { it == Display.STATE_ON } ?: true
         } catch (e: Exception) {
             true
+        }
+    }
+
+    /** Asks the secondary UI to show "tap the game's screen" (see focusFlagsFor). */
+    fun showControllerHint() {
+        try {
+            appsChannel?.invokeMethod("showControllerHint", null)
+        } catch (e: Exception) {
+            Log.e(TAG, "showControllerHint failed: ${e.message}")
         }
     }
 

@@ -90,6 +90,11 @@ class SecondaryAppsService {
 
   static bool _screenStateWired = false;
 
+  /// Bumped when a controller press reached this screen while a game or app
+  /// covers the main UI's screen. Android only hands the controller back to
+  /// that game when its screen is touched, so the secondary UI shows a hint.
+  static final ValueNotifier<int> controllerHintTrigger = ValueNotifier<int>(0);
+
   /// Subscribes to native screen on/off edges and seeds [deviceScreenOn] from
   /// the display's live state. Idempotent — safe to call from every widget that
   /// needs it. Only the secondary engine talks on this channel, so registering
@@ -104,6 +109,9 @@ class SecondaryAppsService {
           break;
         case 'onDeviceScreenOff':
           deviceScreenOn.value = false;
+          break;
+        case 'showControllerHint':
+          controllerHintTrigger.value++;
           break;
       }
       return null;

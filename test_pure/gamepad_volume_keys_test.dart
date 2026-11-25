@@ -140,13 +140,23 @@ void main() {
     final handled = fromSecondary.indexOf(
       'if (handleGamepadKey(event)) return true',
     );
-    final passOn = fromSecondary.indexOf(
-      'if (EventListener.isSystemKey(event.keyCode)) return false',
-    );
+    const volumeOut =
+        'if (EventListener.isSystemKey(event.keyCode)) return false';
+    final passOn = fromSecondary.indexOf(volumeOut, handled);
     final toMainUi = fromSecondary.indexOf('superDispatchKeyEvent(event)');
     expect(handled, isNot(-1));
     expect(passOn, greaterThan(handled));
     expect(toMainUi, greaterThan(passOn));
+    // While a game covers the main UI the other keys are dropped, but the
+    // volume still goes to Android first.
+    final covered = fromSecondary.indexOf('if (isMainUiCovered())');
+    expect(covered, isNot(-1));
+    final coveredVolume = fromSecondary.indexOf(volumeOut, covered);
+    expect(coveredVolume, greaterThan(covered));
+    expect(
+      coveredVolume,
+      lessThan(fromSecondary.indexOf('return true', covered)),
+    );
   });
 
   test('swapped, the top screen hands them to Android too', () {

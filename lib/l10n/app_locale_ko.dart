@@ -315,6 +315,7 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.disableSecondaryScreenSub: '보조 화면에서 앱을 끕니다',
   AppLocale.swapScreens: '화면 바꾸기',
   AppLocale.swapScreensSub: 'NeoStation을 아래 화면에, Now Playing과 독을 위 화면에 표시합니다',
+  AppLocale.controllerHintTapGame: '컨트롤러를 게임에 돌려주려면 게임 화면을 탭하세요',
   AppLocale.bartopShutdown: '종료할 때 BarTOP 전원 끄기',
   AppLocale.bartopShutdownSubtitle: '앱을 종료할 때 컴퓨터도 함께 종료합니다',
 

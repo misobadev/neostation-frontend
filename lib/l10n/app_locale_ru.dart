@@ -344,6 +344,8 @@ const Map<String, dynamic> appLocaleRu = {
       'Выключает приложение на втором мониторе',
   AppLocale.swapScreens: 'Поменять экраны местами',
   AppLocale.swapScreensSub: 'Показывает NeoStation на нижнем экране, а Now Playing и док — на верхнем',
+  AppLocale.controllerHintTapGame:
+      'Коснитесь экрана игры, чтобы вернуть ей управление с контроллера',
   AppLocale.bartopShutdown: 'Выключение BarTOP при выходе',
   AppLocale.bartopShutdownSubtitle:
       'Выключать компьютер при выходе из приложения',

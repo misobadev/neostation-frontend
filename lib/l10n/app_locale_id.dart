@@ -343,6 +343,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.disableSecondaryScreenSub: 'Menutup aplikasi di layar sekunder',
   AppLocale.swapScreens: 'Tukar layar',
   AppLocale.swapScreensSub: 'Menampilkan NeoStation di layar bawah, serta Now Playing dan dock di layar atas',
+  AppLocale.controllerHintTapGame:
+      'Ketuk layar game untuk mengembalikan kontroler ke game',
   AppLocale.bartopShutdown: 'Matikan BarTOP saat keluar',
   AppLocale.bartopShutdownSubtitle: 'Mematikan komputer saat menutup aplikasi',
 

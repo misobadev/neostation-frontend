@@ -343,6 +343,7 @@ const Map<String, dynamic> appLocaleDe = {
       'Schließt die App auf dem zweiten Bildschirm',
   AppLocale.swapScreens: 'Bildschirme tauschen',
   AppLocale.swapScreensSub: 'Zeigt NeoStation auf dem unteren Bildschirm und Now Playing und das Dock auf dem oberen',
+  AppLocale.controllerHintTapGame: 'Tippe auf den Bildschirm des Spiels, um ihm den Controller zurückzugeben',
   AppLocale.bartopShutdown: 'BarTOP beim Beenden ausschalten',
   AppLocale.bartopShutdownSubtitle:
       'Schaltet den Computer beim Schließen der App aus',

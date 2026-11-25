@@ -313,6 +313,7 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.disableSecondaryScreenSub: 'セカンダリ画面のアプリを閉じる',
   AppLocale.swapScreens: '画面を入れ替え',
   AppLocale.swapScreensSub: 'NeoStation を下の画面に、Now Playing とドックを上の画面に表示します',
+  AppLocale.controllerHintTapGame: 'コントローラーをゲームに戻すには、ゲームの画面をタップしてください',
   AppLocale.bartopShutdown: '終了時にBarTOPをシャットダウン',
   AppLocale.bartopShutdownSubtitle: 'アプリ終了時にコンピュータをシャットダウン',
 

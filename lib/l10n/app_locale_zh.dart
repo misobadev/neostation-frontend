@@ -311,6 +311,7 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.disableSecondaryScreenSub: '在副屏幕上关闭应用',
   AppLocale.swapScreens: '交换屏幕',
   AppLocale.swapScreensSub: '在下屏显示 NeoStation，在上屏显示 Now Playing 和程序坞',
+  AppLocale.controllerHintTapGame: '轻触游戏所在的屏幕，将手柄交还给游戏',
   AppLocale.bartopShutdown: '退出时关闭 BarTOP',
   AppLocale.bartopShutdownSubtitle: '退出应用时关闭计算机',
 

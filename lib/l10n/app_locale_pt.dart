@@ -350,6 +350,8 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.disableSecondaryScreenSub: 'Fecha o aplicativo na tela secundária',
   AppLocale.swapScreens: 'Trocar telas',
   AppLocale.swapScreensSub: 'Mostra o NeoStation na tela de baixo, e o Now Playing e o dock na de cima',
+  AppLocale.controllerHintTapGame:
+      'Toque na tela do jogo para devolver o controle a ele',
   AppLocale.bartopShutdown: 'Desligar BarTOP ao sair',
   AppLocale.bartopShutdownSubtitle:
       'Desliga o computador ao fechar o aplicativo',

@@ -318,6 +318,7 @@ mixin AppLocale {
       'disable_secondary_screen_sub';
   static const String swapScreens = 'swap_screens';
   static const String swapScreensSub = 'swap_screens_sub';
+  static const String controllerHintTapGame = 'controller_hint_tap_game';
   static const String bartopShutdown = 'bartop_shutdown';
   static const String bartopShutdownSubtitle = 'bartop_shutdown_subtitle';
   static const String showSyncTab = 'show_sync_tab';

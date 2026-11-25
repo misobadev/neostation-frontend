@@ -344,6 +344,8 @@ const Map<String, dynamic> appLocaleEs = {
       'Apaga la aplicación en la pantalla secundaria',
   AppLocale.swapScreens: 'Intercambiar pantallas',
   AppLocale.swapScreensSub: 'Muestra NeoStation en la pantalla inferior y Now Playing y el dock en la superior',
+  AppLocale.controllerHintTapGame:
+      'Toca la pantalla del juego para devolverle el control',
   AppLocale.bartopShutdown: 'Apagado BarTOP al Salir',
   AppLocale.bartopShutdownSubtitle:
       'Apagar el equipo al salir de la aplicación',

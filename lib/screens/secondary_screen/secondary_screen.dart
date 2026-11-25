@@ -92,6 +92,83 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
   /// `<key> not found` on the secondary display. getString() calls use
   /// `_l10nContext ?? context` so they resolve against this instead.
   BuildContext? _l10nContext;
+
+  /// Whether the "tap the game's screen" hint is showing. See
+  /// [SecondaryAppsService.controllerHintTrigger].
+  bool _controllerHintVisible = false;
+  Timer? _controllerHintTimer;
+
+  void _showControllerHint() {
+    _controllerHintTimer?.cancel();
+    _controllerHintTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _controllerHintVisible = false);
+    });
+    if (mounted && !_controllerHintVisible) {
+      setState(() => _controllerHintVisible = true);
+    }
+  }
+
+  /// Lays the controller hint over [child], above every other layer
+  /// (including the Now Playing dim) so it is readable whatever is showing.
+  Widget _withControllerHint(Widget child) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        child,
+        IgnorePointer(
+          child: AnimatedOpacity(
+            opacity: _controllerHintVisible ? 1 : 0,
+            duration: const Duration(milliseconds: 200),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: EdgeInsets.only(top: 24.r, left: 24.r, right: 24.r),
+                // Above the Scaffold, so no Material supplies the text style.
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 20.r,
+                      vertical: 12.r,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(16.r),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Symbols.sports_esports,
+                          color: Colors.white,
+                          size: 22.r,
+                        ),
+                        SizedBox(width: 12.r),
+                        Flexible(
+                          child: Text(
+                            AppLocale.controllerHintTapGame.getString(
+                              _l10nContext ?? context,
+                            ),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15.r,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Timer? _videoTimer;
   Timer? _previewCountdownTimer;
   bool _showVideo = false;
@@ -173,6 +250,9 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
       // [_deviceAwake] for why the shared-state flag alone isn't trusted.
       SecondaryAppsService.listenForScreenState();
       SecondaryAppsService.deviceScreenOn.addListener(_onScreenPowerChanged);
+      SecondaryAppsService.controllerHintTrigger.addListener(
+        _showControllerHint,
+      );
       // Signal that the secondary screen is active — but only after the initial
       // state sync. Pushing it while the synced value is still null makes
       // updateState fall back to the WELCOME default and clobber the real
@@ -776,6 +856,10 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     // Shared singleton — detach our listener, never dispose the instance.
     _secondaryDisplayState?.removeListener(_onStateChanged);
     SecondaryAppsService.deviceScreenOn.removeListener(_onScreenPowerChanged);
+    SecondaryAppsService.controllerHintTrigger.removeListener(
+      _showControllerHint,
+    );
+    _controllerHintTimer?.cancel();
     _celebrationTimer?.cancel();
     _playTimeTicker?.cancel();
     _dimTimer?.cancel();
@@ -927,265 +1011,279 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
                     value.videoPreviewDelay == 0 &&
                     (!value.videoPreviewFileChecked ||
                         value.videoPreviewFileExists);
-                return Scaffold(
-                  // Falls back to the resolved theme rather than black: before
-                  // the main engine pushes a background, a light-theme user
-                  // would otherwise get a black panel on startup.
-                  backgroundColor: value?.backgroundColor != null
-                      ? Color(value!.backgroundColor!)
-                      : theme.scaffoldBackgroundColor,
-                  body: value == null
-                      ? _buildDefaultStaticUI()
-                      : Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            // Base layer: Shader/App background (Conditional)
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 256),
-                              child: SizedBox.expand(
-                                key: ValueKey(
-                                  'secondary_bg_${value.isGameSelected}_${value.systemName}_${value.backgroundColor}_${value.isOled}',
+                return _withControllerHint(
+                  Scaffold(
+                    // Falls back to the resolved theme rather than black: before
+                    // the main engine pushes a background, a light-theme user
+                    // would otherwise get a black panel on startup.
+                    backgroundColor: value?.backgroundColor != null
+                        ? Color(value!.backgroundColor!)
+                        : theme.scaffoldBackgroundColor,
+                    body: value == null
+                        ? _buildDefaultStaticUI()
+                        : Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // Base layer: Shader/App background (Conditional)
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 256),
+                                child: SizedBox.expand(
+                                  key: ValueKey(
+                                    'secondary_bg_${value.isGameSelected}_${value.systemName}_${value.backgroundColor}_${value.isOled}',
+                                  ),
+                                  child:
+                                      (value.isGameSelected ||
+                                          value.useFluidShader)
+                                      ? buildUnifiedAppBackground(value)
+                                      : buildSystemBackground(value),
                                 ),
-                                child:
-                                    (value.isGameSelected ||
-                                        value.useFluidShader)
-                                    ? buildUnifiedAppBackground(value)
-                                    : buildSystemBackground(value),
+                                transitionBuilder: (child, animation) =>
+                                    FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    ),
                               ),
-                              transitionBuilder: (child, animation) =>
-                                  FadeTransition(
-                                    opacity: animation,
-                                    child: child,
-                                  ),
-                            ),
 
-                            // Game Layer: Screenshot/Video (on top of shader)
-                            if (value.isGameSelected)
-                              Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  // Backs the letterboxed media below, so the
-                                  // bars around a 4:3 snap aren't the theme's
-                                  // (possibly white) background.
-                                  buildMediaMatte(
-                                    context,
-                                    visible: _showsLetterboxedMedia(value),
-                                  ),
-                                  AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 256),
-                                    transitionBuilder: (child, animation) =>
-                                        FadeTransition(
-                                          opacity: animation,
-                                          child: child,
-                                        ),
-                                    child: Stack(
-                                      key: ValueKey(
-                                        'game_content_${value.systemName}_${value.gameId}_${value.gameScreenshot ?? 'none'}_${value.gameFanart ?? 'none'}_${value.gameWheel ?? 'none'}_${value.gameImageBytes != null ? value.gameImageBytes.hashCode : 'none'}_${value.mediaRevision}',
+                              // Game Layer: Screenshot/Video (on top of shader)
+                              if (value.isGameSelected)
+                                Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    // Backs the letterboxed media below, so the
+                                    // bars around a 4:3 snap aren't the theme's
+                                    // (possibly white) background.
+                                    buildMediaMatte(
+                                      context,
+                                      visible: _showsLetterboxedMedia(value),
+                                    ),
+                                    AnimatedSwitcher(
+                                      duration: const Duration(
+                                        milliseconds: 256,
                                       ),
-                                      fit: StackFit.expand,
-                                      children: [
-                                        // Only show background images IF video is NOT showing (user request: "quitando del fondo el screenshot")
-                                        if (!_showVideo &&
-                                            !hideScreenshotForImmediateVideo) ...[
-                                          if (value.isGameLaunching) ...[
-                                            if (value.gameImageBytes != null)
-                                              buildBackgroundBytes(
-                                                value.gameImageBytes!,
-                                                fit: BoxFit.contain, // "se debe ver completo"
-                                              )
-                                            else if (value.gameScreenshot !=
-                                                null)
-                                              buildBackground(
-                                                value.gameScreenshot!,
-                                                fit: BoxFit.contain, // "se debe ver completo"
-                                              )
-                                            else if (value.gameFanart != null ||
-                                                value.gameWheel != null)
-                                              buildFanartWithLogo(value),
-                                          ] else ...[
-                                            if (value.gameImageBytes != null)
-                                              buildBackgroundBytes(
-                                                value.gameImageBytes!,
-                                                fit: BoxFit.contain, // "se debe ver completo"
-                                              )
-                                            else if (value.gameScreenshot !=
-                                                null)
-                                              buildBackground(
-                                                value.gameScreenshot!,
-                                                fit: BoxFit.contain, // "se debe ver completo"
-                                              )
-                                            else if (value.gameFanart != null ||
-                                                value.gameWheel != null)
-                                              buildFanartWithLogo(value),
+                                      transitionBuilder: (child, animation) =>
+                                          FadeTransition(
+                                            opacity: animation,
+                                            child: child,
+                                          ),
+                                      child: Stack(
+                                        key: ValueKey(
+                                          'game_content_${value.systemName}_${value.gameId}_${value.gameScreenshot ?? 'none'}_${value.gameFanart ?? 'none'}_${value.gameWheel ?? 'none'}_${value.gameImageBytes != null ? value.gameImageBytes.hashCode : 'none'}_${value.mediaRevision}',
+                                        ),
+                                        fit: StackFit.expand,
+                                        children: [
+                                          // Only show background images IF video is NOT showing (user request: "quitando del fondo el screenshot")
+                                          if (!_showVideo &&
+                                              !hideScreenshotForImmediateVideo) ...[
+                                            if (value.isGameLaunching) ...[
+                                              if (value.gameImageBytes != null)
+                                                buildBackgroundBytes(
+                                                  value.gameImageBytes!,
+                                                  fit: BoxFit.contain, // "se debe ver completo"
+                                                )
+                                              else if (value.gameScreenshot !=
+                                                  null)
+                                                buildBackground(
+                                                  value.gameScreenshot!,
+                                                  fit: BoxFit.contain, // "se debe ver completo"
+                                                )
+                                              else if (value.gameFanart !=
+                                                      null ||
+                                                  value.gameWheel != null)
+                                                buildFanartWithLogo(value),
+                                            ] else ...[
+                                              if (value.gameImageBytes != null)
+                                                buildBackgroundBytes(
+                                                  value.gameImageBytes!,
+                                                  fit: BoxFit.contain, // "se debe ver completo"
+                                                )
+                                              else if (value.gameScreenshot !=
+                                                  null)
+                                                buildBackground(
+                                                  value.gameScreenshot!,
+                                                  fit: BoxFit.contain, // "se debe ver completo"
+                                                )
+                                              else if (value.gameFanart !=
+                                                      null ||
+                                                  value.gameWheel != null)
+                                                buildFanartWithLogo(value),
+                                            ],
                                           ],
                                         ],
-                                      ],
-                                    ),
-                                  ),
-                                  if (!_showVideo &&
-                                      hideScreenshotForImmediateVideo)
-                                    Center(
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.r,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
                                       ),
                                     ),
-                                  if (_showVideo && _videoController != null)
-                                    SizedBox.expand(
-                                      child: FittedBox(
-                                        fit: BoxFit.contain,
-                                        child: SizedBox(
-                                          width: _videoController!
-                                              .value
-                                              .size
-                                              .width,
-                                          height: _videoController!
-                                              .value
-                                              .size
-                                              .height,
-                                          child: VideoPlayer(_videoController!),
+                                    if (!_showVideo &&
+                                        hideScreenshotForImmediateVideo)
+                                      Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.r,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
                                         ),
                                       ),
-                                    ),
-                                ],
-                              ),
-
-                            // In-game paged container: Now Playing (page 0) and,
-                            // when the game has a RetroAchievements set, the
-                            // achievements panel (page 1). Touch-paged via edge
-                            // chevrons; covers the game art, fading in on launch
-                            // and out on return.
-                            Positioned.fill(
-                              child: IgnorePointer(
-                                ignoring: !value.nowPlayingActive,
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 400),
-                                  child: value.nowPlayingActive
-                                      ? KeyedSubtree(
-                                          key: const ValueKey('in-game-panel'),
-                                          child: _buildInGamePanel(value),
-                                        )
-                                      : const SizedBox.shrink(
-                                          key: ValueKey('in-game-panel-empty'),
+                                    if (_showVideo && _videoController != null)
+                                      SizedBox.expand(
+                                        child: FittedBox(
+                                          fit: BoxFit.contain,
+                                          child: SizedBox(
+                                            width: _videoController!
+                                                .value
+                                                .size
+                                                .width,
+                                            height: _videoController!
+                                                .value
+                                                .size
+                                                .height,
+                                            child: VideoPlayer(
+                                              _videoController!,
+                                            ),
+                                          ),
                                         ),
+                                      ),
+                                  ],
                                 ),
-                              ),
-                            ),
 
-                            // Center Content (system/recent-game logo). Suppressed
-                            // while the in-game container is up so the logo doesn't
-                            // draw on top of it (recent-game launches push state
-                            // with isGameSelected: false + the wheel as systemLogo).
-                            if (!value.isGameSelected &&
-                                !value.nowPlayingActive)
-                              _buildCenterContent(
-                                value,
-                                isTab: value.useFluidShader,
-                              ),
-
-                            if (value.isGameSelected &&
-                                !_showVideo &&
-                                !value.isGameLaunching &&
-                                value.videoPreviewFileChecked &&
-                                value.videoPreviewFileExists &&
-                                value.videoPreviewDeadlineMillis > 0 &&
-                                value.videoPreviewDeadlineMillis >
-                                    DateTime.now().millisecondsSinceEpoch)
-                              Positioned(
-                                left: 24.r,
-                                bottom: 24.r,
-                                child: VideoPreviewCountdown(
-                                  key: ValueKey(
-                                    value.videoPreviewDeadlineMillis,
-                                  ),
-                                  remaining: Duration(
-                                    milliseconds:
-                                        value.videoPreviewDeadlineMillis -
-                                        DateTime.now().millisecondsSinceEpoch,
-                                  ),
-                                  total: Duration(
-                                    seconds: value.videoPreviewDelay.clamp(
-                                      0,
-                                      5,
-                                    ),
+                              // In-game paged container: Now Playing (page 0) and,
+                              // when the game has a RetroAchievements set, the
+                              // achievements panel (page 1). Touch-paged via edge
+                              // chevrons; covers the game art, fading in on launch
+                              // and out on return.
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  ignoring: !value.nowPlayingActive,
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 400),
+                                    child: value.nowPlayingActive
+                                        ? KeyedSubtree(
+                                            key: const ValueKey(
+                                              'in-game-panel',
+                                            ),
+                                            child: _buildInGamePanel(value),
+                                          )
+                                        : const SizedBox.shrink(
+                                            key: ValueKey(
+                                              'in-game-panel-empty',
+                                            ),
+                                          ),
                                   ),
                                 ),
                               ),
 
-                            if (value.isGameSelected && _showVideo)
-                              Positioned(
-                                bottom: 24.r,
-                                right: 24.r,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    SfxService().playNavSound();
-                                    _toggleMute();
-                                  },
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16.r,
-                                      vertical: 10.r,
+                              // Center Content (system/recent-game logo). Suppressed
+                              // while the in-game container is up so the logo doesn't
+                              // draw on top of it (recent-game launches push state
+                              // with isGameSelected: false + the wheel as systemLogo).
+                              if (!value.isGameSelected &&
+                                  !value.nowPlayingActive)
+                                _buildCenterContent(
+                                  value,
+                                  isTab: value.useFluidShader,
+                                ),
+
+                              if (value.isGameSelected &&
+                                  !_showVideo &&
+                                  !value.isGameLaunching &&
+                                  value.videoPreviewFileChecked &&
+                                  value.videoPreviewFileExists &&
+                                  value.videoPreviewDeadlineMillis > 0 &&
+                                  value.videoPreviewDeadlineMillis >
+                                      DateTime.now().millisecondsSinceEpoch)
+                                Positioned(
+                                  left: 24.r,
+                                  bottom: 24.r,
+                                  child: VideoPreviewCountdown(
+                                    key: ValueKey(
+                                      value.videoPreviewDeadlineMillis,
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.7,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12.r),
-                                      border: Border.all(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        width: 1.r,
-                                      ),
+                                    remaining: Duration(
+                                      milliseconds:
+                                          value.videoPreviewDeadlineMillis -
+                                          DateTime.now().millisecondsSinceEpoch,
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        // Select (View), not Start — mute is a
-                                        // Select tap, matching the primary
-                                        // screen's hint.
-                                        Image.asset(
-                                          'assets/images/gamepad/Xbox_View_button.png',
-                                          width: 32.r,
-                                          height: 32.r,
-                                          color: Colors.white,
-                                        ),
-                                        SizedBox(width: 12.r),
-                                        Icon(
-                                          value.isVideoMuted
-                                              ? Symbols.volume_off_rounded
-                                              : Symbols.volume_up_rounded,
-                                          color: Colors.white,
-                                          size: 24.r,
-                                        ),
-                                      ],
+                                    total: Duration(
+                                      seconds: value.videoPreviewDelay.clamp(
+                                        0,
+                                        5,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
 
-                            // Persistent app dock + all-apps launcher. Drawn at
-                            // the top level (not inside the in-game panel) so it
-                            // stays visible while browsing systems and on the
-                            // Now Playing page — hidden on the achievement pages
-                            // and dimmed together with the panel's idle scrim.
-                            // Stays mounted for one animation after being
-                            // disabled so it can slide back out (see
-                            // [_syncDockMount]).
-                            if (_dockShown(value) || _dockSlidingOut)
-                              _buildDockOverlay(value),
+                              if (value.isGameSelected && _showVideo)
+                                Positioned(
+                                  bottom: 24.r,
+                                  right: 24.r,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      SfxService().playNavSound();
+                                      _toggleMute();
+                                    },
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 16.r,
+                                        vertical: 10.r,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.7,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                          width: 1.r,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Select (View), not Start — mute is a
+                                          // Select tap, matching the primary
+                                          // screen's hint.
+                                          Image.asset(
+                                            'assets/images/gamepad/Xbox_View_button.png',
+                                            width: 32.r,
+                                            height: 32.r,
+                                            color: Colors.white,
+                                          ),
+                                          SizedBox(width: 12.r),
+                                          Icon(
+                                            value.isVideoMuted
+                                                ? Symbols.volume_off_rounded
+                                                : Symbols.volume_up_rounded,
+                                            color: Colors.white,
+                                            size: 24.r,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
 
-                            // Scraping Overlay
-                            _buildScrapingOverlay(value),
+                              // Persistent app dock + all-apps launcher. Drawn at
+                              // the top level (not inside the in-game panel) so it
+                              // stays visible while browsing systems and on the
+                              // Now Playing page — hidden on the achievement pages
+                              // and dimmed together with the panel's idle scrim.
+                              // Stays mounted for one animation after being
+                              // disabled so it can slide back out (see
+                              // [_syncDockMount]).
+                              if (_dockShown(value) || _dockSlidingOut)
+                                _buildDockOverlay(value),
 
-                            // App picker overlay (dock-slot assignment or
-                            // all-apps launcher). Top-most so it covers the dock
-                            // and any panel; available in every state.
-                            if (_pickerVisible) _buildAppPickerOverlay(),
-                          ],
-                        ),
+                              // Scraping Overlay
+                              _buildScrapingOverlay(value),
+
+                              // App picker overlay (dock-slot assignment or
+                              // all-apps launcher). Top-most so it covers the dock
+                              // and any panel; available in every state.
+                              if (_pickerVisible) _buildAppPickerOverlay(),
+                            ],
+                          ),
+                  ),
                 );
               },
             ),
