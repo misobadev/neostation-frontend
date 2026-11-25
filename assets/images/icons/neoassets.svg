@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Cube of asset tiles with one tile missing: the piece the community adds -->
+  <g id="icon">
+    <path fill="#7ff0ff" d="M256.0 66.0 L325.2 106.0 L256.0 146.0 L186.8 106.0Z"/>
+    <path fill="#7ff0ff" d="M169.5 116.0 L238.7 156.0 L169.5 196.0 L100.3 156.0Z"/>
+    <path fill="#7ff0ff" d="M256.0 166.0 L325.2 206.0 L256.0 246.0 L186.8 206.0Z"/>
+    <path fill="#14a8cc" d="M91.7 171.0 L160.9 211.0 L160.9 291.0 L91.7 251.0Z"/>
+    <path fill="#14a8cc" d="M91.7 271.0 L160.9 311.0 L160.9 391.0 L91.7 351.0Z"/>
+    <path fill="#14a8cc" d="M178.2 221.0 L247.3 261.0 L247.3 341.0 L178.2 301.0Z"/>
+    <path fill="#14a8cc" d="M178.2 321.0 L247.3 361.0 L247.3 441.0 L178.2 401.0Z"/>
+    <path fill="#e25bd0" d="M264.6 261.0 L333.9 221.0 L333.9 301.0 L264.6 341.0Z"/>
+    <path fill="#e25bd0" d="M264.6 361.0 L333.9 321.0 L333.9 401.0 L264.6 441.0Z"/>
+    <path fill="#e25bd0" d="M351.1 211.0 L420.4 171.0 L420.4 251.0 L351.1 291.0Z"/>
+    <path fill="#e25bd0" d="M351.1 311.0 L420.4 271.0 L420.4 351.0 L351.1 391.0Z"/>
+  </g>
+</svg>

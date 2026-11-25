@@ -18,7 +18,7 @@ import 'new_settings_options/about_settings_content.dart';
 import 'new_settings_options/exit_settings_content.dart';
 import 'new_settings_options/themes_settings_content.dart';
 import 'new_settings_options/system_art_settings_content.dart';
-import 'new_settings_options/screenscraper/screenscraper_settings_content.dart';
+import 'new_settings_options/metadata_settings_content.dart';
 
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -88,8 +88,8 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       GlobalKey<ThemesSettingsContentState>();
   final GlobalKey<SystemArtSettingsContentState> _systemArtSettingsKey =
       GlobalKey<SystemArtSettingsContentState>();
-  final GlobalKey<ScreenScraperSettingsContentState> _screenScraperKey =
-      GlobalKey<ScreenScraperSettingsContentState>();
+  final GlobalKey<MetadataSettingsContentState> _metadataKey =
+      GlobalKey<MetadataSettingsContentState>();
   final GlobalKey<DirectoriesSettingsContentState> _directoriesSettingsKey =
       GlobalKey<DirectoriesSettingsContentState>();
   final GlobalKey<ToolsSettingsContentState> _toolsSettingsKey =
@@ -264,7 +264,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       return true;
     }
     if (selectedKey == AppLocale.metadata) {
-      return _screenScraperKey.currentState?.navigateUp() ?? false;
+      return _metadataKey.currentState?.navigateUp() ?? false;
     }
 
     // Generic linear navigation within content lists.
@@ -322,7 +322,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       return true;
     }
     if (selectedKey == AppLocale.metadata) {
-      return _screenScraperKey.currentState?.navigateDown() ?? false;
+      return _metadataKey.currentState?.navigateDown() ?? false;
     }
 
     final previousIndex = _selectedContentIndex;
@@ -363,8 +363,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
           _systemArtSettingsKey.currentState?.navigateLeft() ?? true;
       if (returnToMenu) _returnFocusToMenu();
     } else if (selectedKey == AppLocale.metadata) {
-      final returnToMenu =
-          _screenScraperKey.currentState?.navigateLeft() ?? true;
+      final returnToMenu = _metadataKey.currentState?.navigateLeft() ?? true;
       if (returnToMenu) _returnFocusToMenu();
     } else {
       _returnFocusToMenu();
@@ -388,7 +387,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
     } else if (selectedKey == AppLocale.systemArt) {
       _systemArtSettingsKey.currentState?.navigateRight();
     } else if (selectedKey == AppLocale.metadata) {
-      _screenScraperKey.currentState?.navigateRight();
+      _metadataKey.currentState?.navigateRight();
     }
   }
 
@@ -419,7 +418,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
     if (_focusOnMenu) return;
     final selectedKey = _menuItems[_selectedMenuIndex].localeKey;
     if (selectedKey == AppLocale.metadata &&
-        (_screenScraperKey.currentState?.navigateBack() ?? false)) {
+        (_metadataKey.currentState?.navigateBack() ?? false)) {
       return;
     }
     _returnFocusToMenu();
@@ -449,7 +448,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
     } else if (selectedKey == AppLocale.systemArt) {
       return _systemArtSettingsKey.currentState?.getItemCount() ?? 0;
     } else if (selectedKey == AppLocale.metadata) {
-      return _screenScraperKey.currentState?.getItemCount() ?? 0;
+      return _metadataKey.currentState?.getItemCount() ?? 0;
     } else if (selectedKey == AppLocale.directories) {
       return _directoriesSettingsKey.currentState?.getItemCount() ?? 0;
     } else if (selectedKey == AppLocale.tools) {
@@ -476,7 +475,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
     } else if (selectedKey == AppLocale.systemArt) {
       _systemArtSettingsKey.currentState?.selectItem(_selectedContentIndex);
     } else if (selectedKey == AppLocale.metadata) {
-      _screenScraperKey.currentState?.selectItem();
+      _metadataKey.currentState?.selectItem();
     } else if (selectedKey == AppLocale.directories) {
       _directoriesSettingsKey.currentState?.selectItem(_selectedContentIndex);
     } else if (selectedKey == AppLocale.tools) {
@@ -713,8 +712,8 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
         },
       );
     } else if (selectedKey == AppLocale.metadata) {
-      return ScreenScraperSettingsContent(
-        key: _screenScraperKey,
+      return MetadataSettingsContent(
+        key: _metadataKey,
         isContentFocused: !_focusOnMenu,
       );
     } else if (selectedKey == AppLocale.launcher) {

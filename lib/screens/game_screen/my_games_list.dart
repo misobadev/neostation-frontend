@@ -77,6 +77,8 @@ import 'package:neostation/widgets/neo_glass.dart';
 import '../../themes/corner_radii.dart';
 import '../../utils/user_data_move_guard.dart';
 
+import 'package:neostation/services/metadata_provider_service.dart';
+
 part 'my_games_list/gamepad_nav.dart';
 part 'my_games_list/context_menu.dart';
 part 'my_games_list/favorites_reorder.dart';
@@ -2219,7 +2221,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     final scrapeSystemId = game.systemId ?? widget.system.id;
     if (scrapeSystemId == null) return;
 
-    if (!await ScreenScraperService.hasSavedCredentials()) {
+    if (!await MetadataProviderService.hasActiveSession()) {
       if (!mounted) return;
       AppNotification.showNotification(
         context,
@@ -2297,7 +2299,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
               gameName: game.name,
               onProgress: onProgress,
             )
-          : await ScreenScraperService.scrapeSingleGame(
+          : await MetadataProviderService.scrapeSingleGame(
               appSystemId: scrapeSystemId,
               romName: game.romname,
               systemFolder: targetSystemFolder,
@@ -2374,6 +2376,16 @@ class _SystemGamesListState extends State<SystemGamesList> {
     final systemId = game.systemId ?? widget.system.id;
     final romPath = game.romPath;
     if (systemId == null || romPath == null || romPath.isEmpty) return;
+
+    if (!await MetadataProviderService.supportsIdentify()) {
+      if (!mounted) return;
+      AppNotification.showNotification(
+        context,
+        AppLocale.identifyNeedsScreenScraper.getString(context),
+        type: NotificationType.info,
+      );
+      return;
+    }
 
     final currentGameId = await ScreenScraperService.getIdentifiedGameId(
       romPath,

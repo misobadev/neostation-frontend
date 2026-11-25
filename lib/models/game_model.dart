@@ -632,10 +632,24 @@ class GameModel {
   String getDescriptionForLanguage(String languageCode) {
     if (descriptions == null || descriptions!.isEmpty) return '';
 
-    const defaultLanguageHierarchy = ['en', 'es', 'fr', 'de', 'it', 'pt', 'jp'];
+    const defaultLanguageHierarchy = [
+      'en',
+      'es',
+      'fr',
+      'de',
+      'it',
+      'pt',
+      'ja',
+      'jp',
+    ];
 
     if (languageCode.isNotEmpty) {
-      final requestedDescription = descriptions![languageCode];
+      // Older ES-DE and ScreenScraper data file Japanese under `jp`.
+      final requestedDescription = languageCode == 'ja'
+          ? (descriptions!['ja']?.isNotEmpty == true
+                ? descriptions!['ja']
+                : descriptions!['jp'])
+          : descriptions![languageCode];
       if (requestedDescription != null && requestedDescription.isNotEmpty) {
         return requestedDescription;
       }

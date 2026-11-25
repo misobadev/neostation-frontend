@@ -471,7 +471,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 193;
+  static const int _databaseVersion = 194;
 
   /// SQL predicate (over `user_roms` aliased `ur`) for an installed app the
   /// user marked as a game. See migration v191.
@@ -2179,6 +2179,12 @@ class SqliteService {
         description_de TEXT,
         description_it TEXT,
         description_pt TEXT,
+        description_ja TEXT,
+        description_ko TEXT,
+        description_ru TEXT,
+        description_zh TEXT,
+        description_id TEXT,
+        regional_names TEXT,
         rating REAL,
         release_date TEXT,
         developer TEXT,
@@ -4813,6 +4819,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -5000,6 +5007,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -5058,6 +5066,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -5298,6 +5307,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -5523,6 +5533,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,

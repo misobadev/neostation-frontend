@@ -160,10 +160,14 @@ jobs:
         env:
           SCREENSCRAPER_DEV_ID: ${{ secrets.SCREENSCRAPER_DEV_ID }}
           SCREENSCRAPER_DEV_PASSWORD: ${{ secrets.SCREENSCRAPER_DEV_PASSWORD }}
+          NEOASSETS_CLIENT_ID: ${{ secrets.NEOASSETS_CLIENT_ID }}
+          NEOASSETS_CLIENT_SECRET: ${{ secrets.NEOASSETS_CLIENT_SECRET }}
         run: |
           : > .env
           [ -n "$SCREENSCRAPER_DEV_ID" ] && echo "SCREENSCRAPER_DEV_ID=$SCREENSCRAPER_DEV_ID" >> .env
           [ -n "$SCREENSCRAPER_DEV_PASSWORD" ] && echo "SCREENSCRAPER_DEV_PASSWORD=$SCREENSCRAPER_DEV_PASSWORD" >> .env
+          [ -n "$NEOASSETS_CLIENT_ID" ] && echo "NEOASSETS_CLIENT_ID=$NEOASSETS_CLIENT_ID" >> .env
+          [ -n "$NEOASSETS_CLIENT_SECRET" ] && echo "NEOASSETS_CLIENT_SECRET=$NEOASSETS_CLIENT_SECRET" >> .env
           echo ".env created with $(wc -l < .env) lines"
 
       - name: Setup Java (for Android)

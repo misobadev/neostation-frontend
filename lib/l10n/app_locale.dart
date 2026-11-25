@@ -908,6 +908,66 @@ mixin AppLocale {
   static const String screenScraperTitle = 'screenscraper_title';
   static const String metadata = 'metadata';
   static const String screenScraperLogin = 'screen_scraper_login';
+  // Metadata providers (NeoAssets / ScreenScraper)
+  static const String paste = 'paste';
+  static const String recommended = 'recommended';
+  static const String chooseMetadataProvider = 'choose_metadata_provider';
+  static const String chooseMetadataProviderSub =
+      'choose_metadata_provider_sub';
+  static const String neoAssetsTagline = 'neoassets_tagline';
+  static const String neoAssetsConnect = 'neoassets_connect';
+  static const String screenScraperTagline = 'screenscraper_tagline';
+  static const String metadataProviderOneSession =
+      'metadata_provider_one_session';
+  static const String compareMatching = 'compare_matching';
+  static const String compareMatchingNeoAssets = 'compare_matching_neoassets';
+  static const String compareMatchingScreenScraper =
+      'compare_matching_screenscraper';
+  static const String compareLanguages = 'compare_languages';
+  static const String compareLanguagesNeoAssets = 'compare_languages_neoassets';
+  static const String compareLanguagesScreenScraper =
+      'compare_languages_screenscraper';
+  static const String compareQuota = 'compare_quota';
+  static const String compareQuotaNeoAssets = 'compare_quota_neoassets';
+  static const String compareQuotaScreenScraper = 'compare_quota_screenscraper';
+  static const String compareDownloads = 'compare_downloads';
+  static const String compareDownloadsNeoAssets = 'compare_downloads_neoassets';
+  static const String compareDownloadsScreenScraper =
+      'compare_downloads_screenscraper';
+  static const String compareSignIn = 'compare_sign_in';
+  static const String compareSignInNeoAssets = 'compare_sign_in_neoassets';
+  static const String compareSignInScreenScraper =
+      'compare_sign_in_screenscraper';
+  static const String neoAssetsLogin = 'neoassets_login';
+  static const String neoAssetsApiKey = 'neoassets_api_key';
+  static const String neoAssetsKeyStep1 = 'neoassets_key_step1';
+  static const String neoAssetsKeyStep2 = 'neoassets_key_step2';
+  static const String neoAssetsKeyStep3 = 'neoassets_key_step3';
+  static const String neoAssetsKeyRejected = 'neoassets_key_rejected';
+  static const String neoAssetsEmailNotVerified =
+      'neoassets_email_not_verified';
+  static const String neoAssetsUnreachable = 'neoassets_unreachable';
+  static const String neoAssetsNotConfigured = 'neoassets_not_configured';
+  static const String identifyNeedsScreenScraper =
+      'identify_needs_screenscraper';
+  static const String neoAssetsSystemsSub = 'neoassets_systems_sub';
+  static const String neoAssetsScrapeSub = 'neoassets_scrape_sub';
+  static const String neoAssetsThreads = 'neoassets_threads';
+  static const String neoAssetsGuest = 'neoassets_guest';
+  static const String neoAssetsContinueAsGuest = 'neoassets_continue_as_guest';
+  static const String neoAssetsGuestNote = 'neoassets_guest_note';
+  static const String neoAssetsGuestHint = 'neoassets_guest_hint';
+  static const String neoAssetsDailyGames = 'neoassets_daily_games';
+  static const String neoAssetsUsedToday = 'neoassets_used_today';
+  static const String neoAssetsResetsIn = 'neoassets_resets_in';
+  static const String neoAssetsUnlimited = 'neoassets_unlimited';
+  static const String neoAssetsRatePerMinute = 'neoassets_rate_per_minute';
+  static const String neoAssetsQuotaExceeded = 'neoassets_quota_exceeded';
+  static const String neoAssetsNoCredentials = 'neoassets_no_credentials';
+  static const String neoAssetsSystemNotMapped = 'neoassets_system_not_mapped';
+  static const String neoAssetsGameNotFound = 'neoassets_game_not_found';
+  static const String switchProvider = 'switch_provider';
+  static const String switchProviderDesc = 'switch_provider_desc';
   static const String scanningSystemsRoms = 'scanning_systems_roms';
   static const String ofSystems = 'of_systems';
   static const String systemsDetected = 'systems_detected';

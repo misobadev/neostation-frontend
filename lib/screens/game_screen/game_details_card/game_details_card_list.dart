@@ -29,7 +29,6 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 
 import '../../../providers/sqlite_config_provider.dart';
-import '../../../services/screenscraper_service.dart';
 import '../../../services/game_service.dart';
 import '../../../services/android_service.dart';
 
@@ -50,6 +49,8 @@ import 'tabs/game_details_achievements_tab.dart';
 import 'package:neostation/screens/retro_achievements_screen/ra_game_achievements_page.dart';
 
 import '../../../utils/user_data_move_guard.dart';
+
+import 'package:neostation/services/metadata_provider_service.dart';
 
 /// A comprehensive details view for a selected game, providing access to metadata,
 /// achievements, system settings, and cloud synchronization status.
@@ -1587,7 +1588,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     _setTab(DetailTab.wheel, persist: false, animate: false);
   }
 
-  /// Orchestrates a metadata acquisition process via ScreenScraperService.
+  /// Orchestrates a metadata acquisition process via the active metadata provider.
   Future<void> _startSingleGameScrape({bool forceOverwrite = true}) async {
     if (_isScrapingGame) return;
     // Refused during a user-data move: new art would stay in the old folder.
@@ -1615,7 +1616,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
 
     if (!context.mounted) return;
 
-    if (!await ScreenScraperService.hasSavedCredentials()) {
+    if (!await MetadataProviderService.hasActiveSession()) {
       if (!mounted) return;
       AppNotification.showNotification(
         context,
@@ -1648,7 +1649,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
           ? _game.systemFolderName!
           : widget.system.primaryFolderName;
 
-      final result = await ScreenScraperService.scrapeSingleGame(
+      final result = await MetadataProviderService.scrapeSingleGame(
         appSystemId: scrapeSystemId,
         romName: _game.romname,
         systemFolder: targetSystemFolder,

@@ -20,7 +20,7 @@ import '../widgets/setting_row.dart';
 import '../widgets/setting_value_chip.dart';
 import '../widgets/settings_section_header.dart';
 import 'scrape_session.dart';
-import 'scraping_progress_panel.dart';
+import '../widgets/scraping_progress_panel.dart';
 import 'screenscraper_account_card.dart';
 import 'screenscraper_login_dialog.dart';
 
@@ -36,9 +36,14 @@ import 'screenscraper_login_dialog.dart';
 class ScreenScraperSettingsContent extends StatefulWidget {
   final bool isContentFocused;
 
+  /// Called after the user signed out, so Settings → Metadata can offer the
+  /// provider choice again.
+  final VoidCallback? onSignedOut;
+
   const ScreenScraperSettingsContent({
     super.key,
     required this.isContentFocused,
+    this.onSignedOut,
   });
 
   @override
@@ -380,6 +385,7 @@ class ScreenScraperSettingsContentState
         _movingRegion = false;
       });
       _scrollToCursor();
+      widget.onSignedOut?.call();
     } else {
       AppNotification.showNotification(
         context,
