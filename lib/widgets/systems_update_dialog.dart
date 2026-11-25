@@ -175,6 +175,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                                     widget.updateInfo.remoteVersion,
                                   ),
                               style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 9.r,
                                 color: theme.colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -209,6 +210,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                                       : widget.updateInfo.currentVersion,
                                 ),
                             style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 9.r,
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
@@ -243,6 +245,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                                         : AppLocale.systemsUpdateDownloading
                                               .getString(context),
                                     style: theme.textTheme.bodySmall?.copyWith(
+                                      fontSize: 9.r,
                                       fontWeight: FontWeight.w500,
                                     ),
                                     overflow: TextOverflow.ellipsis,
@@ -252,6 +255,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                                 Text(
                                   '${(_downloadProgress * 100).toStringAsFixed(0)}%',
                                   style: theme.textTheme.bodySmall?.copyWith(
+                                    fontSize: 9.r,
                                     fontWeight: FontWeight.bold,
                                     color: theme.colorScheme.primary,
                                   ),
