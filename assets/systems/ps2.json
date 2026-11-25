@@ -272,7 +272,7 @@
       }
     },
     {
-      "name": "Standalone ARMSX2 (Deprecated)",
+      "name": "Standalone ARMSX2 (Google Play)",
       "unique_id": "ps2.come.nanodata.armsx2",
       "description": "Supported extensions: iso, chd, gz, mdf, bin, ciso, img.",
       "is_retroachievements_compatible": false,
