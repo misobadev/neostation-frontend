@@ -272,25 +272,37 @@
       }
     },
     {
-      "name": "Standalone ARMSX2 (Google Play)",
-      "unique_id": "ps2.come.nanodata.armsx2",
-      "description": "Supported extensions: iso, chd, gz, mdf, bin, ciso, img.",
-      "is_retroachievements_compatible": false,
-      "platforms": {
-        "android": {
-          "launch_arguments": "-n come.nanodata.armsx2/kr.co.iefriends.pcsx2.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\"",
-          "m3u_first_disc": true
-        }
-      }
-    },
-    {
-      "name": "Standalone ARMSX2",
+      "name": "Standalone ARMSX2 Refresh",
       "unique_id": "ps2.com.armsx2",
       "description": "Supported extensions: iso, chd, gz, mdf, bin, ciso, img.",
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
           "launch_arguments": "-n com.armsx2/.Main -a android.intent.action.VIEW -d \"{file.uri}\"",
+          "m3u_first_disc": true
+        }
+      }
+    },
+    {
+      "name": "Standalone ARMSX2 (Google Play)",
+      "unique_id": "ps2.come.nanodata.armsx2",
+      "description": "Supported extensions: iso, chd, gz, mdf, bin, ciso, img.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n come.nanodata.armsx2/com.armsx2.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\"",
+          "m3u_first_disc": true
+        }
+      }
+    },
+    {
+      "name": "Standalone ARMSX2 (Deprecated)",
+      "unique_id": "ps2.come.nanodata.legacy.armsx2",
+      "description": "Supported extensions: iso, chd, gz, mdf, bin, ciso, img.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n come.nanodata.armsx2/kr.co.iefriends.pcsx2.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\"",
           "m3u_first_disc": true
         }
       }
