@@ -1411,14 +1411,13 @@ class _GamesCarouselState extends State<GamesCarousel> {
                   // boundary. Stepping past either end continues from the
                   // other.
                   wrap: true,
-                  performanceMode: _performanceMode,
                   depth: _performanceMode
                       ? const CarouselDepth(
-                          minScale: 1,
+                          scaleFalloff: 0.7,
+                          minScale: 0.55,
                           opacityBase: 1,
                           opacityFalloff: 0,
                           minOpacity: 1,
-                          edgePull: 0,
                         )
                       : const CarouselDepth(),
                   itemBuilder: (context, index) {
