@@ -259,6 +259,9 @@ void main() {
     provider = RomMSyncProvider(
       browse,
       NeoSyncProvider(NeoSyncService()),
+      // RetroArch's system folder is never this machine's.
+      systemCardHome: (_) async => null,
+      systemCardTarget: (_, _) async => null,
       locateSaves: paths.locate,
       resolveTargets: paths.resolveTargets,
     );

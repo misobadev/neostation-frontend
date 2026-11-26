@@ -64,6 +64,17 @@ typedef ResolveSaveTargets = Future<List<String>> Function(
 /// Enumerates the local library, for the pending-upload sweep.
 typedef ListLocalGames = Future<List<GameModel>> Function();
 
+/// The card folder of a system in RetroArch's system folder when its
+/// RetroArch core is set up here (see `retroArchSystemCardHome`).
+typedef ResolveSystemCardHome = Future<String?> Function(String? system);
+
+/// Where a card named `fileName` goes in RetroArch's system folder (see
+/// `retroArchSystemCardTarget`).
+typedef ResolveSystemCardTarget = Future<List<String>?> Function(
+  String system,
+  String fileName,
+);
+
 /// The standalone save folders configured for a system (the Saves tab's
 /// Standalone save folders), by system folder name.
 typedef ListSaveFolders = Future<List<String>> Function(
@@ -92,14 +103,6 @@ enum _RemoteGuard {
   /// upload is abandoned for this pass rather than performed blind.
   unreadable,
 }
-
-/// The names a system's memory cards that every game shares go by: PS2's
-/// `Mcd001.ps2`…, Dreamcast's `vmu_save_A1.bin`… (a per-game card is named
-/// after its game, and is no other game's to place).
-final _sharedCardNames = {
-  'ps2': RegExp(r'^mcd\d+\.ps2$', caseSensitive: false),
-  'dc': RegExp(r'^vmu_save_[a-d][1-4]\.bin$', caseSensitive: false),
-};
 
 /// How long a listing of every save serves a game's status check (a
 /// highlight) before it is asked for again.
@@ -226,6 +229,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   final ListLocalGames? _listGamesOverride;
   final ListSaveFolders? _saveFoldersOverride;
   final ResolveStandaloneSaveFolder? _standaloneFolderOverride;
+  final ResolveSystemCardHome? _systemCardHomeOverride;
+  final ResolveSystemCardTarget? _systemCardTargetOverride;
 
   final Map<String, GameSyncState> _gameSyncStates = {};
 
@@ -242,6 +247,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     @visibleForTesting ListLocalGames? listGames,
     @visibleForTesting ListSaveFolders? saveFolders,
     @visibleForTesting ResolveStandaloneSaveFolder? standaloneSaveFolder,
+    @visibleForTesting ResolveSystemCardHome? systemCardHome,
+    @visibleForTesting ResolveSystemCardTarget? systemCardTarget,
     @visibleForTesting this._autoSweep = true,
     @visibleForTesting RommLibraryLinker? linker,
     @visibleForTesting Duration sweepStartupDelay = _sweepStartupDelay,
@@ -250,6 +257,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
        _listGamesOverride = listGames,
        _saveFoldersOverride = saveFolders,
        _standaloneFolderOverride = standaloneSaveFolder,
+       _systemCardHomeOverride = systemCardHome,
+       _systemCardTargetOverride = systemCardTarget,
        _startupDelay = sweepStartupDelay {
     _linker = linker ?? _buildLinker();
     if (!_autoSweep) return;
@@ -281,6 +290,80 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
   Future<List<LocalSaveFile>> _locateSaves(GameModel game) =>
       (_locateOverride ?? _neoSync.locateGameSaveFiles)(game);
+
+  /// Where [game]'s downloads go (see [_Placement]).
+  _Placement _placementFor(GameModel game) => _Placement(
+    folders: () async {
+      final system = game.systemFolderName;
+      return system == null || system.isEmpty
+          ? const <String>[]
+          : _saveFolders(system);
+    },
+    standalone: () => _standaloneSaveFolder(game),
+  );
+
+  /// [game]'s saves a sync of it looks at: the syncable ones found for it,
+  /// with the memory cards that every game of its system shares narrowed to
+  /// the ones the emulator it launches with uses.
+  ///
+  /// RomM keeps one copy of a save per game and file name, whatever the
+  /// emulator, so two local cards of one name would both pair with it. A
+  /// game that launches with a standalone emulator never uses the card a
+  /// RetroArch core keeps in RetroArch's system folder. One that launches
+  /// with the RetroArch core, where that core is set up, uses only the cards
+  /// in the system folder: a card of the same kind elsewhere (one downloaded
+  /// into the saves folder before, a standalone emulator's) is left out, and
+  /// a card the server has goes into the system folder. Where the core isn't
+  /// set up, nothing changes.
+  Future<List<LocalSaveFile>> _passSaves(
+    GameModel game,
+    _Placement placement,
+  ) async {
+    final saves = syncableSaves(game, await _locateSaves(game));
+    final system = game.systemFolderName;
+    if (!sharesMemoryCards(system)) return saves;
+    bool cardNamed(LocalSaveFile s) =>
+        !s.relativePath.startsWith('states/') &&
+        CloudPathBuilder.isRetroArchSystemCardName(
+          system,
+          path.basename(s.filePath),
+        );
+    // Nothing to narrow: no lookup (a highlight or the sweep's check runs this
+    // for every game).
+    if (!saves.any((s) => s.inRetroArchSystemFolder || cardNamed(s))) {
+      return saves;
+    }
+    final home = await _systemCardHome(system);
+    // A card in the card folder, whatever claimed it: a standalone emulator's
+    // save folder set to that folder lists it as that folder's.
+    bool inHome(LocalSaveFile s) =>
+        s.inRetroArchSystemFolder ||
+        (home != null &&
+            cardNamed(s) &&
+            path.equals(
+              path.normalize(path.absolute(path.dirname(s.filePath))),
+              home,
+            ));
+    // The emulator is only looked up where the core is set up.
+    final systemCardsUsed =
+        home != null && !(await placement.standalone()).standalone;
+    return [
+      for (final s in saves)
+        if (systemCardsUsed
+            ? inHome(s) || !cardNamed(s)
+            : !s.inRetroArchSystemFolder)
+          s,
+    ];
+  }
+
+  Future<String?> _systemCardHome(String? system) =>
+      (_systemCardHomeOverride ?? _neoSync.retroArchSystemCardHome)(system);
+
+  Future<List<String>?> _systemCardTarget(String system, String name) =>
+      (_systemCardTargetOverride ?? _neoSync.retroArchSystemCardTarget)(
+        system,
+        name,
+      );
 
   Future<List<String>> _resolveTargets(GameModel game, String relativeName) =>
       (_resolveTargetsOverride ?? _neoSync.resolveLocalTargetPaths)(
@@ -359,12 +442,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// or into the emulator's folder otherwise (a copy outside its folders is
   /// never paired for such a game; see the reconcile loop in [_syncGame]). A
   /// standalone emulator with no folder gets nothing, rather than a copy in
-  /// RetroArch's folder that no emulator opens. Everything else is placed the
-  /// RetroArch way, by [_resolveTargets].
+  /// RetroArch's folder that no emulator opens. A memory card that every game
+  /// of its system shares goes into RetroArch's system folder where the core
+  /// keeps it there (see [_passSaves]): onto the card when it is one there,
+  /// into the card folder when this device has none, and nowhere when
+  /// something else is in its place. Everything else is placed the RetroArch
+  /// way, by [_resolveTargets].
   ///
-  /// A file in a configured folder goes back where it came from whichever
-  /// emulator the game launches with: on a shared-card system (PS2,
-  /// Dreamcast) the card in a standalone's folder is the copy that exists.
+  /// A file in a configured folder goes back where it came from: the copy a
+  /// sync pairs is the one the launch emulator uses (see [_passSaves]).
   Future<List<String>?> _downloadTargets(
     GameModel game,
     RommAsset asset, {
@@ -395,6 +481,21 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       }
       final target = safeJoin(folder, localName);
       return target == null ? const [] : [target];
+    }
+    // The card a RetroArch core keeps in RetroArch's system folder is written
+    // where it is; one this device lacks goes there when the core is set up
+    // (see [_passSaves]).
+    if (!asset.isState && paired != null && paired.inRetroArchSystemFolder) {
+      return [paired.filePath];
+    }
+    final system = game.systemFolderName;
+    if (!asset.isState &&
+        system != null &&
+        sharesMemoryCards(system) &&
+        CloudPathBuilder.isRetroArchSystemCardName(system, localName)) {
+      // Empty when something is already in its place: nothing is written.
+      final target = await _systemCardTarget(system, localName);
+      if (target != null) return target;
     }
     return _resolveTargets(game, relativeName);
   }
@@ -545,23 +646,16 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       return disabled;
     }
 
-    final localFiles = syncableSaves(game, await _locateSaves(game));
     // Where downloads go, worked out once per pass and only if one needs it:
     // finding the game's emulator enumerates the system's emulators.
-    final placement = _Placement(
-      folders: () async {
-        final system = game.systemFolderName;
-        return system == null || system.isEmpty
-            ? const <String>[]
-            : _saveFolders(system);
-      },
-      standalone: () => _standaloneSaveFolder(game),
-    );
+    final placement = _placementFor(game);
 
     // The two listings are independent GETs; fetch them concurrently so the
     // launch-blocking sync pays one round-trip, not two serial ones. Each is
     // also independent in failure: RomM can fail one (its states route, say)
-    // while the other answers, and the kind that listed still syncs.
+    // while the other answers, and the kind that listed still syncs. They are
+    // asked for before this device's saves are looked at, which reads
+    // RetroArch's configuration and may look up the game's emulator.
     Future<List<RommAsset>?> listed(
       String kind,
       Future<List<RommAsset>> Function() list,
@@ -573,6 +667,12 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         return null;
       }
     }
+
+    final listings = Future.wait([
+      listed('Saves', () => _svc.listSaves(romId: romId)),
+      listed('States', () => _svc.listStates(romId: romId)),
+    ]);
+    final localFiles = await _passSaves(game, placement);
 
     // PS2 and Dreamcast: every game of the system shares the memory cards.
     final sharesCards = sharesMemoryCards(game.systemFolderName);
@@ -591,7 +691,12 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     // takes the server's.
     final placeCards =
         sharesCards &&
-        localCards.isEmpty &&
+        !localCards.any(
+          (l) => CloudPathBuilder.isRetroArchSystemCardName(
+            game.systemFolderName,
+            path.basename(l.filePath),
+          ),
+        ) &&
         downloadOnly &&
         !statusOnly &&
         deadline != null;
@@ -604,10 +709,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       everySave = _everySaveListed(fresh: !statusOnly);
     }
 
-    final results = await Future.wait([
-      listed('Saves', () => _svc.listSaves(romId: romId)),
-      listed('States', () => _svc.listStates(romId: romId)),
-    ]);
+    final results = await listings;
     final savesListed = results[0] != null;
     final statesListed = results[1] != null;
     if (!savesListed && !statesListed) {
@@ -974,10 +1076,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     final cardsToPlace = placeCards ? await everySave : null;
     bool placeable(RommAsset a) =>
         !a.isState &&
-        (_sharedCardNames[game.systemFolderName]?.hasMatch(
-              localNameForAsset(a),
-            ) ??
-            false);
+        CloudPathBuilder.isRetroArchSystemCardName(
+          game.systemFolderName,
+          localNameForAsset(a),
+        );
 
     // 2) Remote-only files → download.
     for (final a in remote) {
@@ -1011,8 +1113,11 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           );
           countDownload(placed);
           anyRemote = true;
-          // Abandoned at the deadline: the next launch's to place.
-          if (!placed.wrote && !placed.failed) takeLeftForLaunch = true;
+          // Abandoned at the deadline: the next launch's to place. One that
+          // can't go there (something already in its place) isn't.
+          if (!placed.wrote && !placed.failed && deadline.isExpired) {
+            takeLeftForLaunch = true;
+          }
         }
       }
     }
@@ -1329,7 +1434,9 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
       final prefix = isState ? 'states/' : 'saves/';
       for (final f in localFiles) {
-        if (!f.relativePath.startsWith(prefix)) continue;
+        if (!f.relativePath.startsWith(prefix) || f.inRetroArchSystemFolder) {
+          continue;
+        }
         final sub = _subfolderOf(f);
         if (sub.isNotEmpty) return sub;
       }
@@ -1988,12 +2095,16 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
               continue;
             }
             try {
-              // A card unchanged here goes in its one slot, which the next
-              // such download overwrites: routine downloads would otherwise
-              // push the dated copies (a first sync's, a conflict's) out.
-              if (changedHere) {
+              if (firstCardSync) {
+                // Possibly the only copy of everything this device's games
+                // saved on the card: never tidied away.
+                keptHere = await keepRommFirstSyncCopy(target, bytes: current);
+              } else if (changedHere) {
                 keptHere = await keepRommLocalCopy(target, bytes: current);
               } else {
+                // A card unchanged here goes in its one slot, which the next
+                // such download overwrites: routine downloads would otherwise
+                // push the dated copies (a conflict's, one changed here) out.
                 keptHere = await stageRommLocalSlot(target, bytes: current);
                 slotStaged = true;
               }
@@ -2610,7 +2721,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   }) async {
     final List<LocalSaveFile> localFiles;
     try {
-      localFiles = syncableSaves(game, await _locateSaves(game));
+      localFiles = await _passSaves(game, _placementFor(game));
     } catch (e) {
       // Not worth a round trip to find out, and no reason to stop reporting a
       // save that failed before.

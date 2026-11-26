@@ -250,6 +250,9 @@ void main() {
     provider = RomMSyncProvider(
       _FakeBrowse(svc),
       NeoSyncProvider(NeoSyncService()),
+      // RetroArch's system folder is never this machine's.
+      systemCardHome: (_) async => null,
+      systemCardTarget: (_, _) async => null,
       autoSweep: false,
       locateSaves: (_) async => local,
       resolveTargets: (game, relativeName) async {

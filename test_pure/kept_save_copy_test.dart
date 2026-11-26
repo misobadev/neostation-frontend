@@ -53,6 +53,17 @@ void main() {
       expect(name.stampedAt, isNull);
     });
 
+    test('RomM\'s copy from a memory card\'s first sync, with its time', () {
+      final card = p.join('saves', 'Mcd001.ps2');
+      final name = parseKeptCopyPath(
+        rommFirstSyncCopyPath(card, DateTime(2026, 11, 23, 12, 30, 5)),
+      )!;
+      expect(name.savePath, card);
+      expect(name.source, KeptCopySource.rommBeforeDownload);
+      expect(name.stampedAt, DateTime(2026, 11, 23, 12, 30, 5));
+      expect(name.firstSync, isTrue);
+    });
+
     test('a RomM conflict copy, with the local time it was kept', () {
       final save = p.join('saves', 'Zelda.srm');
       final name = parseKeptCopyPath(
@@ -125,6 +136,7 @@ void main() {
         replacedCopyPath(save, DateTime.utc(2026)),
         p.join('saves', 'ZELDA.SRM.NEOSYNC.BAK'),
         rommLocalSlotPath(save),
+        rommFirstSyncCopyPath(save, DateTime(2026, 11, 23, 12)),
       ]) {
         expect(isKeptCopyPath(path), isTrue, reason: path);
       }
@@ -881,6 +893,31 @@ void main() {
       for (final copy in [...dated, slot]) {
         expect(copy.existsSync(), isTrue, reason: copy.path);
       }
+    });
+
+    test('a memory card\'s first-sync copy is never one too many', () async {
+      final card = write('Mcd001.ps2', [0]);
+      final first = write(
+        p.basename(rommFirstSyncCopyPath(card.path, DateTime(2026, 11, 1, 12))),
+        [1],
+        modified: DateTime.utc(2026, 11, 1),
+      );
+      final dated = [
+        for (var i = 2; i <= 6; i++)
+          write(
+            p.basename(rommLocalCopyPath(card.path, DateTime(2026, 11, i, 12))),
+            [i],
+            modified: DateTime.utc(2026, 11, i),
+          ),
+      ];
+
+      await tidy(card.path);
+
+      expect(first.existsSync(), isTrue);
+      expect(
+        dated.where((f) => f.existsSync()),
+        hasLength(maxKeptCopiesPerSave),
+      );
     });
 
     test('when RomM\'s slot holds the same bytes as a dated copy, the slot '
