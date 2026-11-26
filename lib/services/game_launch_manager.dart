@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:neostation/services/logger_service.dart';
 
+import 'game/game_session_manager.dart';
 import 'game_service.dart';
 import 'music_player_service.dart';
 import 'sfx_service.dart';
@@ -173,6 +174,10 @@ class GameLaunchManager extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!Platform.isAndroid) return;
+    // A game on the other screen leaves NeoStation's window running beside it:
+    // focus coming back here is the user tapping it, not the game closing. The
+    // native side reports that close (onGameReturned) instead.
+    if (GameSessionManager.gameOnOtherScreen) return;
     if (state == AppLifecycleState.resumed && !_isClosing) {
       if (_phase == GameLaunchPhase.launching) {
         _resumedBeforeMonitoring = true;

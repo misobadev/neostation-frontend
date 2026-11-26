@@ -236,6 +236,10 @@ const Map<String, dynamic> appLocaleEs = {
       'Escaneo recursivo desactivado. Escaneando {name}...',
   AppLocale.subfolderView: 'Mostrar subcarpetas',
   AppLocale.subfolderViewSubtitle: 'Agrupar las ROMs de subcarpetas en carpetas navegables en lugar de mezclarlas con los juegos',
+  AppLocale.openOnSecondaryScreen: 'Abrir juegos en la pantalla secundaria',
+  AppLocale.openOnSecondaryScreenSubtitle: 'Abre los juegos de este sistema en la otra pantalla de un dispositivo con dos pantallas',
+  AppLocale.launchScreen: 'Pantalla',
+  AppLocale.mainScreen: 'Pantalla principal',
   AppLocale.subfolderViewAll: 'Mostrar subcarpetas en todos los sistemas',
   AppLocale.subfolderViewAllSubtitle:
       'Aplicar de una vez la opción Mostrar subcarpetas a todos los sistemas',
@@ -290,8 +294,6 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.nowPlayingDimOff: 'Desactivado',
   AppLocale.secondarySectionNowPlaying: 'Panel Reproduciendo',
   AppLocale.secondarySectionDock: 'Dock de apps',
-  AppLocale.screenshotAccess: 'Retorno de pantalla y capturas',
-  AppLocale.screenshotAccessSubtitle: 'Restaura la pantalla «Reproduciendo» al cerrar una app abierta desde el dock y permite que el botón de captura haga capturas de pantalla (abre los ajustes de Accesibilidad de Android)',
   AppLocale.scanOnStartupSubtitle:
       'Escanear carpetas de ROMs automáticamente al iniciar la app',
   AppLocale.ignoreHiddenFiles: 'Ignorar elementos ocultos',
@@ -340,6 +342,10 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.disableSecondaryScreen: 'Desactivar en pantalla secundaria',
   AppLocale.disableSecondaryScreenSub:
       'Apaga la aplicación en la pantalla secundaria',
+  AppLocale.swapScreens: 'Intercambiar pantallas',
+  AppLocale.swapScreensSub: 'Muestra NeoStation en la pantalla inferior y Now Playing y el dock en la superior',
+  AppLocale.controllerHintTapGame:
+      'Toca la pantalla del juego para devolverle el control',
   AppLocale.bartopShutdown: 'Apagado BarTOP al Salir',
   AppLocale.bartopShutdownSubtitle:
       'Apagar el equipo al salir de la aplicación',
@@ -371,6 +377,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.exitConfirmation: '¿Seguro que quieres salir de NeoStation?',
   AppLocale.confirmExit: 'Confirmar salida',
   AppLocale.rescanAllFolders: 'Reescanear todas las carpetas de ROMs',
+  AppLocale.pullToRescan: 'Desliza para reescanear',
+  AppLocale.releaseToRescan: 'Suelta para reescanear',
   AppLocale.rescanAllFoldersSubtitle:
       'Buscar nuevos sistemas y ROMs manualmente',
   AppLocale.organizeMultiDiscGames: 'Organizar juegos multidisco',
@@ -956,13 +964,6 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.letsGetSetup: 'Vamos a configurarlo todo',
   AppLocale.storagePermission: 'Permiso de Almacenamiento',
   AppLocale.storagePermissionDesc: 'NeoStation necesita "Acceso a todos los archivos" para gestionar tus configuraciones de RetroArch y sincronizar tus partidas correctamente.\n\nPor favor, concede este permiso en la siguiente pantalla.',
-  AppLocale.screenReturnAccess: 'Acceso para el retorno de pantalla',
-  AppLocale.screenReturnAccessDesc: 'Vuelve a mostrar la pantalla «Reproduciendo» al cerrar una app abierta desde el dock y activa las capturas de pantalla del sistema. Solo se lee el nombre de la app en primer plano: no se recopila ningún contenido de la pantalla.',
-  AppLocale.screenReturnAccessHint: 'Activa NeoStation y luego toca Permitir',
-  AppLocale.screenReturnDialogTitle: 'Activar el retorno de pantalla',
-  AppLocale.screenReturnDialogBody: 'Para abrir apps desde el dock, NeoStation necesita el servicio de accesibilidad de retorno de pantalla. Te trae de vuelta aquí cuando cierras la app que abriste. Sin él, podrías quedarte sin forma de volver.',
-  AppLocale.screenReturnDialogSteps: 'En la siguiente pantalla, busca NeoStation en la lista de servicios y actívalo.',
-  AppLocale.openSettings: 'Abrir ajustes',
   AppLocale.selectRomFolder: 'Seleccionar Carpeta de ROMs',
   AppLocale.romFolderSelected: '¡Carpeta de ROMs seleccionada!',
   AppLocale.chooseRomFolderDesc: 'Elige la carpeta donde se encuentran tus archivos ROM.\n\nNeoStation escaneará esta carpeta en busca de juegos.',

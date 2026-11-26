@@ -25,6 +25,7 @@ import '../repositories/system_repository.dart';
 import '../repositories/emulator_repository.dart';
 import '../repositories/game_repository.dart';
 import '../services/config_service.dart';
+import '../services/launch_display_service.dart';
 
 import 'package:neostation/services/logger_service.dart';
 
@@ -89,8 +90,19 @@ class _SystemEmulatorSettingsDialogState
   int _emulatorActionIndex = 0;
   // 0: Prefer filename, 1: Hide ext, 2: (), 3: [], 4: Recursive (only when
   // [_offersRecursiveScan]), 5: Show subfolders (only when
-  // [_offersSubfolderView]).
+  // [_offersSubfolderView]), 6: Open games on the secondary screen (only when
+  // [_offersLaunchDisplay]).
   late int _totalGeneralItems;
+
+  /// Index of the "Open games on secondary screen" row in the General tab.
+  static const int _launchDisplayIndex = 6;
+
+  /// Set once the display lookup finds a second screen; the row stays hidden
+  /// (and out of the gamepad cycle) on single-screen devices.
+  bool _hasSecondaryDisplay = false;
+
+  /// This system's launch screen setting: true = secondary screen.
+  bool _openOnSecondary = false;
   late List<GlobalKey> _generalItemKeys;
   late List<GlobalKey> _appearanceItemKeys;
 
@@ -129,13 +141,12 @@ class _SystemEmulatorSettingsDialogState
     // 'favorites', 'collections', a single collection) own none, and a
     // collection's id has no `app_systems` row for the setting to be written
     // against at all.
-    _totalGeneralItems =
-        4 + (_offersRecursiveScan ? 1 : 0) + (_offersSubfolderView ? 1 : 0);
+    _totalGeneralItems = _baseGeneralItems;
 
     _generalScrollController = ScrollController();
     _hiddenScrollController = ScrollController();
     _generalItemKeys = List.generate(
-      _totalGeneralItems,
+      _launchDisplayIndex + 1,
       (index) => GlobalKey(
         debugLabel:
             'general_item_${_system.folderName}_${index}_${identityHashCode(this)}',
@@ -152,7 +163,48 @@ class _SystemEmulatorSettingsDialogState
 
     _loadCores();
     _loadHiddenGames();
+    _loadLaunchDisplay();
     _initializeGamepad();
+  }
+
+  /// Reads whether a second screen exists and this system's launch screen.
+  /// Async, so the row (and its gamepad slot) appears once both are known.
+  Future<void> _loadLaunchDisplay() async {
+    final hasSecondary = await LaunchDisplayService.hasSecondaryDisplay();
+    if (!hasSecondary) return;
+    final display = await LaunchDisplayService.getForSystem(_system.folderName);
+    if (!mounted) return;
+    setState(() {
+      _hasSecondaryDisplay = true;
+      _openOnSecondary = display == LaunchDisplay.secondary;
+      _totalGeneralItems = _baseGeneralItems + (_offersLaunchDisplay ? 1 : 0);
+    });
+  }
+
+  /// General-tab rows that do not depend on the display lookup.
+  int get _baseGeneralItems =>
+      4 + (_offersRecursiveScan ? 1 : 0) + (_offersSubfolderView ? 1 : 0);
+
+  /// Whether the General tab offers "Open games on secondary screen".
+  ///
+  /// Needs a second screen, and a real system with its own games: the virtual
+  /// libraries aggregate other systems, whose own setting already applies.
+  /// Tied to both scan rows being present too, because the General tab's
+  /// gamepad indices are fixed (this row is always index 6).
+  bool get _offersLaunchDisplay =>
+      _hasSecondaryDisplay && _offersRecursiveScan && _offersSubfolderView;
+
+  Future<void> _toggleOpenOnSecondary(bool value) async {
+    setState(() => _openOnSecondary = value);
+    try {
+      await LaunchDisplayService.setForSystem(
+        _system.folderName,
+        value ? LaunchDisplay.secondary : null,
+      );
+    } catch (e) {
+      _log.e('Saving the launch screen failed: $e');
+      if (mounted) setState(() => _openOnSecondary = !value);
+    }
   }
 
   @override

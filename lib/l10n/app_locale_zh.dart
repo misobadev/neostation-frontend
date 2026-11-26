@@ -222,6 +222,10 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.recursiveScanDisabled: '递归扫描已禁用。正在扫描 {name}...',
   AppLocale.subfolderView: '显示子文件夹',
   AppLocale.subfolderViewSubtitle: '将子文件夹中的 ROM 归入可浏览的文件夹，而不是与游戏混在一起',
+  AppLocale.openOnSecondaryScreen: '在副屏打开游戏',
+  AppLocale.openOnSecondaryScreenSubtitle: '在双屏设备上，于另一块屏幕启动此系统的游戏',
+  AppLocale.launchScreen: '屏幕',
+  AppLocale.mainScreen: '主屏',
   AppLocale.subfolderViewAll: '在所有系统中显示子文件夹',
   AppLocale.subfolderViewAllSubtitle: '将“显示子文件夹”设置一次性应用到所有系统',
   AppLocale.subfolderViewAllOverridesNotice:
@@ -267,9 +271,6 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.nowPlayingDimOff: '关闭',
   AppLocale.secondarySectionNowPlaying: 'Now Playing 面板',
   AppLocale.secondarySectionDock: '应用坞',
-  AppLocale.screenshotAccess: '界面返回与截图',
-  AppLocale.screenshotAccessSubtitle:
-      '关闭从应用坞打开的应用后恢复 Now Playing 界面，并让截图按钮可以截取屏幕（将打开 Android 无障碍设置）',
   AppLocale.scanOnStartupSubtitle: '应用程序启动时自动扫描 ROM 文件夹',
   AppLocale.ignoreHiddenFiles: '忽略隐藏项目',
   AppLocale.ignoreHiddenFilesSubtitle: 'ROM 扫描期间隐藏隐藏文件和文件夹',
@@ -308,6 +309,9 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.setAsDefaultLauncher: '将 NeoStation 设置为默认启动器',
   AppLocale.disableSecondaryScreen: '在副屏幕上禁用',
   AppLocale.disableSecondaryScreenSub: '在副屏幕上关闭应用',
+  AppLocale.swapScreens: '交换屏幕',
+  AppLocale.swapScreensSub: '在下屏显示 NeoStation，在上屏显示 Now Playing 和程序坞',
+  AppLocale.controllerHintTapGame: '轻触游戏所在的屏幕，将手柄交还给游戏',
   AppLocale.bartopShutdown: '退出时关闭 BarTOP',
   AppLocale.bartopShutdownSubtitle: '退出应用时关闭计算机',
 
@@ -334,6 +338,8 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.exitConfirmation: '您确定要退出 NeoStation 吗？',
   AppLocale.confirmExit: '确认退出',
   AppLocale.rescanAllFolders: '重新扫描所有 ROM 文件夹',
+  AppLocale.pullToRescan: '下拉重新扫描',
+  AppLocale.releaseToRescan: '松开重新扫描',
   AppLocale.rescanAllFoldersSubtitle: '手动扫描新系统和 ROM',
   AppLocale.organizeMultiDiscGames: '整理多碟游戏',
   AppLocale.organizeMultiDiscGamesSubtitle: '自动为多碟游戏创建 .m3u 文件，并将其整理到文件夹中',
@@ -878,15 +884,6 @@ const Map<String, dynamic> appLocaleZh = {
   AppLocale.storagePermission: '存储权限',
   AppLocale.storagePermissionDesc:
       'NeoStation 需要“所有文件访问权限”来管理 RetroArch 配置并同步游戏存档。',
-  AppLocale.screenReturnAccess: '界面返回权限',
-  AppLocale.screenReturnAccessDesc:
-      '关闭从应用坞打开的应用后返回 Now Playing 界面，并启用系统截图。仅读取前台应用的名称，不会收集任何屏幕内容。',
-  AppLocale.screenReturnAccessHint: '开启 NeoStation，然后点按“允许”',
-  AppLocale.screenReturnDialogTitle: '启用界面返回',
-  AppLocale.screenReturnDialogBody:
-      '要从应用坞启动应用，NeoStation 需要“界面返回”无障碍服务。它会在你关闭所打开的应用后带你回到这里。没有它，你可能无法返回。',
-  AppLocale.screenReturnDialogSteps: '在下一个界面中，从服务列表里找到 NeoStation 并将其开启。',
-  AppLocale.openSettings: '打开设置',
   AppLocale.selectRomFolder: '选择 ROM 文件夹',
   AppLocale.romFolderSelected: 'ROM 文件夹已选择！',
   AppLocale.chooseRomFolderDesc: '选择存储 ROM 文件的文件夹。NeoStation 将扫描其中的游戏。',

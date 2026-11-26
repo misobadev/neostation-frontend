@@ -50,7 +50,9 @@ extension _PullToRefresh on _SystemCardGridViewState {
     }
     if (_activePointers.isEmpty && _pullReady) {
       _pullReady = false;
+      _pullTriggered = true;
       _pullProgress.value = 0.0;
+      _pullExtent.value = 0.0;
       _triggerRefresh();
     }
   }
@@ -62,7 +64,9 @@ extension _PullToRefresh on _SystemCardGridViewState {
     }
     if (_activePointers.isEmpty && _pullReady) {
       _pullReady = false;
+      _pullTriggered = true;
       _pullProgress.value = 0.0;
+      _pullExtent.value = 0.0;
       _triggerRefresh();
     }
   }

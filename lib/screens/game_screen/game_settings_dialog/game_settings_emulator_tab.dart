@@ -7,6 +7,7 @@ import 'package:neostation/models/core_emulator_model.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/system_model.dart';
 import 'package:neostation/repositories/game_repository.dart';
+import 'package:neostation/services/launch_display_service.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/emulator_loader.dart';
@@ -15,7 +16,9 @@ import 'package:neostation/widgets/settings_rows.dart';
 /// Per-game emulator override tab for [GameSettingsDialog].
 ///
 /// Lists 'System Default' plus every emulator available for the game's
-/// system, mirroring the behavior of the list view's settings tab.
+/// system, mirroring the behavior of the list view's settings tab. On a device
+/// with a second screen it adds a Screen section below (system default, main
+/// screen, secondary screen) that picks where this game opens.
 class GameSettingsEmulatorTab extends StatefulWidget {
   final GameModel game;
   final SystemModel system;
@@ -56,14 +59,75 @@ class GameSettingsEmulatorTabState extends State<GameSettingsEmulatorTab> {
       ? widget.game.emulatorName
       : _activeEmulatorId as String?;
 
-  int get _totalItems =>
+  /// Whether a second screen exists, so the Screen section is shown.
+  bool _hasSecondaryDisplay = false;
+
+  /// This game's own launch screen; null follows the system.
+  LaunchDisplay? _launchDisplay;
+
+  /// Options of the Screen section, in row order. null = system default.
+  static const List<LaunchDisplay?> _screenOptions = [
+    null,
+    LaunchDisplay.primary,
+    LaunchDisplay.secondary,
+  ];
+
+  int get _emulatorItems =>
       _availableEmulators.isEmpty ? 0 : 1 + _availableEmulators.length;
+
+  /// The Screen section only makes sense next to a launchable game.
+  bool get _showsScreenSection =>
+      _hasSecondaryDisplay && _emulatorItems > 0 && _romPath != null;
+
+  String? get _romPath {
+    final path = widget.game.romPath;
+    return path == null || path.isEmpty ? null : path;
+  }
+
+  /// Emulator rows first (0.._emulatorItems-1), then the Screen rows.
+  int get _totalItems =>
+      _emulatorItems + (_showsScreenSection ? _screenOptions.length : 0);
 
   @override
   void initState() {
     super.initState();
     _loadEmulators();
+    _loadLaunchDisplay();
   }
+
+  Future<void> _loadLaunchDisplay() async {
+    final romPath = _romPath;
+    if (romPath == null) return;
+    if (!await LaunchDisplayService.hasSecondaryDisplay()) return;
+    final display = await LaunchDisplayService.getForGame(romPath);
+    if (!mounted) return;
+    setState(() {
+      _hasSecondaryDisplay = true;
+      _launchDisplay = display;
+    });
+  }
+
+  Future<void> _setLaunchDisplay(LaunchDisplay? display) async {
+    final romPath = _romPath;
+    if (romPath == null) return;
+    final previous = _launchDisplay;
+    if (mounted) setState(() => _launchDisplay = display);
+    try {
+      await LaunchDisplayService.setForGame(romPath, display);
+    } catch (e) {
+      _log.e('Launch screen persistence failed: $e');
+      if (mounted) setState(() => _launchDisplay = previous);
+    }
+  }
+
+  String _screenLabel(BuildContext context, LaunchDisplay? display) =>
+      switch (display) {
+        null => AppLocale.systemDefault.getString(context),
+        LaunchDisplay.primary => AppLocale.mainScreen.getString(context),
+        LaunchDisplay.secondary => AppLocale.secondaryDisplay.getString(
+          context,
+        ),
+      };
 
   @override
   void dispose() {
@@ -94,6 +158,10 @@ class GameSettingsEmulatorTabState extends State<GameSettingsEmulatorTab> {
 
   void trigger() {
     if (_totalItems == 0) return;
+    if (_selectedIndex >= _emulatorItems) {
+      _setLaunchDisplay(_screenOptions[_selectedIndex - _emulatorItems]);
+      return;
+    }
     if (_selectedIndex == 0) {
       _setEmulatorOverride(null);
       return;
@@ -163,28 +231,10 @@ class GameSettingsEmulatorTabState extends State<GameSettingsEmulatorTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: EdgeInsets.only(left: 4.r, bottom: 4.r),
-            child: Row(
-              children: [
-                Icon(
-                  Symbols.sports_esports_rounded,
-                  size: 12.r,
-                  color: Theme.of(context).colorScheme.onSurface
-                      .withValues(alpha: 0.6),
-                ),
-                SizedBox(width: 4.r),
-                Text(
-                  AppLocale.emulator.getString(context),
-                  style: TextStyle(
-                    fontSize: 11.r,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface
-                        .withValues(alpha: 0.6),
-                  ),
-                ),
-              ],
-            ),
+          _sectionHeader(
+            context,
+            Symbols.sports_esports_rounded,
+            AppLocale.emulator.getString(context),
           ),
           // Global System Default Option.
           EmulatorRow(
@@ -219,6 +269,51 @@ class GameSettingsEmulatorTabState extends State<GameSettingsEmulatorTab> {
               emulator: e,
             );
           }),
+          if (_showsScreenSection) ...[
+            SizedBox(height: 8.r),
+            _sectionHeader(
+              context,
+              Symbols.screenshot_monitor_rounded,
+              AppLocale.launchScreen.getString(context),
+            ),
+            ..._screenOptions.asMap().entries.map((entry) {
+              final navIndex = _emulatorItems + entry.key;
+              final option = entry.value;
+              return EmulatorRow(
+                key: _itemKey(navIndex),
+                isSelected: _selectedIndex == navIndex,
+                label: _screenLabel(context, option),
+                isActive: _launchDisplay == option,
+                onTap: () {
+                  SfxService().playNavSound();
+                  setState(() => _selectedIndex = navIndex);
+                  _setLaunchDisplay(option);
+                },
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionHeader(BuildContext context, IconData icon, String label) {
+    final color = Theme.of(context).colorScheme.onSurface
+        .withValues(alpha: 0.6);
+    return Padding(
+      padding: EdgeInsets.only(left: 4.r, bottom: 4.r),
+      child: Row(
+        children: [
+          Icon(icon, size: 12.r, color: color),
+          SizedBox(width: 4.r),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.r,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
         ],
       ),
     );

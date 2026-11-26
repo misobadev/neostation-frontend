@@ -55,6 +55,17 @@
       }
     },
     {
+      "name": "Standalone GBA DS",
+      "unique_id": "gba.io.github.kyannon.gbads",
+      "description": "GBA emulator for dual-screen handhelds that shows the game's map or HUD on the second screen. Supported extensions: agb, bin, cgb, dmg, gb, gba, gbc, sgb, zip, 7z.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n io.github.kyannon.gbads/.LauncherActivity --es rom \"{file.path}\" --activity-clear-task --activity-clear-top"
+        }
+      }
+    },
+    {
       "name": "Standalone Pizza Boy GBA Basic",
       "unique_id": "gba.it.dbtecno.pizzaboygba",
       "description": "Supported extensions: gba, zip, 7z.",

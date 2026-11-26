@@ -74,20 +74,6 @@ class SecondaryAppsService {
     }
   }
 
-  /// Opens Android's accessibility settings (deep-linked to NeoStation's own
-  /// service page) from the secondary-display engine. Used when the Screen
-  /// Return service isn't enabled yet — launching an app without it would
-  /// strand the user with no way back to Now Playing.
-  static Future<void> openAccessibilitySettings() async {
-    try {
-      await _channel.invokeMethod('openAccessibilitySettings');
-    } on PlatformException catch (e) {
-      _log.e(
-        "Secondary: failed to open accessibility settings: '${e.message}'.",
-      );
-    }
-  }
-
   /// Whether the device screen is on, as pushed by the native presentation on
   /// every ACTION_SCREEN_ON/OFF edge.
   ///
@@ -104,6 +90,11 @@ class SecondaryAppsService {
 
   static bool _screenStateWired = false;
 
+  /// Bumped when a controller press reached this screen while a game or app
+  /// covers the main UI's screen. Android only hands the controller back to
+  /// that game when its screen is touched, so the secondary UI shows a hint.
+  static final ValueNotifier<int> controllerHintTrigger = ValueNotifier<int>(0);
+
   /// Subscribes to native screen on/off edges and seeds [deviceScreenOn] from
   /// the display's live state. Idempotent — safe to call from every widget that
   /// needs it. Only the secondary engine talks on this channel, so registering
@@ -118,6 +109,9 @@ class SecondaryAppsService {
           break;
         case 'onDeviceScreenOff':
           deviceScreenOn.value = false;
+          break;
+        case 'showControllerHint':
+          controllerHintTrigger.value++;
           break;
       }
       return null;

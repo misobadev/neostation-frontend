@@ -89,9 +89,9 @@ class GamesGrid extends StatefulWidget {
   /// calling [onFavorite] directly — it is a mouse/touch affordance.
   final VoidCallback? onYButton;
 
-  /// The West face button (X on an Xbox pad, Y on a Nintendo-style one), and
-  /// the footer hint for it. Opens
-  /// the library search; null leaves both unbound.
+  /// The West face button (X on an Xbox pad, Y on a Nintendo-style one) and
+  /// the X button, and the footer hint for West. Opens the library search;
+  /// null leaves them unbound.
   final VoidCallback? onSearch;
 
   /// Attached to the selected card so the host can anchor the context menu to
@@ -780,8 +780,12 @@ class _GamesGridState extends State<GamesGrid> with TickerProviderStateMixin {
       onSelectItem: widget.onPlay,
       onBack: widget.onBack,
       onFavorite: null, // Options moved to Start.
-      onXButton: null, // Options moved to Start.
-      onWestButton: widget.onSearch, // West face button - Search.
+      // Search on West (since #673) and on the button reported as X, so the
+      // X the header shows opens it on every controller: on the AYN controller
+      // West is the button printed Y. (The list view searches on X only and
+      // favourites on Y.)
+      onXButton: widget.onSearch,
+      onWestButton: widget.onSearch,
       onLeftStickClick: widget.onRandom,
       onSelectButton: _toggleVideoMute, // Select tap - Mute preview video.
       onSelectModifierA: widget.onScrape, // Select + A - Scrape.

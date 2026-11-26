@@ -322,25 +322,60 @@ class GamepadNavigation {
   /// hold was a plain tap so Select keeps its own action (e.g. mute the playing
   /// video) while still working as the chord modifier.
   ///
-  /// The dispatch is deferred by [SelectTap.chordWindow] because the
-  /// pulse-emitting controllers release Select while it is still physically
-  /// held — firing immediately would mute the video at the start of every
-  /// chord. Any chord landing inside that window invalidates the pending tap.
+  /// On a layer with Select chords the dispatch is deferred by
+  /// [SelectTap.chordWindow], because the pulse-emitting controllers release
+  /// Select while it is still physically held — firing immediately would mute
+  /// the video at the start of every chord. Any chord landing inside that
+  /// window invalidates the pending tap.
+  ///
+  /// A layer with no chords has nothing to wait for, so the tap fires on the
+  /// release itself. Waiting there only made Select feel slow (opening the
+  /// notifications from the Systems screen took the full window). A pulse
+  /// release still fires just once: the presses that follow it continue the
+  /// same hold, and that hold's final release schedules nothing.
   void _onSelectUp(DateTime now) {
     final schedulesTap = _selectTap.releaseSchedulesTap(now);
     _publishSelectHeld();
     if (!schedulesTap) return;
     _selectTapTimer?.cancel();
+    _selectTapTimer = null;
+    if (!_hasSelectChords) {
+      _dispatchSelectTap();
+      return;
+    }
     _selectTapTimer = Timer(SelectTap.chordWindow, () {
       _selectTapTimer = null;
       if (!_selectTap.tapStillValid) return;
-      final owned = onSelectButton;
-      if (owned != null) {
-        owned();
-        return;
-      }
-      globalSelectTap?.call();
+      _dispatchSelectTap();
     });
+  }
+
+  /// Whether this layer binds any Select+face-button chord.
+  bool get _hasSelectChords =>
+      onSelectModifierA != null ||
+      onSelectModifierB != null ||
+      onSelectModifierX != null ||
+      onSelectModifierY != null;
+
+  /// Fires this layer's own Select action, or the app-wide one when it has none.
+  void _dispatchSelectTap() {
+    final owned = onSelectButton;
+    if (owned != null) {
+      owned();
+      return;
+    }
+    globalSelectTap?.call();
+  }
+
+  /// Feeds a Select press ([down]) or release straight into the tap logic,
+  /// bypassing the plugin plumbing.
+  @visibleForTesting
+  void debugSelectEdge({required bool down}) {
+    if (down) {
+      _onSelectDown(_now());
+    } else {
+      _onSelectUp(_now());
+    }
   }
 
   DateTime? _activationTime;

@@ -285,7 +285,7 @@ class HeaderState extends State<Header> with WidgetsBindingObserver {
               // Measured against the widest the pill can ever be, so the count
               // cannot flip as the clock ticks past a digit or the battery
               // falls to one.
-              final maxSlots = navStripMaxSlots(
+              final fittingSlots = navStripMaxSlots(
                 totalWidth: constraints.maxWidth,
                 statusPillWidth: statusPillWidth(
                   clockTextWidth: _measureText(
@@ -306,8 +306,9 @@ class HeaderState extends State<Header> with WidgetsBindingObserver {
                   // glyph second.
                   withClockGlyph: false,
                   horizontalPadding: 10.r,
-                  bell: 14.r,
-                  bellGap: 10.r,
+                  // The bell sits at the far left of the header, not in the pill.
+                  bell: 0,
+                  bellGap: 0,
                   glyph: 14.r,
                   glyphGap: 4.r,
                   batteryGap: 12.r,
@@ -321,6 +322,15 @@ class HeaderState extends State<Header> with WidgetsBindingObserver {
                 gutter: 4.r,
                 minSlots: minNavTabSlots,
               );
+
+              // With a 24-hour clock the pill is narrow, and the bell no
+              // longer sits in it, so every tab is shown and the strip never
+              // scrolls. The pill scales itself down if it still runs short.
+              final maxSlots =
+                  !configProvider.config.use12HourClock &&
+                      visibleTabs.length > fittingSlots
+                  ? visibleTabs.length
+                  : fittingSlots;
 
               final pillAllowance = statusPillMaxWidth(
                 totalWidth: constraints.maxWidth,
@@ -346,39 +356,43 @@ class HeaderState extends State<Header> with WidgetsBindingObserver {
               return Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Left slot: Discovery's Re-roll, which lives here because
-                  // that board has no footer to put it in.
-                  if (NavTab.values[widget.selectedTabIndex] ==
-                      NavTab.discovery)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [HeaderDiscoveryReroll()],
-                      ),
-                    ),
-
-                  if (widget.onSearch != null)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: EdgeInsets.only(left: 8.r),
-                        child: GamepadControl(
-                          iconPath: 'assets/images/gamepad/Xbox_X_button.png',
-                          label: AppLocale.searchTitle.getString(context),
-                          onTap: () {
-                            SfxService().playNavSound();
-                            widget.onSearch?.call();
-                          },
-                          backgroundColor: Theme.of(context)
-                              .colorScheme
-                              .tertiaryFixed,
-                          textColor: Theme.of(context)
-                              .colorScheme
-                              .onTertiaryFixed,
+                  // Left slot: the notification bell first, at the search
+                  // button's size, then Discovery's Re-roll (that board has no
+                  // footer to put it in) or the touch search entry.
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(left: 8.r),
+                          child: const NotificationBell(),
                         ),
-                      ),
+                        if (NavTab.values[widget.selectedTabIndex] ==
+                            NavTab.discovery)
+                          const HeaderDiscoveryReroll(),
+                        if (widget.onSearch != null)
+                          Padding(
+                            padding: EdgeInsets.only(left: 8.r),
+                            child: GamepadControl(
+                              iconPath:
+                                  'assets/images/gamepad/Xbox_X_button.png',
+                              label: AppLocale.searchTitle.getString(context),
+                              onTap: () {
+                                SfxService().playNavSound();
+                                widget.onSearch?.call();
+                              },
+                              backgroundColor: Theme.of(context)
+                                  .colorScheme
+                                  .tertiaryFixed,
+                              textColor: Theme.of(context)
+                                  .colorScheme
+                                  .onTertiaryFixed,
+                            ),
+                          ),
+                      ],
                     ),
+                  ),
 
                   // Grouped Tab Navigation with Background (Glass Style)
                   Align(
@@ -527,55 +541,58 @@ class HeaderState extends State<Header> with WidgetsBindingObserver {
                         alignment: Alignment.centerRight,
                         child: Padding(
                           padding: EdgeInsets.only(right: 8.r),
-                          child: NeoGlass(
-                            cornerRadius:
-                                Theme.of(context)
-                                    .extension<CornerRadii>()
-                                    ?.radiusExternalRadius ??
-                                14.r,
-                            tint: Theme.of(context).colorScheme.surface,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const NotificationBell(),
-                                SizedBox(width: 10.r),
-                                Text(
-                                  clockText,
-                                  style: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface,
-                                    fontSize: 12.r,
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: 0.3.r,
-                                  ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              NeoGlass(
+                                cornerRadius:
+                                    Theme.of(context)
+                                        .extension<CornerRadii>()
+                                        ?.radiusExternalRadius ??
+                                    14.r,
+                                tint: Theme.of(context).colorScheme.surface,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
                                 ),
-                                if (_batteryLevel != -1 &&
-                                    !_isTelevision &&
-                                    !Responsive.isHandheldXS(context)) ...[
-                                  SizedBox(width: 12.r),
-                                  Icon(
-                                    _getBatteryIconData(),
-                                    color: _getBatteryColor(customColors),
-                                    size: 16.r,
-                                  ),
-                                  SizedBox(width: 4.r),
-                                  Text(
-                                    "$_batteryLevel%",
-                                    style: TextStyle(
-                                      color: _getBatteryColor(customColors),
-                                      fontSize: 12.r,
-                                      fontWeight: FontWeight.w500,
-                                      letterSpacing: 0.3.r,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      clockText,
+                                      style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                        fontSize: 12.r,
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: 0.3.r,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ],
-                            ),
+                                    if (_batteryLevel != -1 &&
+                                        !_isTelevision &&
+                                        !Responsive.isHandheldXS(context)) ...[
+                                      SizedBox(width: 12.r),
+                                      Icon(
+                                        _getBatteryIconData(),
+                                        color: _getBatteryColor(customColors),
+                                        size: 16.r,
+                                      ),
+                                      SizedBox(width: 4.r),
+                                      Text(
+                                        "$_batteryLevel%",
+                                        style: TextStyle(
+                                          color: _getBatteryColor(customColors),
+                                          fontSize: 12.r,
+                                          fontWeight: FontWeight.w500,
+                                          letterSpacing: 0.3.r,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

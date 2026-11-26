@@ -24,8 +24,6 @@ void main() {
       isVideoMuted: true,
       hideBottomScreen: true,
       muteToggleTrigger: 4,
-      screenshotTrigger: 9,
-      screenshotAccessEnabled: true,
       backgroundColor: 0xFF102030,
       themeName: 'midnight',
       isSecondaryActive: true,

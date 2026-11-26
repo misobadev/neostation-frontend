@@ -236,6 +236,11 @@ const Map<String, dynamic> appLocaleEn = {
       'Recursive scan disabled. Scanning {name}...',
   AppLocale.subfolderView: 'Show Subfolders',
   AppLocale.subfolderViewSubtitle: 'Group ROMs in subfolders into browsable folders instead of mixing them with games',
+  AppLocale.openOnSecondaryScreen: 'Open Games on Secondary Screen',
+  AppLocale.openOnSecondaryScreenSubtitle:
+      "Launch this system's games on the other screen of a dual-screen device",
+  AppLocale.launchScreen: 'Screen',
+  AppLocale.mainScreen: 'Main Screen',
   AppLocale.subfolderViewAll: 'Show Subfolders in Every System',
   AppLocale.subfolderViewAllSubtitle:
       'Apply the per-system Show Subfolders setting to every system at once',
@@ -288,8 +293,6 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.nowPlayingDimOff: 'Off',
   AppLocale.secondarySectionNowPlaying: 'Now Playing panel',
   AppLocale.secondarySectionDock: 'App dock',
-  AppLocale.screenshotAccess: 'Screen return & screenshots',
-  AppLocale.screenshotAccessSubtitle: 'Restores the Now Playing screen when you close an app opened from the dock, and lets the screenshot button capture the screen (opens Android accessibility settings)',
   AppLocale.scanOnStartupSubtitle:
       'Automatically scan ROM folders when the application starts',
   AppLocale.ignoreHiddenFiles: 'Ignore hidden items',
@@ -338,6 +341,10 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.disableSecondaryScreen: 'Disable on secondary screen',
   AppLocale.disableSecondaryScreenSub:
       'It turns off the app on secondary display',
+  AppLocale.swapScreens: 'Swap screens',
+  AppLocale.swapScreensSub: 'Shows NeoStation on the bottom screen and Now Playing and the dock on the top one',
+  AppLocale.controllerHintTapGame:
+      'Tap the game\'s screen to give it the controller back',
   AppLocale.bartopShutdown: 'BarTOP Shutdown on Exit',
   AppLocale.bartopShutdownSubtitle:
       'Shut down the computer when exiting the application',
@@ -367,6 +374,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.exitConfirmation: 'Are you sure you want to exit NeoStation?',
   AppLocale.confirmExit: 'Confirm Exit',
   AppLocale.rescanAllFolders: 'Rescan All ROM Folders',
+  AppLocale.pullToRescan: 'Pull to rescan',
+  AppLocale.releaseToRescan: 'Release to rescan',
   AppLocale.rescanAllFoldersSubtitle: 'Manually scan for new systems and ROMs',
   AppLocale.organizeMultiDiscGames: 'Organize Multi-Disc Games',
   AppLocale.organizeMultiDiscGamesSubtitle: 'Automatically creates .m3u files for multi disc games and organises them into folders',
@@ -946,13 +955,6 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.letsGetSetup: 'Let\'s get you set up',
   AppLocale.storagePermission: 'Storage Permission',
   AppLocale.storagePermissionDesc: 'NeoStation needs "All Files Access" to manage your RetroArch configurations and sync your game saves correctly.\n\nPlease grant this permission in the next screen.',
-  AppLocale.screenReturnAccess: 'Screen Return Access',
-  AppLocale.screenReturnAccessDesc: 'Brings the Now Playing screen back when you close an app opened from the dock, and enables system screenshots. Only the foreground app name is read \u2014 no screen content is collected.',
-  AppLocale.screenReturnAccessHint: 'Turn on NeoStation, then tap Allow',
-  AppLocale.screenReturnDialogTitle: 'Enable Screen Return',
-  AppLocale.screenReturnDialogBody: 'To launch apps from the dock, NeoStation needs the Screen Return accessibility service. It lets NeoStation bring you back here after you close the app you opened. Without it you could be left with no way back.',
-  AppLocale.screenReturnDialogSteps: 'On the next screen, find NeoStation in the list of services and switch it on.',
-  AppLocale.openSettings: 'Open settings',
   AppLocale.selectRomFolder: 'Select ROM Folder',
   AppLocale.romFolderSelected: 'ROM folder selected!',
   AppLocale.chooseRomFolderDesc: 'Choose the folder where your ROM files are stored.\n\nNeoStation will scan this folder for games.',

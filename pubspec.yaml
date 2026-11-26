@@ -6,6 +6,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 workspace:
   - packages/flutter_7zip
   - packages/flutter_chd
+  - packages/fvp
   - packages/gamepads
   - packages/gamepads_android
   - packages/gamepads_darwin
@@ -43,7 +44,10 @@ dependencies:
   path_provider: ^2.1.6
   xml: ^7.0.1
   video_player: ^2.14.1
-  fvp: ^0.40.0
+  # Vendored: deletes native players off the UI isolate (fvp#413) and pins
+  # the MDK SDK. See packages/fvp/NEOSTATION.md.
+  fvp:
+    path: packages/fvp
   flutter_secure_storage: ^11.2.0
   shared_preferences: ^2.5.6
   # Held on the 2.4 line: 2.5.0-2.5.4 break preferences when the bottom-screen
