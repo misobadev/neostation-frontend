@@ -20,6 +20,10 @@ void main() {
   final activity = File(
     'android/app/src/main/kotlin/com/neogamelab/neostation/MainActivity.kt',
   ).readAsStringSync();
+  final bottomActivity = File(
+    'android/app/src/main/kotlin/com/neogamelab/neostation/'
+    'SecondaryDisplayActivity.kt',
+  ).readAsStringSync();
 
   // From [signature] to the end of its body, at 4-space member indent.
   String body(String source, String signature) {
@@ -68,26 +72,106 @@ void main() {
   });
 
   test('the activity gives them to Android, even while input is blocked', () {
+    // Key handling lives in handleGamepadKey, shared by both screens: it
+    // returns false for a key Android should get.
+    final handle = body(
+      activity,
+      'internal fun handleGamepadKey(keyEvent: KeyEvent): Boolean',
+    );
+    final volume = handle.indexOf(
+      'if (EventListener.isSystemKey(keyEvent.keyCode)) return false',
+    );
+    expect(volume, isNot(-1));
+    final blocked = handle.indexOf('if (gamepadBlocked) return true');
+    expect(blocked, isNot(-1));
+    expect(volume, lessThan(blocked));
+
+    // And a key it didn't take (volume included) still reaches Android.
     final dispatch = body(
       activity,
       'override fun dispatchKeyEvent(keyEvent: KeyEvent): Boolean',
     );
-    final volume =
-        RegExp(
-          r'if \(EventListener\.isSystemKey\(keyEvent\.keyCode\)\)\s*\{?\s*'
-          r'return super\.dispatchKeyEvent\(keyEvent\)',
-        ).firstMatch(dispatch)?.start ??
-        -1;
-    expect(volume, isNot(-1));
-    expect(
-      volume,
-      lessThan(dispatch.indexOf('if (gamepadBlocked) return true')),
-    );
-    // And a key the plugin didn't take still reaches Android.
     expect(
       dispatch,
-      contains(
-        'return if (handled) true else super.dispatchKeyEvent(keyEvent)',
+      matches(
+        RegExp(
+          r'if \(handleGamepadKey\(keyEvent\)\) return true\s*'
+          r'return super\.dispatchKeyEvent\(keyEvent\)',
+        ),
+      ),
+    );
+  });
+
+  test('the bottom screen hands them to Android too', () {
+    final dispatch = body(
+      bottomActivity,
+      'override fun dispatchKeyEvent(event: KeyEvent): Boolean',
+    );
+    // Swapped, it shows the main UI: the same handling as the top screen.
+    expect(
+      dispatch,
+      matches(
+        RegExp(
+          r'if \(m\.handleGamepadKey\(event\)\) return true\s*'
+          r'return super\.dispatchKeyEvent\(event\)',
+        ),
+      ),
+    );
+    // Showing the secondary UI, it forwards keys to the main UI, but a
+    // volume key the main UI leaves still goes to Android from here.
+    final forwarded = dispatch.indexOf(
+      'if (m.dispatchKeyFromSecondaryUi(event)) return true',
+    );
+    expect(forwarded, isNot(-1));
+    final volume = dispatch.indexOf(
+      'EventListener.isSystemKey(event.keyCode)',
+      forwarded,
+    );
+    expect(volume, isNot(-1));
+    expect(
+      dispatch.indexOf('super.dispatchKeyEvent(event)', volume),
+      isNot(-1),
+    );
+
+    final fromSecondary = body(
+      activity,
+      'internal fun dispatchKeyFromSecondaryUi(event: KeyEvent): Boolean',
+    );
+    final handled = fromSecondary.indexOf(
+      'if (handleGamepadKey(event)) return true',
+    );
+    const volumeOut =
+        'if (EventListener.isSystemKey(event.keyCode)) return false';
+    final passOn = fromSecondary.indexOf(volumeOut, handled);
+    final toMainUi = fromSecondary.indexOf('superDispatchKeyEvent(event)');
+    expect(handled, isNot(-1));
+    expect(passOn, greaterThan(handled));
+    expect(toMainUi, greaterThan(passOn));
+    // While a game covers the main UI the other keys are dropped, but the
+    // volume still goes to Android first.
+    final covered = fromSecondary.indexOf('if (isMainUiCovered())');
+    expect(covered, isNot(-1));
+    final coveredVolume = fromSecondary.indexOf(volumeOut, covered);
+    expect(coveredVolume, greaterThan(covered));
+    expect(
+      coveredVolume,
+      lessThan(fromSecondary.indexOf('return true', covered)),
+    );
+  });
+
+  test('swapped, the top screen hands them to Android too', () {
+    final dispatch = body(
+      activity,
+      'override fun dispatchKeyEvent(keyEvent: KeyEvent): Boolean',
+    );
+    expect(
+      dispatch,
+      matches(
+        RegExp(
+          r'if \(dispatchKeyFromSecondaryUi\(keyEvent\)\) return true\s*'
+          r'return EventListener\.isSystemKey\(keyEvent\.keyCode\) && '
+          r'super\.dispatchKeyEvent\(keyEvent\)',
+        ),
       ),
     );
   });

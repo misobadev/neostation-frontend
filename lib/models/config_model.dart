@@ -115,6 +115,10 @@ class ConfigModel {
   /// Whether to hide the secondary screen interface (useful for dual-monitor setups).
   final bool hideBottomScreen;
 
+  /// Whether the main interface is shown on the secondary (bottom) screen and
+  /// the secondary interface on the main one. Android 10+ dual-screen devices.
+  final bool swapScreens;
+
   /// Whether to play background audio/music from game preview videos.
   final bool videoSound;
 
@@ -335,6 +339,7 @@ class ConfigModel {
     this.videoPreviewDelay = 2,
     this.setupCompleted = false,
     this.hideBottomScreen = false,
+    this.swapScreens = false,
     this.videoSound = false,
     this.sfxEnabled = true,
     this.sfxVolume = 0.75,
@@ -444,6 +449,9 @@ class ConfigModel {
       hideBottomScreen:
           (json['hideBottomScreen'] ?? false).toString().toLowerCase() ==
           'true',
+      swapScreens:
+          (json['swapScreens'] ?? false).toString().toLowerCase() == 'true' ||
+          (json['swap_screens'] ?? 0).toString() == '1',
       videoSound:
           (json['videoSound'] ?? false).toString().toLowerCase() == 'true' ||
           (json['video_sound'] ?? 0).toString() == '1' ||
@@ -731,6 +739,7 @@ class ConfigModel {
       'videoPreviews': videoPreviewDelay >= 0,
       'setupCompleted': setupCompleted,
       'hideBottomScreen': hideBottomScreen,
+      'swapScreens': swapScreens,
       'videoSound': videoSound,
       'sfxEnabled': sfxEnabled,
       'sfxVolume': sfxVolume,
@@ -798,6 +807,7 @@ class ConfigModel {
     int? videoPreviewDelay,
     bool? setupCompleted,
     bool? hideBottomScreen,
+    bool? swapScreens,
     bool? videoSound,
     bool? sfxEnabled,
     double? sfxVolume,
@@ -863,6 +873,7 @@ class ConfigModel {
       videoPreviewDelay: videoPreviewDelay ?? this.videoPreviewDelay,
       setupCompleted: setupCompleted ?? this.setupCompleted,
       hideBottomScreen: hideBottomScreen ?? this.hideBottomScreen,
+      swapScreens: swapScreens ?? this.swapScreens,
       videoSound: videoSound ?? this.videoSound,
       sfxEnabled: sfxEnabled ?? this.sfxEnabled,
       sfxVolume: sfxVolume ?? this.sfxVolume,

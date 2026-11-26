@@ -30,7 +30,8 @@ object EmulatorLauncher {
         extras: List<Map<String, Any>>?,
         activityFlags: List<String>,
         keepSafUri: Boolean,
-        result: MethodChannel.Result
+        result: MethodChannel.Result,
+        launchDisplayId: Int? = null
     ) {
         try {
             val intent = Intent()
@@ -262,7 +263,7 @@ object EmulatorLauncher {
 
             // Don't use resolveActivity — returns null on Android 11+ for valid apps due to
             // package visibility restrictions. Catch ActivityNotFoundException instead.
-            context.startActivity(intent)
+            startOnDisplay(context, intent, launchDisplayId)
             result.success(true)
         } catch (e: ActivityNotFoundException) {
             result.error("ACTIVITY_NOT_FOUND", "Emulator not installed or activity missing: $packageName", null)
@@ -271,6 +272,39 @@ object EmulatorLauncher {
         } catch (e: Exception) {
             e.printStackTrace()
             result.error("LAUNCH_FAILED", e.message, e.toString())
+        }
+    }
+
+    /**
+     * Starts [intent] on [displayId], or wherever Android puts it when that is
+     * null (the caller's display, which is what every launch did before the
+     * per-system/per-game screen setting existed).
+     *
+     * A display the system refuses (gone since it was resolved, or not one this
+     * app may launch on) falls back to the plain launch rather than failing the
+     * game: the user still gets to play, just on the default screen.
+     */
+    private fun startOnDisplay(context: Context, intent: Intent, displayId: Int?) {
+        if (displayId == null) {
+            context.startActivity(intent)
+            return
+        }
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                if (!am.isActivityStartAllowedOnDisplay(context, displayId, intent)) {
+                    android.util.Log.w("EmulatorLauncher", "Launch not allowed on display $displayId; using the default screen")
+                    context.startActivity(intent)
+                    return
+                }
+            }
+            val options = android.app.ActivityOptions.makeBasic().setLaunchDisplayId(displayId)
+            context.startActivity(intent, options.toBundle())
+        } catch (e: ActivityNotFoundException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("EmulatorLauncher", "Launch on display $displayId failed (${e.message}); using the default screen")
+            context.startActivity(intent)
         }
     }
 

@@ -532,6 +532,21 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
             enabled: _system.recursiveScan,
           ),
         ],
+        if (_offersLaunchDisplay) ...[
+          SizedBox(height: 4.r),
+          _buildSwitchItem(
+            index: _SystemEmulatorSettingsDialogState._launchDisplayIndex,
+            key:
+                _generalItemKeys[_SystemEmulatorSettingsDialogState
+                    ._launchDisplayIndex],
+            title: AppLocale.openOnSecondaryScreen.getString(context),
+            subtitle: AppLocale.openOnSecondaryScreenSubtitle.getString(
+              context,
+            ),
+            value: _openOnSecondary,
+            onChanged: _toggleOpenOnSecondary,
+          ),
+        ],
       ],
     );
   }

@@ -1,5 +1,3 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="screenshot_accessibility_label">NeoStation Screenshot</string>
-    <string name="screenshot_accessibility_desc">Lets NeoStation capture a system screenshot when you tap the screenshot button, and restore the Now Playing screen when you close an app launched from the dock. Only the name of the foreground app is read to detect this — no screen content is read or collected.</string>
 </resources>

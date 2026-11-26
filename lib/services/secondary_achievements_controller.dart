@@ -7,7 +7,6 @@ import '../providers/file_provider.dart';
 import '../providers/retro_achievements_provider.dart';
 import 'game_service.dart';
 import 'retro_achievements_resolver.dart';
-import 'screenshot_service.dart';
 
 /// Drives the live RetroAchievements panel on the secondary display for a
 /// single game session, independent of which screen launched the game.
@@ -79,31 +78,6 @@ class SecondaryAchievementsController {
       await state.initialSync;
     }
 
-    // Refresh the in-game screenshot button's visibility on every launch. The
-    // screenshotAccessEnabled flag is otherwise seeded only once at cold start,
-    // which on a fresh install happens BEFORE the user grants access in
-    // first-run setup — so the button would stay hidden until a later cold
-    // restart or display reconnect re-seeded it.
-    //
-    // Resolved UP FRONT (with a short timeout) so it rides in the SAME atomic
-    // launch snapshot below instead of a separate push. A separate push,
-    // serialized before the async RA fetch (so carrying achievements=null), can
-    // be delivered out-of-order AFTER the achievements push and wipe the panel
-    // — the RA panel would flash in then vanish. The old comment here only
-    // reasoned about nowPlayingActive; achievements are just as vulnerable.
-    // A timeout means we couldn't ask, not that the grant was revoked — the
-    // main engine is being backgrounded by the emulator right here, so slow
-    // answers are expected. Falling back to the last known state keeps this
-    // snapshot agreeing with what the provider holds; a bare `false` would
-    // disagree and make the provider's stale-echo guard answer with a second
-    // snapshot in the one window this class documents as unsafe for those.
-    bool screenshotAccess = ScreenshotService.lastKnownAccess ?? false;
-    try {
-      screenshotAccess = await ScreenshotService.isAccessEnabled().timeout(
-        const Duration(seconds: 2),
-        onTimeout: () => ScreenshotService.lastKnownAccess ?? false,
-      );
-    } catch (_) {}
     if (!_active || _state != state) return;
 
     // Show the "Now Playing" page immediately for every launched game — this
@@ -113,7 +87,7 @@ class SecondaryAchievementsController {
     // ignore: unawaited_futures
     state.updateState(
       // isGameLaunching is set here — in the SAME atomic snapshot as
-      // nowPlayingActive (and screenshotAccessEnabled) — rather than via a
+      // nowPlayingActive — rather than via a
       // separate push. The cross-engine transport delivers full snapshots
       // without ordering guarantees, so a separate launch snapshot could land
       // after this one and clobber it (the intermittent "no Now Playing on
@@ -122,7 +96,6 @@ class SecondaryAchievementsController {
       // video teardown off isGameLaunching).
       isGameLaunching: true,
       nowPlayingActive: true,
-      screenshotAccessEnabled: screenshotAccess,
       gameTitle: game.name,
       gameBoxart: boxartPath,
       clearGameBoxart: boxartPath == null,

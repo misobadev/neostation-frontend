@@ -66,14 +66,6 @@ class SecondaryDisplayStateData {
   /// Trigger value used to notify the secondary display of mute state changes.
   final int muteToggleTrigger;
 
-  /// Monotonic counter bumped by the secondary display to request a system
-  /// screenshot of the main screen. The main engine watches for increments.
-  final int screenshotTrigger;
-
-  /// Whether the screenshot accessibility service is granted. Pushed by the main
-  /// engine so the secondary display can hide the screenshot button when off.
-  final bool screenshotAccessEnabled;
-
   /// Solid background color for the secondary display.
   final int? backgroundColor;
 
@@ -278,8 +270,6 @@ class SecondaryDisplayStateData {
     this.isVideoMuted = false,
     this.hideBottomScreen = false,
     this.muteToggleTrigger = 0,
-    this.screenshotTrigger = 0,
-    this.screenshotAccessEnabled = false,
     this.backgroundColor,
     this.themeName,
     this.isSecondaryActive = false,
@@ -362,8 +352,6 @@ class SecondaryDisplayStateData {
     bool? isVideoMuted,
     bool? hideBottomScreen,
     int? muteToggleTrigger,
-    int? screenshotTrigger,
-    bool? screenshotAccessEnabled,
     int? backgroundColor,
     String? themeName,
     bool? isSecondaryActive,
@@ -449,9 +437,6 @@ class SecondaryDisplayStateData {
       isVideoMuted: isVideoMuted ?? this.isVideoMuted,
       hideBottomScreen: hideBottomScreen ?? this.hideBottomScreen,
       muteToggleTrigger: muteToggleTrigger ?? this.muteToggleTrigger,
-      screenshotTrigger: screenshotTrigger ?? this.screenshotTrigger,
-      screenshotAccessEnabled:
-          screenshotAccessEnabled ?? this.screenshotAccessEnabled,
       backgroundColor: backgroundColor ?? this.backgroundColor,
       themeName: themeName ?? this.themeName,
       isSecondaryActive: isSecondaryActive ?? this.isSecondaryActive,
@@ -541,9 +526,6 @@ class SecondaryDisplayStateData {
       isVideoMuted: json['isVideoMuted'] as bool? ?? false,
       hideBottomScreen: json['hideBottomScreen'] as bool? ?? false,
       muteToggleTrigger: json['muteToggleTrigger'] as int? ?? 0,
-      screenshotTrigger: json['screenshotTrigger'] as int? ?? 0,
-      screenshotAccessEnabled:
-          json['screenshotAccessEnabled'] as bool? ?? false,
       backgroundColor: json['backgroundColor'] as int?,
       themeName: json['themeName'] as String?,
       isSecondaryActive: json['isSecondaryActive'] as bool? ?? false,
@@ -631,8 +613,6 @@ class SecondaryDisplayStateData {
       'isVideoMuted': isVideoMuted,
       'hideBottomScreen': hideBottomScreen,
       'muteToggleTrigger': muteToggleTrigger,
-      'screenshotTrigger': screenshotTrigger,
-      'screenshotAccessEnabled': screenshotAccessEnabled,
       'backgroundColor': backgroundColor,
       'themeName': themeName,
       'isSecondaryActive': isSecondaryActive,
@@ -741,8 +721,6 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     bool? isVideoMuted,
     bool? hideBottomScreen,
     int? muteToggleTrigger,
-    int? screenshotTrigger,
-    bool? screenshotAccessEnabled,
     int? backgroundColor,
     String? themeName,
     bool? isSecondaryActive,
@@ -836,8 +814,6 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
           isVideoMuted: isVideoMuted,
           hideBottomScreen: hideBottomScreen,
           muteToggleTrigger: muteToggleTrigger,
-          screenshotTrigger: screenshotTrigger,
-          screenshotAccessEnabled: screenshotAccessEnabled,
           backgroundColor: backgroundColor,
           themeName: themeName,
           isSecondaryActive: isSecondaryActive,
