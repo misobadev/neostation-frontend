@@ -66,7 +66,9 @@ class GameService {
 
     const platform = MethodChannel('com.neogamelab.neostation/game');
     platform.setMethodCallHandler((call) async {
-      if (call.method == 'onGameReturned') {
+      if (call.method == 'onGameOnOtherScreen') {
+        GameSessionManager.markGameOnOtherScreen();
+      } else if (call.method == 'onGameReturned') {
         final elapsedSeconds =
             int.tryParse(call.arguments['elapsedSeconds']?.toString() ?? '0') ??
             0;

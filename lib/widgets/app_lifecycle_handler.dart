@@ -152,12 +152,6 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
           listen: false,
         );
         configProvider.reapplySecondaryDisplay();
-        // Re-push accessibility (Screen Return) state to the secondary display:
-        // the user may have just enabled it in system Settings (e.g. via the
-        // in-game launcher's nudge), which controls the screenshot button and
-        // the launcher's warning badge.
-        // ignore: unawaited_futures
-        configProvider.refreshSecondaryScreenshotAccess();
       }
 
       // ignore: unawaited_futures

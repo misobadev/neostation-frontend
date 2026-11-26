@@ -10,7 +10,6 @@ import '../services/custom_sfx_import_service.dart';
 
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/services/logger_service.dart';
-import 'package:neostation/services/screenshot_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 
 import '../models/system_model.dart';
@@ -93,7 +92,6 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _pendingGameListSizeSave = Future<void>.value();
   bool _lifecycleObserverAdded = false;
   int _lastMuteToggleTrigger = 0;
-  int _lastScreenshotTrigger = 0;
   int _lastDockEditTrigger = 0;
   // Latched once the main UI paints its first frame; re-pushed to the secondary
   // display so the app dock slides in as the app settles instead of popping in
@@ -311,17 +309,16 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
         _secondaryDisplayState = SecondaryDisplayState.instance;
         // Seed the edge-trigger baselines from the restored state BEFORE the
         // listener is attached. The secondary display's shared state (including
-        // the screenshot/mute/dock triggers) survives a main-engine restart via
+        // the mute/dock triggers) survives a main-engine restart via
         // the native shared-state store, but these baselines reset to 0 each
         // launch. Without this seed, the first _onSecondaryStateChanged after a
         // restart sees the restored trigger (> 0) as an increment and fires the
-        // action unprompted — most visibly an automatic screenshot on every
-        // relaunch. The earlier clear-stale-art block already awaited
+        // action unprompted (e.g. entering dock edit mode on every
+        // relaunch). The earlier clear-stale-art block already awaited
         // initialSync, so value holds the restored triggers here; only genuine
         // NEW increments after launch should fire.
         final restored = _secondaryDisplayState!.value;
         if (restored != null) {
-          _lastScreenshotTrigger = restored.screenshotTrigger;
           _lastMuteToggleTrigger = restored.muteToggleTrigger;
           _lastDockEditTrigger = restored.dockEditTrigger;
         }
@@ -351,10 +348,6 @@ class SqliteConfigProvider extends ChangeNotifier with WidgetsBindingObserver {
 
         // Initial permission check
         await refreshAllFilesAccess();
-        // Seed the secondary display with the current screenshot-access state so
-        // its in-game screenshot button shows from a cold start (not just after
-        // visiting settings or reconnecting the display).
-        await refreshSecondaryScreenshotAccess();
         // The main engine can restart while the secondary engine persists (its
         // cached engine group survives), leaving a stale Now Playing panel from
         // a game that was running at quit. Clear it once the state is synced so

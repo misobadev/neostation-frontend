@@ -55,7 +55,6 @@ void main() {
                 onLaunchApp: (_) {},
                 onPickSlot: (_) {},
                 onClearSlot: (_) {},
-                onOpenAccessibilitySettings: () {},
               ),
             ),
           ),

@@ -164,6 +164,27 @@ class SqliteMigrations {
     );
   ''';
 
+  /// CREATE for the per-system / per-game launch screen (v192).
+  ///
+  /// Which screen of a dual-screen handheld a game opens on. `scope` is
+  /// `'system'` (`target` = the system's folder name) or `'game'` (`target` =
+  /// the ROM's `rom_path`, `COLLATE NOCASE` like the column it mirrors).
+  /// `display` is `'primary'` or `'secondary'`; no row means "inherit" (the
+  /// game falls back to its system, the system to Android's default screen).
+  /// A table of its own rather than columns on `user_system_settings` /
+  /// `user_roms`: it is read once per launch and in two settings rows, so it
+  /// does not need threading through every system- and game-loading query. No
+  /// foreign key on purpose: a rescan that drops a ROM leaves a harmless row.
+  static const String createUserLaunchDisplayTableSql = '''
+    CREATE TABLE IF NOT EXISTS user_launch_display (
+      scope TEXT NOT NULL,
+      target TEXT NOT NULL COLLATE NOCASE,
+      display TEXT NOT NULL,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (scope, target)
+    );
+  ''';
+
   /// CREATE for collection membership (v139).
   ///
   /// `rom_path` is the natural key of `user_roms` and is what the favourite
@@ -713,11 +734,17 @@ class SqliteMigrations {
       case 191:
         await _migrateToVersion191(db);
         break;
+      case 192:
+        await _migrateToVersion192(db);
+        break;
       case 193:
         await _migrateToVersion193(db);
         break;
       case 194:
         await _migrateToVersion194(db);
+        break;
+      case 197:
+        await _migrateToVersion197(db);
         break;
       default:
         _log.w('No migration defined for version $version');
@@ -7734,6 +7761,19 @@ class SqliteMigrations {
   /// Test devices that ran this branch at v169/v171 skipped main's v170, so it
   /// is re-run first. Every step is guarded, so a device that skipped a
   /// neighbouring slot, or re-runs this, ends in the same state.
+  /// Migration v192: per-system / per-game launch screen for dual-screen
+  /// handhelds. Idempotent (`CREATE TABLE IF NOT EXISTS`).
+  static Future<void> _migrateToVersion192(Database db) async {
+    _log.i('Migration v192: Adding user_launch_display table');
+    try {
+      db.execute(createUserLaunchDisplayTableSql);
+    } catch (e, stackTrace) {
+      _log.e('Migration v192 failed: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
   static Future<void> _migrateToVersion191(Database db) async {
     _log.i('Migration v191: Adding Android Games system');
     try {
@@ -7845,6 +7885,41 @@ class SqliteMigrations {
       _log.i('Migration v194 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v194: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v197: `user_config.swap_screens`, the dual-screen "Swap
+  /// screens" setting (main interface on the bottom screen). Off by default.
+  ///
+  /// First written as v194, which open pull requests also claim (v194, v195
+  /// and v196 are taken by #881, #880 and #883), so it moved above them.
+  /// Idempotent, so a test device that already ran it as v194 gets nothing
+  /// new here, and one that took another branch's v194 still gets the column.
+  static Future<void> _migrateToVersion197(Database db) async {
+    _log.i('Migration v197: Adding swap_screens to user_config');
+    try {
+      // A device that ran main at v193 skips v192, so its table is created
+      // here. Idempotent (`CREATE TABLE IF NOT EXISTS`).
+      await _migrateToVersion192(db);
+
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i('v197: user_config is not present, nothing to do');
+        return;
+      }
+      if (!columns.contains('swap_screens')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN swap_screens INTEGER DEFAULT 0',
+        );
+      }
+      _log.i('Migration v197 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v197: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

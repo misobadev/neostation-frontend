@@ -222,6 +222,10 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.recursiveScanDisabled: '遞迴掃描已停用。正在掃描 {name}...',
   AppLocale.subfolderView: '顯示子資料夾',
   AppLocale.subfolderViewSubtitle: '將子資料夾中的 ROM 歸入可瀏覽的資料夾，而非與遊戲混在一起',
+  AppLocale.openOnSecondaryScreen: '在副螢幕開啟遊戲',
+  AppLocale.openOnSecondaryScreenSubtitle: '在雙螢幕裝置上，於另一個螢幕啟動此系統的遊戲',
+  AppLocale.launchScreen: '螢幕',
+  AppLocale.mainScreen: '主螢幕',
   AppLocale.subfolderViewAll: '在所有系統中顯示子資料夾',
   AppLocale.subfolderViewAllSubtitle: '將「顯示子資料夾」設定一次套用到所有系統',
   AppLocale.subfolderViewAllOverridesNotice:
@@ -267,9 +271,6 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.nowPlayingDimOff: '關閉',
   AppLocale.secondarySectionNowPlaying: 'Now Playing 面板',
   AppLocale.secondarySectionDock: '應用程式塢',
-  AppLocale.screenshotAccess: '畫面返回與截圖',
-  AppLocale.screenshotAccessSubtitle:
-      '關閉從應用程式塢開啟的應用程式後恢復 Now Playing 畫面，並讓截圖按鈕可擷取螢幕畫面（將開啟 Android 無障礙設定）',
   AppLocale.scanOnStartupSubtitle: '應用程式啟動時自動掃描 ROM 資料夾',
   AppLocale.ignoreHiddenFiles: '忽略隱藏項目',
   AppLocale.ignoreHiddenFilesSubtitle: 'ROM 掃描期間隱藏隱藏檔案和資料夾',
@@ -308,6 +309,9 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.setAsDefaultLauncher: '將 NeoStation 設為預設啟動器',
   AppLocale.disableSecondaryScreen: '在副螢幕上停用',
   AppLocale.disableSecondaryScreenSub: '在副螢幕上關閉應用程式',
+  AppLocale.swapScreens: '交換螢幕',
+  AppLocale.swapScreensSub: '在下螢幕顯示 NeoStation，在上螢幕顯示 Now Playing 與 Dock',
+  AppLocale.controllerHintTapGame: '輕觸遊戲所在的螢幕，將手把交還給遊戲',
   AppLocale.bartopShutdown: '離開時關閉 BarTOP',
   AppLocale.bartopShutdownSubtitle: '離開應用程式時關閉電腦',
 
@@ -933,14 +937,6 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.storagePermission: '儲存權限',
   AppLocale.storagePermissionDesc:
       'NeoStation 需要「所有檔案存取權限」來管理 RetroArch 設定並同步遊戲存檔。',
-  AppLocale.screenReturnAccess: '畫面返回權限',
-  AppLocale.screenReturnAccessDesc:
-      '關閉從應用程式塢開啟的應用程式後返回 Now Playing 畫面，並啟用系統截圖。僅讀取前景應用程式的名稱，不會收集任何螢幕內容。',
-  AppLocale.screenReturnAccessHint: '開啟 NeoStation，然後點按「允許」',
-  AppLocale.screenReturnDialogTitle: '啟用畫面返回',
-  AppLocale.screenReturnDialogBody: '要從應用程式塢啟動應用程式，NeoStation 需要「畫面返回」無障礙服務。它會在你關閉所開啟的應用程式後帶你回到這裡。沒有它，你可能無法返回。',
-  AppLocale.screenReturnDialogSteps: '在下一個畫面中，從服務清單裡找到 NeoStation 並將其開啟。',
-  AppLocale.openSettings: '開啟設定',
   AppLocale.selectRomFolder: '選擇 ROM 資料夾',
   AppLocale.romFolderSelected: 'ROM 資料夾已選擇！',
   AppLocale.chooseRomFolderDesc: '選擇儲存 ROM 檔案的資料夾。NeoStation 將掃描其中的遊戲。',

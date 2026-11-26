@@ -293,6 +293,10 @@ class SqliteConfigService {
                 ) ??
                 0) ==
             1,
+        swapScreens:
+            (int.tryParse(userConfig?['swap_screens']?.toString() ?? '0') ??
+                0) ==
+            1,
         customSfx: CustomSfx.decode(userConfig?['custom_sfx']),
         sfxEnabled:
             (int.tryParse(userConfig?['sfx_enabled']?.toString() ?? '1') ??
@@ -538,6 +542,7 @@ class SqliteConfigService {
           videoPreviewDelay: config.videoPreviewDelay,
           setupCompleted: config.setupCompleted ? 1 : 0,
           hideBottomScreen: config.hideBottomScreen ? 1 : 0,
+          swapScreens: config.swapScreens ? 1 : 0,
           videoSound: config.videoSound ? 1 : 0,
           sfxEnabled: config.sfxEnabled ? 1 : 0,
           sfxVolume: config.sfxVolume,

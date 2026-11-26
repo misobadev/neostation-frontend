@@ -236,6 +236,10 @@ const Map<String, dynamic> appLocaleRu = {
       'Рекурсивное сканирование выключено. Сканирование {name}...',
   AppLocale.subfolderView: 'Показывать подпапки',
   AppLocale.subfolderViewSubtitle: 'Группировать ROM в подпапках в виде просматриваемых папок, а не смешивать их с играми',
+  AppLocale.openOnSecondaryScreen: 'Открывать игры на втором экране',
+  AppLocale.openOnSecondaryScreenSubtitle: 'Запускать игры этой системы на другом экране устройства с двумя экранами',
+  AppLocale.launchScreen: 'Экран',
+  AppLocale.mainScreen: 'Основной экран',
   AppLocale.subfolderViewAll: 'Показывать подпапки во всех системах',
   AppLocale.subfolderViewAllSubtitle:
       'Применить настройку «Показывать подпапки» сразу ко всем системам',
@@ -291,8 +295,6 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.nowPlayingDimOff: 'Выкл',
   AppLocale.secondarySectionNowPlaying: 'Панель Now Playing',
   AppLocale.secondarySectionDock: 'Док приложений',
-  AppLocale.screenshotAccess: 'Возврат к экрану и скриншоты',
-  AppLocale.screenshotAccessSubtitle: 'Возвращает экран Now Playing, когда вы закрываете приложение, открытое из дока, и позволяет кнопке скриншота делать скриншоты (открывает настройки специальных возможностей Android)',
   AppLocale.scanOnStartupSubtitle:
       'Автоматически сканировать папки ROM при запуске приложения',
   AppLocale.ignoreHiddenFiles: 'Игнорировать скрытые элементы',
@@ -340,6 +342,10 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.disableSecondaryScreen: 'Отключить на втором экране',
   AppLocale.disableSecondaryScreenSub:
       'Выключает приложение на втором мониторе',
+  AppLocale.swapScreens: 'Поменять экраны местами',
+  AppLocale.swapScreensSub: 'Показывает NeoStation на нижнем экране, а Now Playing и док — на верхнем',
+  AppLocale.controllerHintTapGame:
+      'Коснитесь экрана игры, чтобы вернуть ей управление с контроллера',
   AppLocale.bartopShutdown: 'Выключение BarTOP при выходе',
   AppLocale.bartopShutdownSubtitle:
       'Выключать компьютер при выходе из приложения',
@@ -1018,14 +1024,6 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.letsGetSetup: 'Давайте все настроим',
   AppLocale.storagePermission: 'Разрешение на доступ к памяти',
   AppLocale.storagePermissionDesc: 'NeoStation нужен «Доступ ко всем файлам» для управления конфигурациями RetroArch.',
-  AppLocale.screenReturnAccess: 'Доступ для возврата к экрану',
-  AppLocale.screenReturnAccessDesc: 'Возвращает экран Now Playing, когда вы закрываете приложение, открытое из дока, и включает системные скриншоты. Считывается только название приложения на переднем плане — содержимое экрана не собирается.',
-  AppLocale.screenReturnAccessHint:
-      'Включите NeoStation, затем нажмите «Разрешить»',
-  AppLocale.screenReturnDialogTitle: 'Включить возврат к экрану',
-  AppLocale.screenReturnDialogBody: 'Чтобы запускать приложения из дока, NeoStation нужна служба специальных возможностей для возврата к экрану. Она возвращает вас сюда после закрытия открытого приложения. Без неё вернуться сюда может быть невозможно.',
-  AppLocale.screenReturnDialogSteps: 'На следующем экране найдите NeoStation в списке служб и включите эту службу.',
-  AppLocale.openSettings: 'Открыть настройки',
   AppLocale.selectRomFolder: 'Выбрать папку ROM',
   AppLocale.romFolderSelected: 'Папка ROM выбрана!',
   AppLocale.chooseRomFolderDesc: 'Выберите папку, где хранятся ваши ROM.',
