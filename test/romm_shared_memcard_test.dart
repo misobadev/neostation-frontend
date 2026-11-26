@@ -11,6 +11,7 @@ import 'package:neostation/models/romm_asset.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/romm_save_map_repository.dart';
+import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
@@ -83,6 +84,11 @@ class _FakeRommService extends RommService {
     listCalls.add(romId);
     return List.of(savesByRom[romId] ?? const []);
   }
+
+  @override
+  Future<List<RommAsset>> listAllSaves() async => [
+    for (final saves in savesByRom.values) ...saves,
+  ];
 
   @override
   Future<List<RommAsset>> listStates({required int romId}) async => const [];
@@ -313,24 +319,23 @@ void main() {
       expect(svc.uploads.length, uploadsBefore);
     });
 
-    test(
-      'unrecorded local progress beats a stale remote (prefer local)',
-      () async {
-        // Remote has an hour-old card; the local card was just written and no
-        // sync state is recorded — local must win via upload, not be replaced.
-        svc.seedSave(
-          1,
-          'Mcd001.ps2',
-          'STALE'.codeUnits,
-          updatedAt: DateTime.now().toUtc().subtract(const Duration(hours: 1)),
-        );
+    test('a card never synced from here is not uploaded over the server\'s, '
+        'even when the server\'s is older (NEO-270)', () async {
+      // Remote has an hour-old card; the local card was just written and no
+      // sync state is recorded. It may be a blank card an emulator has just
+      // made, so the server's card wins, at the next launch.
+      svc.seedSave(
+        1,
+        'Mcd001.ps2',
+        'STALE'.codeUnits,
+        updatedAt: DateTime.now().toUtc().subtract(const Duration(hours: 1)),
+      );
 
-        await provider.syncGameSavesAfterClose(gameA);
+      await provider.syncGameSavesAfterClose(gameA);
 
-        expect(await memcard.readAsString(), 'INITIAL');
-        expect(svc.uploads, ['1/Mcd001.ps2']);
-      },
-    );
+      expect(await memcard.readAsString(), 'INITIAL');
+      expect(svc.uploads, isEmpty);
+    });
 
     test('remote-only branch: the per-target mtime guard refuses to overwrite '
         'a newer local card', () async {
@@ -453,7 +458,11 @@ void main() {
   // rewritten on every exit, so the local copy is essentially never untouched
   // and the other device's save could never arrive.
   group('pre-launch pulls a newer remote over a locally-changed copy', () {
+    // The card was synced from here before: a card never synced is NEO-270's
+    // (romm_shared_card_first_sync_test.dart).
     test('the other device wins when the server copy is newer', () async {
+      await provider.syncGameSavesAfterClose(gameA);
+      svc.uploads.clear();
       // Local has unsynced changes *and* the server has moved on since.
       await memcard.writeAsString('LOCAL PROGRESS');
       svc.seedSave(
@@ -472,7 +481,18 @@ void main() {
 
     test('a locally-newer save is still not overwritten', () async {
       // The per-target mtime guard, not the localChanged test, is what protects
-      // real local progress — so a stale remote must lose even now.
+      // real local progress — so a stale remote must lose even now. Synced two
+      // hours ago, so the hour-old remote reads as moved on.
+      final twoHoursAgo = DateTime.now()
+          .subtract(const Duration(hours: 2))
+          .millisecondsSinceEpoch;
+      await SyncRepository.saveSyncState(
+        RomMSyncProvider.kProviderId,
+        memcard.path,
+        twoHoursAgo,
+        twoHoursAgo,
+        7,
+      );
       await memcard.writeAsString('LOCAL PROGRESS');
       svc.seedSave(
         1,

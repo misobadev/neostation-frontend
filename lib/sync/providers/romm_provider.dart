@@ -93,6 +93,18 @@ enum _RemoteGuard {
   unreadable,
 }
 
+/// The names a system's memory cards that every game shares go by: PS2's
+/// `Mcd001.ps2`…, Dreamcast's `vmu_save_A1.bin`… (a per-game card is named
+/// after its game, and is no other game's to place).
+final _sharedCardNames = {
+  'ps2': RegExp(r'^mcd\d+\.ps2$', caseSensitive: false),
+  'dc': RegExp(r'^vmu_save_[a-d][1-4]\.bin$', caseSensitive: false),
+};
+
+/// How long a listing of every save serves a game's status check (a
+/// highlight) before it is asked for again.
+const _everySaveMaxAge = Duration(seconds: 60);
+
 /// What became of one [RomMSyncProvider._upload].
 enum _UploadOutcome {
   uploaded,
@@ -460,6 +472,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
   @override
   Future<void> logout() async {
+    _everySaveCache = null;
     await _browse.disconnect();
   }
 
@@ -561,6 +574,36 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       }
     }
 
+    // PS2 and Dreamcast: every game of the system shares the memory cards.
+    final sharesCards = sharesMemoryCards(game.systemFolderName);
+    final localCards = sharesCards
+        ? localFiles
+              .where(
+                (l) =>
+                    !l.relativePath.startsWith('states/') &&
+                    isSharedMemoryCard(l.filePath),
+              )
+              .toList()
+        : const <LocalSaveFile>[];
+    // A launch on a device with no card yet places the server's, from any
+    // game (step 3 below): the emulator would otherwise make a blank one, and
+    // the session played on it would end up in a copy when the next launch
+    // takes the server's.
+    final placeCards =
+        sharesCards &&
+        localCards.isEmpty &&
+        downloadOnly &&
+        !statusOnly &&
+        deadline != null;
+    // Every save the user has, under any game: asked for only for a card this
+    // device has never synced, or one to place, and alongside this game's
+    // listings, so a launch waits for one round trip. Null when the listing
+    // failed.
+    Future<List<RommAsset>?>? everySave;
+    if (placeCards || await _anyNeverSynced(localCards)) {
+      everySave = _everySaveListed(fresh: !statusOnly);
+    }
+
     final results = await Future.wait([
       listed('Saves', () => _svc.listSaves(romId: romId)),
       listed('States', () => _svc.listStates(romId: romId)),
@@ -614,6 +657,12 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     bool anyLocal = reconciled.isNotEmpty;
     bool anyRemote = remote.isNotEmpty;
 
+    // A card this device has never synced, left for the next launch to take
+    // or for the next post-close sync to send: not up to date. Unchecked: the
+    // listing of every save failed, so nothing was decided for it.
+    var takeLeftForLaunch = false, uploadLeftForClose = false;
+    var cardsUnchecked = false;
+
     // 1) Reconcile each local file against its remote counterpart.
     for (final local in reconciled) {
       // A game that launches with a standalone emulator only has the copy in
@@ -643,10 +692,115 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       if (match != null) matchedRemote.add(match.key);
 
       final localMs = local.lastModified.millisecondsSinceEpoch;
-      final recorded = await SyncRepository.getSyncState(
-        kProviderId,
-        local.filePath,
-      );
+      final sharedCard =
+          sharesCards && !isState && isSharedMemoryCard(local.filePath);
+      final recorded = sharedCard
+          ? await _cardSyncRecord(local.filePath)
+          : await SyncRepository.getSyncState(kProviderId, local.filePath);
+
+      // A memory card every game of its system shares, which this device has
+      // never synced with RomM. The server's card wins, as NeoSync's does
+      // (#849): one that differs is taken by the launch, this device's kept
+      // as a dated copy. Pushing it instead is how a blank card an emulator
+      // has just made on a new device replaced the real one. RomM keeps a
+      // copy under every game, so the server's card is the newest copy of
+      // that name under any game: a game with no copy of its own is no sign
+      // the server has no card.
+      if (sharedCard && recorded == null) {
+        everySave ??= _everySaveListed(fresh: !statusOnly);
+        final saves = await everySave;
+        if (saves == null) {
+          // Where the newest copy is can't be told, so nothing is taken or
+          // sent: this game's own copy may be an old one. After a game
+          // closes, that is a save that may not have gone up: reported, and
+          // retried by the sweep, as a failed upload is.
+          cardsUnchecked = true;
+          if (!downloadOnly && !uploadOnly) {
+            uploadsFailed++;
+          } else if (!downloadOnly) {
+            uploadsDeferred++;
+          }
+          continue;
+        }
+        final card = _serverCard(baseName, match, saves);
+        // A post-close sync of it that failed is retried by the sweep, which
+        // lists afresh as post-close does.
+        final retry = uploadOnly && _failedUploads.containsKey(_keyOf(game));
+        if (card == null) {
+          if (!downloadOnly && (!uploadOnly || retry)) {
+            // No copy anywhere: the first device's card goes up, once a
+            // session has ended (as for any new save). Not otherwise from a
+            // sweep, which has no session to vouch for it.
+            countUpload(await _upload(romId, local, isState));
+          } else {
+            if (!downloadOnly) uploadsDeferred++;
+            uploadLeftForClose = true;
+            if (!statusOnly) {
+              _log.i(
+                'RomM: $baseName not synced from this device before and on '
+                'no game on the server — it goes up after the game closes',
+              );
+            }
+          }
+          continue;
+        }
+        final digest = await _md5OfFile(local.filePath);
+        if (digest != null &&
+            await _serverHoldsSameBytes(card, digest, local)) {
+          // The same card: recorded, so later changes sync as usual. A
+          // status check writes nothing.
+          if (!statusOnly) {
+            await _recordSynced(local, card.updatedAtMs, digest);
+          }
+          if (match != null || statusOnly || downloadOnly || uploadOnly) {
+            continue;
+          }
+          // Recorded, and this game has no copy: it goes up below, like any
+          // save the server lacks.
+        } else if (downloadOnly && !statusOnly && deadline != null) {
+          // Only the launch takes it: elsewhere an emulator may still have
+          // the card open (Android can't tell), and only the launch knows
+          // nothing is using it yet.
+          if (await FileSystemEntity.type(local.filePath, followLinks: false) ==
+              FileSystemEntityType.link) {
+            // Its copy would read through the link (see [_download]), and
+            // without one the take would lose it: left as it is.
+            takeLeftForLaunch = true;
+            _log.w(
+              'RomM: $baseName not synced from this device before, and a '
+              'link — left as it is, not taken and not uploaded',
+            );
+            continue;
+          }
+          final taken = await _download(
+            game,
+            card,
+            localFiles: localFiles,
+            placement: placement,
+            paired: local,
+            deadline: deadline,
+            firstCardSync: true,
+          );
+          countDownload(taken);
+          // Abandoned at the deadline: still the next launch's to take.
+          if (!taken.wrote && !taken.failed) takeLeftForLaunch = true;
+          continue;
+        } else {
+          // The card is the next launch's to take. For a retry of a failed
+          // post-close sync that settles it: nothing of it is to go up.
+          if (!downloadOnly && !retry) uploadsDeferred++;
+          takeLeftForLaunch = true;
+          if (!statusOnly) {
+            _log.i(
+              'RomM: ${path.basename(local.filePath)} not synced from this '
+              'device before and not the server\'s card — left for the next '
+              'launch, which takes the server\'s and keeps this one',
+            );
+          }
+          continue;
+        }
+      }
+
       final recordedLocalMs = (recorded?['local_modified_at'] as int?) ?? 0;
       final recordedCloudMs = (recorded?['cloud_updated_at'] as int?) ?? 0;
 
@@ -815,10 +969,21 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       }
     }
 
+    // A card to place comes from every game's listing (step 3), so this
+    // game's own copy, which may be an older one, isn't placed here first.
+    final cardsToPlace = placeCards ? await everySave : null;
+    bool placeable(RommAsset a) =>
+        !a.isState &&
+        (_sharedCardNames[game.systemFolderName]?.hasMatch(
+              localNameForAsset(a),
+            ) ??
+            false);
+
     // 2) Remote-only files → download.
     for (final a in remote) {
       if (statusOnly || uploadOnly) break;
       if (matchedRemote.contains(a.key)) continue;
+      if (cardsToPlace != null && placeable(a)) continue;
       countDownload(
         await _download(
           game,
@@ -828,6 +993,28 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           deadline: deadline,
         ),
       );
+    }
+
+    // 3) No memory card on this device yet: the server's cards, the newest
+    // copy of each under any game, are placed like any download.
+    if (placeCards) {
+      if (cardsToPlace == null) {
+        cardsUnchecked = true;
+      } else {
+        for (final a in cardsToPlace.where(placeable)) {
+          final placed = await _download(
+            game,
+            a,
+            localFiles: localFiles,
+            placement: placement,
+            deadline: deadline,
+          );
+          countDownload(placed);
+          anyRemote = true;
+          // Abandoned at the deadline: the next launch's to place.
+          if (!placed.wrote && !placed.failed) takeLeftForLaunch = true;
+        }
+      }
     }
 
     _log.i(
@@ -875,6 +1062,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     // one that didn't go up: the game would start on the older copy.
     if (downloadsFailed > 0) {
       return (status: GameSyncStatus.error, uploads: uploads);
+    }
+    if (cardsUnchecked) {
+      return (status: GameSyncStatus.error, uploads: uploads);
+    }
+    if (takeLeftForLaunch) {
+      return (status: GameSyncStatus.cloudOnly, uploads: uploads);
+    }
+    if (uploadLeftForClose) {
+      return (status: GameSyncStatus.localOnly, uploads: uploads);
     }
     if (!anyLocal && !anyRemote) {
       return (status: GameSyncStatus.noSaveFound, uploads: uploads);
@@ -1241,6 +1437,22 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
   }
 
+  /// [commitRommLocalSlot], once the server's card is written over [target]:
+  /// should that fail too, the staged copy is left where it is (the only
+  /// copy of the card as it was) rather than failing a download that already
+  /// happened, and its path returned.
+  static Future<String> _commitSlotQuietly(String target, String staged) async {
+    try {
+      return await commitRommLocalSlot(target, staged);
+    } catch (e) {
+      _log.e(
+        'RomM download: could not keep $staged as the slot of $target — '
+        'left as it is: $e',
+      );
+      return staged;
+    }
+  }
+
   /// Removes a copy [_download] kept and then didn't need.
   static Future<void> _deleteKeptCopy(String copyPath) async {
     try {
@@ -1438,6 +1650,66 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         '${p2(n.hour)}-${p2(n.minute)}-${p2(n.second)}';
   }
 
+  /// This device's record of the shared memory card at [filePath], kept under
+  /// its path as listed (by an upload, or a download onto it) or, by a
+  /// download placed in a folder, normalised. When both exist, the later one.
+  static Future<Map<String, dynamic>?> _cardSyncRecord(String filePath) async {
+    final normalised = path.normalize(path.absolute(filePath));
+    Map<String, dynamic>? newest;
+    for (final key in {filePath, normalised}) {
+      final record = await SyncRepository.getSyncState(kProviderId, key);
+      if (record == null) continue;
+      int at(Map<String, dynamic> r) => (r['local_modified_at'] as int?) ?? 0;
+      if (newest == null || at(record) > at(newest)) newest = record;
+    }
+    return newest;
+  }
+
+  /// Whether this device has never synced one of [cards] with RomM.
+  static Future<bool> _anyNeverSynced(List<LocalSaveFile> cards) async {
+    for (final card in cards) {
+      if (await _cardSyncRecord(card.filePath) == null) return true;
+    }
+    return false;
+  }
+
+  /// Every save the user has on the server, under any game, newest per name;
+  /// null when the listing failed. Unless [fresh], a listing up to
+  /// [_everySaveMaxAge] old is reused: a highlight only shows a status, and a
+  /// list of PS2 games would otherwise ask for every save at each one.
+  Future<List<RommAsset>?> _everySaveListed({required bool fresh}) async {
+    final cached = _everySaveCache;
+    if (!fresh &&
+        cached != null &&
+        DateTime.now().difference(cached.at) < _everySaveMaxAge) {
+      return cached.saves;
+    }
+    try {
+      final saves = latestPerLocalName(
+        syncableRemote(await _svc.listAllSaves()),
+      );
+      _everySaveCache = (at: DateTime.now(), saves: saves);
+      return saves;
+    } catch (e) {
+      _log.e('RomM listing every save failed: $e');
+      return null;
+    }
+  }
+
+  ({DateTime at, List<RommAsset> saves})? _everySaveCache;
+
+  /// The server's copy of the shared memory card named [localName]: the newest
+  /// of [thisGame]'s and those in [everySave] (every game's), or null when no
+  /// game has one.
+  static RommAsset? _serverCard(
+    String localName,
+    RommAsset? thisGame,
+    List<RommAsset> everySave,
+  ) => latestPerLocalName([
+    ?thisGame,
+    ...everySave.where((a) => !a.isState && localNameForAsset(a) == localName),
+  ]).firstOrNull;
+
   /// Records [local] as settled at [cloudUpdatedAt], no transfer having been
   /// needed.
   ///
@@ -1552,6 +1824,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// could not be kept first, or would be read through a link (that target is
   /// then left as it was). Everything else (no target, an expired deadline,
   /// a newer local copy) is a routine `wrote: false`.
+  ///
+  /// [firstCardSync] takes the server's copy of a shared memory card this
+  /// device has never synced: it is written onto [paired], whatever its time,
+  /// and the bell says the card was synced from here for the first time.
   Future<_DownloadOutcome> _download(
     GameModel game,
     RommAsset asset, {
@@ -1559,7 +1835,9 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     required _Placement placement,
     LocalSaveFile? paired,
     SyncDeadline? deadline,
+    bool firstCardSync = false,
   }) async {
+    assert(!firstCardSync || paired != null);
     var skippedCoreMismatch = false;
     try {
       // Placement comes from this device's own RetroArch layout, never from the
@@ -1575,14 +1853,16 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       final relativeName = sub.isNotEmpty
           ? '$prefix/$sub/$localName'
           : '$prefix/$localName';
-      final targets = await _downloadTargets(
-        game,
-        asset,
-        relativeName: relativeName,
-        localName: localName,
-        placement: placement,
-        paired: paired,
-      );
+      final targets = firstCardSync && paired != null
+          ? [paired.filePath]
+          : await _downloadTargets(
+              game,
+              asset,
+              relativeName: relativeName,
+              localName: localName,
+              placement: placement,
+              paired: paired,
+            );
       if (targets == null) {
         return (wrote: false, coreMismatch: false, failed: false);
       }
@@ -1624,6 +1904,17 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         final isLink =
             await FileSystemEntity.type(target, followLinks: false) ==
             FileSystemEntityType.link;
+        // A memory card every game of its system shares. The server's copy
+        // under this game may come from a card this device never had (another
+        // game's copy of it), which nothing here can tell from an ordinary
+        // pull: this device's card is kept whenever the bytes differ.
+        final sharedCard =
+            !asset.isState &&
+            sharesMemoryCards(game.systemFolderName) &&
+            isSharedMemoryCard(target);
+        var changedHere = false;
+        // [keptHere] is the card staged for its slot, not yet the slot.
+        var slotStaged = false;
         // Per-target guard (mirrors NeoSync): never overwrite a copy that is
         // newer than the remote asset, unless its bytes are still the ones
         // recorded at the last sync (only its time moved, as when an emulator
@@ -1633,7 +1924,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         if (await f.exists()) {
           final localMs = (await f.stat()).modified.millisecondsSinceEpoch;
           localMsHere = localMs;
-          if (localMs > asset.updatedAtMs + _mtimeToleranceMs &&
+          // A first sync of a shared card takes the server's whatever the
+          // time: a card an emulator has just made is newer than any.
+          if (!firstCardSync &&
+              localMs > asset.updatedAtMs + _mtimeToleranceMs &&
               !await _unchangedSinceLastSync(target)) {
             _log.i('RomM download: skip $target (local newer than remote)');
             continue;
@@ -1674,8 +1968,17 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           // kept, this target is left as it was. A save already holding the
           // server's bytes loses nothing.
           final localDigest = md5.convert(current);
-          if (localDigest != serverDigest &&
-              await _changedHereSinceLastSync(target, localDigest, localMs)) {
+          if (localDigest != serverDigest) {
+            changedHere = await _changedHereSinceLastSync(
+              target,
+              localDigest,
+              localMs,
+            );
+          }
+          // A shared card that is a link and unchanged here is written
+          // through, as before: its copy would read through the link.
+          if (changedHere ||
+              (sharedCard && !isLink && localDigest != serverDigest)) {
             if (isLink) {
               _log.w(
                 'RomM download: skip $target — it changed here, and no copy is '
@@ -1685,7 +1988,15 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
               continue;
             }
             try {
-              keptHere = await keepRommLocalCopy(target, bytes: current);
+              // A card unchanged here goes in its one slot, which the next
+              // such download overwrites: routine downloads would otherwise
+              // push the dated copies (a first sync's, a conflict's) out.
+              if (changedHere) {
+                keptHere = await keepRommLocalCopy(target, bytes: current);
+              } else {
+                keptHere = await stageRommLocalSlot(target, bytes: current);
+                slotStaged = true;
+              }
             } catch (e) {
               _log.e(
                 'RomM download: could not keep this device\'s $target before '
@@ -1736,26 +2047,44 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
               if (keptHere != null) await _deleteKeptCopy(keptHere);
             } catch (e) {
               final kept = keptHere == null
-                  ? ''
-                  : '; this device\'s copy is kept as '
-                        '${path.basename(keptHere)}';
+                  ? null
+                  : slotStaged
+                  ? await _commitSlotQuietly(target, keptHere)
+                  : keptHere;
               _log.e(
                 'RomM download: $target could not be written or put back'
-                '$kept: $e',
+                '${kept == null ? '' : '; this device\'s copy is kept as ${path.basename(kept)}'}'
+                ': $e',
               );
-              if (keptHere != null) await _tidyQuietly(target, keptHere);
+              if (kept != null) await _tidyQuietly(target, kept);
             }
           }
           rethrow;
         }
         wroteAny = true;
+        if (keptHere != null && slotStaged) {
+          keptHere = await _commitSlotQuietly(target, keptHere);
+        }
         if (keptHere != null) {
           _log.w(
-            'RomM download: $target had changed here too — kept this '
-            'device\'s copy as ${path.basename(keptHere)} before writing the '
-            'server\'s newer one',
+            firstCardSync
+                ? 'RomM download: $target not synced from this device before '
+                      '— kept this device\'s card as '
+                      '${path.basename(keptHere)} and took the server\'s'
+                : changedHere
+                ? 'RomM download: $target had changed here too — kept this '
+                      'device\'s copy as ${path.basename(keptHere)} before '
+                      'writing the server\'s newer one'
+                : 'RomM download: kept this device\'s card $target as '
+                      '${path.basename(keptHere)} before writing the server\'s',
           );
-          reportNewerCloudCopy(gameName: game.name, savePath: target);
+          // An ordinary pull over a card unchanged here is not news; the copy
+          // waits in Save history.
+          if (firstCardSync) {
+            reportFirstCardSyncTookCloud(gameName: game.name, savePath: target);
+          } else if (changedHere) {
+            reportNewerCloudCopy(gameName: game.name, savePath: target);
+          }
           await _tidyQuietly(target, keptHere);
         }
         final stat = await f.stat();
@@ -1928,7 +2257,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   Future<void> _recordUploadOutcome(GameModel game, _Pending uploads) async {
     if (!_browse.isConnected) return;
     final left = uploads == _Pending.unknown
-        ? await _pendingUpload(game)
+        ? await _pendingUpload(game, afterClose: true)
         : uploads;
     if (_noteUpload(game, left)) _reportUploadFailures();
   }
@@ -2266,10 +2595,19 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// [_Pending.waiting] when [game] has a local save the server has not been
   /// told about — either never recorded, or changed since it was recorded —
   /// and [_Pending.unknown] when its save folder could not be read.
+  /// [_Pending.deferred] when the only such save is a memory card every game
+  /// shares that this device has never synced: that waits for the game's own
+  /// syncs, unless its upload already failed.
   ///
   /// The point of this check is that it touches only the disk and the local
   /// sync-state table, so the sweep can rule a game out without a round trip.
-  Future<_Pending> _pendingUpload(GameModel game) async {
+  ///
+  /// [afterClose]: asked for a post-close sync that could not tell, where a
+  /// never-synced card may be the session's and not have gone up: waiting.
+  Future<_Pending> _pendingUpload(
+    GameModel game, {
+    bool afterClose = false,
+  }) async {
     final List<LocalSaveFile> localFiles;
     try {
       localFiles = syncableSaves(game, await _locateSaves(game));
@@ -2279,11 +2617,26 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       _log.w('RomM: cannot locate saves for ${game.romname}: $e');
       return _Pending.unknown;
     }
+    final sharesCards = sharesMemoryCards(game.systemFolderName);
+    var left = _Pending.none;
     for (final local in localFiles) {
-      final recorded = await SyncRepository.getSyncState(
-        kProviderId,
-        local.filePath,
-      );
+      final sharedCard =
+          sharesCards &&
+          !local.relativePath.startsWith('states/') &&
+          isSharedMemoryCard(local.filePath);
+      final recorded = sharedCard
+          ? await _cardSyncRecord(local.filePath)
+          : await SyncRepository.getSyncState(kProviderId, local.filePath);
+      // A shared memory card this device has never synced is not a sweep's to
+      // send (only after the game closes is it known to be the card in use),
+      // unless the upload after it closed failed: that is retried.
+      if (recorded == null && sharedCard) {
+        if (afterClose || _failedUploads.containsKey(_keyOf(game))) {
+          return _Pending.waiting;
+        }
+        left = _Pending.deferred;
+        continue;
+      }
       // No record at all: either a first upload that failed, or a save made
       // before RomM sync was on. Both want pushing.
       if (recorded == null) return _Pending.waiting;
@@ -2293,7 +2646,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
         return _Pending.waiting;
       }
     }
-    return _Pending.none;
+    return left;
   }
 
   /// Fires the connect-time work once, on a disconnected → connected
@@ -2304,6 +2657,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     final connected = _browse.isConnected;
     if (connected == _wasConnected) return;
     _wasConnected = connected;
+    // Another server or account may follow: its saves are not these.
+    _everySaveCache = null;
     if (!connected) return;
     _scheduleSweep();
   }

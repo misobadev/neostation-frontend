@@ -71,6 +71,11 @@ class _FakeRommService extends RommService {
     return List.of(savesByRom[romId] ?? const []);
   }
 
+  @override
+  Future<List<RommAsset>> listAllSaves() async => [
+    for (final saves in savesByRom.values) ...saves,
+  ];
+
   final Map<int, List<RommAsset>> statesByRom = {};
 
   /// Plants a server-side save state.
@@ -264,6 +269,19 @@ void main() {
     await tmp.delete(recursive: true);
   });
 
+  /// Records [card] as synced as it is now, before the server's copy at
+  /// [remoteAt] arrived.
+  Future<void> syncedBefore(File card) async {
+    final stat = card.statSync();
+    await SyncRepository.saveSyncState(
+      RomMSyncProvider.kProviderId,
+      card.path,
+      stat.modified.millisecondsSinceEpoch,
+      remoteAt.subtract(const Duration(hours: 1)).millisecondsSinceEpoch,
+      stat.size,
+    );
+  }
+
   group('a save already in the emulator\'s folder', () {
     test('is replaced in place by a newer RomM copy', () async {
       final card = File(p.join(folder.path, 'Mcd001.ps2'))
@@ -275,6 +293,8 @@ void main() {
       local = [localSave(card.path, 'Mcd001.ps2')];
       svc.seedSave(1, 'Mcd001.ps2', 'NEW'.codeUnits, updatedAt: remoteAt);
 
+      // Synced here before (a card never synced is NEO-270's first sync).
+      await syncedBefore(card);
       await provider.syncGameSavesBeforeLaunch(game);
 
       expect(card.readAsStringSync(), 'NEW');
@@ -313,6 +333,7 @@ void main() {
         local = [localSave(card.path, 'slot1/Mcd001.ps2')];
         svc.seedSave(1, 'Mcd001.ps2', 'NEW'.codeUnits, updatedAt: remoteAt);
 
+        await syncedBefore(card);
         await provider.syncGameSavesBeforeLaunch(game);
 
         expect(card.readAsStringSync(), 'NEW');
