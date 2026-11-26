@@ -4,8 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/logger_service.dart';
 
-/// The NeoAssets scrape settings: scrape mode, media types and the systems
-/// to scrape, kept in preferences.
+/// The NeoAssets scrape settings: scrape mode, media types, video streaming
+/// and the systems to scrape, kept in preferences.
 ///
 /// NeoAssets' own, apart from every other metadata provider's settings: the
 /// providers share the scraped library, not how each one scrapes it.
@@ -17,6 +17,11 @@ class NeoAssetsSettingsRepository {
   static const String _scrapeModePref = 'neoassets_scrape_mode';
   static const String _mediaTypesPref = 'neoassets_scrape_media_types';
   static const String _systemsPref = 'neoassets_scrape_systems';
+  static const String _streamVideoPref = 'neoassets_stream_video';
+
+  /// Videos play from NeoAssets instead of being downloaded, unless the user
+  /// turns it off: they are what takes up most of the disk.
+  static const bool defaultStreamVideo = true;
 
   /// `new_only` (new and unfinished games) or `all`.
   static const String defaultScrapeMode = 'new_only';
@@ -57,6 +62,23 @@ class NeoAssetsSettingsRepository {
       return await prefs.setStringList(_mediaTypesPref, types);
     } catch (e) {
       _log.e('Error saving the NeoAssets media types: $e');
+      return false;
+    }
+  }
+
+  /// Whether a scrape keeps each game's video link and plays it from
+  /// NeoAssets instead of downloading the file.
+  static Future<bool> getStreamVideo() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_streamVideoPref) ?? defaultStreamVideo;
+  }
+
+  static Future<bool> saveStreamVideo(bool enabled) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return await prefs.setBool(_streamVideoPref, enabled);
+    } catch (e) {
+      _log.e('Error saving the NeoAssets video streaming setting: $e');
       return false;
     }
   }

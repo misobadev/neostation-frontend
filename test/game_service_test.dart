@@ -137,6 +137,39 @@ void main() {
     );
   });
 
+  group('GameService.loadGamesForSystem (video link)', () {
+    test('carries a streamed video link to the listed game', () async {
+      await db.execute(
+        "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('snes', 'Super Nintendo', 'snes')",
+      );
+      await db.execute(
+        "INSERT INTO user_system_settings (app_system_id) VALUES ('snes')",
+      );
+      await db.execute(
+        "INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) VALUES ('a.smc', '/roms/snes/a.smc', 'snes', 1)",
+      );
+      await db.execute(
+        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, real_name, video_url) VALUES ('snes', 'a.smc', 'A', 'https://cdn.example/a.mp4')",
+      );
+
+      final games = await GameService.loadGamesForSystem(
+        SystemModel(
+          id: SystemFolderNames.favorites,
+          folderName: SystemFolderNames.favorites,
+          realName: 'Favorites',
+          iconImage: 'assets/images/icons/heart-bulk.png',
+          color: '#ff006a',
+          isVirtual: true,
+        ),
+      );
+
+      expect(
+        games.singleWhere((g) => g.romname == 'a.smc').videoUrl,
+        'https://cdn.example/a.mp4',
+      );
+    });
+  });
+
   // isGameLaunchInProgress widens the launch window used to suppress the
   // resume-triggered secondary-display reset. It must be true from the moment a
   // launch is initiated (beginLaunchPending) — before _registerGameLaunch flips

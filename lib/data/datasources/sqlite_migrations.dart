@@ -746,6 +746,9 @@ class SqliteMigrations {
       case 197:
         await _migrateToVersion197(db);
         break;
+      case 198:
+        await _migrateToVersion198(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7920,6 +7923,35 @@ class SqliteMigrations {
       _log.i('Migration v197 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v197: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v198: `user_screenscraper_metadata.video_url`, the NeoAssets
+  /// link a game's video streams from when "Streaming video" keeps it off the
+  /// disk. Idempotent: the column is added only when missing.
+  static Future<void> _migrateToVersion198(Database db) async {
+    _log.i('Migration v198: NeoAssets video links');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_screenscraper_metadata)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i(
+          'v198: user_screenscraper_metadata is not present, nothing to do',
+        );
+        return;
+      }
+      if (!columns.contains('video_url')) {
+        db.execute(
+          'ALTER TABLE user_screenscraper_metadata ADD COLUMN video_url TEXT',
+        );
+      }
+      _log.i('Migration v198 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v198: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

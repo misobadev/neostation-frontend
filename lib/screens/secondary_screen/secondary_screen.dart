@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:neostation/services/preview_video_source.dart';
 import 'package:neostation/widgets/brand_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -757,8 +758,9 @@ class _SecondaryScreenState extends State<SecondaryScreen> {
     final gen = _videoGeneration;
     VideoPlayerController? controller;
     try {
-      controller = VideoPlayerController.file(File(path));
-      await controller.initialize();
+      // [path] is a file or, for a streamed NeoAssets video, a link.
+      controller = PreviewVideoSource.controllerFor(path);
+      await PreviewVideoSource.initialize(controller, path);
       if (!mounted || gen != _videoGeneration) {
         await controller.dispose();
         return;

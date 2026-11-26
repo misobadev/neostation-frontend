@@ -981,6 +981,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.identifyNeedsScreenScraper:
       'Identify is only available with ScreenScraper for now.',
   AppLocale.neoAssetsSystemsSub: 'Systems NeoAssets has a catalog for',
+  AppLocale.neoAssetsStreamVideo: 'Streaming video',
+  AppLocale.neoAssetsStreamVideoSub: 'Saves a lot of disk space: videos play from the internet instead of being downloaded. Needs a connection; offline, only the image is shown.',
   AppLocale.neoAssetsScrapeSub:
       'Fetch metadata and media for the enabled systems',
   AppLocale.neoAssetsThreads: 'Threads: {count}',

@@ -989,6 +989,8 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.identifyNeedsScreenScraper:
       'Пока функция «Определить» доступна только с ScreenScraper.',
   AppLocale.neoAssetsSystemsSub: 'Системы, для которых есть каталог NeoAssets',
+  AppLocale.neoAssetsStreamVideo: 'Потоковое видео',
+  AppLocale.neoAssetsStreamVideoSub: 'Экономит много места на диске: видео воспроизводятся из интернета, а не скачиваются. Нужно подключение; без него показывается только изображение.',
   AppLocale.neoAssetsScrapeSub:
       'Загрузить метаданные и медиа для включённых систем',
   AppLocale.neoAssetsThreads: 'Потоки: {count}',

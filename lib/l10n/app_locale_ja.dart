@@ -929,6 +929,9 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.neoAssetsNotConfigured: 'このビルドの NeoStation はまだ NeoAssets に接続できません。',
   AppLocale.identifyNeedsScreenScraper: '識別は現在 ScreenScraper でのみ利用できます。',
   AppLocale.neoAssetsSystemsSub: 'NeoAssets にカタログがあるシステム',
+  AppLocale.neoAssetsStreamVideo: '動画ストリーミング',
+  AppLocale.neoAssetsStreamVideoSub:
+      'ディスク容量を大幅に節約：動画をダウンロードせずインターネットから再生します。接続が必要です。オフライン時は画像のみ表示されます。',
   AppLocale.neoAssetsScrapeSub: '有効なシステムのメタデータとメディアを取得',
   AppLocale.neoAssetsThreads: 'スレッド: {count}',
   AppLocale.neoAssetsGuest: 'ゲスト',

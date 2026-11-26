@@ -957,6 +957,8 @@ mixin AppLocale {
   static const String identifyNeedsScreenScraper =
       'identify_needs_screenscraper';
   static const String neoAssetsSystemsSub = 'neoassets_systems_sub';
+  static const String neoAssetsStreamVideo = 'neoassets_stream_video';
+  static const String neoAssetsStreamVideoSub = 'neoassets_stream_video_sub';
   static const String neoAssetsScrapeSub = 'neoassets_scrape_sub';
   static const String neoAssetsThreads = 'neoassets_threads';
   static const String neoAssetsGuest = 'neoassets_guest';

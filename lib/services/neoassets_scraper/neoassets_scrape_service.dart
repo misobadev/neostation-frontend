@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 
@@ -215,6 +216,12 @@ class NeoAssetsScrapeService {
       final mediaTypes = await NeoAssetsSettingsRepository.getMediaTypes();
       final language = await GameLibraryRepository.getAppLanguage();
 
+      // With streaming off, a game scraped while it was on still has only its
+      // link: its video is fetched from there, with no lookup.
+      final fetchStreamedVideos =
+          mediaTypes.contains('video') &&
+          !await NeoAssetsSettingsRepository.getStreamVideo();
+
       final systems = await getSystems();
       final enabled = await getEnabledSystems(systems);
       final queue = <_RomJob>[];
@@ -238,6 +245,24 @@ class NeoAssetsScrapeService {
               romPath: rom['rom_path']?.toString() ?? '',
             ),
           );
+        }
+        if (fetchStreamedVideos) {
+          final queued = {for (final rom in roms) rom['filename'].toString()};
+          final systemFolder = system['folder_name'].toString();
+          for (final link in await streamedVideosToFetch(id, systemFolder)) {
+            if (queued.contains(link.filename)) continue;
+            queue.add(
+              _RomJob(
+                appSystemId: id,
+                systemName: system['name'].toString(),
+                systemFolder: systemFolder,
+                selector: selector,
+                filename: link.filename,
+                romPath: '',
+                videoUrl: link.url,
+              ),
+            );
+          }
         }
       }
 
@@ -282,19 +307,21 @@ class NeoAssetsScrapeService {
             progress: 0,
           );
           try {
-            final outcome = await _scrapeRom(
-              job,
-              apiKey: apiKey,
-              newOnly: scrapeMode == 'new_only',
-              mediaTypes: mediaTypes,
-              language: language,
-              onRequest: () => requests++,
-              onStep: (step, value) => progress.updateThreadProgress(
-                threadId: threadId,
-                currentStep: step,
-                progress: value,
-              ),
-            );
+            final outcome = job.videoUrl != null
+                ? await _fetchStreamedVideo(job)
+                : await _scrapeRom(
+                    job,
+                    apiKey: apiKey,
+                    newOnly: scrapeMode == 'new_only',
+                    mediaTypes: mediaTypes,
+                    language: language,
+                    onRequest: () => requests++,
+                    onStep: (step, value) => progress.updateThreadProgress(
+                      threadId: threadId,
+                      currentStep: step,
+                      progress: value,
+                    ),
+                  );
             if (outcome == _RomOutcome.scraped) {
               succeeded++;
             } else {
@@ -484,6 +511,15 @@ class NeoAssetsScrapeService {
 
     onStep?.call(ThreadProcessingStep.scanningImages, 0.35);
     final metadata = metadataFor(job.filename, game, language: language);
+    final regions = RegionalName.regionsFor(language);
+    // Streaming keeps the video's link and leaves the file on NeoAssets.
+    final streamVideo =
+        mediaTypes.contains('video') &&
+        await NeoAssetsSettingsRepository.getStreamVideo();
+    if (mediaTypes.contains('video')) {
+      final url = game.firstMedia('video', regions: regions)?.url;
+      metadata['video_url'] = isStreamableUrl(url) ? url : null;
+    }
     if (newOnly) {
       await GameLibraryRepository.fillGameMetadataGaps(
         metadata,
@@ -510,8 +546,13 @@ class NeoAssetsScrapeService {
     final mediaOk = await _downloadMedia(
       job,
       game,
-      mediaTypes,
-      RegionalName.regionsFor(language),
+      streamVideo
+          ? [
+              for (final t in mediaTypes)
+                if (t != 'video') t,
+            ]
+          : mediaTypes,
+      regions,
       overwrite: !newOnly,
       onProgress: (p) =>
           onStep?.call(ThreadProcessingStep.downloadingImages, 0.5 + p * 0.5),
@@ -522,6 +563,16 @@ class NeoAssetsScrapeService {
       job.filename,
     );
     return _RomOutcome.scraped;
+  }
+
+  /// Whether [url] is a web address a video can stream from: anything else
+  /// (a local path, another scheme) is never handed to the player.
+  static bool isStreamableUrl(String? url) {
+    if (url == null || url.isEmpty) return false;
+    final uri = Uri.tryParse(url);
+    return uri != null &&
+        (uri.scheme == 'https' || uri.scheme == 'http') &&
+        uri.host.isNotEmpty;
   }
 
   /// Maps a NeoAssets game to the game library's metadata columns.
@@ -602,6 +653,60 @@ class NeoAssetsScrapeService {
     return results.every((ok) => ok);
   }
 
+  /// The games on [appSystemId] whose video NeoAssets streams and that have
+  /// no video file yet, for a session with streaming switched off.
+  @visibleForTesting
+  static Future<List<({String filename, String url})>> streamedVideosToFetch(
+    String appSystemId,
+    String systemFolder,
+  ) async {
+    final links = await GameLibraryRepository.getVideoLinks(appSystemId);
+    if (links.isEmpty) return const [];
+    final folder = path.join(
+      await ScrapedMediaPaths.getMediaDirectory(),
+      systemFolder,
+      ScrapedMediaPaths.folderFor('video'),
+    );
+    final missing = <({String filename, String url})>[];
+    for (final link in links) {
+      if (!isStreamableUrl(link.url)) continue;
+      final baseName = await ScrapedMediaPaths.artBaseName(
+        link.filename,
+        appSystemId,
+      );
+      var onDisk = false;
+      for (final ext in _videoExtensions) {
+        if (await File(path.join(folder, '$baseName.$ext')).exists()) {
+          onDisk = true;
+          break;
+        }
+      }
+      if (!onDisk) missing.add(link);
+    }
+    return missing;
+  }
+
+  /// Downloads a streamed game's video from its saved link. No lookup, so it
+  /// costs nothing against the account's rate or quota.
+  static Future<_RomOutcome> _fetchStreamedVideo(_RomJob job) async {
+    // The saved link carries no type; its extension must be a video's.
+    final media = NeoAssetsMedia(kind: 'video', url: job.videoUrl!, mime: '');
+    if (!_videoExtensions.contains(media.extension)) {
+      return _RomOutcome.mediaFailed;
+    }
+    final ok = await _downloadOne(
+      media,
+      path.join(
+        await ScrapedMediaPaths.getMediaDirectory(),
+        job.systemFolder,
+        ScrapedMediaPaths.folderFor('video'),
+      ),
+      await ScrapedMediaPaths.artBaseName(job.filename, job.appSystemId),
+      overwrite: false,
+    );
+    return ok ? _RomOutcome.scraped : _RomOutcome.mediaFailed;
+  }
+
   static final RegExp _safeExtension = RegExp(r'^[a-z0-9]{1,8}$');
 
   static Future<bool> _downloadOne(
@@ -657,6 +762,9 @@ class _RomJob {
   final String filename;
   final String romPath;
 
+  /// Set for a game whose video is only fetched from its saved link.
+  final String? videoUrl;
+
   const _RomJob({
     required this.appSystemId,
     required this.systemName,
@@ -664,5 +772,6 @@ class _RomJob {
     required this.selector,
     required this.filename,
     required this.romPath,
+    this.videoUrl,
   });
 }

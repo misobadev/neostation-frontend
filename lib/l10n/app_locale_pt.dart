@@ -998,6 +998,8 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.identifyNeedsScreenScraper:
       'Por enquanto, Identificar só está disponível com o ScreenScraper.',
   AppLocale.neoAssetsSystemsSub: 'Sistemas com catálogo no NeoAssets',
+  AppLocale.neoAssetsStreamVideo: 'Vídeo em streaming',
+  AppLocale.neoAssetsStreamVideoSub: 'Economiza muito espaço em disco: os vídeos são reproduzidos pela internet em vez de baixados. Precisa de conexão; offline, só a imagem é exibida.',
   AppLocale.neoAssetsScrapeSub:
       'Baixa metadados e mídias dos sistemas ativados',
   AppLocale.neoAssetsThreads: 'Threads: {count}',

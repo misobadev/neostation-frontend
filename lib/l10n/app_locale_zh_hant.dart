@@ -906,6 +906,8 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.neoAssetsNotConfigured: '此版本的 NeoStation 尚無 NeoAssets 存取權限。',
   AppLocale.identifyNeedsScreenScraper: '目前僅 ScreenScraper 支援識別功能。',
   AppLocale.neoAssetsSystemsSub: 'NeoAssets 有目錄的系統',
+  AppLocale.neoAssetsStreamVideo: '串流播放影片',
+  AppLocale.neoAssetsStreamVideoSub: '大幅節省磁碟空間：影片從網路播放，而不是下載。需要網路連線；離線時僅顯示圖片。',
   AppLocale.neoAssetsScrapeSub: '為已啟用的系統取得中繼資料與媒體',
   AppLocale.neoAssetsThreads: '執行緒：{count}',
   AppLocale.neoAssetsGuest: '訪客',

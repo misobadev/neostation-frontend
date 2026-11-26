@@ -12,6 +12,7 @@ import 'package:neostation/services/neoassets_scraper/neoassets_scrape_service.d
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/widgets/custom_toggle_switch.dart';
 
 import '../widgets/scraping_progress_panel.dart';
 import '../widgets/setting_row.dart';
@@ -58,14 +59,15 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
     'video',
   ];
 
-  static const int _gridColumns = 6;
+  static const int _gridColumns = 5;
 
   static const int _accountSlot = 0;
   static const int _scrapeSlot = 1;
   static const int _modeSlot = 2;
   static const int _mediaStart = 3;
   static int get _mediaEnd => _mediaStart + _mediaTypes.length;
-  static int get _toggleAllSlot => _mediaEnd;
+  static int get _streamSlot => _mediaEnd;
+  static int get _toggleAllSlot => _streamSlot + 1;
   static int get _gridStart => _toggleAllSlot + 1;
   int get _gridEnd => _gridStart + _systems.length;
 
@@ -82,6 +84,7 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
   int _accountButton = 0;
   String _scrapeMode = 'new_only';
   List<String> _enabledMedia = [];
+  bool _streamVideo = NeoAssetsSettingsRepository.defaultStreamVideo;
   List<Map<String, dynamic>> _systems = [];
   Map<String, bool> _enabledSystems = {};
   int _cursor = 0;
@@ -116,6 +119,7 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
       final guest = await NeoAssetsScrapeService.isGuest();
       final scrapeMode = await NeoAssetsSettingsRepository.getScrapeMode();
       final media = await NeoAssetsSettingsRepository.getMediaTypes();
+      final streamVideo = await NeoAssetsSettingsRepository.getStreamVideo();
       final systems = await NeoAssetsScrapeService.getSystems();
       final enabled = await NeoAssetsScrapeService.getEnabledSystems(systems);
       if (!mounted) return;
@@ -124,7 +128,14 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
         _guest = guest;
         _scrapeMode = scrapeMode;
         _enabledMedia = List<String>.from(media);
-        _systems = systems;
+        _streamVideo = streamVideo;
+        // The grid shows short names, so it is ordered by them.
+        _systems = [...systems]
+          ..sort(
+            (a, b) => a['short_name'].toString().toLowerCase().compareTo(
+              b['short_name'].toString().toLowerCase(),
+            ),
+          );
         _enabledSystems = enabled;
         _isLoading = false;
       });
@@ -154,7 +165,7 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
       next = i < _gridColumns ? _toggleAllSlot : _cursor - _gridColumns;
     } else if (_isMediaSlot(_cursor)) {
       next = _modeSlot;
-    } else if (_cursor == _toggleAllSlot) {
+    } else if (_cursor == _streamSlot) {
       next = _mediaStart;
     } else {
       next = _cursor - 1;
@@ -176,7 +187,7 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
         next = _gridEnd - 1;
       }
     } else if (_isMediaSlot(_cursor)) {
-      next = _toggleAllSlot;
+      next = _streamSlot;
     } else {
       next = _cursor + 1;
     }
@@ -236,6 +247,8 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
     } else if (_isMediaSlot(slot)) {
       final type = _mediaTypes[slot - _mediaStart];
       _setMedia(type, !_enabledMedia.contains(type));
+    } else if (slot == _streamSlot) {
+      _setStreamVideo(!_streamVideo);
     } else if (slot == _toggleAllSlot) {
       _toggleAllSystems();
     } else if (_isGridSlot(slot)) {
@@ -345,6 +358,13 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
     if (mounted && ok) setState(() => _enabledMedia = types);
   }
 
+  Future<void> _setStreamVideo(bool enabled) async {
+    setState(() => _streamVideo = enabled);
+    final ok = await NeoAssetsSettingsRepository.saveStreamVideo(enabled);
+    if (!mounted || ok) return;
+    setState(() => _streamVideo = !enabled);
+  }
+
   Future<void> _toggleSystem(String id) async {
     final previous = _enabledSystems[id] ?? true;
     setState(() => _enabledSystems[id] = !previous);
@@ -415,6 +435,18 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
           SizedBox(height: 14.r),
           SettingsSectionHeader(label: AppLocale.media.getString(context)),
           _buildMediaChips(context),
+          SizedBox(height: 8.r),
+          SettingRow(
+            key: _keyFor(_streamSlot),
+            title: AppLocale.neoAssetsStreamVideo.getString(context),
+            subtitle: AppLocale.neoAssetsStreamVideoSub.getString(context),
+            focused: _focused(_streamSlot),
+            onTap: () => _setStreamVideo(!_streamVideo),
+            trailing: CustomToggleSwitch(
+              value: _streamVideo,
+              onChanged: _setStreamVideo,
+            ),
+          ),
           SizedBox(height: 14.r),
           SettingsSectionHeader(label: AppLocale.systems.getString(context)),
           SettingRow(
@@ -657,7 +689,7 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
         _toggleSystem(id);
       },
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 6.r),
+        padding: EdgeInsets.symmetric(horizontal: 7.r, vertical: 6.r),
         decoration: BoxDecoration(
           color: focused
               ? theme.colorScheme.onSurface
@@ -674,27 +706,59 @@ class NeoAssetsSettingsContentState extends State<NeoAssetsSettingsContent> {
             width: 1.r,
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              enabled ? Symbols.check_rounded : Symbols.add_rounded,
-              size: 11.r,
-              color: focused
-                  ? fg
-                  : (enabled ? NeoAssetsBrand.ink(context) : fg),
-            ),
-            SizedBox(width: 4.r),
-            Expanded(
-              child: Text(
-                system['name'].toString(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 8.r,
-                  color: fg,
-                  fontWeight: enabled ? FontWeight.w600 : FontWeight.normal,
+            Row(
+              children: [
+                Expanded(
+                  // Long short names (Genesis, Naomi GD) shrink rather than
+                  // cut off.
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      (system['short_name'] ?? system['name']).toString(),
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 11.r,
+                        height: 1.1,
+                        color: fg,
+                        fontWeight: enabled ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                SizedBox(width: 3.r),
+                Icon(
+                  enabled ? Symbols.check_rounded : Symbols.add_rounded,
+                  size: 11.r,
+                  color: focused
+                      ? fg
+                      : (enabled ? NeoAssetsBrand.ink(context) : fg),
+                ),
+              ],
+            ),
+            SizedBox(height: 3.r),
+            Row(
+              children: [
+                Icon(
+                  Symbols.sports_esports_rounded,
+                  size: 9.r,
+                  color: fg.withValues(alpha: 0.7),
+                ),
+                SizedBox(width: 3.r),
+                Text(
+                  '${system['rom_count'] ?? 0}',
+                  style: TextStyle(
+                    fontSize: 8.r,
+                    height: 1.1,
+                    color: fg.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

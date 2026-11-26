@@ -27,12 +27,14 @@ class GameLibraryRepository {
   /// on, then fetches its media.
   static const int scrapedMetadataOnly = 2;
 
-  /// Returns every detected system, ordered by name, whatever metadata
-  /// provider knows it. Callers filter by what their provider supports.
+  /// Returns every detected system, ordered by name, with its short name and
+  /// visible game count, whatever metadata provider knows it. Callers filter by what their provider supports.
   static Future<List<Map<String, dynamic>>> getDetectedSystems() async {
     final db = await SqliteService.getDatabase();
     final results = await db.rawQuery('''
-      SELECT s.id, s.real_name, s.folder_name
+      SELECT s.id, s.real_name, s.short_name, s.folder_name,
+             (SELECT COUNT(*) FROM user_roms ur
+               WHERE ur.app_system_id = s.id AND ur.is_hidden = 0) AS rom_count
       FROM user_detected_systems uds
       JOIN app_systems s ON uds.app_system_id = s.id
       WHERE s.folder_name != 'android-apps'
@@ -43,7 +45,9 @@ class GameLibraryRepository {
           (row) => {
             'id': row['id'].toString(),
             'name': row['real_name'].toString(),
+            'short_name': (row['short_name'] ?? row['real_name']).toString(),
             'folder_name': row['folder_name'].toString(),
+            'rom_count': row['rom_count'] as int? ?? 0,
           },
         )
         .toList();
@@ -164,6 +168,35 @@ class GameLibraryRepository {
     } catch (e) {
       _log.e('Error filling game metadata gaps: $e');
       return false;
+    }
+  }
+
+  /// The games on [appSystemId] with a NeoAssets video link (see
+  /// `video_url`), as file name and link.
+  static Future<List<({String filename, String url})>> getVideoLinks(
+    String appSystemId,
+  ) async {
+    // "Android Games" rows, and so their metadata, live under `android`.
+    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
+    try {
+      final db = await SqliteService.getDatabase();
+      final rows = await db.query(
+        'user_screenscraper_metadata',
+        columns: ['filename', 'video_url'],
+        where:
+            "app_system_id = ? AND video_url IS NOT NULL AND video_url != ''",
+        whereArgs: [appSystemId],
+      );
+      return [
+        for (final row in rows)
+          (
+            filename: row['filename'].toString(),
+            url: row['video_url'].toString(),
+          ),
+      ];
+    } catch (e) {
+      _log.w('Could not read the video links of $appSystemId: $e');
+      return [];
     }
   }
 

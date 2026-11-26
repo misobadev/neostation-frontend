@@ -936,6 +936,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.identifyNeedsScreenScraper:
       '식별 기능은 현재 ScreenScraper에서만 사용할 수 있습니다.',
   AppLocale.neoAssetsSystemsSub: 'NeoAssets 카탈로그가 있는 시스템',
+  AppLocale.neoAssetsStreamVideo: '동영상 스트리밍',
+  AppLocale.neoAssetsStreamVideoSub: '디스크 공간을 크게 절약합니다: 동영상을 다운로드하지 않고 인터넷에서 재생합니다. 연결이 필요하며, 오프라인에서는 이미지만 표시됩니다.',
   AppLocale.neoAssetsScrapeSub: '켜진 시스템의 메타데이터와 미디어 가져오기',
   AppLocale.neoAssetsThreads: '스레드: {count}',
   AppLocale.neoAssetsGuest: '게스트',

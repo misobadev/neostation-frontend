@@ -342,6 +342,7 @@ class DatabaseTestHelper {
         description_zh TEXT,
         description_id TEXT,
         regional_names TEXT,
+        video_url TEXT,
         rating REAL,
         release_date TEXT,
         developer TEXT,

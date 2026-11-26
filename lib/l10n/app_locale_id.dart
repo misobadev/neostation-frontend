@@ -987,6 +987,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.identifyNeedsScreenScraper:
       'Untuk saat ini, Identifikasi hanya tersedia dengan ScreenScraper.',
   AppLocale.neoAssetsSystemsSub: 'Sistem yang punya katalog NeoAssets',
+  AppLocale.neoAssetsStreamVideo: 'Streaming video',
+  AppLocale.neoAssetsStreamVideoSub: 'Menghemat banyak ruang disk: video diputar dari internet, bukan diunduh. Perlu koneksi; saat offline, hanya gambar yang ditampilkan.',
   AppLocale.neoAssetsScrapeSub:
       'Ambil metadata dan media untuk sistem yang aktif',
   AppLocale.neoAssetsThreads: 'Thread: {count}',
