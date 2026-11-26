@@ -44,6 +44,15 @@ void main() {
       expect(name.stampedAt, isNull);
     });
 
+    test('RomM\'s slot for a memory card from before a download, with no '
+        'time', () {
+      final card = p.join('saves', 'Mcd001.ps2');
+      final name = parseKeptCopyPath(rommLocalSlotPath(card))!;
+      expect(name.savePath, card);
+      expect(name.source, KeptCopySource.rommBeforeDownload);
+      expect(name.stampedAt, isNull);
+    });
+
     test('a RomM conflict copy, with the local time it was kept', () {
       final save = p.join('saves', 'Zelda.srm');
       final name = parseKeptCopyPath(
@@ -115,6 +124,7 @@ void main() {
         '$save.romm-conflict-2026-11-06_18-32-44',
         replacedCopyPath(save, DateTime.utc(2026)),
         p.join('saves', 'ZELDA.SRM.NEOSYNC.BAK'),
+        rommLocalSlotPath(save),
       ]) {
         expect(isKeptCopyPath(path), isTrue, reason: path);
       }
@@ -652,6 +662,98 @@ void main() {
 
   // Copies piled up: one per conflict, per restore, per download, some holding
   // the save's own bytes or another copy's.
+  group('RomM\'s slot for a memory card', () {
+    late Directory root;
+    late File card;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('kept_slot_');
+      card = File(p.join(root.path, 'Mcd001.ps2'))..writeAsStringSync('CARD');
+    });
+
+    tearDown(() async {
+      await root.delete(recursive: true);
+    });
+
+    test('is written beside the card first, and becomes the slot only when '
+        'committed', () async {
+      final staged = await stageRommLocalSlot(card.path);
+      expect(staged, rommLocalSlotStagingPath(card.path));
+      expect(isKeptCopyPath(staged), isTrue, reason: 'never synced as a save');
+      expect(parseKeptCopyPath(staged), isNull, reason: 'never listed');
+      expect(File(rommLocalSlotPath(card.path)).existsSync(), isFalse);
+
+      final slot = await commitRommLocalSlot(card.path, staged);
+      expect(slot, rommLocalSlotPath(card.path));
+      expect(File(slot).readAsStringSync(), 'CARD');
+      expect(File(staged).existsSync(), isFalse);
+    });
+
+    test('the slot stays as it was until the next copy is committed', () async {
+      final slot = await commitRommLocalSlot(
+        card.path,
+        await stageRommLocalSlot(card.path),
+      );
+
+      final staged = await stageRommLocalSlot(
+        card.path,
+        bytes: 'NEXT'.codeUnits,
+      );
+      expect(File(slot).readAsStringSync(), 'CARD');
+
+      await commitRommLocalSlot(card.path, staged);
+      expect(File(slot).readAsStringSync(), 'NEXT');
+      expect(root.listSync(), hasLength(2));
+    });
+
+    test('a link at the slot is replaced, never written through', () async {
+      final target = File(p.join(root.path, 'elsewhere'))
+        ..writeAsStringSync('UNTOUCHED');
+      Link(rommLocalSlotPath(card.path)).createSync(target.path);
+
+      final slot = await commitRommLocalSlot(
+        card.path,
+        await stageRommLocalSlot(card.path),
+      );
+
+      expect(target.readAsStringSync(), 'UNTOUCHED');
+      expect(
+        FileSystemEntity.typeSync(slot, followLinks: false),
+        FileSystemEntityType.file,
+      );
+      expect(File(slot).readAsStringSync(), 'CARD');
+    }, skip: Platform.isWindows ? 'links need privileges on Windows' : false);
+
+    test('a folder at the slot: the copy is kept as a dated copy', () async {
+      Directory(rommLocalSlotPath(card.path)).createSync();
+
+      final kept = await commitRommLocalSlot(
+        card.path,
+        await stageRommLocalSlot(card.path),
+      );
+
+      expect(
+        parseKeptCopyPath(kept)?.source,
+        KeptCopySource.rommBeforeDownload,
+      );
+      expect(parseKeptCopyPath(kept)?.stampedAt, isNotNull);
+      expect(File(kept).readAsStringSync(), 'CARD');
+      expect(File(rommLocalSlotStagingPath(card.path)).existsSync(), isFalse);
+    });
+
+    test('a link at the staging name is never written through', () async {
+      final target = File(p.join(root.path, 'elsewhere'))
+        ..writeAsStringSync('UNTOUCHED');
+      Link(rommLocalSlotStagingPath(card.path)).createSync(target.path);
+
+      await expectLater(
+        stageRommLocalSlot(card.path),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(target.readAsStringSync(), 'UNTOUCHED');
+    }, skip: Platform.isWindows ? 'links need privileges on Windows' : false);
+  });
+
   group('tidying the copies of a save', () {
     late Directory root;
     final allSources = KeptCopySource.values.toSet();
@@ -757,6 +859,46 @@ void main() {
         replaced(DateTime.utc(2026, 11, 5)),
       ]);
       expect(maxKeptCopiesPerSave, 3);
+    });
+
+    test('RomM\'s slot for a card is not counted, so routine downloads push '
+        'no dated copy out', () async {
+      final card = write('Mcd001.ps2', [0]);
+      final dated = [
+        for (var i = 1; i <= 3; i++)
+          write(
+            p.basename(rommLocalCopyPath(card.path, DateTime(2026, 11, i, 12))),
+            [i],
+            modified: DateTime.utc(2026, 11, i),
+          ),
+      ];
+      final slot = write(p.basename(rommLocalSlotPath(card.path)), [
+        9,
+      ], modified: DateTime.utc(2026, 11, 9));
+
+      await tidy(card.path, justKept: {slot.path});
+
+      for (final copy in [...dated, slot]) {
+        expect(copy.existsSync(), isTrue, reason: copy.path);
+      }
+    });
+
+    test('when RomM\'s slot holds the same bytes as a dated copy, the slot '
+        'goes', () async {
+      final card = write('Mcd001.ps2', [0]);
+      final dated = write(
+        p.basename(rommLocalCopyPath(card.path, DateTime(2026, 11, 1, 12))),
+        [7],
+        modified: DateTime.utc(2026, 11, 1),
+      );
+      final slot = write(p.basename(rommLocalSlotPath(card.path)), [
+        7,
+      ], modified: DateTime.utc(2026, 11, 9));
+
+      await tidy(card.path, justKept: {slot.path});
+
+      expect(dated.existsSync(), isTrue);
+      expect(slot.existsSync(), isFalse);
     });
 
     test('a copy kept recently stays, however old the save it holds', () async {

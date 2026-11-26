@@ -1550,8 +1550,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
     );
   }
 
-  /// The library search the West face button opens, or null in the music
-  /// library, where that button keeps its old X / Y actions.
+  /// The library search the X button opens, or null in the music library,
+  /// where X keeps its shuffle toggle.
   VoidCallback? get _searchAction =>
       widget.system.folderName == 'music' ? null : _openSearchFromButton;
 

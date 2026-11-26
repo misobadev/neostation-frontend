@@ -1662,11 +1662,18 @@ class RommService {
   Future<List<RommAsset>> listStates({required int romId}) =>
       _listAssets('/api/states', romId: romId, isState: true);
 
+  /// Every save RomM holds for the current user, under any game
+  /// (`GET /api/saves`). RomM stores a memory card that every game of its
+  /// system shares under each game it was synced with, so the newest copy of
+  /// a card can sit under another game.
+  Future<List<RommAsset>> listAllSaves() =>
+      _listAssets('/api/saves', isState: false);
+
   /// Inventory for the Saves tab, including archival versions and backups.
   /// Unlike per-game sync discovery, this lists all of the current user's files.
   Future<List<RommAsset>> listSaveAssets() async {
     final results = await Future.wait([
-      _listAssets('/api/saves', isState: false),
+      listAllSaves(),
       _listAssets('/api/states', isState: true),
     ]);
     return [...results[0], ...results[1]];

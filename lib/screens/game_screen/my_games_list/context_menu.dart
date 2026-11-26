@@ -179,7 +179,7 @@ extension _ContextMenu on _SystemGamesListState {
     );
   }
 
-  /// Opens the library search from the West face button.
+  /// Opens the library search from the X button.
   ///
   /// Inside a concrete system this is the same filtered search as Options →
   /// Search. Aggregate views still span several systems, so they open

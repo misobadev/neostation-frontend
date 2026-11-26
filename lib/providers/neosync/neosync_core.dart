@@ -5,7 +5,7 @@ part of '../neo_sync_provider.dart';
 /// session rather than for every game. [systemFolderName] is the system's own
 /// folder name (`dc`, never an alias like `dreamcast`).
 bool _sharesMemoryCards(String? systemFolderName) =>
-    systemFolderName == 'ps2' || systemFolderName == 'dc';
+    sharesMemoryCards(systemFolderName);
 
 /// Which sync of a game is running: when a memory card this device has never
 /// synced may be acted on depends on it (see [NeoSyncCore.detectGameSaveFiles]).
