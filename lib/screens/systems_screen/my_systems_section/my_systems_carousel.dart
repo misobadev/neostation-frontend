@@ -118,7 +118,8 @@ class MySystemsCarousel extends StatefulWidget {
   /// B. Unbound on the systems screen, which is a root tab.
   final VoidCallback? onBackPressed;
 
-  /// X. Unbound on the systems screen; a pushed host supplies its own picker.
+  /// X. Search on the systems screen (with West, for AYN pads, whose West is
+  /// the button printed Y); a pushed host supplies its own picker.
   final VoidCallback? onXPressed;
 
   /// The West face button (X on an Xbox pad, Y on a Nintendo-style one). The
