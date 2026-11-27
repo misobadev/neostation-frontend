@@ -215,7 +215,9 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.deleteThemeConfirm: 'Удалить импортированную тему «%s»?',
 
   AppLocale.generalSettings: 'Общие настройки',
-  AppLocale.alwaysShowRomName: 'Всегда показывать имя файла ROM',
+  AppLocale.useRomFileNameAsTitle:
+      'Использовать имя файла вместо названия игры',
+  AppLocale.hideRomFileNameSubtitle: 'Скрывать имя файла под названием игры',
   AppLocale.hideExtension: 'Скрывать расширение файла (только имя ROM)',
   AppLocale.hideParentheses: 'Скрывать скобки в имени файла ()',
   AppLocale.hideBrackets: 'Скрывать квадратные скобки в имени файла []',
@@ -223,8 +225,10 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.hideSystemLogoSubtitle: 'Скрыть оверлей с логотипом системы',
   AppLocale.recursiveScan: 'Рекурсивное сканирование ROM',
   AppLocale.recursiveScanSubtitle: 'Искать ROM в подкаталогах',
-  AppLocale.alwaysShowRomNameSubtitle:
-      'Использовать имя файла ROM в списках (игнорирует полученные названия)',
+  AppLocale.useRomFileNameAsTitleSubtitle:
+      'Показывать имя файла ROM вместо названия из метаданных',
+  AppLocale.hideRomFileNameSubtitleDescription:
+      'Скрывает дополнительную строку с именем файла, не меняя название игры',
   AppLocale.hideExtensionSubtitle: 'Если список использует имя файла, скрывать расширения, такие как .iso или .zip',
   AppLocale.hideParenthesesSubtitle:
       'Если список использует имя файла, удалять текст в круглых скобках',

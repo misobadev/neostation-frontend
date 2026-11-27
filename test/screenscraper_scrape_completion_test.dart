@@ -34,6 +34,7 @@ void main() {
   late bool quotaUsedUp;
   // The developer ScreenScraper names for the game, if any.
   late String? gameDeveloper;
+  late List<Map<String, String>> gameNames;
   late Directory media;
   HttpOverrides? previousOverrides;
 
@@ -66,6 +67,9 @@ void main() {
     gameMedia = [];
     quotaUsedUp = false;
     gameDeveloper = null;
+    gameNames = [
+      {'region': 'us', 'text': 'Game'},
+    ];
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) {
       final path = request.uri.path;
@@ -84,9 +88,7 @@ void main() {
               'response': {
                 'jeu': {
                   'id': '1',
-                  'noms': [
-                    {'region': 'us', 'text': 'Game'},
-                  ],
+                  'noms': gameNames,
                   if (gameDeveloper != null)
                     'developpeur': {'text': gameDeveloper},
                   'medias': [
@@ -188,6 +190,18 @@ void main() {
       );
 
   group('scraping one game', () {
+    test(
+      'a match without a title keeps the filename out of metadata',
+      () async {
+        gameNames = [];
+        gameDeveloper = 'Studio';
+        await scrape();
+        final row = (await db.query('user_screenscraper_metadata')).single;
+        expect(row['real_name'], isNull);
+        expect(row['developer'], 'Studio');
+      },
+    );
+
     test('a game whose media fail is left for New content only', () async {
       gameMedia = [('ss', 'missing'), ('fanart', 'art')];
 

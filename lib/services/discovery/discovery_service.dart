@@ -236,7 +236,7 @@ class DiscoveryService {
   ) {
     final scraped = [
       for (final row in rows)
-        if ((row['ss_real_name'] as String?)?.isNotEmpty == true) row,
+        if (_isScraped(row)) row,
     ];
     final pool = scraped.isEmpty ? rows.toList() : scraped;
     if (pool.isEmpty) return const [];
@@ -288,9 +288,7 @@ class DiscoveryService {
       // media type was off), so it is taken as sufficient evidence but never
       // as necessary — see
       // [DiscoveryCandidate.isScraped].
-      isScraped:
-          _isTrue(row['is_fully_scraped']) ||
-          (row['ss_real_name'] as String?)?.isNotEmpty == true,
+      isScraped: _isScraped(row),
       isFavorite: _isTrue(row['is_favorite']),
       achievementCount: (row['ra_num_achievements'] as num?)?.toInt() ?? 0,
       // Earned counts are not part of the local catalog: `app_ra_game_list` is
@@ -300,6 +298,10 @@ class DiscoveryService {
       achievementsEarned: null,
     );
   }
+
+  bool _isScraped(Map<String, Object?> row) =>
+      _isTrue(row['is_fully_scraped']) ||
+      (row['ss_real_name'] as String?)?.trim().isNotEmpty == true;
 
   bool _isTrue(Object? value) {
     if (value is bool) return value;

@@ -27,11 +27,6 @@ class GameListService {
   static final RegExp _bracketsRegex = RegExp(r'\[[^\]]*\]');
   static final RegExp _whitespaceRegex = RegExp(r'\s+');
 
-  static bool _hasScreenscraperRealName(DatabaseGameModel dbGame) {
-    final t = dbGame.screenscraperRealName?.trim();
-    return t != null && t.isNotEmpty;
-  }
-
   /// Sanitizes a filename for display in the UI based on user preferences.
   ///
   /// Optionally strips extensions, regional tags (parentheses), and technical
@@ -59,17 +54,21 @@ class GameListService {
       name = name.replaceAll(_bracketsRegex, '');
     }
     name = name.replaceAll(_whitespaceRegex, ' ').trim();
-    if (!hideExtension) {
-      name = name.replaceAll(RegExp(r'\s+(?=\.[^.]+$)'), '');
-    }
-    return name;
+    return hideExtension ? name : _trimSpaceBeforeExtension(name);
   }
 
-  static String _formatListNameFromScrapedTitle(String rawTitle) {
-    String name = rawTitle.trim();
-    name = name.replaceAll(_whitespaceRegex, ' ').trim();
-    name = name.replaceAll(RegExp(r'\s+(?=\.[^.]+$)'), '');
-    return name;
+  static String _trimSpaceBeforeExtension(String name) =>
+      name.replaceAll(RegExp(r'\s+(?=\.[^.]+$)'), '');
+
+  static bool _isSwitchFilenameTitle(DatabaseGameModel game, String title) {
+    if (game.appSystemId != 'switch' && game.appSystemId != 'nintendo-switch') {
+      return false;
+    }
+    final extension = path.extension(game.filename.trim()).toLowerCase();
+    // The Switch scanner stores a filename-derived title, not embedded metadata.
+    // Match its legacy slash split and case-sensitive extension replacement.
+    return (extension == '.xci' || extension == '.nsp') &&
+        title == game.romPath.split('/').last.replaceAll(extension, '').trim();
   }
 
   /// The name the game lists show for [dbGame] under a system's naming
@@ -81,59 +80,63 @@ class GameListService {
     DatabaseGameModel dbGame,
     Map<String, Object?> settings,
     Set<String> extensions,
-  ) => _resolveListDisplayName(
-    dbGame: dbGame,
-    preferFileName: (settings['prefer_file_name'] ?? 0) == 1,
-    hideExtension: (settings['hide_extension'] ?? 1) == 1,
-    hideParentheses: (settings['hide_parentheses'] ?? 1) == 1,
-    hideBrackets: (settings['hide_brackets'] ?? 1) == 1,
-    validExtensionsSet: extensions,
-  ).name;
+  ) => _resolveListDisplayName(dbGame, settings, extensions).name;
 
   /// Resolves the optimal display name for a game considering scraped metadata
   /// and user-defined naming conventions.
-  static ({String name, bool showRomFileNameSubtitle}) _resolveListDisplayName({
-    required DatabaseGameModel dbGame,
-    required bool preferFileName,
-    required bool hideExtension,
-    required bool hideParentheses,
-    required bool hideBrackets,
-    required Set<String> validExtensionsSet,
-  }) {
+  static ({
+    String name,
+    bool showRomFileNameSubtitle,
+    bool showRomFileNameInInfo,
+  })
+  _resolveListDisplayName(
+    DatabaseGameModel dbGame,
+    Map<String, Object?> settings,
+    Set<String> validExtensionsSet,
+  ) {
     final filename = dbGame.filename;
-    final scraped = _hasScreenscraperRealName(dbGame);
-    final coalesced = dbGame.realName ?? dbGame.titleName ?? filename;
+    final preferFileName = settings['prefer_file_name'] == 1;
+    final showRomFileName = settings['hide_rom_file_name_subtitle'] != 1;
 
-    if (preferFileName) {
-      return (
-        name: _formatListNameFromFilename(
-          filename,
-          validExtensionsSet,
-          hideExtension: hideExtension,
-          hideParentheses: hideParentheses,
-          hideBrackets: hideBrackets,
-        ),
-        showRomFileNameSubtitle: false,
-      );
+    if (!preferFileName) {
+      // realName also contains SQL's filename fallback. Read the source fields.
+      final scrapedTitle = dbGame.screenscraperRealName?.trim() ?? '';
+      final title = scrapedTitle.isNotEmpty
+          ? scrapedTitle
+          : dbGame.titleName?.trim() ?? '';
+      if (title.isNotEmpty &&
+          (scrapedTitle.isNotEmpty || !_isSwitchFilenameTitle(dbGame, title))) {
+        final String name;
+        if (dbGame.screenscraperRealName == filename) {
+          name = filename;
+        } else if (scrapedTitle.isNotEmpty) {
+          name = _trimSpaceBeforeExtension(
+            title.replaceAll(_whitespaceRegex, ' '),
+          );
+        } else {
+          name = title;
+        }
+        return (
+          name: name,
+          showRomFileNameSubtitle:
+              showRomFileName &&
+              name != filename &&
+              !SystemFolderNames.isAndroidApps(dbGame.systemFolderName),
+          showRomFileNameInInfo: showRomFileName,
+        );
+      }
     }
-    if (scraped) {
-      return (
-        name: _formatListNameFromScrapedTitle(coalesced),
-        showRomFileNameSubtitle: true,
-      );
-    }
-    if (coalesced != filename) {
-      return (name: coalesced, showRomFileNameSubtitle: false);
-    }
+    final name = _formatListNameFromFilename(
+      filename,
+      validExtensionsSet,
+      hideExtension: (settings['hide_extension'] ?? 1) == 1,
+      hideParentheses: (settings['hide_parentheses'] ?? 1) == 1,
+      hideBrackets: (settings['hide_brackets'] ?? 1) == 1,
+    );
     return (
-      name: _formatListNameFromFilename(
-        filename,
-        validExtensionsSet,
-        hideExtension: hideExtension,
-        hideParentheses: hideParentheses,
-        hideBrackets: hideBrackets,
-      ),
+      name: name.isEmpty ? filename : name,
       showRomFileNameSubtitle: false,
+      showRomFileNameInInfo: showRomFileName,
     );
   }
 
@@ -183,57 +186,15 @@ class GameListService {
       );
 
       final settings = await SystemRepository.getSystemSettings(system.id!);
-      final preferFileName = (settings['prefer_file_name'] ?? 0) == 1;
-      final hideExtension = (settings['hide_extension'] ?? 1) == 1;
-      final hideParentheses = (settings['hide_parentheses'] ?? 1) == 1;
-      final hideBrackets = (settings['hide_brackets'] ?? 1) == 1;
 
       final validExtensionsSet = validExtensions
           .map((e) => e.toLowerCase())
           .toSet();
 
-      final games = databaseGames.map((dbGame) {
-        final resolved = _resolveListDisplayName(
-          dbGame: dbGame,
-          preferFileName: preferFileName,
-          hideExtension: hideExtension,
-          hideParentheses: hideParentheses,
-          hideBrackets: hideBrackets,
-          validExtensionsSet: validExtensionsSet,
-        );
-
-        return GameModel(
-          romname: dbGame.filename,
-          realname: dbGame.realName ?? dbGame.filename,
-          name: resolved.name,
-          showRomFileNameSubtitle: resolved.showRomFileNameSubtitle,
-          descriptions: dbGame.descriptions,
-          videoUrl: dbGame.videoUrl,
-          year: dbGame.year ?? '',
-          developer: dbGame.developer ?? '',
-          publisher: dbGame.publisher ?? '',
-          genre: dbGame.genre ?? '',
-          players: dbGame.players ?? '',
-          rating: dbGame.rating ?? 0.0,
-          isFavorite: dbGame.isFavorite,
-          lastPlayed: dbGame.lastPlayed,
-          playTime: dbGame.playTime,
-          romPath: dbGame.romPath,
-          emulatorName: dbGame.emulatorName,
-          coreName: dbGame.coreName,
-          raHash: dbGame.raHash,
-          idRa: dbGame.idRa,
-          systemRaId: dbGame.systemRaId,
-          raNumAchievements: dbGame.raNumAchievements,
-          systemId: dbGame.appSystemId,
-          systemFolderName: system.folderName,
-          cloudSyncEnabled: dbGame.cloudSyncEnabled,
-          titleId: dbGame.titleId,
-          titleName: dbGame.titleName,
-        );
-      }).toList();
-
-      return games;
+      return [
+        for (final game in databaseGames)
+          _toListGame(game, settings, validExtensionsSet, system: system),
+      ];
     } catch (e) {
       _log.e('Error loading games for ${system.realName}: $e');
       return [];
@@ -293,53 +254,53 @@ class GameListService {
 
     return databaseGames.map((dbGame) {
       final sid = dbGame.appSystemId ?? '';
-      final settings = settingsBySystem[sid] ?? {};
-      final preferFileName = (settings['prefer_file_name'] ?? 0) == 1;
-      final hideExtension = (settings['hide_extension'] ?? 1) == 1;
-      final hideParentheses = (settings['hide_parentheses'] ?? 1) == 1;
-      final hideBrackets = (settings['hide_brackets'] ?? 1) == 1;
-      final extSet = extensionsBySystem[sid] ?? {};
 
-      final resolved = _resolveListDisplayName(
-        dbGame: dbGame,
-        preferFileName: preferFileName,
-        hideExtension: hideExtension,
-        hideParentheses: hideParentheses,
-        hideBrackets: hideBrackets,
-        validExtensionsSet: extSet,
-      );
-
-      return GameModel(
-        romname: dbGame.filename,
-        realname: dbGame.realName ?? dbGame.filename,
-        name: resolved.name,
-        showRomFileNameSubtitle: resolved.showRomFileNameSubtitle,
-        descriptions: dbGame.descriptions,
-        videoUrl: dbGame.videoUrl,
-        year: dbGame.year ?? '',
-        developer: dbGame.developer ?? '',
-        publisher: dbGame.publisher ?? '',
-        genre: dbGame.genre ?? '',
-        players: dbGame.players ?? '',
-        rating: dbGame.rating ?? 0.0,
-        isFavorite: dbGame.isFavorite,
-        lastPlayed: dbGame.lastPlayed,
-        playTime: dbGame.playTime,
-        romPath: dbGame.romPath,
-        emulatorName: dbGame.emulatorName,
-        coreName: dbGame.coreName,
-        raHash: dbGame.raHash,
-        idRa: dbGame.idRa,
-        systemRaId: dbGame.systemRaId,
-        raNumAchievements: dbGame.raNumAchievements,
-        systemId: dbGame.appSystemId,
-        systemFolderName: dbGame.systemFolderName,
-        systemRealName: dbGame.systemRealName,
-        cloudSyncEnabled: dbGame.cloudSyncEnabled,
-        titleId: dbGame.titleId,
-        titleName: dbGame.titleName,
+      return _toListGame(
+        dbGame,
+        settingsBySystem[sid] ?? const {},
+        extensionsBySystem[sid] ?? const {},
       );
     }).toList();
+  }
+
+  static GameModel _toListGame(
+    DatabaseGameModel dbGame,
+    Map<String, Object?> settings,
+    Set<String> extensions, {
+    SystemModel? system,
+  }) {
+    final resolved = _resolveListDisplayName(dbGame, settings, extensions);
+    return GameModel(
+      romname: dbGame.filename,
+      realname: dbGame.realName ?? dbGame.filename,
+      name: resolved.name,
+      showRomFileNameSubtitle: resolved.showRomFileNameSubtitle,
+      showRomFileNameInInfo: resolved.showRomFileNameInInfo,
+      descriptions: dbGame.descriptions,
+      videoUrl: dbGame.videoUrl,
+      year: dbGame.year ?? '',
+      developer: dbGame.developer ?? '',
+      publisher: dbGame.publisher ?? '',
+      genre: dbGame.genre ?? '',
+      players: dbGame.players ?? '',
+      rating: dbGame.rating ?? 0.0,
+      isFavorite: dbGame.isFavorite,
+      lastPlayed: dbGame.lastPlayed,
+      playTime: dbGame.playTime,
+      romPath: dbGame.romPath,
+      emulatorName: dbGame.emulatorName,
+      coreName: dbGame.coreName,
+      raHash: dbGame.raHash,
+      idRa: dbGame.idRa,
+      systemRaId: dbGame.systemRaId,
+      raNumAchievements: dbGame.raNumAchievements,
+      systemId: dbGame.appSystemId,
+      systemFolderName: system?.folderName ?? dbGame.systemFolderName,
+      systemRealName: system == null ? dbGame.systemRealName : null,
+      cloudSyncEnabled: dbGame.cloudSyncEnabled,
+      titleId: dbGame.titleId,
+      titleName: dbGame.titleName,
+    );
   }
 
   /// The name each of [databaseGames] shows in a list, by `rom_path`, under
@@ -397,10 +358,6 @@ class GameListService {
       if (dbGame == null) return null;
 
       final settings = await SystemRepository.getSystemSettings(system.id!);
-      final preferFileName = (settings['prefer_file_name'] ?? 0) == 1;
-      final hideExtension = (settings['hide_extension'] ?? 1) == 1;
-      final hideParentheses = (settings['hide_parentheses'] ?? 1) == 1;
-      final hideBrackets = (settings['hide_brackets'] ?? 1) == 1;
       final validExtensions = await SystemRepository.getExtensionsForSystem(
         system.id!,
       );
@@ -408,44 +365,7 @@ class GameListService {
           .map((e) => e.toLowerCase())
           .toSet();
 
-      final resolved = _resolveListDisplayName(
-        dbGame: dbGame,
-        preferFileName: preferFileName,
-        hideExtension: hideExtension,
-        hideParentheses: hideParentheses,
-        hideBrackets: hideBrackets,
-        validExtensionsSet: validExtensionsSet,
-      );
-
-      return GameModel(
-        romname: dbGame.filename,
-        realname: dbGame.realName ?? dbGame.filename,
-        name: resolved.name,
-        showRomFileNameSubtitle: resolved.showRomFileNameSubtitle,
-        descriptions: dbGame.descriptions,
-        videoUrl: dbGame.videoUrl,
-        year: dbGame.year ?? '',
-        developer: dbGame.developer ?? '',
-        publisher: dbGame.publisher ?? '',
-        genre: dbGame.genre ?? '',
-        players: dbGame.players ?? '',
-        rating: dbGame.rating ?? 0.0,
-        isFavorite: dbGame.isFavorite,
-        lastPlayed: dbGame.lastPlayed,
-        playTime: dbGame.playTime,
-        romPath: dbGame.romPath,
-        emulatorName: dbGame.emulatorName,
-        coreName: dbGame.coreName,
-        raHash: dbGame.raHash,
-        idRa: dbGame.idRa,
-        systemRaId: dbGame.systemRaId,
-        raNumAchievements: dbGame.raNumAchievements,
-        systemId: dbGame.appSystemId,
-        systemFolderName: system.folderName,
-        cloudSyncEnabled: dbGame.cloudSyncEnabled,
-        titleId: dbGame.titleId,
-        titleName: dbGame.titleName,
-      );
+      return _toListGame(dbGame, settings, validExtensionsSet, system: system);
     } catch (e) {
       _log.e('Error loading game details for $romName: $e');
       return null;

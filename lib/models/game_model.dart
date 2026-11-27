@@ -111,8 +111,11 @@ class GameModel {
   /// disk; see [DatabaseGameModel.videoUrl].
   final String? videoUrl;
 
-  /// UI hint: Whether to display the [romname] as a subtitle in the details view.
+  /// Whether the compact game footer shows [romname] under a metadata title.
   final bool showRomFileNameSubtitle;
+
+  /// Whether Game Info may show the original filename if it differs from [name].
+  final bool showRomFileNameInInfo;
 
   const GameModel({
     required this.romname,
@@ -147,6 +150,7 @@ class GameModel {
     this.box2dAspectRatio,
     this.videoUrl,
     this.showRomFileNameSubtitle = false,
+    this.showRomFileNameInInfo = true,
   });
 
   /// Creates a [GameModel] from a JSON metadata map.
@@ -279,6 +283,7 @@ class GameModel {
     String? box2dAspectRatio,
     String? videoUrl,
     bool? showRomFileNameSubtitle,
+    bool? showRomFileNameInInfo,
   }) {
     return GameModel(
       romname: romname ?? this.romname,
@@ -314,6 +319,8 @@ class GameModel {
       videoUrl: videoUrl ?? this.videoUrl,
       showRomFileNameSubtitle:
           showRomFileNameSubtitle ?? this.showRomFileNameSubtitle,
+      showRomFileNameInInfo:
+          showRomFileNameInInfo ?? this.showRomFileNameInInfo,
     );
   }
 

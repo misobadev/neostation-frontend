@@ -69,6 +69,7 @@ const _cover = '/assets/romm/resources/roms/1/cover/big.png';
 class _FakeService extends RommService {
   Map<String, dynamic>? detail = {
     'is_identified': true,
+    'name': 'Linked Game',
     'igdb_id': 1234,
     'summary': 'From RomM.',
     'metadatum': {

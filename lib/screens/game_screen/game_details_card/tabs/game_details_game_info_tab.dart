@@ -354,19 +354,15 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
 
   /// The game's own identity, at the foot of the panel.
   ///
-  /// The display name and the ROM filename underneath it. The card carries no
-  /// title of its own anywhere else — the selected row in the list beside it is
-  /// the title — but this panel is where a game's facts are read, and the two
-  /// facts a scrape can disagree about are exactly these: what the game is
-  /// called now, and what the file it came from is called. The footer's
-  /// filename line only appears for scraped games, so an unscraped one had no
-  /// way to see its filename at all.
-  ///
-  /// Either line drops out when it is empty (an Android app has no ROM), and
-  /// the whole block drops out when both are, so nothing draws an empty band.
+  /// Keep the original filename available here even for filename-based titles,
+  /// unless the user opted out or the title already shows the same text.
   Widget _buildIdentityFooter() {
-    final String name = widget.game.name.trim();
-    final String romname = widget.game.romname.trim();
+    final String name = widget.game.name;
+    final String rawFilename = widget.game.romname;
+    final String romname =
+        widget.game.showRomFileNameInInfo && rawFilename != name
+        ? rawFilename
+        : '';
     if (name.isEmpty && romname.isEmpty) return const SizedBox.shrink();
 
     return Padding(

@@ -14,8 +14,8 @@ import 'package:neostation/themes/corner_radii.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// An unscraped game's info panel shows an "Incomplete Metadata" notice above
-/// the game's name and ROM filename. On a short landscape phone the room
+/// The info panel can show an "Incomplete Metadata" notice above the game's
+/// title and optional ROM filename. On a short landscape phone the room
 /// between the header and that identity footer is less than the notice needs,
 /// and the notice (a centred column) used to spill out over the footer, so the
 /// explanation was drawn straight across the name and filename.
@@ -57,6 +57,7 @@ void main() {
     WidgetTester tester, {
     required Size screen,
     required double cardHeight,
+    GameModel? game,
   }) async {
     tester.view.physicalSize = screen;
     tester.view.devicePixelRatio = 1.0;
@@ -84,7 +85,7 @@ void main() {
                     children: [
                       GameDetailsGameInfoTab(
                         system: _system,
-                        game: _game,
+                        game: game ?? _game,
                         fileProvider: FileProvider(),
                         description: '',
                         isScrapingGame: false,
@@ -134,4 +135,32 @@ void main() {
       expect(shown.center.dx, moreOrLessEquals(panel.center.dx, epsilon: 1));
     });
   }
+
+  testWidgets('the info panel hides the extra filename, not the title', (
+    tester,
+  ) async {
+    await mountPanel(
+      tester,
+      screen: const Size(890, 400),
+      cardHeight: 300,
+      game: _game.copyWith(showRomFileNameInInfo: false),
+    );
+
+    expect(find.text(_game.name), findsOneWidget);
+    expect(find.text(_game.romname), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the info panel does not repeat an identical filename', (
+    tester,
+  ) async {
+    await mountPanel(
+      tester,
+      screen: const Size(890, 400),
+      cardHeight: 300,
+      game: _game.copyWith(name: _game.romname),
+    );
+
+    expect(find.text(_game.romname), findsOneWidget);
+  });
 }

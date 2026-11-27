@@ -1035,11 +1035,8 @@ double get _onArtShadowRoom => 6.r;
 /// that name was matched from. There is no game title on the card for the same
 /// reason in reverse — it would be a strict duplicate of the selected row.
 ///
-/// Only populated for scraped games: [GameListService] sets
-/// `showRomFileNameSubtitle` exclusively on the scraped branch, because a
-/// filename under a name derived from that same filename says nothing. For an
-/// unscraped game, or a user running `preferFileName`, this renders nothing at
-/// all and the clock simply keeps its line — the line's height is reserved
+/// Only populated when the game's title isn't derived from its filename and
+/// the system hasn't hidden the extra filename. The line's height is reserved
 /// either way, so the footer does not resize as the cursor walks the list.
 ///
 /// White with a drop shadow, matching the clock: this paints straight onto the

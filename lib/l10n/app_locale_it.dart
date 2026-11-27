@@ -214,7 +214,9 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.deleteThemeConfirm: 'Rimuovere il tema importato "%s"?',
 
   AppLocale.generalSettings: 'Impostazioni Generali',
-  AppLocale.alwaysShowRomName: 'Mostra sempre il nome della ROM',
+  AppLocale.useRomFileNameAsTitle: 'Usa il nome del file come titolo del gioco',
+  AppLocale.hideRomFileNameSubtitle:
+      'Nascondi il nome del file sotto il titolo',
   AppLocale.hideExtension: 'Nascondi estensione file (solo nome ROM)',
   AppLocale.hideParentheses: 'Nascondi parentesi () dal nome file',
   AppLocale.hideBrackets: 'Nascondi parentesi quadre [] dal nome file',
@@ -222,8 +224,10 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.hideSystemLogoSubtitle: 'Nascondi sovrapposizione logo del sistema',
   AppLocale.recursiveScan: 'Scansione ricorsiva ROM',
   AppLocale.recursiveScanSubtitle: 'Scansiona ROM nelle sottodirectory',
-  AppLocale.alwaysShowRomNameSubtitle:
-      'Usa nome file ROM nella lista (ignora titoli cercati)',
+  AppLocale.useRomFileNameAsTitleSubtitle:
+      'Usa il nome del file ROM al posto del titolo dei metadati',
+  AppLocale.hideRomFileNameSubtitleDescription:
+      'Nasconde il nome del file senza cambiare il titolo del gioco',
   AppLocale.hideExtensionSubtitle:
       'Nasconde estensioni come .iso o .zip quando la lista usa nomi file',
   AppLocale.hideParenthesesSubtitle:

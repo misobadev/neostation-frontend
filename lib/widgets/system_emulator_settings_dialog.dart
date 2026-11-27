@@ -90,12 +90,15 @@ class _SystemEmulatorSettingsDialogState
   int _emulatorActionIndex = 0;
   // 0: Prefer filename, 1: Hide ext, 2: (), 3: [], 4: Recursive (only when
   // [_offersRecursiveScan]), 5: Show subfolders (only when
-  // [_offersSubfolderView]), 6: Open games on the secondary screen (only when
-  // [_offersLaunchDisplay]).
-  late int _totalGeneralItems;
+  // [_offersSubfolderView]).
+  int get _romFileNameSubtitleIndex =>
+      4 + (_offersRecursiveScan ? 1 : 0) + (_offersSubfolderView ? 1 : 0);
 
-  /// Index of the "Open games on secondary screen" row in the General tab.
-  static const int _launchDisplayIndex = 6;
+  int get _launchDisplayIndex =>
+      _romFileNameSubtitleIndex + (_offersRomFileNameSubtitle ? 1 : 0);
+
+  int get _totalGeneralItems =>
+      _launchDisplayIndex + (_offersLaunchDisplay ? 1 : 0);
 
   /// Set once the display lookup finds a second screen; the row stays hidden
   /// (and out of the gamepad cycle) on single-screen devices.
@@ -136,13 +139,6 @@ class _SystemEmulatorSettingsDialogState
 
     // Initialize local system state
     _system = widget.system;
-    // Recursive scan + subfolder view (items 4/5) only mean something for a
-    // system that owns a ROM directory. Aggregate libraries ('all',
-    // 'favorites', 'collections', a single collection) own none, and a
-    // collection's id has no `app_systems` row for the setting to be written
-    // against at all.
-    _totalGeneralItems = _baseGeneralItems;
-
     _generalScrollController = ScrollController();
     _hiddenScrollController = ScrollController();
     _generalItemKeys = List.generate(
@@ -177,20 +173,13 @@ class _SystemEmulatorSettingsDialogState
     setState(() {
       _hasSecondaryDisplay = true;
       _openOnSecondary = display == LaunchDisplay.secondary;
-      _totalGeneralItems = _baseGeneralItems + (_offersLaunchDisplay ? 1 : 0);
     });
   }
-
-  /// General-tab rows that do not depend on the display lookup.
-  int get _baseGeneralItems =>
-      4 + (_offersRecursiveScan ? 1 : 0) + (_offersSubfolderView ? 1 : 0);
 
   /// Whether the General tab offers "Open games on secondary screen".
   ///
   /// Needs a second screen, and a real system with its own games: the virtual
   /// libraries aggregate other systems, whose own setting already applies.
-  /// Tied to both scan rows being present too, because the General tab's
-  /// gamepad indices are fixed (this row is always index 6).
   bool get _offersLaunchDisplay =>
       _hasSecondaryDisplay && _offersRecursiveScan && _offersSubfolderView;
 
@@ -322,6 +311,14 @@ class _SystemEmulatorSettingsDialogState
     }
   }
 
+  Future<void> _toggleHideRomFileNameSubtitle(bool value) async {
+    setState(() => _system = _system.copyWith(hideRomFileNameSubtitle: value));
+    await context.read<SqliteConfigProvider>().updateHideRomFileNameSubtitle(
+      _system.id!,
+      value,
+    );
+  }
+
   Future<void> _toggleSubfolderView(bool value) async {
     setState(() => _system = _system.copyWith(subfolderView: value));
     await SystemRepository.setSubfolderView(widget.system.id!, value);
@@ -398,6 +395,14 @@ class _SystemEmulatorSettingsDialogState
   }
 
   // ── General tab rows ──────────────────────────────────────────────────────
+
+  // Aggregate views inherit the game's own system preference. Installed apps
+  // and the music player don't show a ROM filename subtitle.
+  bool get _offersRomFileNameSubtitle =>
+      _system.id != null &&
+      !_isVirtualLibrarySystem &&
+      _system.folderName != SystemFolderNames.music &&
+      !SystemFolderNames.isAndroidApps(_system.folderName);
 
   /// Whether this system offers the "Recursive Scan" row — see
   /// [SystemFolderNames.recursiveScanExcluded] for the systems that don't.

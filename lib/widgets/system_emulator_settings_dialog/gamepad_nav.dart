@@ -207,9 +207,10 @@ extension _GamepadNav on _SystemEmulatorSettingsDialogState {
         if (_system.recursiveScan) {
           _toggleSubfolderView(!_system.subfolderView);
         }
-      } else if (_generalIndex ==
-              _SystemEmulatorSettingsDialogState._launchDisplayIndex &&
-          _offersLaunchDisplay) {
+      } else if (_generalIndex == _romFileNameSubtitleIndex &&
+          _offersRomFileNameSubtitle) {
+        _toggleHideRomFileNameSubtitle(!_system.hideRomFileNameSubtitle);
+      } else if (_generalIndex == _launchDisplayIndex && _offersLaunchDisplay) {
         _toggleOpenOnSecondary(!_openOnSecondary);
       }
     } else if (_currentTab == 2) {
