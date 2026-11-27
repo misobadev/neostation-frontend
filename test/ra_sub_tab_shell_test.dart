@@ -283,9 +283,9 @@ void main() {
     final awards = AppLocale.en[AppLocale.raAwards]!;
     final logout = AppLocale.en[AppLocale.logout]!;
     final awardsPanel = find.text(AppLocale.en[AppLocale.noAwardsYet]!);
-    final highlight = Theme.of(
-      tester.element(find.byType(RADashboardHub)),
-    ).colorScheme.onSurface;
+    final highlight = Theme.of(tester.element(find.byType(RADashboardHub)))
+        .colorScheme
+        .onSurface;
     expect(menuBackground(awards), highlight);
 
     await press(LogicalKeyboardKey.arrowDown);
