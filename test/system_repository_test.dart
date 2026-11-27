@@ -174,6 +174,50 @@ void main() {
       expect(settings['hide_extension'], 0);
     });
 
+    test('subtitle updates preserve naming on upgraded v61 tables', () async {
+      await db.execute('DROP TABLE user_system_settings');
+      await db.execute('''
+        CREATE TABLE user_system_settings (
+          app_system_id TEXT PRIMARY KEY, updated_at TEXT,
+          hide_rom_file_name_subtitle INTEGER DEFAULT 0,
+          hide_extension INTEGER DEFAULT 0, hide_parentheses INTEGER DEFAULT 0,
+          hide_brackets INTEGER DEFAULT 0
+        )
+      ''');
+      for (final expected in [1, 0]) {
+        await SystemRepository.setHideRomFileNameSubtitle('nes', expected == 1);
+        final settings = await SystemRepository.getSystemSettings('nes');
+        expect(settings['hide_extension'], expected);
+        expect(settings['hide_parentheses'], expected);
+        expect(settings['hide_brackets'], expected);
+        if (expected == 1) {
+          await db.execute(
+            'UPDATE user_system_settings SET hide_extension = 0, '
+            'hide_parentheses = 0, hide_brackets = 0',
+          );
+        }
+      }
+    });
+
+    test('system loaders preserve the ROM filename subtitle setting', () async {
+      await seedSystem(id: 'nes', realName: 'NES', folderName: 'nes');
+      await db.execute(
+        "INSERT INTO user_detected_systems (app_system_id, actual_folder_name) VALUES ('nes', 'nes')",
+      );
+
+      await SystemRepository.setHideRomFileNameSubtitle('nes', true);
+      final byFolder = await SystemRepository.getSystemByFolderName('nes');
+      final all = await SystemRepository.getAllSystems();
+      final detected = await SystemRepository.getDetectedSystems();
+      expect(byFolder?.hideRomFileNameSubtitle, isTrue);
+      expect(all.single.hideRomFileNameSubtitle, isTrue);
+      expect(detected.single.hideRomFileNameSubtitle, isTrue);
+
+      await SystemRepository.setHideRomFileNameSubtitle('nes', false);
+      final updated = await SystemRepository.getSystemByFolderName('nes');
+      expect(updated?.hideRomFileNameSubtitle, isFalse);
+    });
+
     test('setSubfolderView persists setting', () async {
       await seedSystem(id: 'nes', realName: 'NES', folderName: 'nes');
 

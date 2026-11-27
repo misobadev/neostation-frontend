@@ -256,6 +256,7 @@ class DatabaseTestHelper {
         hide_brackets INTEGER DEFAULT 1,
         hide_logo INTEGER DEFAULT 0,
         prefer_file_name INTEGER DEFAULT 0,
+        hide_rom_file_name_subtitle INTEGER NOT NULL DEFAULT 0,
         subfolder_view INTEGER DEFAULT 0,
         custom_background_path TEXT,
         custom_logo_path TEXT,

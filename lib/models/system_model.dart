@@ -106,6 +106,9 @@ class SystemModel {
   /// When true, game lists prioritize the raw filename over metadata titles.
   final bool preferFileName;
 
+  /// Whether to hide the extra ROM filename below a game's title.
+  final bool hideRomFileNameSubtitle;
+
   /// When true, ROMs in subfolders are presented as navigable folders in the
   /// game list instead of being flattened in with top-level games.
   final bool subfolderView;
@@ -153,6 +156,7 @@ class SystemModel {
     this.customLogoPath,
     this.hideLogo = false,
     this.preferFileName = false,
+    this.hideRomFileNameSubtitle = false,
     this.subfolderView = false,
     this.extensions = const [],
     this.folders = const [],
@@ -349,6 +353,9 @@ class SystemModel {
           (int.tryParse((json['prefer_file_name'] ?? '0').toString()) ?? 0) ==
               1 ||
           json['prefer_file_name']?.toString() == 'true',
+      hideRomFileNameSubtitle:
+          json['hide_rom_file_name_subtitle']?.toString() == '1' ||
+          json['hide_rom_file_name_subtitle'] == true,
       subfolderView:
           (int.tryParse((json['subfolder_view'] ?? '0').toString()) ?? 0) ==
               1 ||
@@ -397,6 +404,7 @@ class SystemModel {
       'custom_logo_path': customLogoPath,
       'hide_logo': hideLogo ? 1 : 0,
       'prefer_file_name': preferFileName ? 1 : 0,
+      'hide_rom_file_name_subtitle': hideRomFileNameSubtitle ? 1 : 0,
       'subfolder_view': subfolderView ? 1 : 0,
       'extensions': extensions,
       'folders': folders,
@@ -436,6 +444,7 @@ class SystemModel {
     String? customLogoPath,
     bool? hideLogo,
     bool? preferFileName,
+    bool? hideRomFileNameSubtitle,
     bool? subfolderView,
     List<String>? extensions,
     List<String>? folders,
@@ -473,6 +482,8 @@ class SystemModel {
       customLogoPath: customLogoPath ?? this.customLogoPath,
       hideLogo: hideLogo ?? this.hideLogo,
       preferFileName: preferFileName ?? this.preferFileName,
+      hideRomFileNameSubtitle:
+          hideRomFileNameSubtitle ?? this.hideRomFileNameSubtitle,
       subfolderView: subfolderView ?? this.subfolderView,
       extensions: extensions ?? this.extensions,
       folders: folders ?? this.folders,
@@ -496,6 +507,7 @@ class SystemModel {
         other.customLogoPath == customLogoPath &&
         other.hideLogo == hideLogo &&
         other.preferFileName == preferFileName &&
+        other.hideRomFileNameSubtitle == hideRomFileNameSubtitle &&
         other.extensions.length == extensions.length &&
         other.folders.length == folders.length;
   }
@@ -508,6 +520,7 @@ class SystemModel {
     customLogoPath,
     hideLogo,
     preferFileName,
+    hideRomFileNameSubtitle,
     extensions.length,
     folders.length,
   );
