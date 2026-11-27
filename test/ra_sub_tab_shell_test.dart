@@ -261,6 +261,12 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    Color? menuBackground(String label) {
+      final row = find.widgetWithText(AnimatedContainer, label);
+      final decoration = tester.widget<AnimatedContainer>(row).decoration;
+      return (decoration as BoxDecoration).color;
+    }
+
     await press(LogicalKeyboardKey.arrowDown);
     expect(
       tester.widget<RADashboardHub>(find.byType(RADashboardHub)).section,
@@ -271,6 +277,25 @@ void main() {
     final hub = tester.widget<RADashboardHub>(find.byType(RADashboardHub));
     expect(hub.section, RaDashboardSection.unlocks);
     expect(hub.menuFocused, isTrue);
+
+    await press(LogicalKeyboardKey.arrowDown);
+    await press(LogicalKeyboardKey.arrowDown);
+    final awards = AppLocale.en[AppLocale.raAwards]!;
+    final logout = AppLocale.en[AppLocale.logout]!;
+    final awardsPanel = find.text(AppLocale.en[AppLocale.noAwardsYet]!);
+    final highlight = Theme.of(tester.element(find.byType(RADashboardHub)))
+        .colorScheme
+        .onSurface;
+    expect(menuBackground(awards), highlight);
+
+    await press(LogicalKeyboardKey.arrowDown);
+    expect(menuBackground(logout), highlight);
+    expect(menuBackground(awards), Colors.transparent);
+    expect(awardsPanel.hitTestable(), findsOneWidget);
+
+    await press(LogicalKeyboardKey.arrowUp);
+    expect(menuBackground(awards), highlight);
+    expect(menuBackground(logout), Colors.transparent);
 
     await press(LogicalKeyboardKey.arrowRight);
     expect(
