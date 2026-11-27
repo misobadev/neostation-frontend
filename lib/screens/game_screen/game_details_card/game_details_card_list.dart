@@ -554,12 +554,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     super.didUpdateWidget(oldWidget);
 
     // Identity check: If the selected game or its source system changes, reset all local states.
-    if (!identical(oldWidget.game, widget.game) ||
-        oldWidget.game.romname != widget.game.romname ||
-        oldWidget.game.systemFolderName != widget.game.systemFolderName ||
-        oldWidget.game.name != widget.game.name ||
-        oldWidget.game.showRomFileNameSubtitle !=
-            widget.game.showRomFileNameSubtitle) {
+    if (!identical(oldWidget.game, widget.game)) {
       // A game this screen has already identified and fetched can be answered
       // out of memory in the same frame the selection changed. That is worth a
       // branch of its own: the alternative is entering the loading state and

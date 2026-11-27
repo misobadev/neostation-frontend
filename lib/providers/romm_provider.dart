@@ -1725,7 +1725,6 @@ class RommProvider extends ChangeNotifier {
           systemId,
           indexedName,
           {
-            'real_name': rom.name,
             ...info,
             // No longer ES-DE's row: resetting an ES-DE import deletes
             // those, which would take RomM's info with it.
@@ -2601,7 +2600,6 @@ class RommProvider extends ChangeNotifier {
       if (detail == null) return;
       final metadata = <String, dynamic>{
         'filename': indexedName,
-        'real_name': rom.name,
         ..._rommInfoFields(detail),
       };
 
@@ -2752,7 +2750,11 @@ class RommProvider extends ChangeNotifier {
   static Map<String, dynamic> _rommInfoFields(Map<String, dynamic> detail) {
     final md =
         (detail['metadatum'] as Map?)?.cast<String, dynamic>() ?? const {};
-    final fields = <String, dynamic>{};
+    final title = detail['name']?.toString();
+    final fields = <String, dynamic>{
+      if (title != null && title.trim().isNotEmpty && _rommIdentified(detail))
+        'real_name': title,
+    };
     final summary = detail['summary']?.toString();
     if (summary != null && summary.isNotEmpty) {
       fields['description_en'] = summary;

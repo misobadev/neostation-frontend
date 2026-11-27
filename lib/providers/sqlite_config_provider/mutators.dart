@@ -271,6 +271,22 @@ extension SqliteConfigMutators on SqliteConfigProvider {
     _notify();
   }
 
+  /// Persists whether the extra ROM filename is hidden for one system.
+  Future<void> updateHideRomFileNameSubtitle(
+    String systemId,
+    bool value,
+  ) async {
+    await SystemRepository.setHideRomFileNameSubtitle(systemId, value);
+    final index = _detectedSystems.indexWhere(
+      (system) => system.id == systemId,
+    );
+    if (index < 0) return;
+    _detectedSystems[index] = _detectedSystems[index].copyWith(
+      hideRomFileNameSubtitle: value,
+    );
+    _notify();
+  }
+
   /// Updates whether system cards hide their logo footer and render square.
   ///
   /// Purely visual, so unlike [updateSubfolderViewAll] it needs no per-system

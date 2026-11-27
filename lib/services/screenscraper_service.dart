@@ -586,7 +586,7 @@ class ScreenScraperService {
     for (final nom in noms) {
       final region = nom['region']?.toString();
       final text = nom['text']?.toString();
-      if (text != null && text.isNotEmpty) {
+      if (text != null && text.trim().isNotEmpty) {
         final priority = regionPriority[region] ?? 0;
         if (priority > bestNamePriority) {
           bestNamePriority = priority;
@@ -594,7 +594,7 @@ class ScreenScraperService {
         }
       }
     }
-    metadata['real_name'] = realName ?? filename;
+    metadata['real_name'] = realName;
 
     final synopses = gameInfo['synopsis'] as List<dynamic>? ?? [];
     String? preferredDescription;

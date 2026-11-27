@@ -105,6 +105,9 @@ class SystemRepository {
   static Future<void> setPreferFileName(String systemId, bool value) =>
       SqliteService.setSystemPreferFileName(systemId, value);
 
+  static Future<void> setHideRomFileNameSubtitle(String systemId, bool value) =>
+      SqliteService.setSystemHideRomFileNameSubtitle(systemId, value);
+
   static Future<void> setSubfolderView(String systemId, bool value) =>
       SqliteService.setSystemSubfolderView(systemId, value);
 

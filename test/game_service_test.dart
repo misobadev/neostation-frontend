@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/system_model.dart';
+import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/services/game_service.dart';
 
 import 'database_test_helper.dart';
@@ -82,6 +83,164 @@ void main() {
       expect(result.single['c'], 0);
     });
   });
+
+  group('ROM display names', () {
+    const xbox = SystemModel(
+      id: 'xbox',
+      folderName: 'xbox',
+      realName: 'Xbox',
+      iconImage: '',
+      color: '',
+    );
+    const favorites = SystemModel(
+      id: SystemFolderNames.favorites,
+      folderName: SystemFolderNames.favorites,
+      realName: 'Favorites',
+      iconImage: '',
+      color: '',
+      isVirtual: true,
+    );
+    const scraped = '  Halo  (USA) [!].xiso.iso';
+    const unscraped = 'Fable.v2 (USA) [!].XISO.ISO';
+
+    setUp(() async {
+      await db.execute(
+        "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('xbox', 'Xbox', 'xbox')",
+      );
+      await db.execute(
+        "INSERT INTO app_system_extensions (system_id, extension) VALUES ('xbox', 'xiso'), ('xbox', 'iso')",
+      );
+      for (final filename in [scraped, unscraped]) {
+        await db.execute(
+          'INSERT INTO user_roms (filename, rom_path, app_system_id, is_favorite) '
+          "VALUES (?, ?, 'xbox', 1)",
+          [filename, '/roms/xbox/$filename'],
+        );
+      }
+      await db.execute(
+        'INSERT INTO user_screenscraper_metadata (app_system_id, filename, real_name) '
+        "VALUES ('xbox', ?, 'Halo: Combat Evolved'), ('xbox', ?, '   ')",
+        [scraped, unscraped],
+      );
+    });
+
+    test('hiding the filename keeps the metadata title', () async {
+      final before = await GameService.loadGamesForSystem(xbox);
+      final shown = before.singleWhere((game) => game.romname == scraped);
+      expect(shown.name, 'Halo: Combat Evolved');
+      expect(shown.showRomFileNameSubtitle, isTrue);
+      expect(shown.showRomFileNameInInfo, isTrue);
+
+      await SystemRepository.setHideRomFileNameSubtitle('xbox', true);
+      for (final system in [xbox, favorites]) {
+        final games = await GameService.loadGamesForSystem(system);
+        final hidden = games.singleWhere((game) => game.romname == scraped);
+        expect(hidden.name, shown.name);
+        expect(hidden.showRomFileNameSubtitle, isFalse);
+        expect(hidden.showRomFileNameInInfo, isFalse);
+        expect(hidden.romPath, '/roms/xbox/$scraped');
+      }
+      final details = await GameService.getGameDetails(xbox, scraped);
+      expect(details?.name, shown.name);
+      expect(details?.showRomFileNameSubtitle, isFalse);
+      expect(details?.showRomFileNameInInfo, isFalse);
+    });
+
+    test('formats file names the same by choice or fallback', () async {
+      await SystemRepository.setHideRomFileNameSubtitle('xbox', true);
+      final games = await GameService.loadGamesForSystem(xbox);
+      final fallback = games.singleWhere((game) => game.romname == unscraped);
+      expect(fallback.name, 'Fable.v2');
+      expect(fallback.showRomFileNameSubtitle, isFalse);
+      expect(fallback.showRomFileNameInInfo, isFalse);
+
+      await SystemRepository.setPreferFileName('xbox', true);
+      await SystemRepository.setHideRomFileNameSubtitle('xbox', false);
+      final preferred = await GameService.loadGamesForSystem(xbox);
+      expect(
+        {for (final game in preferred) game.romname: game.name},
+        {scraped: 'Halo', unscraped: 'Fable.v2'},
+      );
+      expect(preferred.every((game) => !game.showRomFileNameSubtitle), isTrue);
+      expect(preferred.every((game) => game.showRomFileNameInInfo), isTrue);
+
+      await SystemRepository.setPreferFileName('xbox', false);
+      await SystemRepository.setHideExtension('xbox', false);
+      await SystemRepository.setHideParentheses('xbox', false);
+      await SystemRepository.setHideBrackets('xbox', false);
+      final details = await GameService.getGameDetails(xbox, unscraped);
+      expect(details?.name, unscraped);
+      expect(details?.showRomFileNameSubtitle, isFalse);
+    });
+
+    test('an explicit metadata title can equal the full filename', () async {
+      await db.execute(
+        'UPDATE user_screenscraper_metadata SET real_name = filename',
+      );
+      final games = await GameService.loadGamesForSystem(xbox);
+      expect(
+        games.map((game) => game.name),
+        unorderedEquals([scraped, unscraped]),
+      );
+      expect(games.every((game) => !game.showRomFileNameSubtitle), isTrue);
+    });
+
+    test('a title embedded in the ROM is metadata too', () async {
+      await db.execute(
+        'UPDATE user_roms SET title_name = ? WHERE filename = ?',
+        ['Fable: The Lost Chapters', unscraped],
+      );
+
+      final details = await GameService.getGameDetails(xbox, unscraped);
+      expect(details?.name, 'Fable: The Lost Chapters');
+      expect(details?.showRomFileNameSubtitle, isTrue);
+    });
+  });
+
+  test(
+    'formats the filename-derived title stored by the Switch scanner',
+    () async {
+      const system = SystemModel(
+        id: 'switch',
+        folderName: 'switch',
+        realName: 'Nintendo Switch',
+        iconImage: '',
+        color: '',
+      );
+      const filename = 'Game (USA) [v1].xci';
+      const scannerTitle = 'Game (USA) [v1]';
+      await db.execute(
+        "INSERT INTO app_systems (id, real_name, folder_name) VALUES ('switch', 'Nintendo Switch', 'switch')",
+      );
+      await db.execute(
+        "INSERT INTO app_system_extensions (system_id, extension) VALUES ('switch', 'xci')",
+      );
+      await db.execute(
+        'INSERT INTO user_roms (filename, rom_path, app_system_id, title_id, title_name) '
+        "VALUES (?, ?, 'switch', '0100000000000001', ?)",
+        [filename, '/roms/switch/$filename', scannerTitle],
+      );
+
+      final game = (await GameService.loadGamesForSystem(system)).single;
+      expect(game.name, 'Game');
+      expect(game.showRomFileNameSubtitle, isFalse);
+      expect(game.showRomFileNameInInfo, isTrue);
+
+      await SystemRepository.setHideExtension('switch', false);
+      final details = await GameService.getGameDetails(system, filename);
+      expect(details?.name, 'Game.xci');
+      expect(details?.showRomFileNameSubtitle, isFalse);
+
+      await db.execute(
+        'INSERT INTO user_screenscraper_metadata (app_system_id, filename, real_name) '
+        "VALUES ('switch', ?, ?)",
+        [filename, scannerTitle],
+      );
+      final scraped = (await GameService.loadGamesForSystem(system)).single;
+      expect(scraped.name, scannerTitle);
+      expect(scraped.showRomFileNameSubtitle, isTrue);
+    },
+  );
 
   group('GameService.loadGamesForSystem (favorites)', () {
     test(

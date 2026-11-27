@@ -214,7 +214,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.deleteThemeConfirm: 'Hapus tema impor "%s"?',
 
   AppLocale.generalSettings: 'Pengaturan Umum',
-  AppLocale.alwaysShowRomName: 'Selalu tampilkan nama ROM',
+  AppLocale.useRomFileNameAsTitle: 'Gunakan nama file sebagai judul game',
+  AppLocale.hideRomFileNameSubtitle: 'Sembunyikan nama file di bawah judul',
   AppLocale.hideExtension: 'Sembunyikan ekstensi file (hanya nama ROM)',
   AppLocale.hideParentheses: 'Sembunyikan tanda kurung () di nama file',
   AppLocale.hideBrackets: 'Sembunyikan tanda kurung siku [] di nama file',
@@ -222,8 +223,10 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.hideSystemLogoSubtitle: 'Sembunyikan overlay logo sistem',
   AppLocale.recursiveScan: 'Pemindaian ROM rekursif',
   AppLocale.recursiveScanSubtitle: 'Pindai ROM di subdirektori',
-  AppLocale.alwaysShowRomNameSubtitle:
-      'Gunakan nama file ROM di daftar (abaikan judul hasil scraping)',
+  AppLocale.useRomFileNameAsTitleSubtitle:
+      'Gunakan nama file ROM alih-alih judul dari metadata',
+  AppLocale.hideRomFileNameSubtitleDescription:
+      'Sembunyikan baris nama file tanpa mengubah judul game',
   AppLocale.hideExtensionSubtitle:
       'Sembunyikan ekstensi seperti .iso atau .zip saat menggunakan nama file',
   AppLocale.hideParenthesesSubtitle:

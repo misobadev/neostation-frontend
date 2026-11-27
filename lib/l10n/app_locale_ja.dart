@@ -208,7 +208,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.deleteThemeConfirm: 'インポートしたテーマ「%s」を削除しますか？',
 
   AppLocale.generalSettings: '全般設定',
-  AppLocale.alwaysShowRomName: '常にROM名を表示',
+  AppLocale.useRomFileNameAsTitle: 'ファイル名をゲームタイトルに使う',
+  AppLocale.hideRomFileNameSubtitle: 'タイトルの下にファイル名を表示しない',
   AppLocale.hideExtension: 'ファイル拡張子を非表示 (ROM名のみ)',
   AppLocale.hideParentheses: 'ファイル名の丸括弧 () を非表示',
   AppLocale.hideBrackets: 'ファイル名の角括弧 [] を非表示',
@@ -216,7 +217,9 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.hideSystemLogoSubtitle: 'システムロゴのオーバーレイを非表示',
   AppLocale.recursiveScan: '再帰的なROMスキャン',
   AppLocale.recursiveScanSubtitle: 'サブディレクトリ内のROMをスキャン',
-  AppLocale.alwaysShowRomNameSubtitle: 'リストでROMファイル名を使用 (スクレイピングしたタイトルを無視)',
+  AppLocale.useRomFileNameAsTitleSubtitle: 'メタデータのタイトルの代わりにROMファイル名を表示します',
+  AppLocale.hideRomFileNameSubtitleDescription:
+      'ゲームタイトルはそのままに、追加のファイル名表示を非表示にします',
   AppLocale.hideExtensionSubtitle: 'ファイル名使用時に .iso や .zip などの拡張子を非表示',
   AppLocale.hideParenthesesSubtitle: 'ファイル名使用時に丸括弧 () 内のテキストを削除',
   AppLocale.hideBracketsSubtitle: 'ファイル名使用時に角括弧 [] 内のテキストを削除',

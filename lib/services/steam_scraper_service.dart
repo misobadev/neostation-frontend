@@ -185,7 +185,7 @@ class SteamScraperService {
         final metadata = <String, dynamic>{
           'app_system_id': systemId,
           'filename': filename,
-          'real_name': gameData['name'] ?? filename,
+          'real_name': gameData['name'],
           'developer': (gameData['developers'] as List?)?.first?.toString(),
           'publisher': (gameData['publishers'] as List?)?.first?.toString(),
           'rating': (gameData['metacritic']?['score'] as num? ?? 0) / 5.0, // Normalize metacritic 0-100 to 0-20 (UI maps to 0-10 star scale).

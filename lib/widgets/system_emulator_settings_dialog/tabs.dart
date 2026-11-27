@@ -475,8 +475,8 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
         _buildSwitchItem(
           index: 0,
           key: _generalItemKeys[0],
-          title: AppLocale.alwaysShowRomName.getString(context),
-          subtitle: AppLocale.alwaysShowRomNameSubtitle.getString(context),
+          title: AppLocale.useRomFileNameAsTitle.getString(context),
+          subtitle: AppLocale.useRomFileNameAsTitleSubtitle.getString(context),
           value: _system.preferFileName,
           onChanged: _togglePreferFileName,
         ),
@@ -532,13 +532,24 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
             enabled: _system.recursiveScan,
           ),
         ],
+        if (_offersRomFileNameSubtitle) ...[
+          SizedBox(height: 4.r),
+          _buildSwitchItem(
+            index: _romFileNameSubtitleIndex,
+            key: _generalItemKeys[_romFileNameSubtitleIndex],
+            title: AppLocale.hideRomFileNameSubtitle.getString(context),
+            subtitle: AppLocale.hideRomFileNameSubtitleDescription.getString(
+              context,
+            ),
+            value: _system.hideRomFileNameSubtitle,
+            onChanged: _toggleHideRomFileNameSubtitle,
+          ),
+        ],
         if (_offersLaunchDisplay) ...[
           SizedBox(height: 4.r),
           _buildSwitchItem(
-            index: _SystemEmulatorSettingsDialogState._launchDisplayIndex,
-            key:
-                _generalItemKeys[_SystemEmulatorSettingsDialogState
-                    ._launchDisplayIndex],
+            index: _launchDisplayIndex,
+            key: _generalItemKeys[_launchDisplayIndex],
             title: AppLocale.openOnSecondaryScreen.getString(context),
             subtitle: AppLocale.openOnSecondaryScreenSubtitle.getString(
               context,

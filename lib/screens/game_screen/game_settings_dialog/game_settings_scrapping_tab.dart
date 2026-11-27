@@ -195,9 +195,7 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
     String field(String column, String snapshot) =>
         row == null ? snapshot : (row[column] as String?) ?? '';
     setState(() {
-      _titleController.text =
-          (row?['real_name'] as String?) ??
-          (widget.game.name.isNotEmpty ? widget.game.name : '');
+      _titleController.text = field('real_name', '');
       _developerController.text = field('developer', widget.game.developer);
       _publisherController.text = field('publisher', widget.game.publisher);
       _genreController.text = field('genre', widget.game.genre);
@@ -223,7 +221,9 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
     }
 
     final fields = <String, dynamic>{
-      'real_name': nullable(_titleController.text),
+      'real_name': _titleController.text == widget.game.romname
+          ? _titleController.text
+          : nullable(_titleController.text),
       'developer': nullable(_developerController.text),
       'publisher': nullable(_publisherController.text),
       'genre': nullable(_genreController.text),

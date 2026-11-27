@@ -218,7 +218,9 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.deleteThemeConfirm: 'Importiertes Theme „%s“ entfernen?',
 
   AppLocale.generalSettings: 'Allgemeine Einstellungen',
-  AppLocale.alwaysShowRomName: 'ROM-Namen immer anzeigen',
+  AppLocale.useRomFileNameAsTitle: 'Dateiname als Spieltitel',
+  AppLocale.hideRomFileNameSubtitle:
+      'Dateiname unter dem Spieltitel ausblenden',
   AppLocale.hideExtension: 'Dateiendung ausblenden (nur ROM-Name)',
   AppLocale.hideParentheses: 'Klammern () im Dateinamen ausblenden',
   AppLocale.hideBrackets: 'Eckige Klammern [] im Dateinamen ausblenden',
@@ -226,8 +228,10 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.hideSystemLogoSubtitle: 'Systemlogo-Overlay ausblenden',
   AppLocale.recursiveScan: 'Rekursive ROM-Suche',
   AppLocale.recursiveScanSubtitle: 'ROMs in Unterverzeichnissen suchen',
-  AppLocale.alwaysShowRomNameSubtitle:
-      'ROM-Dateinamen in der Liste verwenden (ignoriert Scraper-Titel)',
+  AppLocale.useRomFileNameAsTitleSubtitle:
+      'ROM-Dateinamen statt des Titels aus den Metadaten verwenden',
+  AppLocale.hideRomFileNameSubtitleDescription:
+      'Blendet den zusätzlichen Dateinamen aus, ohne den Titel zu ändern',
   AppLocale.hideExtensionSubtitle: 'Blendet Endungen wie .iso oder .zip aus, wenn Dateinamen verwendet werden',
   AppLocale.hideParenthesesSubtitle:
       'Entfernt Text in Klammern (), wenn Dateinamen verwendet werden',

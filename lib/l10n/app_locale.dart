@@ -196,7 +196,8 @@ mixin AppLocale {
   // General settings
   // ---------------------------------------------------------------------------
   static const String generalSettings = 'general_settings';
-  static const String alwaysShowRomName = 'always_show_rom_name';
+  static const String useRomFileNameAsTitle = 'use_rom_file_name_as_title';
+  static const String hideRomFileNameSubtitle = 'hide_rom_file_name_subtitle';
   static const String hideExtension = 'hide_extension';
   static const String hideParentheses = 'hide_parentheses';
   static const String hideBrackets = 'hide_brackets';
@@ -204,8 +205,10 @@ mixin AppLocale {
   static const String hideSystemLogoSubtitle = 'hide_system_logo_subtitle';
   static const String recursiveScan = 'recursive_scan';
   static const String recursiveScanSubtitle = 'recursive_scan_subtitle';
-  static const String alwaysShowRomNameSubtitle =
-      'always_show_rom_name_subtitle';
+  static const String useRomFileNameAsTitleSubtitle =
+      'use_rom_file_name_as_title_subtitle';
+  static const String hideRomFileNameSubtitleDescription =
+      'hide_rom_file_name_subtitle_description';
   static const String hideExtensionSubtitle = 'hide_extension_subtitle';
   static const String hideParenthesesSubtitle = 'hide_parentheses_subtitle';
   static const String hideBracketsSubtitle = 'hide_brackets_subtitle';
