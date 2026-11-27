@@ -328,16 +328,19 @@ class SqliteDatabaseService {
       ..addAll(deduplicatedEntries);
 
     if (system.id == 'switch' || system.id == 'nintendo-switch') {
-      final filtered = await filterSwitchContent(romEntries);
+      final filtered = await filterSwitchContent(
+        romEntries,
+        storedTitleIds: await _storedTitleIds(system.id!),
+      );
       romEntries
         ..clear()
         ..addAll(filtered);
     }
 
     // Clean orphaned entries (files deleted from disk or excluded by filters).
-    // Rows under a root that
-    // is not mounted right now are left alone: a missing SD card lists as an
-    // empty root, and without this every game on it would read as deleted.
+    // Rows under a root that is not mounted right now are left alone: a
+    // missing SD card lists as an empty root, and without this every game on
+    // it would read as deleted.
     final offlineRoots = offlineRomRoots(
       rootFoldersMap ?? await getExistingSubdirectories(romFolders),
     );
@@ -556,32 +559,64 @@ class SqliteDatabaseService {
   /// known, so an extraction that failed once — unreadable file, missing Switch
   /// keys — is retried later instead of being frozen out by the path diff.
   static bool _needsMetadataExtraction(String systemId, RomEntry entry) {
-    if (systemId == 'switch' || systemId == 'nintendo-switch') return true;
+    // Switch packages are read by filterSwitchContent before this point; only
+    // entries it actually read carry metadata worth writing.
+    if (systemId == 'switch' || systemId == 'nintendo-switch') {
+      return entry.switchInfo != null;
+    }
     final lower = entry.filename.toLowerCase();
     return lower.endsWith('.psvita') || lower.endsWith('.steam');
   }
 
   /// Excludes standalone updates and DLC before path reconciliation so a
   /// rescan also removes their old library rows. Unidentified files are kept.
+  ///
+  /// All Switch file reads happen here, outside any database transaction.
+  /// [storedTitleIds] maps known `rom_path`s to the base-game Title ID already
+  /// stored for them: those files are not read again, which keeps a rescan of
+  /// a large SAF library from re-reading every header. A stored update/DLC ID
+  /// is not trusted on its own (older builds could store one for a bundle
+  /// holding the base game), so that file is read again before it is dropped.
   @visibleForTesting
   static Future<List<RomEntry>> filterSwitchContent(
-    List<RomEntry> entries,
-  ) async {
+    List<RomEntry> entries, {
+    Map<String, String> storedTitleIds = const {},
+  }) async {
     final games = <RomEntry>[];
     for (final entry in entries) {
       final extension = path.extension(entry.filename).toLowerCase();
-      // Cartridge images can bundle updates alongside the base game. Their
-      // HEAD header does not contain an application title ID; keep them intact.
-      if (extension != '.nsp' && extension != '.nsz') {
+      final isPackage = extension == '.nsp' || extension == '.nsz';
+      if (!isPackage && extension != '.xci') {
         games.add(entry);
         continue;
       }
-      final info = await SwitchTitleExtractor.extractGameInfo(entry.path);
-      final filenameId = RegExp(
-        r'(?<![0-9a-fA-F])0100[0-9a-fA-F]{12}(?![0-9a-fA-F])',
-      ).firstMatch(entry.filename)?.group(0);
-      final titleId = info?.titleId ?? filenameId;
-      if (SwitchTitleExtractor.isAdditionalContent(titleId)) continue;
+      final storedId = storedTitleIds[entry.path];
+      if (storedId != null &&
+          !SwitchTitleExtractor.isAdditionalContent(storedId)) {
+        games.add(entry);
+        continue;
+      }
+
+      SwitchGameInfo? info;
+      try {
+        info = await SwitchTitleExtractor.extractGameInfo(
+          entry.path,
+          fileName: entry.filename,
+        );
+      } catch (e) {
+        _log.e('Error reading Switch package ${entry.path}: $e');
+      }
+
+      // Cartridge images can bundle updates alongside the base game. Their
+      // HEAD header does not contain an application title ID; keep them
+      // intact and only carry the metadata through to the insert.
+      if (isPackage) {
+        final filenameId = RegExp(
+          r'(?<![0-9a-fA-F])0100[0-9a-fA-F]{12}(?![0-9a-fA-F])',
+        ).firstMatch(entry.filename)?.group(0);
+        final titleId = info?.titleId ?? filenameId;
+        if (SwitchTitleExtractor.isAdditionalContent(titleId)) continue;
+      }
       games.add(
         RomEntry(
           path: entry.path,
@@ -594,6 +629,25 @@ class SqliteDatabaseService {
     return games;
   }
 
+  /// The Title IDs already stored for [systemId], keyed by `rom_path`.
+  static Future<Map<String, String>> _storedTitleIds(String systemId) async {
+    try {
+      final db = await SqliteService.getDatabase();
+      final rows = await db.rawQuery(
+        'SELECT rom_path, title_id FROM user_roms '
+        'WHERE app_system_id = ? AND title_id IS NOT NULL',
+        [systemId],
+      );
+      return {
+        for (final row in rows)
+          row['rom_path'].toString(): row['title_id'].toString(),
+      };
+    } catch (e) {
+      _log.e('Error loading stored Switch Title IDs: $e');
+      return const {};
+    }
+  }
+
   /// Calculates a tuned batch size for insertions based on the total file count.
   static int _calculateOptimalBatchSize(int totalFiles) {
     if (totalFiles <= 10) return totalFiles;
@@ -604,8 +658,9 @@ class SqliteDatabaseService {
 
   /// Executes a high-performance batch insertion of multiple ROM entries.
   ///
-  /// Handles platform-specific metadata extraction (Switch title info, Vita
-  /// Title IDs, Steam App IDs) during the operation.
+  /// Handles platform-specific metadata extraction (Vita Title IDs, Steam App
+  /// IDs) during the operation. Switch title info arrives already read on
+  /// [RomEntry.switchInfo].
   static Future<void> _batchInsertRoms(
     String systemFolderName,
     List<RomEntry> romEntries,
@@ -616,8 +671,6 @@ class SqliteDatabaseService {
     final system = await SqliteService.getSystemByFolderName(systemFolderName);
     final systemId = system.id!;
     final isSwitch = systemId == 'switch' || systemId == 'nintendo-switch';
-
-    if (isSwitch) await SwitchTitleExtractor.loadKeys();
 
     await db.transaction((txn) async {
       // app_emulator_unique_id/os_id are left NULL = "inherit the system
@@ -644,18 +697,12 @@ class SqliteDatabaseService {
         String? titleId;
         String? titleName;
 
-        if (isSwitch) {
-          try {
-            final info =
-                entry.switchInfo ??
-                await SwitchTitleExtractor.extractGameInfo(entry.path);
-            if (info != null) {
-              titleId = info.titleId;
-              titleName = info.gameName;
-            }
-          } catch (e) {
-            _log.e('Error extracting Switch game info for ${entry.path}: $e');
-          }
+        // Switch metadata was read by filterSwitchContent, outside this
+        // transaction; nothing is read from the file here.
+        final switchInfo = isSwitch ? entry.switchInfo : null;
+        if (switchInfo != null) {
+          titleId = switchInfo.titleId;
+          titleName = switchInfo.gameName;
         }
 
         if (entry.filename.toLowerCase().endsWith('.psvita')) {

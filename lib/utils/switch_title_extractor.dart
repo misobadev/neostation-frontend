@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 import 'package:pointycastle/export.dart';
 import 'package:neostation/services/logger_service.dart';
 
@@ -156,23 +157,28 @@ header_key = aeaab1ca08adf9bef12991f369e3c567d6881e4e4a6a47a51f6e4877062d542d
     return titleId.toRadixString(16).toUpperCase().padLeft(16, '0');
   }
 
+  /// Upper bounds for the PFS0 header and `.cnmt.xml` reads. These lengths
+  /// come straight from the file, and the Android SAF reader allocates the
+  /// whole buffer up front, so a corrupt package with a huge value would run
+  /// the app out of memory. Real headers are a few KB.
+  @visibleForTesting
+  static const int maxPfs0FileCount = 0x1000;
+  @visibleForTesting
+  static const int maxPfs0StringTableSize = 0x100000;
+  @visibleForTesting
+  static const int maxCnmtXmlSize = 0x100000;
+
   /// Extracts game information from an XCI (NX Cartridge Image) file.
-  static Future<SwitchGameInfo?> _extractFromXCI(String path) async {
+  static Future<SwitchGameInfo?> _extractFromXCI(
+    String path,
+    String displayName,
+  ) async {
     final reader = _SwitchByteReader(path);
     if (!await reader.exists()) return null;
 
     try {
-      final fileName = path
-          .split(
-            Platform.isWindows || path.startsWith('content://')
-                ? '/'
-                : Platform.pathSeparator,
-          )
-          .last
-          .replaceAll('.xci', '');
-
       final headerBytes = await reader.read(0x100, 0x200);
-      if (headerBytes == null) return null;
+      if (headerBytes == null || headerBytes.length < 4) return null;
 
       // Verify "HEAD" magic at offset 0x100.
       if (String.fromCharCodes(headerBytes.sublist(0, 4)) != 'HEAD') {
@@ -186,7 +192,7 @@ header_key = aeaab1ca08adf9bef12991f369e3c567d6881e4e4a6a47a51f6e4877062d542d
             .map((b) => b.toRadixString(16).padLeft(2, '0'))
             .join()
             .toUpperCase();
-        return SwitchGameInfo(titleId, fileName, 'XCI');
+        return SwitchGameInfo(titleId, displayName, 'XCI');
       }
       return null;
     } catch (e) {
@@ -196,38 +202,44 @@ header_key = aeaab1ca08adf9bef12991f369e3c567d6881e4e4a6a47a51f6e4877062d542d
     }
   }
 
-  /// Extracts game information from an NSP (Nintendo Submission Package) file.
-  static Future<SwitchGameInfo?> _extractFromNSP(String path) async {
+  /// Extracts game information from an NSP/NSZ (Nintendo Submission Package).
+  ///
+  /// A package can carry more than one title (a base game bundled with its
+  /// update or DLC), so every Title ID found is collected and a base
+  /// application ID wins over update/DLC IDs. Otherwise a bundle whose base
+  /// has no ticket would be classified as its update and dropped from the
+  /// library.
+  static Future<SwitchGameInfo?> _extractFromNSP(
+    String path,
+    String displayName,
+  ) async {
     final reader = _SwitchByteReader(path);
     if (!await reader.exists()) return null;
 
     try {
-      final fileName = path
-          .split(
-            Platform.isWindows || path.startsWith('content://')
-                ? '/'
-                : Platform.pathSeparator,
-          )
-          .last
-          .replaceAll('.nsp', '');
-
       // Parse Partition Filesystem (PFS0) header.
       final headerBytes = await reader.read(0, 16);
       if (headerBytes == null ||
+          headerBytes.length < 16 ||
           String.fromCharCodes(headerBytes.sublist(0, 4)) != 'PFS0') {
         return null;
       }
 
-      final fileCount = ByteData.sublistView(
-        Uint8List.fromList(headerBytes.sublist(4, 8)),
-      ).getUint32(0, Endian.little);
-      final stringTableSize = ByteData.sublistView(
-        Uint8List.fromList(headerBytes.sublist(8, 12)),
-      ).getUint32(0, Endian.little);
+      final header = ByteData.sublistView(Uint8List.fromList(headerBytes));
+      final fileCount = header.getUint32(4, Endian.little);
+      final stringTableSize = header.getUint32(8, Endian.little);
+      if (fileCount > maxPfs0FileCount ||
+          stringTableSize > maxPfs0StringTableSize) {
+        _log.w('Skipping $path: implausible PFS0 header size');
+        return null;
+      }
 
-      final fileEntrySize = 24;
+      const fileEntrySize = 24;
       final fileTableBytes = await reader.read(16, fileCount * fileEntrySize);
-      if (fileTableBytes == null) return null;
+      if (fileTableBytes == null ||
+          fileTableBytes.length < fileCount * fileEntrySize) {
+        return null;
+      }
 
       final stringTableBytes = await reader.read(
         16 + (fileCount * fileEntrySize),
@@ -235,119 +247,87 @@ header_key = aeaab1ca08adf9bef12991f369e3c567d6881e4e4a6a47a51f6e4877062d542d
       );
       if (stringTableBytes == null) return null;
       final stringTable = String.fromCharCodes(stringTableBytes);
+      final fileTable = ByteData.sublistView(
+        Uint8List.fromList(fileTableBytes),
+      );
+      final dataOffset = 16 + (fileCount * fileEntrySize) + stringTableSize;
 
-      String? titleId;
-
-      // Strategy 1: Search for a .tik file (fastest method, covers ~87% of cases).
-      for (int i = 0; i < fileCount; i++) {
-        final entryOffset = i * fileEntrySize;
-        final stringTableOffset = ByteData.sublistView(
-          Uint8List.fromList(
-            fileTableBytes.sublist(entryOffset + 16, entryOffset + 20),
-          ),
-        ).getUint32(0, Endian.little);
+      String nameAt(int i) {
+        final stringTableOffset = fileTable.getUint32(
+          i * fileEntrySize + 16,
+          Endian.little,
+        );
         final nameEndIndex = stringTable.indexOf('\x00', stringTableOffset);
-        final internalName = stringTable.substring(
+        return stringTable.substring(
           stringTableOffset,
           nameEndIndex == -1 ? null : nameEndIndex,
         );
+      }
 
+      int offsetAt(int i) =>
+          fileTable.getUint64(i * fileEntrySize, Endian.little);
+      int sizeAt(int i) =>
+          fileTable.getUint64(i * fileEntrySize + 8, Endian.little);
+
+      final titleIds = <String>[];
+      bool hasBaseId() => titleIds.any((id) => !isAdditionalContent(id));
+
+      // Strategy 1: ticket file names (fastest, covers most packages).
+      for (int i = 0; i < fileCount; i++) {
+        final internalName = nameAt(i);
         if (internalName.toLowerCase().endsWith('.tik') &&
             internalName.length >= 16) {
-          titleId = internalName.substring(0, 16).toUpperCase();
-          if (!isAdditionalContent(titleId)) break;
+          titleIds.add(internalName.substring(0, 16).toUpperCase());
         }
       }
 
-      // Strategy 2: Parse metadata from .cnmt.xml if Title ID wasn't found in .tik.
-      if (titleId == null) {
-        final dataOffset = 16 + (fileCount * fileEntrySize) + stringTableSize;
-        for (int i = 0; i < fileCount; i++) {
-          final entryOffset = i * fileEntrySize;
-          final fileOffset = ByteData.sublistView(
-            Uint8List.fromList(
-              fileTableBytes.sublist(entryOffset, entryOffset + 8),
-            ),
-          ).getUint64(0, Endian.little);
-          final fileSize = ByteData.sublistView(
-            Uint8List.fromList(
-              fileTableBytes.sublist(entryOffset + 8, entryOffset + 16),
-            ),
-          ).getUint64(0, Endian.little);
-          final stringTableOffset = ByteData.sublistView(
-            Uint8List.fromList(
-              fileTableBytes.sublist(entryOffset + 16, entryOffset + 20),
-            ),
-          ).getUint32(0, Endian.little);
-
-          final nameEndIndex = stringTable.indexOf('\x00', stringTableOffset);
-          final internalName = stringTable.substring(
-            stringTableOffset,
-            nameEndIndex == -1 ? null : nameEndIndex,
+      // Strategy 2: .cnmt.xml metadata, when no ticket named a base game.
+      if (!hasBaseId()) {
+        for (int i = 0; i < fileCount && !hasBaseId(); i++) {
+          if (!nameAt(i).toLowerCase().endsWith('.cnmt.xml')) continue;
+          final fileSize = sizeAt(i);
+          if (fileSize <= 0 || fileSize > maxCnmtXmlSize) continue;
+          final xmlBytes = await reader.read(
+            dataOffset + offsetAt(i),
+            fileSize,
           );
-
-          if (internalName.toLowerCase().endsWith('.cnmt.xml')) {
-            final xmlBytes = await reader.read(
-              dataOffset + fileOffset.toInt(),
-              fileSize.toInt(),
-            );
-            if (xmlBytes == null) continue;
-            final xmlContent = utf8.decode(xmlBytes);
-
-            final match = RegExp(r'<(TitleId|Id)>0x([0-9a-fA-F]+)</\1>')
-                .firstMatch(xmlContent);
-            if (match != null) {
-              titleId = match.group(2)!.toUpperCase();
-              break;
-            }
-          }
+          if (xmlBytes == null) continue;
+          final xmlContent = utf8.decode(xmlBytes, allowMalformed: true);
+          final match = RegExp(r'<(TitleId|Id)>0x([0-9a-fA-F]+)</\1>')
+              .firstMatch(xmlContent);
+          if (match != null) titleIds.add(match.group(2)!.toUpperCase());
         }
       }
 
-      // Strategy 3: Decrypt .cnmt.nca header as a last resort (covers remaining ~4% of cases).
-      if (titleId == null &&
+      // Strategy 3: decrypt .cnmt.nca headers as a last resort.
+      if (!hasBaseId() &&
           _keysLoaded &&
           _encryptionKeys.containsKey('header_key')) {
-        final dataOffset = 16 + (fileCount * fileEntrySize) + stringTableSize;
-        for (int i = 0; i < fileCount; i++) {
-          final entryOffset = i * fileEntrySize;
-          final fileOffset = ByteData.sublistView(
-            Uint8List.fromList(
-              fileTableBytes.sublist(entryOffset, entryOffset + 8),
-            ),
-          ).getUint64(0, Endian.little);
-          final stringTableOffset = ByteData.sublistView(
-            Uint8List.fromList(
-              fileTableBytes.sublist(entryOffset + 16, entryOffset + 20),
-            ),
-          ).getUint32(0, Endian.little);
-          final nameEndIndex = stringTable.indexOf('\x00', stringTableOffset);
-          final internalName = stringTable.substring(
-            stringTableOffset,
-            nameEndIndex == -1 ? null : nameEndIndex,
+        for (int i = 0; i < fileCount && !hasBaseId(); i++) {
+          if (!nameAt(i).toLowerCase().endsWith('.cnmt.nca')) continue;
+          final encryptedHeader = await reader.read(
+            dataOffset + offsetAt(i),
+            0xC00,
           );
-
-          if (internalName.toLowerCase().endsWith('.cnmt.nca')) {
-            final encryptedHeader = await reader.read(
-              dataOffset + fileOffset.toInt(),
-              0xC00,
-            );
-            if (encryptedHeader == null) continue;
-
-            final decryptedHeader = _decryptNCAHeader(
-              Uint8List.fromList(encryptedHeader),
-              _encryptionKeys['header_key']!,
-            );
-            if (decryptedHeader != null) {
-              titleId = _extractTitleIdFromNCAHeader(decryptedHeader);
-              if (titleId != null) break;
-            }
+          if (encryptedHeader == null || encryptedHeader.length < 0xC00) {
+            continue;
           }
+          final decryptedHeader = _decryptNCAHeader(
+            Uint8List.fromList(encryptedHeader),
+            _encryptionKeys['header_key']!,
+          );
+          if (decryptedHeader == null) continue;
+          final titleId = _extractTitleIdFromNCAHeader(decryptedHeader);
+          if (titleId != null) titleIds.add(titleId);
         }
       }
 
-      if (titleId != null) return SwitchGameInfo(titleId, fileName, 'NSP');
-      return null;
+      if (titleIds.isEmpty) return null;
+      final titleId = titleIds.firstWhere(
+        (id) => !isAdditionalContent(id),
+        orElse: () => titleIds.first,
+      );
+      return SwitchGameInfo(titleId, displayName, 'NSP');
     } catch (e) {
       return null;
     } finally {
@@ -355,9 +335,12 @@ header_key = aeaab1ca08adf9bef12991f369e3c567d6881e4e4a6a47a51f6e4877062d542d
     }
   }
 
-  /// Application IDs are aligned to 0x1000; patches use offset 0x800
-  /// and add-on content uses nonzero offsets in the next application range.
-  /// Reject malformed/non-application IDs rather than hiding unknown files.
+  /// Whether [titleId] is a standalone update or DLC rather than a game.
+  ///
+  /// Application IDs have their low 13 bits clear. An update is the base ID
+  /// + 0x800 and DLC is base + 0x1000 + n (n >= 1), so both have a non-zero
+  /// low 12 bits while a base game never does. Malformed or non-application
+  /// IDs return false so unknown files stay visible.
   static bool isAdditionalContent(String? titleId) {
     if (titleId == null ||
         !RegExp(r'^0100[0-9a-fA-F]{12}$').hasMatch(titleId)) {
@@ -366,15 +349,44 @@ header_key = aeaab1ca08adf9bef12991f369e3c567d6881e4e4a6a47a51f6e4877062d542d
     return int.parse(titleId.substring(13), radix: 16) != 0;
   }
 
-  /// Main entry point to extract Title ID and metadata from a Switch ROM (NSP or XCI).
-  static Future<SwitchGameInfo?> extractGameInfo(String path) async {
+  /// The name shown for an unscraped game: the file name without its
+  /// extension.
+  @visibleForTesting
+  static String displayNameFor(String filePath) =>
+      p.basenameWithoutExtension(_fileNameFor(filePath));
+
+  /// The file name (with extension) of a plain path or a SAF `content://`
+  /// URI. SAF URIs carry the path URL-encoded
+  /// (`primary%3AROMs%2Fswitch%2FGame.nsz`), so they are decoded first.
+  static String _fileNameFor(String filePath) {
+    if (!filePath.startsWith('content://')) return p.basename(filePath);
+    var name = filePath;
+    try {
+      name = Uri.decodeComponent(filePath);
+    } catch (_) {
+      // Keep the raw URI if it is not valid percent-encoding.
+    }
+    // A SAF document id can keep a volume prefix ("primary:Game.nsp").
+    return name.split('/').last.split(':').last;
+  }
+
+  /// Main entry point to extract Title ID and metadata from a Switch ROM
+  /// (NSP, NSZ or XCI). [fileName] is the scanned entry's own name, used for
+  /// the extension and the display name; it is derived from [path] when
+  /// omitted.
+  static Future<SwitchGameInfo?> extractGameInfo(
+    String path, {
+    String? fileName,
+  }) async {
     if (!_keysLoaded) await loadKeys();
 
-    final extension = path.toLowerCase().split('.').last;
-    if (extension == 'nsp' || extension == 'nsz') {
-      return await _extractFromNSP(path);
-    } else if (extension == 'xci') {
-      return await _extractFromXCI(path);
+    final name = fileName ?? _fileNameFor(path);
+    final displayName = p.basenameWithoutExtension(name);
+    final extension = p.extension(name).toLowerCase();
+    if (extension == '.nsp' || extension == '.nsz') {
+      return await _extractFromNSP(path, displayName);
+    } else if (extension == '.xci') {
+      return await _extractFromXCI(path, displayName);
     }
     return null;
   }
