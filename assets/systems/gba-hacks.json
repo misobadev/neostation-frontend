@@ -56,6 +56,18 @@
       }
     },
     {
+      "name": "Standalone GBA Duo",
+      "unique_id": "gba-hacks.com.khumam.gbaduo",
+      "description": "GB, GBC and GBA emulator for dual-screen handhelds that shows a live companion screen (party, bag, maps) on the second screen. Supported extensions: gb, gbc, gba, zip.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.khumam.gbaduo/.library.LaunchActivity -a android.intent.action.VIEW -d \"{file.localuri}\"",
+          "keep_saf_uri": true
+        }
+      }
+    },
+    {
       "name": "Standalone GBA DS",
       "unique_id": "gba-hacks.io.github.kyannon.gbads",
       "description": "GBA emulator for dual-screen handhelds that shows the game's map or HUD on the second screen. Supported extensions: agb, bin, cgb, dmg, gb, gba, gbc, sgb, zip, 7z.",
