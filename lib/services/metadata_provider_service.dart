@@ -50,6 +50,7 @@ class MetadataProviderService {
         romName: romName,
         systemFolder: systemFolder,
         romPath: romPath,
+        gameName: gameName,
         onProgress: onProgress,
         forceOverwrite: forceOverwrite,
       );

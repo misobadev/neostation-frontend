@@ -229,31 +229,43 @@ class NeoAssetsScrapeService {
         final id = system['id'].toString();
         if (enabled[id] != true) continue;
         final selector = NeoAssetsSystemMap.selectorFor(id)!;
-        final roms = await GameLibraryRepository.getRomsForScraping(
-          id,
-          scrapeMode,
-          mediaWanted: mediaTypes.isNotEmpty,
-        );
+        // "Android Games" owns no rows: its games are the `android` rows the
+        // user marked, and their metadata and art live under `android`.
+        final roms = id == SystemFolderNames.androidGames
+            ? await GameLibraryRepository.getAndroidGamesForScraping(
+                scrapeMode,
+                mediaWanted: mediaTypes.isNotEmpty,
+              )
+            : await GameLibraryRepository.getRomsForScraping(
+                id,
+                scrapeMode,
+                mediaWanted: mediaTypes.isNotEmpty,
+              );
         for (final rom in roms) {
           queue.add(
             _RomJob(
-              appSystemId: id,
+              appSystemId: SystemFolderNames.rowSystemFolder(id),
               systemName: system['name'].toString(),
-              systemFolder: system['folder_name'].toString(),
+              systemFolder: SystemFolderNames.rowSystemFolder(
+                system['folder_name'].toString(),
+              ),
               selector: selector,
               filename: rom['filename'].toString(),
               romPath: rom['rom_path']?.toString() ?? '',
+              title: rom['title_name']?.toString(),
             ),
           );
         }
         if (fetchStreamedVideos) {
           final queued = {for (final rom in roms) rom['filename'].toString()};
-          final systemFolder = system['folder_name'].toString();
+          final systemFolder = SystemFolderNames.rowSystemFolder(
+            system['folder_name'].toString(),
+          );
           for (final link in await streamedVideosToFetch(id, systemFolder)) {
             if (queued.contains(link.filename)) continue;
             queue.add(
               _RomJob(
-                appSystemId: id,
+                appSystemId: SystemFolderNames.rowSystemFolder(id),
                 systemName: system['name'].toString(),
                 systemFolder: systemFolder,
                 selector: selector,
@@ -389,6 +401,7 @@ class NeoAssetsScrapeService {
     required String romName,
     required String systemFolder,
     required String romPath,
+    String? gameName,
     Function(String status, double progress)? onProgress,
     bool forceOverwrite = false,
   }) async {
@@ -399,7 +412,9 @@ class NeoAssetsScrapeService {
         return {'success': false, 'message': AppLocale.neoAssetsNoCredentials};
       }
       final apiKey = await _sessionKey();
-      final selector = NeoAssetsSystemMap.selectorFor(rowSystemId);
+      // "Android Games" is mapped itself; its rows' own system (`android`,
+      // every installed app) is not.
+      final selector = NeoAssetsSystemMap.selectorFor(appSystemId);
       if (selector == null) {
         return {
           'success': false,
@@ -410,10 +425,11 @@ class NeoAssetsScrapeService {
         _RomJob(
           appSystemId: rowSystemId,
           systemName: '',
-          systemFolder: systemFolder,
+          systemFolder: SystemFolderNames.rowSystemFolder(systemFolder),
           selector: selector,
           filename: romName,
           romPath: romPath,
+          title: gameName,
         ),
         apiKey: apiKey,
         newOnly: !forceOverwrite,
@@ -477,13 +493,22 @@ class NeoAssetsScrapeService {
 
     onStep?.call(ThreadProcessingStep.fetchingMetadata, 0.1);
     onRequest?.call();
-    var game = await NeoAssetsScrapeClient.lookupGame(
-      selector: job.selector,
-      apiKey: apiKey,
-      name: job.filename,
-      crc: fingerprint?.crc32,
-      md5: fingerprint?.md5,
-    );
+    // An installed app has no file to hash: it is looked up by its package
+    // (its rom_path), with its label as the name fallback.
+    var game = isApp
+        ? await NeoAssetsScrapeClient.lookupGame(
+            selector: job.selector,
+            apiKey: apiKey,
+            package: job.romPath.isNotEmpty ? job.romPath : job.filename,
+            name: job.title,
+          )
+        : await NeoAssetsScrapeClient.lookupGame(
+            selector: job.selector,
+            apiKey: apiKey,
+            name: job.filename,
+            crc: fingerprint?.crc32,
+            md5: fingerprint?.md5,
+          );
 
     // The name rode along on that request and the server falls back to it
     // when no hash matches, so only a ROM that had no hash yet is worth a
@@ -762,6 +787,10 @@ class _RomJob {
   final String filename;
   final String romPath;
 
+  /// The app's label for an installed Android app, the name fallback when its
+  /// package is not in the catalog.
+  final String? title;
+
   /// Set for a game whose video is only fetched from its saved link.
   final String? videoUrl;
 
@@ -772,6 +801,7 @@ class _RomJob {
     required this.selector,
     required this.filename,
     required this.romPath,
+    this.title,
     this.videoUrl,
   });
 }

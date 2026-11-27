@@ -46,6 +46,9 @@ class NeoAssetsSystemMap {
     'pspminis': 'psp',
     // NeoAssets' virtual "arcade" system expands to every arcade catalog.
     'arc': 'arcade',
+    // Only the installed apps the user marked as games are looked up, by
+    // package name. The plain Android tab (every other app) is not offered.
+    'android_games': 'android',
   };
 
   /// NeoStation systems looked up across a NeoAssets group.

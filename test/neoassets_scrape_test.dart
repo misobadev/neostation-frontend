@@ -338,6 +338,13 @@ void main() {
         const NeoAssetsSystemSelector.group('mame-fbneo'),
       );
       expect(NeoAssetsSystemMap.selectorFor('steam'), isNull);
+    });
+
+    test('offers Android Games, not every installed app', () {
+      expect(
+        NeoAssetsSystemMap.selectorFor('android_games'),
+        const NeoAssetsSystemSelector.system('android'),
+      );
       expect(NeoAssetsSystemMap.selectorFor('android'), isNull);
     });
 

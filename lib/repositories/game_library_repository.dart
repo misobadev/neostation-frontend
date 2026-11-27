@@ -286,6 +286,23 @@ class GameLibraryRepository {
     );
   }
 
+  /// Returns the "Android Games" apps eligible for scraping: the `android`
+  /// rows the user marked as games, with the same columns and [scrapeMode]
+  /// filter as [getRomsForScraping].
+  static Future<List<Map<String, dynamic>>> getAndroidGamesForScraping(
+    String scrapeMode, {
+    required bool mediaWanted,
+  }) async {
+    final filter = _scrapeModeFilter(scrapeMode, mediaWanted: mediaWanted);
+    final db = await SqliteService.getDatabase();
+    return await db.rawQuery(
+      '''SELECT ur.filename, ur.rom_path, ur.title_name, usm.is_fully_scraped
+       FROM user_roms ur LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
+       WHERE ur.app_system_id = ? AND ${SqliteService.androidGameFlagSql} $filter''',
+      [SystemFolderNames.android],
+    );
+  }
+
   /// Returns the cached dump identity for [romPath], or null if it has never
   /// been fingerprinted.
   ///
