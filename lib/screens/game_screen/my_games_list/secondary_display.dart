@@ -183,14 +183,14 @@ extension _SecondaryDisplay on _SystemGamesListState {
       _fileProvider,
     );
 
-    final videoPath = _getVideoPath(game);
-    final videoExists = await _fileProvider.fileExists(videoPath);
+    final videoPath = await _previewVideoSource(game);
+    final videoExists = videoPath != null;
 
     final configProvider = mounted
         ? context.read<SqliteConfigProvider>()
         : null;
     final isVideoMuted = !configProvider!.config.videoSound;
-    final isScraperLoggedIn = await ScreenScraperService.hasSavedCredentials();
+    final isScraperLoggedIn = await MetadataProviderService.hasActiveSession();
 
     final isMusicSystem = widget.system.folderName == 'music';
 
@@ -341,8 +341,8 @@ extension _SecondaryDisplay on _SystemGamesListState {
       return;
     }
 
-    final videoPath = _getVideoPath(game);
-    final videoExists = await _fileProvider.fileExists(videoPath);
+    final videoPath = await _previewVideoSource(game);
+    final videoExists = videoPath != null;
     if (!mounted || !_videoPreviewsEnabled) return;
 
     if (mounted && _selectedGame == game) {
@@ -395,7 +395,11 @@ extension _SecondaryDisplay on _SystemGamesListState {
   void _updateBackground(GameModel game) {
     // Aggregate views keep their own backdrop: the list's folder name is not a
     // hardware system, so there is no per-system art to swap in.
-    if (!mounted || SystemFolderNames.isAggregate(widget.system.folderName)) {
+    // The carousel also resolves and paints its own backdrop.
+    if (!mounted ||
+        SystemFolderNames.isAggregate(widget.system.folderName) ||
+        (widget.system.folderName != 'music' &&
+            _configProvider.config.gameViewMode == 'carousel')) {
       return;
     }
 
@@ -436,17 +440,23 @@ extension _SecondaryDisplay on _SystemGamesListState {
     );
   }
 
-  /// Checks whether the selected game has a preview file without creating a
-  /// controller. The visual countdown must not run for a game that only has a
-  /// screenshot.
+  /// Checks whether the selected game has a preview video (a file, or a
+  /// NeoAssets link when streaming) without creating a controller. The visual
+  /// countdown must not run for a game that only has a screenshot.
   Future<void> _checkVideoPreviewFile(GameModel game) async {
     if (_videoPreviewFileChecked || _videoPreviewFileCheckGame == game) return;
     _videoPreviewFileCheckGame = game;
     try {
-      final path = _getVideoPath(game);
-      final exists = _fileProvider.isInitialized
-          ? await _fileProvider.fileExists(path)
-          : await File(path).exists();
+      final localPath = _getVideoPath(game);
+      final exists =
+          await PreviewVideoSource.resolve(
+            localPath: localPath,
+            localExists: _fileProvider.isInitialized
+                ? await _fileProvider.fileExists(localPath)
+                : await File(localPath).exists(),
+            videoUrl: game.videoUrl,
+          ) !=
+          null;
       if (!mounted || _selectedGame != game) return;
       rebuild(() {
         _videoPreviewFileChecked = true;
@@ -556,11 +566,15 @@ extension _SecondaryDisplay on _SystemGamesListState {
 
     rebuild(() => _isVideoLoading = true);
 
-    final videoPath = _getVideoPath(game);
-    final file = File(videoPath);
-    final fileExists = _fileProvider.isInitialized
-        ? await _fileProvider.fileExists(videoPath)
-        : await file.exists();
+    final localPath = _getVideoPath(game);
+    final videoSource = await PreviewVideoSource.resolve(
+      localPath: localPath,
+      localExists: _fileProvider.isInitialized
+          ? await _fileProvider.fileExists(localPath)
+          : await File(localPath).exists(),
+      videoUrl: game.videoUrl,
+    );
+    final fileExists = videoSource != null;
 
     if (!mounted || _selectedGame != game || !_videoPreviewsEnabled) {
       if (mounted) {
@@ -605,12 +619,18 @@ extension _SecondaryDisplay on _SystemGamesListState {
         _videoController = null;
       }
 
-      final mainController = VideoPlayerController.file(
-        file,
+      final mainController = PreviewVideoSource.controllerFor(
+        videoSource,
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
       );
 
-      await mainController.initialize();
+      try {
+        await PreviewVideoSource.initialize(mainController, videoSource);
+      } catch (_) {
+        // A stream that can't start (offline, slow network) leaves the image.
+        mainController.dispose();
+        rethrow;
+      }
 
       // The setting can be turned off while the decoder initializes.
       if (!mounted || _selectedGame != game || !_videoPreviewsEnabled) {
@@ -656,9 +676,21 @@ extension _SecondaryDisplay on _SystemGamesListState {
         rebuild(() {
           _showVideo = false;
           _isVideoLoading = false;
+          if (_selectedGame == game) _videoPreviewFileExists = false;
         });
       }
     }
+  }
+
+  /// The preview's source for [game]: its video file, or its NeoAssets link
+  /// when streaming; null when it has neither.
+  Future<String?> _previewVideoSource(GameModel game) async {
+    final localPath = _getVideoPath(game);
+    return PreviewVideoSource.resolve(
+      localPath: localPath,
+      localExists: await _fileProvider.fileExists(localPath),
+      videoUrl: game.videoUrl,
+    );
   }
 
   /// Resolves the absolute filesystem path for the targeted game video.

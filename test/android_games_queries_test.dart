@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/data/datasources/sqlite_service.dart';
+import 'package:neostation/repositories/game_library_repository.dart';
 import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
 
@@ -175,5 +176,37 @@ void main() {
       (await GameRepository.getGamesBySystem('android')).map((g) => g.romPath),
       containsAll(['com.android.chrome', 'com.tencent.ig']),
     );
+  });
+
+  group('scraping', () {
+    test('Android Games scrapes only the marked apps, by package', () async {
+      final roms = await GameLibraryRepository.getAndroidGamesForScraping(
+        'all',
+        mediaWanted: true,
+      );
+
+      expect(roms.map((r) => r['rom_path']).toSet(), {
+        'com.tencent.ig',
+        'com.tencent.tmgp.cf',
+      });
+      expect(roms.map((r) => r['title_name']).toSet(), {
+        'PUBG Mobile',
+        'CrossFire',
+      });
+    });
+
+    test('new content only skips a fully scraped game', () async {
+      await db.execute(
+        'INSERT INTO user_screenscraper_metadata (app_system_id, filename, '
+        "is_fully_scraped) VALUES ('android', 'com.tencent.ig', 1)",
+      );
+
+      final roms = await GameLibraryRepository.getAndroidGamesForScraping(
+        'new_only',
+        mediaWanted: true,
+      );
+
+      expect(roms.map((r) => r['rom_path']), ['com.tencent.tmgp.cf']);
+    });
   });
 }

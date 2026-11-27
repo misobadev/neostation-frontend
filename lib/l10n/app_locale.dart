@@ -213,6 +213,11 @@ mixin AppLocale {
   static const String recursiveScanDisabled = 'recursive_scan_disabled';
   static const String subfolderView = 'subfolder_view';
   static const String subfolderViewSubtitle = 'subfolder_view_subtitle';
+  static const String openOnSecondaryScreen = 'open_on_secondary_screen';
+  static const String openOnSecondaryScreenSubtitle =
+      'open_on_secondary_screen_subtitle';
+  static const String launchScreen = 'launch_screen';
+  static const String mainScreen = 'main_screen';
   static const String subfolderViewAll = 'subfolder_view_all';
   static const String subfolderViewAllSubtitle = 'subfolder_view_all_subtitle';
   static const String subfolderViewAllOverridesNotice =
@@ -269,8 +274,6 @@ mixin AppLocale {
   static const String secondarySectionNowPlaying =
       'secondary_section_now_playing';
   static const String secondarySectionDock = 'secondary_section_dock';
-  static const String screenshotAccess = 'screenshot_access';
-  static const String screenshotAccessSubtitle = 'screenshot_access_subtitle';
   static const String ignoreHiddenFiles = 'ignore_hidden_files';
   static const String ignoreHiddenFilesSubtitle =
       'ignore_hidden_files_subtitle';
@@ -313,6 +316,9 @@ mixin AppLocale {
   static const String disableSecondaryScreen = 'disable_secondary_screen';
   static const String disableSecondaryScreenSub =
       'disable_secondary_screen_sub';
+  static const String swapScreens = 'swap_screens';
+  static const String swapScreensSub = 'swap_screens_sub';
+  static const String controllerHintTapGame = 'controller_hint_tap_game';
   static const String bartopShutdown = 'bartop_shutdown';
   static const String bartopShutdownSubtitle = 'bartop_shutdown_subtitle';
   static const String showSyncTab = 'show_sync_tab';
@@ -908,6 +914,68 @@ mixin AppLocale {
   static const String screenScraperTitle = 'screenscraper_title';
   static const String metadata = 'metadata';
   static const String screenScraperLogin = 'screen_scraper_login';
+  // Metadata providers (NeoAssets / ScreenScraper)
+  static const String paste = 'paste';
+  static const String recommended = 'recommended';
+  static const String chooseMetadataProvider = 'choose_metadata_provider';
+  static const String chooseMetadataProviderSub =
+      'choose_metadata_provider_sub';
+  static const String neoAssetsTagline = 'neoassets_tagline';
+  static const String neoAssetsConnect = 'neoassets_connect';
+  static const String screenScraperTagline = 'screenscraper_tagline';
+  static const String metadataProviderOneSession =
+      'metadata_provider_one_session';
+  static const String compareMatching = 'compare_matching';
+  static const String compareMatchingNeoAssets = 'compare_matching_neoassets';
+  static const String compareMatchingScreenScraper =
+      'compare_matching_screenscraper';
+  static const String compareLanguages = 'compare_languages';
+  static const String compareLanguagesNeoAssets = 'compare_languages_neoassets';
+  static const String compareLanguagesScreenScraper =
+      'compare_languages_screenscraper';
+  static const String compareQuota = 'compare_quota';
+  static const String compareQuotaNeoAssets = 'compare_quota_neoassets';
+  static const String compareQuotaScreenScraper = 'compare_quota_screenscraper';
+  static const String compareDownloads = 'compare_downloads';
+  static const String compareDownloadsNeoAssets = 'compare_downloads_neoassets';
+  static const String compareDownloadsScreenScraper =
+      'compare_downloads_screenscraper';
+  static const String compareSignIn = 'compare_sign_in';
+  static const String compareSignInNeoAssets = 'compare_sign_in_neoassets';
+  static const String compareSignInScreenScraper =
+      'compare_sign_in_screenscraper';
+  static const String neoAssetsLogin = 'neoassets_login';
+  static const String neoAssetsApiKey = 'neoassets_api_key';
+  static const String neoAssetsKeyStep1 = 'neoassets_key_step1';
+  static const String neoAssetsKeyStep2 = 'neoassets_key_step2';
+  static const String neoAssetsKeyStep3 = 'neoassets_key_step3';
+  static const String neoAssetsKeyRejected = 'neoassets_key_rejected';
+  static const String neoAssetsEmailNotVerified =
+      'neoassets_email_not_verified';
+  static const String neoAssetsUnreachable = 'neoassets_unreachable';
+  static const String neoAssetsNotConfigured = 'neoassets_not_configured';
+  static const String identifyNeedsScreenScraper =
+      'identify_needs_screenscraper';
+  static const String neoAssetsSystemsSub = 'neoassets_systems_sub';
+  static const String neoAssetsStreamVideo = 'neoassets_stream_video';
+  static const String neoAssetsStreamVideoSub = 'neoassets_stream_video_sub';
+  static const String neoAssetsScrapeSub = 'neoassets_scrape_sub';
+  static const String neoAssetsThreads = 'neoassets_threads';
+  static const String neoAssetsGuest = 'neoassets_guest';
+  static const String neoAssetsContinueAsGuest = 'neoassets_continue_as_guest';
+  static const String neoAssetsGuestNote = 'neoassets_guest_note';
+  static const String neoAssetsGuestHint = 'neoassets_guest_hint';
+  static const String neoAssetsDailyGames = 'neoassets_daily_games';
+  static const String neoAssetsUsedToday = 'neoassets_used_today';
+  static const String neoAssetsResetsIn = 'neoassets_resets_in';
+  static const String neoAssetsUnlimited = 'neoassets_unlimited';
+  static const String neoAssetsRatePerMinute = 'neoassets_rate_per_minute';
+  static const String neoAssetsQuotaExceeded = 'neoassets_quota_exceeded';
+  static const String neoAssetsNoCredentials = 'neoassets_no_credentials';
+  static const String neoAssetsSystemNotMapped = 'neoassets_system_not_mapped';
+  static const String neoAssetsGameNotFound = 'neoassets_game_not_found';
+  static const String switchProvider = 'switch_provider';
+  static const String switchProviderDesc = 'switch_provider_desc';
   static const String scanningSystemsRoms = 'scanning_systems_roms';
   static const String ofSystems = 'of_systems';
   static const String systemsDetected = 'systems_detected';
@@ -916,13 +984,6 @@ mixin AppLocale {
   static const String letsGetSetup = 'lets_get_setup';
   static const String storagePermission = 'storage_permission';
   static const String storagePermissionDesc = 'storage_permission_desc';
-  static const String screenReturnAccess = 'screen_return_access';
-  static const String screenReturnAccessDesc = 'screen_return_access_desc';
-  static const String screenReturnAccessHint = 'screen_return_access_hint';
-  static const String screenReturnDialogTitle = 'screen_return_dialog_title';
-  static const String screenReturnDialogBody = 'screen_return_dialog_body';
-  static const String screenReturnDialogSteps = 'screen_return_dialog_steps';
-  static const String openSettings = 'open_settings';
   static const String selectRomFolder = 'select_rom_folder';
   static const String romFolderSelected = 'rom_folder_selected';
   static const String chooseRomFolderDesc = 'choose_rom_folder_desc';

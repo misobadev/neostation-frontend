@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/services/preview_video_source.dart';
 import 'package:neostation/sync/providers/neo_sync_adapter.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/theme_provider.dart';
@@ -76,6 +77,8 @@ import 'package:neostation/widgets/neo_glass.dart';
 
 import '../../themes/corner_radii.dart';
 import '../../utils/user_data_move_guard.dart';
+
+import 'package:neostation/services/metadata_provider_service.dart';
 
 part 'my_games_list/gamepad_nav.dart';
 part 'my_games_list/context_menu.dart';
@@ -1547,8 +1550,8 @@ class _SystemGamesListState extends State<SystemGamesList> {
     );
   }
 
-  /// The library search the West face button opens, or null in the music
-  /// library, where that button keeps its old X / Y actions.
+  /// The library search the X button opens, or null in the music library,
+  /// where X keeps its shuffle toggle.
   VoidCallback? get _searchAction =>
       widget.system.folderName == 'music' ? null : _openSearchFromButton;
 
@@ -2219,7 +2222,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
     final scrapeSystemId = game.systemId ?? widget.system.id;
     if (scrapeSystemId == null) return;
 
-    if (!await ScreenScraperService.hasSavedCredentials()) {
+    if (!await MetadataProviderService.hasActiveSession()) {
       if (!mounted) return;
       AppNotification.showNotification(
         context,
@@ -2297,7 +2300,7 @@ class _SystemGamesListState extends State<SystemGamesList> {
               gameName: game.name,
               onProgress: onProgress,
             )
-          : await ScreenScraperService.scrapeSingleGame(
+          : await MetadataProviderService.scrapeSingleGame(
               appSystemId: scrapeSystemId,
               romName: game.romname,
               systemFolder: targetSystemFolder,
@@ -2374,6 +2377,16 @@ class _SystemGamesListState extends State<SystemGamesList> {
     final systemId = game.systemId ?? widget.system.id;
     final romPath = game.romPath;
     if (systemId == null || romPath == null || romPath.isEmpty) return;
+
+    if (!await MetadataProviderService.supportsIdentify()) {
+      if (!mounted) return;
+      AppNotification.showNotification(
+        context,
+        AppLocale.identifyNeedsScreenScraper.getString(context),
+        type: NotificationType.info,
+      );
+      return;
+    }
 
     final currentGameId = await ScreenScraperService.getIdentifiedGameId(
       romPath,

@@ -25,7 +25,6 @@ class NowPlayingPanel extends StatelessWidget {
     required this.sessionRunning,
     required this.sessionTime,
     required this.use12HourClock,
-    required this.onRequestScreenshot,
   });
 
   final SecondaryDisplayStateData value;
@@ -40,9 +39,6 @@ class NowPlayingPanel extends StatelessWidget {
   /// Whether the corner clock uses the 12-hour (AM/PM) form, mirroring the
   /// user's header-clock preference.
   final bool use12HourClock;
-
-  /// Asks the main engine to capture a screenshot of the main screen.
-  final VoidCallback onRequestScreenshot;
 
   @override
   Widget build(BuildContext context) {
@@ -137,10 +133,6 @@ class NowPlayingPanel extends StatelessWidget {
                           (key) => key.getString(context),
                         ),
                       ),
-                      if (value.screenshotAccessEnabled) ...[
-                        SizedBox(height: 28.r),
-                        _buildScreenshotButton(context, scheme),
-                      ],
                     ],
                   ),
                 ),
@@ -161,42 +153,6 @@ class NowPlayingPanel extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  /// Tappable pill that asks the main engine to capture a system screenshot of
-  /// the main screen.
-  Widget _buildScreenshotButton(BuildContext context, ColorScheme scheme) {
-    return GestureDetector(
-      onTap: onRequestScreenshot,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 20.r, vertical: 12.r),
-        decoration: BoxDecoration(
-          color: scheme.onSurface.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: scheme.onSurface.withValues(alpha: 0.18)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Symbols.photo_camera_rounded,
-              color: scheme.onSurface,
-              size: 22.r,
-            ),
-            SizedBox(width: 12.r),
-            Text(
-              AppLocale.screenshot.getString(context).toUpperCase(),
-              style: TextStyle(
-                color: scheme.onSurface,
-                fontSize: 14.r,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 2.r,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -13,7 +13,6 @@ import 'package:neostation/utils/effective_system.dart';
 import 'package:neostation/utils/rom_tree.dart';
 import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
-import 'package:neostation/providers/system_background_provider.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
@@ -82,9 +81,9 @@ class GamesCarousel extends StatefulWidget {
   /// calling [onFavorite] directly — it is a mouse/touch affordance.
   final VoidCallback? onYButton;
 
-  /// The West face button (X on an Xbox pad, Y on a Nintendo-style one), and
-  /// the footer hint for it. Opens
-  /// the library search; null leaves both unbound.
+  /// The West face button (X on an Xbox pad, Y on a Nintendo-style one) and
+  /// the X button, and the footer hint for West. Opens the library search;
+  /// null leaves them unbound.
   final VoidCallback? onSearch;
 
   /// Attached to the centred card so the host can anchor the context menu to
@@ -178,13 +177,11 @@ class _GamesCarouselState extends State<GamesCarousel> {
   String? _chromeSig;
   Widget? _chromeFooter;
   final Map<String, double> _letterWidthCache = {};
-  final Map<String, bool> _fileExistsCache = {};
 
   /// Folder preview covers, keyed by "relPath|imageType" so box/fanart styles
   /// cache independently. Resolving walks the game list and stats the disk, so
   /// each folder card is computed once.
   final Map<String, List<File>> _folderCoverCache = {};
-  int _lastBgIndex = -1;
 
   static final Map<String, Size?> _imgSizeCache = {};
 
@@ -344,7 +341,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
     _initializeGamepad();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToCurrentLetter();
-      _updateBackground();
       _loadAchievementsForSelectedGame();
     });
   }
@@ -362,7 +358,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _carouselKey.currentState?.jumpToPage(_currentIndex);
         _scrollToCurrentLetter();
-        _updateBackground();
       });
       _scheduleAchievementsLoad();
     }
@@ -373,13 +368,9 @@ class _GamesCarouselState extends State<GamesCarousel> {
       }
     }
     if (widget.artworkVersion != oldWidget.artworkVersion) {
-      _fileExistsCache.clear();
-      _lastBgIndex = -1;
       // A scrape can add a preview video to the settled game, which changes
-      // whether the footer's mute pill applies — the cache above no longer
-      // answers it, so let the chrome rebuild against the new media too.
+      // whether the footer's mute pill applies.
       _chromeSig = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _updateBackground());
     }
   }
 
@@ -449,8 +440,12 @@ class _GamesCarouselState extends State<GamesCarousel> {
       },
       onBack: widget.onBack,
       onFavorite: null, // Options moved to Start.
-      onXButton: null, // Options moved to Start.
-      onWestButton: widget.onSearch, // West face button - Search.
+      // Search on West (since #673) and on the button reported as X, so the
+      // X the header shows opens it on every controller: on the AYN controller
+      // West is the button printed Y. (The list view searches on X only and
+      // favourites on Y.)
+      onXButton: widget.onSearch,
+      onWestButton: widget.onSearch,
       onLetterJump: _letterJump, // Held D-pad left/right → alphabet skipping.
       letterJumpAxis: LetterJumpAxis.horizontal,
       onLeftStickClick: widget.onRandom,
@@ -576,7 +571,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
     if (_settledIndex != _currentIndex) {
       setState(() => _settledIndex = _currentIndex);
     }
-    _updateBackground();
   }
 
   /// (Re)builds the footer pill + action-button legend only when the settled
@@ -739,54 +733,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
     );
   }
 
-  void _updateBackground() {
-    if (_performanceMode || !mounted || widget.games.isEmpty) return;
-    if (_currentIndex < 0 || _currentIndex >= widget.games.length) return;
-    if (_lastBgIndex == _currentIndex) return;
-    _lastBgIndex = _currentIndex;
-
-    final game = widget.games[_currentIndex];
-    final folder = _folderForGame(game);
-
-    String imagePath = game.getImagePath(
-      folder,
-      'fanarts',
-      widget.fileProvider,
-    );
-    bool exists = _fileExistsCache.putIfAbsent(
-      imagePath,
-      () => File(imagePath).existsSync(),
-    );
-
-    if (!exists) {
-      imagePath = game.getScreenshotPath(folder, widget.fileProvider);
-      exists = _fileExistsCache.putIfAbsent(
-        imagePath,
-        () => File(imagePath).existsSync(),
-      );
-    }
-
-    final ImageProvider imageProvider;
-    if (exists) {
-      imageProvider = FileImage(File(imagePath));
-    } else {
-      // Fall back to the logo of the system the *game* belongs to, not the
-      // list's. In an aggregate view the list is not a hardware system, and a
-      // collection has no bundled logo at all ('collection:<uuid>.webp' does
-      // not exist), so keying the asset off the list would resolve to nothing.
-      // Mirrors the secondary display's fallback.
-      final path =
-          'assets/images/logos/${SystemFolderNames.artFolderName(_folderForGame(game))}.webp';
-      imageProvider = AssetImage(path);
-      imagePath = path;
-    }
-
-    context.read<SystemBackgroundProvider>().updateImage(
-      imageProvider,
-      imagePath: imagePath,
-    );
-  }
-
   void _scrollToCurrentLetter() {
     if (!_letterBarController.hasClients || widget.games.isEmpty) return;
 
@@ -863,18 +809,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
 
   Widget _buildFanartCard(GameModel game, bool isSelected) {
     final theme = Theme.of(context);
-    final folder = _folderForGame(game);
-    final screenshotPath = game.getScreenshotPath(folder, widget.fileProvider);
-    final hasScreenshot = File(screenshotPath).existsSync();
-    final fanartPath = game.getImagePath(
-      folder,
-      'fanarts',
-      widget.fileProvider,
-    );
-    final hasFanart = File(fanartPath).existsSync();
-    final bgPath = hasFanart
+    final fanartPath = _resolveImagePath(game, 'fanarts');
+    final bgPath = fanartPath.isNotEmpty
         ? fanartPath
-        : (hasScreenshot ? screenshotPath : '');
+        : _resolveImagePath(game, 'screenshots');
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -1382,6 +1320,18 @@ class _GamesCarouselState extends State<GamesCarousel> {
   Widget _buildFanartBackground() {
     final index = _settledIndex.clamp(0, widget.games.length - 1);
     final game = widget.games[index];
+    const opacity = 0.20;
+    final fanart = GameFanartBackground(
+      game: _isFolderIndex(index) ? null : game,
+      systemFolder: _folderForGame(game),
+      fileProvider: widget.fileProvider,
+      artworkVersion: widget.artworkVersion,
+      performanceMode: _performanceMode,
+      waitForImage: true,
+      imageOpacity: _performanceMode
+          ? const AlwaysStoppedAnimation(opacity)
+          : null,
+    );
 
     return IgnorePointer(
       child: RepaintBoundary(
@@ -1389,17 +1339,12 @@ class _GamesCarouselState extends State<GamesCarousel> {
           fit: StackFit.expand,
           children: [
             ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
-            // Blend with the theme background so light themes stay light.
-            Opacity(
-              opacity: 0.20,
-              child: GameFanartBackground(
-                game: _isFolderIndex(index) ? null : game,
-                systemFolder: _folderForGame(game),
-                fileProvider: widget.fileProvider,
-                artworkVersion: widget.artworkVersion,
-                performanceMode: _performanceMode,
-              ),
-            ),
+            // Preserve the original group opacity when outgoing and incoming
+            // fanart overlap. The single-image path can apply it at paint time.
+            if (_performanceMode)
+              fanart
+            else
+              Opacity(opacity: opacity, child: fanart),
           ],
         ),
       ),
@@ -1466,14 +1411,13 @@ class _GamesCarouselState extends State<GamesCarousel> {
                   // boundary. Stepping past either end continues from the
                   // other.
                   wrap: true,
-                  performanceMode: _performanceMode,
                   depth: _performanceMode
                       ? const CarouselDepth(
-                          minScale: 1,
+                          scaleFalloff: 0.7,
+                          minScale: 0.55,
                           opacityBase: 1,
                           opacityFalloff: 0,
                           minOpacity: 1,
-                          edgePull: 0,
                         )
                       : const CarouselDepth(),
                   itemBuilder: (context, index) {

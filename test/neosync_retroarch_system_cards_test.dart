@@ -586,13 +586,17 @@ void main() {
         }
       });
 
-      test('is left out of RomM\'s saves', () async {
-        card(cardName, newer, DateTime(2026, 9, 1));
+      test(
+        'is among the saves RomM is given, marked as a system folder card',
+        () async {
+          final only = card(cardName, newer, DateTime(2026, 9, 1));
 
-        final located = await provider.locateGameSaveFiles(game());
+          final located = await provider.locateGameSaveFiles(game());
 
-        expect(located, isEmpty);
-      });
+          expect(located.map((f) => f.filePath), [only.path]);
+          expect(located.single.inRetroArchSystemFolder, isTrue);
+        },
+      );
 
       test('is listed for Save history, with its folder', () async {
         final only = card(cardName, newer, DateTime(2026, 9, 1));
@@ -708,7 +712,10 @@ void main() {
         expect(service.uploadPaths, ['saves/$cloudPath']);
       });
 
-      test('RomM never places a card in the card folder', () async {
+      // RomM places system cards through its own hook
+      // (retroArchSystemCardTarget), not this one.
+      test('the target lookup RomM is given never names the card '
+          'folder', () async {
         final targets = await provider.resolveLocalTargetPaths(
           game(),
           'saves/$cloudPath',

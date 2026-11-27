@@ -4,8 +4,11 @@ import '../constants/system_folder_names.dart';
 import '../data/datasources/sqlite_service.dart';
 import '../models/rom_fingerprint.dart';
 import '../services/credential_store.dart';
+import '../utils/regional_name.dart';
 
 import 'package:neostation/services/logger_service.dart';
+
+import 'game_library_repository.dart';
 
 class MetadataTransferResult {
   final String appSystemId;
@@ -21,14 +24,12 @@ class MetadataTransferResult {
 class ScraperRepository {
   static final _log = LoggerService.instance;
 
-  /// `user_screenscraper_metadata.is_fully_scraped` once a game's media have
-  /// downloaded: "New content only" leaves the game alone.
-  static const int scrapedFully = 1;
+  /// See [GameLibraryRepository.scrapedFully].
+  static const int scrapedFully = GameLibraryRepository.scrapedFully;
 
-  /// `is_fully_scraped` for a game scraped while every media type was switched
-  /// off: "New content only" leaves it alone until a media type is switched
-  /// on, then fetches its media.
-  static const int scrapedMetadataOnly = 2;
+  /// See [GameLibraryRepository.scrapedMetadataOnly].
+  static const int scrapedMetadataOnly =
+      GameLibraryRepository.scrapedMetadataOnly;
 
   /// Returns detected systems that have a ScreenScraper ID, ordered by name.
   static Future<List<Map<String, dynamic>>> getScraperSystems() async {
@@ -63,6 +64,49 @@ class ScraperRepository {
           },
         )
         .toList();
+  }
+
+  /// See [GameLibraryRepository.getDetectedSystems].
+  static Future<List<Map<String, dynamic>>> getDetectedSystems() =>
+      GameLibraryRepository.getDetectedSystems();
+
+  /// See [GameLibraryRepository.getAppLanguage].
+  static Future<String> getAppLanguage() =>
+      GameLibraryRepository.getAppLanguage();
+
+  /// Retitles every game that has regional names (NeoAssets matches) with
+  /// the title of [language]'s release. Returns how many titles changed.
+  static Future<int> applyRegionalNames(String language) async {
+    final db = await SqliteService.getDatabase();
+    final rows = await db.rawQuery(
+      "SELECT app_system_id, filename, real_name, regional_names "
+      "FROM user_screenscraper_metadata "
+      "WHERE regional_names IS NOT NULL AND regional_names != ''",
+    );
+    var changed = 0;
+    await db.execute('BEGIN');
+    try {
+      for (final row in rows) {
+        final name = RegionalName.pick(
+          RegionalName.decode(row['regional_names']),
+          language,
+        );
+        if (name == null || name == row['real_name']) continue;
+        await db.update(
+          'user_screenscraper_metadata',
+          {'real_name': name},
+          where: 'app_system_id = ? AND filename = ?',
+          whereArgs: [row['app_system_id'], row['filename']],
+        );
+        changed++;
+      }
+      await db.execute('COMMIT');
+    } catch (e) {
+      await db.execute('ROLLBACK');
+      _log.e('Error applying regional names: $e');
+      rethrow;
+    }
+    return changed;
   }
 
   /// Returns current enabled/disabled config per system ID.
@@ -679,6 +723,8 @@ class ScraperRepository {
         ..remove('is_fully_scraped')
         ..remove('updated_at')
         ..['updated_at'] = DateTime.now().toIso8601String();
+      // A title set by hand stops following the app language.
+      if (values.containsKey('real_name')) values['regional_names'] = null;
 
       if (existing.isEmpty) {
         values['app_system_id'] = appSystemId;
@@ -704,99 +750,22 @@ class ScraperRepository {
     }
   }
 
-  /// Saves the metadata to the local user_screenscraper_metadata table.
+  /// See [GameLibraryRepository.saveGameMetadata].
   static Future<bool> saveGameMetadata(
     Map<String, dynamic> metadata,
     String appSystemId, {
     bool isFullyScraped = false,
-  }) async {
-    // "Android Games" rows, and so their metadata, live under `android`.
-    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
-    try {
-      final db = await SqliteService.getDatabase();
-      metadata['app_system_id'] = appSystemId;
-      metadata['is_fully_scraped'] = isFullyScraped ? 1 : 0;
-      metadata['updated_at'] = DateTime.now().toIso8601String();
+  }) => GameLibraryRepository.saveGameMetadata(
+    metadata,
+    appSystemId,
+    isFullyScraped: isFullyScraped,
+  );
 
-      await db.insert(
-        'user_screenscraper_metadata',
-        metadata,
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-
-      return true;
-    } catch (e) {
-      _log.e('Error saving game metadata: $e');
-      return false;
-    }
-  }
-
-  /// Saves a ScreenScraper match for a "New content only" session without
-  /// replacing what the game already has.
-  ///
-  /// With no row this is [saveGameMetadata]. An existing row keeps every
-  /// non-empty column and only its empty ones are filled from [metadata]: the
-  /// session reaches games not yet fully scraped, and their metadata may be
-  /// the user's own (the metadata editor) or an ES-DE import, which a match
-  /// with less information would otherwise blank. Columns the match doesn't
-  /// carry (ES-DE's media subfolder, the RetroAchievements id) stay as they
-  /// are.
-  ///
-  /// The file name is matched exactly, as the session's selection and
-  /// [markGameFullyScraped] match it: a row differing only in case isn't this
-  /// game's, so the match gets a row of its own, as [saveGameMetadata] gives it.
-  ///
-  /// As with [saveGameMetadata], the game isn't finished until its media are
-  /// (`is_fully_scraped` = 0), and it no longer counts as an ES-DE import, so
-  /// an ES-DE reset keeps it.
+  /// See [GameLibraryRepository.fillGameMetadataGaps].
   static Future<bool> fillGameMetadataGaps(
     Map<String, dynamic> metadata,
     String appSystemId,
-  ) async {
-    // "Android Games" rows, and so their metadata, live under `android`.
-    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
-    try {
-      final db = await SqliteService.getDatabase();
-      final filename = metadata['filename'];
-      final existing = await db.query(
-        'user_screenscraper_metadata',
-        where: 'app_system_id = ? AND filename = ?',
-        whereArgs: [appSystemId, filename],
-        limit: 1,
-      );
-      if (existing.isEmpty) {
-        return await saveGameMetadata(metadata, appSystemId);
-      }
-
-      final row = existing.first;
-      final toWrite = <String, dynamic>{};
-      metadata.forEach((col, val) {
-        if (const {
-          'app_system_id',
-          'filename',
-          'is_fully_scraped',
-          'updated_at',
-        }.contains(col)) {
-          return;
-        }
-        if (!_isBlank(val) && _isBlank(row[col])) toWrite[col] = val;
-      });
-      toWrite['is_fully_scraped'] = 0;
-      toWrite['esde_imported'] = 0;
-      toWrite['updated_at'] = DateTime.now().toIso8601String();
-
-      await db.update(
-        'user_screenscraper_metadata',
-        toWrite,
-        where: 'app_system_id = ? AND filename = ?',
-        whereArgs: [appSystemId, filename],
-      );
-      return true;
-    } catch (e) {
-      _log.e('Error filling game metadata gaps: $e');
-      return false;
-    }
-  }
+  ) => GameLibraryRepository.fillGameMetadataGaps(metadata, appSystemId);
 
   /// Null, or a string with nothing but white space.
   static bool _isBlank(Object? value) =>
@@ -945,44 +914,20 @@ class ScraperRepository {
     }
   }
 
-  /// Marks a game's metadata on [appSystemId] as fully scraped, or, with
-  /// [metadataOnly], as scraped while every media type was switched off.
+  /// See [GameLibraryRepository.markGameFullyScraped].
   static Future<void> markGameFullyScraped(
     String appSystemId,
     String filename, {
     bool metadataOnly = false,
-  }) async {
-    // "Android Games" rows, and so their metadata, live under `android`.
-    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
-    final db = await SqliteService.getDatabase();
-    await db.update(
-      'user_screenscraper_metadata',
-      {
-        'is_fully_scraped': metadataOnly ? scrapedMetadataOnly : scrapedFully,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'app_system_id = ? AND filename = ?',
-      whereArgs: [appSystemId, filename],
-    );
-  }
+  }) => GameLibraryRepository.markGameFullyScraped(
+    appSystemId,
+    filename,
+    metadataOnly: metadataOnly,
+  );
 
-  /// Clears a game's finished mark on [appSystemId] while its media are
-  /// fetched again, so "New content only" retries the game if they fail.
-  /// Saving metadata clears the mark too; this is for when none is saved.
-  static Future<void> markGameUnfinished(
-    String appSystemId,
-    String filename,
-  ) async {
-    // "Android Games" rows, and so their metadata, live under `android`.
-    appSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
-    final db = await SqliteService.getDatabase();
-    await db.update(
-      'user_screenscraper_metadata',
-      {'is_fully_scraped': 0, 'updated_at': DateTime.now().toIso8601String()},
-      where: 'app_system_id = ? AND filename = ? AND is_fully_scraped != 0',
-      whereArgs: [appSystemId, filename],
-    );
-  }
+  /// See [GameLibraryRepository.markGameUnfinished].
+  static Future<void> markGameUnfinished(String appSystemId, String filename) =>
+      GameLibraryRepository.markGameUnfinished(appSystemId, filename);
 
   /// Transfers scraped metadata from the first matching source ROM to a newly
   /// created multi-disc playlist. Source paths keep the update scoped to the
@@ -1099,47 +1044,28 @@ class ScraperRepository {
 
   // ── Bulk scraping ─────────────────────────────────────────────────────────
 
-  /// The `WHERE` condition that limits a scrape to what [scrapeMode] still
-  /// has to do: for "New content only", games never scraped or not finished,
-  /// plus games scraped for metadata only once a media type is switched on.
-  static Future<String> _scrapeModeFilter(String scrapeMode) async {
-    if (scrapeMode != 'new_only') return '';
-    final mediaWanted = (await getEnabledMediaTypes()).isNotEmpty;
-    final metadataOnly = mediaWanted
-        ? ' OR usm.is_fully_scraped = $scrapedMetadataOnly'
-        : '';
-    return 'AND (usm.filename IS NULL OR usm.is_fully_scraped = 0$metadataOnly)';
-  }
-
-  /// Returns the count of ROMs eligible for scraping for a given system.
+  /// ROMs of [appSystemId] that [scrapeMode] still has to do, judged against
+  /// ScreenScraper's media types. See
+  /// [GameLibraryRepository.getRomCountForScraping].
   static Future<int> getRomCountForScraping(
     String appSystemId,
     String scrapeMode,
-  ) async {
-    final filter = await _scrapeModeFilter(scrapeMode);
-    final db = await SqliteService.getDatabase();
-    final result = await db.rawQuery(
-      '''SELECT COUNT(*) as count FROM user_roms ur LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-       WHERE ur.app_system_id = ? $filter''',
-      [appSystemId],
-    );
-    return int.tryParse(result.first['count']?.toString() ?? '0') ?? 0;
-  }
+  ) async => GameLibraryRepository.getRomCountForScraping(
+    appSystemId,
+    scrapeMode,
+    mediaWanted: (await getEnabledMediaTypes()).isNotEmpty,
+  );
 
-  /// Returns the list of ROMs eligible for scraping for a given system.
+  /// See [getRomCountForScraping] and
+  /// [GameLibraryRepository.getRomsForScraping].
   static Future<List<Map<String, dynamic>>> getRomsForScraping(
     String appSystemId,
     String scrapeMode,
-  ) async {
-    final filter = await _scrapeModeFilter(scrapeMode);
-    final db = await SqliteService.getDatabase();
-    return await db.rawQuery(
-      '''SELECT ur.filename, ur.rom_path, ur.title_name, usm.is_fully_scraped
-       FROM user_roms ur LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-       WHERE ur.app_system_id = ? $filter''',
-      [appSystemId],
-    );
-  }
+  ) async => GameLibraryRepository.getRomsForScraping(
+    appSystemId,
+    scrapeMode,
+    mediaWanted: (await getEnabledMediaTypes()).isNotEmpty,
+  );
 
   // ── Steam scraper operations ──────────────────────────────────────────────
 
@@ -1253,97 +1179,25 @@ class ScraperRepository {
     }
   }
 
-  /// Returns the cached dump identity for [romPath], or null if it has never
-  /// been fingerprinted.
-  ///
-  /// A row with only a crc32 is normal and complete: the zip fast path yields
-  /// crc and size without ever decompressing, and crc alone resolves a
-  /// ScreenScraper lookup.
-  static Future<RomFingerprint?> getRomFingerprint(String romPath) async {
-    try {
-      final db = await SqliteService.getDatabase();
-      final rows = await db.rawQuery(
-        'SELECT ss_hash, rom_crc32, rom_size FROM user_roms '
-        'WHERE rom_path = ? LIMIT 1',
-        [romPath],
-      );
-      if (rows.isEmpty) return null;
+  /// See [GameLibraryRepository.getRomFingerprint].
+  static Future<RomFingerprint?> getRomFingerprint(String romPath) =>
+      GameLibraryRepository.getRomFingerprint(romPath);
 
-      final row = rows.first;
-      final crc = row['rom_crc32']?.toString();
-      final md5 = row['ss_hash']?.toString();
-      if ((crc == null || crc.isEmpty) && (md5 == null || md5.isEmpty)) {
-        return null;
-      }
+  /// See [GameLibraryRepository.getRomFingerprintSkipReason].
+  static Future<String?> getRomFingerprintSkipReason(String romPath) =>
+      GameLibraryRepository.getRomFingerprintSkipReason(romPath);
 
-      return RomFingerprint(
-        crc32: crc ?? '',
-        md5: (md5 != null && md5.isNotEmpty) ? md5 : null,
-        sizeBytes: (row['rom_size'] as int?) ?? 0,
-      );
-    } catch (e) {
-      _log.e('Error reading ROM fingerprint for $romPath: $e');
-      return null;
-    }
-  }
-
-  /// Returns why [romPath] was parked by an earlier fingerprint attempt, or
-  /// null if it is not parked. The read half of [markRomFingerprintSkipped]:
-  /// without it the marker is write-only and every scrape re-walks the ROM.
-  static Future<String?> getRomFingerprintSkipReason(String romPath) async {
-    try {
-      final db = await SqliteService.getDatabase();
-      final rows = await db.rawQuery(
-        'SELECT rom_fingerprint_skipped FROM user_roms '
-        'WHERE rom_path = ? LIMIT 1',
-        [romPath],
-      );
-      if (rows.isEmpty) return null;
-      final reason = rows.first['rom_fingerprint_skipped']?.toString();
-      return (reason == null || reason.isEmpty) ? null : reason;
-    } catch (e) {
-      _log.e('Error reading fingerprint skip reason for $romPath: $e');
-      return null;
-    }
-  }
-
-  /// Caches [fingerprint] against [romPath] and clears any skip marker, since
-  /// a value now exists.
+  /// See [GameLibraryRepository.updateRomFingerprint].
   static Future<void> updateRomFingerprint(
     String romPath,
     RomFingerprint fingerprint,
-  ) async {
-    try {
-      final db = await SqliteService.getDatabase();
-      await db.rawUpdate(
-        'UPDATE user_roms SET rom_crc32 = ?, rom_size = ?, '
-        // Never blank an md5 the slow path already produced: the cheap zip
-        // path returns crc only, and re-running it must not lose the md5.
-        'ss_hash = COALESCE(?, ss_hash), rom_fingerprint_skipped = NULL '
-        'WHERE rom_path = ?',
-        [fingerprint.crc32, fingerprint.sizeBytes, fingerprint.md5, romPath],
-      );
-    } catch (e) {
-      _log.e('Error saving ROM fingerprint for $romPath: $e');
-    }
-  }
+  ) => GameLibraryRepository.updateRomFingerprint(romPath, fingerprint);
 
-  /// Records that [romPath] could not be fingerprinted and why, so a bulk pass
-  /// stops revisiting it. Mirrors `markRomRaHashSkipped`.
+  /// See [GameLibraryRepository.markRomFingerprintSkipped].
   static Future<void> markRomFingerprintSkipped(
     String romPath,
     String reason,
-  ) async {
-    try {
-      final db = await SqliteService.getDatabase();
-      await db.rawUpdate(
-        'UPDATE user_roms SET rom_fingerprint_skipped = ? WHERE rom_path = ?',
-        [reason, romPath],
-      );
-    } catch (e) {
-      _log.e('Error marking ROM fingerprint skipped for $romPath: $e');
-    }
-  }
+  ) => GameLibraryRepository.markRomFingerprintSkipped(romPath, reason);
 
   // ── Games identified by hand ──────────────────────────────────────────────
 

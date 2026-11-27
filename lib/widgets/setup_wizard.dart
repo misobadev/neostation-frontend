@@ -12,7 +12,6 @@ import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/user_data_location_service.dart';
-import 'package:neostation/services/screenshot_service.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/widgets/system_art_pack_tile.dart';
@@ -81,7 +80,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   final ScrollController _artPackScrollController = ScrollController();
   final List<GlobalKey> _artPackKeys = [];
 
-  /// Whether All-Files (storage) access is currently granted.
+  /// Whether All-Files (storage) access is currently granted. Re-checked
+  /// whenever the app resumes (the user grants it in system Settings, so we
+  /// can't observe the change synchronously).
   bool _storageGranted = false;
 
   /// Set whenever the app leaves the foreground, so the permissions step can
@@ -89,22 +90,6 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   /// launched at all". Only the latter may re-arm gamepad input on a timer —
   /// see [_handlePermissionAction].
   bool _leftForegroundDuringGrant = false;
-
-  /// Whether the screenshot/return accessibility service is currently granted.
-  /// Both are re-checked whenever the app resumes (the user grants them in
-  /// system Settings, so we can't observe the change synchronously).
-  bool _accessibilityGranted = false;
-
-  /// Whether a secondary display is present. The accessibility (Screen Return)
-  /// grant only makes sense on dual-screen devices, so we hide it otherwise.
-  bool _hasSecondaryDisplay = false;
-
-  /// Whether the accessibility grant should be offered at all.
-  bool get _needsAccessibility => Platform.isAndroid && _hasSecondaryDisplay;
-
-  /// Whether the accessibility requirement is satisfied — either it's granted,
-  /// or it doesn't apply on this device.
-  bool get _accessibilityDone => !_needsAccessibility || _accessibilityGranted;
 
   /// True once setup is being finalised, so the per-frame secondary-display
   /// push stops re-asserting `setupWizardActive` and the dock can come in.
@@ -118,15 +103,13 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
   GamepadNavigation? _gamepadNav;
 
-  // Step indices. Android has two extra steps (Permissions + Accessibility)
-  // that don't exist on desktop; the getters resolve to -1 there so a
+  // Step indices. Android has an extra Permissions step that doesn't exist on
+  // desktop; the getters resolve to -1 there so a
   // comparison against a real (>= 0) step never matches.
   //   Android: 0=Welcome, 1=Language, 2=UserData, 3=Permissions, 4=Folder,
   //            5=Scanning, 6=EsdeImport, 7=ArtPack
   //   Desktop: 0=Welcome, 1=Language, 2=UserData, 3=Folder, 4=Scanning,
   //            5=EsdeImport, 6=ArtPack
-  // The Permissions step covers both All-Files access and the accessibility
-  // (Screen Return) service.
   int get _stepWelcome => 0;
   int get _stepLanguage => 1;
   int get _stepUserData => 2;
@@ -152,35 +135,16 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     _initGamepad();
     if (Platform.isAndroid) {
       _secondaryDisplayState = SecondaryDisplayState.instance;
-      _hasSecondaryDisplay =
-          _secondaryDisplayState!.value?.isSecondaryActive ?? false;
-      _secondaryDisplayState!.addListener(_onSecondaryStateChanged);
       _refreshPermissionStates();
     }
   }
 
-  /// Keeps [_hasSecondaryDisplay] in sync so the accessibility row appears the
-  /// moment a secondary display reports in (it may connect after the wizard
-  /// first builds).
-  void _onSecondaryStateChanged() {
-    final has = _secondaryDisplayState?.value?.isSecondaryActive ?? false;
-    if (has != _hasSecondaryDisplay && mounted) {
-      setState(() => _hasSecondaryDisplay = has);
-    }
-  }
-
-  /// Re-polls both permission states (storage + accessibility). Called on
-  /// resume so the Permissions step reflects grants the user just made in
-  /// system Settings.
+  /// Re-polls the storage permission state. Called on resume so the
+  /// Permissions step reflects a grant the user just made in system Settings.
   Future<void> _refreshPermissionStates() async {
     final storage = await PermissionService.hasAllFilesAccess();
-    final access = await ScreenshotService.isAccessEnabled();
-    if (mounted &&
-        (storage != _storageGranted || access != _accessibilityGranted)) {
-      setState(() {
-        _storageGranted = storage;
-        _accessibilityGranted = access;
-      });
+    if (mounted && storage != _storageGranted) {
+      setState(() => _storageGranted = storage);
     }
   }
 
@@ -303,7 +267,6 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _secondaryDisplayState?.removeListener(_onSecondaryStateChanged);
     _gamepadNav?.dispose();
     _artPackScrollController.dispose();
     // Shared singleton — never dispose the instance.
@@ -383,7 +346,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       }
       return;
     }
-    // Permissions step: neither grant is a hard requirement. ROM access goes
+    // Permissions step: the grant is not a hard requirement. ROM access goes
     // through SAF, and UserDataLocationService already falls back to the
     // app-specific external dir without All-Files access. The skip is
     // deliberately unconditional — gating it on `_storageGranted` walled users
@@ -927,9 +890,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     return problem;
   }
 
-  /// Combined permissions step: All-Files (storage) access plus the optional
-  /// accessibility (Screen Return) service, each with a live granted/pending
-  /// status. The main action button grants the next pending one, then advances.
+  /// Permissions step: All-Files (storage) access with a live granted/pending
+  /// status. The main action button grants it if pending, then advances.
   Widget _buildPermissionStep(ThemeData theme) {
     return SingleChildScrollView(
       child: Column(
@@ -943,18 +905,6 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             description: AppLocale.storagePermissionDesc.getString(context),
             granted: _storageGranted,
           ),
-          // Screen Return access only applies to dual-screen devices.
-          if (_needsAccessibility) ...[
-            SizedBox(height: 12 * _u),
-            _buildPermissionRow(
-              theme,
-              icon: Symbols.settings_accessibility_rounded,
-              title: AppLocale.screenReturnAccess.getString(context),
-              description: AppLocale.screenReturnAccessDesc.getString(context),
-              granted: _accessibilityGranted,
-              hint: AppLocale.screenReturnAccessHint.getString(context),
-            ),
-          ],
         ],
       ),
     );
@@ -968,7 +918,6 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     required String title,
     required String description,
     required bool granted,
-    String? hint,
   }) {
     final iconSize = 28 * _u;
     final titleSize = _font(15);
@@ -1017,18 +966,6 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     height: 1.3,
                   ),
                 ),
-                if (!granted && hint != null) ...[
-                  SizedBox(height: 6 * _u),
-                  Text(
-                    hint,
-                    style: TextStyle(
-                      fontSize: textSize,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.primary,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -1971,8 +1908,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       return AppLocale.next.getString(context);
     }
     if (_currentStep == _stepPermissions) {
-      // Grant the next pending permission; once both are satisfied, advance.
-      if (!_storageGranted || !_accessibilityDone) {
+      // Grant storage access if pending; once granted, advance.
+      if (!_storageGranted) {
         return AppLocale.grantAccess.getString(context);
       }
       return AppLocale.next.getString(context);
@@ -2020,15 +1957,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     }
 
     // Step 1 (user data location): advance, then auto-skip the permissions step
-    // if both permissions are already granted.
+    // if storage access is already granted.
     if (_currentStep == _stepUserData) {
       setState(() => _currentStep = _currentStep + 1);
       if (Platform.isAndroid) {
         _refreshPermissionStates().then((_) {
-          if (mounted &&
-              _currentStep == _stepPermissions &&
-              _storageGranted &&
-              _accessibilityDone) {
+          if (mounted && _currentStep == _stepPermissions && _storageGranted) {
             setState(() => _currentStep = _stepFolder);
           }
         });
@@ -2082,12 +2016,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     }
   }
 
-  /// Drives the combined permissions step: grants the next pending permission
-  /// (storage first, then accessibility), or advances to folder once both are
-  /// granted. Gamepad input is suspended around any trip to system Settings.
+  /// Drives the permissions step: requests storage access if pending, or
+  /// advances to folder once it is granted. Gamepad input is suspended around
+  /// any trip to system Settings.
   Future<void> _handlePermissionAction() async {
-    // Both satisfied → move on.
-    if (_storageGranted && _accessibilityDone) {
+    // Already granted → move on.
+    if (_storageGranted) {
       setState(() => _currentStep = _stepFolder);
       return;
     }
@@ -2110,17 +2044,10 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       if (mounted && !_leftForegroundDuringGrant) _gamepadNav?.activate();
     });
     try {
-      if (!_storageGranted) {
-        final success = await PermissionService.requestAllFilesAccess();
-        if (success && mounted) {
-          context.read<SqliteConfigProvider>().refreshAllFilesAccess();
-          setState(() => _storageGranted = true);
-        }
-      } else {
-        // Accessibility can't be granted in-app — send the user to system
-        // Settings. We re-check on resume (didChangeAppLifecycleState) and
-        // light up the green check when they come back with it enabled.
-        await ScreenshotService.openAccessSettings();
+      final success = await PermissionService.requestAllFilesAccess();
+      if (success && mounted) {
+        context.read<SqliteConfigProvider>().refreshAllFilesAccess();
+        setState(() => _storageGranted = true);
       }
     } catch (e) {
       _log.e('Error requesting permissions: $e');

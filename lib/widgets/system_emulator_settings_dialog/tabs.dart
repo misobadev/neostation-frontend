@@ -532,6 +532,21 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
             enabled: _system.recursiveScan,
           ),
         ],
+        if (_offersLaunchDisplay) ...[
+          SizedBox(height: 4.r),
+          _buildSwitchItem(
+            index: _SystemEmulatorSettingsDialogState._launchDisplayIndex,
+            key:
+                _generalItemKeys[_SystemEmulatorSettingsDialogState
+                    ._launchDisplayIndex],
+            title: AppLocale.openOnSecondaryScreen.getString(context),
+            subtitle: AppLocale.openOnSecondaryScreenSubtitle.getString(
+              context,
+            ),
+            value: _openOnSecondary,
+            onChanged: _toggleOpenOnSecondary,
+          ),
+        ],
       ],
     );
   }
@@ -844,6 +859,29 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
     return _buildCoresList();
   }
 
+  /// Section label above the installed (configured) and not-installed
+  /// (not-configured) emulators. Not selectable: D-pad nav skips headers.
+  Widget _buildEmulatorSectionHeader(EmulatorHeaderItem item, int index) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 4.r,
+        right: 4.r,
+        top: index == 0 ? 2.r : 8.r,
+        bottom: 4.r,
+      ),
+      child: Text(
+        item.title.getString(context).toUpperCase(),
+        style: TextStyle(
+          fontSize: 10.r,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.8,
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCoresList() {
     if (_totalEmulators == 0) {
       return Center(
@@ -883,7 +921,9 @@ extension _Tabs on _SystemEmulatorSettingsDialogState {
             final item = _displayItems[index];
             final isSelected = _selectedIndex == index;
 
-            if (item is EmulatorGroupedCoreItem) {
+            if (item is EmulatorHeaderItem) {
+              return _buildEmulatorSectionHeader(item, index);
+            } else if (item is EmulatorGroupedCoreItem) {
               return _buildGroupedCoreItem(item, index, isSelected);
             } else if (item is EmulatorCoreItem) {
               return _buildCoreItem(

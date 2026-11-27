@@ -28,14 +28,16 @@
       "nso",
       "nsp",
       "nup",
-      "xci"
+      "xci",
+      "nsz",
+      "xcz"
     ]
   },
   "emulators": [
     {
       "name": "Standalone Skyline",
       "unique_id": "switch.skyline.emu",
-      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -47,7 +49,7 @@
       "name": "Standalone Eden",
       "default_standalone": true,
       "unique_id": "switch.dev.eden.eden_emulator",
-      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp, nsz, xcz.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -67,7 +69,7 @@
     {
       "name": "Standalone Eden Duo",
       "unique_id": "switch.dev.igawa6.edenduo",
-      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp, nsz, xcz",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {

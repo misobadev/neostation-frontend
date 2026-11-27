@@ -71,6 +71,11 @@ class _FakeRommService extends RommService {
     return List.of(savesByRom[romId] ?? const []);
   }
 
+  @override
+  Future<List<RommAsset>> listAllSaves() async => [
+    for (final saves in savesByRom.values) ...saves,
+  ];
+
   final Map<int, List<RommAsset>> statesByRom = {};
 
   /// Plants a server-side save state.
@@ -245,6 +250,9 @@ void main() {
     provider = RomMSyncProvider(
       _FakeBrowse(svc),
       NeoSyncProvider(NeoSyncService()),
+      // RetroArch's system folder is never this machine's.
+      systemCardHome: (_) async => null,
+      systemCardTarget: (_, _) async => null,
       autoSweep: false,
       locateSaves: (_) async => local,
       resolveTargets: (game, relativeName) async {
@@ -264,6 +272,19 @@ void main() {
     await tmp.delete(recursive: true);
   });
 
+  /// Records [card] as synced as it is now, before the server's copy at
+  /// [remoteAt] arrived.
+  Future<void> syncedBefore(File card) async {
+    final stat = card.statSync();
+    await SyncRepository.saveSyncState(
+      RomMSyncProvider.kProviderId,
+      card.path,
+      stat.modified.millisecondsSinceEpoch,
+      remoteAt.subtract(const Duration(hours: 1)).millisecondsSinceEpoch,
+      stat.size,
+    );
+  }
+
   group('a save already in the emulator\'s folder', () {
     test('is replaced in place by a newer RomM copy', () async {
       final card = File(p.join(folder.path, 'Mcd001.ps2'))
@@ -275,6 +296,8 @@ void main() {
       local = [localSave(card.path, 'Mcd001.ps2')];
       svc.seedSave(1, 'Mcd001.ps2', 'NEW'.codeUnits, updatedAt: remoteAt);
 
+      // Synced here before (a card never synced is NEO-270's first sync).
+      await syncedBefore(card);
       await provider.syncGameSavesBeforeLaunch(game);
 
       expect(card.readAsStringSync(), 'NEW');
@@ -313,6 +336,7 @@ void main() {
         local = [localSave(card.path, 'slot1/Mcd001.ps2')];
         svc.seedSave(1, 'Mcd001.ps2', 'NEW'.codeUnits, updatedAt: remoteAt);
 
+        await syncedBefore(card);
         await provider.syncGameSavesBeforeLaunch(game);
 
         expect(card.readAsStringSync(), 'NEW');
@@ -501,6 +525,100 @@ void main() {
         expect(retroArchAsked, isEmpty);
       },
     );
+  });
+
+  // NEO-279: a save this device lacks goes in the folder of the core the
+  // game launches with.
+  group('launchCoreFolderFor', () {
+    CoreEmulatorModel emu(String id, String name) => CoreEmulatorModel(
+      uniqueId: id,
+      osId: 1,
+      systemId: 'snes',
+      name: name,
+      isStandalone: false,
+      isDefault: false,
+      isretroAchievementsCompatible: false,
+    );
+    final emulators = [
+      emu('snes.ra.snes9x', 'RetroArch Snes9x'),
+      emu('snes.ra64.bsnes', 'RetroArch64 bsnes (64-bit)'),
+      emu('snes.xyz.standalone', 'Standalone SNES'),
+    ];
+
+    test('the core of the emulator the game launches with', () {
+      expect(
+        RomMSyncProvider.launchCoreFolderFor(
+          uniqueId: 'snes.ra64.bsnes',
+          emulators: emulators,
+        ),
+        'bsnes',
+      );
+      expect(
+        RomMSyncProvider.launchCoreFolderFor(
+          uniqueId: 'snes.ra.snes9x',
+          emulators: emulators,
+        ),
+        'Snes9x',
+      );
+    });
+
+    test('none for a standalone emulator or one not listed', () {
+      for (final id in ['snes.xyz.standalone', 'snes.ra.missing']) {
+        expect(
+          RomMSyncProvider.launchCoreFolderFor(
+            uniqueId: id,
+            emulators: emulators,
+          ),
+          isNull,
+          reason: id,
+        );
+      }
+    });
+  });
+
+  group('otherSystemsCoreFoldersFor', () {
+    test('other systems\' RetroArch cores, not this one\'s, nor a core both '
+        'have', () {
+      expect(
+        RomMSyncProvider.otherSystemsCoreFoldersFor(
+          systemId: 'gg',
+          emulators: [
+            (systemId: 'gg', name: 'RetroArch Genesis Plus GX'),
+            (systemId: 'sms', name: 'RetroArch Genesis Plus GX'),
+            (systemId: 'gb', name: 'RetroArch64 Gambatte (64-bit)'),
+            (systemId: 'gb', name: 'Standalone GB'),
+            (systemId: 'nes', name: 'RetroArch FCEUmm'),
+          ],
+        ),
+        {'gambatte', 'fceumm'},
+      );
+    });
+
+    // The systems' files spell some cores differently; one spelling is one
+    // core.
+    test('a core this system has under another spelling is not another '
+        'system\'s', () {
+      final emulators = [
+        (systemId: 'pico', name: 'RetroArch Picodrive'),
+        (systemId: 'md', name: 'RetroArch PicoDrive'),
+        (systemId: 'gb', name: 'RetroArch Bsnes'),
+        (systemId: 'snes', name: 'RetroArch bsnes'),
+      ];
+      expect(
+        RomMSyncProvider.otherSystemsCoreFoldersFor(
+          systemId: 'pico',
+          emulators: emulators,
+        ),
+        {'bsnes'},
+      );
+      expect(
+        RomMSyncProvider.otherSystemsCoreFoldersFor(
+          systemId: 'snes',
+          emulators: emulators,
+        ),
+        {'picodrive'},
+      );
+    });
   });
 
   group('standaloneSaveFolderFor', () {

@@ -61,8 +61,8 @@ extension _GamepadNav on _SystemGamesListState {
   /// Handles the X button for the music library.
   ///
   /// Games moved their view picker into Options on Start and open search with
-  /// the West face button ([_searchAction]); music keeps its shuffle toggle
-  /// because it is not a view setting.
+  /// the X button ([_searchAction]); music keeps its shuffle toggle because it
+  /// is not a view setting.
   void _handleXButton() {
     if (widget.system.folderName != 'music') return;
     final service = MusicPlayerService();
@@ -88,9 +88,9 @@ extension _GamepadNav on _SystemGamesListState {
       onSelectItem: _handleAButton, // Button A - panel gate, else launch.
       onBack: _handleBButton, // Button B - leave the panel, else go back.
       onFavorite: _toggleFavorite, // Button Y - favourite the selected game.
-      // Games use North Y for favourites and the other face button for Search,
-      // so the binding stays the same on both Xbox-style and AYN-style pads
-      // where the West face button is reported as Y. Music keeps its shuffle
+      // Games use Y for favourites and X for Search, as the buttons are
+      // reported, so the binding stays the same on both Xbox-style and
+      // AYN-style pads, where the West face button is reported as Y. Music keeps its shuffle
       // on the X face button.
       onXButton: widget.system.folderName == 'music'
           ? _handleXButton

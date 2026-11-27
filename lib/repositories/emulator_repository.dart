@@ -47,6 +47,10 @@ class EmulatorRepository {
   static Future<Map<String, EmulatorModel>> getUserDetectedEmulators() =>
       SqliteService.getUserDetectedEmulators();
 
+  /// Every emulator's display name on the current OS, with its system id.
+  static Future<List<({String systemId, String name})>>
+  getEmulatorNamesCurrentOs() => SqliteService.getEmulatorNamesCurrentOs();
+
   /// Returns all emulators (cores + standalone) for a system on the current OS.
   static Future<List<CoreEmulatorModel>> getEmulatorsForSystemCurrentOs(
     String systemId,

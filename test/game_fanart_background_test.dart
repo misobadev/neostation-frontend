@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -75,6 +77,8 @@ void main() {
     int artworkVersion = 0,
     bool performanceMode = true,
     bool zoom = false,
+    Animation<double>? imageOpacity,
+    bool waitForImage = false,
   }) {
     return tester.pumpWidget(
       MaterialApp(
@@ -85,6 +89,8 @@ void main() {
           artworkVersion: artworkVersion,
           performanceMode: performanceMode,
           zoom: zoom,
+          imageOpacity: imageOpacity,
+          waitForImage: waitForImage,
         ),
       ),
     );
@@ -234,5 +240,221 @@ void main() {
     await pumpBackground(tester);
     expect(find.byType(AnimatedSwitcher), findsNothing);
     expect(find.byType(ScaleTransition), findsNothing);
+  });
+
+  Future<Completer<ImageInfo>> prepare(String path, {int width = 1920}) async {
+    writeFanart(path);
+    final frame = Completer<ImageInfo>();
+    final provider = ResizeImage(FileImage(File(path)), width: width);
+    final key = await provider.obtainKey(ImageConfiguration.empty);
+    PaintingBinding.instance.imageCache.putIfAbsent(
+      key,
+      () => OneFrameImageStreamCompleter(frame.future),
+    );
+    return frame;
+  }
+
+  void deliver(Completer<ImageInfo> frame) {
+    final recorder = ui.PictureRecorder();
+    ui.Canvas(recorder).drawColor(Colors.blue, BlendMode.src);
+    final picture = recorder.endRecording();
+    frame.complete(ImageInfo(image: picture.toImageSync(1, 1)));
+    picture.dispose();
+  }
+
+  double opacityOf(WidgetTester tester, String path) => tester
+      .widget<FadeTransition>(
+        find.ancestor(
+          of: find.byKey(ValueKey<(String?, int)>((path, 0))),
+          matching: find.descendant(
+            of: find.byType(AnimatedSwitcher),
+            matching: find.byType(FadeTransition),
+          ),
+        ),
+      )
+      .opacity
+      .value;
+
+  testWidgets('performance mode can paint a translucent image directly', (
+    tester,
+  ) async {
+    final frame = await prepare(game.imagePath, width: 1344);
+    await pumpBackground(
+      tester,
+      waitForImage: true,
+      imageOpacity: const AlwaysStoppedAnimation(0.2),
+    );
+
+    expect(find.byType(Image), findsNothing);
+    deliver(frame);
+    await tester.idle();
+    await tester.pump();
+    expect(tester.widget<Image>(find.byType(Image)).opacity?.value, 0.2);
+    expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
+    expect(find.byType(AnimatedSwitcher), findsNothing);
+  });
+
+  testWidgets('carousel waits for a decoded image before the original fade', (
+    tester,
+  ) async {
+    Future<void> show(GameModel selection) => pumpBackground(
+      tester,
+      selectedGame: selection,
+      performanceMode: false,
+      waitForImage: true,
+    );
+
+    AnimatedSwitcher switcher() =>
+        tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher));
+
+    final initial = await prepare(game.imagePath);
+    await show(game);
+    expect(find.byType(Image), findsNothing);
+    deliver(initial);
+    await tester.idle();
+    await tester.pump();
+    expect(
+      switcher().child!.key,
+      ValueKey<(String?, int)>((game.imagePath, 0)),
+    );
+    expect(opacityOf(tester, game.imagePath), 1);
+
+    final next = _TrackedGame('sonic.bin', '${media.path}/sonic.png');
+    final frame = await prepare(next.imagePath);
+    await show(next);
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(
+      switcher().child!.key,
+      ValueKey<(String?, int)>((game.imagePath, 0)),
+    );
+    expect(find.byType(Image), findsOneWidget);
+
+    deliver(frame);
+    await tester.idle();
+    // The decoded stream must survive eviction between readiness and paint.
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    await tester.pump();
+    await tester.pump();
+    expect(switcher().duration, const Duration(milliseconds: 400));
+    expect(
+      switcher().child!.key,
+      ValueKey<(String?, int)>((next.imagePath, 0)),
+    );
+    expect(find.byType(Image), findsNWidgets(2));
+    expect(opacityOf(tester, game.imagePath), 1);
+    expect(opacityOf(tester, next.imagePath), 0);
+    expect(
+      tester
+          .widgetList<RawImage>(find.byType(RawImage))
+          .every((raw) => raw.image != null),
+      isTrue,
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(opacityOf(tester, game.imagePath), closeTo(0.5, 0.01));
+    expect(opacityOf(tester, next.imagePath), closeTo(0.5, 0.01));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsOneWidget);
+
+    final slow = _TrackedGame('slow.bin', '${media.path}/slow.png');
+    final slowFrame = await prepare(slow.imagePath);
+    await show(slow);
+    await tester.pump(const Duration(milliseconds: 399));
+    expect(
+      switcher().child!.key,
+      ValueKey<(String?, int)>((next.imagePath, 0)),
+    );
+    provider.mediaSourceChanged();
+
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(switcher().child!.key, const ValueKey<(String?, int)>((null, 0)));
+    expect(opacityOf(tester, next.imagePath), 1);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(opacityOf(tester, next.imagePath), closeTo(0.5, 0.01));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsNothing);
+
+    deliver(slowFrame);
+    await tester.pumpAndSettle();
+    expect(
+      switcher().child!.key,
+      ValueKey<(String?, int)>((slow.imagePath, 0)),
+    );
+  });
+
+  for (final performanceMode in [false, true]) {
+    final mode = performanceMode ? 'performance mode' : 'normal mode';
+    testWidgets('slow selections share the stale backdrop deadline in $mode', (
+      tester,
+    ) async {
+      Future<void> show(GameModel selection) => pumpBackground(
+        tester,
+        selectedGame: selection,
+        performanceMode: performanceMode,
+        waitForImage: true,
+      );
+
+      final width = performanceMode ? 1344 : 1920;
+      deliver(await prepare(game.imagePath, width: width));
+      await tester.idle();
+      await show(game);
+      final oldBackdrop = find.byKey(
+        ValueKey<(String?, int)>((game.imagePath, 0)),
+      );
+      expect(oldBackdrop, findsOneWidget);
+
+      final slow = _TrackedGame('slow.bin', '${media.path}/slow.png');
+      final slowFrame = await prepare(slow.imagePath, width: width);
+      await show(slow);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final next = _TrackedGame('sonic.bin', '${media.path}/sonic.png');
+      final nextFrame = await prepare(next.imagePath, width: width);
+      await show(next);
+      await tester.pump(const Duration(milliseconds: 99));
+      expect(oldBackdrop, findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(
+        find.byKey(const ValueKey<(String?, int)>((null, 0))),
+        findsOneWidget,
+      );
+      if (performanceMode) expect(oldBackdrop, findsNothing);
+      await tester.pumpAndSettle();
+      expect(oldBackdrop, findsNothing);
+
+      deliver(slowFrame);
+      await tester.pumpAndSettle();
+      expect(find.byType(Image), findsNothing);
+
+      deliver(nextFrame);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(ValueKey<(String?, int)>((next.imagePath, 0))),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('replacement fades in while the initial decode is pending', (
+    tester,
+  ) async {
+    final initial = await prepare(game.imagePath);
+    await pumpBackground(tester, performanceMode: false, waitForImage: true);
+
+    final next = _TrackedGame('sonic.bin', '${media.path}/sonic.png');
+    deliver(await prepare(next.imagePath));
+    await tester.idle();
+    await pumpBackground(
+      tester,
+      selectedGame: next,
+      performanceMode: false,
+      waitForImage: true,
+    );
+    expect(opacityOf(tester, next.imagePath), 0);
+    deliver(initial);
+    await tester.pumpAndSettle();
+    expect(find.byKey(ValueKey((game.imagePath, 0))), findsNothing);
+    expect(opacityOf(tester, next.imagePath), 1);
   });
 }

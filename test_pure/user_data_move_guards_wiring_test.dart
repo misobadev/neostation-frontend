@@ -78,7 +78,7 @@ void main() {
     refusesBefore(
       'lib/screens/game_screen/my_games_list.dart',
       'Future<void> _scrapeSelectedGame(',
-      'hasSavedCredentials()',
+      'hasActiveSession()',
     );
     refusesBefore(
       'lib/screens/game_screen/game_settings_dialog/'

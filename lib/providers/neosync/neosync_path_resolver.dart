@@ -607,7 +607,7 @@ extension NeoSyncPathResolver on NeoSyncProvider {
   /// Puede retornar múltiples rutas si el sistema lo requiere (ej. múltiples emuladores Switch)
   ///
   /// With [includeSystemCards] false, a card never goes into RetroArch's
-  /// system folder: RomM doesn't sync the cards there.
+  /// system folder: RomM places those itself ([retroArchSystemCardTarget]).
   Future<List<String>> resolveCloudFileToLocalPath(
     GameModel game,
     NeoSyncFile cloudFile, {
@@ -871,6 +871,27 @@ extension NeoSyncPathResolver on NeoSyncProvider {
       return null;
     }
     return CloudPathBuilder.sharedCardPath(system!.folderName, fileName);
+  }
+
+  // ── Public reuse hooks for other sync providers (e.g. RomM) ───────────────
+
+  /// [systemFolder]'s card folder in RetroArch's system folder when the
+  /// RetroArch core that keeps its shared cards there is set up on this
+  /// device; null otherwise (see [_retroArchSystemCardHome]).
+  Future<String?> retroArchSystemCardHome(String? systemFolder) =>
+      _retroArchSystemCardHome(systemFolder);
+
+  /// Where the card named [fileName] goes in [systemFolder]'s card folder of
+  /// RetroArch's system folder: null when it doesn't go there (not named like
+  /// the core's cards, or the core isn't set up here), empty when something is
+  /// already in its place (see [_retroArchSystemCardTarget]).
+  Future<List<String>?> retroArchSystemCardTarget(
+    String systemFolder,
+    String fileName,
+  ) async {
+    final cloudPath = CloudPathBuilder.sharedCardPath(systemFolder, fileName);
+    if (cloudPath == null) return null;
+    return _retroArchSystemCardTarget(systemFolder, cloudPath);
   }
 
   /// Where a cloud card at [cloudPath] goes in RetroArch's system folder: the

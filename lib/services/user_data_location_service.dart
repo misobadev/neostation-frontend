@@ -12,7 +12,7 @@ import 'package:neostation/services/credential_store.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/neo_assets_service.dart';
 import 'package:neostation/services/retro_achievements_cache.dart';
-import 'package:neostation/services/screenscraper/media_resolver.dart';
+import 'package:neostation/services/scraping/scraped_media_paths.dart';
 import 'package:neostation/utils/resolved_path.dart';
 
 /// What stopped a user-data move, for the message the user sees.
@@ -146,7 +146,7 @@ class UserDataLocationService {
   static void _resetPathDerivedCaches() {
     NeoAssetsService.resetCacheDir();
     RetroAchievementsCache.resetCacheDir();
-    ScreenscraperMediaResolver.resetMediaDirectory();
+    ScrapedMediaPaths.resetMediaDirectory();
     CredentialStore.resetFileStore();
   }
 

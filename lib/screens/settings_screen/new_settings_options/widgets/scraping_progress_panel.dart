@@ -64,11 +64,13 @@ class ScrapingProgressPanel extends StatelessWidget {
                 context,
                 icon: Symbols.cloud_sync_rounded,
                 title: AppLocale.request.getString(context),
-                value:
-                    '${provider.totalRequests} / ${provider.maxDailyRequests}',
+                // No daily cap (0): show the count alone, with no bar.
+                value: provider.maxDailyRequests > 0
+                    ? '${provider.totalRequests} / ${provider.maxDailyRequests}'
+                    : '${provider.totalRequests}',
                 percentage: provider.maxDailyRequests > 0
                     ? provider.totalRequests / provider.maxDailyRequests
-                    : 0.0,
+                    : null,
               ),
             ),
           ],
@@ -131,8 +133,11 @@ class ScrapingProgressPanel extends StatelessWidget {
     required IconData icon,
     required String title,
     required String value,
-    required double percentage,
+    required double? percentage,
   }) {
+    // A null percentage (no cap to measure against) keeps the bar's space so
+    // the cards in the row stay the same height, but draws nothing.
+    final shown = percentage ?? 0.0;
     final theme = Theme.of(context);
     return Container(
       padding: EdgeInsets.all(8.r),
@@ -171,24 +176,37 @@ class ScrapingProgressPanel extends StatelessWidget {
             ),
           ),
           SizedBox(height: 2.r),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2.r),
-            child: LinearProgressIndicator(
-              value: percentage.clamp(0.0, 1.0),
-              backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.3),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                percentage > 0.8 ? Colors.orange : theme.colorScheme.primary,
-              ),
-              minHeight: 4.h,
-            ),
-          ),
-          SizedBox(height: 2.h),
-          Text(
-            '${(percentage * 100).round()}%',
-            style: TextStyle(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              fontSize: 7.sp,
-              fontWeight: FontWeight.w500,
+          Visibility(
+            visible: percentage != null,
+            maintainSize: true,
+            maintainAnimation: true,
+            maintainState: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2.r),
+                  child: LinearProgressIndicator(
+                    value: shown.clamp(0.0, 1.0),
+                    backgroundColor: theme.colorScheme.surface.withValues(
+                      alpha: 0.3,
+                    ),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      shown > 0.8 ? Colors.orange : theme.colorScheme.primary,
+                    ),
+                    minHeight: 4.h,
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  '${(shown * 100).round()}%',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontSize: 7.sp,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

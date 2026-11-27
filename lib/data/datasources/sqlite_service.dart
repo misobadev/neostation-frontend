@@ -471,7 +471,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 193;
+  static const int _databaseVersion = 198;
 
   /// SQL predicate (over `user_roms` aliased `ur`) for an installed app the
   /// user marked as a game. See migration v191.
@@ -1983,6 +1983,7 @@ class SqliteService {
         ignore_hidden_files INTEGER DEFAULT 1,
         setup_completed INTEGER DEFAULT 0,
         hide_bottom_screen INTEGER DEFAULT 0,
+        swap_screens INTEGER DEFAULT 0,
         sfx_enabled INTEGER DEFAULT 1,
         sfx_volume REAL DEFAULT 0.75,
         custom_sfx TEXT,
@@ -2179,6 +2180,13 @@ class SqliteService {
         description_de TEXT,
         description_it TEXT,
         description_pt TEXT,
+        description_ja TEXT,
+        description_ko TEXT,
+        description_ru TEXT,
+        description_zh TEXT,
+        description_id TEXT,
+        regional_names TEXT,
+        video_url TEXT,
         rating REAL,
         release_date TEXT,
         developer TEXT,
@@ -2224,6 +2232,7 @@ class SqliteService {
       SqliteMigrations.createAppRommPlaytimeStateTableSql,
       SqliteMigrations.createUserCollectionsTableSql,
       SqliteMigrations.createUserCollectionItemsTableSql,
+      SqliteMigrations.createUserLaunchDisplayTableSql,
       // One row per Discovery slot per ISO week. No foreign key to user_roms on
       // purpose: a rescan that removes a ROM should leave a dangling pick that
       // the service re-resolves into a new choice, not cascade the row away.
@@ -2993,6 +3002,7 @@ class SqliteService {
     int? videoPreviewDelay,
     int? setupCompleted,
     int? hideBottomScreen,
+    int? swapScreens,
     int? sfxEnabled,
     double? sfxVolume,
     String? customSfx,
@@ -3080,6 +3090,9 @@ class SqliteService {
     }
     if (hideBottomScreen != null) {
       updates['hide_bottom_screen'] = hideBottomScreen;
+    }
+    if (swapScreens != null) {
+      updates['swap_screens'] = swapScreens;
     }
     if (sfxEnabled != null) {
       updates['sfx_enabled'] = sfxEnabled;
@@ -3338,6 +3351,45 @@ class SqliteService {
   }
 
   /// Sets whether ROM subfolders are shown as navigable folders in the game list.
+  /// The launch screen stored for [scope] (`'system'` or `'game'`) and
+  /// [target] (system folder name or ROM path), or null when none is set.
+  /// See [SqliteMigrations.createUserLaunchDisplayTableSql].
+  static Future<String?> getLaunchDisplay(String scope, String target) async {
+    final db = await instance.database;
+    final rows = await db.query(
+      'user_launch_display',
+      columns: ['display'],
+      where: 'scope = ? AND target = ?',
+      whereArgs: [scope, target],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['display']?.toString();
+  }
+
+  /// Stores [display] for [scope]/[target], or clears it (inherit) when null.
+  static Future<void> setLaunchDisplay(
+    String scope,
+    String target,
+    String? display,
+  ) async {
+    final db = await instance.database;
+    if (display == null) {
+      await db.delete(
+        'user_launch_display',
+        where: 'scope = ? AND target = ?',
+        whereArgs: [scope, target],
+      );
+      return;
+    }
+    await db.insert('user_launch_display', {
+      'scope': scope,
+      'target': target,
+      'display': display,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
   static Future<void> setSystemSubfolderView(
     String systemId,
     bool enabled,
@@ -4813,6 +4865,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id, usm.video_url,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -5000,6 +5053,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id, usm.video_url,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -5058,6 +5112,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id, usm.video_url,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -5298,6 +5353,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id, usm.video_url,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -5523,6 +5579,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id, usm.video_url,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -5886,6 +5943,28 @@ class SqliteService {
       where: 'app_system_id = ? AND filename = ?',
       whereArgs: [system.id, filename],
     );
+  }
+
+  /// Every emulator's display name on the current OS, with its system id.
+  static Future<List<({String systemId, String name})>>
+  getEmulatorNamesCurrentOs() async {
+    final db = await instance.database;
+    final results = await db.rawQuery(
+      '''
+      SELECT e.system_id, e.name
+      FROM app_emulators e
+      JOIN app_os os ON e.os_id = os.id
+      WHERE os.name = ?
+      ''',
+      [getCurrentOs()],
+    );
+    return [
+      for (final row in results)
+        (
+          systemId: row['system_id']?.toString() ?? '',
+          name: row['name']?.toString() ?? '',
+        ),
+    ];
   }
 
   /// Retrieves all emulators available for a system on the current operating system.

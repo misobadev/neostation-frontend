@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -95,7 +97,8 @@ class ScrapingProvider extends ChangeNotifier {
   /// Total number of API requests performed in the current session.
   int _totalRequests = 0;
 
-  /// Daily request limit provided by the scraping service (ScreenScraper.fr).
+  /// Daily request limit provided by the scraping service; 0 when the
+  /// service has no daily cap.
   int _maxDailyRequests = 0;
 
   /// Total number of games identified for scraping.
@@ -153,8 +156,10 @@ class ScrapingProvider extends ChangeNotifier {
 
   /// Initializes and starts a new scraping session.
   ///
-  /// Resets all counters and enables the device's wakelock.
-  void startScraping({int? maxThreads}) {
+  /// Resets all counters and enables the device's wakelock. [threadSlots] is
+  /// how many worker tiles the panel draws, idle ones included; by default
+  /// 15, or one per worker when there are more.
+  void startScraping({int? maxThreads, int? threadSlots}) {
     if (_isScraping) return;
     _isScraping = true;
     _totalRequests = 0;
@@ -170,8 +175,9 @@ class ScrapingProvider extends ChangeNotifier {
     _lastProcessedCount = 0;
     _lastUpdateTime = DateTime.now();
 
+    // Never fewer slots than workers, or a worker would have no tile.
     _threads = List.generate(
-      15,
+      math.max(threadSlots ?? 15, _maxThreads),
       (index) => ThreadProgress(
         threadId: index + 1,
         isActive: false,

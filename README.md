@@ -65,6 +65,23 @@ Folders that already contain `.m3u` playlists are skipped during the scan.
 
 ## Installation
 
+### Arch Linux (community-maintained AUR packages)
+
+Two independently maintained packages are available from the Arch User Repository:
+
+- [`neostation-bin`](https://aur.archlinux.org/packages/neostation-bin) repackages the official Linux AppImage release.
+- [`neostation`](https://aur.archlinux.org/packages/neostation) builds NeoStation from release source, while retaining some prebuilt third-party components. Integrations that rely on compile-time settings may differ from official builds; see [Build-time Configuration](#build-time-configuration).
+
+Choose one package; they cannot be installed together. Review its PKGBUILD before installing. The AUR packaging is maintained independently of the NeoStation team and is not part of Arch Linux's official repositories.
+
+For example, with the `yay` AUR helper:
+
+```bash
+yay -S neostation-bin
+```
+
+To build the application from source instead, use `neostation` as the package name. Supported architectures and package-specific build requirements are listed on each AUR page.
+
 ### Linux (Flatpak)
 
 ```bash
@@ -115,6 +132,9 @@ Create a `.env` file from `.env.example` for local development.
 |----------|-------------|
 | `SCREENSCRAPER_DEV_ID` | ScreenScraper developer ID |
 | `SCREENSCRAPER_DEV_PASSWORD` | ScreenScraper developer password |
+| `NEOASSETS_CLIENT_ID` | NeoAssets developer application client id (`nsapp_…`) |
+| `NEOASSETS_CLIENT_SECRET` | NeoAssets developer application secret |
+| `NEOASSETS_SCRAPE_URL` | Optional NeoAssets API base URL (default `https://api.neoassets.dev`); use `http://10.0.2.2:8090` to reach a local instance from the Android emulator |
 
 > RetroAchievements no longer uses a build-time key. Each user signs in with their own RetroAchievements username and web API key (from [retroachievements.org/controlpanel.php](https://retroachievements.org/controlpanel.php)) inside the app.
 
@@ -148,6 +168,8 @@ The release workflow (`.github/workflows/build-and-deploy.yml`) reads build secr
 |-------------------|-------------|
 | `SCREENSCRAPER_DEV_ID` | ScreenScraper developer ID |
 | `SCREENSCRAPER_DEV_PASSWORD` | ScreenScraper developer password |
+| `NEOASSETS_CLIENT_ID` | NeoAssets developer application client id (`nsapp_…`) |
+| `NEOASSETS_CLIENT_SECRET` | NeoAssets developer application secret |
 
 **Required for Android release signing:**
 

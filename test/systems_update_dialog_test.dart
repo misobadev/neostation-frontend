@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -84,6 +85,49 @@ void main() {
       captureProgress?.call(onProgress);
       return Completer<SystemsUpdateResult?>().future;
     };
+  }
+
+  for (final size in <Size>[
+    const Size(640, 480),
+    const Size(1280, 720),
+    const Size(1920, 1080),
+    const Size(3840, 2160),
+  ]) {
+    testWidgets('version typography scales with dialog at $size', (
+      tester,
+    ) async {
+      await pumpDialog(tester, runner: pendingRunner(), size: size);
+      final scale = math.min(size.width / 640, size.height / 480);
+      for (final version in [
+        updateInfo.currentVersion,
+        updateInfo.remoteVersion,
+      ]) {
+        final text = tester.widget<Text>(find.textContaining(version));
+        expect(text.style?.fontSize, closeTo(9 * scale, 0.01));
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('progress typography scales with dialog at $size', (
+      tester,
+    ) async {
+      void Function(double, String)? progress;
+      await pumpDialog(
+        tester,
+        runner: pendingRunner(captureProgress: (p) => progress = p),
+        size: size,
+      );
+      await tester.tap(find.text('UPDATE NOW'));
+      await tester.pump();
+      progress!(0.5, 'Scaling test progress');
+      await tester.pump();
+      final scale = math.min(size.width / 640, size.height / 480);
+      for (final label in ['Scaling test progress', '50%']) {
+        final text = tester.widget<Text>(find.text(label));
+        expect(text.style?.fontSize, closeTo(9 * scale, 0.01));
+      }
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('idle dialog fits a 640x480 panel', (tester) async {

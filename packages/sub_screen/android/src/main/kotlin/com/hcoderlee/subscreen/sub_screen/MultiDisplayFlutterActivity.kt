@@ -56,7 +56,11 @@ open class MultiDisplayFlutterActivity : FlutterActivity() {
         onCloseSubScreen()
     }
 
-    private fun launchSubScreen(display: Display) {
+    /**
+     * Shows the sub screen on [display]. Open so a host can put the sub screen
+     * in a window of its own choosing instead of the default [Presentation].
+     */
+    protected open fun launchSubScreen(display: Display) {
         try {
             subScreenPresentation = (createSubScreenPresentation(display) ?: FlutterPresentation(
                 context,

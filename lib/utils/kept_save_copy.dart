@@ -23,9 +23,14 @@ enum KeptCopySource {
   /// (`<save>.replaced-<time>.neosync.bak`).
   replaced,
 
-  /// RomM: this device's save, kept before a download replaced it when it
-  /// had changed here too (`<save>.romm-local-<time>`; see
-  /// [keepRommLocalCopy]).
+  /// RomM: this device's save, kept before a download replaced it: when it
+  /// had changed here too, as its own dated copy (`<save>.romm-local-<time>`;
+  /// see [keepRommLocalCopy]); a memory card every game shares, unchanged
+  /// here, in one slot that the next such download replaces
+  /// (`<save>.romm-local-last`; see [stageRommLocalSlot]); such a card synced
+  /// from this device for the first time, as a dated copy that is never
+  /// removed automatically (`<save>.romm-first-<time>`; see
+  /// [keepRommFirstSyncCopy]).
   rommBeforeDownload,
 }
 
@@ -41,11 +46,16 @@ class KeptCopyName {
     required this.savePath,
     required this.source,
     this.stampedAt,
+    this.firstSync = false,
   });
 
   final String savePath;
   final KeptCopySource source;
   final DateTime? stampedAt;
+
+  /// A memory card's first sync from this device kept it: this device's card
+  /// from before the server's replaced it, which nothing removes but the user.
+  final bool firstSync;
 }
 
 /// The ending NeoSync's copies share. Both providers' save listings skip
@@ -58,6 +68,16 @@ const String serverConflictMarker = '.romm-conflict-';
 /// What RomM puts between a save's name and the time in its copies of this
 /// device's save, kept before a download ([keepRommLocalCopy]).
 const String rommLocalCopyMarker = '.romm-local-';
+
+/// What RomM puts between a memory card's name and the time in the copy of
+/// this device's card its first sync keeps ([keepRommFirstSyncCopy]).
+const String rommFirstSyncCopyMarker = '.romm-first-';
+
+/// Whether every game of the system in [systemFolderName] shares its memory
+/// cards (PS2 `.ps2` cards, Dreamcast `vmu_save*.bin`; see
+/// [isSharedMemoryCard]).
+bool sharesMemoryCards(String? systemFolderName) =>
+    systemFolderName == 'ps2' || systemFolderName == 'dc';
 
 final _otherDevice = RegExp(
   r'^(.+)\.cloud(?:-(\d{8}-\d{6})|-[A-Za-z0-9]{1,12})?\.neosync\.bak$',
@@ -77,6 +97,11 @@ final _serverConflict = RegExp(
   caseSensitive: false,
 );
 final _rommStamp = RegExp(r'^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$');
+final _rommFirstSync = RegExp(
+  r'^(.+)\.romm-first-(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})(?:-\d+)?$',
+  caseSensitive: false,
+);
+final _rommLocalSlot = RegExp(r'^(.+)\.romm-local-last$', caseSensitive: false);
 final _rommLocal = RegExp(
   r'^(.+)\.romm-local-(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})(?:-\d+)?$',
   caseSensitive: false,
@@ -88,7 +113,8 @@ bool isKeptCopyPath(String path) {
   final name = p.basename(path).toLowerCase();
   return name.endsWith(keptCopyEnding) ||
       name.contains(serverConflictMarker) ||
-      name.contains(rommLocalCopyMarker);
+      name.contains(rommLocalCopyMarker) ||
+      name.contains(rommFirstSyncCopyMarker);
 }
 
 /// Whether the save at [path] is a memory card that every game of its system
@@ -143,6 +169,22 @@ KeptCopyName? _parseKeptCopyName(String path) {
     return KeptCopyName(
       savePath: save(m.group(1)!),
       source: KeptCopySource.beforeDownload,
+    );
+  }
+  m = _rommFirstSync.firstMatch(name);
+  if (m != null) {
+    return KeptCopyName(
+      savePath: save(m.group(1)!),
+      source: KeptCopySource.rommBeforeDownload,
+      stampedAt: _localStamp(m.group(2)!),
+      firstSync: true,
+    );
+  }
+  m = _rommLocalSlot.firstMatch(name);
+  if (m != null) {
+    return KeptCopyName(
+      savePath: save(m.group(1)!),
+      source: KeptCopySource.rommBeforeDownload,
     );
   }
   m = _rommLocal.firstMatch(name);
@@ -235,12 +277,19 @@ Future<String> keepLocalCopy(
 /// Where [keepRommLocalCopy] keeps this device's save at [savePath], kept at
 /// [at]: `<save>.romm-local-<local yyyy-MM-dd_HH-mm-ss>[-attempt]`, named as
 /// RomM's conflict copies are, so the two sort together.
-String rommLocalCopyPath(String savePath, DateTime at, {int attempt = 1}) {
+String rommLocalCopyPath(String savePath, DateTime at, {int attempt = 1}) =>
+    '$savePath$rommLocalCopyMarker${_rommStampFor(at, attempt)}';
+
+/// Where [keepRommFirstSyncCopy] keeps this device's card at [savePath], kept
+/// at [at]: `<save>.romm-first-<local yyyy-MM-dd_HH-mm-ss>[-attempt]`.
+String rommFirstSyncCopyPath(String savePath, DateTime at, {int attempt = 1}) =>
+    '$savePath$rommFirstSyncCopyMarker${_rommStampFor(at, attempt)}';
+
+String _rommStampFor(DateTime at, int attempt) {
   final t = at.toLocal();
   String two(int n) => n.toString().padLeft(2, '0');
   final suffix = attempt > 1 ? '-$attempt' : '';
-  return '$savePath$rommLocalCopyMarker'
-      '${t.year.toString().padLeft(4, '0')}-${two(t.month)}-${two(t.day)}'
+  return '${t.year.toString().padLeft(4, '0')}-${two(t.month)}-${two(t.day)}'
       '_${two(t.hour)}-${two(t.minute)}-${two(t.second)}$suffix';
 }
 
@@ -259,6 +308,84 @@ Future<String> keepRommLocalCopy(
     bytes,
     (attempt) => rommLocalCopyPath(savePath, at, attempt: attempt),
   );
+}
+
+/// Keeps a copy of this device's memory card at [savePath] before its first
+/// sync from this device takes the server's card over it, and returns where
+/// ([rommFirstSyncCopyPath], at [now]). Kept as [keepRommLocalCopy] keeps a
+/// copy, but never removed by [tidyKeptCopies] for being one too many: it may
+/// be the only copy of everything this device's games saved on the card.
+Future<String> keepRommFirstSyncCopy(
+  String savePath, {
+  DateTime? now,
+  List<int>? bytes,
+}) {
+  final at = now ?? DateTime.now();
+  return _keepCopy(
+    savePath,
+    bytes,
+    (attempt) => rommFirstSyncCopyPath(savePath, at, attempt: attempt),
+  );
+}
+
+/// Where [commitRommLocalSlot] keeps this device's card at [savePath]:
+/// `<save>.romm-local-last`.
+String rommLocalSlotPath(String savePath) =>
+    '$savePath${rommLocalCopyMarker}last';
+
+/// Where [stageRommLocalSlot] writes the card before it becomes the slot:
+/// `<save>.romm-local-last.new`, which no save listing takes for a save and
+/// no list of copies shows.
+String rommLocalSlotStagingPath(String savePath) =>
+    '${rommLocalSlotPath(savePath)}.new';
+
+/// Writes this device's memory card at [savePath] beside it, to become its
+/// one slot ([rommLocalSlotPath]) once RomM has written the server's card over
+/// it ([commitRommLocalSlot]), and returns where. The slot holds the card as
+/// it was before the last such download: the next one replaces it, so routine
+/// downloads never push the dated copies out (see [tidyKeptCopies]). Until
+/// then the slot is left as it is, so a download that never happens (a
+/// launch that went ahead, a write that failed) takes nothing from it: the
+/// caller removes the staged copy instead.
+///
+/// A staged copy left from before is replaced; anything else at its name (a
+/// link, say) is never written through: the error is thrown, as is any
+/// other, and a copy cut short is removed.
+Future<String> stageRommLocalSlot(String savePath, {List<int>? bytes}) async {
+  final content = bytes ?? await File(savePath).readAsBytes();
+  final path = rommLocalSlotStagingPath(savePath);
+  if (await FileSystemEntity.type(path, followLinks: false) ==
+      FileSystemEntityType.file) {
+    await File(path).delete();
+  }
+  await File(path).create(exclusive: true);
+  try {
+    await File(path).writeAsBytes(content, flush: true);
+  } catch (_) {
+    await _deleteQuietly(File(path));
+    rethrow;
+  }
+  return path;
+}
+
+/// Makes the copy [stageRommLocalSlot] wrote at [stagedPath] the slot of the
+/// card at [savePath], replacing the slot before it, and returns the slot's
+/// path. Renaming replaces whatever entry has the slot's name and follows no
+/// link. When that fails (a folder has the name, say), the copy is kept as a
+/// dated copy instead ([keepRommLocalCopy]), so it isn't lost.
+Future<String> commitRommLocalSlot(String savePath, String stagedPath) async {
+  final slot = rommLocalSlotPath(savePath);
+  try {
+    await File(stagedPath).rename(slot);
+    return slot;
+  } on FileSystemException {
+    final kept = await keepRommLocalCopy(
+      savePath,
+      bytes: await File(stagedPath).readAsBytes(),
+    );
+    await _deleteQuietly(File(stagedPath));
+    return kept;
+  }
 }
 
 Future<String> _keepCopy(
@@ -518,10 +645,12 @@ const int maxKeptCopiesPerSave = 3;
 ///   A copy written after the save is left: that is a copy kept just before
 ///   the save is replaced, by a download or a restore under way;
 /// * of copies holding the same bytes, all but the most recently kept;
-/// * beyond [limit], the copies kept least recently. The before-download copy
-///   (the undated [KeptCopySource.beforeDownload] copy) is one slot that each
-///   download overwrites, so it can't pile up and isn't counted; dated ones
-///   count.
+/// * beyond [limit], the copies kept least recently. The before-download
+///   copies with no time in their name (NeoSync's `<save>.neosync.bak`,
+///   RomM's `<save>.romm-local-last`) are each one slot that downloads
+///   overwrite, so they can't pile up and aren't counted; dated ones count,
+///   except the copy a memory card's first sync from this device kept
+///   ([keepRommFirstSyncCopy]), which is never removed for being one too many.
 ///
 /// "Kept most recently" goes by each copy's file time, when it was written
 /// beside the save, not by the time in its name: a cloud copy of an old save
@@ -553,6 +682,7 @@ Future<List<String>> tidyKeptCopies(
           int size,
           bool justKept,
           bool slot,
+          bool firstSync,
         })
       >[];
   Future<void> consider(String path) async {
@@ -574,11 +704,13 @@ Future<List<String>> tidyKeptCopies(
         modified: stat.modified,
         size: stat.size,
         justKept: protected.contains(p.normalize(path)),
-        // The single before-download slot, which each download overwrites;
-        // a dated copy of this device's save counts like any other.
+        // A single before-download slot, which downloads overwrite; a dated
+        // copy of this device's save counts like any other.
         slot:
-            name.source == KeptCopySource.beforeDownload &&
+            (name.source == KeptCopySource.beforeDownload ||
+                name.source == KeptCopySource.rommBeforeDownload) &&
             name.stampedAt == null,
+        firstSync: name.firstSync,
       ));
     } on FileSystemException {
       return;
@@ -602,6 +734,12 @@ Future<List<String>> tidyKeptCopies(
   }
   if (copies.isEmpty) return const [];
   copies.sort((a, b) {
+    // RomM's slot for a card comes last: when it holds the same bytes as a
+    // dated copy, the slot is the one removed, since the next routine
+    // download replaces it anyway.
+    final aRommSlot = a.slot && a.source == KeptCopySource.rommBeforeDownload;
+    final bRommSlot = b.slot && b.source == KeptCopySource.rommBeforeDownload;
+    if (aRommSlot != bRommSlot) return aRommSlot ? 1 : -1;
     if (a.justKept != b.justKept) return a.justKept ? -1 : 1;
     return b.modified.compareTo(a.modified);
   });
@@ -637,7 +775,7 @@ Future<List<String>> tidyKeptCopies(
         digest == saveDigest &&
         copy.modified.isBefore(saveStat!.modified);
     final duplicate = digest != null && !seen.add(digest);
-    final counts = !copy.slot;
+    final counts = !copy.slot && !copy.firstSync;
     final overLimit = counts && counted >= limit;
     if (!heldBySave && !duplicate && !overLimit) {
       if (counts) counted++;

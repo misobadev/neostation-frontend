@@ -17,10 +17,34 @@ class AppConfig {
 
   /// Base URL for the NeoAssets public catalog API (system art packs).
   ///
-  /// The `/api/v1/packs` endpoints are public and need no token or account;
-  /// the developer-only `/api/v1/scrape/*` endpoints are not used.
+  /// The `/api/v1/packs` endpoints are public and need no token or account.
+  /// The scraping endpoints use [neoAssetsScrapeBaseUrl].
   static const String neoAssetsApiBaseUrl = 'https://api.neoassets.dev';
 
   /// CDN that serves the NeoAssets pack images.
   static const String neoAssetsCdnBaseUrl = 'https://cdn.neoassets.dev';
+
+  /// Base URL of the NeoAssets scraping API (`/api/v1/scrape/*`), the
+  /// metadata provider that replaces ScreenScraper over time.
+  ///
+  /// Overridable at build time (`--dart-define=NEOASSETS_SCRAPE_URL=...`) so a
+  /// local instance can be targeted; the Android emulator reaches the host's
+  /// `localhost` as `10.0.2.2`.
+  static const String neoAssetsScrapeBaseUrl = String.fromEnvironment(
+    'NEOASSETS_SCRAPE_URL',
+    defaultValue: neoAssetsApiBaseUrl,
+  );
+
+  /// NeoStation's NeoAssets developer application, provided at build time
+  /// like the ScreenScraper developer credentials. Without them the
+  /// NeoAssets metadata provider reports itself as unavailable.
+  static const String neoAssetsClientId = String.fromEnvironment(
+    'NEOASSETS_CLIENT_ID',
+  );
+  static const String neoAssetsClientSecret = String.fromEnvironment(
+    'NEOASSETS_CLIENT_SECRET',
+  );
+
+  /// Where users create the personal API key NeoStation signs in with.
+  static const String neoAssetsProfileUrl = 'https://neoassets.dev/app/profile';
 }
