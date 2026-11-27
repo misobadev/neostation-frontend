@@ -395,7 +395,11 @@ extension _SecondaryDisplay on _SystemGamesListState {
   void _updateBackground(GameModel game) {
     // Aggregate views keep their own backdrop: the list's folder name is not a
     // hardware system, so there is no per-system art to swap in.
-    if (!mounted || SystemFolderNames.isAggregate(widget.system.folderName)) {
+    // The carousel also resolves and paints its own backdrop.
+    if (!mounted ||
+        SystemFolderNames.isAggregate(widget.system.folderName) ||
+        (widget.system.folderName != 'music' &&
+            _configProvider.config.gameViewMode == 'carousel')) {
       return;
     }
 
