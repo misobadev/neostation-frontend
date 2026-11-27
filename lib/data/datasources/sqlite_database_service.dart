@@ -59,7 +59,22 @@ class RomEntry {
   /// on desktop reads it.
   final int size;
 
-  RomEntry({required this.path, required this.filename, this.size = 0});
+  /// Switch metadata read by [SqliteDatabaseService.classifySwitchContent],
+  /// before the insert transaction.
+  final SwitchGameInfo? switchInfo;
+
+  /// Whether this scan classified the Switch package as a standalone update
+  /// or DLC. Null when it was not classified this scan (not a Switch package,
+  /// already classified in the database, or unidentifiable).
+  final bool? switchAdditionalContent;
+
+  RomEntry({
+    required this.path,
+    required this.filename,
+    this.size = 0,
+    this.switchInfo,
+    this.switchAdditionalContent,
+  });
 }
 
 /// Service responsible for managing ROM discovery, filesystem synchronization,
@@ -319,6 +334,16 @@ class SqliteDatabaseService {
       ..clear()
       ..addAll(deduplicatedEntries);
 
+    if (system.id == 'switch' || system.id == 'nintendo-switch') {
+      final classified = await classifySwitchContent(
+        romEntries,
+        classifiedPaths: await _classifiedSwitchPaths(system.id!),
+      );
+      romEntries
+        ..clear()
+        ..addAll(classified);
+    }
+
     // Clean orphaned entries (files deleted from disk). Rows under a root that
     // is not mounted right now are left alone: a missing SD card lists as an
     // empty root, and without this every game on it would read as deleted.
@@ -540,9 +565,92 @@ class SqliteDatabaseService {
   /// known, so an extraction that failed once — unreadable file, missing Switch
   /// keys — is retried later instead of being frozen out by the path diff.
   static bool _needsMetadataExtraction(String systemId, RomEntry entry) {
-    if (systemId == 'switch' || systemId == 'nintendo-switch') return true;
+    // Switch packages are read by classifySwitchContent before this point;
+    // only entries it actually read carry something worth writing.
+    if (systemId == 'switch' || systemId == 'nintendo-switch') {
+      return entry.switchInfo != null || entry.switchAdditionalContent != null;
+    }
     final lower = entry.filename.toLowerCase();
     return lower.endsWith('.psvita') || lower.endsWith('.steam');
+  }
+
+  /// Reads Switch packages and classifies standalone updates and DLC.
+  ///
+  /// Nothing is removed: the insert hides an update/DLC row the first time it
+  /// is classified, so the user's data for it survives and a wrong guess can
+  /// be undone from the hidden games list. Unidentified files stay visible.
+  ///
+  /// All Switch file reads happen here, outside any database transaction.
+  /// Files in [classifiedPaths] were classified by an earlier scan and are not
+  /// read again, which keeps a rescan of a large SAF library quick.
+  @visibleForTesting
+  static Future<List<RomEntry>> classifySwitchContent(
+    List<RomEntry> entries, {
+    Set<String> classifiedPaths = const {},
+  }) async {
+    final result = <RomEntry>[];
+    for (final entry in entries) {
+      final extension = path.extension(entry.filename).toLowerCase();
+      final isPackage = extension == '.nsp' || extension == '.nsz';
+      if ((!isPackage && extension != '.xci') ||
+          classifiedPaths.contains(entry.path)) {
+        result.add(entry);
+        continue;
+      }
+
+      SwitchGameInfo? info;
+      try {
+        info = await SwitchTitleExtractor.extractGameInfo(
+          entry.path,
+          fileName: entry.filename,
+        );
+      } catch (e) {
+        _log.e('Error reading Switch package ${entry.path}: $e');
+      }
+
+      bool? additionalContent;
+      if (isPackage) {
+        // Package metadata wins over a Title ID in the filename.
+        final filenameId = RegExp(
+          r'(?<![0-9a-fA-F])0100[0-9a-fA-F]{12}(?![0-9a-fA-F])',
+        ).firstMatch(entry.filename)?.group(0);
+        final titleId = info?.titleId ?? filenameId;
+        if (titleId != null) {
+          additionalContent = SwitchTitleExtractor.isAdditionalContent(titleId);
+        }
+      } else if (info != null) {
+        // Cartridge images can bundle updates alongside the base game, and
+        // their HEAD header holds no application Title ID: always a game.
+        additionalContent = false;
+      }
+
+      result.add(
+        RomEntry(
+          path: entry.path,
+          filename: entry.filename,
+          size: entry.size,
+          switchInfo: info,
+          switchAdditionalContent: additionalContent,
+        ),
+      );
+    }
+    return result;
+  }
+
+  /// Paths of [systemId]'s rows an earlier scan already classified.
+  static Future<Set<String>> _classifiedSwitchPaths(String systemId) async {
+    try {
+      final db = await SqliteService.getDatabase();
+      final rows = await db.rawQuery(
+        'SELECT rom_path FROM user_roms '
+        'WHERE app_system_id = ? AND switch_additional_content IS NOT NULL',
+        [systemId],
+      );
+      return {for (final row in rows) row['rom_path'].toString()};
+    } catch (e) {
+      _log.e('Error loading classified Switch rows: $e');
+      return const {};
+    }
   }
 
   /// Calculates a tuned batch size for insertions based on the total file count.
@@ -555,8 +663,9 @@ class SqliteDatabaseService {
 
   /// Executes a high-performance batch insertion of multiple ROM entries.
   ///
-  /// Handles platform-specific metadata extraction (Switch title info, Vita
-  /// Title IDs, Steam App IDs) during the operation.
+  /// Handles platform-specific metadata extraction (Vita Title IDs, Steam App
+  /// IDs) during the operation. Switch title info arrives already read on
+  /// [RomEntry.switchInfo].
   static Future<void> _batchInsertRoms(
     String systemFolderName,
     List<RomEntry> romEntries,
@@ -568,8 +677,6 @@ class SqliteDatabaseService {
     final systemId = system.id!;
     final isSwitch = systemId == 'switch' || systemId == 'nintendo-switch';
 
-    if (isSwitch) await SwitchTitleExtractor.loadKeys();
-
     await db.transaction((txn) async {
       // app_emulator_unique_id/os_id are left NULL = "inherit the system
       // default", resolved live at launch. Do NOT freeze the default here:
@@ -577,16 +684,27 @@ class SqliteDatabaseService {
       // the installed-aware default resolution at launch.
       const sql = '''
         INSERT INTO user_roms
-        (app_system_id, app_emulator_unique_id, app_emulator_os_id, filename, rom_path, title_id, title_name, created_at)
+        (app_system_id, app_emulator_unique_id, app_emulator_os_id, filename, rom_path, title_id, title_name, is_hidden, switch_additional_content, created_at)
         VALUES (
           ?,
           NULL,
           NULL,
-          ?, ?, ?, ?, datetime('now')
+          ?, ?, ?, ?, ?, ?, datetime('now')
         )
         ON CONFLICT(rom_path) DO UPDATE SET
           title_id = COALESCE(EXCLUDED.title_id, title_id),
           title_name = COALESCE(EXCLUDED.title_name, title_name),
+          -- A Switch update/DLC is hidden only the first time it is
+          -- classified, so a user who unhides it keeps it visible.
+          is_hidden = CASE
+            WHEN user_roms.switch_additional_content IS NULL
+              AND EXCLUDED.switch_additional_content = 1 THEN 1
+            ELSE user_roms.is_hidden
+          END,
+          switch_additional_content = COALESCE(
+            EXCLUDED.switch_additional_content,
+            user_roms.switch_additional_content
+          ),
           updated_at = datetime('now')
       ''';
 
@@ -595,16 +713,12 @@ class SqliteDatabaseService {
         String? titleId;
         String? titleName;
 
-        if (isSwitch && !entry.path.startsWith('content://')) {
-          try {
-            final info = await SwitchTitleExtractor.extractGameInfo(entry.path);
-            if (info != null) {
-              titleId = info.titleId;
-              titleName = info.gameName;
-            }
-          } catch (e) {
-            _log.e('Error extracting Switch game info for ${entry.path}: $e');
-          }
+        // Switch metadata was read by classifySwitchContent, outside this
+        // transaction; nothing is read from the file here.
+        final switchInfo = isSwitch ? entry.switchInfo : null;
+        if (switchInfo != null) {
+          titleId = switchInfo.titleId;
+          titleName = switchInfo.gameName;
         }
 
         if (entry.filename.toLowerCase().endsWith('.psvita')) {
@@ -668,12 +782,15 @@ class SqliteDatabaseService {
           }
         }
 
+        final additionalContent = entry.switchAdditionalContent;
         batch.rawInsert(sql, [
           systemId,
           entry.filename,
           entry.path,
           titleId,
           titleName,
+          additionalContent == true ? 1 : 0,
+          additionalContent == null ? null : (additionalContent ? 1 : 0),
         ]);
       }
       await batch.commit(noResult: true);
