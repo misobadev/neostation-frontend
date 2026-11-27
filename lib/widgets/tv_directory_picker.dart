@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:file_picker/file_picker.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
+
 import '../utils/gamepad_nav.dart';
 import '../services/game_service.dart';
 import '../services/logger_service.dart';
@@ -535,19 +537,16 @@ class _TvDirectoryPickerState extends State<TvDirectoryPicker> {
     return path;
   }
 
+  /// Keys [GamepadNavigation] doesn't handle. It already takes the arrow keys
+  /// and Enter on every platform, before this focus handler sees them;
+  /// handling them here too moved two rows per press and acted twice on one
+  /// Enter.
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
 
-    if (key == LogicalKeyboardKey.arrowDown) {
-      _moveIndex(1);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowUp) {
-      _moveIndex(-1);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter) {
+    // A TV remote's centre button.
+    if (key == LogicalKeyboardKey.select) {
       _handleSelect();
       return KeyEventResult.handled;
     }
@@ -1184,6 +1183,10 @@ class _TvButtonState extends State<_TvButton> {
 
     return InkWell(
       onTap: widget.onPressed,
+      // Kept out of keyboard focus (Tab): Enter belongs to the list, through
+      // GamepadNavigation, and a focused button would act on it as well.
+      // Escape or Backspace cancels; a click or tap still presses it.
+      canRequestFocus: false,
       onFocusChange: (v) => setState(() => _focused = v),
       borderRadius: BorderRadius.circular(8.r),
       child: AnimatedContainer(

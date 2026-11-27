@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:video_player/video_player.dart';
+
 import 'dart:async';
+
 import '../../../models/system_model.dart';
 import '../../../utils/effective_system.dart';
 import '../../../models/game_model.dart';
@@ -12,21 +15,26 @@ import '../../../providers/retro_achievements_provider.dart';
 import '../../../sync/i_sync_provider.dart';
 import '../../../models/retro_achievements_game_info.dart';
 import '../../../repositories/retro_achievements_repository.dart';
+
 import 'package:neostation/services/sfx_service.dart';
+
 import 'dialogs/ra_match_picker_dialog.dart';
 import '../../../services/retro_achievements_helper.dart';
 import '../../../utils/artwork_cache.dart';
 import '../../../utils/ra_coverage.dart';
 import '../../../utils/gamepad_nav.dart';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:provider/provider.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
-import '../../../services/screenscraper_service.dart';
 import '../../../services/game_service.dart';
 import '../../../services/android_service.dart';
+
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+
 import '../../../models/secondary_display_state.dart';
 import 'widgets/game_details_footer.dart';
 import 'widgets/game_details_tabs_header.dart';
@@ -37,6 +45,12 @@ import 'tabs/game_details_box2d_tab.dart';
 import 'tabs/game_details_screenshot_video_tab.dart';
 import 'tabs/game_details_game_info_tab.dart';
 import 'tabs/game_details_achievements_tab.dart';
+
+import 'package:neostation/screens/retro_achievements_screen/ra_game_achievements_page.dart';
+
+import '../../../utils/user_data_move_guard.dart';
+
+import 'package:neostation/services/metadata_provider_service.dart';
 
 /// A comprehensive details view for a selected game, providing access to metadata,
 /// achievements, system settings, and cloud synchronization status.
@@ -50,6 +64,24 @@ class GameDetailsCardList extends StatefulWidget {
   final bool showVideo;
   final VideoPlayerController? videoController;
   final bool isVideoLoading;
+
+  /// Absolute time at which the preview video may start. Null when previews
+  /// are disabled.
+  final DateTime? videoPreviewDeadline;
+
+  /// Configured screenshot dwell, used to keep the countdown ring in step when
+  /// this card is shown after part of the delay already elapsed.
+  final Duration videoPreviewTotal;
+
+  /// Whether the host already checked the selected game for a preview file and
+  /// what that check found. Used to avoid a screenshot flash at 0 s when the
+  /// video exists but its controller is still starting.
+  final bool videoPreviewFileChecked;
+  final bool videoPreviewFileExists;
+
+  /// Called after the card starts or pauses preview playback so the host can
+  /// refresh music ducking from the controller's real playing state.
+  final VoidCallback? onVideoPlaybackChanged;
   final bool isAllMode;
   final RetroAchievementsProvider retroAchievementsProvider;
   final ISyncProvider syncProvider;
@@ -130,9 +162,6 @@ class GameDetailsCardList extends StatefulWidget {
   final Function(bool Function() enter, bool Function() exit)?
   onRegisterPanelFocus;
 
-  /// Callback to register the Select button action.
-  final Function(VoidCallback)? onRegisterSelectButton;
-
   /// Callback to register the scrape action (Select + A combo).
   final Function(VoidCallback)? onRegisterScrapeAction;
 
@@ -150,6 +179,11 @@ class GameDetailsCardList extends StatefulWidget {
     this.showVideo = false,
     this.videoController,
     this.isVideoLoading = false,
+    this.videoPreviewDeadline,
+    this.videoPreviewTotal = const Duration(seconds: 2),
+    this.videoPreviewFileChecked = false,
+    this.videoPreviewFileExists = false,
+    this.onVideoPlaybackChanged,
     this.isAllMode = false,
     required this.retroAchievementsProvider,
     required this.syncProvider,
@@ -180,7 +214,6 @@ class GameDetailsCardList extends StatefulWidget {
     this.onRegisterIsPlayingGameBlocked,
     this.onRegisterTabNavigation,
     this.onRegisterPanelFocus,
-    this.onRegisterSelectButton,
     this.onRegisterScrapeAction,
     this.isSecondaryScreenActive = false,
     this.isNavigatingFast = false,
@@ -235,6 +268,10 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
 
   // Resource lifecycle and deferred timers.
   bool _isVideoDelayActive = false;
+  bool _previewPlaying = false;
+  bool _isStartingPreview = false;
+  Duration _previewRemaining = Duration.zero;
+  Duration _previewTotal = Duration.zero;
   Timer? _videoDelayTimer;
   double _scrapeProgress = 0.0;
   String _scrapeStatus = '';
@@ -333,6 +370,12 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       return widget.system;
     }
   }
+
+  /// Installed Android apps have no box art (ScreenScraper has none for
+  /// them, and the app icon already stands in for the wheel), so their card
+  /// leaves the cover tab out: wheel, screenshots and video, and the info.
+  bool get _isBox2dHidden =>
+      SystemFolderNames.isAndroidApps(_effectiveSystem.folderName);
 
   /// Predicate indicating if RetroAchievements integration is technically feasible for this hardware.
   bool get _hasRetroAchievements =>
@@ -456,7 +499,6 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     widget.onRegisterCloseOverlays?.call(_closeAllOverlays);
     widget.onRegisterTabNavigation?.call(_handleTabNavigation);
     widget.onRegisterPanelFocus?.call(_activatePanel, _dismissPanel);
-    widget.onRegisterSelectButton?.call(_handleSelectAction);
     widget.onRegisterScrapeAction?.call(_onScrapeGameCompact);
     widget.onRegisterNavigation?.call(
       moveUp: () => _movePanel(
@@ -578,7 +620,29 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       _applyVideoMuteState();
     }
 
+    if (_currentTab == DetailTab.screenshotVideo) {
+      final deadlineChanged =
+          oldWidget.videoPreviewDeadline != widget.videoPreviewDeadline;
+      final controllerChanged =
+          oldWidget.videoController != widget.videoController;
+      if (deadlineChanged) {
+        if (widget.videoPreviewDeadline != null) {
+          _startVideoDelay();
+        } else {
+          _cancelVideoDelay();
+        }
+      } else if (controllerChanged &&
+          !_isVideoDelayActive &&
+          widget.videoController?.value.isInitialized == true) {
+        // The player became ready after a countdown that already elapsed (or
+        // while none was running). Start it now; an active countdown keeps its
+        // own timer and must not be cut short by this rebuild.
+        _startVideoDelay();
+      }
+    }
+
     if ((_isGameInfoHidden && _currentTab == DetailTab.screenshotVideo) ||
+        (_isBox2dHidden && _currentTab == DetailTab.box2d) ||
         (!_hasRetroAchievements && _currentTab == DetailTab.achievements)) {
       _currentTab = DetailTab.wheel;
       // A tab yanked away isn't a navigation the user made, so nothing slides:
@@ -594,14 +658,6 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
             : DetailTab.screenshotVideo,
       );
     });
-  }
-
-  void _handleSelectAction() {
-    // Select mutes the preview video on every tab. Achievements used to take
-    // it over for its refresh, which is now a D-pad target in the panel's own
-    // header — a hidden second binding for a visible button just made Select
-    // mean two things depending on where you were.
-    _toggleVideoMute();
   }
 
   @override
@@ -622,36 +678,105 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     super.dispose();
   }
 
-  /// Initiates a 3-second aesthetic delay before transitioning to video playback.
-  void _startVideoDelay() {
+  /// Starts (or immediately finishes) the visual countdown for the current
+  /// selection. The deadline comes from the game-selection time, so switching
+  /// to this tab late only shows the remaining part of the countdown.
+  void _startVideoDelay({DateTime? deadline}) {
     _videoDelayTimer?.cancel();
+    _videoDelayTimer = null;
+
+    final target = deadline ?? widget.videoPreviewDeadline;
+    if (target == null) {
+      _cancelVideoDelay();
+      return;
+    }
+
+    final remaining = target.difference(DateTime.now());
+    if (remaining > Duration.zero &&
+        widget.videoController?.value.isPlaying == true) {
+      unawaited(widget.videoController!.pause());
+      widget.onVideoPlaybackChanged?.call();
+    }
+
+    if (remaining <= Duration.zero) {
+      setState(() {
+        _isVideoDelayActive = false;
+        _previewPlaying = false;
+        _previewRemaining = Duration.zero;
+        _previewTotal = widget.videoPreviewTotal;
+      });
+      unawaited(_startPreviewPlayback());
+      return;
+    }
 
     setState(() {
       _isVideoDelayActive = true;
+      _previewPlaying = false;
+      _previewRemaining = remaining;
+      _previewTotal = widget.videoPreviewTotal;
     });
 
-    _videoDelayTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _isVideoDelayActive = false;
-        });
+    _videoDelayTimer = Timer(remaining, () {
+      if (!mounted) return;
+      setState(() {
+        _isVideoDelayActive = false;
+        _previewRemaining = Duration.zero;
+      });
+      unawaited(_startPreviewPlayback());
+    });
+  }
 
-        if (widget.videoController?.value.isInitialized == true) {
-          widget.videoController?.play();
-        }
+  Future<void> _startPreviewPlayback() async {
+    final controller = widget.videoController;
+    if (_isStartingPreview ||
+        controller == null ||
+        !controller.value.isInitialized ||
+        _currentTab != DetailTab.screenshotVideo) {
+      return;
+    }
+
+    _isStartingPreview = true;
+    try {
+      // Apply the current mute state before the first audible frame.
+      await _applyVideoMuteState();
+      if (!mounted ||
+          widget.videoController != controller ||
+          _currentTab != DetailTab.screenshotVideo) {
+        return;
       }
-    });
+
+      // Entering the media tab again restarts the preview from its first frame.
+      await controller.seekTo(Duration.zero);
+      if (!mounted ||
+          widget.videoController != controller ||
+          _currentTab != DetailTab.screenshotVideo) {
+        return;
+      }
+
+      await controller.play();
+      if (!mounted || widget.videoController != controller) return;
+      setState(() => _previewPlaying = true);
+      widget.onVideoPlaybackChanged?.call();
+    } finally {
+      _isStartingPreview = false;
+    }
   }
 
   void _cancelVideoDelay() {
     _videoDelayTimer?.cancel();
     _videoDelayTimer = null;
-    setState(() {
-      _isVideoDelayActive = false;
-    });
-    if (widget.videoController?.value.isPlaying == true) {
+    final wasPlaying = widget.videoController?.value.isPlaying == true;
+    if (wasPlaying) {
       widget.videoController?.pause();
     }
+    if (mounted) {
+      setState(() {
+        _isVideoDelayActive = false;
+        _previewPlaying = false;
+        _previewRemaining = Duration.zero;
+      });
+    }
+    if (wasPlaying) widget.onVideoPlaybackChanged?.call();
   }
 
   /// Loads RetroAchievements data for the current game, including MD5 hash generation.
@@ -667,6 +792,24 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     setState(() {
       _isManualMatch = source == RetroAchievementsRepository.raMatchManual;
     });
+  }
+
+  bool _achievementsPageInFlight = false;
+
+  Future<void> _openAchievementsPage() async {
+    final gameId = _currentGameInfo?.id;
+    if (_achievementsPageInFlight || gameId == null || gameId <= 0) return;
+    _achievementsPageInFlight = true;
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              RaGameAchievementsPage(gameId: gameId, fallbackTitle: _game.name),
+        ),
+      );
+    } finally {
+      _achievementsPageInFlight = false;
+    }
   }
 
   /// Opens the manual match picker and reloads the tab when the user picked a
@@ -873,6 +1016,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
             top: 0.r,
             child: GameDetailsTabsHeader(
               isScreenshotVideoHidden: _isGameInfoHidden,
+              isBox2dHidden: _isBox2dHidden,
               hasRetroAchievements: _hasRetroAchievements,
               currentTab: _currentTab,
               onTabChanged: _setTab,
@@ -955,6 +1099,12 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
                         bottomOffset: panelBottomOffset,
                         screenshotPath: screenshotPath,
                         isVideoDelayActive: _isVideoDelayActive,
+                        hasVideoPreview: widget.videoPreviewDeadline != null,
+                        previewRemaining: _previewRemaining,
+                        previewTotal: _previewTotal,
+                        videoPreviewPlaying: _previewPlaying,
+                        videoPreviewFileChecked: widget.videoPreviewFileChecked,
+                        videoPreviewFileExists: widget.videoPreviewFileExists,
                         videoController: widget.videoController,
                         imageVersion: _artworkImageVersion,
                         onToggleVideoMute: _toggleVideoMute,
@@ -993,6 +1143,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
                             : null,
                         onRefresh: refreshAchievements,
                         onFixMatch: _openMatchPicker,
+                        onOpenPage: _openAchievementsPage,
                         raHash: _game.raHash,
                       ),
                     ),
@@ -1240,6 +1391,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
   /// Whether [tab] can be shown for the current game and display setup.
   bool _isTabAvailable(DetailTab tab) {
     if (tab == DetailTab.screenshotVideo && _isGameInfoHidden) return false;
+    if (tab == DetailTab.box2d && _isBox2dHidden) return false;
     if (tab == DetailTab.achievements && !_hasRetroAchievements) {
       return false;
     }
@@ -1407,7 +1559,13 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       if (tab == DetailTab.screenshotVideo) {
         config.updateShowGameInfo(true);
         widget.videoController?.setVolume(0);
-        _startVideoDelay();
+        if (widget.videoPreviewDeadline != null) {
+          _startVideoDelay(
+            deadline: DateTime.now().add(widget.videoPreviewTotal),
+          );
+        } else {
+          _cancelVideoDelay();
+        }
       } else {
         if (config.config.showGameInfo) {
           config.updateShowGameInfo(false);
@@ -1430,9 +1588,11 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
     _setTab(DetailTab.wheel, persist: false, animate: false);
   }
 
-  /// Orchestrates a metadata acquisition process via ScreenScraperService.
+  /// Orchestrates a metadata acquisition process via the active metadata provider.
   Future<void> _startSingleGameScrape({bool forceOverwrite = true}) async {
     if (_isScrapingGame) return;
+    // Refused during a user-data move: new art would stay in the old folder.
+    if (refuseWhileUserDataMoves()) return;
 
     // Safety: Pause video previews to avoid resource contention or audio leaks during scraping.
     if (widget.videoController != null) {
@@ -1448,7 +1608,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
       if (!mounted) return;
       AppNotification.showNotification(
         context,
-        'Error: System ID is missing.',
+        AppLocale.errorSystemNotFound.getString(context),
         type: NotificationType.error,
       );
       return;
@@ -1456,11 +1616,11 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
 
     if (!context.mounted) return;
 
-    if (!await ScreenScraperService.hasSavedCredentials()) {
+    if (!await MetadataProviderService.hasActiveSession()) {
       if (!mounted) return;
       AppNotification.showNotification(
         context,
-        'Please log in to ScreenScraper in the Scraping tab first.',
+        AppLocale.loginToScrape.getString(context),
         type: NotificationType.info,
       );
       return;
@@ -1489,7 +1649,7 @@ class _GameDetailsCardListState extends State<GameDetailsCardList>
           ? _game.systemFolderName!
           : widget.system.primaryFolderName;
 
-      final result = await ScreenScraperService.scrapeSingleGame(
+      final result = await MetadataProviderService.scrapeSingleGame(
         appSystemId: scrapeSystemId,
         romName: _game.romname,
         systemFolder: targetSystemFolder,

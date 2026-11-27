@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -10,16 +11,21 @@ import 'package:neostation/services/music_player_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+
 import 'dart:io';
 import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
+
 import '../../../themes/corner_radii.dart';
+import '../../../widgets/neo_glass.dart';
 import '../../../widgets/shaders/shader_gif_widget.dart';
 import '../../../widgets/shaders/music_card_shader_background.dart';
 import '../../../utils/image_utils.dart';
 import '../../../widgets/cover_mosaic.dart';
 import '../../../widgets/system_logo_fallback.dart';
 import '../../../utils/game_utils.dart';
+import '../../../utils/performance_mode.dart';
 import '../../../utils/count_label.dart';
 
 /// Replaces the card the systems grid/carousel would otherwise build for one
@@ -30,14 +36,13 @@ import '../../../utils/count_label.dart';
 /// rendered by the systems widgets themselves. The collections browser uses it
 /// for exactly one entry — the trailing "New collection" card, which is an icon
 /// and a label rather than artwork plus a logo.
-typedef SystemCardOverrideBuilder =
-    Widget? Function(
-      BuildContext context,
-      int index,
-      SystemInfo info,
-      bool isSelected,
-      VoidCallback onTap,
-    );
+typedef SystemCardOverrideBuilder = Widget? Function(
+  BuildContext context,
+  int index,
+  SystemInfo info,
+  bool isSelected,
+  VoidCallback onTap,
+);
 
 /// A premium card component representing a system or a 'Recent Game' entry.
 ///
@@ -52,6 +57,10 @@ class SystemCard extends StatefulWidget {
     this.isSelected = false,
     this.backgroundCacheWidth = 512,
     this.showCount = false,
+    this.isCompact = false,
+    this.artworkInset = 4,
+    this.showShadow = true,
+    this.highlightSelected = true,
   });
 
   /// The system or game metadata resolved for this card.
@@ -87,11 +96,36 @@ class SystemCard extends StatefulWidget {
   /// cards); the carousel passes 1024 since its cards are much larger.
   final int backgroundCacheWidth;
 
+  /// Whether this card occupies the compact 2x1 recent-game slot.
+  ///
+  /// The compact slot has less artwork to spare, so the game wheel is scaled
+  /// down to keep it from crowding the card.
+  final bool isCompact;
+
+  /// Inset of the artwork and footer from the card edge, in logical pixels
+  /// before responsive scaling. The grid passes a larger value than the
+  /// carousel so its smaller cards get visible breathing room.
+  final double artworkInset;
+
+  /// Whether the card casts its drop shadow.
+  final bool showShadow;
+
+  /// Whether a selected card switches its frame and footer to the selection
+  /// colour. The carousel turns it off: its centred card already stands out
+  /// by its place and size, so it keeps the same colours as the others.
+  final bool highlightSelected;
+
   @override
   State<SystemCard> createState() => _SystemCardState();
+
+  /// Height of the "time played" strip under a game card's artwork.
+  static double get gameFooterHeight => 32.r;
 }
 
 class _SystemCardState extends State<SystemCard> {
+  /// Whether the card wears the selection colours.
+  bool get _highlighted => widget.isSelected && widget.highlightSelected;
+
   late final FocusNode _focusNode;
   late final GlobalKey _contentStackKey;
   final MusicPlayerService _musicPlayerService = MusicPlayerService();
@@ -104,6 +138,9 @@ class _SystemCardState extends State<SystemCard> {
 
   String? _themeBackgroundPath;
   String _lastThemeFolder = '';
+
+  /// Set from the config in build; controls the render-time effect overrides.
+  bool _performanceMode = false;
 
   /// Cached wheel file and existence check — computed once, not on every build.
   File? _cachedWheelFile;
@@ -232,6 +269,26 @@ class _SystemCardState extends State<SystemCard> {
       _musicPlayerService.isPlaying &&
       _musicCoverBytes != null;
 
+  Widget _buildSmartCollectionBadge(BuildContext context) => Positioned(
+    top: 8.r,
+    right: 8.r,
+    child: Tooltip(
+      message: AppLocale.smartCollection.getString(context),
+      child: Container(
+        padding: EdgeInsets.all(5.r),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(8.r),
+        ),
+        child: Icon(
+          Symbols.auto_awesome_rounded,
+          size: 18.r,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     // Subscribe to theme folder changes — only re-resolve assets when theme actually changes.
@@ -246,6 +303,7 @@ class _SystemCardState extends State<SystemCard> {
           (p) => p.config.hideSystemLogos,
         ) &&
         !SystemFolderNames.isCollection(widget.info.folderName);
+    _performanceMode = context.performanceMode;
 
     if (!widget.info.isGame && themeFolder != _lastThemeFolder) {
       _lastThemeFolder = themeFolder;
@@ -259,108 +317,140 @@ class _SystemCardState extends State<SystemCard> {
           : neoAssets.getBackgroundForSystemSync(folderName);
     }
 
+    final radii = Theme.of(context).extension<CornerRadii>();
+    final outerRadius = radii?.radiusExternal ?? BorderRadius.circular(14.r);
+    final outerRadiusPx = radii?.radiusExternalRadius ?? 14.r;
+
     return Padding(
       padding: EdgeInsets.all(2.r),
       child: MouseRegion(
         cursor: SystemMouseCursors.basic,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius:
-                Theme.of(context).extension<CornerRadii>()?.radiusExternal ??
-                BorderRadius.circular(14.r),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outline,
-              width: 1.r,
+        child: NeoGlassRim(
+          cornerRadius: outerRadiusPx,
+          child: Container(
+            decoration: BoxDecoration(
+              // The chrome (the frame around the artwork and the footer)
+              // switches to secondary on selection; the artwork itself stays.
+              // Transparent while the grid's liquid selection draws the
+              // frame behind the card.
+              color: (GooeyCardChrome.maybeOf(context)?.liquid ?? false)
+                  ? Colors.transparent
+                  : _highlighted
+                  ? Theme.of(context).colorScheme.secondary
+                  : Theme.of(context).colorScheme.surface,
+              borderRadius: outerRadius,
+              boxShadow: widget.showShadow && !_performanceMode
+                  ? [
+                      BoxShadow(
+                        color: Theme.of(context).colorScheme.shadow
+                            .withValues(alpha: 0.1),
+                        blurRadius: 4.r,
+                        offset: Offset(2.0.r, 2.0.r),
+                      ),
+                    ]
+                  : null,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.1),
-                blurRadius: 4.r,
-                offset: Offset(2.0.r, 2.0.r),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius:
-                Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
-                BorderRadius.circular(9.r),
-            child: InkWell(
-              focusNode: _focusNode,
-              onTap: () {
-                // A tap on the already-selected card confirms it rather than
-                // moving the selection (touch users have no A button), so it
-                // earns the enter sound instead of the nav sound.
-                if (widget.isSelected) {
-                  SfxService().playEnterSound();
-                } else {
-                  SfxService().playNavSound();
-                }
-                widget.onTap?.call();
-              },
-              // No sound here: every host opens a menu from this callback and
-              // plays its own, so playing one too would double it.
-              onLongPress: widget.onLongPress,
-              canRequestFocus: false,
-              focusColor: Colors.transparent,
-              hoverColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  top: 4.r,
-                  bottom: 0.r,
-                  left: 4.r,
-                  right: 4.r,
-                ),
-                child: widget.info.isGame
-                    ? Column(
-                        children: [
-                          Expanded(
-                            child: Stack(
-                              key: _contentStackKey,
-                              children: [
-                                _buildSystemBackground(),
-                                _buildGameMainContent(context),
-                              ],
+            child: ClipRRect(
+              borderRadius:
+                  Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
+                  BorderRadius.circular(9.r),
+              child: InkWell(
+                focusNode: _focusNode,
+                onTap: () {
+                  // A tap on the already-selected card confirms it rather than
+                  // moving the selection (touch users have no A button), so it
+                  // earns the enter sound instead of the nav sound.
+                  if (widget.isSelected) {
+                    SfxService().playEnterSound();
+                  } else {
+                    SfxService().playNavSound();
+                  }
+                  widget.onTap?.call();
+                },
+                // No sound here: every host opens a menu from this callback and
+                // plays its own, so playing one too would double it.
+                onLongPress: widget.onLongPress,
+                canRequestFocus: false,
+                focusColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: widget.artworkInset.r,
+                    bottom: hideSystemLogos && !widget.info.isGame
+                        ? widget.artworkInset.r
+                        : 0.r,
+                    left: widget.artworkInset.r,
+                    right: widget.artworkInset.r,
+                  ),
+                  child: widget.info.isGame
+                      ? Column(
+                          children: [
+                            Expanded(
+                              child: Stack(
+                                key: _contentStackKey,
+                                children: [
+                                  _buildSystemBackground(),
+                                  _buildGameMainContent(context),
+                                ],
+                              ),
                             ),
-                          ),
-                          _buildGameFooter(context),
-                        ],
-                      )
-                    : (hideSystemLogos
-                          ? Column(
-                              children: [
-                                Expanded(
-                                  child: Stack(
-                                    key: _contentStackKey,
-                                    children: [
-                                      _buildSystemBackground(),
-                                      if (widget.showCount)
-                                        _buildCountPill(context),
-                                    ],
+                            _buildGameFooter(context),
+                          ],
+                        )
+                      : (hideSystemLogos
+                            ? Column(
+                                children: [
+                                  Expanded(
+                                    child: Stack(
+                                      key: _contentStackKey,
+                                      children: [
+                                        _buildSystemBackground(),
+                                        if (widget.info.isSmartCollection)
+                                          _buildSmartCollectionBadge(context),
+                                        if (widget.showCount)
+                                          _buildCountPill(context),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              children: [
-                                AspectRatio(
-                                  aspectRatio: 1,
-                                  child: Stack(
-                                    key: _contentStackKey,
+                                ],
+                              )
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  // Simple two-part card: artwork content on top,
+                                  // a dedicated footer strip for the logo below.
+                                  // Reserving real height for the footer stops it
+                                  // collapsing into a one-pixel line at size S.
+                                  final footerHeight = math.max(
+                                    28.r,
+                                    constraints.maxWidth * 0.24,
+                                  );
+                                  return Column(
                                     children: [
-                                      _buildSystemBackground(),
-                                      if (widget.showCount)
-                                        _buildCountPill(context),
+                                      Expanded(
+                                        child: Stack(
+                                          key: _contentStackKey,
+                                          children: [
+                                            _buildSystemBackground(),
+                                            if (widget.info.isSmartCollection)
+                                              _buildSmartCollectionBadge(
+                                                context,
+                                              ),
+                                            if (widget.showCount)
+                                              _buildCountPill(context),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        height: footerHeight,
+                                        child: _buildSystemFooter(context),
+                                      ),
                                     ],
-                                  ),
-                                ),
-                                _buildSystemFooter(context),
-                              ],
-                            )),
+                                  );
+                                },
+                              )),
+                ),
               ),
             ),
           ),
@@ -372,7 +462,7 @@ class _SystemCardState extends State<SystemCard> {
   /// Orchestrates background rendering, selecting between static images,
   /// music cover shaders, or GIF animators.
   Widget _buildSystemBackground() {
-    if (widget.info.folderName == 'music') {
+    if (widget.info.folderName == 'music' && !_performanceMode) {
       return AnimatedBuilder(
         animation: _musicPlayerService,
         builder: (context, child) {
@@ -388,9 +478,9 @@ class _SystemCardState extends State<SystemCard> {
                     widget.info.color1AsColor ??
                     Theme.of(context).colorScheme.primary,
                 borderRadius:
-                    Theme.of(
-                      context,
-                    ).extension<CornerRadii>()?.radiusInternalRadius ??
+                    Theme.of(context)
+                        .extension<CornerRadii>()
+                        ?.radiusInternalRadius ??
                     12.r,
                 opacity: 1.0,
               ),
@@ -409,6 +499,14 @@ class _SystemCardState extends State<SystemCard> {
   Widget _buildDefaultSystemBackground() {
     final customBgPath = widget.info.customBackgroundPath;
     final hasCustomBg = customBgPath != null && customBgPath.isNotEmpty;
+
+    // Performance mode never creates the GIF shader; the card falls back to
+    // its static tint/mosaic instead of animating a background.
+    if (_performanceMode &&
+        ((hasCustomBg && ImageUtils.isGif(customBgPath)) ||
+            (!hasCustomBg && ImageUtils.isGif(_themeBackgroundPath)))) {
+      return _buildArtlessBackground();
+    }
 
     // SCENARIO A: Animated GIF (custom or theme-provided).
     if (hasCustomBg && ImageUtils.isGif(customBgPath)) {
@@ -473,7 +571,10 @@ class _SystemCardState extends State<SystemCard> {
                 File(activeBgPath),
                 key: ValueKey('${activeBgPath}_${widget.info.imageVersion}'),
                 fit: BoxFit.cover,
-                cacheWidth: widget.backgroundCacheWidth,
+                cacheWidth: performanceCacheWidth(
+                  widget.backgroundCacheWidth,
+                  performanceMode: _performanceMode,
+                ),
                 errorBuilder: (context, error, stackTrace) =>
                     _buildArtlessBackground(),
               )
@@ -511,9 +612,8 @@ class _SystemCardState extends State<SystemCard> {
                 Symbols.search_rounded,
                 size: box.biggest.shortestSide * 0.55,
                 weight: 600,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.9),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.9),
               ),
             ),
           ),
@@ -521,7 +621,7 @@ class _SystemCardState extends State<SystemCard> {
       );
     }
 
-    if (mosaicPaths.isEmpty) return tint;
+    if (mosaicPaths.isEmpty || _performanceMode) return tint;
 
     return Stack(
       fit: StackFit.expand,
@@ -578,7 +678,7 @@ class _SystemCardState extends State<SystemCard> {
     Widget assetLogo() => Image.asset(
       assetLogoPath,
       height: resolvedHeight,
-      cacheWidth: 256,
+      cacheWidth: performanceCacheWidth(256, performanceMode: _performanceMode),
       fit: BoxFit.contain,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
           tint(child),
@@ -591,7 +691,10 @@ class _SystemCardState extends State<SystemCard> {
         File(customLogoPath),
         key: ValueKey('${customLogoPath}_${widget.info.imageVersion}'),
         height: resolvedHeight,
-        cacheWidth: 256,
+        cacheWidth: performanceCacheWidth(
+          256,
+          performanceMode: _performanceMode,
+        ),
         fit: BoxFit.contain,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
             tint(child),
@@ -618,35 +721,10 @@ class _SystemCardState extends State<SystemCard> {
     );
   }
 
-  /// Builds the foreground content for game cards, including the RECENT badge
-  /// and the game wheel/logo.
+  /// Builds the foreground content for game cards: the game wheel/logo.
   Widget _buildGameMainContent(BuildContext context) {
     return Stack(
       children: [
-        // RECENT badge.
-        Positioned(
-          top: 6.r,
-          right: 6.r,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondary,
-              borderRadius:
-                  Theme.of(context).extension<CornerRadii>()?.radiusInternal ??
-                  BorderRadius.circular(9.r),
-            ),
-            child: Text(
-              AppLocale.recentBadge.getString(context),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSecondary,
-                fontSize: 8.r,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-        ),
-
         // Central game wheel/logo. The inset that lets the wheel breathe on the
         // 3x2 card would eat most of a 2x1 one, so it scales with the box and
         // only reaches its full value on cards tall enough to spare it.
@@ -656,19 +734,47 @@ class _SystemCardState extends State<SystemCard> {
               : LayoutBuilder(
                   builder: (context, constraints) {
                     final shortestSide = constraints.biggest.shortestSide;
+                    final maxInset = widget.isCompact ? 36.r : 48.r;
+                    final insetFactor = widget.isCompact ? 0.22 : 0.15;
                     final inset = shortestSide.isFinite
-                        ? math.min(48.r, shortestSide * 0.15)
-                        : 48.r;
+                        ? math.min(maxInset, shortestSide * insetFactor)
+                        : maxInset;
 
+                    final cacheWidth = performanceCacheWidth(
+                      512,
+                      performanceMode: _performanceMode,
+                    );
+                    // The same drop shadow as the game list's wheel: a copy
+                    // in the theme's shadow colour, offset down and right,
+                    // scaled to the card.
+                    final shadowOffset = widget.isCompact ? 3.r : 5.r;
                     return Padding(
                       padding: EdgeInsets.all(inset),
-                      child: Image.file(
-                        _cachedWheelFile!,
-                        height: 256.r,
-                        fit: BoxFit.contain,
-                        cacheWidth: 512,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const SizedBox.shrink(),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Transform.translate(
+                            offset: Offset(shadowOffset, shadowOffset),
+                            child: Image.file(
+                              _cachedWheelFile!,
+                              height: 256.r,
+                              fit: BoxFit.contain,
+                              cacheWidth: cacheWidth,
+                              color: Theme.of(context).colorScheme.shadow
+                                  .withValues(alpha: 0.5),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const SizedBox.shrink(),
+                            ),
+                          ),
+                          Image.file(
+                            _cachedWheelFile!,
+                            height: 256.r,
+                            fit: BoxFit.contain,
+                            cacheWidth: cacheWidth,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -681,30 +787,41 @@ class _SystemCardState extends State<SystemCard> {
   /// Renders a footer for game cards, matching the system card footer style.
   Widget _buildGameFooter(BuildContext context) {
     return Container(
-      height: 32.r,
+      height: SystemCard.gameFooterHeight,
       alignment: Alignment.center,
       padding: EdgeInsets.symmetric(horizontal: 8.r),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            AppLocale.timePlayedLabel
-                .getString(context)
-                .replaceFirst(
-                  '{time}',
-                  _formatPlayTimeLocalized(
-                    widget.info.gameModel?.playTime ?? 0,
-                  ),
-                )
-                .toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 10.r,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
+          GooeyCardChrome.fadeColor(
+            context,
+            color: _highlighted
+                ? Theme.of(context).colorScheme.onSecondary
+                : Theme.of(context).colorScheme.onSurface,
+            // Shrinks rather than cuts off on the narrow cards of the
+            // smallest sizes.
+            builder: (color) => FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                AppLocale.timePlayedLabel
+                    .getString(context)
+                    .replaceFirst(
+                      '{time}',
+                      _formatPlayTimeLocalized(
+                        widget.info.gameModel?.playTime ?? 0,
+                      ),
+                    )
+                    .toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10.r,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                ),
+              ),
             ),
           ),
         ],
@@ -712,32 +829,26 @@ class _SystemCardState extends State<SystemCard> {
     );
   }
 
-  /// Renders a bottom footer with the system logo for non-game system cards.
+  /// Renders the dedicated logo footer.
   ///
-  /// The footer expands to fill the remaining space below the square artwork,
-  /// and the logo is auto-sized to fit while keeping its aspect ratio — the
-  /// whole strip is the logo's, which is the point of floating the count over
-  /// the artwork instead (see [_buildCountPill]).
+  /// No background of its own: the card surface already provides it. Keeping
+  /// the logo in a fixed-height strip (rather than overlaying it or squeezing
+  /// it into a gradient) is both simpler to reason about and cheaper to paint.
   Widget _buildSystemFooter(BuildContext context) {
     final assetLogoPath = _resolveSystemLogoPath();
+    final selected = _highlighted;
 
-    return Expanded(
-      child: Container(
-        padding: EdgeInsets.only(top: 1.r, bottom: 1.r, left: 2.r, right: 2.r),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: FittedBox(
-                fit: BoxFit.contain,
-                child: _buildSystemLogo(
-                  assetLogoPath,
-                  height: 128.r,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ),
-          ],
+    return Padding(
+      padding: EdgeInsets.only(bottom: 2.r, left: 4.r, right: 4.r),
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: GooeyCardChrome.fadeColor(
+          context,
+          color: selected
+              ? Theme.of(context).colorScheme.onSecondary
+              : Theme.of(context).colorScheme.onSurface,
+          builder: (color) =>
+              _buildSystemLogo(assetLogoPath, height: 128.r, color: color),
         ),
       ),
     );

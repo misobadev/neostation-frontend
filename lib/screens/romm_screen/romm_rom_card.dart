@@ -263,7 +263,7 @@ class RommRomCardState extends State<RommRomCard> {
     final muted = scheme.onSurface.withValues(alpha: 0.6);
     final chips = <Widget>[];
 
-    final platform = _platformLabel();
+    final platform = widget.provider.platformLabel(widget.rom);
     if (platform != null) {
       chips.add(_metaChip(Symbols.videogame_asset_rounded, platform, muted));
     }
@@ -387,17 +387,6 @@ class RommRomCardState extends State<RommRomCard> {
         ),
       ],
     );
-  }
-
-  /// Human-readable platform name for this ROM, resolved from the loaded
-  /// platform list (falls back to the upper-cased slug).
-  String? _platformLabel() {
-    final slug = widget.rom.platformSlug;
-    if (slug.isEmpty) return null;
-    for (final p in widget.provider.platforms) {
-      if (p.slug == slug) return p.name;
-    }
-    return slug.toUpperCase();
   }
 
   /// Compact size label (e.g. "2.1 MB"); null when the size is unknown.

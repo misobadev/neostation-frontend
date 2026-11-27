@@ -6,17 +6,19 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 workspace:
   - packages/flutter_7zip
   - packages/flutter_chd
+  - packages/fvp
   - packages/gamepads
   - packages/gamepads_android
   - packages/gamepads_darwin
   - packages/gamepads_linux
   - packages/gamepads_platform_interface
   - packages/gamepads_windows
+  - packages/sub_screen
 
-version: 0.14.0+130
+version: 1.0.0-rc.2+3002
 
 environment:
-  sdk: '>=3.9.2'
+  sdk: '>=3.13.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -31,42 +33,53 @@ dependencies:
   flutter_chd:
     path: packages/flutter_chd
 
-  file_picker: ^12.2.0
-  device_info_plus: ^13.2.0
-  package_info_plus: ^10.2.1
-  google_fonts: ^8.2.1
+  file_picker: ^13.3.2
+  device_info_plus: ^13.3.0
+  package_info_plus: ^10.2.2
+  google_fonts: ^9.0.0
   material_symbols_icons: ^4.2960.0
   provider: ^6.1.5+1
-  battery_plus: ^7.1.1
+  battery_plus: ^7.1.2
   path: ^1.9.1
   path_provider: ^2.1.6
-  xml: ^6.6.1
-  video_player: ^2.13.0
-  fvp: ^0.38.1
-  flutter_secure_storage: ^10.3.1
-  shared_preferences: ^2.5.5
+  xml: ^7.0.1
+  video_player: ^2.14.1
+  # Vendored: deletes native players off the UI isolate (fvp#413) and pins
+  # the MDK SDK. See packages/fvp/NEOSTATION.md.
+  fvp:
+    path: packages/fvp
+  flutter_secure_storage: ^11.2.0
+  shared_preferences: ^2.5.6
+  # Held on the 2.4 line: 2.5.0-2.5.4 break preferences when the bottom-screen
+  # engine is destroyed, and 2.5.5 only fixes that on Flutter 3.50 (NEO-249,
+  # GitHub #829). Lift with the Flutter 3.50 upgrade (NEO-242); Dependabot
+  # ignores 2.5+ until then.
+  shared_preferences_android: ">=2.4.27 <2.5.0"
   http: ^1.6.0
-  flutter_svg: ^2.0.10
-  crypto: ^3.0.7
-  archive: ^4.3.0
+  flutter_svg: ^2.3.2
+  crypto: ^3.0.8
+  archive: ^4.6.0
   web_socket_channel: ^3.0.3
-  url_launcher: ^6.3.2
+  url_launcher: ^6.3.3
   widget_mask: ^1.0.0
   flutter_screenutil: 5.9.3
-  window_manager: ^0.5.2
+  window_manager: ^0.6.0
   permission_handler: ^12.0.3
   pointycastle: ^4.0.0
-  sqlite3: ^3.6.0
+  sqlite3: ^3.8.0
   fullscreen_window: ^1.2.1
   animated_toggle_switch: ^0.8.7
   marquee: ^2.3.0
   logger: ^2.8.0
-  sub_screen: ^0.1.9
-  flutter_soloud: ^4.1.7
-  audio_metadata_reader: ^1.8.0
+  sub_screen:
+    path: packages/sub_screen
+  flutter_soloud: ^5.2.3
+  audio_metadata_reader: ^1.8.1
   wakelock_plus: ^1.8.0
-  flutter_localization: ^0.4.1
+  flutter_localization: ^1.0.0
   flutter_tilt: ^4.1.0
+  flutter_staggered_animations: ^1.1.1
+  spring: ^2.0.2
 
 dev_dependencies:
   flutter_test:
@@ -75,6 +88,7 @@ dev_dependencies:
   flutter_launcher_icons: "^0.14.4"
   mocktail: ^1.0.5
   fake_async: ^1.3.3
+  test: ^1.31.1
 
 flutter_launcher_icons:
   android: "launcher_icon"
@@ -88,7 +102,7 @@ flutter_launcher_icons:
   windows:
     generate: true
     image_path: "assets/images/logo.png"
-    icon_size: 48
+    icon_size: 256
   macos:
     generate: true
     image_path: "assets/images/logo.png"
@@ -101,6 +115,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/logos/
+    - assets/images/neosync/
     - assets/images/emulators/
     - assets/images/gamepad/
     - assets/images/icons/
@@ -110,6 +125,7 @@ flutter:
     - assets/systems/
     - assets/sounds/
   shaders:
+    - assets/shaders/gooey_selector.frag
     - assets/shaders/stripes.frag
     - assets/shaders/fluid.frag
     - assets/shaders/gif_player.frag

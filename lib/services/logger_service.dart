@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/utils/log_redaction.dart';
@@ -17,6 +20,9 @@ class LoggerService {
 
   Logger _logger;
   bool _initialized = false;
+
+  /// The file [init] opened, or null when this isolate logs to the console only.
+  String? _filePath;
 
   /// Lines logged in this isolate since [startCapture], or null when nothing
   /// is collecting.
@@ -37,6 +43,10 @@ class LoggerService {
   /// that must not lose a line in that isolate should check this and fall back
   /// to `debugPrint`.
   bool get isFileBacked => _initialized;
+
+  /// The log file this isolate writes to, or null when it isn't file-backed.
+  @visibleForTesting
+  String? get filePath => _filePath;
 
   LoggerService._internal()
     : _logger = Logger(
@@ -73,7 +83,7 @@ class LoggerService {
 
       _logger = Logger(
         level: Level.info,
-        printer: RedactingPrinter(SimplePrinter(colors: true)),
+        printer: RedactingPrinter(TimestampedPrinter()),
         filter: CustomProductionFilter(),
         output: MultiOutput([
           ConsoleOutput(),
@@ -82,11 +92,69 @@ class LoggerService {
       );
 
       _initialized = true;
+      _filePath = logFilePath;
       i('Logger initialized with file output: $logFilePath');
     } catch (e) {
       // ignore: avoid_print
       print('Error initializing file logger: $e');
     }
+  }
+
+  /// Reopens the log file under the current user-data folder, after it moved.
+  ///
+  /// `app.log` lives in the user-data folder, and the setup wizard moves that
+  /// without a restart: without this the rest of the session went on writing
+  /// to the old folder, which a log export then missed. The new file logger
+  /// replaces the old one before the old one is closed, so nothing logged
+  /// meanwhile hits a closed logger. A logger that never opened a file (the
+  /// second screen's engine) is left as it is.
+  Future<void> reinitialize() async {
+    if (!_initialized) return;
+    try {
+      // Same folder (a move that was put back): two writers on one file would
+      // interleave, and the rotation would rename the open one.
+      if (await ConfigService.getLogFilePath() == _filePath) return;
+    } catch (e) {
+      w('Log file not moved: $e');
+      return;
+    }
+    final previous = _logger;
+    final previousPath = _filePath;
+    _initialized = false;
+    await init();
+    if (!_initialized) {
+      // The new folder couldn't take the log: keep writing where we were.
+      _logger = previous;
+      _filePath = previousPath;
+      _initialized = true;
+      return;
+    }
+    // Not awaited, and bounded: a file that never opened (the unwritable
+    // folder the wizard resets away from) never finishes flushing, and the
+    // wizard step must not wait on it.
+    unawaited(
+      previous
+          .close()
+          .timeout(const Duration(seconds: 2), onTimeout: () {})
+          .catchError((Object _) {}),
+    );
+  }
+
+  /// Puts the logger back to console-only, as before [init], for tests.
+  @visibleForTesting
+  Future<void> resetForTesting() async {
+    final previous = _logger;
+    _logger = Logger(
+      printer: RedactingPrinter(SimplePrinter(colors: true)),
+      filter: ProductionFilter(),
+      output: MultiOutput([ConsoleOutput()]),
+    );
+    _initialized = false;
+    _filePath = null;
+    await previous
+        .close()
+        .timeout(const Duration(seconds: 2), onTimeout: () {})
+        .catchError((Object _) {});
   }
 
   /// Starts collecting everything this isolate logs, on top of its normal
@@ -199,6 +267,63 @@ class RedactingPrinter extends LogPrinter {
   @override
   List<String> log(LogEvent event) =>
       _inner.log(event).map(redactSecrets).toList();
+}
+
+/// One plain line per event for the log file: local date and time, level and
+/// message, then the error and the top of its stack trace when there is one.
+///
+/// No ANSI colors: the file is read in text editors and attached to bug
+/// reports. The date is what lets a user's log be matched against the moment
+/// they saw a crash, and the stack is what makes an error line actionable.
+class TimestampedPrinter extends LogPrinter {
+  TimestampedPrinter({this.maxStackFrames = 12});
+
+  /// How many stack frames an error keeps; the rest is rarely useful and a
+  /// repeated failure would otherwise flood the file.
+  final int maxStackFrames;
+
+  static const _labels = {
+    Level.trace: 'T',
+    Level.debug: 'D',
+    Level.info: 'I',
+    Level.warning: 'W',
+    Level.error: 'E',
+    Level.fatal: 'F',
+  };
+
+  @override
+  List<String> log(LogEvent event) {
+    final label = _labels[event.level] ?? '?';
+    final message = event.message is Function
+        ? (event.message as Function)().toString()
+        : event.message.toString();
+    final error = event.error != null ? '  ERROR: ${event.error}' : '';
+    final lines = ['${formatTime(event.time)} [$label] $message$error'];
+
+    final stack = event.stackTrace;
+    if (stack != null) {
+      final frames = stack
+          .toString()
+          .split('\n')
+          .where((l) => l.trim().isNotEmpty)
+          .toList();
+      for (final frame in frames.take(maxStackFrames)) {
+        lines.add('    $frame');
+      }
+      if (frames.length > maxStackFrames) {
+        lines.add('    ... ${frames.length - maxStackFrames} more frames');
+      }
+    }
+    return lines;
+  }
+
+  /// `2026-11-22 18:13:49.594`, in local time.
+  static String formatTime(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    String three(int n) => n.toString().padLeft(3, '0');
+    return '${t.year}-${two(t.month)}-${two(t.day)} '
+        '${two(t.hour)}:${two(t.minute)}:${two(t.second)}.${three(t.millisecond)}';
+  }
 }
 
 /// Custom log filter that permits INFO level logs even in production/release environments.

@@ -159,19 +159,17 @@ class ScreenScraperAccountCard extends StatelessWidget {
   Widget _buildLogoutButton(BuildContext context, ThemeData theme) {
     final selected = logoutFocused;
     return Container(
+      padding: EdgeInsets.all(4.r),
       decoration: BoxDecoration(
+        color: selected ? theme.colorScheme.onSurface : Colors.transparent,
         borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(
-          color: selected ? theme.colorScheme.primary : Colors.transparent,
-          width: 2.r,
-        ),
       ),
       child: IconButton(
         onPressed: onLogout,
         icon: Icon(
           Symbols.logout_rounded,
           size: 20.r,
-          color: theme.colorScheme.error,
+          color: selected ? theme.colorScheme.surface : theme.colorScheme.error,
         ),
         tooltip: AppLocale.disconnectAccount.getString(context),
       ),

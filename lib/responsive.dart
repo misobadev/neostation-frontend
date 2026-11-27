@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/utils/grid_sizes.dart';
 
 class Responsive extends StatelessWidget {
   final Widget handheldXS;
@@ -97,21 +98,16 @@ class Responsive extends StatelessWidget {
     return getSystemsCrossAxisCount(context);
   }
 
-  /// Convierte el tamaño de card del usuario ('S', 'M', 'L', 'XL') a columnas.
-  static int getSystemsCrossAxisCountFromSize(String size) {
-    switch (size) {
-      case 'S':
-        return 7;
-      case 'M':
-        return 6;
-      case 'L':
-        return 5;
-      case 'XL':
-        return 4;
-      default:
-        return 6;
-    }
-  }
+  /// The column count for a card size (see [GridSizes]).
+  static int getSystemsCrossAxisCountFromSize(String size) =>
+      GridSizes.columns(size);
+
+  /// Maps a Discovery card size to its column count.
+  ///
+  /// Discovery uses the same density scale as the systems grid: XS=8, S=7,
+  /// M=6, L=5 and XL=4. An unknown value falls back to M.
+  static int getDiscoveryCrossAxisCountFromSize(String size) =>
+      getSystemsCrossAxisCountFromSize(size);
 
   /// Obtener el crossAxisCount para el grid de Apps de Android
   /// 10 para pantallas grandes, menos para pequeñas

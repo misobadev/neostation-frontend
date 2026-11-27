@@ -34,7 +34,7 @@ void main() {
     );
   });
 
-  testWidgets('rows render: title, console/date line, progress, awards', (
+  testWidgets('the grid shows the selected game in the card under it', (
     tester,
   ) async {
     final provider = _TabProvider(
@@ -48,16 +48,16 @@ void main() {
     final tabKey = GlobalKey<RaGamesTabState>();
     await _pumpTab(tester, provider, tabKey);
 
+    // A tile per game; only the selected one is named, in the card, with
+    // its earned/total and its award.
+    expect(find.byKey(const ValueKey('ra-game-tile-200')), findsOneWidget);
+    expect(find.byKey(const ValueKey('ra-game-tile-202')), findsOneWidget);
     expect(find.text('Game 0'), findsOneWidget);
-    expect(find.text('Game 2'), findsOneWidget);
-    expect(find.text('PlayStation • 2026-09-01'), findsNWidgets(3));
-    // Progress text: earned/total, per row.
+    expect(find.text('Game 2'), findsNothing);
     expect(find.text('10/50'), findsOneWidget);
-    expect(find.text('11/50'), findsOneWidget);
-    expect(find.text('12/50'), findsOneWidget);
-    // Only the awarded rows carry a badge.
+    expect(find.text('11/50'), findsNothing);
     expect(find.text('Mastery'), findsOneWidget);
-    expect(find.text('Completion'), findsOneWidget);
+    expect(find.text('Completion'), findsNothing);
     // The chips row is part of the tab, All selected first.
     expect(find.text('All'), findsOneWidget);
     expect(find.text('Mastered'), findsOneWidget);
@@ -70,7 +70,7 @@ void main() {
     await _disposeTab(tester);
   });
 
-  testWidgets('the cursor walks rows and A activates the row under it', (
+  testWidgets('the cursor walks the grid and A activates the game under it', (
     tester,
   ) async {
     final provider = _TabProvider(items: List.generate(6, _game), loaded: true);
@@ -79,8 +79,8 @@ void main() {
     await _pumpTab(tester, provider, tabKey, activated: activated);
 
     final state = tabKey.currentState!;
-    expect(state.handleNavigateDown(), isTrue);
-    expect(state.handleNavigateDown(), isTrue);
+    expect(state.handleNavigateRight(), isTrue);
+    expect(state.handleNavigateRight(), isTrue);
     state.activateCurrent();
     expect(activated.single.title, 'Game 2');
 
@@ -99,8 +99,8 @@ void main() {
       await _pumpTab(tester, provider, tabKey, activated: activated);
 
       final state = tabKey.currentState!;
-      state.handleNavigateDown();
-      state.handleNavigateDown();
+      state.handleNavigateRight();
+      state.handleNavigateRight();
       state.activateCurrent();
       expect(activated.single.gameId, 202);
 
@@ -166,8 +166,8 @@ void main() {
     expect(state.handleNavigateLeft(), isTrue);
     expect(provider.gamesFilter, RaGamesFilter.beaten);
     await tester.pump();
-    expect(find.text('Game 2'), findsOneWidget);
-    expect(find.text('Game 0'), findsNothing);
+    expect(find.byKey(const ValueKey('ra-game-tile-202')), findsOneWidget);
+    expect(find.byKey(const ValueKey('ra-game-tile-200')), findsNothing);
     // The switch is a client-side re-derivation: no fetch, ever.
     expect(provider.fetchLog, isEmpty);
 
@@ -175,15 +175,14 @@ void main() {
     expect(state.handleNavigateLeft(), isTrue);
     expect(provider.gamesFilter, RaGamesFilter.mastered);
     await tester.pump();
-    expect(find.text('Game 1'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ra-game-tile-201')), findsOneWidget);
     expect(state.handleNavigateRight(), isTrue);
     expect(provider.gamesFilter, RaGamesFilter.beaten);
     await tester.pump();
 
-    // Left/Right on the rows themselves are silent.
-    state.handleNavigateDown(); // back into the list
+    // In the grid, Left on the first column hands back to the menu.
+    state.handleNavigateDown(); // back into the grid
     expect(state.handleNavigateLeft(), isFalse);
-    expect(state.handleNavigateRight(), isFalse);
     expect(provider.fetchLog, isEmpty);
 
     await _disposeTab(tester);
@@ -224,11 +223,10 @@ void main() {
     await _pumpTab(tester, provider, tabKey, activated: activated);
 
     final state = tabKey.currentState!;
-    state.handleNavigateDown(); // Game 1, mastered
+    state.handleNavigateRight(); // Game 1, mastered
 
     // Switch to Mastered through the chips, the way the D-pad does: Up from
-    // Game 1 walks to Game 0 first, the second Up arms the chips.
-    state.handleNavigateUp();
+    // the grid's first row arms the chips.
     expect(state.handleNavigateUp(), isTrue); // chips armed
     expect(state.handleNavigateRight(), isTrue); // All → Mastered
     expect(provider.gamesFilter, RaGamesFilter.mastered);
@@ -263,7 +261,7 @@ void main() {
 
     final state = tabKey.currentState!;
     for (var i = 0; i < 4; i++) {
-      state.handleNavigateDown();
+      state.handleNavigateRight();
     }
     // An append, never a reset: the loaded rows stay under the cursor.
     expect(provider.fetchLog, ['games-page']);
@@ -281,10 +279,10 @@ void main() {
     final tabKey = GlobalKey<RaGamesTabState>();
     await _pumpTab(tester, provider, tabKey);
 
-    // Park the cursor on the last row by tap: taps place the cursor without
+    // Park the cursor on the last game by tap: taps place the cursor without
     // prefetching, so the only thing that can ask for a page here is the
     // wall press itself.
-    await tester.tap(find.text('Game 11'));
+    await tester.tap(find.byKey(const ValueKey('ra-game-tile-211')));
     await tester.pump();
     expect(provider.fetchLog, isEmpty);
 
@@ -310,26 +308,28 @@ void main() {
     // Up from row 0 arms the chips (the tab's own zone), not the strip.
     expect(state.handleNavigateUp(), isTrue);
     expect(state.handleNavigateUp(), isFalse);
-    state.handleNavigateDown(); // back to the list
-    state.handleNavigateDown();
-    state.handleNavigateDown();
+    state.handleNavigateDown(); // back to the grid
+    state.handleNavigateRight();
+    state.handleNavigateRight();
+    expect(state.handleNavigateRight(), isFalse);
     expect(state.handleNavigateDown(), isFalse);
     expect(provider.fetchLog, isEmpty);
-    // The end-of-list footer is the honest answer at the wall.
-    expect(find.text(raGamesEndOfListText), findsOneWidget);
 
     await _disposeTab(tester);
   });
 
-  testWidgets('tapping a row moves the cursor there and activates it', (
-    tester,
-  ) async {
+  testWidgets('a tap selects a game and a second tap opens it', (tester) async {
     final provider = _TabProvider(items: List.generate(6, _game), loaded: true);
     final tabKey = GlobalKey<RaGamesTabState>();
     final activated = <RaGamesListItem>[];
     await _pumpTab(tester, provider, tabKey, activated: activated);
 
-    await tester.tap(find.text('Game 3'));
+    final tile = find.byKey(const ValueKey('ra-game-tile-203'));
+    await tester.tap(tile);
+    await tester.pump();
+    expect(activated, isEmpty);
+    expect(find.text('Game 3'), findsOneWidget);
+    await tester.tap(tile);
     await tester.pump();
     expect(activated.single.title, 'Game 3');
 
@@ -389,7 +389,7 @@ void main() {
     final tabKey = GlobalKey<RaGamesTabState>();
     await _pumpTab(tester, provider, tabKey);
 
-    expect(find.text('Game 1'), findsOneWidget);
+    expect(find.text('Game 0'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     await _disposeTab(tester);
@@ -406,8 +406,8 @@ void main() {
     final tabKey = GlobalKey<RaGamesTabState>();
     await _pumpTab(tester, provider, tabKey);
 
-    // Rows stay on screen; the error lives in the footer, not over the rows.
-    expect(find.text('Game 1'), findsOneWidget);
+    // The grid stays on screen; the error lives in the footer, not over it.
+    expect(find.text('Game 0'), findsOneWidget);
     expect(find.text('Error loading games: Boom'), findsOneWidget);
 
     // The footer retry resumes the append rather than resetting the list.
@@ -496,7 +496,8 @@ Finder _selectedRows() => find.byWidgetPredicate(
   (w) =>
       w is Semantics &&
       w.properties.selected == true &&
-      w.properties.label == null,
+      w.key is ValueKey<String> &&
+      (w.key! as ValueKey<String>).value.startsWith('ra-game-tile-'),
 );
 
 /// Mounts the tab the way the shell's IndexedStack does, minus the shell: the
@@ -570,11 +571,11 @@ class _TabProvider extends RetroAchievementsProvider {
   /// way the real provider's does. Everything else stays pinned per test.
   _TabProvider({
     this.items = const [],
-    bool loaded = false,
+    this._loaded = false,
     this.loading = false,
     this.hasMore = true,
     this.error,
-  }) : _loaded = loaded;
+  });
 
   List<RaGamesListItem> items;
   bool _loaded;

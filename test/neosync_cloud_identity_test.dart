@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/utils/cloud_path_builder.dart';
+import 'package:path/path.dart' as p;
 
 /// Cross-OS identity tests for NeoSync.
 ///
@@ -111,6 +112,152 @@ void main() {
           'saves/memcards/Mcd001.ps2',
           cloudType: 'shared',
         ),
+        isTrue,
+      );
+    });
+  });
+
+  group('sharedCardPath', () {
+    test('puts a PS2 card under PS2/, whatever its case', () {
+      expect(
+        CloudPathBuilder.sharedCardPath('ps2', 'Game.ps2'),
+        'saves/PS2/Game.ps2',
+      );
+      expect(
+        CloudPathBuilder.sharedCardPath('ps2', 'MCD001.PS2'),
+        'saves/PS2/MCD001.PS2',
+      );
+    });
+
+    test('puts a Dreamcast VMU under dc/, for either system name', () {
+      for (final system in ['dc', 'dreamcast']) {
+        expect(
+          CloudPathBuilder.sharedCardPath(system, 'vmu_save_A1.bin'),
+          'saves/dc/vmu_save_A1.bin',
+        );
+      }
+    });
+
+    test('leaves every other file to its own path', () {
+      expect(CloudPathBuilder.sharedCardPath('ps2', 'Game.srm'), isNull);
+      expect(CloudPathBuilder.sharedCardPath('dc', 'Game.A1.bin'), isNull);
+      expect(CloudPathBuilder.sharedCardPath('psx', 'Game.ps2'), isNull);
+      expect(CloudPathBuilder.sharedCardPath(null, 'vmu_save_A1.bin'), isNull);
+    });
+  });
+
+  group('RetroArch system-folder cards', () {
+    const system = '/ra/system';
+
+    test('LRPS2 keeps its cards in pcsx2/memcards, Flycast in dc', () {
+      expect(
+        CloudPathBuilder.retroArchSystemCardFolder('ps2', system),
+        p.join(system, 'pcsx2', 'memcards'),
+      );
+      expect(
+        CloudPathBuilder.retroArchSystemCardFolder('dc', system),
+        p.join(system, 'dc'),
+      );
+      expect(
+        CloudPathBuilder.retroArchSystemCoreFolder('ps2', system),
+        p.join(system, 'pcsx2'),
+      );
+      expect(
+        CloudPathBuilder.retroArchSystemCoreFolder('dc', system),
+        p.join(system, 'dc'),
+      );
+    });
+
+    test('no other system has one', () {
+      for (final other in ['psx', 'dreamcast', 'gc', null]) {
+        expect(
+          CloudPathBuilder.retroArchSystemCardFolder(other, system),
+          isNull,
+        );
+        expect(
+          CloudPathBuilder.retroArchSystemCoreFolder(other, system),
+          isNull,
+        );
+      }
+    });
+
+    test('names the cores keep there are cards; per-game cards are not', () {
+      for (final name in ['Mcd001.ps2', 'MCD002.PS2', 'Mcd010.ps2']) {
+        expect(CloudPathBuilder.isRetroArchSystemCardName('ps2', name), isTrue);
+      }
+      for (final name in ['vmu_save_A1.bin', 'VMU_SAVE_d2.BIN']) {
+        expect(CloudPathBuilder.isRetroArchSystemCardName('dc', name), isTrue);
+      }
+      for (final (system, name) in [
+        ('ps2', 'Game.ps2'),
+        ('ps2', 'Mcd.ps2'),
+        ('ps2', 'Mcd001.ps2.bak'),
+        ('ps2', 'xMcd001.ps2'),
+        ('dc', 'Game.A1.bin'),
+        ('dc', 'vmu_save_E1.bin'),
+        ('dc', 'vmu_save_A1.bin.bak'),
+        ('dc', 'dc_flash.bin'),
+        ('psx', 'Mcd001.ps2'),
+      ]) {
+        expect(
+          CloudPathBuilder.isRetroArchSystemCardName(system, name),
+          isFalse,
+          reason: '$system $name',
+        );
+      }
+    });
+  });
+
+  group('memory card formats', () {
+    test('the PCSX2 family writes one format', () {
+      for (final emulator in [
+        'ps2.net.pcsx2.android',
+        'ps2.xyz.aethersx2.android',
+        'ps2.xyz.aethersx2.tturnip',
+        'ps2.com.armsx2',
+        'ps2.come.nanodata.armsx2',
+        'retroarch.lrps2',
+        'retroarch.pcsx2',
+      ]) {
+        expect(
+          CloudPathBuilder.sameMemoryCardFormat(
+            emulator,
+            'ps2.net.pcsx2.android',
+          ),
+          isTrue,
+          reason: emulator,
+        );
+      }
+    });
+
+    test('Flycast and Reicast write one format', () {
+      for (final emulator in ['retroarch.flycast', 'dc.com.reicast.emulator']) {
+        expect(
+          CloudPathBuilder.sameMemoryCardFormat(
+            emulator,
+            'dc.com.flycast.emulator',
+          ),
+          isTrue,
+          reason: emulator,
+        );
+      }
+    });
+
+    test('any other emulator is its own format', () {
+      // EmuCoreX's lineage is unknown, so its cards are kept apart.
+      expect(
+        CloudPathBuilder.sameMemoryCardFormat(
+          'ps2.com.sbro.emucorex',
+          'ps2.net.pcsx2.android',
+        ),
+        isFalse,
+      );
+      expect(
+        CloudPathBuilder.sameMemoryCardFormat('standalone', 'another'),
+        isFalse,
+      );
+      expect(
+        CloudPathBuilder.sameMemoryCardFormat('standalone', 'standalone'),
         isTrue,
       );
     });

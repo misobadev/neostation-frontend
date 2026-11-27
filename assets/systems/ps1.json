@@ -186,6 +186,17 @@
       }
     },
     {
+      "name": "RetroArch64 GooseStation",
+      "unique_id": "ps1.ra64.goosestation",
+      "description": "Supported extensions: bin, chd, cue, ecm, exe, img, iso, m3u, mds, pbp, psexe, psf. Its license forbids redistribution: build it with goosestation-builder and install it in RetroArch. Needs a PS1 BIOS (e.g. scph5501.bin) in RetroArch's system folder. On Android, install the core as goosestation_libretro_android.so.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"goosestation\""
+        }
+      }
+    },
+    {
       "name": "RetroArch32 Beetle PSX HW",
       "default_core": true,
       "unique_id": "ps1.ra32.mednafen_psx_hw",
@@ -364,6 +375,31 @@
         "macos": {
           "executable": "retroarch",
           "args": "-L swanstation_libretro.dylib \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "RetroArch GooseStation",
+      "unique_id": "ps1.ra.goosestation",
+      "description": "Supported extensions: bin, chd, cue, ecm, exe, img, iso, m3u, mds, pbp, psexe, psf. Its license forbids redistribution: build it with goosestation-builder and install it in RetroArch. Needs a PS1 BIOS (e.g. scph5501.bin) in RetroArch's system folder. On Android, install the core as goosestation_libretro_android.so.",
+      "is_retroachievements_compatible": true,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"goosestation\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L goosestation_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L goosestation_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "retroarch",
+          "args": "-L goosestation_libretro.dylib \"{file.path}\""
         }
       }
     }

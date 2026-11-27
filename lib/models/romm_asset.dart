@@ -6,6 +6,10 @@ class RommAsset {
   /// RomM asset id (used for `/api/{saves|states}/{id}/content`).
   final int id;
 
+  /// The owning ROM. Filenames are not identities: different games/platforms
+  /// can use the same save filename.
+  final int? romId;
+
   /// The emulator's filename for this save/state (e.g. "Game.srm").
   final String fileName;
 
@@ -49,6 +53,7 @@ class RommAsset {
     required this.fileName,
     required this.fileSizeBytes,
     required this.isState,
+    this.romId,
     this.contentHash,
     this.createdAt,
     this.updatedAt,
@@ -63,6 +68,7 @@ class RommAsset {
   }) {
     return RommAsset(
       id: int.tryParse((json['id'] ?? 0).toString()) ?? 0,
+      romId: int.tryParse((json['rom_id'] ?? '').toString()),
       fileName: (json['file_name'] ?? '').toString(),
       fileSizeBytes:
           int.tryParse((json['file_size_bytes'] ?? '0').toString()) ?? 0,
@@ -78,6 +84,10 @@ class RommAsset {
 
   /// Milliseconds-since-epoch of [updatedAt], or 0 when unknown.
   int get updatedAtMs => updatedAt?.millisecondsSinceEpoch ?? 0;
+
+  /// Identifies this asset on its server. Saves and states are numbered
+  /// independently, so an [id] alone could match a save to a state.
+  ({bool isState, int id}) get key => (isState: isState, id: id);
 
   /// A trimmed string, or null when the field is absent or blank.
   ///

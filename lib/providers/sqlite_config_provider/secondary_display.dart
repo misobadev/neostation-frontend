@@ -3,20 +3,50 @@ part of '../sqlite_config_provider.dart';
 /// Secondary-display integration for [SqliteConfigProvider].
 ///
 /// Owns the native platform-channel handling for the dual-screen subscreen:
-/// connect/disconnect events, screenshot-access requests, in-game state resets,
+/// connect/disconnect events, in-game state resets,
 /// and re-applying the persisted visibility setting. Extracted verbatim from the
 /// host, which retains the class declaration, all state, and lifecycle wiring.
 /// `notifyListeners()` routes through the host's `_notify()` bridge and the
 /// statics `_log`/`_secondaryDisplayChannel` are host-qualified (both required
 /// from an extension).
 extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
+  /// Shows the main interface on the secondary (bottom) screen and the
+  /// secondary interface on the main one, or back. Android 10+ only; the
+  /// native side applies it at once and reads it again at every start.
+  Future<void> updateSwapScreens(bool value) async {
+    final previous = _config;
+    _config = _config.copyWith(swapScreens: value);
+    await _saveOrRevert(previous);
+    if (Platform.isAndroid) {
+      // ignore: unawaited_futures
+      SqliteConfigProvider._secondaryDisplayChannel.invokeMethod(
+        'setScreensSwapped',
+        {'swapped': value},
+      );
+    }
+    _notify();
+  }
+
+  /// Whether this device can swap screens (Android 10+).
+  Future<bool> isScreenSwapSupported() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return await SqliteConfigProvider._secondaryDisplayChannel
+              .invokeMethod<bool>('isScreenSwapSupported') ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Toggles the visibility of the secondary display on dual-screen hardware.
   Future<void> updateHideBottomScreen(
     bool value, {
     int? backgroundColor,
   }) async {
+    final previous = _config;
     _config = _config.copyWith(hideBottomScreen: value);
-    await SqliteConfigService.saveConfig(_config);
+    await _saveOrRevert(previous);
 
     if (Platform.isAndroid && _secondaryDisplayState != null) {
       final current = _secondaryDisplayState!.value;
@@ -36,10 +66,6 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
           // stuck inactive, since hiding has already forced it false.
           isSecondaryActive: !value,
         );
-        if (!value) {
-          // ignore: unawaited_futures
-          refreshSecondaryScreenshotAccess();
-        }
       }
     }
 
@@ -74,14 +100,6 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
         SqliteConfigProvider._log.i('Secondary display disconnected');
         _onSecondaryDisplayChanged(connected: false);
         break;
-      case 'onAccessibilityConnected':
-        // The user just enabled the Screen Return service (e.g. via the in-game
-        // launcher nudge). Re-push access state so the secondary display clears
-        // the launcher warning badge and reveals the screenshot button — this
-        // fires even while a game keeps the main engine backgrounded.
-        // ignore: unawaited_futures
-        refreshSecondaryScreenshotAccess();
-        break;
     }
   }
 
@@ -94,12 +112,15 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
         isSecondaryActive: true,
         nowPlayingDimDelay: _config.nowPlayingDimDelay,
         nowPlayingDimLevel: _config.nowPlayingDimLevel,
+        videoPreviewDelay: _config.videoPreviewDelay,
         fanartDimLevel: _config.fanartDimLevel,
         dockApps: _config.dockApps,
         dockEnabled: _config.dockEnabled,
+        hideSystemLogo: _config.secondaryHideSystemLogo,
         dockSlotCount: _config.dockSlotCount,
         sfxEnabled: _config.sfxEnabled,
         sfxVolume: _config.sfxVolume,
+        customSfx: _config.customSfx,
         use12HourClock: _config.use12HourClock,
         // If the main UI is already up (e.g. a display hot-connected after
         // launch), carry the ready latch so the dock slides in on connect;
@@ -107,8 +128,6 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
         // [markAppReady] fires at first frame.
         appReady: _appReady,
       );
-      // ignore: unawaited_futures
-      refreshSecondaryScreenshotAccess();
     } else {
       _secondaryDisplayState!.updateState(isSecondaryActive: false);
     }
@@ -178,11 +197,6 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
         // ignore: unawaited_futures
         toggleVideoSound();
       }
-      if (state.screenshotTrigger > _lastScreenshotTrigger) {
-        _lastScreenshotTrigger = state.screenshotTrigger;
-        // ignore: unawaited_futures
-        _handleSecondaryScreenshotRequest();
-      }
       if (state.dockEditTrigger > _lastDockEditTrigger) {
         _lastDockEditTrigger = state.dockEditTrigger;
         // The secondary already shows the new layout; persist it on the main
@@ -192,17 +206,18 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
       } else if (_initialized &&
           (!listEquals(state.dockApps, _config.dockApps) ||
               state.dockEnabled != _config.dockEnabled ||
+              state.hideSystemLogo != _config.secondaryHideSystemLogo ||
               state.dockSlotCount != _config.dockSlotCount ||
               state.nowPlayingDimDelay != _config.nowPlayingDimDelay ||
               state.nowPlayingDimLevel != _config.nowPlayingDimLevel ||
+              state.videoPreviewDelay != _config.videoPreviewDelay ||
               state.fanartDimLevel != _config.fanartDimLevel ||
               state.sfxEnabled != _config.sfxEnabled ||
               state.sfxVolume != _config.sfxVolume ||
+              CustomSfx.encode(state.customSfx) !=
+                  CustomSfx.encode(_config.customSfx) ||
               (state.use12HourClock != null &&
-                  state.use12HourClock != _config.use12HourClock) ||
-              (ScreenshotService.lastKnownAccess != null &&
-                  state.screenshotAccessEnabled !=
-                      ScreenshotService.lastKnownAccess))) {
+                  state.use12HourClock != _config.use12HourClock))) {
         // No edit trigger, yet a main-owned field in the shared snapshot
         // disagrees with the persisted config — this is a stale echo from the
         // secondary, whose startup snapshot synced before (or raced) our boot
@@ -214,36 +229,21 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
         // dockEditTrigger above), so the main engine owns them and we re-assert
         // the persisted values whenever they drift. (Guarded on _initialized so
         // we don't fight before the config has loaded.)
-        //
-        // screenshotAccessEnabled rides along for the same reason: its default
-        // is false, so the same boot echo made the dock treat an already-granted
-        // Screen Return as revoked — every filled slot guarded behind the
-        // "enable Screen Return" explainer until the user opened Secondary
-        // settings. Only re-asserted once we've actually checked with Android
-        // (null = not checked yet), so we never push a guessed `false`.
         _secondaryDisplayState?.updateState(
           dockApps: _config.dockApps,
           dockEnabled: _config.dockEnabled,
+          hideSystemLogo: _config.secondaryHideSystemLogo,
           dockSlotCount: _config.dockSlotCount,
           nowPlayingDimDelay: _config.nowPlayingDimDelay,
           nowPlayingDimLevel: _config.nowPlayingDimLevel,
+          videoPreviewDelay: _config.videoPreviewDelay,
           fanartDimLevel: _config.fanartDimLevel,
           sfxEnabled: _config.sfxEnabled,
           sfxVolume: _config.sfxVolume,
+          customSfx: _config.customSfx,
           use12HourClock: _config.use12HourClock,
-          screenshotAccessEnabled: ScreenshotService.lastKnownAccess,
         );
       }
-    }
-  }
-
-  /// Responds to a screenshot request from the secondary display: fires a system
-  /// screenshot of the main screen, or opens accessibility settings if the user
-  /// hasn't granted screenshot access yet.
-  Future<void> _handleSecondaryScreenshotRequest() async {
-    final taken = await ScreenshotService.takeScreenshot();
-    if (!taken) {
-      await ScreenshotService.openAccessSettings();
     }
   }
 
@@ -255,22 +255,6 @@ extension SqliteConfigSecondaryDisplay on SqliteConfigProvider {
       nowPlayingActive: false,
       showAchievementPanel: false,
     );
-  }
-
-  /// Pushes a known screenshot-access state to the secondary display so it can
-  /// show or hide the in-game screenshot button.
-  void pushScreenshotAccess(bool enabled) {
-    _secondaryDisplayState?.updateState(screenshotAccessEnabled: enabled);
-  }
-
-  /// Checks current screenshot access and pushes it to the secondary display.
-  ///
-  /// Runs the check even when there's no secondary state yet: it refreshes
-  /// [ScreenshotService.lastKnownAccess], which is what corrects a later stale
-  /// echo from the secondary engine.
-  Future<void> refreshSecondaryScreenshotAccess() async {
-    final enabled = await ScreenshotService.isAccessEnabled();
-    _secondaryDisplayState?.updateState(screenshotAccessEnabled: enabled);
   }
 
   /// Re-applies the persisted secondary display visibility setting to the native

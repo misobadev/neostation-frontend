@@ -1,40 +1,61 @@
 import 'dart:io';
+
+import 'package:neostation/widgets/wizard_frame.dart';
+import 'package:neostation/widgets/wizard_language_picker.dart';
+import 'package:neostation/services/startup_language.dart';
+import 'package:neostation/widgets/west_button_glyph.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/user_data_location_service.dart';
-import 'package:neostation/services/screenshot_service.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/widgets/system_art_pack_tile.dart';
 import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/services/esde_import_service.dart';
 import 'package:neostation/services/global_notification_service.dart';
+
 import '../providers/sqlite_config_provider.dart';
 import '../utils/gamepad_nav.dart';
+
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
+
 import '../widgets/tv_directory_picker.dart';
 import '../widgets/folder_not_empty_dialog.dart';
+import '../widgets/info_dialog.dart';
+import '../utils/rom_folder_path.dart';
 import 'core_footer.dart';
 import '../models/secondary_display_state.dart';
 
 /// Initial configuration wizard for the first time the app is opened
 class SetupWizard extends StatefulWidget {
-  final VoidCallback onComplete;
+  final Future<void> Function() onComplete;
 
-  const SetupWizard({super.key, required this.onComplete});
+  /// The step to open on, so the layout tests can check every step at every
+  /// screen size without walking through folder pickers and a scan.
+  @visibleForTesting
+  final int initialStep;
+
+  const SetupWizard({
+    super.key,
+    required this.onComplete,
+    this.initialStep = 0,
+  });
 
   @override
   State<SetupWizard> createState() => _SetupWizardState();
 }
 
 class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
+  /// The wizard's size unit and font sizes, shared with [WizardFrame].
+  double get _u => WizardFrame.unitOf(context);
+  double _font(double size) => WizardFrame.fontOf(context, size);
+
   int _currentStep = 0;
   bool _isSelectingFolder = false;
   bool _isSelectingUserDataFolder = false;
@@ -59,7 +80,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   final ScrollController _artPackScrollController = ScrollController();
   final List<GlobalKey> _artPackKeys = [];
 
-  /// Whether All-Files (storage) access is currently granted.
+  /// Whether All-Files (storage) access is currently granted. Re-checked
+  /// whenever the app resumes (the user grants it in system Settings, so we
+  /// can't observe the change synchronously).
   bool _storageGranted = false;
 
   /// Set whenever the app leaves the foreground, so the permissions step can
@@ -68,44 +91,36 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   /// see [_handlePermissionAction].
   bool _leftForegroundDuringGrant = false;
 
-  /// Whether the screenshot/return accessibility service is currently granted.
-  /// Both are re-checked whenever the app resumes (the user grants them in
-  /// system Settings, so we can't observe the change synchronously).
-  bool _accessibilityGranted = false;
-
-  /// Whether a secondary display is present. The accessibility (Screen Return)
-  /// grant only makes sense on dual-screen devices, so we hide it otherwise.
-  bool _hasSecondaryDisplay = false;
-
-  /// Whether the accessibility grant should be offered at all.
-  bool get _needsAccessibility => Platform.isAndroid && _hasSecondaryDisplay;
-
-  /// Whether the accessibility requirement is satisfied — either it's granted,
-  /// or it doesn't apply on this device.
-  bool get _accessibilityDone => !_needsAccessibility || _accessibilityGranted;
-
   /// True once setup is being finalised, so the per-frame secondary-display
   /// push stops re-asserting `setupWizardActive` and the dock can come in.
   bool _finishing = false;
+
+  /// True while [_finishSetup] is saving or showing its failure, so a second
+  /// press can't start another save.
+  bool _saving = false;
 
   static final _log = LoggerService.instance;
 
   GamepadNavigation? _gamepadNav;
 
-  // Step indices. Android has two extra steps (Permissions + Accessibility)
-  // that don't exist on desktop; the getters resolve to -1 there so a
+  // Step indices. Android has an extra Permissions step that doesn't exist on
+  // desktop; the getters resolve to -1 there so a
   // comparison against a real (>= 0) step never matches.
-  //   Android: 0=UserData, 1=Permissions, 2=Folder, 3=Scanning,
-  //            4=EsdeImport, 5=ArtPack
-  //   Desktop: 0=UserData, 1=Folder, 2=Scanning, 3=EsdeImport, 4=ArtPack
-  // The Permissions step covers both All-Files access and the accessibility
-  // (Screen Return) service.
-  int get _stepUserData => 0;
-  int get _stepPermissions => Platform.isAndroid ? 1 : -1;
-  int get _stepFolder => Platform.isAndroid ? 2 : 1;
-  int get _stepScanning => Platform.isAndroid ? 3 : 2;
-  int get _stepEsde => Platform.isAndroid ? 4 : 3;
-  int get _stepArtPack => Platform.isAndroid ? 5 : 4;
+  //   Android: 0=Welcome, 1=Language, 2=UserData, 3=Permissions, 4=Folder,
+  //            5=Scanning, 6=EsdeImport, 7=ArtPack
+  //   Desktop: 0=Welcome, 1=Language, 2=UserData, 3=Folder, 4=Scanning,
+  //            5=EsdeImport, 6=ArtPack
+  int get _stepWelcome => 0;
+  int get _stepLanguage => 1;
+  int get _stepUserData => 2;
+  int get _stepPermissions => Platform.isAndroid ? 3 : -1;
+  int get _stepFolder => Platform.isAndroid ? 4 : 3;
+  int get _stepScanning => Platform.isAndroid ? 5 : 4;
+  int get _stepEsde => Platform.isAndroid ? 6 : 5;
+  int get _stepArtPack => Platform.isAndroid ? 7 : 6;
+
+  /// The language shown selected on the first step.
+  String _language = 'en';
 
   /// The art-pack step is always the final step of the wizard.
   bool get _isLastStep => _currentStep == _stepArtPack;
@@ -113,40 +128,23 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _currentStep = widget.initialStep;
     WidgetsBinding.instance.addObserver(this);
+    _initLanguage();
     _initializeSteps();
     _initGamepad();
     if (Platform.isAndroid) {
       _secondaryDisplayState = SecondaryDisplayState.instance;
-      _hasSecondaryDisplay =
-          _secondaryDisplayState!.value?.isSecondaryActive ?? false;
-      _secondaryDisplayState!.addListener(_onSecondaryStateChanged);
       _refreshPermissionStates();
     }
   }
 
-  /// Keeps [_hasSecondaryDisplay] in sync so the accessibility row appears the
-  /// moment a secondary display reports in (it may connect after the wizard
-  /// first builds).
-  void _onSecondaryStateChanged() {
-    final has = _secondaryDisplayState?.value?.isSecondaryActive ?? false;
-    if (has != _hasSecondaryDisplay && mounted) {
-      setState(() => _hasSecondaryDisplay = has);
-    }
-  }
-
-  /// Re-polls both permission states (storage + accessibility). Called on
-  /// resume so the Permissions step reflects grants the user just made in
-  /// system Settings.
+  /// Re-polls the storage permission state. Called on resume so the
+  /// Permissions step reflects a grant the user just made in system Settings.
   Future<void> _refreshPermissionStates() async {
     final storage = await PermissionService.hasAllFilesAccess();
-    final access = await ScreenshotService.isAccessEnabled();
-    if (mounted &&
-        (storage != _storageGranted || access != _accessibilityGranted)) {
-      setState(() {
-        _storageGranted = storage;
-        _accessibilityGranted = access;
-      });
+    if (mounted && storage != _storageGranted) {
+      setState(() => _storageGranted = storage);
     }
   }
 
@@ -191,7 +189,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             context,
             listen: false,
           );
-          if (provider.scanCompleted) _handleMainAction();
+          if (provider.scanCompleted || _scanFailed(provider)) {
+            _handleMainAction();
+          }
         } else {
           // Every step — including the final art-pack one — goes through the
           // same primary action as the on-screen button. Shortcutting the last
@@ -200,18 +200,40 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           _handleMainAction();
         }
       },
-      onBack: () {
-        _handleSkip();
+      // B always goes back a step; the step's other action (another
+      // user-data folder, or skipping an optional step) is on the West face
+      // button, as in the beta import wizard.
+      onBack: _handleBack,
+      onWestButton: () {
+        if (_currentStep == _stepUserData) {
+          if (!_isSelectingUserDataFolder) _selectUserDataLocationWizard();
+          return;
+        }
+        if (_canSkip) _handleSkip();
       },
-      onNavigateUp: () => _moveArtPackSelection(-1),
-      onNavigateDown: () => _moveArtPackSelection(1),
+      onNavigateUp: () => _currentStep == _stepLanguage
+          ? _moveLanguage(-WizardLanguagePicker.columns)
+          : _moveArtPackSelection(-_artPackColumns),
+      onNavigateDown: () => _currentStep == _stepLanguage
+          ? _moveLanguage(WizardLanguagePicker.columns)
+          : _moveArtPackSelection(_artPackColumns),
+      onNavigateLeft: () => _currentStep == _stepLanguage
+          ? _moveLanguage(-1)
+          : _moveArtPackSelection(-1),
+      onNavigateRight: () => _currentStep == _stepLanguage
+          ? _moveLanguage(1)
+          : _moveArtPackSelection(1),
     );
     _gamepadNav?.initialize();
     _gamepadNav?.activate();
   }
 
-  /// Moves the art-pack list selection by [delta] (D-pad up/down). A no-op on
-  /// every other wizard step.
+  /// Packs a row on the art-pack step.
+  static const int _artPackColumns = 2;
+
+  /// Moves the art-pack selection by [delta]: ±1 across a row (D-pad
+  /// left/right), ±[_artPackColumns] down a column (up/down). A no-op on every
+  /// other wizard step.
   void _moveArtPackSelection(int delta) {
     if (_currentStep != _stepArtPack) return;
     final neoAssets = context.read<NeoAssetsProvider>();
@@ -245,7 +267,6 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _secondaryDisplayState?.removeListener(_onSecondaryStateChanged);
     _gamepadNav?.dispose();
     _artPackScrollController.dispose();
     // Shared singleton — never dispose the instance.
@@ -274,8 +295,58 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     );
   }
 
+  /// Whether the wizard is in the middle of something a step change would cut
+  /// short: a picker, an ES-DE import or an art pack download.
+  bool get _isBusy =>
+      _isSelectingFolder ||
+      _isSelectingUserDataFolder ||
+      _isImportingEsde ||
+      _isDownloadingArt;
+
+  /// Whether this step offers Back: every step but the first, and not while
+  /// it is busy or a scan is running (the scan would carry on behind the
+  /// folder step and land its systems there).
+  bool _canGoBack(SqliteConfigProvider provider) {
+    if (_currentStep == _stepWelcome || _isBusy) return false;
+    if (_currentStep == _stepScanning && provider.isScanning) return false;
+    return true;
+  }
+
+  /// Back one step. The permissions step exists on Android only, and its
+  /// index is skipped on the desktop by the step numbering itself.
+  void _handleBack() {
+    if (!_canGoBack(context.read<SqliteConfigProvider>())) return;
+    setState(() => _currentStep = _currentStep - 1);
+    if (_currentStep == _stepPermissions) _refreshPermissionStates();
+  }
+
+  /// The optional steps, whose other action is Skip: the folder and
+  /// permissions steps (Android only), the two trailing ones (ES-DE import,
+  /// art pack) everywhere, and a scan that stopped with an error.
+  bool get _canSkip {
+    if (_currentStep == _stepScanning) {
+      return _scanFailed(context.read<SqliteConfigProvider>());
+    }
+    return _currentStep == _stepEsde ||
+        _currentStep == _stepArtPack ||
+        (Platform.isAndroid &&
+            (_currentStep == _stepFolder || _currentStep == _stepPermissions));
+  }
+
   void _handleSkip() {
-    // Permissions step: neither grant is a hard requirement. ROM access goes
+    // A running ES-DE import reports its outcome on this step, and a running
+    // art pack download finishes setup itself.
+    if (_isImportingEsde || _isDownloadingArt) return;
+
+    // A scan that stopped with an error can be skipped (the library is scanned
+    // again on the next start, or from Settings).
+    if (_currentStep == _stepScanning) {
+      if (_scanFailed(context.read<SqliteConfigProvider>())) {
+        setState(() => _currentStep = _stepEsde);
+      }
+      return;
+    }
+    // Permissions step: the grant is not a hard requirement. ROM access goes
     // through SAF, and UserDataLocationService already falls back to the
     // app-specific external dir without All-Files access. The skip is
     // deliberately unconditional — gating it on `_storageGranted` walled users
@@ -287,14 +358,17 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     }
 
     if (_currentStep == _stepFolder) {
-      // Skip folder selection → Advance to Scanning step.
-      setState(() => _currentStep = _stepScanning);
-
       // Start initial scan to detect available systems (e.g., Android apps).
       final provider = Provider.of<SqliteConfigProvider>(
         context,
         listen: false,
       );
+      // A leftover error (say, from a folder that couldn't be added) would
+      // read as a failed scan until the scan starts.
+      provider.clearError();
+      // Skip folder selection → Advance to Scanning step.
+      setState(() => _currentStep = _stepScanning);
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         provider.scanSystems();
       });
@@ -315,7 +389,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   }
 
   void _initializeSteps() {
-    // Load the current user-data path for display in step 0.
+    // Load the current user-data path for display on the user-data step.
     _loadUserDataPath();
   }
 
@@ -325,8 +399,13 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     } catch (e) {
       _log.e('Wizard: user-data path check failed: $e');
     }
-    final p = await ConfigService.getUserDataPath();
-    if (mounted) setState(() => _selectedUserDataPath = p);
+    try {
+      final p = await ConfigService.getUserDataPath();
+      if (mounted) setState(() => _selectedUserDataPath = p);
+    } catch (e) {
+      // The folder went missing after the startup check: nothing to show.
+      _log.e('Wizard: user-data path unavailable: $e');
+    }
   }
 
   Future<void> _resetUnwritableUserDataPath() async {
@@ -347,6 +426,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       await context.read<SqliteConfigProvider>().reinitialize();
       if (!mounted) return;
       await context.read<NeoAssetsProvider>().reinitialize();
+      await LoggerService.instance.reinitialize();
+      if (!mounted) return;
+      await context.read<FileProvider>().reinitialize();
     }
   }
 
@@ -355,14 +437,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   //          4=EsdeImport, 5=ArtPack (6 steps)
   // Desktop: 0=UserData, 1=FolderSelect, 2=Scanning, 3=EsdeImport,
   //          4=ArtPack (5 steps)
-  int get _totalSteps => Platform.isAndroid ? 6 : 5;
+  int get _totalSteps => Platform.isAndroid ? 8 : 7;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
     final isOled = themeProvider.isOled;
     final bgColor = theme.scaffoldBackgroundColor;
 
@@ -387,307 +467,36 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             ),
 
           // Contenido principal
-          SafeArea(
-            child: isLandscape
-                ? _buildLandscapeLayout(theme)
-                : _buildPortraitLayout(theme),
-          ),
+          SafeArea(child: _buildLayout(theme)),
         ],
       ),
     );
   }
 
-  Widget _buildPortraitLayout(ThemeData theme) {
-    return Center(
-      child: Container(
-        constraints: BoxConstraints(maxWidth: 600.w),
-        padding: EdgeInsets.all(32.r),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(32.r),
-          border: Border.all(
-            color: theme.colorScheme.primary.withValues(alpha: 0.2),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Logo
-            Image.asset(
-              'assets/images/logo_transparent.png',
-              width: 120.r,
-              height: 120.r,
-            ),
-            SizedBox(height: 24.r),
-
-            // Título
-            Text(
-              AppLocale.welcomeNeoStation.getString(context),
-              style: TextStyle(
-                fontSize: 28.r,
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 12.r),
-
-            Text(
-              AppLocale.letsGetSetup.getString(context),
-              style: TextStyle(
-                fontSize: 16.r,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            SizedBox(height: 48.r),
-
-            // Progress indicator
-            _buildProgressIndicator(theme),
-
-            SizedBox(height: 32.r),
-
-            // Step content
-            Expanded(child: _buildStepContent(theme)),
-
-            SizedBox(height: 24.r),
-
-            // Navigation buttons
-            _buildNavigationButtons(theme),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLandscapeLayout(ThemeData theme) {
-    return Padding(
-      padding: EdgeInsets.all(16.r),
-      child: Row(
-        children: [
-          // Left side: Logo and title
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: EdgeInsets.all(24.r),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(24.r),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  width: 1.r,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(
-                    'assets/images/logo_transparent.png',
-                    width: 64.r,
-                    height: 64.r,
-                  ),
-                  SizedBox(height: 12.r),
-
-                  Text(
-                    AppLocale.welcomeNeoStation.getString(context),
-                    style: TextStyle(
-                      fontSize: 14.r,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 8.r),
-
-                  Text(
-                    AppLocale.letsGetSetup.getString(context),
-                    style: TextStyle(
-                      fontSize: 10.r,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-
-                  SizedBox(height: 16.r),
-
-                  // Progress indicator vertical — scaled to fit the remaining
-                  // card height so it never overflows regardless of step count.
-                  Flexible(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: _buildVerticalProgressIndicator(theme),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          SizedBox(width: 16.r),
-
-          // Right side: Content and navigation
-          Expanded(
-            flex: 3,
-            child: Container(
-              padding: EdgeInsets.all(16.r),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(24.r),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.05),
-                  width: 1.r,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Center(
-                      child: Container(
-                        constraints: BoxConstraints(maxWidth: 400.w),
-                        child: _buildStepContent(theme),
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(height: 8.r),
-
-                  // Navigation buttons
-                  _buildNavigationButtons(theme),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVerticalProgressIndicator(ThemeData theme) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(_totalSteps, (index) {
-        final isCompleted = index < _currentStep;
-        final isCurrent = index == _currentStep;
-
-        return Column(
-          children: [
-            Container(
-              width: 24.r,
-              height: 24.r,
-              decoration: BoxDecoration(
-                color: isCompleted || isCurrent
-                    ? theme.colorScheme.primary
-                    : Colors.transparent,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isCompleted || isCurrent
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.primary.withValues(alpha: 0.3),
-                  width: 2.r,
-                ),
-              ),
-              child: Center(
-                child: isCompleted
-                    ? Icon(
-                        Symbols.check_rounded,
-                        color: Colors.white,
-                        size: 14.r,
-                      )
-                    : Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          fontSize: 10.r,
-                          fontWeight: FontWeight.bold,
-                          color: isCurrent
-                              ? Colors.white
-                              : theme.colorScheme.primary.withValues(
-                                  alpha: 0.5,
-                                ),
-                        ),
-                      ),
-              ),
-            ),
-            if (index < _totalSteps - 1)
-              Container(
-                width: 2.r,
-                height: 18.r,
-                color: isCompleted
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.primary.withValues(alpha: 0.2),
-              ),
-          ],
-        );
-      }),
-    );
-  }
-
-  Widget _buildProgressIndicator(ThemeData theme) {
-    // Scale down to fit the screen width so the extra steps don't overflow.
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(_totalSteps, (index) {
-          final isCompleted = index < _currentStep;
-          final isCurrent = index == _currentStep;
-
-          return Row(
-            children: [
-              Container(
-                width: 40.r,
-                height: 40.r,
-                decoration: BoxDecoration(
-                  color: isCompleted || isCurrent
-                      ? theme.colorScheme.primary
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isCompleted || isCurrent
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.primary.withValues(alpha: 0.3),
-                    width: 2.r,
-                  ),
-                ),
-                child: Center(
-                  child: isCompleted
-                      ? Icon(
-                          Symbols.check_rounded,
-                          color: Colors.white,
-                          size: 24.r,
-                        )
-                      : Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            fontSize: 18.r,
-                            fontWeight: FontWeight.bold,
-                            color: isCurrent
-                                ? Colors.white
-                                : theme.colorScheme.primary.withValues(
-                                    alpha: 0.5,
-                                  ),
-                          ),
-                        ),
-                ),
-              ),
-              if (index < _totalSteps - 1)
-                Container(
-                  width: 40.r,
-                  height: 2.r,
-                  color: isCompleted
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.primary.withValues(alpha: 0.2),
-                ),
-            ],
-          );
-        }),
-      ),
+  /// The layout every wizard shares ([WizardFrame]): the logo and the step
+  /// dots at fixed places, the step with its buttons centred under them.
+  Widget _buildLayout(ThemeData theme) {
+    final step = _currentStep + 1;
+    return WizardFrame(
+      step: step,
+      total: _totalSteps,
+      stepLabel: AppLocale.wizardStepOf
+          .getString(context)
+          .replaceAll('{step}', '$step')
+          .replaceAll('{total}', '$_totalSteps'),
+      color: theme.colorScheme.onSurface,
+      content: _buildStepContent(theme),
+      buttons: _buildNavigationButtons(theme),
     );
   }
 
   Widget _buildStepContent(ThemeData theme) {
+    if (_currentStep == _stepWelcome) {
+      return _buildWelcomeStep(theme);
+    }
+    if (_currentStep == _stepLanguage) {
+      return _buildLanguageStep(theme);
+    }
     if (_currentStep == _stepUserData) {
       return _buildUserDataLocationStep(theme);
     }
@@ -709,12 +518,121 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     return Container();
   }
 
+  /// The device's language is picked and applied straight away, so the
+  /// wizard speaks it from its first screen; the language step can change it.
+  void _initLanguage() {
+    _language = supportedLanguageFor(
+      WidgetsBinding.instance.platformDispatcher.locale,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final provider = context.read<SqliteConfigProvider>();
+      if (provider.config.appLanguage != _language) {
+        provider.updateAppLanguage(_language);
+      }
+    });
+  }
+
+  void _selectLanguage(String code) {
+    if (code == _language) return;
+    setState(() => _language = code);
+    context.read<SqliteConfigProvider>().updateAppLanguage(code);
+  }
+
+  void _moveLanguage(int delta) =>
+      _selectLanguage(WizardLanguagePicker.move(_language, delta));
+
+  /// The first step: what NeoStation is, and A to start.
+  Widget _buildWelcomeStep(ThemeData theme) {
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            AppLocale.welcomeNeoStation.getString(context),
+            style: TextStyle(
+              fontSize: _font(19),
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 12 * _u),
+          Text(
+            AppLocale.wizardWelcomeBody.getString(context),
+            style: TextStyle(
+              fontSize: _font(15),
+              height: 1.35,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageStep(ThemeData theme) {
+    // The welcome's text sizes: twelve languages have to fit under the
+    // title on a handheld's short screen.
+    final scale = _u;
+    // A landscape phone or 16:9 handheld: shorter than the 640×480 design.
+    final short = MediaQuery.sizeOf(context).height < 480;
+
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // The icon beside the title rather than above it, so the grid
+          // keeps its room.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Symbols.translate_rounded,
+                size: 24 * _u,
+                color: theme.colorScheme.onSurface,
+              ),
+              SizedBox(width: 10 * scale),
+              Flexible(
+                child: Text(
+                  AppLocale.wizardLanguageTitle.getString(context),
+                  style: TextStyle(
+                    fontSize: _font(19),
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8 * scale),
+          Text(
+            AppLocale.wizardLanguageBody.getString(context),
+            style: TextStyle(
+              fontSize: _font(13),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: (short ? 12 : 20) * scale),
+          WizardLanguagePicker(
+            selected: _language,
+            onSelected: _selectLanguage,
+            unit: scale,
+            dense: short,
+            fontSize: _font(14) / scale,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildUserDataLocationStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-    final iconSize = isLandscape ? 48.r : 80.r;
-    final titleSize = isLandscape ? 14.r : 24.r;
-    final textSize = isLandscape ? 10.r : 14.r;
+    final iconSize = 40 * _u;
+    final titleSize = _font(19);
+    final textSize = _font(14);
 
     return SingleChildScrollView(
       child: Column(
@@ -727,7 +645,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                 ? theme.colorScheme.primary
                 : theme.colorScheme.primary.withValues(alpha: 0.6),
           ),
-          SizedBox(height: isLandscape ? 16.r : 24.r),
+          SizedBox(height: 16 * _u),
 
           Text(
             AppLocale.userDataLocation.getString(context),
@@ -738,7 +656,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: isLandscape ? 8.r : 16.r),
+          SizedBox(height: 8 * _u),
 
           Text(
             AppLocale.userDataLocationSubtitle.getString(context),
@@ -751,12 +669,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           ),
 
           if (_selectedUserDataPath != null) ...[
-            SizedBox(height: isLandscape ? 8.r : 16.r),
+            SizedBox(height: 8 * _u),
             Container(
-              padding: EdgeInsets.all(10.r),
+              padding: EdgeInsets.all(10 * _u),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8.r),
+                borderRadius: BorderRadius.circular(8 * _u),
                 border: Border.all(
                   color: theme.colorScheme.primary.withValues(alpha: 0.2),
                 ),
@@ -765,15 +683,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                 children: [
                   Icon(
                     Symbols.folder_rounded,
-                    size: 16.r,
+                    size: 16 * _u,
                     color: theme.colorScheme.primary,
                   ),
-                  SizedBox(width: 8.r),
+                  SizedBox(width: 8 * _u),
                   Expanded(
                     child: Text(
                       _selectedUserDataPath!,
                       style: TextStyle(
-                        fontSize: 11.r,
+                        fontSize: _font(11),
                         color: theme.colorScheme.onSurface,
                         fontFamily: 'monospace',
                       ),
@@ -785,39 +703,64 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               ),
             ),
           ],
-
-          SizedBox(height: isLandscape ? 12.r : 20.r),
-
-          // "Change Location" inline button
-          GamepadControl(
-            icon: Symbols.folder_rounded,
-            label: AppLocale.selectUserDataFolder.getString(context),
-            onTap: _isSelectingUserDataFolder
-                ? null
-                : () => _selectUserDataLocationWizard(),
-            busy: _isSelectingUserDataFolder,
-            textColor: theme.colorScheme.primary,
-          ),
         ],
       ),
     );
   }
 
-  void _showUserDataNotWritable() {
+  /// Shows [body] under [title] on screen.
+  ///
+  /// The app's header, and with it the notification bell, isn't shown during
+  /// setup, so a message the user needs has to appear here. The wizard's
+  /// navigation isn't a manager layer, so it is paused while the dialogue is
+  /// open (or a press on it would also press the wizard's buttons), and only
+  /// resumed if it was running: a flow that paused it resumes it itself.
+  Future<void> _showWizardMessage(
+    String title,
+    String body, {
+    IconData icon = Symbols.error_rounded,
+  }) async {
+    if (!mounted) return;
+    final wasActive = _gamepadNav?.isActive ?? false;
+    _gamepadNav?.deactivate();
+    try {
+      await InfoDialog.show(
+        context,
+        title: title,
+        body: body,
+        okLabel: AppLocale.ok.getString(context),
+        icon: icon,
+      );
+    } finally {
+      if (mounted && wasActive) _gamepadNav?.activate();
+    }
+  }
+
+  String _userDataNotWritableMessage() {
     var message = AppLocale.userDataFolderNotWritable.getString(context);
     if (Platform.isAndroid) {
       message +=
           '\n${AppLocale.userDataFolderGrantAllFiles.getString(context)}';
     }
-    GlobalNotificationService().show(
-      id: 'wizard_user_data_not_writable',
-      message: message,
-      type: GlobalNotificationType.error,
-    );
+    return message;
   }
 
-  /// Opens a folder picker, saves the new user-data path, and reinitializes the DB.
+  /// Opens a folder picker, saves the new user-data path, and reinitialises
+  /// the DB, then shows on screen why a picked folder can't be used.
   Future<void> _selectUserDataLocationWizard() async {
+    final problem = await _changeUserDataLocation();
+    if (problem != null && mounted) {
+      await _showWizardMessage(
+        AppLocale.userDataLocation.getString(context),
+        problem,
+      );
+    }
+  }
+
+  /// [_selectUserDataLocationWizard]'s work: answers why the picked folder
+  /// can't be used, or null.
+  Future<String?> _changeUserDataLocation() async {
+    String? problem;
     setState(() => _isSelectingUserDataFolder = true);
     _gamepadNav?.deactivate();
 
@@ -837,6 +780,10 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               selected = UserDataLocationService.safUriToRealPath(
                 uri.toString(),
               );
+              // A folder from another provider has no path SQLite can open.
+              if (selected == null && mounted) {
+                problem = AppLocale.wizardFolderNotUsable.getString(context);
+              }
             }
           } on PlatformException catch (e) {
             if (e.code == 'PICKER_FAILED' && mounted) {
@@ -852,14 +799,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
         );
       }
 
-      if (selected == null || !mounted) return;
+      if (selected == null || !mounted) return problem;
 
       // Normalize trailing separator.
       if (selected.endsWith(Platform.pathSeparator)) {
         selected = selected.substring(0, selected.length - 1);
       }
 
-      if (selected == _selectedUserDataPath) return;
+      if (selected == _selectedUserDataPath) return problem;
 
       // Refuse a folder the database can't be created in. On Android this
       // step runs before the permissions step, so without All-Files access a
@@ -867,8 +814,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       // written. Saving it anyway left SQLite failing with code 14 on every
       // launch, stuck on an empty library.
       if (!await UserDataLocationService.canWriteDirectory(selected)) {
-        if (mounted) _showUserDataNotWritable();
-        return;
+        if (mounted) problem = _userDataNotWritableMessage();
+        return problem;
       }
 
       // Warn if the chosen folder already contains files, so the user doesn't
@@ -876,21 +823,21 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       final entryCount = await UserDataLocationService.countDirectoryEntries(
         selected,
       );
-      if (!mounted) return;
+      if (!mounted) return problem;
       if (entryCount > 0) {
         final proceed = await FolderNotEmptyDialog.show(
           context,
           path: selected,
           itemCount: entryCount,
         );
-        if (!proceed || !mounted) return;
+        if (!proceed || !mounted) return problem;
       }
 
       final previousCustomPath = await UserDataLocationService.getCustomPath();
       await UserDataLocationService.setCustomPath(selected);
 
       // Reinitialize the DB at the new path (no data yet on first launch).
-      if (!mounted) return;
+      if (!mounted) return problem;
       final configProvider = Provider.of<SqliteConfigProvider>(
         context,
         listen: false,
@@ -913,7 +860,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           await UserDataLocationService.clearCustomPath();
         }
         await configProvider.reinitialize();
-        if (mounted) _showUserDataNotWritable();
+        if (mounted) problem = _userDataNotWritableMessage();
         selected = await ConfigService.getUserDataPath();
       }
 
@@ -922,8 +869,16 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       // Without this the art pack downloaded on the final step lands in the
       // folder the app started in, and is gone on the next launch even though
       // System Art still shows the pack as applied.
-      if (!mounted) return;
+      if (!mounted) return problem;
       await context.read<NeoAssetsProvider>().reinitialize();
+
+      // Every art lookup goes through this provider, which resolved the media
+      // folder at launch: without it the art scraped from here on lands in
+      // the new folder but isn't found until the next launch. The log file
+      // lives in the user-data folder too.
+      await LoggerService.instance.reinitialize();
+      if (!mounted) return problem;
+      await context.read<FileProvider>().reinitialize();
 
       if (mounted) setState(() => _selectedUserDataPath = selected);
     } catch (e) {
@@ -932,15 +887,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       if (mounted) setState(() => _isSelectingUserDataFolder = false);
       _gamepadNav?.activate();
     }
+    return problem;
   }
 
-  /// Combined permissions step: All-Files (storage) access plus the optional
-  /// accessibility (Screen Return) service, each with a live granted/pending
-  /// status. The main action button grants the next pending one, then advances.
+  /// Permissions step: All-Files (storage) access with a live granted/pending
+  /// status. The main action button grants it if pending, then advances.
   Widget _buildPermissionStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-
     return SingleChildScrollView(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -952,21 +904,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             title: AppLocale.storagePermission.getString(context),
             description: AppLocale.storagePermissionDesc.getString(context),
             granted: _storageGranted,
-            isLandscape: isLandscape,
           ),
-          // Screen Return access only applies to dual-screen devices.
-          if (_needsAccessibility) ...[
-            SizedBox(height: isLandscape ? 12.r : 20.r),
-            _buildPermissionRow(
-              theme,
-              icon: Symbols.settings_accessibility_rounded,
-              title: AppLocale.screenReturnAccess.getString(context),
-              description: AppLocale.screenReturnAccessDesc.getString(context),
-              granted: _accessibilityGranted,
-              isLandscape: isLandscape,
-              hint: AppLocale.screenReturnAccessHint.getString(context),
-            ),
-          ],
         ],
       ),
     );
@@ -980,18 +918,16 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     required String title,
     required String description,
     required bool granted,
-    required bool isLandscape,
-    String? hint,
   }) {
-    final iconSize = isLandscape ? 28.r : 40.r;
-    final titleSize = isLandscape ? 13.r : 18.r;
-    final textSize = isLandscape ? 9.r : 13.r;
+    final iconSize = 28 * _u;
+    final titleSize = _font(15);
+    final textSize = _font(12);
 
     return Container(
-      padding: EdgeInsets.all(isLandscape ? 12.r : 16.r),
+      padding: EdgeInsets.all(12 * _u),
       decoration: BoxDecoration(
         color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(16.r),
+        borderRadius: BorderRadius.circular(16 * _u),
         border: Border.all(
           color: granted
               ? Colors.green.withValues(alpha: 0.5)
@@ -1006,7 +942,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             size: iconSize,
             color: granted ? Colors.green : theme.colorScheme.primary,
           ),
-          SizedBox(width: isLandscape ? 12.r : 16.r),
+          SizedBox(width: 12 * _u),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1019,7 +955,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     color: theme.colorScheme.onSurface,
                   ),
                 ),
-                SizedBox(height: 4.r),
+                SizedBox(height: 4 * _u),
                 Text(
                   granted ? AppLocale.enabled.getString(context) : description,
                   style: TextStyle(
@@ -1030,27 +966,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     height: 1.3,
                   ),
                 ),
-                if (!granted && hint != null) ...[
-                  SizedBox(height: 6.r),
-                  Text(
-                    hint,
-                    style: TextStyle(
-                      fontSize: textSize,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.primary,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
-          SizedBox(width: isLandscape ? 8.r : 12.r),
+          SizedBox(width: 8 * _u),
           Icon(
             granted
                 ? Symbols.check_circle_rounded
                 : Symbols.radio_button_unchecked_rounded,
-            size: isLandscape ? 20.r : 26.r,
+            size: 20 * _u,
             color: granted
                 ? Colors.green
                 : theme.colorScheme.onSurface.withValues(alpha: 0.3),
@@ -1061,11 +985,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   }
 
   Widget _buildFolderSelectionStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-    final iconSize = isLandscape ? 48.r : 80.r;
-    final titleSize = isLandscape ? 14.r : 24.r;
-    final textSize = isLandscape ? 10.r : 14.r;
+    final iconSize = 40 * _u;
+    final titleSize = _font(19);
+    final textSize = _font(14);
 
     return SingleChildScrollView(
       child: Column(
@@ -1078,7 +1000,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                 ? Colors.green
                 : theme.colorScheme.primary,
           ),
-          SizedBox(height: isLandscape ? 16.r : 24.r),
+          SizedBox(height: 16 * _u),
 
           Text(
             AppLocale.selectRomFolder.getString(context),
@@ -1088,7 +1010,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               color: theme.colorScheme.onSurface,
             ),
           ),
-          SizedBox(height: isLandscape ? 8.r : 16.r),
+          SizedBox(height: 8 * _u),
 
           Text(
             _selectedFolder != null
@@ -1106,16 +1028,21 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     );
   }
 
+  /// Whether the scan this step started stopped with an error. Without this
+  /// the step waited for a completion that never came: Next stayed disabled
+  /// and Skip did nothing.
+  bool _scanFailed(SqliteConfigProvider provider) =>
+      !provider.isScanning && !provider.scanCompleted && provider.error != null;
+
   Widget _buildScanningStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-    final containerSize = isLandscape ? 48.r : 80.r;
-    final iconSize = isLandscape ? 24.r : 48.r;
-    final titleSize = isLandscape ? 16.r : 24.r;
-    final textSize = isLandscape ? 12.r : 14.r;
+    final containerSize = 56 * _u;
+    final iconSize = 28 * _u;
+    final titleSize = _font(19);
+    final textSize = _font(14);
 
     return Consumer<SqliteConfigProvider>(
       builder: (context, provider, child) {
+        final failed = _scanFailed(provider);
         return SingleChildScrollView(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1135,17 +1062,23 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                           color: Colors.green,
                           size: iconSize,
                         )
+                      : failed
+                      ? Icon(
+                          Symbols.error_rounded,
+                          color: theme.colorScheme.error,
+                          size: iconSize,
+                        )
                       : SizedBox(
                           width: iconSize,
                           height: iconSize,
                           child: CircularProgressIndicator(
                             color: theme.colorScheme.primary,
-                            strokeWidth: 3.r,
+                            strokeWidth: 3 * _u,
                           ),
                         ),
                 ),
               ),
-              SizedBox(height: isLandscape ? 4.r : 24.r),
+              SizedBox(height: 4 * _u),
 
               Text(
                 provider.scanCompleted
@@ -1157,15 +1090,24 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                   color: theme.colorScheme.onSurface,
                 ),
               ),
-              SizedBox(height: isLandscape ? 4.r : 16.r),
+              SizedBox(height: 4 * _u),
 
               Text(
-                provider.scanStatus.isNotEmpty
+                failed
+                    ? AppLocale.wizardScanFailed
+                          .getString(context)
+                          .replaceFirst(
+                            '{error}',
+                            provider.error!.split('\n').first,
+                          )
+                    : provider.scanStatus.isNotEmpty
                     ? provider.scanStatus
                     : AppLocale.scanningSystemsRoms.getString(context),
                 style: TextStyle(
                   fontSize: textSize,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: failed
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.7),
                   height: 1.3,
                 ),
                 textAlign: TextAlign.center,
@@ -1173,13 +1115,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
               // Progress bar
               if (provider.totalSystemsToScan > 0 &&
-                  !provider.scanCompleted) ...[
-                SizedBox(height: isLandscape ? 4.r : 32.r),
+                  !provider.scanCompleted &&
+                  !failed) ...[
+                SizedBox(height: 4 * _u),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8.r),
+                  borderRadius: BorderRadius.circular(8 * _u),
                   child: LinearProgressIndicator(
                     value: provider.scanProgress,
-                    minHeight: 8.r,
+                    minHeight: 8 * _u,
                     backgroundColor: theme.colorScheme.primary.withValues(
                       alpha: 0.1,
                     ),
@@ -1188,7 +1131,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-                SizedBox(height: 8.r),
+                SizedBox(height: 8 * _u),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1204,7 +1147,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                             provider.totalSystemsToScan.toString(),
                           ),
                       style: TextStyle(
-                        fontSize: textSize - 2.r,
+                        fontSize: textSize - 2 * _u,
                         color: theme.colorScheme.onSurface.withValues(
                           alpha: 0.6,
                         ),
@@ -1213,7 +1156,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     Text(
                       '${(provider.scanProgress * 100).toInt()}%',
                       style: TextStyle(
-                        fontSize: textSize - 2.r,
+                        fontSize: textSize - 2 * _u,
                         color: theme.colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1223,15 +1166,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               ],
 
               if (provider.scanCompleted) ...[
-                SizedBox(height: isLandscape ? 4.r : 32.r),
+                SizedBox(height: 4 * _u),
                 Container(
-                  padding: EdgeInsets.all(isLandscape ? 12.r : 16.r),
+                  padding: EdgeInsets.all(12 * _u),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12.r),
+                    borderRadius: BorderRadius.circular(12 * _u),
                     border: Border.all(
                       color: Colors.green.withValues(alpha: 0.3),
-                      width: 1.r,
+                      width: 1 * _u,
                     ),
                   ),
                   child: Row(
@@ -1239,9 +1182,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                       Icon(
                         Symbols.check_circle_rounded,
                         color: Colors.green,
-                        size: isLandscape ? 20.r : 24.r,
+                        size: 20 * _u,
                       ),
-                      SizedBox(width: 12.r),
+                      SizedBox(width: 12 * _u),
                       Expanded(
                         child: Text(
                           '${AppLocale.foundSystemsWithGames.getString(context).replaceFirst('{count}', provider.detectedRealSystems.length.toString())}\n${AppLocale.wizardTapNextToContinue.getString(context)}',
@@ -1267,11 +1210,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   Widget _buildEsdeStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-    final iconSize = isLandscape ? 48.r : 80.r;
-    final titleSize = isLandscape ? 16.r : 24.r;
-    final textSize = isLandscape ? 12.r : 14.r;
+    final iconSize = 40 * _u;
+    final titleSize = _font(19);
+    final textSize = _font(14);
     final result = _esdeResult;
 
     return SingleChildScrollView(
@@ -1285,7 +1226,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             size: iconSize,
             color: result != null ? Colors.green : theme.colorScheme.primary,
           ),
-          SizedBox(height: isLandscape ? 16.r : 24.r),
+          SizedBox(height: 16 * _u),
 
           Text(
             AppLocale.wizardEsdeStepTitle.getString(context),
@@ -1296,7 +1237,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: isLandscape ? 8.r : 16.r),
+          SizedBox(height: 8 * _u),
 
           Text(
             AppLocale.wizardEsdeStepDesc.getString(context),
@@ -1310,14 +1251,14 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
           // Live progress while importing.
           if (_isImportingEsde) ...[
-            SizedBox(height: isLandscape ? 12.r : 28.r),
+            SizedBox(height: 12 * _u),
             SizedBox(
-              width: 220.r,
+              width: 220 * _u,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8.r),
+                borderRadius: BorderRadius.circular(8 * _u),
                 child: LinearProgressIndicator(
                   value: _esdeProgress > 0 ? _esdeProgress : null,
-                  minHeight: 8.r,
+                  minHeight: 8 * _u,
                   backgroundColor: theme.colorScheme.primary.withValues(
                     alpha: 0.1,
                   ),
@@ -1328,11 +1269,11 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               ),
             ),
             if (_esdeLabel.isNotEmpty) ...[
-              SizedBox(height: 8.r),
+              SizedBox(height: 8 * _u),
               Text(
                 _esdeLabel,
                 style: TextStyle(
-                  fontSize: textSize - 2.r,
+                  fontSize: textSize - 2 * _u,
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
                 textAlign: TextAlign.center,
@@ -1342,15 +1283,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
 
           // Import result summary.
           if (result != null) ...[
-            SizedBox(height: isLandscape ? 12.r : 28.r),
+            SizedBox(height: 12 * _u),
             Container(
-              padding: EdgeInsets.all(isLandscape ? 12.r : 16.r),
+              padding: EdgeInsets.all(12 * _u),
               decoration: BoxDecoration(
                 color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12.r),
+                borderRadius: BorderRadius.circular(12 * _u),
                 border: Border.all(
                   color: Colors.green.withValues(alpha: 0.3),
-                  width: 1.r,
+                  width: 1 * _u,
                 ),
               ),
               child: Row(
@@ -1359,9 +1300,9 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                   Icon(
                     Symbols.check_circle_rounded,
                     color: Colors.green,
-                    size: isLandscape ? 20.r : 24.r,
+                    size: 20 * _u,
                   ),
-                  SizedBox(width: 12.r),
+                  SizedBox(width: 12 * _u),
                   Flexible(
                     child: Text(
                       '${AppLocale.esdeImportComplete.getString(context)}\n'
@@ -1389,11 +1330,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   Widget _buildArtPackStep(ThemeData theme) {
-    final orientation = MediaQuery.of(context).orientation;
-    final isLandscape = orientation == Orientation.landscape;
-    final iconSize = isLandscape ? 48.r : 80.r;
-    final titleSize = isLandscape ? 16.r : 24.r;
-    final textSize = isLandscape ? 12.r : 14.r;
+    final titleSize = _font(19);
+    final textSize = _font(13);
 
     return Consumer<NeoAssetsProvider>(
       builder: (context, neoAssets, child) {
@@ -1414,76 +1352,66 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             ..clear()
             ..addAll(List.generate(themes.length, (_) => GlobalKey()));
         }
-        return SingleChildScrollView(
+        // The text on the left and the packs on the right (the app runs in
+        // landscape), so the packs get the panel's whole height and only
+        // they scroll.
+        final packs = SingleChildScrollView(
           controller: _artPackScrollController,
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Smaller icon + tighter spacing so the compact thumbnail below
-              // fits without scrolling.
-              Icon(
-                hasTheme
-                    ? Symbols.check_circle_rounded
-                    : Symbols.palette_rounded,
-                size: iconSize * 0.7,
-                color: hasTheme ? Colors.green : theme.colorScheme.primary,
-              ),
-              SizedBox(height: isLandscape ? 10.r : 16.r),
-
-              Text(
-                AppLocale.wizardArtPackTitle.getString(context),
-                style: TextStyle(
-                  fontSize: titleSize,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: isLandscape ? 6.r : 12.r),
-
-              Text(
-                hasTheme
-                    ? AppLocale.wizardArtPackInstalled.getString(context)
-                    : unavailable
-                    ? AppLocale.wizardArtPackUnavailable.getString(context)
-                    : AppLocale.wizardArtPackDesc.getString(context),
-                style: TextStyle(
-                  fontSize: textSize,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  height: 1.3,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
               // The pack list. Tapping a row selects it; the main button
               // downloads the selected pack.
               if (!unavailable && !neoAssets.downloading) ...[
-                SizedBox(height: isLandscape ? 10.r : 16.r),
-                for (int i = 0; i < themes.length; i++)
-                  SystemArtPackTile(
-                    key: _artPackKeys[i],
-                    pack: themes[i],
-                    mosaicSize: isLandscape ? 48 : 56,
-                    isSelected: themes[i].folder == selectedFolder,
-                    isActive: neoAssets.isThemeActive(themes[i].folder),
-                    onTap: () => setState(
-                      () => _selectedArtPackFolder = themes[i].folder,
-                    ),
-                  ),
+                SizedBox(height: 10 * _u),
+                // Two packs a row, so a short screen shows several at
+                // once; the D-pad moves across and down the grid.
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final gap = 6 * _u;
+                    final tileWidth =
+                        (constraints.maxWidth - gap * (_artPackColumns - 1)) /
+                        _artPackColumns;
+                    return Wrap(
+                      spacing: gap,
+                      runSpacing: gap,
+                      children: [
+                        for (int i = 0; i < themes.length; i++)
+                          SizedBox(
+                            width: tileWidth,
+                            child: SystemArtPackTile(
+                              key: _artPackKeys[i],
+                              pack: themes[i],
+                              mosaicSize: 32 * _u,
+                              margin: EdgeInsets.zero,
+                              compact: true,
+                              isSelected: themes[i].folder == selectedFolder,
+                              isActive: neoAssets.isThemeActive(
+                                themes[i].folder,
+                              ),
+                              onTap: () => setState(
+                                () => _selectedArtPackFolder = themes[i].folder,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
               ],
 
               // Live download progress.
               if (neoAssets.downloading) ...[
-                SizedBox(height: isLandscape ? 12.r : 28.r),
+                SizedBox(height: 12 * _u),
                 SizedBox(
-                  width: 220.r,
+                  width: 220 * _u,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8.r),
+                    borderRadius: BorderRadius.circular(8 * _u),
                     child: LinearProgressIndicator(
                       value: neoAssets.downloadProgress > 0
                           ? neoAssets.downloadProgress
                           : null,
-                      minHeight: 8.r,
+                      minHeight: 8 * _u,
                       backgroundColor: theme.colorScheme.primary.withValues(
                         alpha: 0.1,
                       ),
@@ -1493,7 +1421,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-                SizedBox(height: 8.r),
+                SizedBox(height: 8 * _u),
                 Text(
                   '${(neoAssets.downloadProgress * 100).toInt()}%',
                   style: TextStyle(
@@ -1505,6 +1433,61 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
               ],
             ],
           ),
+        );
+        final heading = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  hasTheme
+                      ? Symbols.check_circle_rounded
+                      : Symbols.palette_rounded,
+                  size: 24 * _u,
+                  color: hasTheme ? Colors.green : theme.colorScheme.primary,
+                ),
+                SizedBox(width: 10 * _u),
+                Flexible(
+                  child: Text(
+                    AppLocale.wizardArtPackTitle.getString(context),
+                    style: TextStyle(
+                      fontSize: titleSize,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    textAlign: TextAlign.start,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 6 * _u),
+            Text(
+              hasTheme
+                  ? AppLocale.wizardArtPackInstalled.getString(context)
+                  : unavailable
+                  ? AppLocale.wizardArtPackUnavailable.getString(context)
+                  : AppLocale.wizardArtPackDesc.getString(context),
+              style: TextStyle(
+                fontSize: textSize,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                height: 1.3,
+              ),
+              textAlign: TextAlign.start,
+            ),
+          ],
+        );
+        return Row(
+          children: [
+            // Scrolls only on a screen too short for the text.
+            Expanded(
+              flex: 2,
+              child: Center(child: SingleChildScrollView(child: heading)),
+            ),
+            SizedBox(width: 16 * _u),
+            Expanded(flex: 3, child: packs),
+          ],
         );
       },
     );
@@ -1518,6 +1501,11 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     // Pick the ES-DE root folder (platform-branched, mirrors the Directories
     // settings picker).
     String? selected;
+    // A folder from another provider has no path the import can read.
+    var unusable = false;
+    // Without All files access, a folder NeoStation can't read looks empty to
+    // the import.
+    var needsAllFilesAccess = false;
     _gamepadNav?.deactivate();
     try {
       if (Platform.isAndroid) {
@@ -1529,18 +1517,21 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
           try {
             final uri = await PermissionService.requestFolderAccess();
             if (uri != null) {
-              final uriStr = uri.toString();
-              final hasFiles = await PermissionService.hasAllFilesAccess();
-              selected =
-                  await UserDataLocationService.resolveAndroidUserDataPath(
-                    uriStr,
-                    hasAllFilesAccess: hasFiles,
-                  ) ??
-                  UserDataLocationService.safUriToRealPath(uriStr);
+              // The folder as picked, never NeoStation's own storage.
+              selected = UserDataLocationService.safUriToRealPath(
+                uri.toString(),
+              );
+              unusable = selected == null;
+              needsAllFilesAccess =
+                  !unusable && !await PermissionService.hasAllFilesAccess();
             }
           } on PlatformException catch (e) {
             if (e.code == 'PICKER_FAILED' && mounted) {
               selected = await TvDirectoryPicker.show(context);
+              // The in-app browser leaves no folder grant behind.
+              needsAllFilesAccess =
+                  selected != null &&
+                  !await PermissionService.hasAllFilesAccess();
             }
           }
         }
@@ -1554,7 +1545,15 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       _gamepadNav?.activate();
     }
 
-    if (selected == null || !mounted) return;
+    if (selected == null || !mounted) {
+      if (unusable && mounted) {
+        await _showWizardMessage(
+          AppLocale.wizardEsdeStepTitle.getString(context),
+          AppLocale.wizardFolderNotUsable.getString(context),
+        );
+      }
+      return;
+    }
     if (selected.endsWith(Platform.pathSeparator)) {
       selected = selected.substring(0, selected.length - 1);
     }
@@ -1575,8 +1574,39 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     final localeEsdeSummarySystems = AppLocale.esdeSummarySystems.getString(
       context,
     );
+    final localeEsdeImportFailed = AppLocale.esdeImportFailed.getString(
+      context,
+    );
+    final localeErrorConfiguringPath = AppLocale.errorConfiguringPath.getString(
+      context,
+    );
+    final localeEsdeTitle = AppLocale.wizardEsdeStepTitle.getString(context);
+    // Added to the not-found results when All files access is missing.
+    final allFilesHint = needsAllFilesAccess
+        ? '\n${AppLocale.userDataFolderGrantAllFiles.getString(context)}'
+        : '';
 
-    await context.read<SqliteConfigProvider>().updateEsdeFolderPath(selected);
+    try {
+      await context.read<SqliteConfigProvider>().updateEsdeFolderPath(selected);
+    } catch (e) {
+      _log.e('Wizard ES-DE folder save failed: $e');
+      GlobalNotificationService().show(
+        id: 'wizard_esde_folder_error',
+        message: localeErrorConfiguringPath.replaceFirst('{error}', '$e'),
+        type: GlobalNotificationType.error,
+      );
+      // The bell isn't on screen during setup.
+      await _showWizardMessage(
+        localeEsdeTitle,
+        localeErrorConfiguringPath.replaceFirst(
+          '{error}',
+          '$e'.split('\n').first,
+        ),
+      );
+      return;
+    }
+    GlobalNotificationService().dismiss('wizard_esde_folder_error');
+    if (!mounted) return;
 
     setState(() {
       _isImportingEsde = true;
@@ -1619,7 +1649,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       // Rebuild the artwork fallback map now esde_media_dir rows exist.
       if (mounted) await context.read<FileProvider>().refreshEsde();
     } catch (e) {
-      error = e.toString();
+      error = localeEsdeImportFailed.replaceFirst('{error}', '$e');
       _log.e('Wizard ES-DE import failed: $e');
     }
 
@@ -1643,19 +1673,30 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
         type: GlobalNotificationType.error,
         progress: null,
       );
+      // The bell above is the record; it isn't on screen during setup.
+      await _showWizardMessage(localeEsdeTitle, error);
     } else if (result != null && !result.gamelistsDirFound) {
       GlobalNotificationService().update(
         id: notificationId,
-        message: localeEsdeImportNotEsdeFolder,
+        message: '$localeEsdeImportNotEsdeFolder$allFilesHint',
         type: GlobalNotificationType.error,
         progress: null,
+      );
+      await _showWizardMessage(
+        localeEsdeTitle,
+        '$localeEsdeImportNotEsdeFolder$allFilesHint',
       );
     } else if (!matched) {
       GlobalNotificationService().update(
         id: notificationId,
-        message: localeEsdeImportNothingFound,
+        message: '$localeEsdeImportNothingFound$allFilesHint',
         type: GlobalNotificationType.info,
         progress: null,
+      );
+      await _showWizardMessage(
+        localeEsdeTitle,
+        '$localeEsdeImportNothingFound$allFilesHint',
+        icon: Symbols.info_rounded,
       );
     } else {
       final importResult = result;
@@ -1713,6 +1754,10 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     // with nothing said about it.
     if (!applied) {
       _log.w('Art pack was not applied; staying on the wizard art-pack step');
+      await _showWizardMessage(
+        AppLocale.wizardArtPackTitle.getString(context),
+        AppLocale.wizardArtPackFailed.getString(context),
+      );
       return;
     }
 
@@ -1728,35 +1773,37 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     if (isInScanningStep) {
       return Consumer<SqliteConfigProvider>(
         builder: (context, provider, child) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // Next button only when scan completes
-              GamepadControl(
-                iconPath: 'assets/images/gamepad/Xbox_A_button.png',
-                label: AppLocale.next.getString(context),
-                onTap: provider.scanCompleted
-                    ? () => _handleMainAction()
-                    : null,
-                backgroundColor: theme.colorScheme.primary,
-                textColor: theme.colorScheme.onPrimary,
+          final failed = _scanFailed(provider);
+          return _buttonRow([
+            if (_canGoBack(provider)) _backButton(theme),
+            if (failed)
+              _westButton(
+                theme,
+                AppLocale.skipForNow.getString(context),
+                () => _handleSkip(),
               ),
-            ],
-          );
+            // Next once the scan completes; Retry if it stopped with an error
+            GamepadControl(
+              iconPath: 'assets/images/gamepad/Xbox_A_button.png',
+              label: failed
+                  ? AppLocale.retry.getString(context)
+                  : AppLocale.next.getString(context),
+              onTap: provider.scanCompleted || failed
+                  ? () => _handleMainAction()
+                  : null,
+              backgroundColor: theme.colorScheme.tertiary,
+              textColor: theme.colorScheme.onTertiary,
+            ),
+          ]);
         },
       );
     }
 
-    // For other steps, use normal logic.
-    // Skip is offered on the optional steps: the folder and permissions steps
-    // (Android only), plus the two trailing optional steps (ES-DE import, art
-    // pack) on every platform. The permissions step always offers it — see
-    // _handleSkip for why it must never be gated on a grant succeeding.
-    final showSkip =
-        _currentStep == _stepEsde ||
-        _currentStep == _stepArtPack ||
-        (Platform.isAndroid &&
-            (_currentStep == _stepFolder || _currentStep == _stepPermissions));
+    // For other steps, use normal logic. Skip ([_canSkip]) is offered on the
+    // optional steps. The permissions step always offers it: see _handleSkip
+    // for why it must never be gated on a grant succeeding.
+    final showSkip = _canSkip;
+    final provider = context.watch<SqliteConfigProvider>();
     // Wrapped in a NeoAssets consumer so the art-pack step's button label
     // (Download vs Finish) stays in sync with the live theme/download state —
     // otherwise a non-reactive read can show "Finish" while the action still
@@ -1772,45 +1819,97 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             !neoAssets.hasActiveTheme &&
             neoAssets.themes.isEmpty &&
             neoAssets.loading;
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            if (showSkip)
-              GamepadControl(
-                iconPath: 'assets/images/gamepad/Xbox_B_button.png',
-                label: AppLocale.skipForNow.getString(context),
-                onTap: () => _handleSkip(),
-                textColor: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              )
-            else
-              SizedBox(width: 64.r),
-
-            // Main action button
-            GamepadControl(
-              iconPath: 'assets/images/gamepad/Xbox_A_button.png',
-              label: _getButtonText(),
-              onTap:
-                  (_isSelectingFolder ||
-                      _isImportingEsde ||
-                      _isDownloadingArt ||
-                      artLoading)
+        return _buttonRow([
+          if (_canGoBack(provider)) _backButton(theme),
+          if (_currentStep == _stepUserData)
+            _westButton(
+              theme,
+              AppLocale.selectUserDataFolder.getString(context),
+              _isSelectingUserDataFolder
                   ? null
-                  : () => _handleMainAction(),
-              busy: _isSelectingFolder || artLoading,
-              backgroundColor: theme.colorScheme.primary,
-              textColor: theme.colorScheme.onPrimary,
+                  : () => _selectUserDataLocationWizard(),
+              busy: _isSelectingUserDataFolder,
             ),
-          ],
-        );
+          if (showSkip)
+            _westButton(
+              theme,
+              AppLocale.skipForNow.getString(context),
+              _isImportingEsde || _isDownloadingArt
+                  ? null
+                  : () => _handleSkip(),
+            ),
+          // Main action button
+          GamepadControl(
+            iconPath: 'assets/images/gamepad/Xbox_A_button.png',
+            label: _getButtonText(),
+            onTap:
+                (_isSelectingFolder ||
+                    _isImportingEsde ||
+                    _isDownloadingArt ||
+                    artLoading)
+                ? null
+                : () => _handleMainAction(),
+            busy: _isSelectingFolder || artLoading,
+            backgroundColor: theme.colorScheme.tertiary,
+            textColor: theme.colorScheme.onTertiary,
+          ),
+        ]);
       },
     );
   }
 
+  /// The step's buttons, centred, as in the beta import wizard: Back (B)
+  /// first, then the step's other action (the West face button), then its
+  /// main action (A).
+  Widget _buttonRow(List<Widget> buttons) => Wrap(
+    alignment: WrapAlignment.center,
+    spacing: 12 * _u,
+    runSpacing: 8 * _u,
+    children: buttons,
+  );
+
+  /// The colours of the other buttons, as on the app's footers: the main
+  /// action is tertiary, the rest tertiaryFixed.
+  Color _secondaryButtonColor(ThemeData theme) =>
+      theme.colorScheme.onTertiaryFixed;
+
+  /// Back (B): to the previous step.
+  Widget _backButton(ThemeData theme) => GamepadControl(
+    iconPath: 'assets/images/gamepad/Xbox_B_button.png',
+    label: AppLocale.back.getString(context),
+    onTap: _handleBack,
+    backgroundColor: theme.colorScheme.tertiaryFixed,
+    textColor: _secondaryButtonColor(theme),
+  );
+
+  /// The step's other action, on the West face button (X on an Xbox
+  /// layout, Y on a Nintendo one).
+  Widget _westButton(
+    ThemeData theme,
+    String label,
+    VoidCallback? onTap, {
+    bool busy = false,
+  }) => WestButtonGlyph(
+    builder: (context, iconPath) => GamepadControl(
+      iconPath: iconPath,
+      label: label,
+      onTap: onTap,
+      busy: busy,
+      backgroundColor: theme.colorScheme.tertiaryFixed,
+      textColor: _secondaryButtonColor(theme),
+    ),
+  );
+
   String _getButtonText() {
-    if (_currentStep == _stepUserData) return AppLocale.next.getString(context);
+    if (_currentStep == _stepWelcome) {
+      return AppLocale.wizardStartSetup.getString(context);
+    }
+    if (_currentStep == _stepLanguage || _currentStep == _stepUserData) {
+      return AppLocale.next.getString(context);
+    }
     if (_currentStep == _stepPermissions) {
-      // Grant the next pending permission; once both are satisfied, advance.
-      if (!_storageGranted || !_accessibilityDone) {
+      // Grant storage access if pending; once granted, advance.
+      if (!_storageGranted) {
         return AppLocale.grantAccess.getString(context);
       }
       return AppLocale.next.getString(context);
@@ -1848,16 +1947,22 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
   }
 
   Future<void> _handleMainAction() async {
-    // Step 0 (user data location): advance, then auto-skip the permissions step
-    // if both permissions are already granted.
+    if (_currentStep == _stepWelcome) {
+      setState(() => _currentStep = _stepLanguage);
+      return;
+    }
+    if (_currentStep == _stepLanguage) {
+      setState(() => _currentStep = _stepUserData);
+      return;
+    }
+
+    // Step 1 (user data location): advance, then auto-skip the permissions step
+    // if storage access is already granted.
     if (_currentStep == _stepUserData) {
       setState(() => _currentStep = _currentStep + 1);
       if (Platform.isAndroid) {
         _refreshPermissionStates().then((_) {
-          if (mounted &&
-              _currentStep == _stepPermissions &&
-              _storageGranted &&
-              _accessibilityDone) {
+          if (mounted && _currentStep == _stepPermissions && _storageGranted) {
             setState(() => _currentStep = _stepFolder);
           }
         });
@@ -1876,6 +1981,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     }
 
     if (_currentStep == _stepScanning) {
+      final provider = context.read<SqliteConfigProvider>();
+      if (_scanFailed(provider)) {
+        // The scan stopped with an error: try it again.
+        provider.scanSystems();
+        return;
+      }
       // Scan finished → advance to the optional ES-DE import step.
       setState(() => _currentStep = _stepEsde);
       return;
@@ -1905,12 +2016,12 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     }
   }
 
-  /// Drives the combined permissions step: grants the next pending permission
-  /// (storage first, then accessibility), or advances to folder once both are
-  /// granted. Gamepad input is suspended around any trip to system Settings.
+  /// Drives the permissions step: requests storage access if pending, or
+  /// advances to folder once it is granted. Gamepad input is suspended around
+  /// any trip to system Settings.
   Future<void> _handlePermissionAction() async {
-    // Both satisfied → move on.
-    if (_storageGranted && _accessibilityDone) {
+    // Already granted → move on.
+    if (_storageGranted) {
       setState(() => _currentStep = _stepFolder);
       return;
     }
@@ -1921,7 +2032,7 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     // Safety re-arm. The request below can fail to open anything at all on
     // some ROMs, and with no Settings screen there is no resume to re-activate
     // on either — which left the wizard permanently deaf to the controller,
-    // B (skip) included. Only fires while we still hold the foreground, so a
+    // Back and Skip included. Only fires while we still hold the foreground, so a
     // Settings screen that did open keeps input suspended as intended.
     _leftForegroundDuringGrant = false;
     // Deliberately not gated on still being the permissions step: a touch
@@ -1933,17 +2044,10 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       if (mounted && !_leftForegroundDuringGrant) _gamepadNav?.activate();
     });
     try {
-      if (!_storageGranted) {
-        final success = await PermissionService.requestAllFilesAccess();
-        if (success && mounted) {
-          context.read<SqliteConfigProvider>().refreshAllFilesAccess();
-          setState(() => _storageGranted = true);
-        }
-      } else {
-        // Accessibility can't be granted in-app — send the user to system
-        // Settings. We re-check on resume (didChangeAppLifecycleState) and
-        // light up the green check when they come back with it enabled.
-        await ScreenshotService.openAccessSettings();
+      final success = await PermissionService.requestAllFilesAccess();
+      if (success && mounted) {
+        context.read<SqliteConfigProvider>().refreshAllFilesAccess();
+        setState(() => _storageGranted = true);
       }
     } catch (e) {
       _log.e('Error requesting permissions: $e');
@@ -1963,6 +2067,8 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     });
     _gamepadNav?.deactivate();
 
+    // Why a picked folder wasn't added, shown once the picker has closed.
+    String? problem;
     try {
       final configProvider = Provider.of<SqliteConfigProvider>(
         context,
@@ -1986,19 +2092,54 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
             }
           }
         }
-
-        if (result != null && mounted) {
-          await configProvider.addRomFolder(result, scan: false);
-        }
-      } else {
-        await configProvider.selectRomFolder(scan: false, context: context);
-        // Provider already called addRomFolder internally; read back the path
-        result = configProvider.config.romFolder;
+      } else if (mounted) {
+        // Desktop: the platform picker, falling back to the in-app browser
+        // where no XDG portal backend exists (SteamOS Game Mode). Picked here
+        // rather than through the provider so the wizard knows which folder
+        // was picked, and can tell a cancelled pick from one that failed.
+        result = await TvDirectoryPicker.pickDirectory(
+          context,
+          dialogTitle: AppLocale.selectRomFolder.getString(context),
+        );
       }
 
-      if (result != null && mounted) {
+      final folders = configProvider.config.romFolders;
+      // A library the user-data step opened can already have folders: a
+      // cancelled pick (desktop has no Skip on this step) or a full list
+      // moves on with them, as before.
+      var keepFolders =
+          result == null && folders.isNotEmpty && !Platform.isAndroid;
+      if (result != null && mounted && !folders.contains(result)) {
+        // addRomFolder refuses these only through the provider's error and the
+        // notification bell; a failed save also throws.
+        if (folders.length >= 5) {
+          problem = AppLocale.maxRomFoldersReached.getString(context);
+          keepFolders = true;
+        } else if (isTransientPortalPath(result)) {
+          problem = AppLocale.wizardRomFolderTemporary.getString(context);
+        } else {
+          final notAdded = AppLocale.wizardRomFolderNotAdded.getString(context);
+          configProvider.clearError();
+          try {
+            await configProvider.addRomFolder(result, scan: false);
+          } catch (_) {
+            // Reported just below: the folder isn't in the list, and the
+            // provider's error says why.
+          }
+          if (!configProvider.config.romFolders.contains(result)) {
+            final reason = (configProvider.error ?? '').split('\n').first;
+            problem = notAdded.replaceFirst('{error}', reason).trim();
+          }
+        }
+      }
+
+      final added =
+          result != null && configProvider.config.romFolders.contains(result);
+      if (mounted && (added || keepFolders)) {
+        // A leftover error would read as a failed scan until the scan starts.
+        configProvider.clearError();
         setState(() {
-          _selectedFolder = result;
+          _selectedFolder = added ? result : folders.first;
           _isSelectingFolder = false;
           _currentStep++;
         });
@@ -2020,15 +2161,33 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
     } finally {
       _gamepadNav?.activate();
     }
+
+    if (problem != null && mounted) {
+      await _showWizardMessage(
+        AppLocale.selectRomFolder.getString(context),
+        problem,
+      );
+    }
   }
 
   Future<void> _finishSetup() async {
+    if (_saving) return;
+    _saving = true;
+    // The wizard's navigation isn't a manager layer: pause it while saving,
+    // so presses during the save (or on the failure dialogue below) don't
+    // press Finish or Skip again or pick another art pack.
+    _gamepadNav?.deactivate();
+
     // Stop pinning the secondary display's dock/launcher off-screen. Set before
     // any await so a rebuild racing the save can't re-assert the flag; the
     // wrapper pushes the clear once completeSetup() lands.
     _finishing = true;
 
-    // Verificar que la configuración está guardada
+    final failedTitle = AppLocale.wizardSaveFailedTitle.getString(context);
+    final failedBody = AppLocale.wizardSaveFailedBody.getString(context);
+    final ok = AppLocale.ok.getString(context);
+
+    // Warn if no ROM folder was saved
     final configProvider = Provider.of<SqliteConfigProvider>(
       context,
       listen: false,
@@ -2039,10 +2198,27 @@ class _SetupWizardState extends State<SetupWizard> with WidgetsBindingObserver {
       _log.w('Warning: ROM folder not saved in config!');
     }
 
-    // Forzar guardado de la configuración
-    await configProvider.saveConfig();
-
-    // Llamar al callback de completado
-    widget.onComplete();
+    // Save the configuration, then mark setup as completed.
+    try {
+      await configProvider.saveConfig();
+      await widget.onComplete();
+      return;
+    } catch (e) {
+      _log.e('Finishing setup failed: $e');
+      if (!mounted) return;
+      setState(() => _finishing = false);
+      try {
+        await InfoDialog.show(
+          context,
+          title: failedTitle,
+          body: failedBody.replaceFirst('{error}', '$e'.split('\n').first),
+          okLabel: ok,
+          icon: Symbols.error_rounded,
+        );
+      } finally {
+        _saving = false;
+        if (mounted) _gamepadNav?.activate();
+      }
+    }
   }
 }

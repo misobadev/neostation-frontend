@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -13,7 +14,9 @@ import 'package:fullscreen_window/fullscreen_window.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/nav_tabs.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
+import '../../../providers/sqlite_database_provider.dart';
 import '../../../repositories/retro_achievements_repository.dart';
 import '../../../repositories/system_repository.dart';
 import '../../../widgets/info_dialog.dart';
@@ -22,8 +25,14 @@ import 'settings_title.dart';
 import 'widgets/setting_row.dart';
 import 'widgets/setting_value_chip.dart';
 import 'widgets/language_picker_overlay.dart';
+import 'widgets/custom_sounds_dialog.dart';
+import '../../../providers/scraping_provider.dart';
+import '../../../services/metadata_provider_service.dart';
 import '../../../services/permission_service.dart';
 import '../../../services/sfx_service.dart';
+import '../../../services/systems_update_service.dart';
+import '../../../utils/systems_update_flow.dart';
+import 'widgets/settings_action_button.dart';
 
 /// A specialized content panel for system-wide configuration, including platform-specific orchestration (Windows/Android/Linux).
 ///
@@ -49,6 +58,10 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     with WidgetsBindingObserver {
   bool _isDefaultLauncher = false;
 
+  /// The installed systems version, shown on the check-for-updates row. Empty
+  /// until it has loaded.
+  String _systemsVersion = '';
+
   static final _log = LoggerService.instance;
 
   final ScrollController _scrollController = ScrollController();
@@ -67,25 +80,69 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     SfxService.maxVolume,
   ];
 
+  /// Off, then the available preview-video delays in seconds.
+  static const List<int> _videoPreviewDelayCycle = [-1, 0, 1, 2, 3, 4, 5];
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadFullscreenState();
     _checkDefaultLauncher();
+    _loadSystemsVersion();
+    SystemsUpdateFlow.checking.addListener(_onSystemsCheckChanged);
+    SystemsUpdateFlow.running.addListener(_onSystemsUpdateRunChanged);
 
     // Pre-allocate keys for maximum theoretical setting items (the fixed rows
     // plus one per navigation tab that can be toggled).
-    for (int i = 0; i < 17 + NavTab.values.length; i++) {
+    for (int i = 0; i < 20 + NavTab.values.length; i++) {
       _itemKeys.add(GlobalKey());
     }
   }
 
   @override
   void dispose() {
+    SystemsUpdateFlow.checking.removeListener(_onSystemsCheckChanged);
+    SystemsUpdateFlow.running.removeListener(_onSystemsUpdateRunChanged);
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Swaps the row's subtitle between the version and "Checking...".
+  void _onSystemsCheckChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// A run that ended, from here or from start-up, may have installed a new
+  /// version, so the row re-reads it.
+  void _onSystemsUpdateRunChanged() {
+    if (!SystemsUpdateFlow.running.value) _loadSystemsVersion();
+  }
+
+  Future<void> _loadSystemsVersion() async {
+    try {
+      final version = await SystemsUpdateService.currentVersion();
+      if (!mounted) return;
+      setState(() => _systemsVersion = version);
+    } catch (e) {
+      _log.w('Failed to read the systems version: $e');
+    }
+  }
+
+  /// Checks for a systems update now, through the same flow as start-up.
+  ///
+  /// Not awaited: the flow outlives this panel and reports its outcome through
+  /// the notification bell, and the row follows it through the listeners
+  /// above. A press while a check is already running joins that one.
+  void _checkForSystemsUpdate() {
+    unawaited(
+      SystemsUpdateFlow.run(
+        context,
+        trigger: SystemsUpdateTrigger.manual,
+        library: SystemsUpdateLibrary.of(context.read<SqliteConfigProvider>()),
+      ),
+    );
   }
 
   @override
@@ -107,7 +164,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
       try {
         final isFullscreen = context.read<SqliteConfigProvider>().isFullscreen;
         if (Platform.isMacOS) {
-          await windowManager.setFullScreen(isFullscreen);
+          WindowManager.instance.getCurrent()?.isFullScreen = isFullscreen;
         } else {
           FullScreenWindow.setFullScreen(isFullscreen);
         }
@@ -124,7 +181,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
       try {
         await context.read<SqliteConfigProvider>().updateIsFullscreen(value);
         if (Platform.isMacOS) {
-          await windowManager.setFullScreen(value);
+          WindowManager.instance.getCurrent()?.isFullScreen = value;
         } else {
           FullScreenWindow.setFullScreen(value);
         }
@@ -202,16 +259,17 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     count++; // Ignore hidden files in scan
     count++; // Auto-update App
     count++; // Auto-update Systems
+    count++; // Check for Systems Updates
     count++; // SFX Sounds
     count++; // SFX volume (dimmed, but still navigable, while SFX are off)
+    count++; // Custom sounds
     count++; // 12-Hour Clock
+    count++; // Ignore leading articles in game sorting
+    count++; // Play preview videos
     count++; // Show subfolders (every system)
     count++; // Cloud-save mark in the game views
     count++; // Achievement badges on game tiles
     count++; // Match RetroAchievements on startup
-    if (Platform.isAndroid) {
-      count++; // Android Apps layout
-    }
     count += hidableNavTabs().length; // Navigation tab visibility
     count++; // Language
     if (!kIsWeb &&
@@ -342,6 +400,13 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     }
     currentItemIndex++;
 
+    // Protocol: Check for Systems Updates now.
+    if (index == currentItemIndex) {
+      _checkForSystemsUpdate();
+      return;
+    }
+    currentItemIndex++;
+
     // Protocol: Interface Sound Effects.
     if (index == currentItemIndex) {
       final sfxEnabled = configProvider.config.sfxEnabled;
@@ -361,11 +426,36 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     }
     currentItemIndex++;
 
+    if (index == currentItemIndex) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const CustomSoundsDialog(),
+      );
+      return;
+    }
+    currentItemIndex++;
+
     // Protocol: 12-Hour Clock Format.
     if (index == currentItemIndex) {
       configProvider.updateUse12HourClock(
         !configProvider.config.use12HourClock,
       );
+      return;
+    }
+    currentItemIndex++;
+
+    if (index == currentItemIndex) {
+      configProvider.updateIgnoreArticlesInGameSort(
+        !configProvider.config.ignoreArticlesInGameSort,
+      );
+      return;
+    }
+    currentItemIndex++;
+
+    // Protocol: Preview video delay.
+    if (index == currentItemIndex) {
+      _cycleVideoPreviewDelay(configProvider);
       return;
     }
     currentItemIndex++;
@@ -401,17 +491,6 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
       return;
     }
     currentItemIndex++;
-
-    // Protocol: Android apps appear as either a System card or a root tab.
-    if (Platform.isAndroid) {
-      if (index == currentItemIndex) {
-        configProvider.updateAndroidAppsAsTab(
-          !configProvider.config.androidAppsAsTab,
-        );
-        return;
-      }
-      currentItemIndex++;
-    }
 
     // Protocol: Navigation Tab Visibility (one entry per hidable tab, in the
     // same order the rows are built below).
@@ -508,6 +587,25 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     };
   }
 
+  /// Advances the preview delay through Off, 0 s, 1 s ... 5 s and persists it.
+  void _cycleVideoPreviewDelay(SqliteConfigProvider provider) {
+    final current = provider.config.videoPreviewDelay;
+    final index = _videoPreviewDelayCycle.indexOf(current);
+    final next =
+        _videoPreviewDelayCycle[(index < 0
+            ? 0
+            : (index + 1) % _videoPreviewDelayCycle.length)];
+    provider.updateVideoPreviewDelay(next);
+  }
+
+  /// Human label for the current preview delay.
+  String _videoPreviewDelayLabel(BuildContext context, int seconds) {
+    if (seconds < 0) {
+      return AppLocale.videoPreviewsOff.getString(context);
+    }
+    return '$seconds ${AppLocale.secondsShort.getString(context)}';
+  }
+
   /// Synchronizes the scroll viewport with the currently focused setting item.
   void scrollToIndex(int index) {
     _scroller.ensureVisibleIndex(
@@ -534,7 +632,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
           child: SingleChildScrollView(
             controller: _scrollController,
             physics: const ClampingScrollPhysics(),
-            padding: EdgeInsets.only(bottom: 24.r),
+            padding: EdgeInsets.only(top: 6.r, bottom: 24.r),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -551,13 +649,7 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                       title: AppLocale.androidSystemSettings.getString(context),
                       subtitle: AppLocale.androidSystemSettingsSubtitle
                           .getString(context),
-                      trailing: Icon(
-                        Symbols.open_in_new_rounded,
-                        size: 18.r,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
-                      ),
+                      trailing: Icon(Symbols.open_in_new_rounded, size: 18.r),
                     );
                   }(),
                   SizedBox(height: 12.r),
@@ -666,6 +758,35 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                   );
                 }(),
 
+                // Setting: Check for Systems Updates now.
+                SizedBox(height: 12.r),
+                () {
+                  final index = currentItemIdx++;
+                  final focused =
+                      widget.isContentFocused &&
+                      widget.selectedContentIndex == index;
+                  return SettingRow(
+                    key: _itemKeys[index],
+                    onTap: () => selectItem(index),
+                    focused: focused,
+                    title: AppLocale.checkSystemsUpdates.getString(context),
+                    subtitle: SystemsUpdateFlow.checking.value
+                        ? AppLocale.systemsUpdateChecking.getString(context)
+                        : AppLocale.systemsUpdateCurrentVersion
+                              .getString(context)
+                              .replaceFirst(
+                                '{version}',
+                                _systemsVersion.isNotEmpty
+                                    ? _systemsVersion
+                                    : '-',
+                              ),
+                    trailing: SettingsActionButton(
+                      icon: Symbols.system_update_alt_rounded,
+                      selected: focused,
+                    ),
+                  );
+                }(),
+
                 // Setting: SFX Feedback.
                 SizedBox(height: 12.r),
                 () {
@@ -713,6 +834,21 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                   );
                 }(),
 
+                SizedBox(height: 12.r),
+                () {
+                  final index = currentItemIdx++;
+                  return SettingRow(
+                    key: _itemKeys[index],
+                    onTap: () => selectItem(index),
+                    focused:
+                        widget.isContentFocused &&
+                        widget.selectedContentIndex == index,
+                    title: AppLocale.customSounds.getString(context),
+                    subtitle: AppLocale.customSoundsSubtitle.getString(context),
+                    trailing: Icon(Symbols.chevron_right_rounded, size: 18.r),
+                  );
+                }(),
+
                 // Setting: 12-Hour Clock Format.
                 SizedBox(height: 12.r),
                 () {
@@ -739,9 +875,53 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                   );
                 }(),
 
-                // Setting: Show subfolders, applied to every system. The
-                // per-system toggle in a system's settings dialog stays
-                // available; this stamps them all at once.
+                // Setting: Ignore leading articles in game sorting.
+                SizedBox(height: 12.r),
+                () {
+                  final index = currentItemIdx++;
+                  return SettingRow(
+                    key: _itemKeys[index],
+                    onTap: () => selectItem(index),
+                    focused:
+                        widget.isContentFocused &&
+                        widget.selectedContentIndex == index,
+                    title: AppLocale.ignoreArticlesInGameSort.getString(
+                      context,
+                    ),
+                    subtitle: AppLocale.ignoreArticlesInGameSortSubtitle
+                        .getString(context),
+                    trailing: CustomToggleSwitch(
+                      value: config.ignoreArticlesInGameSort,
+                      onChanged: (value) => context
+                          .read<SqliteConfigProvider>()
+                          .updateIgnoreArticlesInGameSort(value),
+                      activeColor: theme.colorScheme.primary,
+                    ),
+                  );
+                }(),
+
+                SizedBox(height: 12.r),
+                () {
+                  final index = currentItemIdx++;
+                  return SettingRow(
+                    key: _itemKeys[index],
+                    onTap: () => selectItem(index),
+                    focused:
+                        widget.isContentFocused &&
+                        widget.selectedContentIndex == index,
+                    title: AppLocale.videoPreviews.getString(context),
+                    subtitle: AppLocale.videoPreviewsSubtitle.getString(
+                      context,
+                    ),
+                    trailing: SettingValueChip(
+                      text: _videoPreviewDelayLabel(
+                        context,
+                        config.videoPreviewDelay,
+                      ),
+                    ),
+                  );
+                }(),
+
                 SizedBox(height: 12.r),
                 () {
                   final index = currentItemIdx++;
@@ -836,34 +1016,6 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
                     ),
                   );
                 }(),
-
-                // Setting: Android Apps location. This moves the existing
-                // virtual system into a top-level tab without changing the
-                // default Systems experience.
-                if (Platform.isAndroid) ...[
-                  SizedBox(height: 12.r),
-                  () {
-                    final index = currentItemIdx++;
-                    return SettingRow(
-                      key: _itemKeys[index],
-                      onTap: () => selectItem(index),
-                      focused:
-                          widget.isContentFocused &&
-                          widget.selectedContentIndex == index,
-                      title: AppLocale.androidAppLayout.getString(context),
-                      subtitle: AppLocale.androidAppLayoutSubtitle.getString(
-                        context,
-                      ),
-                      trailing: SettingValueChip(
-                        text:
-                            (config.androidAppsAsTab
-                                    ? AppLocale.androidAppLayoutTab
-                                    : AppLocale.androidAppLayoutSystem)
-                                .getString(context),
-                      ),
-                    );
-                  }(),
-                ],
 
                 // Setting: Navigation Tab Visibility — one row per hidable tab,
                 // so a future tab gets its toggle from its NavTabSpec alone.
@@ -1112,7 +1264,18 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     );
 
     if (result != null && mounted) {
-      context.read<SqliteConfigProvider>().updateAppLanguage(result);
+      final scraping = context.read<ScrapingProvider>();
+      final games = context.read<SqliteDatabaseProvider>();
+      await context.read<SqliteConfigProvider>().updateAppLanguage(result);
+      // Game titles from NeoAssets follow the app language.
+      final retitled = await MetadataProviderService.syncTitlesToLanguage(
+        result,
+      );
+      if (retitled > 0) {
+        // The home screen's recent card reads the cached games.
+        await games.loadDatabase();
+        scraping.markArtworkUpdated();
+      }
     }
   }
 }

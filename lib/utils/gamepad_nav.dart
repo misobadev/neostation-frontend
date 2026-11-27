@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gamepads/gamepads.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/sfx_service.dart';
+
 import '../responsive.dart';
 import 'desktop_window_focus.dart';
 import 'gamepad_translator.dart';
@@ -62,15 +64,29 @@ class GamepadNavigation {
   final VoidCallback? onPreviousTab;
   final VoidCallback? onNextTab;
   final VoidCallback? onSelectItem;
+
+  /// Disable when selection itself previews an audio clip.
+  final bool playSelectSound;
   final VoidCallback? onBack;
   final VoidCallback? onFavorite;
   final VoidCallback? onSettings;
   final VoidCallback? onXButton;
+
+  /// The West face button — X on an Xbox pad, Square on a PlayStation one, Y
+  /// on a Nintendo-style one — whichever input the active controller reports
+  /// it as (see [GamepadEventTranslator.westButtonFor]). When set it takes
+  /// that press ahead of [onXButton] / [onFavorite].
+  final VoidCallback? onWestButton;
   final VoidCallback? onLeftStickClick;
   final VoidCallback? onRightStickClick;
   final VoidCallback? onSelectButton;
   final VoidCallback? onLeftBumper;
   final VoidCallback? onRightBumper;
+
+  /// L2/R2. Fire once per pull, on press; holding does not repeat. Unbound
+  /// triggers stay silent.
+  final VoidCallback? onLeftTrigger;
+  final VoidCallback? onRightTrigger;
 
   /// Select (View) chord combos. On its own Select fires [onSelectButton], or
   /// [globalSelectTap] when the layer defines none.
@@ -112,6 +128,15 @@ class GamepadNavigation {
   final bool Function()? canHandleInput;
 
   static final _log = LoggerService.instance;
+
+  /// Clock used for input pacing. Tests replace it with a controllable clock.
+  static DateTime Function() _now = DateTime.now;
+
+  @visibleForTesting
+  static void debugSetClock(DateTime Function() now) => _now = now;
+
+  @visibleForTesting
+  static void debugResetClock() => _now = DateTime.now;
 
   /// When true, all raw input events are logged for diagnostic purposes.
   static bool _debugLogging = false;
@@ -297,25 +322,60 @@ class GamepadNavigation {
   /// hold was a plain tap so Select keeps its own action (e.g. mute the playing
   /// video) while still working as the chord modifier.
   ///
-  /// The dispatch is deferred by [SelectTap.chordWindow] because the
-  /// pulse-emitting controllers release Select while it is still physically
-  /// held — firing immediately would mute the video at the start of every
-  /// chord. Any chord landing inside that window invalidates the pending tap.
+  /// On a layer with Select chords the dispatch is deferred by
+  /// [SelectTap.chordWindow], because the pulse-emitting controllers release
+  /// Select while it is still physically held — firing immediately would mute
+  /// the video at the start of every chord. Any chord landing inside that
+  /// window invalidates the pending tap.
+  ///
+  /// A layer with no chords has nothing to wait for, so the tap fires on the
+  /// release itself. Waiting there only made Select feel slow (opening the
+  /// notifications from the Systems screen took the full window). A pulse
+  /// release still fires just once: the presses that follow it continue the
+  /// same hold, and that hold's final release schedules nothing.
   void _onSelectUp(DateTime now) {
     final schedulesTap = _selectTap.releaseSchedulesTap(now);
     _publishSelectHeld();
     if (!schedulesTap) return;
     _selectTapTimer?.cancel();
+    _selectTapTimer = null;
+    if (!_hasSelectChords) {
+      _dispatchSelectTap();
+      return;
+    }
     _selectTapTimer = Timer(SelectTap.chordWindow, () {
       _selectTapTimer = null;
       if (!_selectTap.tapStillValid) return;
-      final owned = onSelectButton;
-      if (owned != null) {
-        owned();
-        return;
-      }
-      globalSelectTap?.call();
+      _dispatchSelectTap();
     });
+  }
+
+  /// Whether this layer binds any Select+face-button chord.
+  bool get _hasSelectChords =>
+      onSelectModifierA != null ||
+      onSelectModifierB != null ||
+      onSelectModifierX != null ||
+      onSelectModifierY != null;
+
+  /// Fires this layer's own Select action, or the app-wide one when it has none.
+  void _dispatchSelectTap() {
+    final owned = onSelectButton;
+    if (owned != null) {
+      owned();
+      return;
+    }
+    globalSelectTap?.call();
+  }
+
+  /// Feeds a Select press ([down]) or release straight into the tap logic,
+  /// bypassing the plugin plumbing.
+  @visibleForTesting
+  void debugSelectEdge({required bool down}) {
+    if (down) {
+      _onSelectDown(_now());
+    } else {
+      _onSelectUp(_now());
+    }
   }
 
   DateTime? _activationTime;
@@ -328,6 +388,12 @@ class GamepadNavigation {
 
   String? _currentGamepadId;
   String? _currentGamepadName;
+
+  /// Which input the most recently used controller reports its West face
+  /// button as, so button hints can show the glyph of the button to press.
+  static final ValueNotifier<GamepadInputType> activeWestButton = ValueNotifier(
+    GamepadInputType.buttonX,
+  );
 
   final GamepadEventTranslator _translator = GamepadEventTranslator();
 
@@ -350,15 +416,19 @@ class GamepadNavigation {
     this.onPreviousTab,
     this.onNextTab,
     this.onSelectItem,
+    this.playSelectSound = true,
     this.onBack,
     this.onFavorite,
     this.onSettings,
     this.onXButton,
+    this.onWestButton,
     this.onLeftStickClick,
     this.onRightStickClick,
     this.onSelectButton,
     this.onLeftBumper,
     this.onRightBumper,
+    this.onLeftTrigger,
+    this.onRightTrigger,
     this.onSelectModifierA,
     this.onSelectModifierB,
     this.onSelectModifierX,
@@ -443,6 +513,7 @@ class GamepadNavigation {
           firstGamepad.systemInfo,
         );
         _translator.updateGamepadName(firstGamepad.id, firstGamepad.name);
+        activeWestButton.value = _translator.westButtonFor(firstGamepad.id);
 
         if (Platform.isLinux) {
           final connectionType = firstGamepad.deviceInfo.connectionType;
@@ -468,6 +539,7 @@ class GamepadNavigation {
 
       _translator.updateGamepadSystemInfo(gamepadId, gamepad.systemInfo);
       _translator.updateGamepadName(gamepadId, gamepad.name);
+      activeWestButton.value = _translator.westButtonFor(gamepadId);
       final connectionType = gamepad.deviceInfo.connectionType;
       _translator.updateGamepadConnectionType(gamepadId, connectionType);
       _currentGamepadName = gamepad.name;
@@ -509,7 +581,7 @@ class GamepadNavigation {
 
     // Start grace period only on true transitions to prevent discarding mid-flight release events.
     if (wasInactive) {
-      _activationTime = DateTime.now();
+      _activationTime = _now();
       // Clear any stale repeat timers that may have survived a prior deactivation.
       cancelAllRepeatTimers();
       // Drop remembered button states: a button held while this layer was
@@ -549,7 +621,7 @@ class GamepadNavigation {
 
   /// Whether a Select+face-button chord should register right now: Select is
   /// still reported down, or it pulsed within the chord window.
-  bool _isSelectChordActive() => _selectTap.isChordActive(DateTime.now());
+  bool _isSelectChordActive() => _selectTap.isChordActive(_now());
 
   /// Maps a face button to its Select-modifier combo callback, if any.
   VoidCallback? _selectModifierFor(GamepadInputType inputType) {
@@ -565,6 +637,18 @@ class GamepadNavigation {
       default:
         return null;
     }
+  }
+
+  /// Fires [onWestButton] when [event] is the active controller's West face
+  /// button, reporting whether it did.
+  bool _dispatchWest(TranslatedGamepadEvent event) {
+    final onWest = onWestButton;
+    if (onWest == null) return false;
+    if (event.inputType != _translator.westButtonFor(event.gamepadId)) {
+      return false;
+    }
+    onWest();
+    return true;
   }
 
   /// Cancels all active auto-repeat timers.
@@ -670,13 +754,15 @@ class GamepadNavigation {
   Future<void> _toggleFullscreen() async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       if (Platform.isWindows || Platform.isMacOS) {
-        final isFullscreen = await windowManager.isFullScreen();
-        await windowManager.setFullScreen(!isFullscreen);
+        final window = WindowManager.instance.getCurrent();
+        if (window != null) {
+          final isFullscreen = window.isFullScreen;
+          window.isFullScreen = !isFullscreen;
 
-        // Allow some time for the window manager to process the state change.
-        await Future.delayed(const Duration(milliseconds: 100));
-        final newState = await windowManager.isFullScreen();
-        FullscreenNotifier().notifyFullscreenChanged(newState);
+          // Allow some time for the window manager to process the state change.
+          await Future.delayed(const Duration(milliseconds: 100));
+          FullscreenNotifier().notifyFullscreenChanged(window.isFullScreen);
+        }
       }
     }
   }
@@ -715,7 +801,7 @@ class GamepadNavigation {
         );
       }
 
-      final now = DateTime.now();
+      final now = _now();
 
       // Select (View) chord modifier on Android: read the RAW key directly.
       // This controller auto-repeats ACTION_DOWN (value 0.0) while the button is
@@ -849,7 +935,11 @@ class GamepadNavigation {
           }
           _lastShoulderDispatchTime = now;
           _shoulderReleasedSinceDispatch = false;
-        } else {
+        } else if (!GamepadEventTranslator.isTrigger(
+          translatedEvent.inputType,
+        )) {
+          // Triggers skip this: the translator already makes each pull one
+          // press, and a pull must not swallow the button pressed after it.
           // Select and any face button that lands during a Select chord bypass
           // the action debounce so a quick chord isn't swallowed.
           final isChordRelated =
@@ -896,7 +986,7 @@ class GamepadNavigation {
     // action on release (see [_onSelectUp]). Some controllers only reliably report one edge
     // of this button, so the timestamp is stamped on BOTH press and release.
     if (event.inputType == GamepadInputType.buttonSelect) {
-      final now = DateTime.now();
+      final now = _now();
       if (event.isPressed) {
         _onSelectDown(now);
       } else if (event.isReleased) {
@@ -927,7 +1017,7 @@ class GamepadNavigation {
 
     bool shouldProcess;
 
-    // Directional and shoulder buttons usually fire on press.
+    // Directional, shoulder and trigger buttons usually fire on press.
     if (event.inputType == GamepadInputType.dpadUp ||
         event.inputType == GamepadInputType.dpadDown ||
         event.inputType == GamepadInputType.dpadLeft ||
@@ -936,6 +1026,7 @@ class GamepadNavigation {
         event.inputType == GamepadInputType.leftStickY ||
         event.inputType == GamepadInputType.buttonLB ||
         event.inputType == GamepadInputType.buttonRB ||
+        event.inputType == GamepadInputType.buttonLT ||
         event.inputType == GamepadInputType.buttonRT) {
       shouldProcess = event.isPressed;
     } else {
@@ -1040,7 +1131,7 @@ class GamepadNavigation {
         break;
 
       case GamepadInputType.buttonA:
-        SfxService().playEnterSound();
+        if (playSelectSound) SfxService().playEnterSound();
         onSelectItem?.call();
         break;
 
@@ -1051,12 +1142,12 @@ class GamepadNavigation {
 
       case GamepadInputType.buttonY:
         SfxService().playNavSound();
-        onFavorite?.call();
+        if (!_dispatchWest(event)) onFavorite?.call();
         break;
 
       case GamepadInputType.buttonX:
         SfxService().playNavSound();
-        onXButton?.call();
+        if (!_dispatchWest(event)) onXButton?.call();
         break;
 
       case GamepadInputType.buttonStart:
@@ -1070,6 +1161,17 @@ class GamepadNavigation {
       case GamepadInputType.buttonLB:
       case GamepadInputType.buttonRB:
         if (_dispatchShoulder(event.inputType)) _startShoulderHold(event);
+        break;
+
+      case GamepadInputType.buttonLT:
+      case GamepadInputType.buttonRT:
+        final action = event.inputType == GamepadInputType.buttonLT
+            ? onLeftTrigger
+            : onRightTrigger;
+        if (action != null) {
+          SfxService().playNavSound();
+          action();
+        }
         break;
 
       // L3 (left stick click) only — the UI hint shows the Left-Stick-Click
@@ -1124,7 +1226,7 @@ class GamepadNavigation {
         event.logicalKey == LogicalKeyboardKey.keyE;
     if (!isTabKey &&
         _activationTime != null &&
-        DateTime.now().difference(_activationTime!).inMilliseconds <
+        _now().difference(_activationTime!).inMilliseconds <
             _reactivationGraceMs) {
       return false;
     }
@@ -1159,7 +1261,7 @@ class GamepadNavigation {
       return false;
     }
 
-    final now = DateTime.now();
+    final now = _now();
 
     // Keyboard throttling for directional and basic action keys.
     if (isKeyDown &&
@@ -1171,7 +1273,8 @@ class GamepadNavigation {
           key == LogicalKeyboardKey.arrowRight ||
           key == LogicalKeyboardKey.enter ||
           key == LogicalKeyboardKey.backspace ||
-          key == LogicalKeyboardKey.escape) {
+          key == LogicalKeyboardKey.escape ||
+          key == LogicalKeyboardKey.contextMenu) {
         return true;
       }
       return false;
@@ -1222,7 +1325,7 @@ class GamepadNavigation {
       handled = true;
     } else if (key == LogicalKeyboardKey.enter) {
       if (isKeyDown) {
-        SfxService().playEnterSound();
+        if (playSelectSound) SfxService().playEnterSound();
         onSelectItem?.call();
       }
       handled = true;
@@ -1240,7 +1343,10 @@ class GamepadNavigation {
         onFavorite?.call();
       }
       handled = true;
-    } else if (key == LogicalKeyboardKey.escape) {
+    } else if (key == LogicalKeyboardKey.escape ||
+        // A TV remote's ≡ (Android's Menu key) arrives as a keyboard key, not
+        // through the gamepad plugin: it is the remote's Start.
+        key == LogicalKeyboardKey.contextMenu) {
       if (isKeyDown) {
         SfxService().playNavSound();
         onSettings?.call();
@@ -1354,7 +1460,7 @@ class GamepadNavigation {
   void _startRepeatTimer(dynamic key, Function action) {
     _repeatTimers[key]?.cancel();
 
-    final heldSince = DateTime.now();
+    final heldSince = _now();
     final bool canLetterJump =
         onLetterJump != null && _isLetterJumpKey(key) != null;
     final bool forward = _isLetterJumpKey(key) ?? false;
@@ -1370,7 +1476,7 @@ class GamepadNavigation {
           return;
         }
 
-        final held = DateTime.now().difference(heldSince);
+        final held = _now().difference(heldSince);
         if (canLetterJump &&
             held >= _letterJumpAfter &&
             onLetterJump!(forward)) {
@@ -1470,7 +1576,7 @@ class GamepadNavigation {
     _shoulderHoldInput = event.inputType;
     _shoulderHoldRawKey = event.originalKey.toLowerCase();
     _shoulderHoldGamepadId = event.gamepadId;
-    _shoulderHoldStartedAt = DateTime.now();
+    _shoulderHoldStartedAt = _now();
 
     void schedule(Duration delay) {
       _shoulderHoldTimer = Timer(delay, () {
@@ -1478,8 +1584,7 @@ class GamepadNavigation {
         final input = _shoulderHoldInput;
         if (startedAt == null || input == null) return;
 
-        if (DateTime.now().difference(startedAt).inMilliseconds >
-            _shoulderHoldMaxMs) {
+        if (_now().difference(startedAt).inMilliseconds > _shoulderHoldMaxMs) {
           _stopShoulderHold();
           return;
         }

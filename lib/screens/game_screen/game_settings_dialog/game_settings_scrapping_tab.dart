@@ -11,7 +11,9 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/system_model.dart';
 import 'package:neostation/providers/file_provider.dart';
+import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/repositories/game_repository.dart';
+import 'package:neostation/repositories/romm_save_map_repository.dart';
 import 'package:neostation/repositories/scraper_repository.dart';
 import 'package:neostation/repositories/system_repository.dart';
 import 'package:neostation/screens/game_screen/my_games_carousel.dart';
@@ -21,6 +23,9 @@ import 'package:neostation/services/screenscraper_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/artwork_cache.dart';
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/utils/user_data_move_guard.dart';
+import 'package:provider/provider.dart';
+import 'package:neostation/services/metadata_provider_service.dart';
 
 /// Sub-tabs inside the Scrapping tab of [GameSettingsDialog].
 enum _ScrappingSubTab { data, media }
@@ -60,17 +65,18 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
   _ScrappingSubTab _currentSubTab = _ScrappingSubTab.data;
 
   // ── Navigation entries (per sub-tab) ────────────────────────────────────
-  // Data tab: rescrape, identify, title, developer, publisher, genre,
-  // 6 descriptions, save.
+  // Data tab: rescrape, identify, rescrape from RomM, title, developer,
+  // publisher, genre, 6 descriptions, save.
   static const int _idxRescrape = 0;
   static const int _idxIdentify = 1;
-  static const int _idxTitle = 2;
-  static const int _idxDeveloper = 3;
-  static const int _idxPublisher = 4;
-  static const int _idxGenre = 5;
-  static const int _idxDescStart = 6;
-  static const int _idxSave = 12;
-  static const int _totalDataItems = 13;
+  static const int _idxRommRescrape = 2;
+  static const int _idxTitle = 3;
+  static const int _idxDeveloper = 4;
+  static const int _idxPublisher = 5;
+  static const int _idxGenre = 6;
+  static const int _idxDescStart = 7;
+  static const int _idxSave = 13;
+  static const int _totalDataItems = 14;
 
   // Media tab: screenshot, wheel, fanart, boxart.
   static const int _idxImageStart = 0;
@@ -97,6 +103,14 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
   // Async state
   bool _isScraping = false;
   double _scrapeProgress = 0;
+  bool _isRommScraping = false;
+
+  /// Whether the game is linked to a RomM entry; null until read.
+  bool? _rommLinked;
+
+  /// A scrape of either kind is running: both write this game's metadata row
+  /// and art, so only one runs at a time, and nothing else edits them meanwhile.
+  bool get _busy => _isScraping || _isRommScraping;
   bool _isSaving = false;
   int _thumbsVersion = 0;
 
@@ -126,10 +140,25 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
       ? widget.game.systemFolderName!
       : widget.system.primaryFolderName;
 
+  /// The folder RomM links are keyed by, as the Manage tab reads them.
+  String get _rommLinkFolder =>
+      widget.isAllMode && widget.game.systemFolderName != null
+      ? widget.game.systemFolderName!
+      : widget.system.folderName;
+
   @override
   void initState() {
     super.initState();
     _loadMetadata();
+    _loadRommLink();
+  }
+
+  Future<void> _loadRommLink() async {
+    final mapping = await RommSaveMapRepository.getMapping(
+      widget.game.romname,
+      _rommLinkFolder,
+    );
+    if (mounted) setState(() => _rommLinked = mapping != null);
   }
 
   @override
@@ -160,29 +189,32 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
       );
     }
     if (!mounted) return;
+    // With a row, its own values: the game passed in is a snapshot from
+    // when the dialog opened, and after a rescrape its stale values would be
+    // shown, and saved back, for columns the new data left empty.
+    String field(String column, String snapshot) =>
+        row == null ? snapshot : (row[column] as String?) ?? '';
     setState(() {
       _titleController.text =
           (row?['real_name'] as String?) ??
           (widget.game.name.isNotEmpty ? widget.game.name : '');
-      _developerController.text =
-          (row?['developer'] as String?) ?? widget.game.developer;
-      _publisherController.text =
-          (row?['publisher'] as String?) ?? widget.game.publisher;
-      _genreController.text = (row?['genre'] as String?) ?? widget.game.genre;
+      _developerController.text = field('developer', widget.game.developer);
+      _publisherController.text = field('publisher', widget.game.publisher);
+      _genreController.text = field('genre', widget.game.genre);
       for (final lang in _descLanguages) {
         // Exact-language values only — getDescriptionForLanguage would leak
         // the EN fallback into other languages' fields.
-        _descControllers[lang]!.text =
-            (row?['description_$lang'] as String?) ??
-            widget.game.descriptions?[lang] ??
-            '';
+        _descControllers[lang]!.text = field(
+          'description_$lang',
+          widget.game.descriptions?[lang] ?? '',
+        );
       }
     });
   }
 
   Future<void> _saveMetadata() async {
     final systemId = _systemId;
-    if (systemId == null || _isSaving) return;
+    if (systemId == null || _isSaving || _busy) return;
     setState(() => _isSaving = true);
 
     String? nullable(String text) {
@@ -197,6 +229,9 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
       'genre': nullable(_genreController.text),
       for (final lang in _descLanguages)
         'description_$lang': nullable(_descControllers[lang]!.text),
+      // Edited here, no longer ES-DE's row: resetting an ES-DE import deletes
+      // those, which would take the edits with it.
+      'esde_imported': 0,
     };
 
     final ok = await ScraperRepository.updateGameMetadata(
@@ -257,7 +292,9 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
   /// With [identifyAs], the ROM is first pointed at that ScreenScraper game
   /// (Identify…) and scraped from it.
   Future<void> _forceRescrape({int? identifyAs}) async {
-    if (_isScraping) return;
+    if (_busy) return;
+    // Refused during a user-data move: new art would stay in the old folder.
+    if (refuseWhileUserDataMoves()) return;
     final romPath = widget.game.romPath;
     if (romPath == null) return;
 
@@ -296,7 +333,7 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
               gameName: widget.game.name,
               onProgress: onProgress,
             )
-          : await ScreenScraperService.scrapeSingleGame(
+          : await MetadataProviderService.scrapeSingleGame(
               appSystemId: systemId,
               romName: widget.game.romname,
               systemFolder: targetSystem.primaryFolderName,
@@ -335,12 +372,122 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
     }
   }
 
+  /// Why Rescrape from RomM can't run now (an AppLocale key), or null when it
+  /// can: RomM must be connected and the game linked to a RomM entry.
+  String? _rommRescrapeBlocker(bool connected) {
+    if (!connected) return AppLocale.rommNotConnected;
+    if (_rommLinked != true) return AppLocale.rommLinkStateNotLinked;
+    return null;
+  }
+
+  /// Rescrape from RomM: replaces this game's info and art with its linked
+  /// RomM entry's, as Force Rescrape does with ScreenScraper's.
+  Future<void> _rescrapeFromRomm() async {
+    if (_busy || _isSaving) return;
+    // Refused during a user-data move, as Force Rescrape is: new art would
+    // stay in the old folder.
+    if (refuseWhileUserDataMoves()) return;
+    final romm = context.read<RommProvider>();
+    setState(() => _isRommScraping = true);
+    try {
+      // The link can change in the Manage tab of this same dialog, and is
+      // read asynchronously on open: ask again before saying it isn't there.
+      if (_rommLinked != true) await _loadRommLink();
+      if (!mounted) return;
+      final blocker = _rommRescrapeBlocker(romm.isConnected);
+      if (blocker != null) {
+        AppNotification.showNotification(
+          context,
+          blocker.getString(context),
+          type: NotificationType.info,
+        );
+        return;
+      }
+
+      // Resolve the real system (not the favorites/all virtual one).
+      SystemModel targetSystem = widget.system;
+      if (widget.isAllMode && widget.game.systemFolderName != null) {
+        final original = await SystemRepository.getSystemByFolderName(
+          widget.game.systemFolderName!,
+        );
+        if (original != null) targetSystem = original;
+      }
+
+      final outcome = await romm.rescrapeFromRomm(
+        widget.game,
+        targetSystem,
+        widget.fileProvider,
+      );
+      final done = outcome == RommRescrapeOutcome.done;
+      // Unlinked in the Manage tab meanwhile.
+      if (outcome == RommRescrapeOutcome.notLinked) _rommLinked = false;
+
+      if (done) {
+        // Bust cached artwork so the fresh media shows up everywhere.
+        await evictScrapedArtwork(_artworkPaths());
+        GamesGrid.evictArtworkCaches(_artworkPaths());
+        GamesCarousel.evictArtworkCaches(_artworkPaths());
+      }
+      if (mounted) {
+        final (message, type) = switch (outcome) {
+          RommRescrapeOutcome.done => (
+            AppLocale.scrapeSuccessful,
+            NotificationType.success,
+          ),
+          RommRescrapeOutcome.notConnected => (
+            AppLocale.rommNotConnected,
+            NotificationType.info,
+          ),
+          RommRescrapeOutcome.notLinked => (
+            AppLocale.rommLinkStateNotLinked,
+            NotificationType.info,
+          ),
+          RommRescrapeOutcome.failed => (
+            AppLocale.scrapeErrorGame,
+            NotificationType.error,
+          ),
+        };
+        AppNotification.showNotification(
+          context,
+          message.getString(context),
+          type: type,
+        );
+        // Shows what the row holds now, whatever the outcome.
+        await _loadMetadata();
+        if (done && mounted) setState(() => _thumbsVersion++);
+      }
+      // The game list refreshes even if this dialog was closed meanwhile.
+      if (done) widget.onGameUpdated?.call();
+    } catch (e) {
+      _log.e('Rescrape from RomM failed: $e');
+      if (mounted) {
+        AppNotification.showNotification(
+          context,
+          AppLocale.scrapeErrorGame.getString(context),
+          type: NotificationType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRommScraping = false);
+    }
+  }
+
   /// Identify…: lets the user search ScreenScraper for this game and point it
   /// at the right one, then scrapes it like Force Rescrape.
   Future<void> _identify() async {
     final romPath = widget.game.romPath;
     final systemId = _systemId;
-    if (_isScraping || romPath == null || romPath.isEmpty || systemId == null) {
+    if (_busy || romPath == null || romPath.isEmpty || systemId == null) {
+      return;
+    }
+
+    if (!await MetadataProviderService.supportsIdentify()) {
+      if (!mounted) return;
+      AppNotification.showNotification(
+        context,
+        AppLocale.identifyNeedsScreenScraper.getString(context),
+        type: NotificationType.info,
+      );
       return;
     }
 
@@ -381,6 +528,7 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
       : widget.game.getImagePath(_folder, type, widget.fileProvider);
 
   Future<void> _replaceImage(String type) async {
+    if (_busy) return;
     final result = await FilePicker.pickFile(type: FileType.image);
     final srcPath = result?.path;
     if (srcPath == null || !mounted) return;
@@ -497,6 +645,8 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
         _forceRescrape();
       } else if (idx == _idxIdentify) {
         _identify();
+      } else if (idx == _idxRommRescrape) {
+        _rescrapeFromRomm();
       } else if (idx >= _idxTitle && idx < _idxSave) {
         _focusFieldAt(idx);
       } else if (idx == _idxSave) {
@@ -622,11 +772,15 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
                     child: LinearProgressIndicator(
                       value: _scrapeProgress > 0 ? _scrapeProgress : null,
                       minHeight: 4.r,
-                      backgroundColor: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.1,
-                      ),
+                      backgroundColor:
+                          (_selectedIndex == _idxRescrape
+                                  ? theme.colorScheme.surface
+                                  : theme.colorScheme.onSurface)
+                              .withValues(alpha: 0.15),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        theme.colorScheme.secondary,
+                        _selectedIndex == _idxRescrape
+                            ? theme.colorScheme.surface
+                            : theme.colorScheme.secondary,
                       ),
                     ),
                   )
@@ -649,6 +803,29 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
               SfxService().playNavSound();
               setState(() => _selectedIndex = _idxIdentify);
               _identify();
+            },
+          ),
+
+          // Rescrape from RomM.
+          Builder(
+            builder: (context) {
+              final blocker = _rommRescrapeBlocker(
+                context.select<RommProvider, bool>((p) => p.isConnected),
+              );
+              return _NavRow(
+                key: _itemKey(_idxRommRescrape),
+                isSelected: _selectedIndex == _idxRommRescrape,
+                icon: Symbols.cloud_download_rounded,
+                label: AppLocale.rescrapeFromRomm.getString(context),
+                subtitle: _isRommScraping
+                    ? '${AppLocale.scraping.getString(context)}…'
+                    : (blocker ?? AppLocale.rescrape).getString(context),
+                onTap: () {
+                  SfxService().playNavSound();
+                  setState(() => _selectedIndex = _idxRommRescrape);
+                  _rescrapeFromRomm();
+                },
+              );
             },
           ),
 
@@ -723,7 +900,9 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
                     height: 16.r,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: theme.colorScheme.secondary,
+                      color: _selectedIndex == _idxSave
+                          ? theme.colorScheme.surface
+                          : theme.colorScheme.secondary,
                     ),
                   )
                 : null,
@@ -798,6 +977,10 @@ class _SubTabItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = isSelected
+        ? scheme.surface
+        : scheme.onSurface.withValues(alpha: 0.6);
     return InkWell(
       canRequestFocus: false,
       focusColor: Colors.transparent,
@@ -812,15 +995,13 @@ class _SubTabItem extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: 6.r),
         decoration: BoxDecoration(
           color: isSelected
-              ? theme.colorScheme.secondary.withValues(alpha: 0.15)
-              : theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.3,
-                ),
+              ? scheme.onSurface
+              : scheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(6.r),
           border: Border.all(
             color: isSelected
-                ? theme.colorScheme.secondary.withValues(alpha: 0.5)
-                : theme.colorScheme.outline.withValues(alpha: 0.1),
+                ? Colors.transparent
+                : scheme.outline.withValues(alpha: 0.1),
             width: 1.r,
           ),
         ),
@@ -830,9 +1011,7 @@ class _SubTabItem extends StatelessWidget {
           style: TextStyle(
             fontSize: 10.r,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            color: isSelected
-                ? theme.colorScheme.secondary
-                : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            color: foreground,
             letterSpacing: 0.5.r,
           ),
         ),
@@ -897,14 +1076,17 @@ class _NavRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = isSelected ? scheme.surface : scheme.onSurface;
+    final mutedForeground = isSelected
+        ? scheme.surface.withValues(alpha: 0.7)
+        : scheme.onSurface.withValues(alpha: 0.7);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: EdgeInsets.only(bottom: 4.r),
         decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.secondary.withValues(alpha: 0.15)
-              : Colors.transparent,
+          color: isSelected ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(6.r),
         ),
         padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 6.r),
@@ -915,17 +1097,11 @@ class _NavRow extends StatelessWidget {
               height: 18.r,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? theme.colorScheme.secondary.withValues(alpha: 0.2)
-                    : theme.colorScheme.secondary.withValues(alpha: 0.1),
+                    ? scheme.surface.withValues(alpha: 0.12)
+                    : scheme.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4.r),
               ),
-              child: Icon(
-                icon,
-                color: isSelected
-                    ? theme.colorScheme.secondary
-                    : theme.colorScheme.onSurface,
-                size: 11.r,
-              ),
+              child: Icon(icon, color: foreground, size: 11.r),
             ),
             SizedBox(width: 8.r),
             Expanded(
@@ -935,9 +1111,7 @@ class _NavRow extends StatelessWidget {
                   Text(
                     label,
                     style: TextStyle(
-                      color: isSelected
-                          ? theme.colorScheme.secondary
-                          : theme.colorScheme.onSurface,
+                      color: foreground,
                       fontSize: 12.r,
                       fontWeight: FontWeight.w600,
                     ),
@@ -945,12 +1119,7 @@ class _NavRow extends StatelessWidget {
                   if (subtitle.isNotEmpty)
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
-                        fontSize: 10.r,
-                      ),
+                      style: TextStyle(color: mutedForeground, fontSize: 10.r),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -991,6 +1160,11 @@ class _MetadataFieldRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = isSelected ? scheme.surface : scheme.onSurface;
+    final labelForeground = isSelected
+        ? scheme.surface.withValues(alpha: 0.7)
+        : scheme.onSurface.withValues(alpha: 0.7);
     return GestureDetector(
       onTap: () {
         onTap();
@@ -999,14 +1173,14 @@ class _MetadataFieldRow extends StatelessWidget {
       child: Container(
         margin: EdgeInsets.only(bottom: 4.r),
         decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.secondary.withValues(alpha: 0.12)
-              : Colors.transparent,
+          color: isSelected ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(6.r),
           border: Border.all(
             color: focusNode.hasFocus
-                ? theme.colorScheme.secondary.withValues(alpha: 0.6)
-                : theme.colorScheme.outline.withValues(alpha: 0.15),
+                ? foreground.withValues(alpha: 0.6)
+                : (isSelected
+                      ? Colors.transparent
+                      : scheme.outline.withValues(alpha: 0.15)),
             width: 1.r,
           ),
         ),
@@ -1021,9 +1195,7 @@ class _MetadataFieldRow extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: isSelected
-                        ? theme.colorScheme.secondary
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: labelForeground,
                     fontSize: 10.r,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1041,10 +1213,7 @@ class _MetadataFieldRow extends StatelessWidget {
                       padding: EdgeInsets.only(top: 4.r, bottom: 4.r),
                       child: Text(
                         controller.text.isEmpty ? '—' : controller.text,
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurface,
-                          fontSize: 11.r,
-                        ),
+                        style: TextStyle(color: foreground, fontSize: 11.r),
                         maxLines: maxLines,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1069,10 +1238,8 @@ class _MetadataFieldRow extends StatelessWidget {
                         onSubmitted: maxLines == 1
                             ? (_) => onSubmitted?.call()
                             : null,
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurface,
-                          fontSize: 11.r,
-                        ),
+                        cursorColor: foreground,
+                        style: TextStyle(color: foreground, fontSize: 11.r),
                         decoration: InputDecoration(
                           isDense: true,
                           border: InputBorder.none,
@@ -1108,6 +1275,8 @@ class _ArtworkRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = isSelected ? scheme.surface : scheme.onSurface;
     final file = File(imagePath);
     final exists = file.existsSync();
 
@@ -1116,9 +1285,7 @@ class _ArtworkRow extends StatelessWidget {
       child: Container(
         margin: EdgeInsets.only(bottom: 4.r),
         decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.secondary.withValues(alpha: 0.15)
-              : Colors.transparent,
+          color: isSelected ? scheme.onSurface : Colors.transparent,
           borderRadius: BorderRadius.circular(6.r),
         ),
         padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
@@ -1129,7 +1296,9 @@ class _ArtworkRow extends StatelessWidget {
               child: Container(
                 width: 40.r,
                 height: 40.r,
-                color: theme.colorScheme.surfaceContainerHighest,
+                color: isSelected
+                    ? scheme.surface.withValues(alpha: 0.15)
+                    : scheme.surfaceContainerHighest,
                 child: exists
                     ? Image.file(
                         file,
@@ -1138,17 +1307,13 @@ class _ArtworkRow extends StatelessWidget {
                         errorBuilder: (_, _, _) => Icon(
                           Symbols.broken_image_rounded,
                           size: 16.r,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.4,
-                          ),
+                          color: foreground.withValues(alpha: 0.4),
                         ),
                       )
                     : Icon(
                         Symbols.image_rounded,
                         size: 16.r,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.4,
-                        ),
+                        color: foreground.withValues(alpha: 0.4),
                       ),
               ),
             ),
@@ -1157,9 +1322,7 @@ class _ArtworkRow extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: isSelected
-                      ? theme.colorScheme.secondary
-                      : theme.colorScheme.onSurface,
+                  color: foreground,
                   fontSize: 12.r,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1168,10 +1331,10 @@ class _ArtworkRow extends StatelessWidget {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 3.r),
               decoration: BoxDecoration(
-                color: theme.colorScheme.secondary.withValues(alpha: 0.12),
+                color: foreground.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(4.r),
                 border: Border.all(
-                  color: theme.colorScheme.secondary.withValues(alpha: 0.4),
+                  color: foreground.withValues(alpha: 0.4),
                   width: 1.r,
                 ),
               ),
@@ -1180,7 +1343,7 @@ class _ArtworkRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11.r,
                   fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.secondary,
+                  color: foreground,
                 ),
               ),
             ),

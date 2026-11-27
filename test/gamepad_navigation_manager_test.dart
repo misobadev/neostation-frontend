@@ -123,6 +123,25 @@ void main() {
       },
     );
 
+    test('returning from carousel to list retains Options until dismissal', () {
+      final r = _Recorder();
+      r.push('games_list');
+      r.push('games_carousel');
+      r.push('game_options_dialog', modal: true);
+      r.events.clear();
+
+      // The list's config listener requests activation before the carousel
+      // unmounts. Only the stack owner may receive that activation.
+      GamepadNavigationManager.reactivate();
+      r.pop('games_carousel');
+      expect(r.events, ['+game_options_dialog']);
+
+      r.events.clear();
+      r.pop('game_options_dialog');
+      expect(r.events, ['-game_options_dialog', '+games_list']);
+      r.pop('games_list');
+    });
+
     test('a modal still stacks on top of another modal', () {
       final r = _Recorder();
       r.push('app_screen');
@@ -179,36 +198,33 @@ void main() {
   });
 
   group('GamepadNavigationManager launch focus owner', () {
-    test(
-      'returns input to the launching screen, not to whatever drifted up',
-      () {
-        // The observed failure: launching frees memory and clears artwork
-        // caches, the systems carousel remounts behind the launch dialog and
-        // re-pushes its layer, and the games list the user is looking at ends up
-        // buried. Waking "the top layer" then woke the carousel and the
-        // controller looked dead.
-        final r = _Recorder();
-        r.push('app_screen');
-        r.push('my_systems_list');
-        r.push('system_games_list');
+    test('returns input to the launching screen, not to whatever drifted up', () {
+      // The observed failure: launching frees memory and clears artwork
+      // caches, the systems carousel remounts behind the launch dialog and
+      // re-pushes its layer, and the games list the user is looking at ends up
+      // buried. Waking "the top layer" then woke the carousel and the
+      // controller looked dead.
+      final r = _Recorder();
+      r.push('app_screen');
+      r.push('my_systems_list');
+      r.push('system_games_list');
 
-        GamepadNavigationManager.rememberFocusOwner('system_games_list');
-        GamepadNavigationManager.deactivateAll();
+      GamepadNavigationManager.rememberFocusOwner('system_games_list');
+      GamepadNavigationManager.deactivateAll();
 
-        // The background screen remounts mid-launch and lands on top.
-        r.pop('my_systems_list');
-        r.push('my_systems_list');
-        r.events.clear();
+      // The background screen remounts mid-launch and lands on top.
+      r.pop('my_systems_list');
+      r.push('my_systems_list');
+      r.events.clear();
 
-        GamepadNavigationManager.restoreFocusOwner();
+      GamepadNavigationManager.restoreFocusOwner();
 
-        expect(r.events, ['-my_systems_list', '+system_games_list']);
+      expect(r.events, ['-my_systems_list', '+system_games_list']);
 
-        r.pop('system_games_list');
-        r.pop('my_systems_list');
-        r.pop('app_screen');
-      },
-    );
+      r.pop('system_games_list');
+      r.pop('my_systems_list');
+      r.pop('app_screen');
+    });
 
     test('leaves the owner alone when it is already on top', () {
       final r = _Recorder();

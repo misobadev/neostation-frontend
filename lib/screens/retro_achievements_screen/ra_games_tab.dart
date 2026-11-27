@@ -44,12 +44,22 @@ class RaGamesTab extends StatefulWidget {
   final VoidCallback? onBack;
   final VoidCallback? onSelect;
 
+  /// Drawn inside a panel that already has its own frame and title: no card
+  /// of its own and no header row.
+  final bool embedded;
+
+  /// Whether the D-pad is in this list. The cursor is hidden while it is not,
+  /// so the list doesn't look selected while the menu beside it has focus.
+  final bool focused;
+
   const RaGamesTab({
     super.key,
     required this.active,
     required this.onActivate,
     this.onBack,
     this.onSelect,
+    this.embedded = false,
+    this.focused = true,
   });
 
   @override
@@ -89,11 +99,12 @@ class RaGamesTabState extends State<RaGamesTab> {
   /// of both sources.
   static const int _loadMoreMargin = 8;
 
-  /// Row height, in design units. Uniform on purpose: [CenteredScrollController]
-  /// centers by arithmetic (`index × extent`), so a list where every row —
-  /// data or footer — is exactly this tall needs no measurement pass.
-  /// Taller than the Unlocks row: this one carries a progress bar.
-  double get _rowExtent => 64.r;
+  /// The games show as a grid of their icons, like the awards; the selected
+  /// one is described in the card under it. Set by the grid's layout.
+  int _columns = 8;
+
+  /// A grid row's height (tile and gap), for keeping the cursor in view.
+  double _rowExtent = 60;
 
   @override
   void initState() {
@@ -148,7 +159,7 @@ class RaGamesTabState extends State<RaGamesTab> {
   bool handleNavigateUp() {
     if (_chipsFocused) return false;
     final provider = context.read<RetroAchievementsProvider>();
-    if (_moveSelection(-1, provider)) return true;
+    if (_moveSelection(-_columns, provider)) return true;
     // Row 0 (or an empty list): one step finer before the strip.
     setState(() => _chipsFocused = true);
     return true;
@@ -161,16 +172,29 @@ class RaGamesTabState extends State<RaGamesTab> {
       setState(() => _chipsFocused = false);
       return true;
     }
-    return _moveSelection(1, context.read<RetroAchievementsProvider>());
+    return _moveSelection(_columns, context.read<RetroAchievementsProvider>());
   }
 
   /// Left/Right are the filter axis while the chips are armed — the switch
   /// is immediate, wrap-around, the strip's own behavior for its pills. On
   /// the rows they are silent, like the Unlocks rows: a row has no
   /// in-row actions.
-  bool handleNavigateLeft() => _chipsFocused ? _switchFilter(-1) : false;
+  /// Left on the first column answers false, which sends the D-pad back
+  /// to the menu, as on the awards grid.
+  bool handleNavigateLeft() {
+    if (_chipsFocused) return _switchFilter(-1);
+    final provider = context.read<RetroAchievementsProvider>();
+    final items = provider.visibleGamesListItems;
+    if (items.isEmpty ||
+        _selectedIndexIn(items).clamp(0, items.length - 1) % _columns == 0) {
+      return false;
+    }
+    return _moveSelection(-1, provider);
+  }
 
-  bool handleNavigateRight() => _chipsFocused ? _switchFilter(1) : false;
+  bool handleNavigateRight() => _chipsFocused
+      ? _switchFilter(1)
+      : _moveSelection(1, context.read<RetroAchievementsProvider>());
 
   /// A: on the chips it enters the list (the same step Down makes); on a row
   /// it is the drill-down.
@@ -215,12 +239,20 @@ class RaGamesTabState extends State<RaGamesTab> {
     final items = provider.visibleGamesListItems;
     if (items.isEmpty) return false;
     final current = _selectedIndexIn(items).clamp(0, items.length - 1);
-    final target = current + delta;
+    var target = current + delta;
     if (target < 0) return false;
-    if (target >= items.length) return _requestNextPage(provider);
+    if (target >= items.length) {
+      // Down onto a short last row lands on its last game; past the very
+      // end asks for the next page.
+      if (delta > 1 && current ~/ _columns < (items.length - 1) ~/ _columns) {
+        target = items.length - 1;
+      } else {
+        return _requestNextPage(provider);
+      }
+    }
     _selectedGameId = items[target].gameId;
     _scrollController.updateSelectedIndex(target);
-    _scrollController.scrollToIndex(target);
+    _reveal(target);
     setState(() {});
     if (target >= items.length - _loadMoreMargin &&
         provider.gamesListHasMore &&
@@ -228,6 +260,29 @@ class RaGamesTabState extends State<RaGamesTab> {
       unawaited(provider.loadGamesPage());
     }
     return true;
+  }
+
+  /// Scrolls the grid so the row holding [index] is in view.
+  void _reveal(int index) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final controller = _scrollController.scrollController;
+      if (!mounted || !controller.hasClients) return;
+      final position = controller.position;
+      final top = (index ~/ _columns) * _rowExtent;
+      final bottom = top + _rowExtent;
+      double? to;
+      if (top < position.pixels) {
+        to = top;
+      } else if (bottom > position.pixels + position.viewportDimension) {
+        to = bottom - position.viewportDimension;
+      }
+      if (to == null) return;
+      controller.animateTo(
+        to.clamp(0, position.maxScrollExtent),
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   bool _requestNextPage(RetroAchievementsProvider provider) {
@@ -257,7 +312,7 @@ class RaGamesTabState extends State<RaGamesTab> {
     final index = id == null ? -1 : items.indexWhere((i) => i.gameId == id);
     if (index >= 0) {
       _scrollController.updateSelectedIndex(index);
-      _scrollController.scrollToIndex(index);
+      _reveal(index);
     } else {
       _resetSelection();
     }
@@ -359,9 +414,21 @@ class RaGamesTabState extends State<RaGamesTab> {
       child: Consumer<RetroAchievementsProvider>(
         builder: (context, provider, child) {
           final items = provider.visibleGamesListItems;
-          _scrollController.updateTotalItems(items.length + 1);
-          _scrollController.setItemExtent(_rowExtent);
+          _scrollController.updateTotalItems(items.length);
           final theme = Theme.of(context);
+          final body = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildFilterChips(context, provider),
+              SizedBox(height: 10.r),
+              Expanded(
+                child: items.isEmpty
+                    ? _buildPendingArea(context, provider)
+                    : _buildList(context, provider, items),
+              ),
+            ],
+          );
+          if (widget.embedded) return body;
           return Column(
             children: [
               Expanded(
@@ -373,13 +440,7 @@ class RaGamesTabState extends State<RaGamesTab> {
                     children: [
                       _buildHeader(context),
                       SizedBox(height: 10.r),
-                      _buildFilterChips(context, provider),
-                      SizedBox(height: 10.r),
-                      Expanded(
-                        child: items.isEmpty
-                            ? _buildPendingArea(context, provider)
-                            : _buildList(context, provider, items),
-                      ),
+                      Expanded(child: body),
                     ],
                   ),
                 ),
@@ -440,7 +501,7 @@ class RaGamesTabState extends State<RaGamesTab> {
               ),
             },
             selected: provider.gamesFilter == filter,
-            armed: _chipsFocused,
+            armed: widget.focused && _chipsFocused,
             onTap: () {
               SfxService().playNavSound();
               _applyFilter(provider, filter);
@@ -523,29 +584,54 @@ class RaGamesTabState extends State<RaGamesTab> {
     List<RaGamesListItem> items,
   ) {
     final selected = _selectedIndexIn(items).clamp(0, items.length - 1);
-    return ListView.builder(
-      controller: _scrollController.scrollController,
-      itemExtent: _rowExtent,
-      itemCount: items.length + 1,
-      itemBuilder: (context, index) {
-        if (index == items.length) return _buildFooter(context, provider);
-        return _buildGameRow(
-          context,
-          items[index],
-          selected: index == selected,
-          onTap: () => _tapRow(index, items[index]),
-        );
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final gap = 6.r;
+              _columns = (constraints.maxWidth / 42.r).floor().clamp(3, 18);
+              final tile =
+                  (constraints.maxWidth - (_columns - 1) * gap) / _columns;
+              _rowExtent = tile + gap;
+              return GridView.builder(
+                controller: _scrollController.scrollController,
+                padding: EdgeInsets.symmetric(vertical: 2.r),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: _columns,
+                  mainAxisExtent: tile,
+                  crossAxisSpacing: gap,
+                  mainAxisSpacing: gap,
+                ),
+                itemCount: items.length,
+                itemBuilder: (context, index) => _buildGameTile(
+                  context,
+                  items[index],
+                  selected: index == selected,
+                  focused: widget.focused && index == selected,
+                  onTap: () => _tapRow(index, items[index]),
+                ),
+              );
+            },
+          ),
+        ),
+        if (provider.gamesListLoading || provider.gamesListError != null)
+          SizedBox(height: 24.r, child: _buildFooter(context, provider)),
+        SizedBox(height: 8.r),
+        _gameDetails(context, items[selected]),
+      ],
     );
   }
 
+  /// A tap selects the game; a tap on the selected one opens it.
   void _tapRow(int index, RaGamesListItem item) {
     SfxService().playNavSound();
+    final alreadySelected = _selectedGameId == item.gameId;
     _selectedGameId = item.gameId;
     _scrollController.updateSelectedIndex(index);
-    _scrollController.scrollToIndex(index);
     setState(() {});
-    widget.onActivate(item);
+    if (alreadySelected) widget.onActivate(item);
   }
 
   /// The row after the last one: what "keep going" means at the bottom of
@@ -610,122 +696,67 @@ class RaGamesTabState extends State<RaGamesTab> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildGameRow(
+  Color _awardColor(BuildContext context, RaGamesListItem item) {
+    final light = Theme.of(context).brightness == Brightness.light;
+    final gold = light ? const Color(0xFFB8860B) : const Color(0xFFFFD700);
+    final silver = light ? const Color(0xFF757575) : const Color(0xFFC0C0C0);
+    return item.awardMode == 'hardcore' || item.isMastered ? gold : silver;
+  }
+
+  String _awardText(BuildContext context, RaGamesListItem item) =>
+      item.isMastered
+      ? AppLocale.raMasteryLabel.getString(context)
+      : item.isCompleted
+      ? AppLocale.raCompletionLabel.getString(context)
+      : AppLocale.raFilterBeaten.getString(context);
+
+  /// A game in the grid: its icon, edged in the award's gold or silver once
+  /// beaten, and in the accent while the D-pad is on it.
+  Widget _buildGameTile(
     BuildContext context,
     RaGamesListItem item, {
     required bool selected,
+    required bool focused,
     required VoidCallback onTap,
   }) {
     final theme = Theme.of(context);
-    final isLightTheme = theme.brightness == Brightness.light;
-    // The mastery/award gold, darkened on light themes for legibility (the
-    // dashboard's award rows and the Unlocks hardcore chip use the same
-    // pair), and the completion silver beside it.
-    final goldColor = isLightTheme
-        ? const Color(0xFFB8860B)
-        : const Color(0xFFFFD700);
-    final silverColor = isLightTheme
-        ? const Color(0xFF757575)
-        : const Color(0xFFC0C0C0);
+    final scheme = theme.colorScheme;
+    final icon = item.imageIcon.isNotEmpty ? item.imageIcon : item.imageBoxArt;
+    final edge = focused
+        ? scheme.primary
+        : selected
+        ? scheme.primary.withValues(alpha: 0.6)
+        : item.isBeaten
+        ? _awardColor(context, item)
+        : scheme.onSurface.withValues(alpha: 0.12);
     return Semantics(
+      key: ValueKey('ra-game-tile-${item.gameId}'),
       selected: selected,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          // Rows are driven by the tab's gamepad layer, not the focus system;
-          // keeping them out of focus traversal is also what makes the
-          // keyboard-driven input tests honest.
-          canRequestFocus: false,
-          focusColor: Colors.transparent,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            decoration: BoxDecoration(
-              // Transparent rather than absent so arming a row doesn't shift
-              // the layout by a border width — the strip's border plays the
-              // same trick.
-              color: selected
-                  ? theme.colorScheme.primary.withValues(alpha: 0.10)
-                  : Colors.transparent,
-              borderRadius:
-                  theme.extension<CornerRadii>()?.radiusInternal ??
-                  BorderRadius.circular(10.r),
-              border: Border.all(
-                color: selected
-                    ? theme.colorScheme.primary.withValues(alpha: 0.85)
-                    : Colors.transparent,
-                width: 1.5.r,
-              ),
+      button: true,
+      label: item.title,
+      child: InkWell(
+        onTap: onTap,
+        canRequestFocus: false,
+        focusColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(6.r),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6.r),
+            border: Border.all(
+              color: edge,
+              width: focused ? 3.r : (item.isBeaten || selected ? 2.r : 1.r),
             ),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 6.r),
-              child: Row(
-                children: [
-                  _boxArt(context, item),
-                  SizedBox(width: 10.r),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 10.r,
-                          ),
-                        ),
-                        SizedBox(height: 3.r),
-                        Text(
-                          _subtitle(context, item),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 8.r,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.65,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 5.r),
-                        if (item.maxPossible > 0)
-                          _progressBar(context, item, goldColor),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: 8.r),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (item.isBeaten) ...[
-                        _awardChip(
-                          context,
-                          label: item.isMastered
-                              ? AppLocale.raMasteryLabel.getString(context)
-                              : item.isCompleted
-                              ? AppLocale.raCompletionLabel.getString(context)
-                              : AppLocale.raFilterBeaten.getString(context),
-                          color: item.awardMode == 'hardcore' || item.isMastered
-                              ? goldColor
-                              : silverColor,
-                        ),
-                        SizedBox(height: 4.r),
-                      ],
-                      Text(
-                        '${item.numAwarded}/${item.maxPossible}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 9.r,
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.network(
+            _raMediaUrl(icon),
+            fit: BoxFit.cover,
+            cacheWidth: (48.r * MediaQuery.devicePixelRatioOf(context)).ceil(),
+            errorBuilder: (_, _, _) => Icon(
+              Symbols.videogame_asset_rounded,
+              size: 20.r,
+              color: scheme.primary,
             ),
           ),
         ),
@@ -733,110 +764,114 @@ class RaGamesTabState extends State<RaGamesTab> {
     );
   }
 
-  /// `Console • date` — the date is whichever activity the row carries
-  /// (played more recently than the last award, or the reverse), which is
-  /// also what orders the list.
-  String _subtitle(BuildContext context, RaGamesListItem item) {
-    final date = item.sortDate;
-    final console = item.consoleName;
-    final mode = item.awardMode == 'hardcore'
-        ? AppLocale.raHardcore.getString(context)
-        : item.awardMode == 'softcore'
-        ? AppLocale.raCasual.getString(context)
-        : null;
-    final suffix = mode == null ? '' : ' · $mode';
-    if (date == null || console.isEmpty) {
-      return '${date == null ? console : _formatDate(date)}$suffix';
-    }
-    return '$console • ${_formatDate(date)}$suffix';
-  }
-
-  /// The hardcore/casual split as a two-tone bar: the gold segment is the
-  /// hardcore subset of what is earned, the primary segment the rest of it,
-  /// the track what is still unearned. The game-view footer's single
-  /// determinate bar is the visual reference; the split is this tab's one
-  /// addition.
-  Widget _progressBar(
-    BuildContext context,
-    RaGamesListItem item,
-    Color hardcoreColor,
-  ) {
+  /// The selected game, under the grid: its icon, title, console and date,
+  /// the award if beaten, and how many achievements are earned.
+  Widget _gameDetails(BuildContext context, RaGamesListItem item) {
     final theme = Theme.of(context);
-    final total = item.maxPossible;
-    final hardcore = item.numAwardedHardcore.clamp(0, total);
-    final casual = (item.numAwarded - hardcore).clamp(0, total - hardcore);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(3.r),
-      child: SizedBox(
-        height: 6.r,
-        child: Row(
-          children: [
-            Expanded(
-              flex: hardcore,
-              child: Container(color: hardcoreColor),
+    final scheme = theme.colorScheme;
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
+    Widget pill(String text, {Color? color, bool strong = false}) => Container(
+      padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 1.r),
+      decoration: BoxDecoration(
+        color: (color ?? scheme.onSurface).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: (color ?? scheme.onSurface).withValues(alpha: 0.35),
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 8.r,
+          fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+          color: scheme.onSurface.withValues(alpha: 0.85),
+        ),
+      ),
+    );
+    return Container(
+      padding: EdgeInsets.all(6.r),
+      decoration: BoxDecoration(
+        color: scheme.onSurface.withValues(alpha: 0.05),
+        borderRadius: radii.radiusInternal,
+        border: Border.all(color: scheme.onSurface.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        children: [
+          // The game's RetroAchievements icon, like the grid above.
+          Container(
+            width: 34.r,
+            height: 34.r,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6.r),
+              border: Border.all(
+                color: item.isBeaten
+                    ? _awardColor(context, item)
+                    : scheme.onSurface.withValues(alpha: 0.12),
+                width: item.isBeaten ? 2.r : 1.r,
+              ),
             ),
-            Expanded(
-              flex: casual,
-              child: Container(color: theme.colorScheme.primary),
+            clipBehavior: Clip.antiAlias,
+            child: Image.network(
+              _raMediaUrl(
+                item.imageIcon.isNotEmpty ? item.imageIcon : item.imageBoxArt,
+              ),
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Icon(
+                Symbols.videogame_asset_rounded,
+                size: 20.r,
+                color: scheme.primary,
+              ),
             ),
-            Expanded(
-              flex: total - hardcore - casual,
-              child: Container(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.12),
+          ),
+          SizedBox(width: 8.r),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.r,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                SizedBox(height: 3.r),
+                Wrap(
+                  spacing: 5.r,
+                  runSpacing: 4.r,
+                  children: [
+                    pill(
+                      '${item.numAwarded}/${item.maxPossible}',
+                      color: scheme.primary,
+                      strong: true,
+                    ),
+                    if (item.isBeaten)
+                      pill(
+                        _awardText(context, item),
+                        color: _awardColor(context, item),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // When the game was last played or last earned in (what orders
+          // the grid).
+          if (item.sortDate case final date?) ...[
+            SizedBox(width: 8.r),
+            Text(
+              _formatDate(date),
+              style: TextStyle(
+                fontSize: 8.r,
+                color: scheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _awardChip(
-    BuildContext context, {
-    required String label,
-    required Color color,
-  }) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 2.r),
-      decoration: BoxDecoration(
-        border: Border.all(color: color.withValues(alpha: 0.7)),
-        borderRadius: BorderRadius.circular(6.r),
-      ),
-      child: Text(
-        label,
-        style: theme.textTheme.bodySmall?.copyWith(
-          fontSize: 7.5.r,
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-
-  Widget _boxArt(BuildContext context, RaGamesListItem item) {
-    final theme = Theme.of(context);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6.r),
-      child: SizedBox(
-        width: 38.r,
-        height: 50.r,
-        child: Image.network(
-          _raMediaUrl(
-            item.imageBoxArt.isNotEmpty ? item.imageBoxArt : item.imageIcon,
-          ),
-          fit: BoxFit.cover,
-          cacheWidth: (38 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-          cacheHeight: (50 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-          errorBuilder: (context, error, stackTrace) => Container(
-            color: theme.colorScheme.surface,
-            child: Icon(
-              Symbols.emoji_events_rounded,
-              color: theme.colorScheme.primary,
-              size: 18.r,
-            ),
-          ),
-        ),
+        ],
       ),
     );
   }

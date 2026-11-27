@@ -17,7 +17,14 @@ import 'abyss_theme.dart' as abyss;
 import 'cyberpunk_theme.dart' as cyberpunk;
 import 'aqua_theme.dart' as aqua;
 import 'palenight_theme.dart' as palenight;
+import 'sixteen_bit_theme.dart' as sixteen_bit;
+import 'sunset_theme.dart' as sunset;
+import 'neon_arcade_theme.dart' as neon_arcade;
+import 'deep_sea_theme.dart' as deep_sea;
+import 'matcha_theme.dart' as matcha;
+import 'famicom_theme.dart' as famicom;
 import 'horizon_theme.dart' as horizon;
+import 'dmg_theme.dart' as dmg;
 
 class AppThemes {
   /// Registry of user-imported themes, keyed by id. Populated at startup by
@@ -44,7 +51,14 @@ class AppThemes {
   static ThemeData get cyberpunkTheme => cyberpunk.cyberpunkTheme;
   static ThemeData get aquaTheme => aqua.aquaTheme;
   static ThemeData get palenightTheme => palenight.palenightTheme;
+  static ThemeData get sixteenBitTheme => sixteen_bit.sixteenBitTheme;
+  static ThemeData get sunsetTheme => sunset.sunsetTheme;
+  static ThemeData get neonArcadeTheme => neon_arcade.neonArcadeTheme;
+  static ThemeData get deepSeaTheme => deep_sea.deepSeaTheme;
+  static ThemeData get matchaTheme => matcha.matchaTheme;
+  static ThemeData get famicomTheme => famicom.famicomTheme;
   static ThemeData get horizonTheme => horizon.horizonTheme;
+  static ThemeData get dmgTheme => dmg.dmgTheme;
 
   // References to custom colors for each theme
   static dynamic get darkCustomColors => dark.DarkCustomColors();
@@ -62,6 +76,7 @@ class AppThemes {
   static dynamic get aquaCustomColors => aqua.AquaCustomColors();
   static dynamic get palenightCustomColors => palenight.PalenightCustomColors();
   static dynamic get horizonCustomColors => horizon.HorizonCustomColors();
+  static dynamic get dmgCustomColors => dmg.DmgCustomColors();
 
   /// Retrieves a theme's custom colors from its name.
   ///
@@ -110,6 +125,20 @@ class AppThemes {
         return palenight.PalenightCustomColors();
       case 'horizon':
         return horizon.HorizonCustomColors();
+      case 'dmg':
+        return dmg.DmgCustomColors();
+      case 'sixteen_bit':
+        return sixteen_bit.SixteenBitCustomColors();
+      case 'sunset':
+        return sunset.SunsetCustomColors();
+      case 'neon_arcade':
+        return neon_arcade.NeonArcadeCustomColors();
+      case 'deep_sea':
+        return deep_sea.DeepSeaCustomColors();
+      case 'matcha':
+        return matcha.MatchaCustomColors();
+      case 'famicom':
+        return famicom.FamicomCustomColors();
       default:
         return dark.DarkCustomColors();
     }
@@ -169,6 +198,27 @@ class AppThemes {
     } else if (surface == horizonTheme.colorScheme.surface ||
         secondary == horizonTheme.colorScheme.secondary) {
       return horizon.HorizonCustomColors();
+    } else if (surface == dmgTheme.colorScheme.surface ||
+        secondary == dmgTheme.colorScheme.secondary) {
+      return dmg.DmgCustomColors();
+    } else if (surface == sixteenBitTheme.colorScheme.surface ||
+        secondary == sixteenBitTheme.colorScheme.secondary) {
+      return sixteen_bit.SixteenBitCustomColors();
+    } else if (surface == sunsetTheme.colorScheme.surface ||
+        secondary == sunsetTheme.colorScheme.secondary) {
+      return sunset.SunsetCustomColors();
+    } else if (surface == neonArcadeTheme.colorScheme.surface ||
+        secondary == neonArcadeTheme.colorScheme.secondary) {
+      return neon_arcade.NeonArcadeCustomColors();
+    } else if (surface == deepSeaTheme.colorScheme.surface ||
+        secondary == deepSeaTheme.colorScheme.secondary) {
+      return deep_sea.DeepSeaCustomColors();
+    } else if (surface == matchaTheme.colorScheme.surface ||
+        secondary == matchaTheme.colorScheme.secondary) {
+      return matcha.MatchaCustomColors();
+    } else if (surface == famicomTheme.colorScheme.surface ||
+        secondary == famicomTheme.colorScheme.secondary) {
+      return famicom.FamicomCustomColors();
     } else {
       return dark.DarkCustomColors();
     }
@@ -209,6 +259,20 @@ class AppThemes {
         return palenightTheme;
       case 'horizon':
         return horizonTheme;
+      case 'dmg':
+        return dmgTheme;
+      case 'sixteen_bit':
+        return sixteenBitTheme;
+      case 'sunset':
+        return sunsetTheme;
+      case 'neon_arcade':
+        return neonArcadeTheme;
+      case 'deep_sea':
+        return deepSeaTheme;
+      case 'matcha':
+        return matchaTheme;
+      case 'famicom':
+        return famicomTheme;
       default:
         return darkTheme;
     }

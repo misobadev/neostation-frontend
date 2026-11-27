@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -9,30 +10,40 @@ import 'package:neostation/models/system_model.dart';
 import 'package:neostation/screens/app_screen.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../providers/file_provider.dart';
+import '../../../providers/recent_games_cycler.dart';
+import 'widgets/recent_card_cycle.dart';
 import '../../../themes/corner_radii.dart';
 import '../../../utils/gamepad_nav.dart';
 import '../../../services/game_service.dart';
 import '../../../utils/game_launch_utils.dart';
 import '../../../providers/system_background_provider.dart';
+
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
+
 import '../../collections_screen/collections_browser_screen.dart';
 import '../../search_screen/search_screen.dart';
 import '../../game_screen/android_apps/android_apps_grid.dart';
+
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/services/secondary_achievements_controller.dart';
+
 import '../../game_screen/my_games_list.dart';
+
 import 'package:neostation/models/secondary_display_state.dart';
-import 'package:neostation/widgets/header_sort_dropdown.dart';
 import 'package:neostation/widgets/native_carousel.dart';
+
 import 'system_list_builder.dart';
 import 'system_card.dart';
+import '../../../utils/user_data_move_guard.dart';
 
 /// Navigation-layer id the systems screen's own carousel registers under.
 ///
@@ -53,12 +64,16 @@ class MySystemsCarousel extends StatefulWidget {
     super.key,
     this.selectedIndex = 0,
     this.onCardTapped,
+    this.onLeftTrigger,
+    this.onRightTrigger,
     this.items,
     this.onActivate,
     this.onOptions,
     this.onYPressed,
     this.onBackPressed,
     this.onXPressed,
+    this.onWestPressed,
+    this.bindYButton = true,
     this.navLayerId = kSystemsCarouselNavLayerId,
     this.cardOverrideBuilder,
     this.blockSystemBack = true,
@@ -79,6 +94,11 @@ class MySystemsCarousel extends StatefulWidget {
   /// Callback for system selection via interaction.
   final Function(int index)? onCardTapped;
 
+  /// LT and RT. Read on every press so the host can rebind them around the
+  /// currently selected card; left unbound (silent) when null.
+  final VoidCallback? onLeftTrigger;
+  final VoidCallback? onRightTrigger;
+
   /// Cards to show. Null means "the systems list", which this widget builds
   /// itself from the providers.
   final List<SystemInfo>? items;
@@ -90,14 +110,28 @@ class MySystemsCarousel extends StatefulWidget {
   /// Start. Null keeps the built-in emulator-settings dialog.
   final void Function(int index)? onOptions;
 
-  /// Y. Unbound on the systems screen.
+  /// Options entry point for pad Y (when [bindYButton]) and the touch
+  /// long-press. The systems screen binds only the long-press now that Options
+  /// moved to Start; the collections browser still uses Y for its menu.
   final VoidCallback? onYPressed;
 
   /// B. Unbound on the systems screen, which is a root tab.
   final VoidCallback? onBackPressed;
 
-  /// X. Defaults to the header's view/sort picker.
+  /// X. Search on the systems screen (with West, for AYN pads, whose West is
+  /// the button printed Y); a pushed host supplies its own picker.
   final VoidCallback? onXPressed;
+
+  /// The West face button (X on an Xbox pad, Y on a Nintendo-style one). The
+  /// systems screen opens the library search with it.
+  final VoidCallback? onWestPressed;
+
+  /// Whether the gamepad's Y button fires [onYPressed].
+  ///
+  /// The systems screen turns this off now that Options moved to Start. The
+  /// callback itself stays bound to the touch long-press route, which is why
+  /// the two are separate.
+  final bool bindYButton;
 
   /// Anchor for a menu opened on the centred card.
   ///
@@ -211,6 +245,14 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   /// firing redundant postFrameCallbacks on every build.
   int _lastBackgroundBuildIndex = -1;
 
+  /// Set from the config in build; disables decorative effects at render time.
+  bool _performanceMode = false;
+
+  /// Game on the focused card when the background was last pushed, so a recent
+  /// card that cycles in place still refreshes the background and the second
+  /// screen even though the index did not change.
+  String? _lastBackgroundGamePath;
+
   /// Cached systems list and indicator-label widths from the last build.
   /// The continuous scroll handler (fired every frame while swiping) reads
   /// these instead of rebuilding the list + re-measuring text every frame.
@@ -299,13 +341,16 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
       // Resolved on every press: the host rebuilds this callback around the
       // currently selected card, so holding the closure captured here would
       // pin Y to the card selected when this state was created.
-      onFavorite: () => widget.onYPressed?.call(),
+      onFavorite: widget.bindYButton ? () => widget.onYPressed?.call() : null,
       onBack: widget.onBackPressed,
-      onXButton:
-          widget.onXPressed ??
-          () {
-            HeaderSortDropdown.globalKey.currentState?.showDropdown();
-          },
+      onXButton: widget.onXPressed,
+      onLeftTrigger: widget.onLeftTrigger == null
+          ? null
+          : () => widget.onLeftTrigger?.call(),
+      onRightTrigger: widget.onRightTrigger == null
+          ? null
+          : () => widget.onRightTrigger?.call(),
+      onWestButton: widget.onWestPressed,
       onPreviousTab: widget.enableTabBumpers ? AppNavigation.previousTab : null,
       onNextTab: widget.enableTabBumpers ? AppNavigation.nextTab : null,
       onLeftBumper: widget.enableTabBumpers ? AppNavigation.previousTab : null,
@@ -446,6 +491,13 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
         return;
       }
 
+      // Refused during a user-data move: a zipped game unpacks into the user
+      // data's temp folder, which the move is copying.
+      if (refuseWhileUserDataMoves()) {
+        if (mounted) _gamepadNav.activate();
+        return;
+      }
+
       try {
         _gamepadNav.deactivate();
         setState(() => _isGameLaunching = true);
@@ -498,6 +550,22 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           onLaunchFailed: (ctx, r) async {
             _achievementsController.stop(hidePanel: true);
             if (mounted) setState(() => _isGameLaunching = false);
+            if (ctx.mounted) {
+              await LaunchFailureDialog.show(
+                ctx,
+                title: AppLocale.launchGameFailed.getString(ctx),
+                intro: AppLocale.unableToLaunch
+                    .getString(ctx)
+                    .replaceFirst(
+                      '{name}',
+                      systemInfo.gameModel?.name ?? systemInfo.title ?? '',
+                    ),
+                message: r.errorMessage?.isNotEmpty == true
+                    ? r.errorMessage!
+                    : AppLocale.unknownError.getString(ctx),
+                details: r.errorDetails,
+              );
+            }
             GamepadNavigationManager.restoreFocusOwner();
           },
         );
@@ -582,14 +650,14 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
     }
   }
 
-  /// Opens configuration dialogs for the focused carousel item.
+  /// Opens the Options dialog, or the built-in settings fallback, for the
+  /// focused carousel item.
   ///
   /// A recent-activity card used to be turned away here on the grounds that it
-  /// carries a game rather than a system. The grid's START and both layouts' Y
-  /// menu resolve one through [SystemInfo.settingsFolderName] instead, so this
-  /// did the same job three different ways and refused what its siblings
-  /// allowed. It now shares their resolution, and reports an unresolvable card
-  /// the way the grid does rather than doing nothing.
+  /// carries a game rather than a system. The dialog resolves one through
+  /// [SystemInfo.settingsFolderName], so this shares that resolution and
+  /// reports an unresolvable card the way the grid does rather than doing
+  /// nothing.
   void _openSystemSettingsFromCarousel() async {
     final allSystems = _getSystemsList();
 
@@ -809,7 +877,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
   /// Logic to update the global system background provider on selection change.
   void _updateBackground(SystemInfo system) {
-    if (!mounted || !widget.enableDynamicBackground) return;
+    if (!mounted || !widget.enableDynamicBackground || _performanceMode) return;
 
     final displayFolderName = system.primaryFolderName;
     final customBgPath = system.customBackgroundPath;
@@ -889,12 +957,19 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
       child: widget.items != null
           ? Builder(builder: _buildContent)
           : Selector2<SqliteConfigProvider, SqliteDatabaseProvider, int>(
-              selector: (_, config, db) => Object.hash(
+              selector: (context, config, db) => Object.hash(
                 config.detectedSystems.length,
                 config.hiddenSystemFolders.length,
                 config.totalGames,
                 config.config.hideRecentCard,
-                db.getRecentlyPlayedGames(1).firstOrNull?.romPath.hashCode,
+                Object.hashAll(
+                  db
+                      .getRecentlyPlayedGames(RecentGamesCycler.maxGames)
+                      .map((g) => g.romPath),
+                ),
+                // Listening here re-runs this selector when the recent card
+                // cycles, which is what repaints it.
+                Provider.of<RecentGamesCycler?>(context)?.position,
                 db.totalFavorites,
               ),
               builder: (context, _, child) => _buildContent(context),
@@ -905,6 +980,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
     final allSystems = _getSystemsList();
+    _performanceMode = context.select<SqliteConfigProvider, bool>(
+      (p) => p.config.performanceMode,
+    );
     // When the logo footer is hidden the card is square, so the carousel drops
     // its reserved footer height and uses square pages.
     final hideSystemLogos = widget.hideSystemLogos;
@@ -926,12 +1004,22 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
     if (_currentIndex < 0) _currentIndex = 0;
 
     // Trigger background update only when the displayed index changes.
+    final focusedGamePath = allSystems[_currentIndex].gameModel?.romPath;
     if (_lastBackgroundBuildIndex != _currentIndex) {
       _lastBackgroundBuildIndex = _currentIndex;
+      _lastBackgroundGamePath = focusedGamePath;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _updateBackground(allSystems[_currentIndex]);
         }
+      });
+    } else if (_lastBackgroundGamePath != focusedGamePath) {
+      // Same slot, different game: the recent card cycled while focused.
+      _lastBackgroundGamePath = focusedGamePath;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _updateBackground(allSystems[_currentIndex]);
+        _updateSecondaryScreenName();
       });
     }
 
@@ -1001,8 +1089,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                 );
               },
               child: Focus(
-                descendantsAreFocusable:
-                    false, // Intercept native Flutter focus to use custom gamepad logic.
+                descendantsAreFocusable: false, // Intercept native Flutter focus to use custom gamepad logic.
                 skipTraversal: true,
                 child: RepaintBoundary(
                   child: NativeCarousel(
@@ -1017,13 +1104,22 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                     // edge, leaving a ~16px sliver. Floor the scale, lift
                     // the fade, and pull the outer pair back toward the
                     // pack so the row visibly continues past both edges.
-                    depth: const CarouselDepth(
-                      minScale: 0.7,
-                      opacityBase: 0.75,
-                      opacityFalloff: 0.55,
-                      minOpacity: 0.3,
-                      edgePull: 0.15,
-                    ),
+                    performanceMode: _performanceMode,
+                    depth: _performanceMode
+                        ? const CarouselDepth(
+                            minScale: 1,
+                            opacityBase: 1,
+                            opacityFalloff: 0,
+                            minOpacity: 1,
+                            edgePull: 0,
+                          )
+                        : const CarouselDepth(
+                            minScale: 0.7,
+                            opacityBase: 0.75,
+                            opacityFalloff: 0.55,
+                            minOpacity: 0.3,
+                            edgePull: 0.15,
+                          ),
                     itemBuilder: (context, index) {
                       final system = allSystems[index];
                       final isSelected = index == _currentIndex;
@@ -1053,7 +1149,10 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                             ),
                             info: system,
                             isSelected: isSelected,
+                            // The centred card keeps the others' colours.
+                            highlightSelected: false,
                             backgroundCacheWidth: 1024,
+                            artworkInset: 10,
                             onTap: handleTap,
                             // The centred card only. An off-centre card is
                             // painted outside the page slot the viewport
@@ -1076,7 +1175,20 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                       return Stack(
                         fit: StackFit.passthrough,
                         children: [
-                          card,
+                          // The recent card slides between the last few played
+                          // games. Always wrapped (never only when centred), so
+                          // the subtree keeps its shape as selection travels.
+                          if (system.isGame &&
+                              widget.items == null &&
+                              widget.onRightTrigger != null)
+                            RecentCardCycle(
+                              gameKey: system.gameModel?.romPath,
+                              card: card,
+                              // Off centre, a swipe on it scrolls the carousel.
+                              swipeEnabled: isSelected,
+                            )
+                          else
+                            card,
                           Positioned.fill(
                             child: IgnorePointer(
                               child: SizedBox.expand(
@@ -1109,6 +1221,8 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
           ),
         ),
 
+        SizedBox(height: 8.r),
+
         // Secondary Systems Indicator List (Bottom).
         SizedBox(
           height: 40.r,
@@ -1132,9 +1246,9 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                             ? Colors.transparent
                             : Theme.of(context).colorScheme.surface,
                         borderRadius:
-                            Theme.of(
-                              context,
-                            ).extension<CornerRadii>()?.radiusExternal ??
+                            Theme.of(context)
+                                .extension<CornerRadii>()
+                                ?.radiusExternal ??
                             BorderRadius.circular(14.r),
                       ),
                     );
@@ -1143,7 +1257,7 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
 
                 // Focused item sliding indicator. Painted between the
                 // backgrounds and the text so the selected label gets a
-                // solid fill while the text stays perfectly readable.
+                // primary fill and onPrimary text.
                 Positioned.fill(
                   child: ValueListenableBuilder<double>(
                     valueListenable: _pageOffsetNotifier,
@@ -1174,8 +1288,8 @@ class _MySystemsCarouselState extends State<MySystemsCarousel> {
                 ),
 
                 // Foreground text track. Transparent background so the
-                // selector and surface backgrounds show through, while
-                // the selected label uses onPrimary for contrast.
+                // selector and surface backgrounds show through, while the
+                // selected label uses onPrimary for contrast.
                 ValueListenableBuilder<double>(
                   valueListenable: _pageOffsetNotifier,
                   builder: (context, page, _) {

@@ -3,6 +3,7 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/my_systems.dart';
+
 import 'core_footer.dart';
 import 'footer_label_pill.dart';
 
@@ -12,13 +13,11 @@ class SystemsGridFooter extends CoreFooter {
   final SystemInfo system;
   final VoidCallback onEnter;
 
-  /// Y: opens the card's context menu.
+  /// Start: opens the centered Options dialog.
   ///
-  /// This slot used to be Start/Settings, which named one of the things that
-  /// menu now holds rather than the menu itself — and it was hidden on a
-  /// recent-game card, which the menu no longer is. Start still opens the
-  /// settings dialog directly; the hint points at the menu because that is
-  /// what the button beside it does.
+  /// Options used to sit behind Y, with Start opening the settings dialog
+  /// directly. Both actions now live in the same dialog, which Start opens so
+  /// the pad has one predictable route for everything the screen can change.
   final VoidCallback onOptions;
 
   const SystemsGridFooter({
@@ -36,14 +35,19 @@ class SystemsGridFooter extends CoreFooter {
 
   @override
   Widget? buildLeftContent(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return FooterLabelPill(
+      backgroundColor: scheme.surface,
+      foregroundColor: scheme.onSurface,
+      countBackgroundColor: scheme.secondary,
+      countForegroundColor: scheme.onSecondary,
       label: system.isGame
           ? "${AppLocale.lastPlayed.getString(context)}: ${system.title}"
           : system.title ?? "",
       // Games are one-offs, so only real systems carry a count.
       countText: system.isGame
           ? null
-          : "${system.numOfRoms} ${system.folderName == 'android'
+          : "${system.numOfRoms ?? 0} ${system.folderName == 'android'
                 ? AppLocale.apps.getString(context)
                 : system.folderName == 'music'
                 ? AppLocale.tracks.getString(context)
@@ -56,11 +60,11 @@ class SystemsGridFooter extends CoreFooter {
     final theme = Theme.of(context);
 
     return [
-      // Options, on every card: the menu behind it has a row for a
+      // Options, on every card: the dialog behind it has rows for a
       // recent-game card too.
       GamepadControl(
         label: AppLocale.hintOptions.getString(context),
-        iconPath: 'assets/images/gamepad/Xbox_Y_button.png',
+        iconPath: 'assets/images/gamepad/Xbox_Menu_button.png',
         onTap: onOptions,
         textColor: theme.colorScheme.onTertiaryFixed,
         backgroundColor: theme.colorScheme.tertiaryFixed,

@@ -7,6 +7,8 @@ import 'package:neostation/models/my_systems.dart';
 import 'package:neostation/services/sfx_service.dart';
 
 import '../../themes/corner_radii.dart';
+import '../../widgets/gooey_selector.dart';
+import '../../widgets/neo_glass.dart';
 
 /// Fallback tint for a collection that has no artwork and no stored colours,
 /// matching the Collections virtual system's own palette.
@@ -38,6 +40,7 @@ SystemInfo collectionToSystemInfo(
   List<String> mosaicPaths = const [],
 }) {
   return SystemInfo(
+    isSmartCollection: collection.isSmart,
     title: collection.name,
     shortName: collection.name,
     folderName: '${SystemFolderNames.collectionPrefix}${collection.id}',
@@ -164,104 +167,139 @@ class NewCollectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final radii = theme.extension<CornerRadii>();
+    // Like the system cards around it: transparent while the grid's liquid
+    // selection draws its frame behind it, the selected-card colour when
+    // selected without it (performance mode), the card colour otherwise.
+    final liquid = GooeyCardChrome.maybeOf(context)?.liquid ?? false;
 
     return Padding(
       padding: EdgeInsets.all(2.r),
       child: MouseRegion(
         cursor: SystemMouseCursors.basic,
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: radii?.radiusExternal ?? BorderRadius.circular(14.r),
-            border: Border.all(color: theme.colorScheme.outline, width: 1.r),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.shadow.withValues(alpha: 0.1),
-                blurRadius: 4.r,
-                offset: Offset(2.0.r, 2.0.r),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: radii?.radiusInternal ?? BorderRadius.circular(9.r),
-            child: InkWell(
-              onTap: () {
-                if (isSelected) {
-                  SfxService().playEnterSound();
-                } else {
-                  SfxService().playNavSound();
-                }
-                onTap?.call();
-              },
-              canRequestFocus: false,
-              focusColor: Colors.transparent,
-              hoverColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  top: 4.r,
-                  bottom: 0.r,
-                  left: 4.r,
-                  right: 4.r,
-                ),
-                child: Column(
-                  children: [
-                    AspectRatio(
-                      aspectRatio: 1,
-                      child: ClipRRect(
-                        borderRadius:
-                            radii?.radiusInternal ?? BorderRadius.circular(9.r),
-                        child: Container(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.12,
-                          ),
-                          child: Center(
-                            child: Icon(
-                              Symbols.add_rounded,
-                              size: 64.r,
-                              weight: 700,
-                              color: theme.colorScheme.primary,
+        child: NeoGlassRim(
+          cornerRadius: radii?.radiusExternalRadius ?? 14.r,
+          child: Container(
+            decoration: BoxDecoration(
+              color: liquid
+                  ? Colors.transparent
+                  : isSelected
+                  ? theme.colorScheme.secondary
+                  : theme.colorScheme.surface,
+              borderRadius:
+                  radii?.radiusExternal ?? BorderRadius.circular(14.r),
+              boxShadow: liquid
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: theme.colorScheme.shadow.withValues(alpha: 0.1),
+                        blurRadius: 4.r,
+                        offset: Offset(2.0.r, 2.0.r),
+                      ),
+                    ],
+            ),
+            child: ClipRRect(
+              borderRadius: radii?.radiusInternal ?? BorderRadius.circular(9.r),
+              child: InkWell(
+                onTap: () {
+                  if (isSelected) {
+                    SfxService().playEnterSound();
+                  } else {
+                    SfxService().playNavSound();
+                  }
+                  onTap?.call();
+                },
+                canRequestFocus: false,
+                focusColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 4.r,
+                    bottom: 0.r,
+                    left: 4.r,
+                    right: 4.r,
+                  ),
+                  child: Column(
+                    children: [
+                      AspectRatio(
+                        aspectRatio: 1,
+                        child: ClipRRect(
+                          borderRadius:
+                              radii?.radiusInternal ??
+                              BorderRadius.circular(9.r),
+                          // The plus takes the card's text colour, so it stays visible on the
+                          // selected card's fill.
+                          child: GooeyCardChrome.fadeColor(
+                            context,
+                            color: isSelected
+                                ? theme.colorScheme.onSecondary
+                                : theme.colorScheme.onSurface,
+                            builder: (plusColor) => Container(
+                              color: plusColor.withValues(alpha: 0.12),
+                              child: Center(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Icon(
+                                    Symbols.add_rounded,
+                                    size: 64.r,
+                                    weight: 700,
+                                    color: plusColor,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    // "New collection" is wider than a card at every size but
-                    // XL, so the caption is measured against the band it has to
-                    // fit and shrunk until the whole label lands inside it.
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4.r),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final base = TextStyle(
-                              color: theme.colorScheme.onSurface,
-                              fontSize: 10.r,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.0,
-                              height: 1.15,
-                            );
-                            final text = label.toUpperCase();
-                            final fitted = fitCaptionStyle(
-                              text: text,
-                              style: base,
-                              maxWidth: constraints.maxWidth,
-                              maxHeight: constraints.maxHeight,
-                            );
-                            return Center(
-                              child: Text(
-                                text,
-                                maxLines: kCaptionMaxLines,
-                                textAlign: TextAlign.center,
-                                style: fitted,
-                              ),
-                            );
-                          },
+                      // "New collection" is wider than a card at every size but
+                      // XL, so the caption is measured against the band it has to
+                      // fit and shrunk until the whole label lands inside it.
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4.r),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) =>
+                                GooeyCardChrome.fadeColor(
+                                  context,
+                                  color: isSelected
+                                      ? theme.colorScheme.onSecondary
+                                      : theme.colorScheme.onSurface,
+                                  builder: (captionColor) {
+                                    final base = TextStyle(
+                                      color: captionColor,
+                                      fontSize: 10.r,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1.0,
+                                      height: 1.15,
+                                    );
+                                    final text = label.toUpperCase();
+                                    final fitted = fitCaptionStyle(
+                                      text: text,
+                                      style: base,
+                                      maxWidth: constraints.maxWidth,
+                                      maxHeight: constraints.maxHeight,
+                                    );
+                                    // Shrinks further rather than cutting a word on the narrow cards
+                                    // of the smallest sizes.
+                                    return Center(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          text,
+                                          maxLines: kCaptionMaxLines,
+                                          textAlign: TextAlign.center,
+                                          style: fitted,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

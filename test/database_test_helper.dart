@@ -29,6 +29,7 @@ class DatabaseTestHelper {
 
   /// Creates the minimal set of tables required by repository tests.
   Future<void> createMinimalSchema(DatabaseAdapter db) async {
+    await db.execute(SqliteMigrations.createRaCatalogueSyncTableSql);
     await db.execute('''
       CREATE TABLE app_systems (
         id TEXT PRIMARY KEY,
@@ -83,6 +84,7 @@ class DatabaseTestHelper {
         rom_size INTEGER,
         rom_fingerprint_skipped TEXT,
         ss_manual_game_id INTEGER,
+        is_android_game INTEGER DEFAULT 0,
         id_ra INTEGER,
         ra_match_source TEXT,
         ra_hash_skipped TEXT,
@@ -119,8 +121,12 @@ class DatabaseTestHelper {
         bartop_exit_poweroff INTEGER DEFAULT 0,
         scan_on_startup INTEGER DEFAULT 1,
         ignore_hidden_files INTEGER DEFAULT 1,
+        ignore_articles_in_game_sort INTEGER DEFAULT 0,
+        video_previews INTEGER DEFAULT 1,
+        video_preview_delay INTEGER DEFAULT 2,
         setup_completed INTEGER DEFAULT 0,
         hide_bottom_screen INTEGER DEFAULT 0,
+        swap_screens INTEGER DEFAULT 0,
         sfx_enabled INTEGER DEFAULT 1,
         sfx_volume REAL DEFAULT 0.75,
         system_sort_by TEXT DEFAULT 'alphabetical',
@@ -130,7 +136,7 @@ class DatabaseTestHelper {
         app_language TEXT DEFAULT 'en',
         active_theme TEXT DEFAULT '',
         hide_recent_card INTEGER DEFAULT 0,
-        recent_card_size TEXT DEFAULT 'default',
+        recent_card_size TEXT DEFAULT '2x1',
         active_sync_provider TEXT DEFAULT 'neosync',
         game_view_mode TEXT DEFAULT 'list',
         rom_folders TEXT,
@@ -139,6 +145,9 @@ class DatabaseTestHelper {
         auto_update_app INTEGER DEFAULT 1,
         auto_update_systems INTEGER DEFAULT 1,
         system_grid_columns TEXT DEFAULT 'M',
+        discovery_grid_columns TEXT DEFAULT 'M',
+        discovery_view_mode TEXT DEFAULT 'grid',
+        android_grid_columns TEXT DEFAULT 'M',
         use_12_hour_clock INTEGER DEFAULT 0,
         game_details_tab TEXT DEFAULT 'wheel',
         esde_folder_path TEXT,
@@ -152,11 +161,13 @@ class DatabaseTestHelper {
         hide_tab_search INTEGER DEFAULT 0,
         hide_search_card INTEGER DEFAULT 1,
         android_apps_as_tab INTEGER DEFAULT 0,
+        hide_tab_discovery INTEGER DEFAULT 0,
         game_grid_columns TEXT DEFAULT 'M',
         game_list_size TEXT DEFAULT 'S',
         game_carousel_card_style TEXT DEFAULT 'fanart',
         dock_apps TEXT,
         dock_enabled INTEGER DEFAULT 1,
+        secondary_hide_system_logo INTEGER DEFAULT 1,
         dock_slot_count INTEGER DEFAULT 3,
         now_playing_dim_delay INTEGER DEFAULT 3,
         now_playing_dim_level INTEGER DEFAULT 100,
@@ -166,9 +177,11 @@ class DatabaseTestHelper {
         ra_match_on_startup INTEGER DEFAULT 0,
         subfolder_view_all INTEGER DEFAULT 0,
         hide_system_logos INTEGER DEFAULT 0,
+        performance_mode INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
-        neoglass_border_width REAL DEFAULT 2
+        neoglass_border_width REAL DEFAULT 2,
+        corner_radius INTEGER DEFAULT 3
       )
     ''');
 
@@ -204,7 +217,8 @@ class DatabaseTestHelper {
         is_default_core INTEGER,
         is_default_standalone INTEGER NOT NULL DEFAULT 0,
         is_ra_compatible INTEGER,
-        neosync_slug TEXT
+        neosync_slug TEXT,
+        supported_extensions TEXT
       )
     ''');
 
@@ -322,6 +336,13 @@ class DatabaseTestHelper {
         description_de TEXT,
         description_it TEXT,
         description_pt TEXT,
+        description_ja TEXT,
+        description_ko TEXT,
+        description_ru TEXT,
+        description_zh TEXT,
+        description_id TEXT,
+        regional_names TEXT,
+        video_url TEXT,
         rating REAL,
         release_date TEXT,
         developer TEXT,
@@ -342,5 +363,19 @@ class DatabaseTestHelper {
     // The production DDL rather than a copy, so the singleton CHECK and the
     // nullable secret columns behave exactly as they do on a device.
     await db.execute(SqliteMigrations.createUserRommConfigTableSql);
+
+    await db.execute('''
+      CREATE TABLE user_discovery_picks (
+        week_key TEXT NOT NULL,
+        slot_id TEXT NOT NULL,
+        section TEXT NOT NULL,
+        genre_bucket TEXT,
+        slot_order INTEGER NOT NULL DEFAULT 0,
+        rom_path TEXT NOT NULL COLLATE NOCASE,
+        reroll_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (week_key, slot_id)
+      )
+    ''');
   }
 }

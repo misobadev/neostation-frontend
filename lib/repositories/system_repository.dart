@@ -1,9 +1,25 @@
 import 'dart:io';
+
+import '../constants/system_folder_names.dart';
 import '../models/system_model.dart';
 import '../data/datasources/sqlite_service.dart';
 
 /// Repository for handling system data (app_systems - read-only)
 class SystemRepository {
+  /// Whether a system is meant to be shown on the current platform.
+  ///
+  /// Native ports are desktop-only, while the Android app system is the
+  /// inverse. Keeping the rule here prevents a configured folder from leaking
+  /// the card onto a platform that cannot launch its games.
+  static bool isSystemAvailableOnPlatform(String folderName, {bool? android}) {
+    final isAndroid = android ?? Platform.isAndroid;
+    if (folderName == 'ports' && isAndroid) return false;
+    if (SystemFolderNames.isAndroidApps(folderName) && !isAndroid) {
+      return false;
+    }
+    return true;
+  }
+
   /// Get all available systems from the database
   static Future<List<SystemModel>> getAllSystems() async {
     // If the DB is empty, force sync during app startup if necessary
@@ -12,7 +28,9 @@ class SystemRepository {
       await SqliteService.loadAndSyncSystems();
       systems = await SqliteService.getAllSystems();
     }
-    return systems;
+    return systems
+        .where((system) => system.folderName != 'ports' || !Platform.isAndroid)
+        .toList();
   }
 
   /// Get a system by its folder_name
@@ -59,8 +77,7 @@ class SystemRepository {
       final isPresent = allSystems.any((s) => s.folderName == d.folderName);
       if (!isPresent) return false;
 
-      // Filter out Android if not on Android platform
-      if (d.folderName == 'android' && !Platform.isAndroid) {
+      if (!isSystemAvailableOnPlatform(d.folderName)) {
         return false;
       }
 
@@ -152,8 +169,16 @@ class SystemRepository {
   static Future<Map<String, dynamic>> getSystemSettings(String systemId) =>
       SqliteService.getSystemSettings(systemId);
 
+  static Future<Map<String, Map<String, dynamic>>> getSystemSettingsMap(
+    Iterable<String> systemIds,
+  ) => SqliteService.getSystemSettingsMap(systemIds);
+
   static Future<Set<String>> getExtensionsForSystem(String systemId) =>
       SqliteService.getExtensionsForSystem(systemId);
+
+  static Future<Map<String, Set<String>>> getExtensionsMapForSystems(
+    Iterable<String> systemIds,
+  ) => SqliteService.getExtensionsMapForSystems(systemIds);
 
   // ── System extensions ─────────────────────────────────────────────────────
 

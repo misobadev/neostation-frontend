@@ -329,27 +329,30 @@ void main() {
         );
       });
 
-      test('getRomsNeedingRaHash returns only unhashed cartridge ROMs', () async {
-        await db.execute(
-          "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('new.nes', '/roms/nes/new.nes', 'nes')",
-        );
-        await db.execute(
-          "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash) VALUES ('done.nes', '/roms/nes/done.nes', 'nes', 'abc123')",
-        );
-        await db.execute(
-          "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash) VALUES ('empty.nes', '/roms/nes/empty.nes', 'nes', '')",
-        );
+      test(
+        'getRomsNeedingRaHash returns only unhashed cartridge ROMs',
+        () async {
+          await db.execute(
+            "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('new.nes', '/roms/nes/new.nes', 'nes')",
+          );
+          await db.execute(
+            "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash) VALUES ('done.nes', '/roms/nes/done.nes', 'nes', 'abc123')",
+          );
+          await db.execute(
+            "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash) VALUES ('empty.nes', '/roms/nes/empty.nes', 'nes', '')",
+          );
 
-        final candidates =
-            await RetroAchievementsRepository.getRomsNeedingRaHash();
+          final candidates =
+              await RetroAchievementsRepository.getRomsNeedingRaHash();
 
-        expect(
-          candidates.map((c) => c.filename),
-          unorderedEquals(['new.nes', 'empty.nes']),
-        );
-        expect(candidates.first.systemRaId, '7');
-        expect(candidates.first.systemFolderName, 'nes');
-      });
+          expect(
+            candidates.map((c) => c.filename),
+            unorderedEquals(['new.nes', 'empty.nes']),
+          );
+          expect(candidates.first.systemRaId, '7');
+          expect(candidates.first.systemFolderName, 'nes');
+        },
+      );
 
       test(
         'getRomsNeedingRaHash excludes a disc system with no disc algorithm',
@@ -391,23 +394,26 @@ void main() {
         expect(await RetroAchievementsRepository.getRomsNeedingRaHash(), []);
       });
 
-      test('getRomsNeedingRaGameId returns hashed but unmatched ROMs', () async {
-        await db.execute(
-          "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash) VALUES ('pending.nes', '/roms/nes/pending.nes', 'nes', 'aaa')",
-        );
-        await db.execute(
-          "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash, id_ra) VALUES ('matched.nes', '/roms/nes/matched.nes', 'nes', 'bbb', 42)",
-        );
-        await db.execute(
-          "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('nohash.nes', '/roms/nes/nohash.nes', 'nes')",
-        );
+      test(
+        'getRomsNeedingRaGameId returns hashed but unmatched ROMs',
+        () async {
+          await db.execute(
+            "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash) VALUES ('pending.nes', '/roms/nes/pending.nes', 'nes', 'aaa')",
+          );
+          await db.execute(
+            "INSERT INTO user_roms (filename, rom_path, app_system_id, ra_hash, id_ra) VALUES ('matched.nes', '/roms/nes/matched.nes', 'nes', 'bbb', 42)",
+          );
+          await db.execute(
+            "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('nohash.nes', '/roms/nes/nohash.nes', 'nes')",
+          );
 
-        final candidates =
-            await RetroAchievementsRepository.getRomsNeedingRaGameId();
+          final candidates =
+              await RetroAchievementsRepository.getRomsNeedingRaGameId();
 
-        expect(candidates.map((c) => c.filename), ['pending.nes']);
-        expect(candidates.first.raHash, 'aaa');
-      });
+          expect(candidates.map((c) => c.filename), ['pending.nes']);
+          expect(candidates.first.raHash, 'aaa');
+        },
+      );
 
       test('getRomsNeedingRaHash parks ROMs marked unhashable', () async {
         await db.execute(
@@ -778,21 +784,24 @@ void main() {
       expect(gameId, isNull);
     });
 
-    test('findGameIdByFilename still finds the main set beside a subset', () async {
-      await db.execute(
-        "INSERT INTO app_ra_game_list (hash, game_id, console_id, title) VALUES ('sub2', 5101, '7', 'Metroid [Subset - Bonus]')",
-      );
-      await db.execute(
-        "INSERT INTO app_ra_game_list (hash, game_id, console_id, title) VALUES ('main2', 5102, '7', 'Metroid')",
-      );
+    test(
+      'findGameIdByFilename still finds the main set beside a subset',
+      () async {
+        await db.execute(
+          "INSERT INTO app_ra_game_list (hash, game_id, console_id, title) VALUES ('sub2', 5101, '7', 'Metroid [Subset - Bonus]')",
+        );
+        await db.execute(
+          "INSERT INTO app_ra_game_list (hash, game_id, console_id, title) VALUES ('main2', 5102, '7', 'Metroid')",
+        );
 
-      final gameId = await RetroAchievementsRepository.findGameIdByFilename(
-        'nes',
-        'Metroid',
-      );
+        final gameId = await RetroAchievementsRepository.findGameIdByFilename(
+          'nes',
+          'Metroid',
+        );
 
-      expect(gameId, 5102);
-    });
+        expect(gameId, 5102);
+      },
+    );
 
     test('findGameIdByFilename returns null when no match', () async {
       final gameId = await RetroAchievementsRepository.findGameIdByFilename(
@@ -820,20 +829,23 @@ void main() {
       },
     );
 
-    test('findBestLocalGameByRaGameId breaks ties by favorite then name', () async {
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id, id_ra, is_favorite, last_played, title_name) VALUES ('b.nes', '/roms/nes/b.nes', 'nes', 888, 0, NULL, 'Bravo')",
-      );
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id, id_ra, is_favorite, last_played, title_name) VALUES ('a.nes', '/roms/nes/a.nes', 'nes', 888, 1, NULL, 'Alpha')",
-      );
+    test(
+      'findBestLocalGameByRaGameId breaks ties by favorite then name',
+      () async {
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id, id_ra, is_favorite, last_played, title_name) VALUES ('b.nes', '/roms/nes/b.nes', 'nes', 888, 0, NULL, 'Bravo')",
+        );
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id, id_ra, is_favorite, last_played, title_name) VALUES ('a.nes', '/roms/nes/a.nes', 'nes', 888, 1, NULL, 'Alpha')",
+        );
 
-      final result =
-          await RetroAchievementsRepository.findBestLocalGameByRaGameId(888);
+        final result =
+            await RetroAchievementsRepository.findBestLocalGameByRaGameId(888);
 
-      expect(result, isNotNull);
-      expect(result!.game.romPath, '/roms/nes/a.nes');
-      expect(result.game.systemFolderName, 'nes');
-    });
+        expect(result, isNotNull);
+        expect(result!.game.romPath, '/roms/nes/a.nes');
+        expect(result.game.systemFolderName, 'nes');
+      },
+    );
   });
 }

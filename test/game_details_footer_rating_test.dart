@@ -453,10 +453,10 @@ void main() {
       reason: 'omitted outright rather than drawn as a dark sliver',
     );
     // The rest of the row is unaffected: the controls are what the row is for.
-    // On a card this narrow, Play gives up its label and keeps the A action.
-    final playGlyph = find.byType(Image);
-    expect(playGlyph, findsOneWidget);
-    expect(tester.getSize(playGlyph).width, greaterThan(0));
+    // On a card this narrow the PLAY label ellipsizes instead of disappearing.
+    final playLabel = find.text('PLAY');
+    expect(playLabel, findsOneWidget);
+    expect(tester.getSize(playLabel).width, greaterThan(0));
     expect(find.byIcon(Symbols.settings_rounded), findsOneWidget);
   });
 
@@ -526,12 +526,15 @@ void main() {
     // under the cap and takes up every unit the row does not spend.
     await pumpFooter(tester, showsPill: true, width: handheldCardWidth);
 
+    // PLAY is filled with the theme's main action colour.
+    final action = Theme.of(tester.element(find.byType(GameDetailsFooter)))
+        .colorScheme
+        .tertiary;
     final playButton = find.byWidgetPredicate(
       (widget) =>
           widget is Container &&
           widget.decoration is BoxDecoration &&
-          (widget.decoration! as BoxDecoration).color ==
-              const Color(0xFF2ECC71),
+          (widget.decoration! as BoxDecoration).color == action,
     );
     final rects = [
       for (final finder in [

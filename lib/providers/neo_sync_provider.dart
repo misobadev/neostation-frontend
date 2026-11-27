@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show listEquals;
+
 import 'dart:io';
 import 'dart:isolate';
+
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
+
 import '../services/neosync/neo_sync_service.dart';
 import '../services/neosync/auth_service.dart';
 import '../models/neo_sync_models.dart';
@@ -11,19 +15,22 @@ import '../widgets/quota_exceeded_dialog.dart';
 import '../models/neo_sync_models.dart' as neo_sync;
 import '../models/system_model.dart';
 import '../models/game_model.dart';
-import '../utils/switch_save_detector.dart';
-import '../utils/switch_title_extractor.dart';
 import '../repositories/system_repository.dart';
 import '../repositories/sync_repository.dart';
 import '../repositories/game_repository.dart';
-import '../repositories/emulator_repository.dart';
 import '../repositories/neosync_save_folder_repository.dart';
 import '../data/datasources/sqlite_service.dart';
 import '../utils/cloud_path_builder.dart';
 import '../utils/safe_path.dart';
+import '../utils/save_file_listing.dart';
 import '../services/config_service.dart';
 import '../services/retroarch_config_service.dart';
 import '../services/retroachievements_hash_service.dart';
+import '../utils/auto_folder_upload_notice.dart';
+import '../utils/cloud_copy_backup_name.dart';
+import '../utils/kept_cloud_copy_notice.dart';
+import '../utils/kept_save_copy.dart';
+import '../utils/save_changed_here.dart';
 
 part 'neosync/neosync_exceptions.dart';
 part 'neosync/neosync_status.dart';
@@ -46,8 +53,12 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Local cache of user files currently stored in the cloud.
   List<NeoSyncFile> _onlineFiles = [];
 
-  /// Whether a network request to fetch the cloud file list is active.
+  /// Whether a page of the online save list ([onlineFiles]) is loading.
   bool _isLoadingOnlineFiles = false;
+
+  /// Whether the last load of [onlineFiles] failed, so the empty list means
+  /// "couldn't list", not "no saves".
+  bool _onlineFilesLoadFailed = false;
 
   /// Total number of online files matching the active filter.
   int _onlineTotal = 0;
@@ -78,6 +89,7 @@ class NeoSyncProvider extends ChangeNotifier {
 
   List<NeoSyncFile> get onlineFiles => _onlineFiles;
   bool get isLoadingOnlineFiles => _isLoadingOnlineFiles;
+  bool get onlineFilesLoadFailed => _onlineFilesLoadFailed;
   int get onlineTotal => _onlineTotal;
   Map<String, dynamic>? get onlineCounts => _onlineCounts;
   List<String> get onlineSystems => _onlineSystems;
@@ -103,10 +115,25 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Low-level network service for NeoSync API interactions.
   final NeoSyncService _neoSyncService;
 
-  NeoSyncProvider(this._neoSyncService);
+  NeoSyncProvider(this._neoSyncService, {DateTime Function()? now})
+    : _now = now ?? DateTime.now;
+
+  /// The clock the cloud list's age is measured with; tests pass their own.
+  final DateTime Function() _now;
 
   /// Whether a global synchronization task is currently active.
   bool _isSyncing = false;
+
+  /// Stop was pressed during a standalone save folder upload: it ends before
+  /// the next file. Cleared when an upload starts.
+  bool _customFolderUploadCancelled = false;
+
+  /// Stops the standalone save folder upload that is running, before its next
+  /// file; the files already sent stay uploaded. Does nothing when no upload
+  /// is running.
+  void cancelCustomFolderUpload() {
+    if (_isSyncing) _customFolderUploadCancelled = true;
+  }
 
   /// Overall progress of the current sync operation (0.0 to 1.0).
   double _syncProgress = 0.0;
@@ -126,6 +153,11 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Count of files skipped (already up to date).
   int _skippedFiles = 0;
 
+  /// Count of memory cards a standalone folder's upload left for a game's
+  /// next launch: never synced from this device, and not the same as the
+  /// cloud's.
+  int _leftForLaunchFiles = 0;
+
   /// Count of files successfully downloaded from the cloud.
   int _downloadedFiles = 0;
 
@@ -141,18 +173,22 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Consecutive failed upload attempts due to storage quota limits.
   int _quotaExceededAttempts = 0;
 
-  /// Active pre-launch deadline, set for the duration of
-  /// [syncGameSavesBeforeLaunch]. When expired, [_downloadCloudFile] abandons
-  /// its write so a late download can't clobber a save the emulator already
-  /// has open. Null outside the pre-launch path (background syncs are
-  /// unaffected).
-  SyncDeadline? _launchDeadline;
+  /// Deadlines of the pre-launch syncs still running, by the launched game's
+  /// ROM name and, when its system's games share memory cards, also by
+  /// `system:<folder>`. Once one has passed, [_downloadCloudFile] abandons a
+  /// late download of that game or, on such a system, of any of its games,
+  /// whichever sync started it (the launch's own, or the games-list sync of
+  /// the highlighted game), so it can't clobber a save or shared card the
+  /// emulator has open. Kept per launch rather than in one field, so a launch
+  /// doesn't hold back games on other systems, and never loses its deadline
+  /// when an earlier launch's sync finishes.
+  final Map<String, SyncDeadline> _launchDeadlines = {};
 
   /// Whether the user has already been notified of a quota issue in the current session.
   bool _quotaExceededDialogShown = false;
 
-  /// Global flag indicating that a quota limit was recently hit.
-  bool _quotaExceededActive = false;
+  /// The account (id, plan) the quota state belongs to; a change clears it.
+  (String, String)? _quotaAccount;
 
   /// Real-time synchronization state for individual games, keyed by unique ID.
   final Map<String, neo_sync.GameSyncState> _gameSyncStates = {};
@@ -166,6 +202,11 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Set of platform-specific files (e.g., PS2 memory cards, Switch user saves) already handled.
   final Set<String> _processedMultiEmulatorFilesInSession = {};
 
+  /// Shared memory cards a sync is transferring right now. Unlike the set
+  /// above, a launch or a closed game doesn't clear it, so two syncs never move
+  /// the same card at once.
+  final Set<String> _sharedCardsInFlight = {};
+
   /// Identifier of the game ROM currently targeted for per-game sync UI.
   String? _selectedGameRomname;
 
@@ -174,6 +215,40 @@ class NeoSyncProvider extends ChangeNotifier {
 
   /// All metadata for files discovered during the sync process.
   List<NeoSyncFile> _files = [];
+
+  /// When [_files] was fetched from the server, and for which account. A
+  /// game's sync fetches it again once it is older than [_cloudListMaxAge] or
+  /// another account is signed in, so saves changed on another device are
+  /// seen.
+  DateTime? _filesFetchedAt;
+  String? _filesAccountId;
+
+  /// Bumped whenever [_files] is marked stale, so a fetch that was already
+  /// under way can't mark it fresh again with an older list.
+  int _filesGeneration = 0;
+
+  /// Bumped whenever a save is deleted from the cloud here. A listing already
+  /// under way may still have it in, so its answer is never taken.
+  int _filesRemovals = 0;
+
+  /// How long a game's sync trusts the cloud file list it already has.
+  static const _cloudListMaxAge = Duration(seconds: 60);
+
+  /// How old the list may be at a launch or a close before it's fetched
+  /// again. The game list's own sync usually fetched it a moment earlier.
+  static const _cloudListLaunchMaxAge = Duration(seconds: 10);
+
+  /// Marks [_files] stale, or only when older than [olderThan].
+  void _markCloudListStale({Duration? olderThan}) {
+    final fetchedAt = _filesFetchedAt;
+    if (olderThan != null &&
+        fetchedAt != null &&
+        _now().difference(fetchedAt) < olderThan) {
+      return;
+    }
+    _filesFetchedAt = null;
+    _filesGeneration++;
+  }
 
   /// Current user's storage quota and usage metadata.
   NeoSyncQuota? _quota;
@@ -189,6 +264,10 @@ class NeoSyncProvider extends ChangeNotifier {
   int get processedFiles => _processedFiles;
   int get uploadedFiles => _uploadedFiles;
   int get skippedFiles => _skippedFiles;
+
+  /// Memory cards the last standalone folder upload left for a game's next
+  /// launch (see [_leftForLaunchFiles]).
+  int get leftForLaunchFiles => _leftForLaunchFiles;
   int get downloadedFiles => _downloadedFiles;
   List<String> get processedItems => _processedItems;
 
@@ -206,6 +285,19 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Retrieves the current sync state for a specific game.
   neo_sync.GameSyncState? getGameSyncState(String gameId) =>
       _gameSyncStates[gameId];
+
+  /// Whether [file] is a kept copy of a save rather than a save: RomM's
+  /// conflict copies, which earlier builds uploaded as saves. The save
+  /// listing leaves them out on this device, so taken for saves they would
+  /// be downloaded again on every sync.
+  bool _isKeptCopyInCloud(NeoSyncFile file) =>
+      isKeptCopyPath(file.fileName) || isKeptCopyPath(file.filePath);
+
+  /// Whether any game's own sync is under way (the one that runs when a game
+  /// is highlighted, before it launches and after it closes).
+  bool get isAnyGameSyncing => _gameSyncStates.values.any(
+    (state) => state.status == neo_sync.GameSyncStatus.syncing,
+  );
 
   /// Returns the list of local save files detected for a specific game.
   List<LocalSaveFile> getGameLocalSaves(String gameId) =>
@@ -241,32 +333,62 @@ class NeoSyncProvider extends ChangeNotifier {
     return fileName;
   }
 
+  /// Whether an upload's failure [message] is the NeoSync server saying the
+  /// account is out of storage.
+  ///
+  /// Only the server's own reply counts. `syncFile` reports a local file or
+  /// network failure as "Network error: …", and those often mention a
+  /// `/storage/…` path or a connection "closed before full header", which
+  /// must not be taken for a full account.
+  @visibleForTesting
+  static bool isQuotaExceededMessage(String message) =>
+      !message.startsWith('Network error:') &&
+      message.toLowerCase().contains('quota');
+
   /// Analyzes an error message to determine if it represents a storage quota violation.
   ///
   /// Increments failure counters if a quota issue is detected.
   bool _checkQuotaExceeded(String errorMessage) {
-    final lowerMessage = errorMessage.toLowerCase();
-    if (lowerMessage.contains('quota') ||
-        lowerMessage.contains('storage') ||
-        lowerMessage.contains('413') ||
-        lowerMessage.contains('full')) {
+    if (isQuotaExceededMessage(errorMessage)) {
       _quotaExceededAttempts++;
       return true;
     }
     return false;
   }
 
-  /// Resets quota-related failure counters and status flags.
+  /// Resets the quota failure counter.
   void _resetQuotaAttempts() {
     _quotaExceededAttempts = 0;
-    _quotaExceededActive = false;
   }
+
+  /// The deadline of a running launch of the game [romName] or, when
+  /// [sharedCardsSystem] names the game's system because its games share
+  /// memory cards, of any running launch on that system.
+  SyncDeadline? _launchDeadlineFor(String romName, String? sharedCardsSystem) =>
+      _launchDeadlines[romName] ??
+      (sharedCardsSystem == null
+          ? null
+          : _launchDeadlines[_systemLaunchKey(sharedCardsSystem)]);
+
+  static String _systemLaunchKey(String systemFolderName) =>
+      'system:$systemFolderName';
 
   /// Downloads a file from NeoSync storage and writes it to the local filesystem.
   ///
   /// Upon successful download, it synchronizes the local database sync state
-  /// to match the cloud version.
-  Future<void> _downloadCloudFile(NeoSyncFile cloudFile, File localFile) async {
+  /// to match the cloud version. Returns false, having written nothing, when
+  /// the pre-launch deadline that [deadline] returns has passed. It is asked
+  /// once the file is in, so a launch that started during the download counts.
+  /// A failed download throws.
+  ///
+  /// With [backUpFirst] false the local file isn't copied to the single
+  /// before-download slot first (the caller kept a copy of it already).
+  Future<bool> _downloadCloudFile(
+    NeoSyncFile cloudFile,
+    File localFile, {
+    SyncDeadline? Function()? deadline,
+    bool backUpFirst = true,
+  }) async {
     _log.i('Download: starting ${cloudFile.fileName} -> ${localFile.path}');
     final result = await _neoSyncService.downloadFile(cloudFile.id);
     if (result['success'] == true && result['data'] != null) {
@@ -274,17 +396,17 @@ class NeoSyncProvider extends ChangeNotifier {
       // launch-blocking wait has already elapsed the game is running on the
       // local save. Abandon before any write so we never clobber the file the
       // emulator now has open or record bogus sync state.
-      if (_launchDeadline?.isExpired ?? false) {
+      if (deadline?.call()?.isExpired ?? false) {
         _log.i(
           'Abandoning download of ${cloudFile.fileName} (launch deadline passed)',
         );
-        return;
+        return false;
       }
 
       final bytes = result['data'] as List<int>;
       try {
         await localFile.parent.create(recursive: true);
-        await _backupLocalFile(localFile);
+        if (backUpFirst) await _backupLocalFile(localFile);
         await localFile.writeAsBytes(bytes, flush: true);
         _log.i('Download: OK ${bytes.length} bytes -> ${localFile.path}');
       } on FileSystemException catch (e) {
@@ -311,6 +433,7 @@ class NeoSyncProvider extends ChangeNotifier {
       } catch (e) {
         _log.w('Could not save sync state for ${localFile.path}: $e');
       }
+      return true;
     } else {
       final reason = result['message'] ?? 'Unknown download failure';
       final statusCode = result['status_code'];
@@ -318,6 +441,9 @@ class NeoSyncProvider extends ChangeNotifier {
         'Download: FAILED for ${cloudFile.fileName} -> ${localFile.path}: '
         '$reason (status ${statusCode ?? 'n/a'})',
       );
+      // The file may have been deleted or replaced elsewhere: fetch the
+      // cloud list again next time.
+      _markCloudListStale();
       throw Exception(reason);
     }
   }

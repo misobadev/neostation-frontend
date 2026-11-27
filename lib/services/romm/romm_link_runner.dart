@@ -1,7 +1,10 @@
 import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/services/romm/romm_library_linker.dart';
+import 'package:neostation/services/romm_service.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
+import 'package:neostation/utils/romm_failure_message.dart';
 
 /// Localized text for the library-wide link pass, resolved by the caller so the
 /// runner never needs a `BuildContext` — the pass outlives the Tools screen.
@@ -21,8 +24,13 @@ class RommLinkStrings {
   /// Terminal row when there was nothing to link.
   final String nothingToDo;
 
-  /// Terminal row when the pass could not run.
+  /// Terminal row when the pass could not run, for a reason RomM didn't give
+  /// (or whose text wasn't resolved).
   final String failed;
+
+  /// The texts behind [rommBrowseFailureKeys], by key, so a run whose platform
+  /// list RomM couldn't send can say why (see [failedBecause]).
+  final Map<String, String> failureTexts;
 
   /// Terminal row when the pass was refused — disconnected, or a bulk ROM sync
   /// is walking the same server.
@@ -31,6 +39,10 @@ class RommLinkStrings {
   /// Terminal row when the pass stopped before reaching the end of the server,
   /// because RomM went away mid-pass. `{count}` substituted.
   final String stoppedEarlyTemplate;
+
+  /// Terminal row when some systems couldn't be read (or their links saved).
+  /// `{count}` (games linked) and `{failed}` (systems) substituted.
+  final String partialTemplate;
 
   const RommLinkStrings({
     required this.title,
@@ -41,6 +53,8 @@ class RommLinkStrings {
     required this.failed,
     required this.unavailable,
     required this.stoppedEarlyTemplate,
+    required this.partialTemplate,
+    required this.failureTexts,
   });
 
   String progress(int done, int total, String system) => progressTemplate
@@ -52,6 +66,24 @@ class RommLinkStrings {
 
   String stoppedEarly(int count) =>
       stoppedEarlyTemplate.replaceFirst('{count}', '$count');
+
+  String partial(int count, int failed) => partialTemplate
+      .replaceFirst('{count}', '$count')
+      .replaceFirst('{failed}', '$failed');
+
+  /// Terminal row for a pass that failed with [error]: when RomM said why (the
+  /// platform list couldn't be loaded, or every platform's games failed), the
+  /// sentence the browse screen shows for it, e.g. that the server can't be
+  /// reached; otherwise [failed].
+  String failedBecause(Object error) {
+    final cause = error is RommLinkPassException ? error.cause : error;
+    if (cause is! RommException) return failed;
+    return rommFailureMessage(
+      cause,
+      (key) => failureTexts[key] ?? failed,
+      browsing: true,
+    );
+  }
 }
 
 /// Runs the library-wide RomM link pass as a user-initiated Tools action, and
@@ -66,7 +98,8 @@ class RommLinkStrings {
 ///
 /// Shaped after `RaLibraryMatchRunner`, which is the same thing for
 /// RetroAchievements: a library-wide matcher behind a warning dialog, with a
-/// progress row and done / nothing-to-do / failed states.
+/// progress row and done / nothing-to-do / failed states, plus a partial
+/// state for a pass some systems of which couldn't be read.
 class RommLinkRunner {
   static final _log = LoggerService.instance;
 
@@ -86,9 +119,9 @@ class RommLinkRunner {
   /// Runs the pass and returns the number of rows it added, or null when it
   /// could not run at all.
   ///
-  /// Never throws: `linkLibrary` is documented not to, and anything that
-  /// escapes anyway is reported through the notification rather than thrown at
-  /// a button press.
+  /// Never throws: a pass that can't run (`linkLibrary` lets those failures
+  /// through) is reported through the notification rather than thrown at a
+  /// button press.
   static Future<int?> run({
     required RommLinkStrings strings,
     void Function()? onProgressStateChanged,
@@ -97,10 +130,8 @@ class RommLinkRunner {
     _running = true;
     onProgressStateChanged?.call();
 
-    // Terminal rows go through `show` rather than `update`. `update` resolves
-    // progress as `progress ?? existing.progress`, so passing null keeps the
-    // bar the run left behind and the summary sits under a full or frozen one;
-    // `show` replaces the row outright.
+    // Terminal rows go through `show`, which replaces the row outright (title,
+    // type and no progress bar) rather than merging into it.
     void finish(String message, GlobalNotificationType type) {
       GlobalNotificationService().show(
         id: notificationId,
@@ -165,6 +196,39 @@ class RommLinkRunner {
         return summary.rowsAdded;
       }
 
+      // Every platform the pass tried failed: RomM was never read, so neither
+      // "done" nor "nothing new" is true. Say why, as a failed platform list
+      // does.
+      final firstFailure = summary.firstFailure;
+      if (summary.platformFailures > 0 &&
+          summary.platformsProcessed == 0 &&
+          firstFailure != null) {
+        finish(
+          strings.failedBecause(firstFailure),
+          GlobalNotificationType.error,
+        );
+        return null;
+      }
+
+      // Nothing was saved, and only because saving failed: the reason is on
+      // this device, not RomM, so the plain failure text.
+      if (summary.rowsAdded == 0 &&
+          summary.rowsFailed > 0 &&
+          summary.platformFailures == 0) {
+        finish(strings.failed, GlobalNotificationType.error);
+        return null;
+      }
+
+      // Some systems couldn't be read or saved: what was linked, and how many
+      // systems were left. `info` for the same reason as a stopped pass.
+      if (summary.systemsFailed > 0) {
+        finish(
+          strings.partial(summary.rowsAdded, summary.systemsFailed),
+          GlobalNotificationType.info,
+        );
+        return summary.rowsAdded;
+      }
+
       if (summary.rowsAdded == 0) {
         finish(strings.nothingToDo, GlobalNotificationType.info);
         return 0;
@@ -173,7 +237,7 @@ class RommLinkRunner {
       return summary.rowsAdded;
     } catch (e, st) {
       _log.e('RomM link run did not complete', error: e, stackTrace: st);
-      finish(strings.failed, GlobalNotificationType.error);
+      finish(strings.failedBecause(e), GlobalNotificationType.error);
       return null;
     } finally {
       _running = false;

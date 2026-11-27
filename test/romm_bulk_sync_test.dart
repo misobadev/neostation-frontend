@@ -8,6 +8,8 @@ import 'package:neostation/models/romm_rom_page.dart';
 import 'package:neostation/models/system_model.dart';
 import 'package:neostation/providers/romm_bulk_sync.dart';
 import 'package:neostation/providers/romm_provider.dart';
+import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/utils/log_redaction.dart';
 
 /// Covers the bulk-sync engine: enumeration paging, the already-downloaded
 /// filter, the bounded worker pool, and cancellation.
@@ -670,6 +672,8 @@ void main() {
 
   _renderedPercentTests();
 
+  _summaryTests();
+
   group('cancellation', () {
     test(
       'stops handing out work and cancels the transfers in flight',
@@ -1033,43 +1037,40 @@ void _preflightTests() {
       expect(sync.completed, 1, reason: 'the sync still ran');
     });
 
-    test(
-      'a ROM with no resolvable destination is priced, not checked',
-      () async {
-        // Platform 2 has no local system / no writable folder, so nothing can be
-        // said about where its bytes would go.
-        final all = [
-          _rom(1, sizeBytes: 1000),
-          _rom(2, sizeBytes: 4000, platformId: 2),
-        ];
-        RommBulkSyncPlan? seen;
-        final sync = RommBulkSync();
+    test('a ROM with no resolvable destination is priced, not checked', () async {
+      // Platform 2 has no local system / no writable folder, so nothing can be
+      // said about where its bytes would go.
+      final all = [
+        _rom(1, sizeBytes: 1000),
+        _rom(2, sizeBytes: 4000, platformId: 2),
+      ];
+      RommBulkSyncPlan? seen;
+      final sync = RommBulkSync();
 
-        await sync.run(
-          sourceLabel: 'Mixed',
-          fetchPage: _pagesOver(all),
-          isDownloaded: _nothingDownloaded,
-          download: (rom) async => _completed(rom),
-          destination: _volumeByPlatform({
-            1: const RommSyncDestination(volume: '/storage', freeBytes: 2000),
-          }),
-          confirm: (plan) async {
-            seen = plan;
-            return true;
-          },
-        );
+      await sync.run(
+        sourceLabel: 'Mixed',
+        fetchPage: _pagesOver(all),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+        destination: _volumeByPlatform({
+          1: const RommSyncDestination(volume: '/storage', freeBytes: 2000),
+        }),
+        confirm: (plan) async {
+          seen = plan;
+          return true;
+        },
+      );
 
-        expect(seen!.downloadBytes, 5000);
-        expect(seen!.unresolvedRoms, 1);
-        expect(seen!.volumes.single.downloadBytes, 1000);
-        expect(
-          seen!.fits,
-          isTrue,
-          reason:
-              'the 4000 that cannot be placed cannot be held against /storage',
-        );
-      },
-    );
+      expect(seen!.downloadBytes, 5000);
+      expect(seen!.unresolvedRoms, 1);
+      expect(seen!.volumes.single.downloadBytes, 1000);
+      expect(
+        seen!.fits,
+        isTrue,
+        reason:
+            'the 4000 that cannot be placed cannot be held against /storage',
+      );
+    });
 
     test('reports the shortfall when the queue does not fit', () async {
       final all = [for (var i = 0; i < 3; i++) _rom(i, sizeBytes: 1000)];
@@ -1094,58 +1095,55 @@ void _preflightTests() {
       expect(sync.declined, isTrue);
     });
 
-    test(
-      'each volume is checked against its own share, not the roomiest',
-      () async {
-        // The regression this replaced: reporting the roomiest ROM folder let a
-        // queue "fit" because *somewhere* had room. Platform 1's 3000 bytes go to
-        // a volume with 1000 free; platform 2's 1000 go to one with 500k free.
-        // The total (4000) fits in the roomiest volume, and the sync still can't
-        // run as planned.
-        final all = [
-          _rom(1, sizeBytes: 3000),
-          _rom(2, sizeBytes: 1000, platformId: 2),
-        ];
-        RommBulkSyncPlan? seen;
-        final sync = RommBulkSync();
+    test('each volume is checked against its own share, not the roomiest', () async {
+      // The regression this replaced: reporting the roomiest ROM folder let a
+      // queue "fit" because *somewhere* had room. Platform 1's 3000 bytes go to
+      // a volume with 1000 free; platform 2's 1000 go to one with 500k free.
+      // The total (4000) fits in the roomiest volume, and the sync still can't
+      // run as planned.
+      final all = [
+        _rom(1, sizeBytes: 3000),
+        _rom(2, sizeBytes: 1000, platformId: 2),
+      ];
+      RommBulkSyncPlan? seen;
+      final sync = RommBulkSync();
 
-        await sync.run(
-          sourceLabel: 'Everything',
-          fetchPage: _pagesOver(all),
-          isDownloaded: _nothingDownloaded,
-          download: (rom) async => _completed(rom),
-          destination: _volumeByPlatform({
-            1: const RommSyncDestination(volume: '/internal', freeBytes: 1000),
-            2: const RommSyncDestination(volume: '/sdcard', freeBytes: 500000),
-          }),
-          confirm: (plan) async {
-            seen = plan;
-            return false;
-          },
-        );
+      await sync.run(
+        sourceLabel: 'Everything',
+        fetchPage: _pagesOver(all),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+        destination: _volumeByPlatform({
+          1: const RommSyncDestination(volume: '/internal', freeBytes: 1000),
+          2: const RommSyncDestination(volume: '/sdcard', freeBytes: 500000),
+        }),
+        confirm: (plan) async {
+          seen = plan;
+          return false;
+        },
+      );
 
-        expect(seen!.volumes.map((v) => v.volume), ['/internal', '/sdcard']);
-        expect(seen!.volumes.first.requiredBytes, 3000);
-        expect(seen!.volumes.last.requiredBytes, 1000);
-        expect(seen!.fits, isFalse);
-        expect(
-          seen!.shortfallBytes,
-          2000,
-          reason: 'the internal volume is short',
-        );
-        expect(seen!.tightestVolume!.volume, '/internal');
-        expect(
-          seen!.freeBytes,
-          isNull,
-          reason: 'no single free-space figure answers for two volumes',
-        );
-        expect(
-          seen!.spaceUnknown,
-          isFalse,
-          reason: 'both volumes were measured — the plan just does not fit',
-        );
-      },
-    );
+      expect(seen!.volumes.map((v) => v.volume), ['/internal', '/sdcard']);
+      expect(seen!.volumes.first.requiredBytes, 3000);
+      expect(seen!.volumes.last.requiredBytes, 1000);
+      expect(seen!.fits, isFalse);
+      expect(
+        seen!.shortfallBytes,
+        2000,
+        reason: 'the internal volume is short',
+      );
+      expect(seen!.tightestVolume!.volume, '/internal');
+      expect(
+        seen!.freeBytes,
+        isNull,
+        reason: 'no single free-space figure answers for two volumes',
+      );
+      expect(
+        seen!.spaceUnknown,
+        isFalse,
+        reason: 'both volumes were measured — the plan just does not fit',
+      );
+    });
 
     test('ROMs sharing a volume are added together, not checked apart', () async {
       // Two platforms, one volume: 3000 + 3000 against 5000 free is a shortfall
@@ -1273,6 +1271,54 @@ void _preflightTests() {
       },
     );
 
+    test('a single-file zip or 7z gets headroom too', () async {
+      // Single-file archives are unpacked after download as well, so they
+      // briefly need room for both the archive and its contents.
+      RommRom archived(int id, String ext) => RommRom(
+        id: id,
+        name: 'Game $id',
+        platformId: 1,
+        platformSlug: 'ps2',
+        fsName: 'game$id.$ext',
+        fsNameNoExt: 'game$id',
+        fsExtension: ext,
+        fsSizeBytes: 100,
+      );
+      final all = [
+        archived(1, 'zip'),
+        archived(2, '7z'),
+        _rom(3, sizeBytes: 100),
+        // #788: a folder ROM RomM serves as a ZIP, but which it reports with
+        // no extension and has_multiple_files false.
+        RommRom(
+          id: 4,
+          name: 'Game 4',
+          platformId: 1,
+          platformSlug: 'ps2',
+          fsName: 'Game 4',
+          fsNameNoExt: 'Game 4',
+          fsExtension: '',
+          fsSizeBytes: 100,
+        ),
+      ];
+      RommBulkSyncPlan? seen;
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'PS2',
+        fetchPage: _pagesOver(all),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+        confirm: (plan) async {
+          seen = plan;
+          return false;
+        },
+        concurrency: 4,
+      );
+
+      expect(seen!.requiredBytes, 400 + 100 + 100 + 100);
+    });
+
     test('the headroom never exceeds what the queue holds', () async {
       final all = [
         _rom(1, sizeBytes: 100, multiFile: true),
@@ -1362,6 +1408,224 @@ void _renderedPercentTests() {
       // A server that under-reports content-length would otherwise overshoot.
       expect(RommProvider.renderedPercent(1.4), 100);
       expect(RommProvider.renderedPercent(-0.2), 0);
+    });
+  });
+}
+
+/// A finished sync left nothing in the log: a user reporting "half my
+/// platform didn't download" had no record of what the run came to. Each run
+/// now ends with one line saying how it ended and what it did.
+void _summaryTests() {
+  group('summary log line', () {
+    final log = LoggerService.instance;
+
+    setUp(log.startCapture);
+    tearDown(log.takeCapture);
+
+    /// The summary lines logged since [setUp], with their level tag.
+    List<String> summaries() => log
+        .takeCapture()
+        .where((l) => l.contains('RomM bulk sync of "SNES"'))
+        .toList();
+
+    test('a finished run says so, with its counts', () async {
+      final all = [for (var i = 0; i < 4; i++) _rom(i, sizeBytes: 100)];
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: (rom) async => rom.id == 0,
+        download: (rom) async => _completed(rom),
+        concurrency: 1,
+      );
+
+      final lines = summaries();
+      expect(lines, hasLength(1));
+      final line = lines.single;
+      expect(line, startsWith('i|'));
+      for (final part in [
+        'complete',
+        'enumerated 4/4',
+        'queued 3',
+        'completed 3',
+        'failed 0',
+        'cancelled 0',
+        'skipped 1',
+        '300/300 bytes',
+        ' ms',
+      ]) {
+        expect(line, contains(part));
+      }
+      expect(line, isNot(contains('\n')));
+      expect(
+        redactSecrets(line),
+        line,
+        reason: 'nothing in the line reads as a credential to the redactor',
+      );
+    });
+
+    test('a run with failures is a warning naming the last error', () async {
+      final all = [for (var i = 0; i < 3; i++) _rom(i)];
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => rom.id == 1
+            ? _failed(rom, RommDownloadError.noWritableFolder)
+            : _completed(rom),
+        concurrency: 1,
+      );
+
+      final line = summaries().single;
+      expect(line, startsWith('w|'));
+      expect(line, contains('completed 2'));
+      expect(line, contains('failed 1'));
+      expect(line, contains('noWritableFolder'));
+    });
+
+    test('a cancelled run says it was cancelled', () async {
+      final all = [for (var i = 0; i < 5; i++) _rom(i)];
+      final gate = Completer<void>();
+      final sync = RommBulkSync();
+
+      final run = sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver(all),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async {
+          await gate.future;
+          return RommDownload(
+            romId: rom.id,
+            status: RommDownloadStatus.cancelled,
+          );
+        },
+        concurrency: 1,
+      );
+      await pumpEventQueue();
+      sync.cancel();
+      gate.complete();
+      await run;
+
+      final line = summaries().single;
+      expect(line, contains('cancelled:'));
+      expect(line, contains('cancelled 5'));
+    });
+
+    test('a declined plan says it was declined', () async {
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver([_rom(1)]),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+        confirm: (_) async => false,
+      );
+
+      final line = summaries().single;
+      expect(line, contains('declined'));
+      expect(line, contains('queued 1'));
+      expect(line, contains('completed 0'));
+    });
+
+    test('a run with nothing to download says so', () async {
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver([_rom(1)]),
+        isDownloaded: (_) async => true,
+        download: (rom) async => _completed(rom),
+      );
+
+      expect(summaries().single, contains('nothing to do'));
+    });
+
+    test('an enumeration failure is a warning with its offset', () async {
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: ({required int limit, required int offset}) async {
+          throw StateError('server down');
+        },
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+      );
+
+      final line = summaries().single;
+      expect(line, startsWith('w|'));
+      expect(line, contains('enumeration failed at offset 0'));
+    });
+
+    test('a mid-way enumeration failure syncs what was found', () async {
+      final all = [for (var i = 0; i < 25; i++) _rom(i)];
+      final pages = _pagesOver(all);
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: ({required int limit, required int offset}) async {
+          if (offset >= 10) throw StateError('server down');
+          return pages(limit: limit, offset: offset);
+        },
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+        pageSize: 10,
+        concurrency: 1,
+      );
+
+      expect(sync.completed, 10, reason: 'the first page is still synced');
+      final line = summaries().single;
+      expect(line, startsWith('w|'));
+      expect(line, contains('enumeration failed at offset 10'));
+      expect(line, contains('enumerated 10/25'));
+      expect(line, contains('completed 10'));
+    });
+
+    test('a run refused because another is running logs nothing', () async {
+      final gate = Completer<void>();
+      final sync = RommBulkSync();
+
+      final first = sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver([_rom(1)]),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async {
+          await gate.future;
+          return _completed(rom);
+        },
+      );
+      await pumpEventQueue();
+      await sync.run(
+        sourceLabel: 'SNES',
+        fetchPage: _pagesOver([_rom(2)]),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+      );
+      gate.complete();
+      await first;
+
+      expect(summaries(), hasLength(1));
+    });
+
+    test('a source name cannot add lines to the log', () async {
+      final sync = RommBulkSync();
+
+      await sync.run(
+        sourceLabel: 'SNES\nRomM: forged',
+        fetchPage: _pagesOver([_rom(1)]),
+        isDownloaded: _nothingDownloaded,
+        download: (rom) async => _completed(rom),
+      );
+
+      final line = log.takeCapture().singleWhere(
+        (l) => l.contains('RomM bulk sync of'),
+      );
+      expect(line, contains('"SNES RomM: forged"'));
     });
   });
 }

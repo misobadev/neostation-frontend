@@ -117,6 +117,10 @@ enum SyncError {
   /// Provider configuration is missing or invalid.
   configInvalid,
 
+  /// The same operation is already running, so this call did nothing. Its
+  /// outcome belongs to the run in progress, which this result cannot report.
+  busy,
+
   unknown,
 }
 

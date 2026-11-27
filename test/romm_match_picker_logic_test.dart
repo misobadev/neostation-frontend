@@ -160,12 +160,11 @@ void main() {
         syncKey: 'ct-final',
         systemFolder: 'snes',
         systemRealName: 'Super Nintendo',
-        searchRoms:
-            ({
-              required String search,
-              required List<int> platformIds,
-              required int limit,
-            }) async => throw UnimplementedError(),
+        searchRoms: ({
+          required String search,
+          required List<int> platformIds,
+          required int limit,
+        }) async => throw UnimplementedError(),
         platformIdsFor: (_) async => throw StateError('systems table closed'),
         readMapping: () async => null,
         writeMapping:

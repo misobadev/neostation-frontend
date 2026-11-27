@@ -6,6 +6,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:provider/provider.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../widgets/custom_toggle_switch.dart';
@@ -60,9 +61,9 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
 
   /// Calculates the total number of navigable settings (Global Card + Detected Systems).
   int getItemCount(SqliteConfigProvider provider) {
-    // hideRecent + recent card size + search card + favorites +
-    // detectedSystems (excluding favorites to avoid duplication)
-    return 4 +
+    // hideRecent + recent card size + favorites + detectedSystems
+    // (excluding favorites to avoid duplication).
+    return 3 +
         provider.detectedSystems
             .where((s) => s.folderName != SystemFolderNames.favorites)
             .length;
@@ -111,14 +112,6 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
               ? RecentCardSizes.defaultSize
               : RecentCardSizes.twoByOne,
         ),
-      ),
-      _SystemSettingRow(
-        icon: Symbols.search_rounded,
-        title: AppLocale.searchCard.getString(context),
-        subtitle: AppLocale.searchCardSubtitle.getString(context),
-        isEnabled: !provider.config.hideSearchCard,
-        onToggle: () =>
-            provider.updateHideSearchCard(!provider.config.hideSearchCard),
       ),
       _SystemSettingRow(
         icon: Symbols.favorite_rounded,
@@ -174,6 +167,7 @@ class SystemsSettingsContentState extends State<SystemsSettingsContent> {
               child: ListView.builder(
                 controller: _scrollController,
                 physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.only(top: 6.r),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final item = items[index];

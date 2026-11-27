@@ -1,0 +1,111 @@
+{
+  "system": {
+    "id": "atari800",
+    "multidisc": false,
+    "name": "Atari 800",
+    "short_name": "A800",
+    "details": {
+      "manufacturer": "Atari",
+      "release_date": "1979-11-01",
+      "description": "Atari's 8-bit home computer line, from the 400 and 800 to the XL and XE series.",
+      "type": "computer"
+    },
+    "ids": {
+      "screenscraper": 43,
+      "retroachievements": null
+    },
+    "folders": [
+      "atari800",
+      "a800",
+      "atari8bit",
+      "atarixl",
+      "Atari 800",
+      "Atari 8-bit"
+    ],
+    "colors": [
+      "#8D6E63",
+      "#FFCC80"
+    ],
+    "extensions": [
+      "atr",
+      "atx",
+      "bin",
+      "car",
+      "cas",
+      "cdm",
+      "com",
+      "rom",
+      "xex",
+      "xfd",
+      "zip",
+      "7z"
+    ]
+  },
+  "emulators": [
+    {
+      "name": "RetroArch64 atari800",
+      "unique_id": "atari800.ra64.atari800",
+      "description": "Supported extensions: atr, atx, bin, car, cas, cdm, com, rom, xex, xfd, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"atari800\""
+        }
+      },
+      "default_core": true
+    },
+    {
+      "name": "RetroArch32 atari800",
+      "unique_id": "atari800.ra32.atari800",
+      "description": "Supported extensions: atr, atx, bin, car, cas, cdm, com, rom, xex, xfd, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"atari800\""
+        }
+      },
+      "default_core": true
+    },
+    {
+      "name": "RetroArch atari800",
+      "unique_id": "atari800.ra.atari800",
+      "description": "Supported extensions: atr, atx, bin, car, cas, cdm, com, rom, xex, xfd, zip.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture --es ROM \"{file.path}\" --es LIBRETRO \"atari800\""
+        },
+        "windows": {
+          "executable": "retroarch.exe",
+          "args": "-L atari800_libretro.dll \"{file.path}\""
+        },
+        "linux": {
+          "executable": "retroarch",
+          "flatpak": "org.libretro.RetroArch",
+          "emudeck_launcher": "retroarch.sh",
+          "args": "-L atari800_libretro.so \"{file.path}\""
+        },
+        "macos": {
+          "executable": "RetroArch.App",
+          "args": "-L atari800_libretro.dylib \"{file.path}\""
+        }
+      },
+      "default_core": true
+    }
+  ],
+  "neosync": {
+    "sync": true,
+    "android_sync_folder": [
+      "{SYNC_DIR}"
+    ],
+    "windows_sync_folder": [
+      "{SYNC_DIR}"
+    ],
+    "linux_sync_folder": [
+      "{SYNC_DIR}"
+    ],
+    "macos_sync_folder": [
+      "{SYNC_DIR}"
+    ]
+  }
+}

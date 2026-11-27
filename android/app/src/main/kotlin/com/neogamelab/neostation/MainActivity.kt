@@ -18,6 +18,7 @@ import android.provider.Settings
 import androidx.core.view.WindowCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import org.flame_engine.gamepads_android.EventListener
 import org.flame_engine.gamepads_android.GamepadsCompatibleActivity
 import android.os.Looper
 import java.lang.Runnable
@@ -34,15 +35,28 @@ import com.hcoderlee.subscreen.sub_screen.SharedStateManager
 import androidx.core.content.FileProvider
 
 class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
+    companion object {
+        @Volatile
+        private var current: java.lang.ref.WeakReference<MainActivity>? = null
+
+        /** The live instance, for [SecondaryDisplayActivity] and [BottomScreenEngine]. */
+        val instance: MainActivity?
+            get() = current?.get()?.takeUnless { it.isFinishing || it.isDestroyed }
+    }
+
     private val CHANNEL = "com.neogamelab.neostation/game"
     // Max size the dock/picker renders an app icon at; icons are rasterized to
     // this (in px) before encoding so we don't ship/decode full-res drawables.
     private val ICON_TARGET_DP = 56f
     private val LAUNCHER_CHANNEL = "com.neogamelab.neostation/launcher"
-    // How long a dock-launched app gets to reach the bottom display before the
-    // Now Playing panel comes back. Generous: a cold app start on this hardware
-    // can take seconds, and coming back early is the bug this guards against.
-    private val DOCK_LAUNCH_TIMEOUT_MS = 10_000L
+    // Focus/resume edges this soon after a game launch on the other screen are
+    // the handoff, not the user returning (same 5 s as onGameReturned uses).
+    private val OTHER_DISPLAY_HANDOFF_MS = 5_000L
+    // onUserLeaveHint runs while the activity pauses for a launch it just
+    // made, well inside this window.
+    private val OUTBOUND_LAUNCH_GRACE_MS = 2_000L
+    // When focusMainUi checks again that the main UI got focus (see there).
+    private val FOCUS_RETRY_DELAYS_MS = longArrayOf(200L, 600L, 1_500L)
     var keyListener: ((KeyEvent) -> Boolean)? = null
     var motionListener: ((MotionEvent) -> Boolean)? = null
     // A launched game still owns the foreground: set when Flutter starts a
@@ -50,6 +64,23 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     // Flutter ends the session. Drives the session bookkeeping below — it must
     // NOT expire on its own, or a session outlives the flag that describes it.
     private var isGameActive = false
+    // The running game was launched on the screen this activity is not on, so
+    // this activity stays resumed under it and onPause/onResume never bracket
+    // the session. See startGameOnOtherDisplay.
+    private var gameOnOtherDisplay = false
+    // That game covers the bottom-screen activity, whose return to the front is
+    // then the exact "game closed" signal. False when the bottom screen is a
+    // Presentation (Android 9 and older) or hidden, which fall back to this
+    // activity regaining focus.
+    private var bottomScreenTracksGame = false
+    // The bottom screen was sent behind the device's own bottom launcher because
+    // the user left NeoStation with Home; brought back on resume.
+    private var bottomScreenHiddenForHome = false
+    // The main UI is drawn on the bottom screen and the secondary UI on the top
+    // one (General settings > Swap screens). Read from the database before the
+    // bottom screen starts, then driven by Flutter.
+    var screensSwapped = false
+        private set
     // Gamepad input is swallowed so a stray press during the handoff to the
     // emulator can't leak into the UI behind it. Unlike [isGameActive] this is
     // deliberately short-lived and self-expiring, so a launch that never hands
@@ -65,14 +96,18 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     // never receives Android lifecycle callbacks, so its live SESSION timer can
     // freeze while the device sleeps instead of counting phantom play time.
     private var screenStateReceiver: android.content.BroadcastReceiver? = null
-    // True while the Now Playing presentation is hidden to reveal a dock-launched
-    // app on the secondary display; restored when that app is dismissed.
+    // Android 9 and older: true while the Now Playing presentation is hidden to
+    // reveal an app or game launched on the secondary display.
     private var presentationHiddenForApp = false
-    // Brings the panel back if a dock launch never puts its app on the bottom
-    // display (a silently failed launch), so the panel can't stay hidden. One
-    // handler instance: removeCallbacks only matches the handler that posted.
-    private val dockLaunchHandler = Handler(Looper.getMainLooper())
-    private var dockLaunchWatchdog: Runnable? = null
+    // True while the bottom-screen presentation is hidden because the user left
+    // NeoStation with Home/Recents. A Presentation is a window of its own and
+    // outlives the activity going to the background, so without this the
+    // panel stays drawn over the device launcher's bottom screen.
+    private var presentationHiddenForHome = false
+    // Uptime of the last activity this one started (games, apps, settings,
+    // pickers). onUserLeaveHint also fires for those, and they must keep the
+    // bottom screen (Now Playing) instead of being mistaken for Home.
+    private var lastOutboundLaunchAt = 0L
 
     // Usar directorio por defecto para cores; no verificar existencia por permisos
     private fun getDefaultLibretroDirectory(retroArchPackage: String): String {
@@ -88,6 +123,59 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         // so the bottom-screen app dock can list/launch Android apps directly
         // (the secondary engine can't reach the main "/game" channel).
         return SecondaryAppsPresentation(this, display, getSubScreenEntryPoint())
+    }
+
+    /**
+     * Android 10+ puts the bottom screen in [SecondaryDisplayActivity]; older
+     * versions keep the plugin's Presentation. See that class for why.
+     */
+    override fun launchSubScreen(display: Display) {
+        if (!SecondaryDisplayActivity.isSupported) {
+            super.launchSubScreen(display)
+            return
+        }
+        if (isSecondaryDisplayHiddenInDb()) {
+            setSecondaryHomeEnabled(false)
+            return
+        }
+        startBottomScreen(display)
+    }
+
+    /** Starts (or brings back) the bottom-screen activity on [display]. */
+    private fun startBottomScreen(display: Display) {
+        setSecondaryHomeEnabled(true)
+        val existing = SecondaryDisplayActivity.instance
+        if (existing != null && existing.displayId == display.displayId) return
+        try {
+            val intent = Intent(this, SecondaryDisplayActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val options = android.app.ActivityOptions.makeBasic()
+                .setLaunchDisplayId(display.displayId)
+            startActivity(intent, options.toBundle())
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Cannot start the bottom screen: ${e.message}")
+        }
+    }
+
+    /**
+     * Turns the bottom screen's SECONDARY_HOME entry on or off. With NeoStation
+     * as the default launcher Android then shows the bottom screen as that
+     * display's home (at boot, and on Home pressed there) instead of the
+     * device's own bottom launcher. Off while the user hides the bottom screen,
+     * so Android does not bring it back on its own.
+     */
+    private fun setSecondaryHomeEnabled(enabled: Boolean) {
+        if (!SecondaryDisplayActivity.isSupported) return
+        try {
+            // Class names keep the namespace while flavors suffix the package.
+            val component = ComponentName(this, "${SecondaryDisplayActivity::class.java.`package`!!.name}.SecondaryHome")
+            val state = if (enabled) PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+            else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            if (packageManager.getComponentEnabledSetting(component) == state) return
+            packageManager.setComponentEnabledSetting(component, state, PackageManager.DONT_KILL_APP)
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "SECONDARY_HOME toggle failed: ${e.message}")
+        }
     }
 
     override fun onLaunchSubScreen(display: Display) {
@@ -108,6 +196,26 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             File(customPath)
         } else {
             File(getExternalFilesDir(null), "user-data")
+        }
+    }
+
+    /** `user_config.swap_screens`; false when the column or database is missing. */
+    private fun areScreensSwappedInDb(): Boolean {
+        return try {
+            val dbFile = File(getUserDataDir(), "data.sqlite")
+            if (!dbFile.exists()) return false
+            val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+                dbFile.absolutePath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+            )
+            try {
+                db.rawQuery("SELECT swap_screens FROM user_config WHERE id = 1", null).use {
+                    it.moveToFirst() && it.getInt(0) == 1
+                }
+            } finally {
+                db.close()
+            }
+        } catch (e: Exception) {
+            false
         }
     }
 
@@ -137,6 +245,8 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         // playing" from before the quit. Clear it before super.onCreate launches
         // the sub screen, so the stale Now Playing panel never renders.
         clearStaleSecondaryNowPlaying()
+        current = java.lang.ref.WeakReference(this)
+        screensSwapped = SecondaryDisplayActivity.isSupported && areScreensSwappedInDb()
         super.onCreate(savedInstanceState)
 
         // Keep Android's soft-input resize contract intact.  With decor fitting
@@ -224,6 +334,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     private fun notifySecondaryScreenState(on: Boolean) {
         try {
             (subScreenPresentation as? SecondaryAppsPresentation)?.notifyScreenState(on)
+            BottomScreenEngine.notifyScreenState(on)
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "notifySecondaryScreenState: ${e.message}")
         }
@@ -249,12 +360,11 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     }
 
     override fun onDestroy() {
+        // Give the main engine back to this activity's view before it goes, so
+        // a swapped bottom screen never keeps drawing a destroyed engine.
+        SecondaryDisplayActivity.instance?.screenView()?.let { onBottomScreenClosing(SecondaryDisplayActivity.instance!!, it) }
         super.onDestroy()
-        // The watch callback and the watchdog both capture this activity; a
-        // stale one would try to restore a presentation that died with it.
-        ScreenshotAccessibilityService.stopWatch()
-        dockLaunchWatchdog?.let { dockLaunchHandler.removeCallbacks(it) }
-        dockLaunchWatchdog = null
+        if (current?.get() === this) current = null
         displayListener?.let {
             val dm = getSystemService(android.content.Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
             dm.unregisterDisplayListener(it)
@@ -269,12 +379,66 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         screenStateReceiver = null
     }
 
+    /**
+     * Why the previous process of this app ended, as Android recorded it
+     * (API 30+), or null when it can't say.
+     *
+     * A native crash or a low-memory kill leaves nothing in app.log, so the
+     * Dart side logs this on startup. Only an ANR trace is text; a native
+     * crash's trace is a binary tombstone and is left out.
+     */
+    private fun lastExitInfo(): Map<String, Any?>? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        return try {
+            val am = getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val info = am.getHistoricalProcessExitReasons(packageName, 0, 1).firstOrNull()
+                ?: return null
+            val reason = when (info.reason) {
+                android.app.ApplicationExitInfo.REASON_ANR -> "ANR"
+                android.app.ApplicationExitInfo.REASON_CRASH -> "CRASH"
+                android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "CRASH_NATIVE"
+                android.app.ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "DEPENDENCY_DIED"
+                android.app.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "EXCESSIVE_RESOURCE_USAGE"
+                android.app.ApplicationExitInfo.REASON_EXIT_SELF -> "EXIT_SELF"
+                android.app.ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> "INITIALIZATION_FAILURE"
+                android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
+                android.app.ApplicationExitInfo.REASON_OTHER -> "OTHER"
+                android.app.ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "PERMISSION_CHANGE"
+                android.app.ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
+                android.app.ApplicationExitInfo.REASON_USER_REQUESTED -> "USER_REQUESTED"
+                android.app.ApplicationExitInfo.REASON_USER_STOPPED -> "USER_STOPPED"
+                else -> "UNKNOWN(${info.reason})"
+            }
+            var trace: String? = null
+            if (info.reason == android.app.ApplicationExitInfo.REASON_ANR) {
+                trace = info.traceInputStream?.bufferedReader()?.use { reader ->
+                    reader.lineSequence().take(60).joinToString("\n")
+                }
+            }
+            mapOf(
+                "reason" to reason,
+                "timestamp" to info.timestamp,
+                "description" to info.description,
+                "status" to info.status,
+                "pssKb" to info.pss,
+                "trace" to trace,
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel?.setMethodCallHandler {
             call, result ->
             when (call.method) {
+                "syncDeviceScreenState" -> {
+                    val power = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+                    notifyFlutterScreenState(power.isInteractive)
+                    result.success(null)
+                }
                 "launchGenericIntent" -> {
                     val packageName = call.argument<String>("package")
                     val activityName = call.argument<String>("activity")
@@ -285,9 +449,12 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                     val extras = call.argument<List<Map<String, Any>>>("extras")
                     val activityFlags = call.argument<List<String>>("activity_flags") ?: emptyList()
                     val keepSafUri = call.argument<Boolean>("keep_saf_uri") ?: false
+                    // "primary", "secondary" or null (no preference: Android's
+                    // default, which is the screen NeoStation is on).
+                    val launchDisplay = call.argument<String>("launch_display")
 
                     if (packageName != null) {
-                        launchGenericIntent(packageName, activityName, action, category, data, type, extras, activityFlags, keepSafUri, result)
+                        launchGenericIntent(packageName, activityName, action, category, data, type, extras, activityFlags, keepSafUri, launchDisplay, result)
                     } else {
                         result.error("INVALID_ARGUMENTS", "Package name is required", null)
                     }
@@ -320,8 +487,9 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                 "isCoreInstalled" -> {
                     val packageName = call.argument<String>("packageName")
                     val coreFilename = call.argument<String>("coreFilename")
+                    val forceRefresh = call.argument<Boolean>("forceRefresh") ?: false
                     if (packageName != null && coreFilename != null) {
-                        isCoreInstalled(packageName, coreFilename, result)
+                        isCoreInstalled(packageName, coreFilename, forceRefresh, result)
                     } else {
                         result.error("INVALID_ARGUMENTS", "packageName and coreFilename are required", null)
                     }
@@ -347,6 +515,9 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                         result.error("INVALID_ARGUMENTS", "Package name is required", null)
                     }
                 }
+                "getLastExitInfo" -> {
+                    result.success(lastExitInfo())
+                }
                 "isTelevision" -> {
                     val uiModeManager = getSystemService(android.content.Context.UI_MODE_SERVICE) as android.app.UiModeManager
                     result.success(uiModeManager.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION)
@@ -361,6 +532,14 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                     val uriString = call.argument<String>("uri")
                     if (uriString != null) {
                         hasSafPermission(uriString, result)
+                    } else {
+                        result.error("INVALID_ARGUMENTS", "URI is required", null)
+                    }
+                }
+                "releasePermission" -> {
+                    val uriString = call.argument<String>("uri")
+                    if (uriString != null) {
+                        releaseSafPermission(uriString, result)
                     } else {
                         result.error("INVALID_ARGUMENTS", "URI is required", null)
                     }
@@ -522,20 +701,6 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                 "startSecondaryDisplay" -> {
                     result.success(true)
                 }
-                "isScreenshotAccessEnabled" -> {
-                    result.success(isScreenshotAccessEnabled())
-                }
-                "openScreenshotAccessSettings" -> {
-                    openScreenshotAccessSettings()
-                    result.success(true)
-                }
-                "takeSystemScreenshot" -> {
-                    if (!isScreenshotAccessEnabled()) {
-                        result.success(false)
-                    } else {
-                        result.success(ScreenshotAccessibilityService.takeScreenshot())
-                    }
-                }
                 "installApk" -> {
                     val filePath = call.argument<String>("filePath")
                     if (filePath != null) {
@@ -577,17 +742,14 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                     setSecondaryDisplayVisible(visible)
                     result.success(true)
                 }
+                "setScreensSwapped" -> {
+                    setScreensSwapped(call.argument<Boolean>("swapped") ?: false)
+                    result.success(SecondaryDisplayActivity.isSupported)
+                }
+                "isScreenSwapSupported" -> {
+                    result.success(SecondaryDisplayActivity.isSupported)
+                }
                 else -> result.notImplemented()
-            }
-        }
-
-        // When the accessibility service connects (user just enabled it), notify
-        // the main engine so it re-pushes the screenshot/return state to the
-        // secondary display — even while a game keeps the main engine
-        // backgrounded. Hop to the UI thread: onServiceConnected runs off it.
-        ScreenshotAccessibilityService.onConnected = {
-            runOnUiThread {
-                secondaryDisplayChannel?.invokeMethod("onAccessibilityConnected", null)
             }
         }
 
@@ -642,6 +804,16 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     }
 
     private fun setSecondaryDisplayVisible(visible: Boolean) {
+        if (SecondaryDisplayActivity.isSupported) {
+            if (visible) {
+                val dm = getSystemService(android.content.Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
+                dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }?.let { startBottomScreen(it) }
+            } else {
+                setSecondaryHomeEnabled(false)
+                SecondaryDisplayActivity.instance?.close()
+            }
+            return
+        }
         if (visible) {
             // A presentation that was dismissed behind our back (its engine is
             // already destroyed) still sits in subScreenPresentation, and a
@@ -649,7 +821,7 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             // bottom screen dead until the whole app is restarted. Anything
             // that is no longer showing, and isn't merely hidden to reveal a
             // dock-launched app, is dead: drop it so the branch below rebuilds.
-            if (subScreenPresentation?.isShowing == false && !presentationHiddenForApp) {
+            if (subScreenPresentation?.isShowing == false && !presentationHiddenForApp && !presentationHiddenForHome) {
                 onCloseSubScreen()
             }
             if (subScreenPresentation == null) {
@@ -694,75 +866,6 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         }
     }
 
-    /** True when the user has enabled our screenshot accessibility service. */
-    private fun isScreenshotAccessEnabled(): Boolean {
-        // A connected service is the most reliable signal; fall back to the
-        // settings list in case the static reference isn't bound yet.
-        if (ScreenshotAccessibilityService.isConnected) return true
-        val enabled = android.provider.Settings.Secure.getString(
-            contentResolver,
-            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
-        // Build the component via ComponentName so the class keeps its real
-        // namespace (com.neogamelab.neostation.*) while the package picks up the
-        // flavor's applicationId suffix (.dev/.featuretest). A hand-built
-        // "$packageName/$packageName.Foo" string gets the class package wrong on
-        // suffixed flavors and never matches.
-        val component = android.content.ComponentName(
-            this,
-            ScreenshotAccessibilityService::class.java,
-        ).flattenToString()
-        return enabled.split(':').any { it.equals(component, ignoreCase = true) }
-    }
-
-    /**
-     * Opens accessibility settings so the user can grant access. Deep-links
-     * straight to NeoStation's own service page (ACTION_ACCESSIBILITY_DETAILS_SETTINGS)
-     * so the user only has to flip one toggle + confirm, rather than hunting for
-     * NeoStation in the full list. Falls back to the general list if the details
-     * screen isn't available.
-     */
-    internal fun openScreenshotAccessSettings() {
-        val component = android.content.ComponentName(
-            this,
-            ScreenshotAccessibilityService::class.java,
-        ).flattenToString()
-
-        // Details page (API 30+): lands directly on our service's toggle.
-        try {
-            // Literal action string ("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
-            // rather than the Settings constant, which isn't exposed on all
-            // compile SDKs.
-            val intent = android.content.Intent(
-                "android.settings.ACCESSIBILITY_DETAILS_SETTINGS"
-            )
-            // The Settings details screen reads the target component from these
-            // fragment-arg extras.
-            val args = android.os.Bundle().apply {
-                putString(":settings:fragment_args_key", component)
-            }
-            intent.putExtra(":settings:fragment_args_key", component)
-            intent.putExtra(":settings:show_fragment_args", args)
-            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
-            return
-        } catch (e: Exception) {
-            android.util.Log.w(
-                "MainActivity",
-                "Accessibility details screen unavailable, falling back: ${e.message}",
-            )
-        }
-
-        // Fallback: the general accessibility list.
-        try {
-            val intent = android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Cannot open accessibility settings: ${e.message}")
-        }
-    }
-
     private fun isPackageInstalled(packageName: String, result: MethodChannel.Result) {
         try {
             // Try to get package info
@@ -782,57 +885,29 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     }
 
     /**
-     * Determines whether a specific RetroArch libretro core (.so) is actually present,
-     * as opposed to merely having the RetroArch app installed. RetroArch stores its
-     * cores in its own private data dir ({dataDir}/cores/), which this app's sandbox
-     * usually cannot read — so a plain File.exists() from here returns false even when
-     * the core IS installed. We therefore return a TRI-STATE:
-     *   true  = core file positively confirmed present
-     *   false = core file positively confirmed absent (cores dir was readable, or root)
-     *   null  = could not determine (dir unreadable and no root) → caller must fail OPEN
-     * This lets the Ready badge stay accurate where we can tell, without hiding genuinely
-     * installed cores on non-rooted devices. See issue #192.
+     * Tri-state core check used by the Ready badge and by the pre-launch guard:
+     *   true  = core positively confirmed present
+     *   false = core positively confirmed absent
+     *   null  = could not determine → callers must fail open
+     *
+     * The filesystem probe only works when RetroArch's private cores directory
+     * is readable; otherwise [RetroArchCoreChecker] queries RetroArch's exported
+     * InstalledCoresReceiver. Versions without that receiver (1.22.x releases)
+     * answer null, preserving the old behaviour.
      */
-    private fun isCoreInstalled(retroArchPackage: String, coreFilename: String, result: MethodChannel.Result) {
-        try {
-            val coresDir = try {
-                val appInfo = packageManager.getApplicationInfo(retroArchPackage, 0)
-                "${appInfo.dataDir}/cores/"
-            } catch (e: Exception) {
-                "/data/user/0/$retroArchPackage/cores/"
-            }
-            // The DB stores core_filename as the bare base (e.g. "ppsspp"); the actual
-            // Android core is "<base>_libretro_android.so". Probe both the reconstructed
-            // name and the raw value in case a full filename was ever stored.
-            val base = coreFilename
-                .removeSuffix("_libretro_android.so")
-                .removeSuffix("_libretro.so")
-            val candidates = linkedSetOf(
-                "${base}_libretro_android.so",
-                coreFilename,
-            )
-
-            // 1. Direct filesystem check. Trustworthy only if we can actually read the
-            //    cores directory (usually we can't — it's RetroArch's private 0700 dir).
-            if (candidates.any { java.io.File(coresDir, it).exists() }) {
-                result.success(true)
-                return
-            }
-            val dir = java.io.File(coresDir)
-            if (dir.exists() && dir.canRead()) {
-                // Directory readable and none of the candidates were in it → absent.
-                result.success(false)
-                return
-            }
-
-            // 2. Directory unreadable from our sandbox (RetroArch's private 0700 dir).
-            //    We deliberately do NOT escalate to `su` here — requesting root would
-            //    pop a Superuser prompt on rooted devices at game-launch time. Report
-            //    unknown (null) → the caller fails open (treats the core as installed),
-            //    which matches non-rooted/production behavior.
-            result.success(null)
-        } catch (e: Exception) {
-            result.success(null)
+    private fun isCoreInstalled(
+        retroArchPackage: String,
+        coreFilename: String,
+        forceRefresh: Boolean,
+        result: MethodChannel.Result
+    ) {
+        RetroArchCoreChecker.check(
+            context = this,
+            packageName = retroArchPackage,
+            coreFilename = coreFilename,
+            forceRefresh = forceRefresh
+        ) { installed ->
+            result.success(installed)
         }
     }
 
@@ -885,8 +960,25 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         extras: List<Map<String, Any>>?,
         activityFlags: List<String>,
         keepSafUri: Boolean,
+        launchDisplay: String?,
         result: MethodChannel.Result
     ) {
+        val targetDisplayId = resolveGameLaunchDisplay(launchDisplay)
+        val ownDisplayId = window?.decorView?.display?.displayId ?: Display.DEFAULT_DISPLAY
+        val onOtherScreen = targetDisplayId != null && targetDisplayId != ownDisplayId
+
+        // Wraps the result so the other-screen bookkeeping only starts once the
+        // launch actually went through; a failed launch leaves nothing armed.
+        val wrapped = if (!onOtherScreen) result else object : MethodChannel.Result {
+            override fun success(value: Any?) {
+                if (value == true) startGameOnOtherDisplay(targetDisplayId)
+                result.success(value)
+            }
+            override fun error(code: String, message: String?, details: Any?) =
+                result.error(code, message, details)
+            override fun notImplemented() = result.notImplemented()
+        }
+
         EmulatorLauncher.launchGenericIntent(
             context = this,
             packageName = packageName,
@@ -898,11 +990,341 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             extras = extras,
             activityFlags = activityFlags,
             keepSafUri = keepSafUri,
-            result = result
+            result = wrapped,
+            launchDisplayId = targetDisplayId
         )
     }
 
+    /**
+     * Maps the per-system/per-game screen setting to a display id.
+     *
+     * "primary" is the default display (the top screen on the AYN Thor) and
+     * "secondary" the first other display, the same rule the app dock uses.
+     *
+     * With no preference, a game opens where the main UI is: with Swap screens
+     * on that is the bottom screen, so the game takes the main UI's place, as
+     * it does without the swap, instead of covering Now Playing and the dock
+     * on the top one. Otherwise null: launch where Android would, as before
+     * the setting existed, so single-screen handhelds never get a launch
+     * display forced on them.
+     */
+    private fun resolveGameLaunchDisplay(launchDisplay: String?): Int? {
+        if (launchDisplay == null) {
+            if (!mainUiOnBottom()) return null
+            return SecondaryDisplayActivity.instance?.displayId?.takeIf { it >= 0 }
+        }
+        val dm = getSystemService(android.content.Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
+        val secondary = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY } ?: return null
+        return when (launchDisplay) {
+            "primary" -> Display.DEFAULT_DISPLAY
+            "secondary" -> secondary.displayId
+            else -> null
+        }
+    }
 
+    /**
+     * Session bookkeeping for a game launched on the screen this activity is
+     * not on. That game never covers this activity, so Android does not pause
+     * it and the usual onPause/onResume pair never brackets the session.
+     *
+     * When the bottom-screen activity is on that display the game covers it
+     * instead, and its coming back to the front ([onBottomScreenResumed]) ends
+     * the session: exact, and the user tapping NeoStation mid-game no longer
+     * ends it. Flutter is told so it ignores its own focus edges meanwhile.
+     * Without that activity (Android 9 and older, or the bottom screen hidden)
+     * the session ends when this activity gets focus back.
+     */
+    private fun startGameOnOtherDisplay(displayId: Int) {
+        gameOnOtherDisplay = true
+        gameLaunchTimestamp = System.currentTimeMillis()
+        bottomScreenTracksGame = SecondaryDisplayActivity.instance?.displayId == displayId
+        if (bottomScreenTracksGame) {
+            methodChannel?.invokeMethod("onGameOnOtherScreen", null)
+        } else if (subScreenPresentation?.isShowing == true &&
+            subScreenPresentation?.display?.displayId == displayId
+        ) {
+            // Android 9 and older: the Presentation layers above the game.
+            hideSecondaryForApp()
+        }
+    }
+
+    /**
+     * Ends a session started by [startGameOnOtherDisplay]. Idempotent.
+     *
+     * Focus and resume edges in the first seconds after a launch are the
+     * handoff itself (an emulator's splash or a permission prompt can bounce
+     * focus), not the user coming back, so they are ignored unless [exact]: the
+     * bottom screen only comes back once the game has actually closed.
+     */
+    private fun finishGameOnOtherDisplay(exact: Boolean = false) {
+        if (!gameOnOtherDisplay) return
+        if (!exact && gameLaunchTimestamp > 0L &&
+            System.currentTimeMillis() - gameLaunchTimestamp < OTHER_DISPLAY_HANDOFF_MS
+        ) return
+        gameOnOtherDisplay = false
+        bottomScreenTracksGame = false
+        restoreSecondaryAfterApp()
+        reportGameReturned()
+    }
+
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        isTopResumed = isTopResumedActivity
+        applyOwnFocusRole()
+        if (!isTopResumedActivity) return
+        // Swapped, this window shows the secondary UI: same stranded case as
+        // the bottom screen's in onBottomScreenTopResumed.
+        if (mainUiOnBottom() && isMainUiCovered()) {
+            android.util.Log.i("MainActivity", "focus on the secondary UI while the main UI is covered")
+            BottomScreenEngine.showControllerHint()
+        }
+        // Focus coming back while a game runs on the other screen means the
+        // user is back in NeoStation (or the game closed) — unless the bottom
+        // screen tracks that game, which reports the close exactly.
+        if (gameOnOtherDisplay && !bottomScreenTracksGame) {
+            finishGameOnOtherDisplay()
+        }
+        // Swapped, the main UI and so the gamepad live on the bottom screen.
+        if (screensSwapped) focusMainUi("top resumed while swapped")
+    }
+
+    // --- Bottom-screen activity (Android 10+) ---
+
+    /** The bottom screen just created its view: apply the swap and focus roles. */
+    internal fun onBottomScreenReady(bottom: SecondaryDisplayActivity) {
+        applyScreenSwap()
+        if (!screensSwapped) focusMainUi("bottom screen ready")
+    }
+
+    /**
+     * The bottom screen is in front again. If something covered it, that app or
+     * game has just closed: end a game session it was tracking.
+     */
+    internal fun onBottomScreenResumed(bottom: SecondaryDisplayActivity, wasCovered: Boolean) {
+        if (wasCovered && gameOnOtherDisplay && bottomScreenTracksGame) {
+            finishGameOnOtherDisplay(exact = true)
+        }
+    }
+
+    /**
+     * Android made the bottom screen the focused one (it started, or an app
+     * on it closed). Hand focus back to this activity unless the screens are
+     * swapped, or the gamepad would stay on the bottom screen.
+     */
+    internal fun onBottomScreenTopResumed(bottom: SecondaryDisplayActivity) {
+        if (!mainUiOnBottom() && isMainUiCovered()) {
+            // A dock app closed while a game covers the top screen: Android
+            // left focus here, and NeoStation cannot give it to the game.
+            android.util.Log.i("MainActivity", "focus on the secondary UI while the main UI is covered")
+            BottomScreenEngine.showControllerHint()
+            return
+        }
+        if (!screensSwapped && !isTopCovered) focusMainUi("bottom screen top resumed")
+    }
+
+    /** The bottom screen is going away: take the main engine back if it had it. */
+    internal fun onBottomScreenClosing(bottom: SecondaryDisplayActivity, bottomView: io.flutter.embedding.android.FlutterView) {
+        val mainEngine = flutterEngine ?: return
+        if (bottomView.attachedFlutterEngine !== mainEngine) return
+        val topView = findFlutterView(window.decorView) ?: return
+        bottomView.detachFromFlutterEngine()
+        topView.detachFromFlutterEngine()
+        topView.attachToFlutterEngine(mainEngine)
+        applyOwnFocusRole()
+    }
+
+    /** The bottom screen was covered or uncovered (a game or app on its display). */
+    internal fun onBottomScreenCoveredChanged() {
+        applyOwnFocusRole()
+    }
+
+    // This activity is behind another app on its own display (a game, a
+    // dock app or Settings), so it must not pull itself to the front.
+    private var isTopCovered = false
+
+    // This activity is Android's top resumed one, which means its display is
+    // the focused one and gets the gamepad's keys.
+    private var isTopResumed = false
+
+    /** The main UI's engine, for the bottom screen's focus role. */
+    internal val mainEngine: io.flutter.embedding.engine.FlutterEngine?
+        get() = flutterEngine
+
+    /** Whether the main UI is drawn on the bottom screen (screens swapped). */
+    private fun mainUiOnBottom(): Boolean {
+        val engine = flutterEngine ?: return false
+        return SecondaryDisplayActivity.instance?.screenView()?.attachedFlutterEngine === engine
+    }
+
+    /** A game or app covers the screen showing the main UI: the gamepad is its. */
+    internal fun isMainUiCovered(): Boolean =
+        if (mainUiOnBottom()) SecondaryDisplayActivity.instance?.isCovered == true else isTopCovered
+
+    /**
+     * A key reached the window showing the secondary UI, because Android made
+     * its display the focused one (it started, an app on it closed, or it was
+     * tapped). It drives the main UI exactly as if it had reached that window,
+     * and focus is handed back. True when consumed.
+     *
+     * This is what keeps a gamepad press from hanging NeoStation: a window
+     * that cannot take focus on the focused display leaves the key with no
+     * target, and Android reports the app as not responding after 5 s.
+     */
+    internal fun dispatchKeyFromSecondaryUi(event: KeyEvent): Boolean {
+        if (isMainUiCovered()) {
+            // The main UI is behind a game or app: driving it would move a
+            // screen nobody sees. Drop the key and point at the game's screen.
+            if (EventListener.isSystemKey(event.keyCode)) return false
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                BottomScreenEngine.showControllerHint()
+            }
+            return true
+        }
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            handBackFocus("key on the secondary UI")
+        }
+        if (handleGamepadKey(event)) return true
+        // Volume keys: the window that got them applies them.
+        if (EventListener.isSystemKey(event.keyCode)) return false
+        return mainUiWindow()?.superDispatchKeyEvent(event) ?: false
+    }
+
+    /** Motion counterpart of [dispatchKeyFromSecondaryUi]. */
+    internal fun dispatchMotionFromSecondaryUi(event: MotionEvent): Boolean {
+        if (isMainUiCovered()) return true
+        if (handleGamepadMotion(event)) return true
+        return mainUiWindow()?.superDispatchGenericMotionEvent(event) ?: false
+    }
+
+    private fun mainUiWindow(): android.view.Window? =
+        if (mainUiOnBottom()) SecondaryDisplayActivity.instance?.window else window
+
+    /** The secondary UI's window got focus: give it back to the main UI's screen. */
+    internal fun onSecondaryUiFocused() {
+        handBackFocus("secondary UI focused")
+    }
+
+    private fun handBackFocus(reason: String) {
+        val mainUiTopResumed =
+            if (mainUiOnBottom()) SecondaryDisplayActivity.instance?.isTopResumed == true else isTopResumed
+        if (!mainUiTopResumed) focusMainUi(reason)
+    }
+
+    private val focusRetryHandler = Handler(Looper.getMainLooper())
+    private var focusRetry: Runnable? = null
+
+    /**
+     * Gives the focused display back to the screen showing the main UI (the
+     * top one, or the bottom one while swapped), so the gamepad's keys and the
+     * keyboard go there.
+     *
+     * Best effort: the window showing the secondary UI forwards keys to the
+     * main UI anyway ([dispatchKeyFromSecondaryUi]), so a missed handoff no
+     * longer hangs the app. Some firmware (seen on the AYN Thor) keeps focus
+     * on the bottom display after the first [focusTaskOf], so it is checked
+     * again shortly after and retried. The check is whether the main UI's
+     * activity is the top resumed one: [hasWindowFocus] is per display and
+     * stays true on a display that is not the focused one. Nothing runs while
+     * a game or app covers either screen, since it owns the gamepad then.
+     */
+    private fun focusMainUi(reason: String) {
+        if (gameOnOtherDisplay || isMainUiCovered()) return
+        focusTaskOf(mainUiActivity() ?: return)
+        focusRetry?.let { focusRetryHandler.removeCallbacks(it) }
+        var attempt = 0
+        val retry = object : Runnable {
+            override fun run() {
+                val bottom = SecondaryDisplayActivity.instance
+                val onBottom = mainUiOnBottom()
+                val wanted = mainUiActivity() ?: return
+                if (if (onBottom) bottom?.isTopResumed == true else isTopResumed) return
+                if (isTopCovered || bottom?.isCovered == true || gameOnOtherDisplay) return
+                attempt++
+                android.util.Log.i(
+                    "MainActivity",
+                    "focus not on the main UI after $reason, retry $attempt"
+                )
+                focusTaskOf(wanted)
+                if (attempt < FOCUS_RETRY_DELAYS_MS.size) {
+                    focusRetryHandler.postDelayed(this, FOCUS_RETRY_DELAYS_MS[attempt])
+                }
+            }
+        }
+        focusRetry = retry
+        focusRetryHandler.postDelayed(retry, FOCUS_RETRY_DELAYS_MS[0])
+    }
+
+    private fun mainUiActivity(): android.app.Activity? =
+        if (mainUiOnBottom()) SecondaryDisplayActivity.instance else this
+
+    /**
+     * Brings [activity]'s task to the front of its display, which also makes
+     * that display the focused one. moveTaskToFront does not deliver a new
+     * intent, so the activity is not paused and resumed on the way.
+     */
+    private fun focusTaskOf(activity: android.app.Activity) {
+        try {
+            val am = getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            am.moveTaskToFront(activity.taskId, 0)
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "moveTaskToFront failed: ${e.message}")
+        }
+    }
+
+    // --- Screen swap ---
+
+    private fun setScreensSwapped(swapped: Boolean) {
+        if (!SecondaryDisplayActivity.isSupported) return
+        if (screensSwapped == swapped) return
+        screensSwapped = swapped
+        applyScreenSwap()
+        val bottom = SecondaryDisplayActivity.instance
+        if (bottom != null) focusMainUi(if (swapped) "swap on" else "swap off")
+    }
+
+    /**
+     * Shows the main UI on the bottom screen and the secondary UI on the top one
+     * (or back), by trading the two Flutter engines between the two views. The
+     * engines, and so all their state, keep running: only where they draw
+     * changes. Focus follows the main UI, since that is what the gamepad drives
+     * and where text fields need the keyboard.
+     */
+    private fun applyScreenSwap() {
+        val bottom = SecondaryDisplayActivity.instance ?: return
+        val bottomView = bottom.screenView() ?: return
+        val topView = findFlutterView(window.decorView) ?: return
+        val mainEngine = flutterEngine ?: return
+        val subEngine = BottomScreenEngine.current ?: return
+        val wantBottom = if (screensSwapped) mainEngine else subEngine
+        val wantTop = if (screensSwapped) subEngine else mainEngine
+        if (bottomView.attachedFlutterEngine !== wantBottom || topView.attachedFlutterEngine !== wantTop) {
+            bottomView.detachFromFlutterEngine()
+            topView.detachFromFlutterEngine()
+            topView.attachToFlutterEngine(wantTop)
+            bottomView.attachToFlutterEngine(wantBottom)
+            subEngine.lifecycleChannel.appIsResumed()
+            android.util.Log.i("MainActivity", "Screens ${if (screensSwapped) "swapped" else "restored"}")
+        }
+        applyOwnFocusRole()
+        bottom.applyFocusRole()
+    }
+
+    /** This window's side of the focus rule in [focusFlagsFor]. */
+    private fun applyOwnFocusRole() {
+        val showsMainUi = !mainUiOnBottom()
+        val flags = focusFlagsFor(showsMainUi, mainUiCovered = isMainUiCovered(), focusedHere = isTopResumed)
+        val all = android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            android.view.WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
+        window.setFlags(flags, all)
+    }
+
+    private fun findFlutterView(v: View): io.flutter.embedding.android.FlutterView? {
+        if (v is io.flutter.embedding.android.FlutterView) return v
+        if (v is android.view.ViewGroup) {
+            for (i in 0 until v.childCount) findFlutterView(v.getChildAt(i))?.let { return it }
+        }
+        return null
+    }
 
     private fun setGamepadBlock(block: Boolean, result: MethodChannel.Result) {
         setGamepadBlockInternal(block)
@@ -947,8 +1369,68 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         }
     }
 
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        // Every startActivity overload (ours and the plugins') ends up here.
+        lastOutboundLaunchAt = android.os.SystemClock.uptimeMillis()
+        super.startActivityForResult(intent, requestCode, options)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Reaching here without a launch of ours means the user pressed Home
+        // (or Recents): the bottom screen belongs to the device launcher now.
+        if (isGameActive || gamepadBlocked || presentationHiddenForApp) return
+        if (android.os.SystemClock.uptimeMillis() - lastOutboundLaunchAt < OUTBOUND_LAUNCH_GRACE_MS) return
+        SecondaryDisplayActivity.instance?.let { bottom ->
+            // Its own task on its own display: step it behind the device's
+            // bottom launcher, which the system keeps there.
+            if (bottom.moveTaskToBack(true)) bottomScreenHiddenForHome = true
+            return
+        }
+        try {
+            subScreenPresentation?.let {
+                if (it.isShowing) {
+                    it.hide()
+                    presentationHiddenForHome = true
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Hiding secondary on leave failed: ${e.message}")
+        }
+    }
+
+    override fun onCloseSubScreen() {
+        // A closed presentation has nothing left to restore on return.
+        presentationHiddenForHome = false
+        super.onCloseSubScreen()
+        // The plugin calls this when the display goes away, or when this
+        // activity is destroyed: the bottom-screen activity goes with it.
+        if (isFinishing || isDestroyed) return
+        SecondaryDisplayActivity.instance?.close()
+    }
+
+    /** Brings back the bottom screen hidden when the user left with Home. */
+    private fun restoreSecondaryAfterHome() {
+        if (bottomScreenHiddenForHome) {
+            bottomScreenHiddenForHome = false
+            SecondaryDisplayActivity.instance?.let { bottom ->
+                focusTaskOf(bottom)
+                focusMainUi("back from Home")
+            }
+        }
+        if (!presentationHiddenForHome) return
+        presentationHiddenForHome = false
+        try {
+            subScreenPresentation?.show()
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Restoring secondary after Home failed: ${e.message}")
+        }
+    }
+
     override fun onPause() {
         super.onPause()
+        isTopCovered = true
+        SecondaryDisplayActivity.instance?.applyFocusRole()
         // Cuando la app va a segundo plano (RetroArch se abre), registrar el timestamp si no existe
         if (isGameActive && gameLaunchTimestamp == 0L) {
             gameLaunchTimestamp = System.currentTimeMillis()
@@ -957,16 +1439,30 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
 
     override fun onResume() {
         super.onResume()
+        isTopCovered = false
+        SecondaryDisplayActivity.instance?.applyFocusRole()
 
-        // Bring back the Now Playing panel if it was hidden for a dock-launched
-        // app. Only when no watch is armed: a dock app lives on the *other*
-        // display, so this activity resuming says nothing about whether it was
-        // closed — restoring here would drop the panel on top of an app the user
-        // is still using. While the watch runs, it owns the restore.
-        if (!ScreenshotAccessibilityService.isWatching) {
-            restoreSecondaryAfterApp()
+        restoreSecondaryAfterHome()
+
+        // Android 9 and older only: bring back the Presentation hidden for a
+        // dock app. Without a signal from the bottom display, resuming is the
+        // best available sign the user is done with it.
+        restoreSecondaryAfterApp()
+
+        if (gameOnOtherDisplay) {
+            // The bottom screen reports that game's close exactly. Resuming
+            // here (screen back on, a tap on this screen) is not a close.
+            if (!bottomScreenTracksGame) finishGameOnOtherDisplay()
+        } else {
+            reportGameReturned()
         }
+    }
 
+    /**
+     * Tells Flutter the launched game is over and releases the pad. No-op when
+     * no game session is open.
+     */
+    private fun reportGameReturned() {
         if (isGameActive) {
             // Calcular tiempo transcurrido desde el lanzamiento (si tenemos timestamp)
             var elapsedSeconds = 0
@@ -993,20 +1489,51 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
 
     // Gamepad event forwarding / blocking
     override fun dispatchGenericMotionEvent(motionEvent: MotionEvent): Boolean {
+        // Swapped, this window shows the secondary UI: see dispatchKeyEvent.
+        if (mainUiOnBottom()) return dispatchMotionFromSecondaryUi(motionEvent)
+        if (handleGamepadMotion(motionEvent)) return true
+        return super.dispatchGenericMotionEvent(motionEvent)
+    }
+
+    /**
+     * Gamepad motion handling shared with the bottom screen, which forwards its
+     * events here while it holds focus (screens swapped). True when consumed.
+     */
+    internal fun handleGamepadMotion(motionEvent: MotionEvent): Boolean {
         if (gamepadBlocked) return true
-        val handled = motionListener?.invoke(motionEvent) ?: false
-        return if (handled) true else super.dispatchGenericMotionEvent(motionEvent)
+        return motionListener?.invoke(motionEvent) ?: false
+    }
+
+    /**
+     * Gamepad key handling shared with the bottom screen (see
+     * [handleGamepadMotion]). True when consumed; false lets the window's own
+     * view, the one drawing the main UI, take it.
+     */
+    internal fun handleGamepadKey(keyEvent: KeyEvent): Boolean {
+        if (keyEvent.keyCode == KeyEvent.KEYCODE_BACK) return true
+        // Volume keys skip the gamepad plugin and the launch block (up to
+        // 30 s) and go straight to Android, so the volume can always change.
+        if (EventListener.isSystemKey(keyEvent.keyCode)) return false
+        if (gamepadBlocked) return true
+        return keyListener?.invoke(keyEvent) ?: false
     }
 
     override fun dispatchKeyEvent(keyEvent: KeyEvent): Boolean {
-        // BLOQUEAR COMPLETAMENTE el botón BACK (tanto del sistema como del gamepad)
-        if (keyEvent.keyCode == KeyEvent.KEYCODE_BACK) {
-            return true // Consumir completamente, no pasar a ningún lado
+        // Swapped, this window shows the secondary UI; a key that reaches it
+        // still drives the main UI on the bottom screen. Only volume keys
+        // apply here, the secondary UI being touch-only.
+        if (mainUiOnBottom()) {
+            if (dispatchKeyFromSecondaryUi(keyEvent)) return true
+            return EventListener.isSystemKey(keyEvent.keyCode) && super.dispatchKeyEvent(keyEvent)
         }
+        // BACK is swallowed entirely (system and gamepad) inside handleGamepadKey.
+        if (handleGamepadKey(keyEvent)) return true
+        return super.dispatchKeyEvent(keyEvent)
+    }
 
-        if (gamepadBlocked) return true
-        val handled = keyListener?.invoke(keyEvent) ?: false
-        return if (handled) true else super.dispatchKeyEvent(keyEvent)
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && mainUiOnBottom()) onSecondaryUiFocused()
     }
 
     // Launcher methods
@@ -1169,17 +1696,18 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
 
             val dm = getSystemService(android.content.Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
             val secondaryDisplay = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
+            // Apps open where the dock is: on the top screen while swapped.
+            val dockDisplayId = if (screensSwapped) Display.DEFAULT_DISPLAY else secondaryDisplay?.displayId
 
-            if (secondaryDisplay != null) {
+            if (dockDisplayId != null) {
                 try {
                     val options = android.app.ActivityOptions.makeBasic()
-                        .setLaunchDisplayId(secondaryDisplay.displayId)
+                        .setLaunchDisplayId(dockDisplayId)
                     startActivity(intent, options.toBundle())
-                    // The Now Playing presentation is a TYPE_PRESENTATION window
-                    // that layers above normal activities, so it would hide the
-                    // app we just launched on the same display. Hide it (keeping
-                    // the engine + dock state alive) and restore it on resume.
-                    hideSecondaryForApp(packageName, secondaryDisplay.displayId)
+                    // Android 10+: the app simply covers the bottom-screen
+                    // activity, which comes back when it closes. Android 9 and
+                    // older: the Presentation layers above it, so hide it.
+                    if (!SecondaryDisplayActivity.isSupported) hideSecondaryForApp()
                     result.success(true)
                     return
                 } catch (e: Exception) {
@@ -1196,11 +1724,11 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
     }
 
     /**
-     * Hides the Now Playing presentation so a dock-launched app is visible, and
-     * (if the accessibility service is granted) watches the secondary display so
-     * Now Playing is restored the moment the app is dismissed.
+     * Android 9 and older: hides the Now Playing Presentation so an app or
+     * game launched on its display is visible. It is a TYPE_PRESENTATION window
+     * layered above every activity there. Restored by [restoreSecondaryAfterApp].
      */
-    private fun hideSecondaryForApp(packageName: String, displayId: Int) {
+    private fun hideSecondaryForApp() {
         try {
             subScreenPresentation?.let {
                 if (it.isShowing) {
@@ -1208,45 +1736,13 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                     presentationHiddenForApp = true
                 }
             }
-            // Without the watch (service not granted, or pre-R) there is nothing
-            // to tell us the app closed and the watchdog would just drop the
-            // panel onto a running app after its timeout, so arm neither:
-            // onResume then restores, as it did before the watch existed.
-            val watching = ScreenshotAccessibilityService.startWatch(packageName, displayId) {
-                Handler(Looper.getMainLooper()).post { restoreSecondaryAfterApp() }
-            }
-            if (watching) armDockLaunchWatchdog()
         } catch (e: Exception) {
             android.util.Log.w("MainActivity", "Hiding secondary for app failed: ${e.message}")
         }
     }
 
-    /**
-     * Safety net for a dock launch that never reaches the bottom display: the
-     * watch only restores the panel once it has seen the app take the display,
-     * so an app that never appears (a launch the system dropped) would otherwise
-     * leave the bottom screen showing the device's own launcher for good.
-     */
-    private fun armDockLaunchWatchdog() {
-        dockLaunchWatchdog?.let { dockLaunchHandler.removeCallbacks(it) }
-        val watchdog = Runnable {
-            dockLaunchWatchdog = null
-            if (presentationHiddenForApp && !ScreenshotAccessibilityService.hasSeenWatchedApp) {
-                android.util.Log.w("MainActivity", "Dock launch never reached the bottom display; restoring the panel")
-                restoreSecondaryAfterApp()
-            }
-        }
-        dockLaunchWatchdog = watchdog
-        dockLaunchHandler.postDelayed(watchdog, DOCK_LAUNCH_TIMEOUT_MS)
-    }
-
-    /** Restores the Now Playing presentation hidden by a dock launch. */
+    /** Restores the Now Playing Presentation hidden by [hideSecondaryForApp]. */
     private fun restoreSecondaryAfterApp() {
-        ScreenshotAccessibilityService.stopWatch()
-        dockLaunchWatchdog?.let {
-            dockLaunchHandler.removeCallbacks(it)
-            dockLaunchWatchdog = null
-        }
         if (!presentationHiddenForApp) return
         presentationHiddenForApp = false
         try {
@@ -1580,6 +2076,46 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
             }
             result.success(hasPermission)
         } catch (e: Exception) {
+            result.success(false)
+        }
+    }
+
+    /**
+     * Releases the persisted grant of the folder tree [uriString] names, and only that
+     * folder's: a folder inside it or around it, picked on its own, holds a grant of its own.
+     * The held grant is matched by provider and decoded folder id, so `primary%3AROMs` and
+     * `primary:ROMs` are the same folder. Answers whether a grant was released; never fails.
+     */
+    private fun releaseSafPermission(uriString: String, result: MethodChannel.Result) {
+        try {
+            val uri = Uri.parse(uriString)
+            if (!android.provider.DocumentsContract.isTreeUri(uri)) {
+                result.success(false)
+                return
+            }
+            val treeId = android.provider.DocumentsContract.getTreeDocumentId(uri)
+            var released = false
+            for (permission in contentResolver.persistedUriPermissions) {
+                val held = permission.uri
+                if (held.authority != uri.authority ||
+                    !android.provider.DocumentsContract.isTreeUri(held) ||
+                    android.provider.DocumentsContract.getTreeDocumentId(held) != treeId
+                ) {
+                    continue
+                }
+                var flags = 0
+                if (permission.isReadPermission) flags = flags or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                if (permission.isWritePermission) flags = flags or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                try {
+                    contentResolver.releasePersistableUriPermission(held, flags)
+                    released = true
+                } catch (e: Exception) {
+                    android.util.Log.w("MainActivity", "Could not release a SAF permission: ${e.message}")
+                }
+            }
+            result.success(released)
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Could not release a SAF permission: ${e.message}")
             result.success(false)
         }
     }

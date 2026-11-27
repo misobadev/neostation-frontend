@@ -17,6 +17,7 @@ import 'package:neostation/themes/app_themes.dart';
 import 'package:neostation/utils/game_utils.dart';
 import 'package:neostation/widgets/marquee_text.dart';
 import 'package:neostation/themes/chrome_surface.dart';
+
 import '../../themes/corner_radii.dart';
 
 /// A reusable footer used by the game grid and carousel views.
@@ -214,20 +215,20 @@ class GameViewFooter extends StatelessWidget {
         final radii =
             Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m();
         final isFocused = Focus.of(context).hasFocus;
+        // The theme's main action colour, lifted a little when focused.
+        final scheme = Theme.of(context).colorScheme;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           height: 32.r,
           decoration: BoxDecoration(
             color: isFocused
-                ? const Color(0xFF36F184)
-                : const Color(0xFF2ECC71),
+                ? Color.lerp(scheme.tertiary, scheme.onTertiary, 0.15)
+                : scheme.tertiary,
             borderRadius: radii.radiusExternal,
-            border: Border.all(color: const Color(0xFF36F184), width: 1.r),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.shadow
+                    .withValues(alpha: 0.1),
                 blurRadius: 4.r,
                 offset: Offset(2.0.r, 2.0.r),
               ),
@@ -240,40 +241,32 @@ class GameViewFooter extends StatelessWidget {
               focusColor: Colors.transparent,
               hoverColor: Colors.transparent,
               highlightColor: Colors.transparent,
-              splashColor: Colors.white.withValues(alpha: 0.1),
+              splashColor: scheme.onTertiary.withValues(alpha: 0.1),
               borderRadius: radii.radiusExternal,
               onTap: () {
                 SfxService().playEnterSound();
                 onPlay();
               },
-              child: Padding(
-                padding: EdgeInsets.only(left: 8.r, right: 10.r),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/images/gamepad/Xbox_A_button.png',
-                      width: 20.r,
-                      height: 20.r,
-                      color: Theme.of(context).colorScheme.onPrimary,
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12.r),
+                  child: Text(
+                    isFolder
+                        // Same word the systems view uses for descending into
+                        // a container; upper-cased to match PLAY beside it.
+                        ? AppLocale.enter.getString(context).toUpperCase()
+                        : AppLocale.playButton.getString(context),
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: scheme.onTertiary,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11.r,
+                      letterSpacing: 1.5,
+                      height: 1.0,
                     ),
-                    SizedBox(width: 5.r),
-                    Text(
-                      isFolder
-                          // Same word the systems view uses for descending into
-                          // a container; upper-cased to match PLAY beside it.
-                          ? AppLocale.enter.getString(context).toUpperCase()
-                          : AppLocale.playButton.getString(context),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 11.r,
-                        letterSpacing: 1.5,
-                        height: 1.0,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

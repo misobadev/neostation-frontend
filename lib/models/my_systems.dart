@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'system_model.dart';
 import '../models/game_model.dart';
 import '../providers/file_provider.dart';
@@ -65,6 +66,8 @@ class SystemInfo {
   /// Indicates if this entry represents a single game (e.g., in "Recently Played").
   final bool isGame;
 
+  final bool isSmartCollection;
+
   /// The underlying game data if [isGame] is true.
   final GameModel? gameModel;
 
@@ -93,6 +96,7 @@ class SystemInfo {
     this.hideLogo = false,
     this.imageVersion = 0,
     this.isGame = false,
+    this.isSmartCollection = false,
     this.gameModel,
     this.mosaicPaths = const [],
   });
@@ -116,6 +120,7 @@ class SystemInfo {
     bool? hideLogo,
     int? imageVersion,
     bool? isGame,
+    bool? isSmartCollection,
     GameModel? gameModel,
     List<String>? mosaicPaths,
   }) {
@@ -137,6 +142,7 @@ class SystemInfo {
       hideLogo: hideLogo ?? this.hideLogo,
       imageVersion: imageVersion ?? this.imageVersion,
       isGame: isGame ?? this.isGame,
+      isSmartCollection: isSmartCollection ?? this.isSmartCollection,
       gameModel: gameModel ?? this.gameModel,
       mosaicPaths: mosaicPaths ?? this.mosaicPaths,
     );

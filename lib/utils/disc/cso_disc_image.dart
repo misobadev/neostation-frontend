@@ -49,16 +49,12 @@ class CsoDiscImage extends DiscImage {
   int _cachedBlockIndex = -1;
 
   CsoDiscImage._({
-    required String path,
-    required int blockSize,
-    required int align,
-    required int totalBytes,
-    required Uint32List index,
-  }) : _path = path,
-       _blockSize = blockSize,
-       _align = align,
-       _totalBytes = totalBytes,
-       _index = index;
+    required this._path,
+    required this._blockSize,
+    required this._align,
+    required this._totalBytes,
+    required this._index,
+  });
 
   /// Opens the CSO at [path], or returns null when it is not one we can read.
   static Future<CsoDiscImage?> open(String path) async {

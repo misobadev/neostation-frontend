@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/themes/theme_glass.dart';
 
 /// A concrete custom-colors holder for imported (user-supplied) themes.
 ///
@@ -43,8 +44,9 @@ class NeoCustomColors {
   });
 }
 
-/// A user-imported color theme, reconstructed at runtime from a daisyUI JSON
-/// palette (the format exported by the NeoStation theme designer).
+/// A user-imported color theme, reconstructed at runtime from the JSON the
+/// NeoStation theme designer exports (its own format, or the older daisyUI
+/// palette).
 ///
 /// Built-in color themes are compiled Dart; imported ones live only as JSON on
 /// disk, so this class re-derives a [ThemeData] + [NeoCustomColors] from the
@@ -60,6 +62,11 @@ class CustomTheme {
   final Brightness brightness;
   final ThemeData themeData;
   final NeoCustomColors customColors;
+
+  /// The theme's frosted-glass (NeoGlass) defaults, when the JSON ships a
+  /// `glass` block. Applied to the user's NeoGlass settings when the theme is
+  /// selected; null means "leave the user's current glass untouched".
+  final ThemeGlass? glass;
 
   /// The original daisyUI JSON, kept verbatim so it can be re-persisted.
   final Map<String, dynamic> rawJson;
@@ -77,15 +84,83 @@ class CustomTheme {
     required this.customColors,
     required this.rawJson,
     required this.signature,
+    this.glass,
   });
 
-  /// Builds a [CustomTheme] from a daisyUI theme JSON map.
+  /// Builds a [CustomTheme] from a theme JSON map in either format the
+  /// designer has exported: the NeoStation format (`"format":
+  /// "neostation-theme"`, version 2), whose colours are named after what they
+  /// paint, or the older daisyUI palette (still accepted, since themes in that
+  /// shape have been shared).
   ///
-  /// Mirrors the `dartExport()` mapping in the theme designer
-  /// (`~/dev/neostation-theme-designer/index.html`) so an imported theme looks
-  /// identical to the designer's live preview. Accepts both hex (`#rrggbb`) and
-  /// daisyUI-native `oklch(...)` colour values, and honours the `effects` corner
-  /// radii when present.
+  /// Throws [FormatException] when required keys are missing or malformed.
+  factory CustomTheme.fromJson(Map<String, dynamic> json) =>
+      json['format'] == formatId
+      ? CustomTheme._fromNeoStationJson(json)
+      : CustomTheme.fromDaisyJson(json);
+
+  /// The `format` value of a NeoStation theme file.
+  static const String formatId = 'neostation-theme';
+
+  /// The NeoStation format: every colour the app paints, by role.
+  factory CustomTheme._fromNeoStationJson(Map<String, dynamic> json) {
+    final colors = json['colors'];
+    if (colors is! Map) {
+      throw const FormatException('Not a theme: missing "colors" object.');
+    }
+    Color read(String key) {
+      final raw = colors[key];
+      if (raw is! String) {
+        throw FormatException('Missing or invalid colour: "$key".');
+      }
+      return _parseColor(raw, key);
+    }
+
+    final isDark =
+        ((json['brightness'] ?? json['scheme']) as String?)?.toLowerCase() !=
+        'light';
+    final background = read('background');
+    final text = read('text');
+    // Text on a status colour: whichever of the theme's own text and
+    // background reads better on it.
+    Color on(Color fill) => _contrast(fill, text) >= _contrast(fill, background)
+        ? text
+        : background;
+    final success = read('success');
+    final warning = read('warning');
+    final error = read('error');
+    final info = read('info');
+    final surface = read('surface');
+    return CustomTheme._assemble(
+      json: json,
+      isDark: isDark,
+      background: background,
+      surface: surface,
+      onSurface: text,
+      card: surface,
+      outline: read('border'),
+      primary: read('selection'),
+      onPrimary: read('onSelection'),
+      secondary: read('selectedCard'),
+      onSecondary: read('onSelectedCard'),
+      tertiary: read('action'),
+      onTertiary: read('onAction'),
+      tertiaryFixed: read('button'),
+      onTertiaryFixed: read('onButton'),
+      error: error,
+      onError: on(error),
+      success: success,
+      onSuccess: on(success),
+      warning: warning,
+      onWarning: on(warning),
+      info: info,
+      onInfo: on(info),
+    );
+  }
+
+  /// Builds a [CustomTheme] from a daisyUI theme JSON map, the designer's
+  /// earlier export. Accepts both hex (`#rrggbb`) and daisyUI-native
+  /// `oklch(...)` colour values.
   ///
   /// Throws [FormatException] when required keys are missing or malformed.
   factory CustomTheme.fromDaisyJson(Map<String, dynamic> json) {
@@ -115,49 +190,78 @@ class CustomTheme {
     // `scheme`. Accept either so light themes don't silently import as dark.
     final rawScheme = ((json['scheme'] ?? json['colorScheme']) as String?)
         ?.toLowerCase();
-    final isDark = rawScheme != 'light';
-    final brightness = isDark ? Brightness.dark : Brightness.light;
 
-    // --- daisyUI token -> Dart palette (see designer dartExport mapping) ---
     final primary = read('primary');
     final onPrimary = read('primary-content');
-    final secondary = read('secondary');
-    final onSecondary = read('secondary-content');
-    final tertiary = read('accent');
-    final onTertiary = read('accent-content');
     final surface = read('base-100');
     final onSurface = read('base-content');
-    final card = read('base-200');
-    final outline = read('base-300');
-    final error = read('error');
-    final onError = read('error-content');
-    final success = read('success');
-    final warning = read('warning');
-    final info = read('info');
+    return CustomTheme._assemble(
+      json: json,
+      isDark: rawScheme != 'light',
+      background: surface,
+      surface: surface,
+      onSurface: onSurface,
+      card: read('base-200'),
+      outline: read('base-300'),
+      primary: primary,
+      onPrimary: onPrimary,
+      secondary: read('secondary'),
+      onSecondary: read('secondary-content'),
+      tertiary: primary,
+      onTertiary: onPrimary,
+      tertiaryFixed: surface,
+      onTertiaryFixed: onSurface,
+      error: read('error'),
+      onError: read('error-content'),
+      success: read('success'),
+      // daisyUI JSON may lack the -content of a status colour; fall back to
+      // the text colour so nothing renders unreadable.
+      onSuccess: readOr('success-content', onSurface),
+      warning: read('warning'),
+      onWarning: readOr('warning-content', onSurface),
+      info: read('info'),
+      onInfo: readOr('info-content', onSurface),
+    );
+  }
 
-    // daisyUI's `neutral` maps onto Material's tertiaryFixed — the app uses it
-    // for the systems-grid footer and sort dropdown. Fall back to base-300 when
-    // absent so those surfaces stay legible.
-    final neutral = readOr('neutral', outline);
-    final onNeutral = readOr('neutral-content', onSurface);
-
-    // daisyUI JSON has no dedicated on-success/on-info/on-warning; derive
-    // sensible defaults so nothing renders unreadable.
-    final onSuccess = readOr('success-content', onSurface);
-    final onWarning = readOr('warning-content', onSurface);
-    final onInfo = readOr('info-content', onSurface);
-
+  /// The theme both formats resolve to.
+  factory CustomTheme._assemble({
+    required Map<String, dynamic> json,
+    required bool isDark,
+    required Color background,
+    required Color surface,
+    required Color onSurface,
+    required Color card,
+    required Color outline,
+    required Color primary,
+    required Color onPrimary,
+    required Color secondary,
+    required Color onSecondary,
+    required Color tertiary,
+    required Color onTertiary,
+    required Color tertiaryFixed,
+    required Color onTertiaryFixed,
+    required Color error,
+    required Color onError,
+    required Color success,
+    required Color onSuccess,
+    required Color warning,
+    required Color onWarning,
+    required Color info,
+    required Color onInfo,
+  }) {
+    final brightness = isDark ? Brightness.dark : Brightness.light;
     final colorScheme = isDark
         ? ColorScheme.dark(
             primary: primary,
             secondary: secondary,
             tertiary: tertiary,
-            tertiaryFixed: neutral,
+            tertiaryFixed: tertiaryFixed,
             surface: surface,
             onPrimary: onPrimary,
             onSecondary: onSecondary,
             onTertiary: onTertiary,
-            onTertiaryFixed: onNeutral,
+            onTertiaryFixed: onTertiaryFixed,
             onSurface: onSurface,
             error: error,
             onError: onError,
@@ -168,12 +272,12 @@ class CustomTheme {
             primary: primary,
             secondary: secondary,
             tertiary: tertiary,
-            tertiaryFixed: neutral,
+            tertiaryFixed: tertiaryFixed,
             surface: surface,
             onPrimary: onPrimary,
             onSecondary: onSecondary,
             onTertiary: onTertiary,
-            onTertiaryFixed: onNeutral,
+            onTertiaryFixed: onTertiaryFixed,
             onSurface: onSurface,
             error: error,
             onError: onError,
@@ -185,7 +289,7 @@ class CustomTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       cardColor: card,
-      scaffoldBackgroundColor: surface,
+      scaffoldBackgroundColor: background,
       extensions: [
         _radiiFromEffects(json['effects']),
         ChromeSurface.standard(),
@@ -218,8 +322,7 @@ class CustomTheme {
     );
 
     final customColors = NeoCustomColors(
-      // Battery levels map onto the semantic status colours, matching the
-      // designer's Flutter export.
+      // Battery levels map onto the semantic status colours.
       batteryFull: success,
       batteryMedium: warning,
       batteryLow: error,
@@ -240,18 +343,19 @@ class CustomTheme {
     // Fingerprint of the resolved palette (order-stable, notation-independent).
     final sig = StringBuffer(isDark ? 'd|' : 'l|');
     for (final c in [
+      background,
       primary,
       onPrimary,
       secondary,
       onSecondary,
       tertiary,
       onTertiary,
+      tertiaryFixed,
+      onTertiaryFixed,
       surface,
       onSurface,
       card,
       outline,
-      neutral,
-      onNeutral,
       error,
       onError,
       success,
@@ -273,14 +377,21 @@ class CustomTheme {
       customColors: customColors,
       rawJson: Map<String, dynamic>.from(json),
       signature: sig.toString(),
+      glass: ThemeGlass.fromJson(json['glass']),
     );
+  }
+
+  /// WCAG contrast ratio between two colours.
+  static double _contrast(Color a, Color b) {
+    final la = a.computeLuminance(), lb = b.computeLuminance();
+    return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05);
   }
 
   /// Returns a copy with a different [id]/[name] but the same resolved palette,
   /// used when an import collides with an existing id.
   CustomTheme withId(String newId) {
     final json = Map<String, dynamic>.from(rawJson)..['id'] = newId;
-    return CustomTheme.fromDaisyJson(json);
+    return CustomTheme.fromJson(json);
   }
 
   /// Builds a [CornerRadii] from the daisyUI `effects` block, honouring

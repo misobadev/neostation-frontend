@@ -4,7 +4,9 @@ import 'package:flutter_localization/flutter_localization.dart';
 import '../l10n/app_locale.dart';
 import '../models/my_systems.dart';
 
-/// Localized "N Games" / "1 Game" labels for cards, footers and headers.
+/// Localised "N Games" / "1 Game" labels for cards, footers and headers, and
+/// the counted sentences some dialogues build from the same singular/plural
+/// pair.
 ///
 /// Two things these exist to stop callers doing by hand:
 ///
@@ -45,6 +47,41 @@ String collectionsCountLabel(BuildContext context, int count) => _label(
   count,
   AppLocale.collectionCount,
   AppLocale.collectionsCount,
+);
+
+/// "3 save files" / "1 save file", for RomM's saves.
+String saveFilesCountLabel(BuildContext context, int count) => _label(
+  context,
+  count,
+  AppLocale.rommSaveFileCount,
+  AppLocale.rommSaveFilesCount,
+);
+
+/// "3 save states" / "1 save state", for RomM's states.
+String saveStatesCountLabel(BuildContext context, int count) => _label(
+  context,
+  count,
+  AppLocale.rommSaveStateCount,
+  AppLocale.rommSaveStatesCount,
+);
+
+/// "3 orphaned metadata entries will be deleted …", for the orphan cleanup's
+/// confirmation in Settings > Tools.
+String orphanedMetadataDeleteLabel(BuildContext context, int count) => _label(
+  context,
+  count,
+  AppLocale.cleanOrphanedMetadataDeleteOne,
+  AppLocale.cleanOrphanedMetadataDelete,
+);
+
+/// " 2 ES-DE imported entries are left untouched.", the orphan cleanup's note
+/// on the ES-DE rows it never deletes. It is appended to another sentence, so
+/// it starts with the language's own separator; trim it to use it on its own.
+String esdeEntriesKeptSuffix(BuildContext context, int count) => _label(
+  context,
+  count,
+  AppLocale.cleanOrphanedMetadataEsdeSkippedSuffixOne,
+  AppLocale.cleanOrphanedMetadataEsdeSkippedSuffix,
 );
 
 /// The count line for one system card, footer or pill: "12 Games", "1 App",

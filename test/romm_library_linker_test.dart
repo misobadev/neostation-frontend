@@ -121,6 +121,9 @@ class _FakeServer {
   final Map<String, SystemModel?> systemBySlug;
   final Set<int> failingPlatforms;
 
+  /// What a failing platform throws, when not the default.
+  final Map<int, Object> errors = {};
+
   /// `platformId@offset` per page request, in order.
   final List<String> requests = [];
 
@@ -147,7 +150,7 @@ class _FakeServer {
     requests.add('$platformId@$offset');
     onFetch?.call();
     if (failingPlatforms.contains(platformId)) {
-      throw Exception('500 from the server');
+      throw errors[platformId] ?? Exception('500 from the server');
     }
     final all = romsByPlatform[platformId] ?? const [];
     final end = (offset + limit).clamp(0, all.length);
@@ -852,6 +855,110 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  // The Tools row reads these: a run that only failed must say why, and one
+  // that partly failed must say how many systems it couldn't read.
+  group('what a run reports for the Tools row', () {
+    test('the first platform failure is kept, and each failed system '
+        'counted', () async {
+      final first = Exception('first');
+      final server = _FakeServer(
+        platforms: [_platform(1, 'snes'), _platform(2, 'nes')],
+        romsByPlatform: const {},
+        systemBySlug: {'snes': snes, 'nes': _system('nes')},
+        failingPlatforms: {1, 2},
+      );
+      server.errors[1] = first;
+      server.errors[2] = Exception('second');
+
+      final summary = await _linker(server, _FakeMap(), [
+        _game('A.sfc', 'snes'),
+        _game('B.nes', 'nes'),
+      ]).run();
+
+      expect(summary.platformFailures, 2);
+      expect(summary.platformsProcessed, 0);
+      expect(summary.systemsFailed, 2);
+      expect(summary.firstFailure, same(first));
+    });
+
+    test('a system whose two platforms failed is one system', () async {
+      final genesis = _system('genesis');
+      final server = _FakeServer(
+        platforms: [_platform(1, 'genesis'), _platform(2, 'megadrive')],
+        romsByPlatform: const {},
+        systemBySlug: {'genesis': genesis, 'megadrive': genesis},
+        failingPlatforms: {1, 2},
+      );
+
+      final summary = await _linker(server, _FakeMap(), [
+        _game('Sonic.md', 'genesis'),
+      ]).run();
+
+      expect(summary.platformFailures, 2);
+      expect(summary.systemsFailed, 1);
+    });
+
+    test('a system whose links could not be saved counts as failed', () async {
+      final server = _FakeServer(
+        platforms: [_platform(1, 'snes')],
+        romsByPlatform: {
+          1: [_rom(10, platformId: 1, fsName: 'A.sfc')],
+        },
+        systemBySlug: {'snes': snes},
+      );
+      final map = _FakeMap()..failWrites = true;
+
+      final summary = await _linker(server, map, [
+        _game('A.sfc', 'snes'),
+      ]).run();
+
+      expect(summary.rowsAdded, 0);
+      expect(summary.rowsFailed, 1);
+      expect(summary.systemsFailed, 1);
+      expect(summary.firstFailure, isNull, reason: 'RomM did not fail');
+    });
+
+    test('a failed platform on a system with nothing to link is not a failed '
+        'system', () async {
+      // The server has a SNES platform that always fails, but the user has no
+      // SNES games: every run would otherwise report a system unread.
+      final server = _FakeServer(
+        platforms: [_platform(1, 'snes'), _platform(2, 'nes')],
+        romsByPlatform: {
+          2: [_rom(20, platformId: 2, fsName: 'B.nes', slug: 'nes')],
+        },
+        systemBySlug: {'snes': snes, 'nes': _system('nes')},
+        failingPlatforms: {1},
+      );
+
+      final summary = await _linker(server, _FakeMap(), [
+        _game('B.nes', 'nes'),
+      ]).run();
+
+      expect(summary.platformFailures, 1);
+      expect(summary.systemsFailed, 0);
+      expect(summary.rowsAdded, 1);
+    });
+
+    test('a run where everything worked reports no failure', () async {
+      final server = _FakeServer(
+        platforms: [_platform(1, 'snes')],
+        romsByPlatform: {
+          1: [_rom(10, platformId: 1, fsName: 'A.sfc')],
+        },
+        systemBySlug: {'snes': snes},
+      );
+
+      final summary = await _linker(server, _FakeMap(), [
+        _game('A.sfc', 'snes'),
+      ]).run();
+
+      expect(summary.rowsAdded, 1);
+      expect(summary.systemsFailed, 0);
+      expect(summary.firstFailure, isNull);
     });
   });
 

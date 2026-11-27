@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqlite3/sqlite3.dart';
@@ -13,6 +14,14 @@ import 'package:neostation/utils/cloud_path_builder.dart';
 /// to be idempotent, allowing them to be safely re-run if necessary.
 class SqliteMigrations {
   static final _log = LoggerService.instance;
+
+  static const createRaCatalogueSyncTableSql = '''
+    CREATE TABLE IF NOT EXISTS app_ra_catalogue_sync (
+      console_id INTEGER PRIMARY KEY,
+      refreshed_at TEXT NOT NULL,
+      match_pending INTEGER NOT NULL DEFAULT 1
+    )
+  ''';
 
   // ── RomM schema — single source of truth ──────────────────────────────────
   // Referenced by migration v111 and by the fresh-install table list, so a
@@ -144,12 +153,35 @@ class SqliteMigrations {
     CREATE TABLE IF NOT EXISTS user_collections (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      collection_type TEXT NOT NULL DEFAULT 'manual',
+      rules_json TEXT,
       image_path TEXT,
       color1 TEXT,
       color2 TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  ''';
+
+  /// CREATE for the per-system / per-game launch screen (v192).
+  ///
+  /// Which screen of a dual-screen handheld a game opens on. `scope` is
+  /// `'system'` (`target` = the system's folder name) or `'game'` (`target` =
+  /// the ROM's `rom_path`, `COLLATE NOCASE` like the column it mirrors).
+  /// `display` is `'primary'` or `'secondary'`; no row means "inherit" (the
+  /// game falls back to its system, the system to Android's default screen).
+  /// A table of its own rather than columns on `user_system_settings` /
+  /// `user_roms`: it is read once per launch and in two settings rows, so it
+  /// does not need threading through every system- and game-loading query. No
+  /// foreign key on purpose: a rescan that drops a ROM leaves a harmless row.
+  static const String createUserLaunchDisplayTableSql = '''
+    CREATE TABLE IF NOT EXISTS user_launch_display (
+      scope TEXT NOT NULL,
+      target TEXT NOT NULL COLLATE NOCASE,
+      display TEXT NOT NULL,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (scope, target)
     );
   ''';
 
@@ -575,7 +607,8 @@ class SqliteMigrations {
       case 141:
         await _migrateToVersion141(db);
         break;
-      // 142 and 143 are claimed by another branch that is not merged yet.
+      // 142 and 143 were reserved for a branch that renumbered above this
+      // version before merging, so they stay permanently unused.
       case 144:
         await _migrateToVersion144(db);
         break;
@@ -626,11 +659,112 @@ class SqliteMigrations {
       case 163:
         await _migrateToVersion163(db);
         break;
+      case 164:
+        await _migrateToVersion164(db);
+        break;
       case 165:
         await _migrateToVersion165(db);
         break;
+      case 166:
+        // Backfill for installs that reached v165 without this PR’s v164.
+        await _migrateToVersion164(db);
+        break;
+      // 167 was reserved for smart collections, which moved to 170; it stays
+      // empty. 168 is main's custom navigation sounds backfill.
+      case 168:
+        await _migrateToVersion168(db);
+        break;
+      case 170:
+        await _migrateToVersion170(db);
+        break;
+      // 171 is reserved by Android Games (upstream PR #604).
+      case 172:
+        db.execute(createRaCatalogueSyncTableSql);
+        break;
+      case 174:
+        await _migrateToVersion174(db);
+        break;
+      case 175:
+        await _migrateToVersion175(db);
+        break;
+      // A pre-merge build of #691 stamped v175 without #665's RA table.
+      // Re-run both guarded checks so those databases heal on upgrade.
+      case 176:
+        db.execute(createRaCatalogueSyncTableSql);
+        await _migrateToVersion175(db);
+        break;
+      case 177:
+        await _migrateToVersion177(db);
+        break;
+      case 178:
+        await _migrateToVersion178(db);
+        break;
+      // Main builds through v178 skipped the logo-toggle migration at v174.
+      case 179:
+        await _migrateToVersion174(db);
+        break;
+      // 180 and 181 are claimed by other open work (#717).
+      case 182:
+        await _migrateToVersion182(db);
+        break;
+      case 183:
+        await _migrateToVersion183(db);
+        break;
+      case 184:
+        await _migrateToVersion184(db);
+        break;
+      case 185:
+        await _migrateToVersion185(db);
+        break;
+      case 186:
+        await _migrateToVersion186(db);
+        break;
+      case 187:
+        await _migrateToVersion187(db);
+        break;
+      case 188:
+        await _migrateToVersion188(db);
+        break;
+      case 189:
+        await _migrateToVersion189(db);
+        break;
+      case 190:
+        await _migrateToVersion190(db);
+        break;
+      case 191:
+        await _migrateToVersion191(db);
+        break;
+      case 192:
+        await _migrateToVersion192(db);
+        break;
+      case 193:
+        await _migrateToVersion193(db);
+        break;
+      case 194:
+        await _migrateToVersion194(db);
+        break;
+      case 197:
+        await _migrateToVersion197(db);
+        break;
+      case 198:
+        await _migrateToVersion198(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
+    }
+  }
+
+  /// Migration v168: durable custom sounds, renumbered from v166.
+  static Future<void> _migrateToVersion168(Database db) async {
+    // Devices on the former v166 build skipped main’s sorting and manual
+    // ScreenScraper migrations. Backfill both without changing preferences.
+    await _migrateToVersion164(db);
+    await _migrateToVersion165(db);
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name']);
+    if (!columns.contains('custom_sfx')) {
+      db.execute('ALTER TABLE user_config ADD COLUMN custom_sfx TEXT');
     }
   }
 
@@ -6856,6 +6990,75 @@ class SqliteMigrations {
     }
   }
 
+  /// Migration v182: Adds the `user_discovery_picks` table backing the weekly
+  /// Discovery board.
+  ///
+  /// One row per slot per ISO week (`'2026-W33'` + `'gotw'`), so re-rolling a
+  /// single section is a one-row write rather than the read-modify-write a JSON
+  /// blob in `user_config` would need — the dual-engine narrow-write discipline
+  /// the concurrent-write test enforces.
+  ///
+  /// Deliberately no foreign key to `user_roms`: when a rescan removes a ROM,
+  /// the pick should be re-resolved into a fresh choice for that slot, not
+  /// silently cascade-deleted and leave the section blank for the rest of the
+  /// week. `COLLATE NOCASE` matches `user_roms.rom_path`.
+  ///
+  /// Numbered 182, having started at 132 and passed through 142, 151, 160, 161
+  /// and 175. A reserved slot is not a safe slot: each time main's own version
+  /// climbed past the pair, a device upgrading from main would already sit past
+  /// both and skip them silently — the table would simply never exist. Every
+  /// rebase onto main therefore has to re-check the pair against the highest
+  /// number in use anywhere, not just against the numbers main itself occupies:
+  /// main reached 179, with 180 still claimed by an open PR (#717), by the time
+  /// this landed on 182.
+  ///
+  /// Dev builds that ran this branch at 175/176 already sit past main's own
+  /// v175 (`supported_extensions`) and v176 (the RA catalogue table) and would
+  /// skip both, so they are re-run here first; both are idempotent.
+  static Future<void> _migrateToVersion182(Database db) async {
+    db.execute(createRaCatalogueSyncTableSql);
+    await _migrateToVersion175(db);
+    _log.i('Migration v182: Adding user_discovery_picks table');
+
+    try {
+      final tableExists = db.select('''
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='user_discovery_picks'
+        LIMIT 1
+      ''');
+
+      if (tableExists.isEmpty) {
+        db.execute('''
+          CREATE TABLE user_discovery_picks (
+            week_key TEXT NOT NULL,
+            slot_id TEXT NOT NULL,
+            section TEXT NOT NULL,
+            genre_bucket TEXT,
+            slot_order INTEGER NOT NULL DEFAULT 0,
+            rom_path TEXT NOT NULL COLLATE NOCASE,
+            reroll_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (week_key, slot_id)
+          )
+        ''');
+        _log.i('Table user_discovery_picks created');
+      } else {
+        _log.i('Table user_discovery_picks already exists');
+      }
+
+      db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_user_discovery_picks_week
+        ON user_discovery_picks(week_key)
+      ''');
+
+      _log.i('Migration v182 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v182: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
   /// Migration v154: Reopens ROMs parked because their archive could not be
   /// extracted.
   ///
@@ -7122,6 +7325,19 @@ class SqliteMigrations {
     }
   }
 
+  /// Migration v164: persists optional article-insensitive game sorting.
+  static Future<void> _migrateToVersion164(Database db) async {
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('ignore_articles_in_game_sort')) {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN ignore_articles_in_game_sort INTEGER DEFAULT 0',
+      );
+    }
+  }
+
   /// Migration v163: Adds `app_romm_rom_map.link_source`, recording which
   /// writer produced a RomM link row (`download`, `auto`, or `manual`).
   ///
@@ -7161,6 +7377,58 @@ class SqliteMigrations {
     }
   }
 
+  /// Migration v170: adds smart definitions without changing manual memberships.
+  /// Above main’s v168 and the Android Games PR’s v169; devices already on
+  /// main must still run this migration to install smart definitions.
+  static Future<void> _migrateToVersion170(Database db) async {
+    // Test devices on the smart collections branch already ran its former
+    // v163 and therefore skipped upstream's RomM migration at that version.
+    await _migrateToVersion163(db);
+    // All three collection objects, not just the table: a database that
+    // skipped v139 would otherwise lack the items table and its index.
+    await _migrateToVersion139(db);
+    final columns = db
+        .select('PRAGMA table_info(user_collections)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('collection_type')) {
+      db.execute(
+        "ALTER TABLE user_collections ADD COLUMN collection_type TEXT NOT NULL DEFAULT 'manual'",
+      );
+    }
+    if (!columns.contains('rules_json')) {
+      db.execute('ALTER TABLE user_collections ADD COLUMN rules_json TEXT');
+    }
+  }
+
+  /// Migration v174: adds `user_config.secondary_hide_system_logo`.
+  ///
+  /// When enabled, the secondary display drops the system logo while browsing
+  /// and shows only the background art. v171 and v173 are claimed by other
+  /// branches (Android games system, favourite-games sorting), so this takes
+  /// the next slot above them.
+  static Future<void> _migrateToVersion174(Database db) async {
+    _log.i('Migration v174: Adding secondary_hide_system_logo to user_config');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+      if (!columns.contains('secondary_hide_system_logo')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN secondary_hide_system_logo '
+          'INTEGER DEFAULT 0',
+        );
+        _log.i('Column secondary_hide_system_logo added via v174');
+      } else {
+        _log.i('Column secondary_hide_system_logo already exists');
+      }
+      _log.i('Migration v174 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v174: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
   /// Migration v165: adds `user_roms.ss_manual_game_id`, the ScreenScraper game
   /// a user picked by hand for a ROM with Identify….
   ///
@@ -7191,6 +7459,499 @@ class SqliteMigrations {
       _log.i('Migration v165 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v165: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v178: turns the preview on/off flag into a delay in seconds.
+  ///
+  /// -1 disables previews, 0 plays as soon as the decoder is ready, and 1..5
+  /// holds the screenshot. Existing installs with previews off stay off; every
+  /// other install gets the new two-second default. The guard and the
+  /// conditional backfill make the step safe to re-run.
+  static Future<void> _migrateToVersion178(Database db) async {
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('video_preview_delay')) {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN video_preview_delay INTEGER DEFAULT 2',
+      );
+      if (columns.contains('video_previews')) {
+        db.execute(
+          'UPDATE user_config SET video_preview_delay = -1 '
+          'WHERE video_previews = 0',
+        );
+      }
+    }
+  }
+
+  /// Migration v177: persists whether game preview videos play.
+  ///
+  /// Existing installs default to on, preserving the current behaviour until
+  /// the user turns previews off. The column guard makes the migration safe to
+  /// re-run.
+  static Future<void> _migrateToVersion177(Database db) async {
+    final columns = db
+        .select('PRAGMA table_info(user_config)')
+        .map((row) => row['name'].toString())
+        .toSet();
+    if (!columns.contains('video_previews')) {
+      db.execute(
+        'ALTER TABLE user_config ADD COLUMN video_previews INTEGER DEFAULT 1',
+      );
+    }
+  }
+
+  /// Migration v175: adds `app_emulators.supported_extensions`.
+  ///
+  /// Emulator entries can declare which formats they launch (ISO, shortcut,
+  /// serial file, folder...). A null value means "no declaration" and keeps the
+  /// legacy behaviour: compatible with every extension of the system.
+  static Future<void> _migrateToVersion175(Database db) async {
+    _log.i('Migration v175: Adding supported_extensions to app_emulators');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(app_emulators)')
+          .map((row) => row['name'].toString())
+          .toSet();
+      if (!columns.contains('supported_extensions')) {
+        db.execute(
+          'ALTER TABLE app_emulators ADD COLUMN supported_extensions TEXT',
+        );
+        _log.i('Column supported_extensions added via v175');
+      } else {
+        _log.i('Column supported_extensions already exists');
+      }
+      _log.i('Migration v175 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v175: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v183: Adds `user_config.hide_tab_discovery`, the visibility
+  /// toggle for the Discovery tab.
+  ///
+  /// Split from [_migrateToVersion182] rather than folded into it so that a
+  /// collision with a version another branch claims in the meantime only forces
+  /// one of the two to move — which is exactly what happened: both started at
+  /// 132/133 and moved together, to 142/143, then 151/152, then 160/161, then
+  /// 161/162, then 175/176, then 182/183, on successive rebases onto main.
+  ///
+  /// Dev builds that ran this branch at 161/162 already sit past main's own
+  /// v161 (`game_list_size`) and v162 (`android_apps_as_tab`) and would skip
+  /// both, so they are re-run here first; every step is idempotent.
+  static Future<void> _migrateToVersion183(Database db) async {
+    await _migrateToVersion162(db);
+    _log.i('Migration v183: Adding hide_tab_discovery to user_config');
+    try {
+      final tableInfo = db.select('PRAGMA table_info(user_config)');
+      final columns = tableInfo.map((c) => c['name'].toString()).toList();
+      if (!columns.contains('hide_tab_discovery')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN hide_tab_discovery INTEGER DEFAULT 0',
+        );
+        _log.i('Column hide_tab_discovery added via v183');
+      } else {
+        _log.i('Column hide_tab_discovery already exists');
+      }
+      _log.i('Migration v183 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v183: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v184: Adds `user_config.discovery_grid_columns`, the persisted
+  /// column density of the Discovery board ('M' or 'L').
+  ///
+  /// Guarded like every other migration: a device whose database is already
+  /// past this number (or that picked up a branch build with a different v184)
+  /// still gets the column instead of failing every config read.
+  static Future<void> _migrateToVersion184(Database db) async {
+    _log.i('Migration v184: Adding discovery_grid_columns to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('discovery_grid_columns')) {
+        db.execute(
+          "ALTER TABLE user_config ADD COLUMN discovery_grid_columns TEXT DEFAULT 'M'",
+        );
+        _log.i('Column discovery_grid_columns added via v184');
+      } else {
+        _log.i('Column discovery_grid_columns already exists');
+      }
+      _log.i('Migration v184 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v184: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v185: Adds `user_config.discovery_view_mode`, the Discovery
+  /// board's grid/carousel preference.
+  static Future<void> _migrateToVersion185(Database db) async {
+    _log.i('Migration v185: Adding discovery_view_mode to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('discovery_view_mode')) {
+        db.execute(
+          "ALTER TABLE user_config ADD COLUMN discovery_view_mode TEXT DEFAULT 'grid'",
+        );
+        _log.i('Column discovery_view_mode added via v185');
+      } else {
+        _log.i('Column discovery_view_mode already exists');
+      }
+      _log.i('Migration v185 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v185: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v186: Adds `user_config.android_grid_columns`, the persisted
+  /// column density of the Android apps board.
+  static Future<void> _migrateToVersion186(Database db) async {
+    _log.i('Migration v186: Adding android_grid_columns to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('android_grid_columns')) {
+        db.execute(
+          "ALTER TABLE user_config ADD COLUMN android_grid_columns TEXT DEFAULT 'M'",
+        );
+        _log.i('Column android_grid_columns added via v186');
+      } else {
+        _log.i('Column android_grid_columns already exists');
+      }
+      _log.i('Migration v186 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v186: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v187: adds `user_config.performance_mode`.
+  ///
+  /// Off by default, so upgrades keep the current visual behaviour. Guarded
+  /// like every other migration: a database already past this version still
+  /// gets the column instead of failing every config read.
+  static Future<void> _migrateToVersion187(Database db) async {
+    _log.i('Migration v187: Adding performance_mode to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('performance_mode')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN performance_mode '
+          'INTEGER DEFAULT 0',
+        );
+        _log.i('Column performance_mode added via v187');
+      } else {
+        _log.i('Column performance_mode already exists');
+      }
+      _log.i('Migration v187 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v187: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v188: clamps the NeoGlass border width to the new 0–2 range.
+  ///
+  /// Older builds allowed 0–4 (and briefly higher); the settings UI and config
+  /// model now cap at 2, so existing rows are lowered to the new maximum.
+  static Future<void> _migrateToVersion188(Database db) async {
+    _log.i('Migration v188: Clamping neoglass border width');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('neoglass_border_width')) {
+        _log.i('v188: neoglass_border_width is not present, nothing to clamp');
+        return;
+      }
+      db.execute(
+        'UPDATE user_config SET neoglass_border_width = 2 '
+        'WHERE neoglass_border_width > 2',
+      );
+      _log.i('Migration v188 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v188: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v189: adds `user_config.corner_radius`, the corner rounding the
+  /// user picks for every theme (0 square to 5 the roundest, 3 by default).
+  static Future<void> _migrateToVersion189(Database db) async {
+    _log.i('Migration v189: Adding corner_radius to user_config');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('corner_radius')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN corner_radius INTEGER DEFAULT 3',
+        );
+        _log.i('v189: corner_radius column added');
+      } else {
+        _log.i('v189: corner_radius already present, nothing to do');
+      }
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v189: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v190: the compact Recently Played card becomes the default.
+  ///
+  /// The large card was stored as 'default' by the column's own default, not
+  /// by a choice, so those rows move to the compact card once; anyone who
+  /// wants the large one picks it again in Settings › Systems.
+  static Future<void> _migrateToVersion190(Database db) async {
+    _log.i('Migration v190: Compact Recently Played card by default');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toList();
+      if (!columns.contains('recent_card_size')) {
+        _log.i('v190: recent_card_size is not present, nothing to do');
+        return;
+      }
+      db.execute(
+        "UPDATE user_config SET recent_card_size = '2x1' "
+        "WHERE recent_card_size IS NULL OR recent_card_size = 'default'",
+      );
+      _log.i('Migration v190 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v190: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v191: the "Android Games" virtual system.
+  ///
+  /// Adds `user_roms.is_android_game`, the user's own choice of which
+  /// installed apps are games (0/1, default 0: nothing is classified
+  /// automatically), and registers the `android_games` system. The system owns
+  /// no rows: its games are the `android` system's rows with the flag set.
+  ///
+  /// Test devices that ran this branch at v169/v171 skipped main's v170, so it
+  /// is re-run first. Every step is guarded, so a device that skipped a
+  /// neighbouring slot, or re-runs this, ends in the same state.
+  /// Migration v192: per-system / per-game launch screen for dual-screen
+  /// handhelds. Idempotent (`CREATE TABLE IF NOT EXISTS`).
+  static Future<void> _migrateToVersion192(Database db) async {
+    _log.i('Migration v192: Adding user_launch_display table');
+    try {
+      db.execute(createUserLaunchDisplayTableSql);
+    } catch (e, stackTrace) {
+      _log.e('Migration v192 failed: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  static Future<void> _migrateToVersion191(Database db) async {
+    _log.i('Migration v191: Adding Android Games system');
+    try {
+      await _migrateToVersion170(db);
+
+      final columns = db
+          .select('PRAGMA table_info(user_roms)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isNotEmpty && !columns.contains('is_android_game')) {
+        db.execute(
+          'ALTER TABLE user_roms ADD COLUMN is_android_game INTEGER DEFAULT 0',
+        );
+      }
+
+      final tables = db
+          .select("SELECT name FROM sqlite_master WHERE type = 'table'")
+          .map((r) => r['name'].toString())
+          .toSet();
+      if (tables.contains('app_systems')) {
+        db.execute('''
+          INSERT OR IGNORE INTO app_systems (id, screenscraper_id, ra_id, real_name, folder_name, launch_date, description)
+          VALUES ('android_games', 135, 0, 'Android Games', 'android_games', '2008-09-23',
+                  'Installed Android games, launched directly.')
+        ''');
+      }
+      _log.i('Migration v191 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v191: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v193: the secondary display hides the system logo by default.
+  ///
+  /// Flips `user_config.secondary_hide_system_logo` to 1 on every existing
+  /// row, so upgraded devices match fresh installs and show only the
+  /// background art. Users who want the logo back turn the setting off.
+  /// v192 is claimed by the dual-screen swap branch, so this takes v193.
+  ///
+  /// A database that never got the column (skipped v174/v179) gains it here
+  /// with the new default.
+  static Future<void> _migrateToVersion193(Database db) async {
+    _log.i('Migration v193: Hiding the secondary system logo by default');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i('v193: user_config is not present, nothing to do');
+        return;
+      }
+      if (!columns.contains('secondary_hide_system_logo')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN secondary_hide_system_logo '
+          'INTEGER DEFAULT 1',
+        );
+      }
+      db.execute('UPDATE user_config SET secondary_hide_system_logo = 1');
+      _log.i('Migration v193 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v193: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Columns v194 adds to `user_screenscraper_metadata`.
+  static const Map<String, String> v194MetadataColumns = {
+    'description_ja': 'TEXT',
+    'description_ko': 'TEXT',
+    'description_ru': 'TEXT',
+    'description_zh': 'TEXT',
+    'description_id': 'TEXT',
+    'regional_names': 'TEXT',
+  };
+
+  /// Migration v194: room for every language NeoAssets translates into.
+  ///
+  /// NeoAssets returns each description in all of NeoStation's UI languages
+  /// and a game's title per release region, so the metadata table gains a
+  /// description column for the five languages it lacked and
+  /// `regional_names` (JSON, region → title), from which the title shown is
+  /// picked to match the app language. Idempotent: each column is added only
+  /// when missing.
+  static Future<void> _migrateToVersion194(Database db) async {
+    _log.i('Migration v194: NeoAssets languages and regional names');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_screenscraper_metadata)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i(
+          'v194: user_screenscraper_metadata is not present, nothing to do',
+        );
+        return;
+      }
+      for (final entry in v194MetadataColumns.entries) {
+        if (!columns.contains(entry.key)) {
+          db.execute(
+            'ALTER TABLE user_screenscraper_metadata '
+            'ADD COLUMN ${entry.key} ${entry.value}',
+          );
+        }
+      }
+      _log.i('Migration v194 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v194: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v197: `user_config.swap_screens`, the dual-screen "Swap
+  /// screens" setting (main interface on the bottom screen). Off by default.
+  ///
+  /// First written as v194, which open pull requests also claim (v194, v195
+  /// and v196 are taken by #881, #880 and #883), so it moved above them.
+  /// Idempotent, so a test device that already ran it as v194 gets nothing
+  /// new here, and one that took another branch's v194 still gets the column.
+  static Future<void> _migrateToVersion197(Database db) async {
+    _log.i('Migration v197: Adding swap_screens to user_config');
+    try {
+      // A device that ran main at v193 skips v192, so its table is created
+      // here. Idempotent (`CREATE TABLE IF NOT EXISTS`).
+      await _migrateToVersion192(db);
+
+      final columns = db
+          .select('PRAGMA table_info(user_config)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i('v197: user_config is not present, nothing to do');
+        return;
+      }
+      if (!columns.contains('swap_screens')) {
+        db.execute(
+          'ALTER TABLE user_config ADD COLUMN swap_screens INTEGER DEFAULT 0',
+        );
+      }
+      _log.i('Migration v197 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v197: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v198: `user_screenscraper_metadata.video_url`, the NeoAssets
+  /// link a game's video streams from when "Streaming video" keeps it off the
+  /// disk. Idempotent: the column is added only when missing.
+  static Future<void> _migrateToVersion198(Database db) async {
+    _log.i('Migration v198: NeoAssets video links');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_screenscraper_metadata)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i(
+          'v198: user_screenscraper_metadata is not present, nothing to do',
+        );
+        return;
+      }
+      if (!columns.contains('video_url')) {
+        db.execute(
+          'ALTER TABLE user_screenscraper_metadata ADD COLUMN video_url TEXT',
+        );
+      }
+      _log.i('Migration v198 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v198: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

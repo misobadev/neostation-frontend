@@ -74,10 +74,35 @@ extension _WeekCard on RADashboardHubState {
       rommProvider.cancelDownload(rom.id);
       return;
     }
+    final romFolders = context.read<SqliteConfigProvider>().config.romFolders;
+    final fileProvider = context.read<FileProvider>();
+    // A copy already on disk (copied by hand, or from before RomM) is linked,
+    // as the browse screen does, instead of downloaded again over the top.
+    final copy = await rommProvider.findLocalCopy(rom, romFolders);
+    if (!mounted) return;
+    if (copy != null) {
+      final linked = await rommProvider.linkLocalCopy(rom, copy);
+      if (!mounted) return;
+      AppNotification.showNotification(
+        context,
+        switch (linked) {
+          RommMappingWriteResult.written => AppLocale.rommLinked,
+          RommMappingWriteResult.kept => AppLocale.rommDownloaded,
+          RommMappingWriteResult.failed => AppLocale.rommLinkFailed,
+        }.getString(context),
+        type: linked == RommMappingWriteResult.failed
+            ? NotificationType.error
+            : NotificationType.info,
+      );
+      if (linked == RommMappingWriteResult.written) {
+        await rommProvider.importMetadataIfMissing(rom, copy, fileProvider);
+      }
+      return;
+    }
     final result = await rommProvider.downloadRom(
       rom,
-      romFolders: context.read<SqliteConfigProvider>().config.romFolders,
-      fileProvider: context.read<FileProvider>(),
+      romFolders: romFolders,
+      fileProvider: fileProvider,
     );
     if (!mounted) return;
     rebuild(() => _weekDownload = result);
@@ -124,6 +149,9 @@ extension _WeekCard on RADashboardHubState {
         return AppLocale.rommNoSystemMatch.getString(context);
       case RommDownloadError.noWritableFolder:
         return AppLocale.rommNoWritableFolder.getString(context);
+      case RommDownloadError.notEnoughSpace:
+        return AppLocale.rommNotEnoughSpace.getString(context);
+      case RommDownloadError.extraction:
       case RommDownloadError.network:
       case RommDownloadError.none:
         return AppLocale.rommDownloadFailed.getString(context);
@@ -175,41 +203,31 @@ extension _WeekCard on RADashboardHubState {
         borderRadius: BorderRadius.circular(12.r),
         onTap: selectable ? selectWeekCard : null,
         child: Container(
-          padding: EdgeInsets.all(16.r),
+          padding: EdgeInsets.all(8.r),
           decoration: _cardDecoration(
             theme,
-            borderColor: selected
-                ? theme.colorScheme.primary
-                : accent.withValues(
-                    alpha: progress.earnedThisWeek
-                        ? 0.55
-                        : owned != null
-                        ? 0.35
-                        : 0.15,
-                  ),
+            borderColor: selected ? theme.colorScheme.tertiary : null,
             borderWidth: selected ? 2.r : 1.r,
-            background: theme.cardColor.withValues(
-              alpha: progress.earnedThisWeek
-                  ? 0.40
-                  : owned != null
-                  ? 0.34
-                  : 0.25,
-            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Symbols.emoji_events_rounded, size: 18.r, color: accent),
+                  // The same header as the overview's other sections.
+                  Icon(
+                    Symbols.emoji_events_rounded,
+                    size: 15.r,
+                    color: theme.colorScheme.primary,
+                  ),
                   SizedBox(width: 8.r),
                   Expanded(
                     child: Text(
                       AppLocale.aotw.getString(context),
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontSize: 11.r,
+                        fontSize: 10.r,
                         fontWeight: FontWeight.bold,
-                        color: accent,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -224,72 +242,71 @@ extension _WeekCard on RADashboardHubState {
                         ),
                       )
                     else
-                      _buildPill(
-                        context,
-                        icon: status.icon,
-                        label: status.label,
-                        color: status.color,
+                      // The week's status as quiet text, not another pill.
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(status.icon, size: 11.r, color: status.color),
+                          SizedBox(width: 4.r),
+                          Text(
+                            status.label,
+                            style: TextStyle(
+                              fontSize: 8.r,
+                              fontWeight: FontWeight.w600,
+                              color: status.color,
+                            ),
+                          ),
+                        ],
                       ),
                 ],
               ),
-              SizedBox(height: 12.r),
+              SizedBox(height: 6.r),
               if (raProvider.gotwLoading && gotw == null)
-                _buildLoadingState(context, minHeight: 138.r)
+                _buildLoadingState(context, minHeight: 96.r)
               else if (raProvider.gotwError != null && gotw == null)
                 _buildSectionMessage(
                   context,
                   raProvider.gotwError!,
                   isError: true,
                   onRetry: raProvider.fetchGOTW,
-                  minHeight: 138.r,
+                  minHeight: 96.r,
                 )
               else if (gotw == null)
                 _buildSectionMessage(
                   context,
                   AppLocale.raAotwNoActive.getString(context),
-                  minHeight: 138.r,
+                  minHeight: 96.r,
                 )
               else
                 _buildAotwDetails(context, gotw, accent),
               if (gotw != null) ...[
-                SizedBox(height: 12.r),
-                Wrap(
-                  spacing: 8.r,
-                  runSpacing: 8.r,
-                  children: [
-                    _buildPill(
-                      context,
-                      icon: Symbols.stars_rounded,
-                      label:
-                          '${gotw.achievement.points} ${AppLocale.raPointsAbbrev.getString(context)}',
-                      color: accent,
-                    ),
-                    _buildPill(
-                      context,
-                      icon: Symbols.monitoring_rounded,
-                      label:
-                          '${gotw.achievement.trueRatio} ${AppLocale.raAotwTrueRatio.getString(context)}',
-                      color: accent,
-                    ),
-                    _buildPill(
-                      context,
-                      icon: Symbols.groups_rounded,
-                      label: _aotwParticipationLabel(context, gotw),
-                      color: accent,
-                    ),
+                // The facts on one quiet line rather than four pills.
+                SizedBox(height: 6.r),
+                Text(
+                  [
+                    '${gotw.achievement.points} ${AppLocale.raPointsAbbrev.getString(context)}',
+                    '${gotw.achievement.trueRatio} ${AppLocale.raAotwTrueRatio.getString(context)}',
+                    _aotwParticipationLabel(context, gotw),
                     if (gotw.startDateUtc != null)
-                      _buildPill(
-                        context,
-                        icon: Symbols.calendar_today_rounded,
-                        label: AppLocale.raAotwWeekStarted
-                            .getString(context)
-                            .replaceFirst('{date}', _formatDate(gotw.startAt)),
-                        color: accent,
-                      ),
-                  ],
+                      AppLocale.raAotwWeekStarted
+                          .getString(context)
+                          .replaceFirst('{date}', _formatDate(gotw.startAt)),
+                  ].join('  ·  '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 8.r,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
                 ),
-                SizedBox(height: 10.r),
-                _buildAotwLibraryAction(context, raProvider, owned, accent),
+                // Only when there is something to do: open it, find it in
+                // RomM or download it. A game that is nowhere to be had
+                // leaves the card without a line saying so.
+                if (_buildAotwLibraryAction(context, raProvider, owned, accent)
+                    case final action?) ...[
+                  SizedBox(height: 8.r),
+                  action,
+                ],
               ],
             ],
           ),
@@ -298,7 +315,7 @@ extension _WeekCard on RADashboardHubState {
     );
   }
 
-  Widget _buildAotwLibraryAction(
+  Widget? _buildAotwLibraryAction(
     BuildContext context,
     RetroAchievementsProvider raProvider,
     OwnedWeekGameResolution? owned,
@@ -344,41 +361,7 @@ extension _WeekCard on RADashboardHubState {
       );
     }
     final remote = _rommWeekGame;
-    if (remote == null) {
-      final rommConnected = context.read<RommProvider>().isConnected;
-      if (!rommConnected) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _aotwLibraryLabel(
-              context,
-              Symbols.inventory_2_rounded,
-              AppLocale.raAotwNotInLibrary.getString(context),
-              accent,
-            ),
-            SizedBox(height: 6.r),
-            OutlinedButton.icon(
-              onPressed: widget.onOpenRomm,
-              icon: Icon(Symbols.cloud_rounded, size: 15.r),
-              label: Text(AppLocale.rommLogin.getString(context)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: accent,
-                textStyle: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 8.r,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        );
-      }
-      return _aotwLibraryLabel(
-        context,
-        Symbols.inventory_2_rounded,
-        AppLocale.raAotwNotInLibrary.getString(context),
-        accent,
-      );
-    }
+    if (remote == null) return null;
     final download =
         context.watch<RommProvider>().downloadFor(remote.id) ?? _weekDownload;
     final downloading = download?.status == RommDownloadStatus.downloading;
@@ -439,71 +422,62 @@ extension _WeekCard on RADashboardHubState {
     Color accent,
   ) {
     final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.65);
+    // The achievement first (it is what the week is about), then the game
+    // and console on one line, and its description.
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10.r),
-          child: SizedBox(
-            width: 80.r,
-            height: 80.r,
-            child: Image.network(
-              _raMediaUrl(gotw.achievement.badgeUrl),
-              fit: BoxFit.cover,
-              cacheWidth: (80 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-              cacheHeight: (80 * MediaQuery.devicePixelRatioOf(context)).ceil(),
-              errorBuilder: (context, error, stackTrace) => Container(
-                color: theme.colorScheme.surface,
-                child: Icon(
-                  Symbols.emoji_events_rounded,
-                  color: accent,
-                  size: 30.r,
-                ),
-              ),
+        Container(
+          width: 44.r,
+          height: 44.r,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6.r),
+            border: Border.all(
+              color: accent.withValues(alpha: 0.5),
+              width: 2.r,
             ),
           ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.network(
+            _raMediaUrl(gotw.achievement.badgeUrl),
+            fit: BoxFit.cover,
+            cacheWidth: (44.r * MediaQuery.devicePixelRatioOf(context)).ceil(),
+            errorBuilder: (context, error, stackTrace) =>
+                Icon(Symbols.emoji_events_rounded, color: accent, size: 22.r),
+          ),
         ),
-        SizedBox(width: 14.r),
+        SizedBox(width: 10.r),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                gotw.game.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.r,
-                ),
-              ),
-              SizedBox(height: 2.r),
-              Text(
-                gotw.console.title,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  fontSize: 9.r,
-                ),
-              ),
-              SizedBox(height: 8.r),
-              Text(
                 gotw.achievement.title,
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: accent,
-                  fontWeight: FontWeight.w700,
+                style: TextStyle(
                   fontSize: 11.r,
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
-              SizedBox(height: 4.r),
+              SizedBox(height: 1.r),
+              Text(
+                '${gotw.game.title} · ${gotw.console.title}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 8.r, color: muted),
+              ),
+              SizedBox(height: 3.r),
               Text(
                 gotw.achievement.description,
-                maxLines: 3,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 9.r,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.78),
+                style: TextStyle(
+                  fontSize: 8.r,
+                  height: 1.3,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                 ),
               ),
             ],

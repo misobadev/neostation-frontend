@@ -1,69 +1,31 @@
 import 'package:flutter/foundation.dart';
-import 'dart:io';
 
-import 'package:path/path.dart' as path;
-import '../config_service.dart';
+import '../scraping/scraped_media_paths.dart';
 
 /// Media resolution helpers for ScreenScraper downloads.
 ///
-/// Resolves the on-disk media directory (cached), maps API media-type names to
-/// NeoStation folder names, selects the best regional/language asset from an API
-/// response, and checks whether an asset already exists locally. Extracted
-/// verbatim from [ScreenScraperService]; behaviour is unchanged. Sole owner of
-/// the media-directory cache; performs no network I/O (the HTTP downloaders stay
-/// on the facade until the client collaborator is extracted).
+/// Selects the best regional/language asset from an API response. The media
+/// directory and folder names are the provider-neutral [ScrapedMediaPaths];
+/// the members here forward to it. Performs no network I/O.
 class ScreenscraperMediaResolver {
   ScreenscraperMediaResolver._();
 
-  static String? _cachedMediaDirectory;
-
   /// Retrieves the directory path for downloaded media assets.
-  static Future<String> getMediaDirectory() async {
-    if (_cachedMediaDirectory != null) {
-      return _cachedMediaDirectory!;
-    }
+  static Future<String> getMediaDirectory() =>
+      ScrapedMediaPaths.getMediaDirectory();
 
-    final mediaPath = await ConfigService.getMediaPath();
-    final mediaDir = Directory(mediaPath);
-    if (!await mediaDir.exists()) {
-      await mediaDir.create(recursive: true);
-    }
-    _cachedMediaDirectory = mediaDir.path;
-
-    return _cachedMediaDirectory!;
-  }
-
-  /// Forgets the resolved media directory so the next call re-derives it from
-  /// the current user-data path. Call after the user-data location changes —
-  /// the path is memoised on first use and would otherwise keep writing
-  /// scraped media into the previous location for the rest of the session.
-  static void resetMediaDirectory() {
-    _cachedMediaDirectory = null;
-  }
+  /// See [ScrapedMediaPaths.resetMediaDirectory].
+  static void resetMediaDirectory() => ScrapedMediaPaths.resetMediaDirectory();
 
   /// Points media at [path] for tests, or back to the derived folder (null).
   @visibleForTesting
-  static void setMediaDirectoryForTesting(String? path) {
-    _cachedMediaDirectory = path;
-  }
+  static void setMediaDirectoryForTesting(String? path) =>
+      // ignore: invalid_use_of_visible_for_testing_member
+      ScrapedMediaPaths.setMediaDirectoryForTesting(path);
 
   /// Maps API media type names to NeoStation folder names.
-  static String mapMediaTypeToFolder(String mediaType) {
-    switch (mediaType) {
-      case 'fanart':
-        return 'fanarts';
-      case 'ss':
-        return 'screenshots';
-      case 'video':
-        return 'videos';
-      case 'wheel':
-        return 'wheels';
-      case 'box2D':
-        return 'box2d';
-      default:
-        return mediaType;
-    }
-  }
+  static String mapMediaTypeToFolder(String mediaType) =>
+      ScrapedMediaPaths.folderFor(mediaType);
 
   /// Selects the best media asset from a list based on region and language priority.
   ///
@@ -117,18 +79,5 @@ class ScreenscraperMediaResolver {
     }
 
     return bestMedia;
-  }
-
-  /// Verifies if a specific media asset exists in the local cache.
-  static Future<bool> checkFileExists(
-    String relativePath,
-    String userDataDir,
-  ) async {
-    try {
-      final fullPath = path.join(userDataDir, relativePath);
-      return await File(fullPath).exists();
-    } catch (e) {
-      return false;
-    }
   }
 }

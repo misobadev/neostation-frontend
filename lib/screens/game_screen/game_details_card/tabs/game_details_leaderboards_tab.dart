@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/retro_achievements_leaderboard.dart';
 import 'package:neostation/services/sfx_service.dart';
-import 'package:neostation/themes/chrome_surface.dart';
 import 'package:neostation/themes/corner_radii.dart';
 
 import '../widgets/panel_gate_highlight.dart';
 
-typedef RaLoadGameLeaderboards =
-    Future<RaGameLeaderboardsPage> Function(int gameId);
-typedef RaLoadLeaderboardEntries =
-    Future<RaLeaderboardEntriesPage> Function(
-      int leaderboardId, {
-      required int count,
-      required int offset,
-    });
+typedef RaLoadGameLeaderboards = Future<RaGameLeaderboardsPage> Function(
+  int gameId,
+);
+typedef RaLoadLeaderboardEntries = Future<RaLeaderboardEntriesPage> Function(
+  int leaderboardId, {
+  required int count,
+  required int offset,
+});
 typedef RaLoadUserGameLeaderboards =
     Future<RaUserGameLeaderboardsPage> Function(int gameId);
 
@@ -318,7 +318,7 @@ class GameDetailsLeaderboardsTabState
           duration: PanelGateHighlight.duration,
           curve: Curves.easeOut,
           decoration: BoxDecoration(
-            color: ChromeSurface.fill(context),
+            // The glass inside draws the fill.
             borderRadius: radii.radiusExternal,
             border: PanelGateHighlight.border(
               context,
@@ -330,19 +330,24 @@ class GameDetailsLeaderboardsTabState
               context,
               isActive: _isPanelActive,
               resting: BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.25),
+                color: Theme.of(context).colorScheme.shadow
+                    .withValues(alpha: 0.25),
                 blurRadius: 2.r,
                 offset: Offset(2.r, 2.r),
               ),
             ),
           ),
-          child: Column(
-            children: [
-              _buildHeader(context),
-              Expanded(child: _buildBody(context)),
-            ],
+          child: NeoGlass(
+            // Frosted like the game list beside it.
+            cornerRadius:
+                (Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m())
+                    .radiusExternalRadius,
+            child: Column(
+              children: [
+                _buildHeader(context),
+                Expanded(child: _buildBody(context)),
+              ],
+            ),
           ),
         ),
       ),

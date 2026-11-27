@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/utils/color.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/app_version.dart';
 
 import '../themes/corner_radii.dart';
 
@@ -34,25 +32,13 @@ abstract class CoreFooter extends StatefulWidget {
 }
 
 class _CoreFooterState extends State<CoreFooter> {
-  String _appVersion = '';
+  /// From pubspec.yaml ([appVersion]): macOS keeps only numbers in its own
+  /// version string, so a release candidate would show as `1.0.0.1`.
+  final String _appVersion = 'v$appVersion';
 
   @override
   void initState() {
     super.initState();
-    _loadAppVersion();
-  }
-
-  Future<void> _loadAppVersion() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      setState(() {
-        _appVersion = 'v${packageInfo.version}';
-      });
-    } catch (e) {
-      setState(() {
-        _appVersion = 'v1.0.0'; // Fallback
-      });
-    }
   }
 
   @override
@@ -89,7 +75,7 @@ class _CoreFooterState extends State<CoreFooter> {
             bottom: 0,
             child: Center(
               child: Text(
-                '${AppLocale.beta.getString(context)} $_appVersion',
+                _appVersion,
                 style: TextStyle(
                   fontSize: 12.r,
                   color: Theme.of(context).colorScheme.onSurface,
@@ -131,6 +117,20 @@ class GamepadControl extends StatelessWidget {
   /// in flight (e.g. a download or a folder picker).
   final bool busy;
 
+  /// An icon after the button glyph, before any [label] text. An empty
+  /// [label] shows no text.
+  final IconData? trailingIcon;
+
+  /// The control's full name, for a [label] that is empty or shortened to
+  /// fit: shown as a tooltip, and read by screen readers in place of the
+  /// visible text.
+  final String? semanticLabel;
+
+  /// A widget drawn in place of [icon] or [iconPath], in an 18 box. With an
+  /// empty [label] and no [trailingIcon] the control becomes a square of the
+  /// same height as a labelled one, glyph only.
+  final Widget? glyph;
+
   const GamepadControl({
     super.key,
     this.iconPath,
@@ -141,6 +141,9 @@ class GamepadControl extends StatelessWidget {
     this.textColor,
     this.gradient,
     this.busy = false,
+    this.trailingIcon,
+    this.semanticLabel,
+    this.glyph,
   });
 
   @override
@@ -151,8 +154,10 @@ class GamepadControl extends StatelessWidget {
     final Color buttonBg =
         backgroundColor ?? theme.colorScheme.onSurface.withValues(alpha: 0.1);
     final Color contentColor = textColor ?? theme.colorScheme.onPrimary;
+    final bool glyphOnly =
+        glyph != null && label.isEmpty && trailingIcon == null;
 
-    return Material(
+    final control = Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: busy ? null : onTap,
@@ -164,7 +169,9 @@ class GamepadControl extends StatelessWidget {
             BorderRadius.circular(6.r),
 
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 4.r),
+          padding: glyphOnly
+              ? EdgeInsets.all(4.r)
+              : EdgeInsets.symmetric(horizontal: 6.r, vertical: 4.r),
           decoration: BoxDecoration(
             color: gradient == null ? buttonBg : null,
             gradient: gradient,
@@ -192,6 +199,8 @@ class GamepadControl extends StatelessWidget {
                     valueColor: AlwaysStoppedAnimation<Color>(contentColor),
                   ),
                 )
+              else if (glyph != null)
+                SizedBox(width: 18.r, height: 18.r, child: glyph)
               // Material Design icon
               else if (icon != null)
                 Icon(icon, size: 12.r, color: contentColor)
@@ -206,20 +215,42 @@ class GamepadControl extends StatelessWidget {
                     colorBlendMode: BlendMode.srcIn,
                   ),
                 ),
-              SizedBox(width: 4.r),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.r, // Slightly reduced so buttons fit comfortably
-                  color: contentColor,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.2.r,
+              if (trailingIcon != null) ...[
+                SizedBox(width: 2.r),
+                Icon(trailingIcon, size: 14.r, color: contentColor),
+              ],
+              if (label.isNotEmpty) ...[
+                SizedBox(width: 4.r),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize:
+                        12.r, // Slightly reduced so buttons fit comfortably
+                    color: contentColor,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2.r,
+                  ),
                 ),
-              ),
-              SizedBox(width: 4.r),
+              ],
+              if (!glyphOnly) SizedBox(width: 4.r),
             ],
           ),
         ),
+      ),
+    );
+    final name = semanticLabel;
+    if (name == null || name.isEmpty) return control;
+    return Tooltip(
+      message: name,
+      // Named once, by the Semantics below.
+      excludeFromSemantics: true,
+      child: Semantics(
+        label: name,
+        button: true,
+        // The InkWell's own action is excluded with its semantics.
+        onTap: busy ? null : onTap,
+        excludeSemantics: true,
+        child: control,
       ),
     );
   }

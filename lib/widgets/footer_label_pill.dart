@@ -15,7 +15,23 @@ class FooterLabelPill extends StatelessWidget {
   /// Optional chip on the right of the pill (e.g. "128 games"); hidden when null.
   final String? countText;
 
-  const FooterLabelPill({super.key, required this.label, this.countText});
+  /// Optional palette for the outer label pill.
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+
+  /// Optional palette for the inner count chip.
+  final Color? countBackgroundColor;
+  final Color? countForegroundColor;
+
+  const FooterLabelPill({
+    super.key,
+    required this.label,
+    this.countText,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.countBackgroundColor,
+    this.countForegroundColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +51,7 @@ class FooterLabelPill extends StatelessWidget {
           right: countText != null ? 6.r : 12.r,
         ),
         decoration: BoxDecoration(
-          color: theme.colorScheme.tertiaryFixed,
+          color: backgroundColor ?? theme.colorScheme.tertiaryFixed,
           borderRadius: radii?.radiusExternal ?? BorderRadius.circular(24.r),
           boxShadow: [
             BoxShadow(
@@ -52,7 +68,7 @@ class FooterLabelPill extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: theme.colorScheme.onTertiaryFixed,
+                  color: foregroundColor ?? theme.colorScheme.onTertiaryFixed,
                   fontSize: 14.r,
                   fontWeight: FontWeight.bold,
                   overflow: TextOverflow.ellipsis,
@@ -64,7 +80,7 @@ class FooterLabelPill extends StatelessWidget {
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 2.r),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
+                  color: countBackgroundColor ?? theme.colorScheme.surface,
                   borderRadius:
                       radii?.radiusInternal ?? BorderRadius.circular(12.r),
                   boxShadow: [
@@ -78,7 +94,7 @@ class FooterLabelPill extends StatelessWidget {
                 child: Text(
                   countText!,
                   style: TextStyle(
-                    color: theme.colorScheme.onSurface,
+                    color: countForegroundColor ?? theme.colorScheme.onSurface,
                     fontSize: 10.r,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.5.r,

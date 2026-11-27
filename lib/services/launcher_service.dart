@@ -1,10 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as path;
+
 import '../models/system_model.dart';
 import '../models/game_model.dart';
 import '../repositories/game_repository.dart';
+import '../utils/disc/disc_paths.dart';
+import '../utils/disc/m3u_playlist.dart';
 import 'logger_service.dart';
 import 'config_service.dart';
 import 'systems_update_service.dart';
@@ -220,6 +225,14 @@ class LauncherService {
       // (instead of our FileProvider rewrap) declare `"keep_saf_uri": true` in
       // their android config. Keeps the launcher free of hardcoded package names.
       result['keep_saf_uri'] = platformConfig['keep_saf_uri'] == true;
+      // Emulators that cannot open an `.m3u` handed over SAF declare
+      // `"m3u_first_disc": true` and are launched on the playlist's first disc
+      // instead (see [resolveAndroidLaunchFiles]).
+      result['m3u_first_disc'] = platformConfig['m3u_first_disc'] == true;
+      if (platformConfig['directory_launch_arguments'] is String) {
+        result['directory_launch_arguments'] =
+            platformConfig['directory_launch_arguments'];
+      }
 
       if (platformConfig.containsKey('launch_arguments')) {
         final args = platformConfig['launch_arguments'].toString();
@@ -281,7 +294,26 @@ class LauncherService {
       }
     } else {
       if (platformConfig.containsKey('executable')) {
-        result['executable'] = platformConfig['executable'];
+        result['executable'] = resolveDesktopExecutable(
+          platformConfig['executable'].toString(),
+          game,
+        );
+      }
+
+      final launchMode = platformConfig['launch_mode']
+          ?.toString()
+          .trim()
+          .toLowerCase();
+      if (launchMode != null && launchMode.isNotEmpty) {
+        result['launch_mode'] = launchMode;
+      }
+      final rawWorkingDirectory =
+          platformConfig['working_directory']?.toString().trim() ?? '';
+      if (rawWorkingDirectory.isNotEmpty) {
+        result['working_directory'] = resolveDesktopWorkingDirectory(
+          rawWorkingDirectory,
+          game,
+        );
       }
 
       // Linux discovery hints. These let the launcher find a Flatpak or an
@@ -433,9 +465,147 @@ class LauncherService {
     return result;
   }
 
-  /// Resolves file-backed IDs after building the intent and before launching it.
-  /// Standalone ScummVM expects a registered target ID, not the descriptor URI.
+  /// Resolves file-backed values after building the intent and before launching
+  /// it: an `.m3u` becomes its first disc for emulators that declare
+  /// `m3u_first_disc`, and standalone ScummVM gets its registered target ID
+  /// instead of the descriptor URI.
   Future<void> resolveAndroidLaunchFiles(
+    Map<String, dynamic> command,
+    GameModel game,
+  ) async {
+    await _resolveDirectoryLaunch(command, game);
+    await _resolveM3uFirstDisc(command, game);
+    await _resolveScummVmTarget(command, game);
+  }
+
+  /// Keeps emulator-specific ISO/folder differences in the systems JSON,
+  /// instead of Kotlin package checks.
+  Future<void> _resolveDirectoryLaunch(
+    Map<String, dynamic> command,
+    GameModel game,
+  ) async {
+    final template = command['directory_launch_arguments'];
+    final location = game.romPath;
+    if (template is! String || template.isEmpty || location == null) return;
+    if (!await GameRepository.isLaunchDirectory(location)) return;
+    final directoryCommand = _parseLaunchArguments(template);
+    if (directoryCommand['data'] is String) {
+      directoryCommand['data'] = resolvePlaceholdersAndroid(
+        directoryCommand['data'] as String,
+        game,
+      );
+    }
+    final extras = directoryCommand['extras'];
+    if (extras is List) {
+      for (final extra in extras) {
+        if (extra is Map) {
+          extra['value'] = resolvePlaceholdersAndroid(
+            extra['value'].toString(),
+            game,
+          );
+        }
+      }
+    }
+    for (final key in [
+      'package',
+      'activity',
+      'action',
+      'category',
+      'data',
+      'type',
+      'extras',
+      'activity_flags',
+    ]) {
+      command.remove(key);
+    }
+    command.addAll(directoryCommand);
+  }
+
+  /// Swaps a multi-disc `.m3u` launch for the playlist's first disc.
+  ///
+  /// Android Dolphin resolves playlist entries by cutting the playlist path at
+  /// its last `/`, which on a SAF document URI (one `%2F`-encoded component)
+  /// yields a path that does not exist; the PCSX2 family has no playlist
+  /// support at all and drops to its main menu. Both boot the disc directly.
+  /// When the playlist cannot be read the launch keeps the playlist, which is
+  /// no worse than before.
+  Future<void> _resolveM3uFirstDisc(
+    Map<String, dynamic> command,
+    GameModel game,
+  ) async {
+    if (command['m3u_first_disc'] != true) return;
+    final playlist = game.romPath;
+    if (playlist == null || !playlist.toLowerCase().endsWith('.m3u')) return;
+
+    final String contents;
+    try {
+      contents = await GameRepository.readLaunchDescriptor(playlist);
+    } catch (e) {
+      LoggerService.instance.w(
+        'm3u first disc: cannot read $playlist ($e); launching the playlist',
+      );
+      return;
+    }
+    final disc = m3uFirstDisc(playlist, contents);
+    if (disc == null) {
+      LoggerService.instance.w('m3u first disc: empty playlist $playlist');
+      return;
+    }
+
+    final data = command['data'];
+    if (data is String) {
+      command['data'] = swapPlaylistForDisc(data, playlist, disc);
+    }
+    final extras = (command['extras'] as List?) ?? const [];
+    for (final extra in extras) {
+      final value = extra['value'];
+      if (value is String) {
+        extra['value'] = swapPlaylistForDisc(value, playlist, disc);
+      }
+    }
+    LoggerService.instance.i('m3u first disc: launching $disc');
+  }
+
+  /// The first disc of the playlist at [playlistPath] with [contents],
+  /// resolved beside the playlist (a `%2F`-encoded SAF sibling on Android), or
+  /// null when the playlist names no disc.
+  @visibleForTesting
+  static String? m3uFirstDisc(String playlistPath, String contents) {
+    final entries = parseM3uEntries(contents);
+    if (entries.isEmpty) return null;
+    return resolveDiscSibling(playlistPath, entries.first);
+  }
+
+  /// [value], a built launch value, with the playlist swapped for [disc].
+  ///
+  /// The placeholders embed the playlist verbatim (`{file.path}` and
+  /// `{file.localuri}` markers, a `content://` `{file.uri}`) or, for a bare
+  /// path, as a `file://` URI. The `file://` form is swapped first, so its
+  /// encoded path is not half-replaced by the verbatim pass; a `content://`
+  /// playlist has no `file://` form, so that pass is skipped.
+  ///
+  /// This replaces every occurrence. That is right for the shipped templates,
+  /// which carry the playlist as a whole value or a whole marker payload. A
+  /// template embedding it inside a longer string would have that occurrence
+  /// rewritten too.
+  @visibleForTesting
+  static String swapPlaylistForDisc(
+    String value,
+    String playlist,
+    String disc,
+  ) {
+    var swapped = value;
+    if (!playlist.startsWith('content://')) {
+      swapped = swapped.replaceAll(
+        Uri.file(playlist).toString(),
+        Uri.file(disc).toString(),
+      );
+    }
+    return swapped.replaceAll(playlist, disc);
+  }
+
+  /// Standalone ScummVM expects a registered target ID, not the descriptor URI.
+  Future<void> _resolveScummVmTarget(
     Map<String, dynamic> command,
     GameModel game,
   ) async {
@@ -487,8 +657,8 @@ class LauncherService {
   ///                       real path (RetroArch, DuckStation, AetherSX2, Dolphin…).
   /// - `{file.uri}`      — URI: content:// passes through as-is, bare paths → file://.
   ///                       Use for emulators that accept content:// natively (-d flag).
-  /// - `{file.localuri}` — same resolution as {file.path} returned as a file:// URI.
-  ///                       Use for emulators that need file:// but not content://.
+  /// - `{file.localuri}` — keeps a content:// SAF URI as-is (so the launch can grant
+  ///                       read access to it); a bare path becomes a file:// URI.
   String resolvePlaceholdersAndroid(String template, GameModel game) {
     if (template.isEmpty) return template;
 
@@ -550,9 +720,7 @@ class LauncherService {
   String _fillDesktopPlaceholders(String token, GameModel game) {
     final romPath = game.romPath;
     if (romPath == null) return token;
-    var result = token
-        .replaceAll('{file.path}', romPath)
-        .replaceAll('{file.uri}', Uri.file(romPath).toString());
+    var result = _fillDesktopFilePlaceholders(token, romPath, game);
     final titleId = game.titleId;
     if (titleId != null) {
       for (final tag in _titleIdTags) {
@@ -560,6 +728,21 @@ class LauncherService {
       }
     }
     return result;
+  }
+
+  /// Fills the ROM's own placeholders in [text]. A desktop path is never a
+  /// content:// URI, so `{file.localuri}` is the same file:// URI as `{file.uri}`.
+  String _fillDesktopFilePlaceholders(
+    String text,
+    String romPath,
+    GameModel game,
+  ) {
+    final uri = Uri.file(romPath).toString();
+    return text
+        .replaceAll('{file.path}', romPath)
+        .replaceAll('{file.dir}', _gameDirectory(game))
+        .replaceAll('{file.uri}', uri)
+        .replaceAll('{file.localuri}', uri);
   }
 
   static const List<String> _titleIdTags = [
@@ -586,8 +769,16 @@ class LauncherService {
         result = result.replaceAll('{file.path}', game.romPath!);
       }
 
+      final directory = _gameDirectory(game);
+      if (directory.contains(' ') && !template.contains('"{file.dir}"')) {
+        result = result.replaceAll('{file.dir}', '"$directory"');
+      } else {
+        result = result.replaceAll('{file.dir}', directory);
+      }
+
       final uri = Uri.file(game.romPath!).toString();
       result = result.replaceAll('{file.uri}', uri);
+      result = result.replaceAll('{file.localuri}', uri);
 
       if (game.titleId != null) {
         result = result.replaceAll('{tags.vita_game_id}', game.titleId!);
@@ -600,5 +791,103 @@ class LauncherService {
       }
     }
     return result;
+  }
+
+  /// Directory the game lives in: the folder itself for folder games, otherwise
+  /// the file's parent.
+  static String _gameDirectory(GameModel game) {
+    final romPath = game.romPath ?? '';
+    if (romPath.isEmpty) return '';
+    try {
+      if (FileSystemEntity.isDirectorySync(romPath)) return romPath;
+    } catch (_) {
+      // Fall through to the parent path.
+    }
+    return path.dirname(romPath);
+  }
+
+  /// Resolves an executable template without adding argument quotes.
+  String resolveDesktopExecutable(String template, GameModel game) {
+    if (template.isEmpty) return template;
+    var result = ConfigService.resolvePath(template);
+    final romPath = game.romPath;
+    if (romPath != null && romPath.isNotEmpty) {
+      result = _fillDesktopFilePlaceholders(result, romPath, game);
+    }
+    return result;
+  }
+
+  /// Resolves a working-directory template without adding argument quotes.
+  String resolveDesktopWorkingDirectory(String template, GameModel game) {
+    if (template.isEmpty) return template;
+    var result = ConfigService.resolvePath(template);
+    final romPath = game.romPath;
+    if (romPath != null && romPath.isNotEmpty) {
+      result = _fillDesktopFilePlaceholders(result, romPath, game);
+    }
+    return result;
+  }
+
+  /// Replaces `{file.content}` in a resolved launch command with the contents of
+  /// a small text descriptor (the PS3 serial file).
+  ///
+  /// Throws [FormatException] when the descriptor is not a PS3 file, cannot be
+  /// read, or does not contain a serial-shaped value.
+  Future<void> resolveLaunchContent(
+    Map<String, dynamic> command,
+    GameModel game,
+  ) async {
+    final placeholder = '{file.content}';
+    if (!_commandContains(command, placeholder)) return;
+
+    final descriptor = game.romPath;
+    if (descriptor == null || !descriptor.toLowerCase().endsWith('.ps3')) {
+      throw const FormatException('{file.content} needs a .ps3 descriptor');
+    }
+
+    final String contents;
+    try {
+      contents = await GameRepository.readLaunchDescriptor(descriptor);
+    } catch (error) {
+      throw FormatException('Cannot read launch descriptor: $error');
+    }
+    final content = contents.replaceFirst(RegExp(r'^\uFEFF'), '').trim();
+    if (!RegExp(r'^[A-Za-z0-9]{4,32}$').hasMatch(content)) {
+      throw const FormatException('Invalid PS3 serial in launch descriptor');
+    }
+    _replaceInCommand(command, placeholder, content);
+  }
+
+  static bool _commandContains(Map<String, dynamic> command, String needle) {
+    bool has(Object? value) {
+      if (value is String) return value.contains(needle);
+      if (value is List) return value.any(has);
+      if (value is Map) return value.values.any(has);
+      return false;
+    }
+
+    return has(command);
+  }
+
+  static void _replaceInCommand(
+    Map<String, dynamic> command,
+    String needle,
+    String replacement,
+  ) {
+    Object? replace(Object? value) {
+      if (value is String) return value.replaceAll(needle, replacement);
+      if (value is List) return value.map(replace).toList();
+      if (value is Map) {
+        for (final key in value.keys.toList()) {
+          value[key] = replace(value[key]);
+        }
+        return value;
+      }
+      return value;
+    }
+
+    for (final key in command.keys.toList()) {
+      command[key] = replace(command[key]);
+    }
   }
 }

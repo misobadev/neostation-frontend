@@ -1,5 +1,7 @@
 import 'package:neostation/models/game_model.dart';
 
+import 'game_name_sort.dart';
+
 /// Alphabet-bar grouping for a games list.
 ///
 /// Pure, so what the bar shows can be reasoned about — and tested — without
@@ -36,8 +38,11 @@ int favoritesRunLength(List<GameModel> games, {required int folderCount}) {
 ///
 /// Anything that does not start with a letter lands under `#`, which is where
 /// the load order puts it too.
-String letterGroupOf(GameModel game) {
-  final displayName = game.name.isNotEmpty ? game.name : game.realname;
+String letterGroupOf(GameModel game, {bool ignoreArticles = false}) {
+  final displayName = gameNameSortKey(
+    game.name.isNotEmpty ? game.name : game.realname,
+    ignoreArticles: ignoreArticles,
+  );
   return displayName.isNotEmpty ? displayName[0].toUpperCase() : '#';
 }
 
@@ -53,13 +58,14 @@ List<String> letterBarGroups(
   List<GameModel> games, {
   required int folderCount,
   required String favoritesLabel,
+  bool ignoreArticles = false,
 }) {
   final groups = <String>[];
   final run = favoritesRunLength(games, folderCount: folderCount);
   if (run > 0) groups.add(favoritesLabel);
 
   for (var i = folderCount + run; i < games.length; i++) {
-    final letter = letterGroupOf(games[i]);
+    final letter = letterGroupOf(games[i], ignoreArticles: ignoreArticles);
     if (groups.isEmpty || groups.last != letter) groups.add(letter);
   }
   return groups;

@@ -21,8 +21,6 @@ extension NeoSyncUpload on NeoSyncProvider {
     notify();
 
     try {
-      final saveFiles = <File>[];
-
       // 1. Collect RetroArch files (Saves and States)
       final savesPath = await _getRetroArchSavesPath();
       List<File> retroArchSaves = [];
@@ -36,112 +34,10 @@ extension NeoSyncUpload on NeoSyncProvider {
         retroArchStates = await _getSaveFiles(statesPath);
       }
 
-      // 2. Collect Switch NAND files
-      try {
-        final emulators = await SwitchSaveDetector.detectEmulatorNandPaths();
-        if (Platform.isAndroid) {
-          // On Android, group by Title ID and take only the most recent
-          final Map<String, List<MapEntry<File, String>>> savesByTitleId = {};
-
-          for (final emulator in emulators) {
-            final nandPath = emulator.nandDirectory;
-            final savePath =
-                '$nandPath${Platform.pathSeparator}user${Platform.pathSeparator}save${Platform.pathSeparator}0000000000000000';
-            final saveDir = Directory(savePath);
-
-            if (!await saveDir.exists()) {
-              NeoSyncProvider._log.w(
-                'Switch save dir not found for ${emulator.emulatorName}: $savePath',
-              );
-            }
-
-            if (await saveDir.exists()) {
-              NeoSyncProvider._log.d(
-                'Scanning Switch saves for ${emulator.emulatorName}: $savePath',
-              );
-              final switchFiles = saveDir
-                  .listSync(recursive: true)
-                  .whereType<File>()
-                  .where((f) => !f.path.endsWith('.') && !f.path.endsWith('..'))
-                  .where((f) => !f.path.toLowerCase().endsWith('.neosync.bak'))
-                  .toList();
-
-              for (final file in switchFiles) {
-                try {
-                  final pathParts = file.path.split(Platform.pathSeparator);
-                  final saveIndex = pathParts.indexOf('save');
-                  if (saveIndex != -1 && saveIndex + 3 < pathParts.length) {
-                    final titleId = pathParts[saveIndex + 3];
-                    final relativePath = pathParts
-                        .sublist(saveIndex + 4)
-                        .join(Platform.pathSeparator);
-                    final key = '$titleId/$relativePath';
-
-                    if (!savesByTitleId.containsKey(key)) {
-                      savesByTitleId[key] = [];
-                    }
-                    savesByTitleId[key]!.add(
-                      MapEntry(file, emulator.emulatorName),
-                    );
-                  }
-                } catch (e) {
-                  saveFiles.add(file);
-                }
-              }
-            }
-          }
-
-          for (final entry in savesByTitleId.entries) {
-            final files = entry.value;
-            if (files.length == 1) {
-              saveFiles.add(files.first.key);
-            } else {
-              File? mostRecent;
-              DateTime? mostRecentDate;
-              for (final fileEntry in files) {
-                final file = fileEntry.key;
-                final lastModified = await file.lastModified();
-                if (mostRecent == null ||
-                    lastModified.isAfter(mostRecentDate!)) {
-                  mostRecent = file;
-                  mostRecentDate = lastModified;
-                }
-              }
-              if (mostRecent != null) saveFiles.add(mostRecent);
-            }
-          }
-        } else {
-          // Desktop Switch saves
-          for (final emulator in emulators) {
-            final nandPath = emulator.nandDirectory;
-            final savePath =
-                '$nandPath${Platform.pathSeparator}user${Platform.pathSeparator}save${Platform.pathSeparator}0000000000000000';
-            final saveDir = Directory(savePath);
-            if (await saveDir.exists()) {
-              final switchFiles = saveDir
-                  .listSync(recursive: true)
-                  .whereType<File>()
-                  .where((f) => !f.path.endsWith('.') && !f.path.endsWith('..'))
-                  .where((f) => !f.path.toLowerCase().endsWith('.neosync.bak'))
-                  .toList();
-              saveFiles.addAll(switchFiles);
-            }
-          }
-        }
-      } catch (e) {
-        NeoSyncProvider._log.e('Error scanning Switch NAND saves: $e');
-      }
-
-      if (saveFiles.isEmpty) {
-        _syncStatus = 'No local save files found';
-        _processedItems.add('No local save files found for auto-sync');
-        _setSyncing(false);
-        return;
-      }
-
-      // 3. Collect user-configured custom save folders (ARMSX2, ARMSX1, etc.)
-      // from the NeoSync module. Each entry carries its system + emulator slug
-      // so the cloud path identifies the emulator that produced the save.
+      // 2. Collect user-configured custom save folders (ARMSX2, ARMSX1, ...).
+      // Standalone emulators — including Switch (Eden, Citron, Yuzu, ...) — are
+      // ALWAYS synced through a custom folder, never auto-detected, so this is
+      // the only source for standalone saves.
       final customFiles =
           <
             ({File file, String system, String emulatorSlug, String folderRoot})
@@ -170,10 +66,13 @@ extension NeoSyncUpload on NeoSyncProvider {
       }
 
       _totalFiles =
-          retroArchSaves.length +
-          retroArchStates.length +
-          customFiles.length +
-          saveFiles.length; // saveFiles contains Switch files here
+          retroArchSaves.length + retroArchStates.length + customFiles.length;
+
+      if (_totalFiles == 0) {
+        _syncStatus = 'No local save files found';
+        _processedItems.add('No local save files found for auto-sync');
+        return;
+      }
 
       _processedItems.add('Auto-syncing $_totalFiles local files...');
       _syncStatus = 'Checking files for upload...';
@@ -219,14 +118,6 @@ extension NeoSyncUpload on NeoSyncProvider {
         notify();
       }
 
-      // Process the rest (Switch, etc.)
-      for (final file in saveFiles) {
-        await _processAutoUploadFile(file, file.parent.path, isState: false);
-        _processedFiles++;
-        _syncProgress = _totalFiles > 0 ? _processedFiles / _totalFiles : 0.0;
-        notify();
-      }
-
       _syncProgress = 1.0;
       _syncStatus =
           'Auto-upload completed: $_uploadedFiles uploaded, $_skippedFiles already synced';
@@ -248,37 +139,6 @@ extension NeoSyncUpload on NeoSyncProvider {
     }
   }
 
-  /// Fase 1: Subir archivos locales
-  Future<void> _performUploadPhase(String basePath) async {
-    _syncStatus = 'Phase 1: Uploading local files...';
-    _processedItems.add('Phase 1: Scanning and uploading local files...');
-    notify();
-
-    // Determine if it is a states folder for RetroArch
-    final statesPath = await _getRetroArchStatesPath();
-    final isState = statesPath != null && path.equals(basePath, statesPath);
-
-    final saveFiles = await _getSaveFiles(basePath);
-    if (saveFiles.isEmpty) {
-      _processedItems.add('No local files found in ${path.basename(basePath)}');
-      return;
-    }
-
-    _totalFiles = saveFiles.length * 2;
-    _processedItems.add('Found ${saveFiles.length} local files to process');
-
-    for (final file in saveFiles) {
-      await _processUploadFileWithConflictDetection(
-        file,
-        basePath,
-        isState: isState,
-      );
-      _processedFiles++;
-      _syncProgress = _totalFiles > 0 ? _processedFiles / _totalFiles : 0.0;
-      notify();
-    }
-  }
-
   /// Procesa un archivo para auto-subida (versión optimizada)
   Future<void> _processAutoUploadFile(
     File file,
@@ -287,17 +147,9 @@ extension NeoSyncUpload on NeoSyncProvider {
     String? customFolderSystem,
     String? customFolderEmulatorSlug,
     String? retroArchBasePath,
+    List<NeoSyncFile>? cloudFiles,
   }) async {
     try {
-      final isNandFile = file.path.contains(
-        '${Platform.pathSeparator}nand${Platform.pathSeparator}user${Platform.pathSeparator}save',
-      );
-
-      if (isNandFile) {
-        await _handleSwitchNandAutoUpload(file);
-        return;
-      }
-
       final String relativePath;
       String? syncSystemId;
       String? syncEmulatorId;
@@ -412,17 +264,86 @@ extension NeoSyncUpload on NeoSyncProvider {
       // The save base name usually matches the ROM name, so find the game by
       // prefix and use its hash.
       String? gameHash;
+      String? romName;
       try {
         final fileName = path.basenameWithoutExtension(file.path);
         final row = await GameRepository.findRomForSaveName(fileName);
         if (row != null) {
           final game = _gameModelFromRomRow(row, fileName);
+          romName = game.romname;
           gameHash = await _resolveGameHashForUpload(game);
         }
       } catch (e) {
         NeoSyncProvider._log.w(
           'Error resolving game hash for ${path.basename(file.path)}: $e',
         );
+      }
+
+      // Changed here and on another device since the last sync: the other
+      // device's copy is kept beside it before this one is uploaded, as in a
+      // game's own sync. Only where the cloud list was read ([cloudFiles],
+      // the standalone-folder sync).
+      String? cloudCopy;
+      if (cloudFiles != null) {
+        final stat = await file.stat();
+        final local = LocalSaveFile(
+          filePath: file.path,
+          fileName: path.basename(file.path),
+          fileSize: stat.size,
+          lastModified: stat.modified,
+          gameName: gameName,
+          isSynced: false,
+          relativePath: relativePath,
+        );
+        // This file's entry: one under its emulator (or, for a memory card,
+        // under one writing the same card format) over one under none
+        // (uploaded before saves named one), then, of duplicates, the newest,
+        // as a game's own sync takes the newest.
+        NeoSyncFile? cloud;
+        for (final candidate in cloudFiles) {
+          if (!_cloudMatchesLocal(candidate, local)) continue;
+          if (cloud == null) {
+            cloud = candidate;
+            continue;
+          }
+          final named = candidate.emulator != null;
+          final bestNamed = cloud.emulator != null;
+          if (named != bestNamed) {
+            if (named) cloud = candidate;
+          } else if ((candidate.fileModifiedAtTimestamp ?? 0) >
+              (cloud.fileModifiedAtTimestamp ?? 0)) {
+            cloud = candidate;
+          }
+        }
+        if (cloud != null) {
+          final comparison = await _compareWithCloud(local, cloud);
+          // A memory card every game of its system shares that this device
+          // has never synced, and that isn't the same as the cloud's: a
+          // game's own sync takes the cloud's card and keeps this one. Sent
+          // from here, a blank card an emulator just created would replace
+          // every other device's card.
+          if (comparison.status != neo_sync.GameSyncStatus.upToDate &&
+              isSharedMemoryCard(file.path) &&
+              await _neverSynced(file.path)) {
+            _leftForLaunchFiles++;
+            _processedItems.add(
+              "Left for the game's next launch: $relativePath (never synced "
+              'here)',
+            );
+            return;
+          }
+          if (comparison.bothChanged) {
+            final kept = await _keepCloudCopy(local, cloud);
+            if (!kept.ok) {
+              _processedItems.add(
+                "Not uploaded: $relativePath (the other device's copy could "
+                'not be kept)',
+              );
+              return;
+            }
+            cloudCopy = kept.keptPath;
+          }
+        }
       }
 
       final result = await _neoSyncService.syncFile(
@@ -435,8 +356,29 @@ extension NeoSyncUpload on NeoSyncProvider {
         isState: isState,
         scope: null,
         type: syncType,
+        // As for a game's own upload: a newer cloud copy is only written while
+        // no launch of the save's game, or on a system whose games share
+        // memory cards (a PS2 or Dreamcast card), of that system, has gone ahead.
+        deadline: () {
+          final system = syncSystemId;
+          return (romName == null ? null : _launchDeadlines[romName]) ??
+              (_sharesMemoryCards(system)
+                  ? _launchDeadlines[NeoSyncProvider._systemLaunchKey(system!)]
+                  : null);
+        },
       );
 
+      // One tidy, whether or not the upload went through, keeping both
+      // copies this file just got: the other device's, and this device's
+      // when the cloud's turned out newer.
+      final keptLocal = result['keptLocalPath'];
+      if (cloudCopy != null || keptLocal is String) {
+        await tidyKeptCopies(
+          file.path,
+          sources: neoSyncKeptCopySources,
+          justKept: {?cloudCopy, if (keptLocal is String) keptLocal},
+        );
+      }
       if (result['success']) {
         if (result['skipped'] == true) {
           _skippedFiles++;
@@ -445,166 +387,21 @@ extension NeoSyncUpload on NeoSyncProvider {
           _uploadedFiles++;
           _processedItems.add('Auto-uploaded: $relativePath');
           _resetQuotaAttempts();
-        }
-      } else {
-        final errorMessage = result['message'] ?? '';
-        _processedItems.add('Failed to upload: $relativePath - $errorMessage');
-        if (_checkQuotaExceeded(errorMessage)) {
-          _quotaExceededActive = true;
-          throw QuotaExceededException(errorMessage, _quotaExceededAttempts);
-        }
-      }
-    } catch (e) {
-      if (e is! QuotaExceededException) {
-        _processedItems.add('Error processing ${path.basename(file.path)}: $e');
-      } else {
-        rethrow;
-      }
-    }
-  }
-
-  /// Maneja la subida automática de archivos de Switch NAND
-  Future<void> _handleSwitchNandAutoUpload(File file) async {
-    try {
-      final pathParts = file.path.split(Platform.pathSeparator);
-      final saveIndex = pathParts.indexOf('save');
-      if (saveIndex != -1 && saveIndex + 3 < pathParts.length) {
-        final titleId = pathParts[saveIndex + 3];
-
-        final row = await GameRepository.findSwitchGameByTitleId(titleId);
-
-        if (row == null) {
-          NeoSyncProvider._log.w(
-            'Switch upload skipped: titleId "$titleId" not found in DB (${file.path})',
-          );
-          _processedItems.add(
-            'No game matched titleId $titleId - skipping upload',
-          );
-          return;
-        }
-
-        {
-          final romname = row['filename'].toString();
-          final titleName = row['title_name']?.toString();
-          final game = GameModel(
-            name: titleName ?? romname,
-            realname: titleName ?? romname,
-            romname: romname,
-            systemFolderName: 'switch',
-            year: '',
-            developer: '',
-            publisher: '',
-            genre: '',
-            players: '',
-            rating: 0.0,
-            titleId: titleId,
-          );
-
-          final relativePath = await calculateSwitchRelativePath(file, game);
-          final result = await _neoSyncService.syncFile(
-            file,
-            game.name,
-            customFilename: relativePath,
-            type: 'save',
-          );
-
-          if (result['success']) {
-            if (result['skipped'] == true) {
-              _skippedFiles++;
-              _processedItems.add('Already synced: $relativePath');
-            } else {
-              _uploadedFiles++;
-              _processedItems.add('Auto-uploaded: $relativePath');
-              _resetQuotaAttempts();
-            }
-          } else {
-            final errorMessage = result['message'] ?? '';
-            _processedItems.add(
-              'Failed to upload: $relativePath - $errorMessage',
+          if (cloudCopy != null) {
+            reportKeptCloudCopy(
+              gameName: gameName,
+              savePath: file.path,
+              backupPath: cloudCopy,
             );
-            if (_checkQuotaExceeded(errorMessage)) {
-              _quotaExceededActive = true;
-              throw QuotaExceededException(
-                errorMessage,
-                _quotaExceededAttempts,
-              );
-            }
           }
         }
-      }
-    } catch (e) {
-      NeoSyncProvider._log.e('Error processing Switch NAND file: $e');
-    }
-  }
-
-  /// Procesa subida con detección de conflictos
-  Future<void> _processUploadFileWithConflictDetection(
-    File file,
-    String basePath, {
-    bool isState = false,
-  }) async {
-    try {
-      String relativePath = _calculateRelativePath(
-        file,
-        basePath,
-        isState: isState,
-      );
-      final rawGameName = _extractGameNameFromPath(file.path);
-      final gameName = rawGameName.isEmpty ? 'Shared Save' : rawGameName;
-      if (rawGameName.isEmpty) {
-        NeoSyncProvider._log.w(
-          'Upload: empty game_name for ${file.path}; using fallback '
-          '"$gameName"',
-        );
-      }
-
-      String? gameHash;
-      String? systemId;
-      String? emulatorId;
-      try {
-        final fileName = path.basenameWithoutExtension(file.path);
-        final row = await GameRepository.findRomForSaveName(fileName);
-        if (row != null) {
-          final game = _gameModelFromRomRow(row, fileName);
-          gameHash = await _resolveGameHashForUpload(game);
-          systemId = game.systemFolderName;
-          // Derive the RetroArch slug from the save's core folder (ground
-          // truth); fall back to the game metadata.
-          emulatorId =
-              await _resolveRetroArchEmulatorSlug(file, basePath) ??
-              _retroArchCoreSlugFromGame(game);
-        }
-      } catch (e) {
-        NeoSyncProvider._log.w(
-          'Error resolving game hash for ${path.basename(file.path)}: $e',
-        );
-      }
-
-      final result = await _neoSyncService.syncFile(
-        file,
-        gameName,
-        customFilename: relativePath,
-        gameHash: gameHash,
-        isState: isState,
-        systemId: systemId,
-        emulatorId: emulatorId,
-        type: _syncTypeForFile(file, isState: isState),
-      );
-
-      if (result['success']) {
-        if (result['skipped'] == true) {
-          _skippedFiles++;
-          _processedItems.add('Already synced: $relativePath');
-        } else {
-          _uploadedFiles++;
-          _processedItems.add('Uploaded: $relativePath');
-          _resetQuotaAttempts();
+        if (result['downloaded'] == true && keptLocal is String) {
+          reportNewerCloudCopy(gameName: gameName, savePath: file.path);
         }
       } else {
         final errorMessage = result['message'] ?? '';
         _processedItems.add('Failed to upload: $relativePath - $errorMessage');
         if (_checkQuotaExceeded(errorMessage)) {
-          _quotaExceededActive = true;
           throw QuotaExceededException(errorMessage, _quotaExceededAttempts);
         }
       }
@@ -621,28 +418,46 @@ extension NeoSyncUpload on NeoSyncProvider {
   ///
   /// Used right after the user selects a folder so its existing saves are
   /// backed up immediately, without waiting for the next global auto-sync.
-  Future<void> syncCustomSaveFolder(
+  Future<CustomFolderUploadOutcome> syncCustomSaveFolder(
     String systemFolderName,
     String emulatorSlug,
   ) async {
-    if (!isNeoSyncAuthenticated) return;
-    if (_isSyncing) return;
+    if (!isNeoSyncAuthenticated) return CustomFolderUploadOutcome.notSignedIn;
+    if (_isSyncing) return CustomFolderUploadOutcome.busy;
 
-    final folder = await NeoSyncSaveFolderRepository.getFolder(
-      systemFolderName,
-      emulatorSlug,
-    );
-    if (folder == null || folder.isEmpty) return;
-    if (!Directory(folder).existsSync()) return;
+    // Claimed before the first await, so two uploads started together can't
+    // both get past the check above. Listeners hear about it once there is a
+    // folder to upload.
+    _isSyncing = true;
+    // A Stop from before this upload started isn't meant for it; one pressed
+    // from here on is.
+    _customFolderUploadCancelled = false;
+    final String? folder;
+    try {
+      folder = await NeoSyncSaveFolderRepository.getFolder(
+        systemFolderName,
+        emulatorSlug,
+      );
+    } catch (_) {
+      _isSyncing = false;
+      rethrow;
+    }
+    if (folder == null || folder.isEmpty || !Directory(folder).existsSync()) {
+      _isSyncing = false;
+      return CustomFolderUploadOutcome.noFolder;
+    }
 
+    // Neither clears nor sets the provider-wide error: that error turns every
+    // game's NeoSync mark red, and this upload's outcome is reported to its
+    // caller instead (the folders view, or the bell for the automatic one).
     _setSyncing(true);
-    _error = null;
     _syncProgress = 0.0;
     _syncStatus = 'Uploading standalone save folder...';
     _totalFiles = 0;
     _processedFiles = 0;
     _uploadedFiles = 0;
     _skippedFiles = 0;
+    _leftForLaunchFiles = 0;
     _downloadedFiles = 0;
     _processedItems = [];
     notify();
@@ -653,34 +468,102 @@ extension NeoSyncUpload on NeoSyncProvider {
       if (files.isEmpty) {
         _syncStatus = 'No save files found in the selected folder';
         _processedItems.add(_syncStatus);
-        return;
+        return CustomFolderUploadOutcome.empty;
       }
+
+      // Each save is compared with its cloud copy, as a game's own sync does,
+      // so one changed here and on another device keeps the other device's
+      // copy before this one is uploaded. Without the list nothing is
+      // uploaded on a guess.
+      // As at a launch: another device may have uploaded seconds ago.
+      _markCloudListStale(olderThan: NeoSyncProvider._cloudListLaunchMaxAge);
+      final allCloudFiles = await _cloudFileList();
+      if (allCloudFiles == null) {
+        _syncStatus = 'Could not list the cloud saves: nothing uploaded';
+        _processedItems.add(_syncStatus);
+        return CustomFolderUploadOutcome.failed;
+      }
+      // This folder's saves in the cloud: kept as `custom` files under its
+      // emulator (or, uploaded before saves named one, under none). A memory
+      // card of an emulator writing the same card format is the same card:
+      // the cloud keeps one card of a name whichever emulator sent it.
+      final cloudFiles = [
+        for (final cloud in allCloudFiles)
+          if (!_isKeptCopyInCloud(cloud) &&
+              cloud.type == 'custom' &&
+              (cloud.emulator == null ||
+                  cloud.emulator == emulatorSlug ||
+                  (isSharedMemoryCard(cloud.filePath) &&
+                      CloudPathBuilder.sameMemoryCardFormat(
+                        cloud.emulator!,
+                        emulatorSlug,
+                      ))))
+            cloud,
+      ];
 
       _processedItems.add('Uploading $_totalFiles save files...');
       notify();
 
       for (final file in files) {
-        await _processAutoUploadFile(
-          file,
-          folder,
-          isState: false,
-          customFolderSystem: systemFolderName,
-          customFolderEmulatorSlug: emulatorSlug,
-        );
+        if (_customFolderUploadCancelled) {
+          _syncStatus =
+              'Upload stopped: $_uploadedFiles uploaded, $_skippedFiles '
+              'already synced';
+          _processedItems.add(_syncStatus);
+          return CustomFolderUploadOutcome.cancelled;
+        }
+        // A memory card every game of its system shares that a game's own
+        // sync is working on is left to it, so the two never keep or write
+        // the same card's copies at once. The folder sync doesn't claim cards
+        // itself: a launch on the system then syncs the card too, and keeps
+        // its deadline until that sync is done.
+        if (isSharedMemoryCard(file.path) &&
+            _sharedCardsInFlight.contains(file.path)) {
+          _skippedFiles++;
+          _processedItems.add(
+            'Being synced by a game: ${path.basename(file.path)}',
+          );
+        } else {
+          await _processAutoUploadFile(
+            file,
+            folder,
+            isState: false,
+            customFolderSystem: systemFolderName,
+            customFolderEmulatorSlug: emulatorSlug,
+            cloudFiles: cloudFiles,
+          );
+        }
         _processedFiles++;
         _syncProgress = _totalFiles > 0 ? _processedFiles / _totalFiles : 0.0;
         notify();
       }
 
+      // A save that neither uploaded nor was already in sync failed.
+      final failed =
+          _processedFiles -
+          _uploadedFiles -
+          _skippedFiles -
+          _leftForLaunchFiles;
       _syncProgress = 1.0;
       _syncStatus =
-          'Upload complete: $_uploadedFiles uploaded, $_skippedFiles already synced';
+          'Upload complete: $_uploadedFiles uploaded, $_skippedFiles already '
+          'synced, $_leftForLaunchFiles left for a launch, $failed failed';
       _processedItems.add(_syncStatus);
+      return failed > 0
+          ? CustomFolderUploadOutcome.failed
+          : CustomFolderUploadOutcome.uploaded;
+    } on QuotaExceededException catch (e) {
+      final message = 'Error uploading standalone save folder: $e';
+      _syncStatus = 'Error: $message';
+      _processedItems.add(_syncStatus);
+      NeoSyncProvider._log.e(message);
+      return CustomFolderUploadOutcome.quotaExceeded;
     } catch (e) {
-      _error = 'Error uploading standalone save folder: $e';
-      _syncStatus = 'Error: $_error';
+      final message = 'Error uploading standalone save folder: $e';
+      _syncStatus = 'Error: $message';
       _processedItems.add(_syncStatus);
-      NeoSyncProvider._log.e(_error!);
+      NeoSyncProvider._log.e(message);
+      return CustomFolderUploadOutcome.failed;
     } finally {
       _setSyncing(false);
     }

@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
+
 import 'new_settings_options/general_settings_content.dart';
 import 'new_settings_options/secondary_settings_content.dart';
 import 'new_settings_options/directories_settings_content.dart';
@@ -16,10 +18,14 @@ import 'new_settings_options/about_settings_content.dart';
 import 'new_settings_options/exit_settings_content.dart';
 import 'new_settings_options/themes_settings_content.dart';
 import 'new_settings_options/system_art_settings_content.dart';
-import 'new_settings_options/screenscraper/screenscraper_settings_content.dart';
+import 'new_settings_options/metadata_settings_content.dart';
+
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/neo_glass.dart';
+
 import '../../providers/sqlite_config_provider.dart';
 
 /// A unified Settings dashboard featuring a master-detail layout with category navigation and contextual content panels.
@@ -82,8 +88,8 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       GlobalKey<ThemesSettingsContentState>();
   final GlobalKey<SystemArtSettingsContentState> _systemArtSettingsKey =
       GlobalKey<SystemArtSettingsContentState>();
-  final GlobalKey<ScreenScraperSettingsContentState> _screenScraperKey =
-      GlobalKey<ScreenScraperSettingsContentState>();
+  final GlobalKey<MetadataSettingsContentState> _metadataKey =
+      GlobalKey<MetadataSettingsContentState>();
   final GlobalKey<DirectoriesSettingsContentState> _directoriesSettingsKey =
       GlobalKey<DirectoriesSettingsContentState>();
   final GlobalKey<ToolsSettingsContentState> _toolsSettingsKey =
@@ -258,7 +264,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       return true;
     }
     if (selectedKey == AppLocale.metadata) {
-      return _screenScraperKey.currentState?.navigateUp() ?? false;
+      return _metadataKey.currentState?.navigateUp() ?? false;
     }
 
     // Generic linear navigation within content lists.
@@ -316,7 +322,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
       return true;
     }
     if (selectedKey == AppLocale.metadata) {
-      return _screenScraperKey.currentState?.navigateDown() ?? false;
+      return _metadataKey.currentState?.navigateDown() ?? false;
     }
 
     final previousIndex = _selectedContentIndex;
@@ -357,8 +363,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
           _systemArtSettingsKey.currentState?.navigateLeft() ?? true;
       if (returnToMenu) _returnFocusToMenu();
     } else if (selectedKey == AppLocale.metadata) {
-      final returnToMenu =
-          _screenScraperKey.currentState?.navigateLeft() ?? true;
+      final returnToMenu = _metadataKey.currentState?.navigateLeft() ?? true;
       if (returnToMenu) _returnFocusToMenu();
     } else {
       _returnFocusToMenu();
@@ -382,7 +387,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
     } else if (selectedKey == AppLocale.systemArt) {
       _systemArtSettingsKey.currentState?.navigateRight();
     } else if (selectedKey == AppLocale.metadata) {
-      _screenScraperKey.currentState?.navigateRight();
+      _metadataKey.currentState?.navigateRight();
     }
   }
 
@@ -413,7 +418,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
     if (_focusOnMenu) return;
     final selectedKey = _menuItems[_selectedMenuIndex].localeKey;
     if (selectedKey == AppLocale.metadata &&
-        (_screenScraperKey.currentState?.navigateBack() ?? false)) {
+        (_metadataKey.currentState?.navigateBack() ?? false)) {
       return;
     }
     _returnFocusToMenu();
@@ -443,7 +448,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
     } else if (selectedKey == AppLocale.systemArt) {
       return _systemArtSettingsKey.currentState?.getItemCount() ?? 0;
     } else if (selectedKey == AppLocale.metadata) {
-      return _screenScraperKey.currentState?.getItemCount() ?? 0;
+      return _metadataKey.currentState?.getItemCount() ?? 0;
     } else if (selectedKey == AppLocale.directories) {
       return _directoriesSettingsKey.currentState?.getItemCount() ?? 0;
     } else if (selectedKey == AppLocale.tools) {
@@ -470,7 +475,7 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
     } else if (selectedKey == AppLocale.systemArt) {
       _systemArtSettingsKey.currentState?.selectItem(_selectedContentIndex);
     } else if (selectedKey == AppLocale.metadata) {
-      _screenScraperKey.currentState?.selectItem();
+      _metadataKey.currentState?.selectItem();
     } else if (selectedKey == AppLocale.directories) {
       _directoriesSettingsKey.currentState?.selectItem(_selectedContentIndex);
     } else if (selectedKey == AppLocale.tools) {
@@ -548,81 +553,91 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
   }
 
   Widget _buildLeftMenu(ThemeData theme) {
-    return Container(
+    final radii = theme.extension<CornerRadii>();
+    final radiusPx = radii?.radiusExternalRadius ?? 14.r;
+    final radius = radii?.radiusExternal ?? BorderRadius.circular(14.r);
+    final rimWidth = NeoGlass.borderWidthOf(context);
+
+    return SizedBox(
       width: MediaQuery.of(context).size.width * 0.25,
-      decoration: BoxDecoration(
-        color: theme.cardColor.withValues(alpha: 0.25),
-        border: Border(
-          right: BorderSide(
-            color: theme.colorScheme.primary.withValues(alpha: 0.1),
-            width: 1.r,
-          ),
-        ),
-      ),
       child: ListView.builder(
+        padding: EdgeInsets.fromLTRB(16.r, 0, 8.r, 24.r),
         itemCount: _menuItems.length,
         itemBuilder: (context, index) {
           final item = _menuItems[index];
           if (!item.isVisible) return const SizedBox.shrink();
 
           final isSelected = _selectedMenuIndex == index;
+          // While focus lives in the content panel, keep the active category
+          // visible but muted so the content's own selection reads as primary.
+          final mutedSelection = Color.alphaBlend(
+            theme.colorScheme.onSurface.withValues(alpha: 0.18),
+            theme.colorScheme.surface,
+          );
+          final background = isSelected
+              ? (_focusOnMenu ? theme.colorScheme.onSurface : mutedSelection)
+              : theme.colorScheme.surface;
+          final contentColor = isSelected
+              ? (_focusOnMenu
+                    ? theme.colorScheme.surface
+                    : theme.colorScheme.onSurface)
+              : theme.colorScheme.onSurface;
 
-          return Material(
-            key: isSelected ? _selectedMenuItemKey : null,
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                SfxService().playNavSound();
-                _onMenuItemSelected(index);
-              },
-              canRequestFocus: false,
-              focusColor: Colors.transparent,
-              hoverColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 12.r),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? theme.colorScheme.primary.withValues(alpha: 0.15)
-                      : Colors.transparent,
-                  border: Border(
-                    left: BorderSide(
-                      color: isSelected && _focusOnMenu
-                          ? theme.colorScheme.primary
-                          : Colors.transparent,
-                      width: 3.r,
-                    ),
+          final button = Container(
+            decoration: BoxDecoration(color: background, borderRadius: radius),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: radius,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () {
+                  SfxService().playNavSound();
+                  _onMenuItemSelected(index);
+                },
+                canRequestFocus: false,
+                focusColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                borderRadius: radius,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.r,
+                    vertical: 8.r,
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      item.icon,
-                      color: isSelected && _focusOnMenu
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
-                      size: 20.r,
-                    ),
-                    SizedBox(width: 12.r),
-                    Expanded(
-                      child: Text(
-                        item.localeKey.getString(context),
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: isSelected && _focusOnMenu
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurface,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          fontSize: 14.r,
+                  child: Row(
+                    children: [
+                      Icon(item.icon, color: contentColor, size: 18.r),
+                      SizedBox(width: 10.r),
+                      Expanded(
+                        child: Text(
+                          item.localeKey.getString(context),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: contentColor,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            fontSize: 12.r,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
+          );
+
+          return Padding(
+            key: isSelected ? _selectedMenuItemKey : null,
+            padding: EdgeInsets.only(bottom: 8.r),
+            child: rimWidth > 0
+                ? NeoGlassRim(
+                    cornerRadius: radiusPx,
+                    borderWidth: rimWidth,
+                    child: button,
+                  )
+                : button,
           );
         },
       ),
@@ -697,8 +712,8 @@ class _NewSettingsScreenState extends State<NewSettingsScreen> {
         },
       );
     } else if (selectedKey == AppLocale.metadata) {
-      return ScreenScraperSettingsContent(
-        key: _screenScraperKey,
+      return MetadataSettingsContent(
+        key: _metadataKey,
         isContentFocused: !_focusOnMenu,
       );
     } else if (selectedKey == AppLocale.launcher) {

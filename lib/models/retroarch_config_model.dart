@@ -29,6 +29,21 @@ class RetroArchConfig {
   /// settings and users do enable just one.
   final bool sortSavestatesByCore;
 
+  /// Whether RetroArch files save data into a subfolder named after the
+  /// folder the content is in (`sort_savefiles_by_content_enable`). With
+  /// [sortSavefilesByCore] on as well, the core's folder goes inside it:
+  /// `<savefileDirectory>/<content folder>/<Core Name>/`.
+  final bool sortSavefilesByContent;
+
+  /// The same for save states (`sort_savestates_by_content_enable`).
+  final bool sortSavestatesByContent;
+
+  /// Whether the settings above were read from [configPath]. False when no
+  /// file was found or it couldn't be read (on Android, RetroArch's file is
+  /// usually out of reach), and the defaults stand in: RetroArch may then
+  /// sort its saves in ways these fields don't show.
+  final bool settingsRead;
+
   const RetroArchConfig({
     this.id,
     required this.configPath,
@@ -37,6 +52,9 @@ class RetroArchConfig {
     this.savestateDirectory,
     this.sortSavefilesByCore = false,
     this.sortSavestatesByCore = false,
+    this.sortSavefilesByContent = false,
+    this.sortSavestatesByContent = false,
+    this.settingsRead = false,
   });
 
   /// Creates a [RetroArchConfig] instance from a JSON-compatible map.
@@ -57,6 +75,14 @@ class RetroArchConfig {
       sortSavestatesByCore:
           json['sort_savestates_by_core'] == true ||
           json['sortSavestatesByCore'] == true,
+      sortSavefilesByContent:
+          json['sort_savefiles_by_content'] == true ||
+          json['sortSavefilesByContent'] == true,
+      sortSavestatesByContent:
+          json['sort_savestates_by_content'] == true ||
+          json['sortSavestatesByContent'] == true,
+      settingsRead:
+          json['settings_read'] == true || json['settingsRead'] == true,
     );
   }
 
@@ -70,6 +96,9 @@ class RetroArchConfig {
       'savestate_directory': savestateDirectory,
       'sort_savefiles_by_core': sortSavefilesByCore,
       'sort_savestates_by_core': sortSavestatesByCore,
+      'sort_savefiles_by_content': sortSavefilesByContent,
+      'sort_savestates_by_content': sortSavestatesByContent,
+      'settings_read': settingsRead,
     };
   }
 
@@ -82,6 +111,9 @@ class RetroArchConfig {
     String? savestateDirectory,
     bool? sortSavefilesByCore,
     bool? sortSavestatesByCore,
+    bool? sortSavefilesByContent,
+    bool? sortSavestatesByContent,
+    bool? settingsRead,
   }) {
     return RetroArchConfig(
       id: id ?? this.id,
@@ -91,6 +123,11 @@ class RetroArchConfig {
       savestateDirectory: savestateDirectory ?? this.savestateDirectory,
       sortSavefilesByCore: sortSavefilesByCore ?? this.sortSavefilesByCore,
       sortSavestatesByCore: sortSavestatesByCore ?? this.sortSavestatesByCore,
+      sortSavefilesByContent:
+          sortSavefilesByContent ?? this.sortSavefilesByContent,
+      sortSavestatesByContent:
+          sortSavestatesByContent ?? this.sortSavestatesByContent,
+      settingsRead: settingsRead ?? this.settingsRead,
     );
   }
 

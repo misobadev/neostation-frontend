@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -124,18 +125,16 @@ class GameScreenshot extends StatelessWidget {
               isError
                   ? 'assets/images/icons/warning-bulk.png'
                   : 'assets/images/icons/image-bulk.png',
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             isError ? 'Error loading image' : 'No screenshot',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.7),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -205,9 +204,8 @@ class GameScreenshotCard extends StatelessWidget {
                     if (title != null)
                       Text(
                         title!,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -217,9 +215,8 @@ class GameScreenshotCard extends StatelessWidget {
                       Text(
                         subtitle!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.7),
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: 0.7),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

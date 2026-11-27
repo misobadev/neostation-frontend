@@ -1,6 +1,7 @@
 import '../data/datasources/sqlite_service.dart';
 import '../models/database_game_model.dart';
 import '../models/ra_game_list_entry.dart';
+import '../models/ra_catalogue_game.dart';
 import '../models/ra_hash_policy.dart';
 import '../models/ra_match_candidate.dart';
 import '../models/retro_achievements_dashboard_models.dart';
@@ -10,6 +11,69 @@ import '../services/logger_service.dart';
 /// Repository for RetroAchievements data access.
 class RetroAchievementsRepository {
   static final _log = LoggerService.instance;
+
+  static Future<List<({int id, DateTime? refreshedAt})>>
+  getLibraryRaConsoles() async {
+    final db = await SqliteService.getDatabase();
+    final rows = await db.rawQuery('''
+      SELECT DISTINCT CAST(s.ra_id AS INTEGER) AS console_id, c.refreshed_at
+      FROM app_systems s JOIN user_roms ur ON ur.app_system_id = s.id
+      LEFT JOIN app_ra_catalogue_sync c ON c.console_id = CAST(s.ra_id AS INTEGER)
+      WHERE CAST(s.ra_id AS INTEGER) > 0
+      ORDER BY console_id
+    ''');
+    return rows
+        .map(
+          (r) => (
+            id: r['console_id'] as int,
+            refreshedAt: DateTime.tryParse(r['refreshed_at']?.toString() ?? ''),
+          ),
+        )
+        .toList();
+  }
+
+  static Future<void> replaceRaCatalogue(
+    int consoleId,
+    List<RaCatalogueGame> games,
+    DateTime refreshedAt,
+  ) async {
+    if (games.any((g) => g.metadata['console_id'] != consoleId)) {
+      throw ArgumentError('Catalogue console mismatch');
+    }
+    final db = await SqliteService.getDatabase();
+    await db.transaction((txn) async {
+      await txn.delete(
+        'app_ra_game_list',
+        where: 'console_id = ?',
+        whereArgs: [consoleId],
+      );
+      for (final game in games) {
+        for (final hash in game.hashes) {
+          await txn.insert('app_ra_game_list', {
+            ...game.metadata,
+            'hash': hash,
+          });
+        }
+      }
+      await txn.insert('app_ra_catalogue_sync', {
+        'console_id': consoleId,
+        'refreshed_at': refreshedAt.toUtc().toIso8601String(),
+        'match_pending': 1,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
+  static Future<bool> hasPendingRaCatalogueMatch() async {
+    final db = await SqliteService.getDatabase();
+    return (await db.rawQuery(
+      'SELECT 1 FROM app_ra_catalogue_sync WHERE match_pending = 1 LIMIT 1',
+    )).isNotEmpty;
+  }
+
+  static Future<void> completeRaCatalogueMatch() async {
+    final db = await SqliteService.getDatabase();
+    await db.execute('UPDATE app_ra_catalogue_sync SET match_pending = 0');
+  }
 
   static const String _raApiKeyStorageKey = 'ra_api_key';
 
@@ -339,7 +403,7 @@ class RetroAchievementsRepository {
 
   // ── Manual match search ───────────────────────────────────────────────────
 
-  /// Searches the bundled RA snapshot for games on [consoleRaId] whose title
+  /// Searches the local RA catalogue for games on [consoleRaId] whose title
   /// matches [query], for the "this isn't the right game" picker.
   ///
   /// The table holds one row per registered hash, so results are collapsed to

@@ -125,6 +125,13 @@ class NativeCarousel extends StatefulWidget {
   /// Shrink/fade envelope applied to off-centre pages.
   final CarouselDepth depth;
 
+  /// Whether to skip the per-page scale/fade envelope entirely.
+  ///
+  /// Performance mode keeps the PageView and its snapping, navigation and page
+  /// callbacks untouched; it only omits the decorative transforms that make
+  /// off-centre cards shrink and fade.
+  final bool performanceMode;
+
   /// Whether stepping past either end continues from the other.
   ///
   /// Off by default, which is what the systems carousel wants: it is a short
@@ -144,6 +151,7 @@ class NativeCarousel extends StatefulWidget {
     this.footerHeight,
     this.depth = const CarouselDepth(),
     this.wrap = false,
+    this.performanceMode = false,
   });
 
   @override
@@ -155,7 +163,7 @@ class NativeCarouselState extends State<NativeCarousel> {
   int _currentIndex = 0;
   double _lastVpFraction = 0;
   int _lastReportedIndex = 0;
-  final ValueNotifier<double> _pageNotifier = ValueNotifier(0.0);
+  ValueNotifier<double> _pageNotifier = ValueNotifier(0.0);
 
   /// True while a controller-driven page animation is running. Gates pointer
   /// input so a stray touch cannot cancel the animation mid-flight.
@@ -245,6 +253,9 @@ class NativeCarouselState extends State<NativeCarousel> {
     if (_pageController == null || vpFraction != _lastVpFraction) {
       _pageController?.removeListener(_onPageScroll);
       _pageController?.dispose();
+      // Initial layout sets the new position without a scroll notification.
+      _pageNotifier.dispose();
+      _pageNotifier = ValueNotifier(_currentIndex.toDouble());
       _lastVpFraction = vpFraction;
       _pageController = PageController(
         viewportFraction: vpFraction,
@@ -423,6 +434,7 @@ class NativeCarouselState extends State<NativeCarousel> {
                       child: widget.itemBuilder(context, index),
                     ),
                   );
+                  if (widget.performanceMode) return card;
                   return ValueListenableBuilder<double>(
                     valueListenable: _pageNotifier,
                     child: card,
@@ -433,6 +445,13 @@ class NativeCarouselState extends State<NativeCarousel> {
                         depth.minScale,
                         1.0,
                       );
+                      final scaled = Transform.scale(
+                        scale: scale,
+                        child: child,
+                      );
+                      if (depth.minOpacity == 1 && depth.edgePull == 0) {
+                        return scaled;
+                      }
                       final opacity =
                           (depth.opacityBase - distance * depth.opacityFalloff)
                               .clamp(depth.minOpacity, 1.0);
@@ -449,11 +468,7 @@ class NativeCarouselState extends State<NativeCarousel> {
                         opacity: opacity,
                         child: Transform.translate(
                           offset: Offset(pull, 0),
-                          child: Transform.scale(
-                            scale: scale,
-                            alignment: Alignment.center,
-                            child: child,
-                          ),
+                          child: scaled,
                         ),
                       );
                     },

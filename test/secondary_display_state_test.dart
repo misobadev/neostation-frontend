@@ -15,13 +15,15 @@ void main() {
       gameScreenshot: '/data/screenshot.png',
       gameWheel: '/data/wheel.png',
       gameVideo: '/data/video.mp4',
+      videoPreviewDelay: 4,
+      videoPreviewDeadlineMillis: 1700000002500,
+      videoPreviewFileChecked: true,
+      videoPreviewFileExists: true,
       gameImageBytes: Uint8List.fromList([0, 1, 2, 253, 254, 255]),
       isGameSelected: true,
       isVideoMuted: true,
       hideBottomScreen: true,
       muteToggleTrigger: 4,
-      screenshotTrigger: 9,
-      screenshotAccessEnabled: true,
       backgroundColor: 0xFF102030,
       themeName: 'midnight',
       isSecondaryActive: true,
@@ -85,6 +87,8 @@ void main() {
       dockApps: const ['com.a', 'com.b', '', '', ''],
       dockEditTrigger: 3,
       dockEnabled: false,
+      // Non-default so a field dropped from toJson/fromJson fails the round-trip.
+      hideSystemLogo: true,
       dockSlotCount: 4,
       // Both non-default so a field dropped from toJson/fromJson actually fails
       // the round-trip — at their `false` defaults a missing key restores to the
@@ -145,6 +149,9 @@ void main() {
       // applies from the first-launch WELCOME seed, not just after a relaunch.
       expect(restored.fanartDimLevel, 25);
       expect(restored.dockEnabled, isTrue);
+      // Mirrors the config default (secondary_hide_system_logo DEFAULT 1) so the
+      // logo never flashes on the secondary display before the seed lands.
+      expect(restored.hideSystemLogo, isTrue);
       expect(restored.dockSlotCount, 3);
       expect(restored.dockApps, const ['', '', '', '', '']);
       // Both latches start off: the main engine hasn't painted, and the dock is

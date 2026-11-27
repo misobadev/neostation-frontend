@@ -1,10 +1,13 @@
 import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
+import 'dart:isolate';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart'; // Required for rootBundle
 import 'package:path/path.dart' as path; // Required for path operations
 import 'package:sqlite3/sqlite3.dart' as sqlite; // sqlite3 usage
+
 import '../../services/android_service.dart';
 
 import '../../models/system_model.dart';
@@ -87,6 +90,14 @@ abstract class DatabaseExecutorAdapter {
 }
 
 /// Concrete implementation of [DatabaseExecutorAdapter] using `package:sqlite3`.
+/// Inputs for evaluating smart-collection rules: slim game rows, naming
+/// settings keyed by `app_system_id`, and lower-case extensions by system id.
+typedef RuleLibraryRows = ({
+  List<Map<String, Object?>> games,
+  Map<String, Map<String, Object?>> settings,
+  Map<String, Set<String>> extensions,
+});
+
 class DatabaseAdapter implements DatabaseExecutorAdapter {
   final sqlite.Database _db;
   DatabaseAdapter(this._db);
@@ -460,7 +471,31 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 165;
+  static const int _databaseVersion = 198;
+
+  /// SQL predicate (over `user_roms` aliased `ur`) for an installed app the
+  /// user marked as a game. See migration v191.
+  static const String androidGameFlagSql =
+      'COALESCE(ur.is_android_game, 0) = 1';
+
+  /// WHERE clause (over `user_roms` aliased `ur`) selecting the rows listed
+  /// under [systemId], with its arguments.
+  ///
+  /// "Android Games" owns no rows: its games are the `android` system's apps
+  /// the user marked, and "Android" lists only the rest.
+  static (String, List<Object?>) _systemRowsFilter(String systemId) =>
+      switch (systemId) {
+        SystemFolderNames.androidGames => (
+          "ur.app_system_id = 'android' AND $androidGameFlagSql",
+          const [],
+        ),
+        SystemFolderNames.android => (
+          "ur.app_system_id = 'android' AND NOT ($androidGameFlagSql)",
+          const [],
+        ),
+        _ => ('ur.app_system_id = ?', [systemId]),
+      };
+
   static const String _databaseName = 'data.sqlite';
 
   DatabaseAdapter? _database;
@@ -702,6 +737,9 @@ class SqliteService {
     Map<String, int> osMap,
   ) => _syncEmulators(txn, systemId, emulators, osMap, systemId);
 
+  static String? _encodeExtensions(List<String> extensions) =>
+      extensions.isEmpty ? null : jsonEncode(extensions);
+
   static Future<void> _syncEmulators(
     TransactionAdapter txn,
     String systemId,
@@ -805,9 +843,8 @@ class SqliteService {
             final args = platformData['launch_arguments'].toString();
 
             // Extract package and activity from "-n package/activity"
-            final componentMatch = RegExp(
-              r'-n\s+([^\s/]+)/([^\s]+)',
-            ).firstMatch(args);
+            final componentMatch = RegExp(r'-n\s+([^\s/]+)/([^\s]+)')
+                .firstMatch(args);
             if (componentMatch != null) {
               packageName ??= componentMatch.group(1);
               var activity = componentMatch.group(2)!;
@@ -857,9 +894,8 @@ class SqliteService {
           }
           final args = platformData['args'];
           if (args != null) {
-            final match = RegExp(
-              r'-L\s+(?:cores\\|cores/)?([\w_\-\.]+)',
-            ).firstMatch(args);
+            final match = RegExp(r'-L\s+(?:cores\\|cores/)?([\w_\-\.]+)')
+                .firstMatch(args);
             if (match != null) {
               coreFilename = match.group(1);
             }
@@ -872,9 +908,8 @@ class SqliteService {
           }
           final args = platformData['args'];
           if (args != null) {
-            final match = RegExp(
-              r'-L\s+(?:cores\\|cores/)?([\w_\-\.]+)',
-            ).firstMatch(args);
+            final match = RegExp(r'-L\s+(?:cores\\|cores/)?([\w_\-\.]+)')
+                .firstMatch(args);
             if (match != null) {
               coreFilename = match.group(1);
             }
@@ -946,6 +981,7 @@ class SqliteService {
             'android_activity_name': platformData['_resolved_activity_name'],
             'is_ra_compatible': retroAchievementsCompatible ? 1 : 0,
             'neosync_slug': neosyncSlug,
+            'supported_extensions': _encodeExtensions(emuDef.extensions),
           };
 
           if (isDefaultCore) {
@@ -967,8 +1003,7 @@ class SqliteService {
           final existingByName = await txn.query(
             'app_emulators',
             columns: ['unique_identifier'],
-            where:
-                'system_id = ? AND os_id = ? AND name = ? AND unique_identifier IS NULL',
+            where: 'system_id = ? AND os_id = ? AND name = ? AND unique_identifier IS NULL',
             whereArgs: [systemId, osId, dbName],
           );
 
@@ -982,6 +1017,7 @@ class SqliteService {
               'android_activity_name': platformData['_resolved_activity_name'],
               'is_ra_compatible': retroAchievementsCompatible ? 1 : 0,
               'neosync_slug': neosyncSlug,
+              'supported_extensions': _encodeExtensions(emuDef.extensions),
             };
             if (isDefaultCore) {
               updateData['is_default_core'] = 1;
@@ -991,8 +1027,7 @@ class SqliteService {
             await txn.update(
               'app_emulators',
               updateData,
-              where:
-                  'system_id = ? AND os_id = ? AND name = ? AND unique_identifier IS NULL',
+              where: 'system_id = ? AND os_id = ? AND name = ? AND unique_identifier IS NULL',
               whereArgs: [systemId, osId, dbName],
             );
             processedUniqueIds.add(emuDef.uniqueId);
@@ -1012,6 +1047,7 @@ class SqliteService {
               'is_default': 0,
               'is_ra_compatible': retroAchievementsCompatible ? 1 : 0,
               'neosync_slug': neosyncSlug,
+              'supported_extensions': _encodeExtensions(emuDef.extensions),
             };
             if (isDefaultCore) {
               insertData['is_default_core'] = 1;
@@ -1167,8 +1203,38 @@ class SqliteService {
   // Lock logging initialization to avoid recursion
   Completer<DatabaseAdapter>? _initCompleter;
 
+  /// Set while [withAccessHeld] runs: other callers wait for it before they
+  /// get the database.
+  Completer<void>? _accessHold;
+
+  /// Marks the zone of the [withAccessHeld] body, whose own accesses go ahead.
+  static final Object _holdOwner = Object();
+
+  /// Runs [body] while every other caller of [database] waits, and lets them
+  /// go when it ends. Moving the user data copies the database, switches to
+  /// the new folder and closes the old database in [body], so a write that
+  /// arrives meanwhile lands in the new database rather than in the old one,
+  /// which the move then deletes. Code inside [body] (and anything it awaits)
+  /// uses the database as usual. Keep [body] short: reads wait too.
+  ///
+  /// A caller that already holds the database from before the hold, such as
+  /// a scan in progress, isn't held: the move refuses to start while one runs.
+  static Future<T> withAccessHeld<T>(Future<T> Function() body) async {
+    final hold = Completer<void>();
+    instance._accessHold = hold;
+    try {
+      return await runZoned(body, zoneValues: {_holdOwner: true});
+    } finally {
+      instance._accessHold = null;
+      hold.complete();
+    }
+  }
+
   /// Provides the database instance (lazy initialization).
   Future<DatabaseAdapter> get database async {
+    while (_accessHold != null && Zone.current[_holdOwner] != true) {
+      await _accessHold!.future;
+    }
     if (_database != null && _initialized) {
       return _database!;
     }
@@ -1876,6 +1942,7 @@ class SqliteService {
           android_package_name TEXT,
           android_activity_name TEXT,
           neosync_slug TEXT,
+          supported_extensions TEXT,
           PRIMARY KEY (os_id, unique_identifier),
           FOREIGN KEY (os_id) REFERENCES app_os(id) ON DELETE CASCADE,
           FOREIGN KEY (system_id) REFERENCES app_systems(id) ON DELETE CASCADE
@@ -1916,16 +1983,21 @@ class SqliteService {
         ignore_hidden_files INTEGER DEFAULT 1,
         setup_completed INTEGER DEFAULT 0,
         hide_bottom_screen INTEGER DEFAULT 0,
+        swap_screens INTEGER DEFAULT 0,
         sfx_enabled INTEGER DEFAULT 1,
         sfx_volume REAL DEFAULT 0.75,
+        custom_sfx TEXT,
         system_sort_by TEXT DEFAULT 'alphabetical',
+        ignore_articles_in_game_sort INTEGER DEFAULT 0,
+        video_previews INTEGER DEFAULT 1,
+        video_preview_delay INTEGER DEFAULT 2,
         collection_sort_by TEXT DEFAULT 'name',
         collection_sort_order TEXT DEFAULT 'asc',
         system_sort_order TEXT DEFAULT 'asc',
         app_language TEXT DEFAULT 'en',
         active_theme TEXT DEFAULT '',
         hide_recent_card INTEGER DEFAULT 0,
-        recent_card_size TEXT DEFAULT 'default',
+        recent_card_size TEXT DEFAULT '2x1',
         -- Unused since the vertical action rail was removed. Kept so a fresh
         -- install matches the schema migration v103 left on upgraded devices.
         legend_hidden INTEGER DEFAULT 0,
@@ -1937,6 +2009,7 @@ class SqliteService {
         hide_tab_search INTEGER DEFAULT 0,
         hide_search_card INTEGER DEFAULT 1,
         android_apps_as_tab INTEGER DEFAULT 0,
+        hide_tab_discovery INTEGER DEFAULT 0,
         active_sync_provider TEXT DEFAULT 'neosync',
         systems_version TEXT DEFAULT '',
         -- Generation stamp of the bundled RA seed asset that is currently
@@ -1947,12 +2020,16 @@ class SqliteService {
         auto_update_app INTEGER DEFAULT 1,
         auto_update_systems INTEGER DEFAULT 1,
         system_grid_columns TEXT DEFAULT 'M',
+        discovery_grid_columns TEXT DEFAULT 'M',
+        discovery_view_mode TEXT DEFAULT 'grid',
+        android_grid_columns TEXT DEFAULT 'M',
         game_grid_columns TEXT DEFAULT 'M',
         game_list_size TEXT DEFAULT 'S',
         game_carousel_card_style TEXT DEFAULT 'fanart',
         use_12_hour_clock INTEGER DEFAULT 0,
         dock_apps TEXT,
         dock_enabled INTEGER DEFAULT 1,
+        secondary_hide_system_logo INTEGER DEFAULT 1,
         dock_slot_count INTEGER DEFAULT 3,
         now_playing_dim_delay INTEGER DEFAULT 3,
         now_playing_dim_level INTEGER DEFAULT 100,
@@ -1963,9 +2040,11 @@ class SqliteService {
         ra_match_on_startup INTEGER DEFAULT 0,
         subfolder_view_all INTEGER DEFAULT 0,
         hide_system_logos INTEGER DEFAULT 0,
+        performance_mode INTEGER DEFAULT 0,
         neoglass_blur INTEGER DEFAULT 0,
         neoglass_transparency INTEGER DEFAULT 10,
-        neoglass_border_width REAL DEFAULT 2
+        neoglass_border_width REAL DEFAULT 2,
+        corner_radius INTEGER DEFAULT 3
       );
       ''',
       '''
@@ -2016,6 +2095,9 @@ class SqliteService {
         -- ScreenScraper game the user picked by hand (Identify…); NULL means
         -- match automatically. See migration v165.
         ss_manual_game_id INTEGER,
+        -- Android apps only: 1 = the user marked it a game, listed under
+        -- "Android Games" instead of the Android tab. See migration v191.
+        is_android_game INTEGER DEFAULT 0,
         id_ra INTEGER,
         ra_match_source TEXT,
         ra_hash_skipped TEXT,
@@ -2098,6 +2180,13 @@ class SqliteService {
         description_de TEXT,
         description_it TEXT,
         description_pt TEXT,
+        description_ja TEXT,
+        description_ko TEXT,
+        description_ru TEXT,
+        description_zh TEXT,
+        description_id TEXT,
+        regional_names TEXT,
+        video_url TEXT,
         rating REAL,
         release_date TEXT,
         developer TEXT,
@@ -2143,6 +2232,25 @@ class SqliteService {
       SqliteMigrations.createAppRommPlaytimeStateTableSql,
       SqliteMigrations.createUserCollectionsTableSql,
       SqliteMigrations.createUserCollectionItemsTableSql,
+      SqliteMigrations.createUserLaunchDisplayTableSql,
+      // One row per Discovery slot per ISO week. No foreign key to user_roms on
+      // purpose: a rescan that removes a ROM should leave a dangling pick that
+      // the service re-resolves into a new choice, not cascade the row away.
+      // Must stay identical to migration v182 — fresh installs run this instead
+      // of the migrations.
+      '''
+      CREATE TABLE IF NOT EXISTS user_discovery_picks (
+        week_key TEXT NOT NULL,
+        slot_id TEXT NOT NULL,
+        section TEXT NOT NULL,
+        genre_bucket TEXT,
+        slot_order INTEGER NOT NULL DEFAULT 0,
+        rom_path TEXT NOT NULL COLLATE NOCASE,
+        reroll_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (week_key, slot_id)
+      );
+      ''',
     ];
 
     for (final sql in tables) {
@@ -2153,6 +2261,7 @@ class SqliteService {
   /// Creates tables dedicated to RetroAchievements game metadata.
   Future<void> _createRetroArchTables(DatabaseExecutorAdapter db) async {
     const raTables = [
+      SqliteMigrations.createRaCatalogueSyncTableSql,
       '''
       CREATE TABLE IF NOT EXISTS app_ra_game_list (
           id INTEGER,
@@ -2220,6 +2329,9 @@ class SqliteService {
       SqliteMigrations.createAppRommPlaySessionsIndexSql,
       // 9. Index for user_collection_items ("which collections is this ROM in?")
       SqliteMigrations.createUserCollectionItemsIndexSql,
+
+      // 9. Index for user_discovery_picks (reads are always week-scoped)
+      'CREATE INDEX IF NOT EXISTS idx_user_discovery_picks_week ON user_discovery_picks(week_key);',
     ];
 
     for (final sql in indexes) {
@@ -2394,6 +2506,107 @@ class SqliteService {
       _database = null;
       _initialized = false;
       _initCompleter = null; // Allow fresh initialization after close.
+    }
+  }
+
+  /// Writes a consistent copy of the open database to [target], a file that
+  /// must not exist yet, and checks the copy. Returns the open database's
+  /// file. Throws if that file isn't [expectedFile], and removes its copy if
+  /// the copy fails or fails its check.
+  ///
+  /// The database is open in WAL mode and other code keeps writing to it, so
+  /// copying `data.sqlite` and its `-wal` and `-shm` one after another can
+  /// catch them at different moments and produce a corrupt database.
+  /// `VACUUM INTO` reads a single snapshot instead, including what is still
+  /// only in the WAL, and writes it as one file in rollback-journal mode
+  /// (opening it re-enables WAL).
+  ///
+  /// With WAL, a separate read-only connection in a worker isolate reads, so
+  /// the UI isolate is free and its writes carry on meanwhile. Without WAL
+  /// that connection's SHARED lock would make every UI-isolate write wait in
+  /// its busy handler, so the main connection takes the copy itself; see
+  /// [readRuleLibrary] for the same choice.
+  static Future<String> snapshotTo(
+    String target, {
+    required String expectedFile,
+  }) async {
+    final db = await instance.database;
+    final databases = await db.rawQuery('PRAGMA database_list');
+    final filename =
+        databases.firstWhere((row) => row['name'] == 'main')['file'] as String;
+    // SQLite reports the path with symbolic links resolved, so compare the
+    // files themselves rather than their paths.
+    if (filename.isEmpty ||
+        !await FileSystemEntity.isFile(expectedFile) ||
+        !await FileSystemEntity.identical(filename, expectedFile)) {
+      throw StateError(
+        'The open database is "$filename", not "$expectedFile"; not copied',
+      );
+    }
+    for (final suffix in const ['', '-journal', '-wal', '-shm']) {
+      final existing = '$target$suffix';
+      if (await FileSystemEntity.type(existing) !=
+          FileSystemEntityType.notFound) {
+        throw StateError('$existing is already there; not copied');
+      }
+    }
+    final journal = (await db.rawQuery('PRAGMA journal_mode'))
+        .single
+        .values
+        .single;
+    try {
+      if (journal.toString().toLowerCase() == 'wal') {
+        await _vacuumIntoInBackground(filename, target);
+      } else {
+        await db.execute('VACUUM INTO ?', [target]);
+      }
+      await _quickCheckInBackground(target);
+    } catch (_) {
+      // None of these were there before, so whatever is there now is this
+      // call's own unfinished or failed copy.
+      for (final suffix in const ['', '-journal', '-wal', '-shm']) {
+        try {
+          await File('$target$suffix').delete();
+        } on FileSystemException {
+          // Not there.
+        }
+      }
+      rethrow;
+    }
+    return filename;
+  }
+
+  static Future<void> _vacuumIntoInBackground(String filename, String target) =>
+      Isolate.run(() {
+        final db = sqlite.sqlite3.open(
+          filename,
+          mode: sqlite.OpenMode.readOnly,
+        );
+        try {
+          db.execute('PRAGMA busy_timeout = 5000');
+          db.execute('VACUUM INTO ?', [target]);
+        } finally {
+          db.close();
+        }
+      });
+
+  // Separate frames, so each worker closure captures only sendable values and
+  // never the caller's native database handle.
+  static Future<void> _quickCheckInBackground(String file) =>
+      Isolate.run(() => _quickCheck(file));
+
+  static void _quickCheck(String file) {
+    final db = sqlite.sqlite3.open(file, mode: sqlite.OpenMode.readOnly);
+    try {
+      final result = [
+        for (final row in db.select('PRAGMA quick_check'))
+          row.values.single.toString(),
+      ];
+      if (result.length != 1 || result.single != 'ok') {
+        throw StateError('Copy of the database failed its check: $result');
+      }
+    } finally {
+      db.close();
     }
   }
 
@@ -2757,8 +2970,9 @@ class SqliteService {
   }
 
   /// Permanently deletes a single game and its metadata from the database.
-  static Future<void> deleteGame(String appSystemId, String filename) async {
+  static Future<void> deleteGame(String systemId, String filename) async {
     final db = await instance.database;
+    final appSystemId = SystemFolderNames.rowSystemFolder(systemId);
     await db.delete(
       'user_screenscraper_metadata',
       where: 'app_system_id = ? AND filename = ?',
@@ -2783,10 +2997,15 @@ class SqliteService {
     int? bartopExitPoweroff,
     int? scanOnStartup,
     int? ignoreHiddenFiles,
+    int? ignoreArticlesInGameSort,
+    int? videoPreviews,
+    int? videoPreviewDelay,
     int? setupCompleted,
     int? hideBottomScreen,
+    int? swapScreens,
     int? sfxEnabled,
     double? sfxVolume,
+    String? customSfx,
     int? use12HourClock,
     String? systemSortBy,
     String? systemSortOrder,
@@ -2802,7 +3021,7 @@ class SqliteService {
     int? hideTabScraper,
     int? hideTabRomm,
     int? hideSearchCard,
-    int? androidAppsAsTab,
+    int? hideTabDiscovery,
     String? activeSyncProvider,
     String? systemsVersion,
     String? raSeedStamp,
@@ -2810,11 +3029,15 @@ class SqliteService {
     int? autoUpdateApp,
     int? autoUpdateSystems,
     String? systemGridColumns,
+    String? discoveryGridColumns,
+    String? discoveryViewMode,
+    String? androidGridColumns,
     String? gameGridColumns,
     String? gameListSize,
     String? gameCarouselCardStyle,
     String? dockApps,
     int? dockEnabled,
+    int? secondaryHideSystemLogo,
     int? dockSlotCount,
     int? nowPlayingDimDelay,
     int? nowPlayingDimLevel,
@@ -2825,9 +3048,11 @@ class SqliteService {
     int? raMatchOnStartup,
     int? subfolderViewAll,
     int? hideSystemLogos,
+    int? performanceMode,
     int? neoglassBlur,
     int? neoglassTransparency,
     double? neoglassBorderWidth,
+    int? cornerRadius,
   }) async {
     final db = await instance.database;
 
@@ -2866,9 +3091,13 @@ class SqliteService {
     if (hideBottomScreen != null) {
       updates['hide_bottom_screen'] = hideBottomScreen;
     }
+    if (swapScreens != null) {
+      updates['swap_screens'] = swapScreens;
+    }
     if (sfxEnabled != null) {
       updates['sfx_enabled'] = sfxEnabled;
     }
+    if (customSfx != null) updates['custom_sfx'] = customSfx;
     if (sfxVolume != null) {
       updates['sfx_volume'] = sfxVolume;
     }
@@ -2880,6 +3109,13 @@ class SqliteService {
     }
     if (systemSortOrder != null) {
       updates['system_sort_order'] = systemSortOrder;
+    }
+    if (ignoreArticlesInGameSort != null) {
+      updates['ignore_articles_in_game_sort'] = ignoreArticlesInGameSort;
+    }
+    if (videoPreviews != null) updates['video_previews'] = videoPreviews;
+    if (videoPreviewDelay != null) {
+      updates['video_preview_delay'] = videoPreviewDelay;
     }
     if (collectionSortBy != null) {
       updates['collection_sort_by'] = collectionSortBy;
@@ -2917,8 +3153,8 @@ class SqliteService {
     if (hideSearchCard != null) {
       updates['hide_search_card'] = hideSearchCard;
     }
-    if (androidAppsAsTab != null) {
-      updates['android_apps_as_tab'] = androidAppsAsTab;
+    if (hideTabDiscovery != null) {
+      updates['hide_tab_discovery'] = hideTabDiscovery;
     }
     if (activeSyncProvider != null) {
       updates['active_sync_provider'] = activeSyncProvider;
@@ -2941,6 +3177,15 @@ class SqliteService {
     if (systemGridColumns != null) {
       updates['system_grid_columns'] = systemGridColumns;
     }
+    if (discoveryGridColumns != null) {
+      updates['discovery_grid_columns'] = discoveryGridColumns;
+    }
+    if (discoveryViewMode != null) {
+      updates['discovery_view_mode'] = discoveryViewMode;
+    }
+    if (androidGridColumns != null) {
+      updates['android_grid_columns'] = androidGridColumns;
+    }
     if (gameGridColumns != null) {
       updates['game_grid_columns'] = gameGridColumns;
     }
@@ -2955,6 +3200,9 @@ class SqliteService {
     }
     if (dockEnabled != null) {
       updates['dock_enabled'] = dockEnabled;
+    }
+    if (secondaryHideSystemLogo != null) {
+      updates['secondary_hide_system_logo'] = secondaryHideSystemLogo;
     }
     if (dockSlotCount != null) {
       updates['dock_slot_count'] = dockSlotCount;
@@ -2980,6 +3228,9 @@ class SqliteService {
     if (hideSystemLogos != null) {
       updates['hide_system_logos'] = hideSystemLogos;
     }
+    if (performanceMode != null) {
+      updates['performance_mode'] = performanceMode;
+    }
     if (neoglassBlur != null) {
       updates['neoglass_blur'] = neoglassBlur;
     }
@@ -2988,6 +3239,9 @@ class SqliteService {
     }
     if (neoglassBorderWidth != null) {
       updates['neoglass_border_width'] = neoglassBorderWidth;
+    }
+    if (cornerRadius != null) {
+      updates['corner_radius'] = cornerRadius;
     }
 
     if (showAchievementsBadge != null) {
@@ -3097,6 +3351,45 @@ class SqliteService {
   }
 
   /// Sets whether ROM subfolders are shown as navigable folders in the game list.
+  /// The launch screen stored for [scope] (`'system'` or `'game'`) and
+  /// [target] (system folder name or ROM path), or null when none is set.
+  /// See [SqliteMigrations.createUserLaunchDisplayTableSql].
+  static Future<String?> getLaunchDisplay(String scope, String target) async {
+    final db = await instance.database;
+    final rows = await db.query(
+      'user_launch_display',
+      columns: ['display'],
+      where: 'scope = ? AND target = ?',
+      whereArgs: [scope, target],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['display']?.toString();
+  }
+
+  /// Stores [display] for [scope]/[target], or clears it (inherit) when null.
+  static Future<void> setLaunchDisplay(
+    String scope,
+    String target,
+    String? display,
+  ) async {
+    final db = await instance.database;
+    if (display == null) {
+      await db.delete(
+        'user_launch_display',
+        where: 'scope = ? AND target = ?',
+        whereArgs: [scope, target],
+      );
+      return;
+    }
+    await db.insert('user_launch_display', {
+      'scope': scope,
+      'target': target,
+      'display': display,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
   static Future<void> setSystemSubfolderView(
     String systemId,
     bool enabled,
@@ -3190,6 +3483,33 @@ class SqliteService {
       return results.first;
     }
     return {};
+  }
+
+  /// Retrieves settings for several systems in one query.
+  ///
+  /// The Discovery board names a handful of games spread across many systems;
+  /// reading those systems one by one turned a board load into dozens of
+  /// round-trips.
+  static Future<Map<String, Map<String, dynamic>>> getSystemSettingsMap(
+    Iterable<String> systemIds,
+  ) async {
+    final ids = systemIds.where((id) => id.isNotEmpty).toSet().toList();
+    if (ids.isEmpty) return {};
+    final db = await instance.database;
+    final placeholders = List.filled(ids.length, '?').join(', ');
+    final rows = await db.rawQuery(
+      'SELECT * FROM user_system_settings '
+      'WHERE app_system_id IN ($placeholders)',
+      ids,
+    );
+    final result = <String, Map<String, dynamic>>{};
+    for (final row in rows) {
+      final id = row['app_system_id']?.toString();
+      if (id != null && id.isNotEmpty) {
+        result[id] = Map<String, dynamic>.from(row);
+      }
+    }
+    return result;
   }
 
   static Future<void> _updateSystemSetting(
@@ -3396,6 +3716,31 @@ class SqliteService {
   ) async {
     if (results.isEmpty) return [];
 
+    // "Android Games" owns no rows and "Android" lists only the apps that are
+    // not games, so the per-system `rom_count` subquery is wrong for both. Count
+    // the marked apps instead. Kept out of the shared SELECTs so they never
+    // reference the v191 column for other systems.
+    if (results.any(
+      (r) => SystemFolderNames.isAndroidApps(r['folder_name']?.toString()),
+    )) {
+      final counts = await db.rawQuery(
+        "SELECT SUM(CASE WHEN $androidGameFlagSql THEN 1 ELSE 0 END) AS games, "
+        "SUM(CASE WHEN NOT ($androidGameFlagSql) THEN 1 ELSE 0 END) AS apps "
+        "FROM user_roms ur WHERE ur.app_system_id = 'android' "
+        "AND ur.is_hidden = 0",
+      );
+      final games = int.tryParse(counts.first['games'].toString()) ?? 0;
+      final apps = int.tryParse(counts.first['apps'].toString()) ?? 0;
+      results = [
+        for (final r in results)
+          switch (r['folder_name']) {
+            SystemFolderNames.androidGames => {...r, 'rom_count': games},
+            SystemFolderNames.android => {...r, 'rom_count': apps},
+            _ => r,
+          },
+      ];
+    }
+
     // 1. Fetch all folder mappings in a single query to minimize IO overhead.
     final folderResults = await db.query('app_system_folders');
     final Map<String, List<String>> folderMap = {};
@@ -3592,9 +3937,10 @@ class SqliteService {
   /// Calculates the total number of ROMs registered for a specific system.
   static Future<int> getRomCountForSystem(String systemId) async {
     final db = await instance.database;
+    final (where, args) = _systemRowsFilter(systemId);
     final results = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM user_roms WHERE app_system_id = ?',
-      [systemId],
+      'SELECT COUNT(*) as count FROM user_roms ur WHERE $where',
+      args,
     );
     if (results.isEmpty) return 0;
     return int.tryParse(results.first['count']?.toString() ?? '0') ?? 0;
@@ -3608,10 +3954,11 @@ class SqliteService {
   /// it. Gate existence on [getRomCountForSystem].
   static Future<int> getVisibleRomCountForSystem(String systemId) async {
     final db = await instance.database;
+    final (where, args) = _systemRowsFilter(systemId);
     final results = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM user_roms '
-      'WHERE app_system_id = ? AND is_hidden = 0',
-      [systemId],
+      'SELECT COUNT(*) as count FROM user_roms ur '
+      'WHERE $where AND ur.is_hidden = 0',
+      args,
     );
     if (results.isEmpty) return 0;
     return int.tryParse(results.first['count']?.toString() ?? '0') ?? 0;
@@ -4502,18 +4849,23 @@ class SqliteService {
     String systemId,
   ) async {
     final db = await instance.database;
-    final results = await db.rawQuery(
-      '''
+    // "Android Games" games are `android` rows reported under the games system,
+    // so every view, launch and setting resolves against it. `s` stays the
+    // row's own system, which the title/description fallbacks below key on.
+    final isAndroidGames = systemId == SystemFolderNames.androidGames;
+    final (where, args) = _systemRowsFilter(systemId);
+    final results = await db.rawQuery('''
       SELECT
         ur.filename, ur.rom_path, ur.is_favorite, ur.is_hidden, ur.play_time, ur.last_played,
         ur.cloud_sync_enabled, ur.title_id, ur.title_name,
         ur.app_emulator_unique_id as emulator_name,
-        s.id as system_id, s.real_name as system_real_name, s.folder_name as system_folder_name,
-        s.short_name as system_short_name,
+        ${isAndroidGames ? 'g' : 's'}.id as system_id, ${isAndroidGames ? 'g' : 's'}.real_name as system_real_name, ${isAndroidGames ? 'g' : 's'}.folder_name as system_folder_name,
+        ${isAndroidGames ? 'g' : 's'}.short_name as system_short_name,
         COALESCE(usm.real_name, CASE WHEN s.folder_name IN ('android') THEN ur.title_name END, ur.filename) as game_display_name,
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id, usm.video_url,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -4529,12 +4881,11 @@ class SqliteService {
         usm.is_fully_scraped
       FROM user_roms ur
       JOIN app_systems s ON ur.app_system_id = s.id
+      ${isAndroidGames ? "JOIN app_systems g ON g.id = 'android_games'" : ''}
       LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-      WHERE ur.app_system_id = ?
+      WHERE $where
       ORDER BY ur.is_favorite DESC, LOWER(game_display_name) ASC
-''',
-      [systemId],
-    );
+''', args);
 
     return results.map((row) => DatabaseGameModel.fromJson(row)).toList();
   }
@@ -4551,7 +4902,147 @@ class SqliteService {
   /// Retrieves all games across all registered systems.
   static Future<List<DatabaseGameModel>> getAllGames() async {
     final db = await instance.database;
-    final results = await db.rawQuery('''
+    final results = await db.rawQuery(_allGamesQuery);
+    return results.map((row) => DatabaseGameModel.fromJson(row)).toList();
+  }
+
+  /// Retrieves full rows for exactly [romPaths], in no particular order.
+  ///
+  /// Smart collections open from paths the rule evaluation already produced,
+  /// so only the matched games are decoded on the UI isolate. Chunked to stay
+  /// far below SQLite's bound-parameter limit on large matches.
+  static Future<List<DatabaseGameModel>> getGamesByRomPaths(
+    Iterable<String> romPaths,
+  ) async {
+    final paths = romPaths.toList();
+    if (paths.isEmpty) return [];
+    final db = await instance.database;
+    final games = <DatabaseGameModel>[];
+    const chunk = 500;
+    for (var i = 0; i < paths.length; i += chunk) {
+      final part = paths.sublist(i, (i + chunk).clamp(0, paths.length));
+      final rows = await db.rawQuery(
+        '$_allGamesSelect WHERE ur.rom_path IN '
+        '(${List.filled(part.length, '?').join(',')})',
+        part,
+      );
+      games.addAll(rows.map(DatabaseGameModel.fromJson));
+    }
+    return games;
+  }
+
+  /// Reads [RuleLibraryRows] and runs [compute] on them off the UI isolate.
+  ///
+  /// With WAL, a separate read-only connection in the worker isolate reads
+  /// and [compute] runs there too, so the rows never cross back; only the
+  /// filename crosses in, never a native SQLite handle. Without WAL (it is
+  /// best-effort and fails on some SD/exFAT setups) a second connection's
+  /// SHARED lock could make a UI-isolate commit spin in its busy handler, and
+  /// an in-memory test database cannot be reopened at all, so those cases
+  /// read on the main connection and only [compute] moves to the worker.
+  static Future<T> readRuleLibrary<T>(
+    T Function(RuleLibraryRows rows) compute,
+  ) async {
+    final db = await instance.database;
+    final databases = await db.rawQuery('PRAGMA database_list');
+    final filename =
+        databases.firstWhere((row) => row['name'] == 'main')['file'] as String;
+    final journal = filename.isEmpty
+        ? null
+        : (await db.rawQuery('PRAGMA journal_mode')).single.values.single;
+    if (journal.toString().toLowerCase() == 'wal') {
+      return _readRuleLibraryInBackground(filename, compute);
+    }
+    final rows = _ruleLibraryRows(
+      await db.rawQuery(_ruleLibraryQuery),
+      await db.rawQuery(_ruleLibrarySettingsQuery),
+      await db.rawQuery(_ruleLibraryExtensionsQuery),
+    );
+    return _computeInBackground(rows, compute);
+  }
+
+  // A separate frame so the worker closure captures only sendable values.
+  static Future<T> _computeInBackground<T>(
+    RuleLibraryRows rows,
+    T Function(RuleLibraryRows rows) compute,
+  ) => Isolate.run(() => compute(rows));
+
+  static Future<T> _readRuleLibraryInBackground<T>(
+    String filename,
+    T Function(RuleLibraryRows rows) compute,
+  ) => Isolate.run(() {
+    final db = sqlite.sqlite3.open(filename, mode: sqlite.OpenMode.readOnly);
+    try {
+      db.execute('PRAGMA busy_timeout = 5000');
+      // One read transaction, so games and naming settings agree.
+      db.execute('BEGIN');
+      try {
+        return compute(
+          _ruleLibraryRows(
+            db.select(_ruleLibraryQuery),
+            db.select(_ruleLibrarySettingsQuery),
+            db.select(_ruleLibraryExtensionsQuery),
+          ),
+        );
+      } finally {
+        db.execute('COMMIT');
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  static RuleLibraryRows _ruleLibraryRows(
+    List<Map<String, Object?>> games,
+    List<Map<String, Object?>> settings,
+    List<Map<String, Object?>> extensions,
+  ) {
+    final extensionsBySystem = <String, Set<String>>{};
+    for (final row in extensions) {
+      extensionsBySystem
+          .putIfAbsent(row['system_id'].toString(), () => {})
+          .add(row['extension'].toString().toLowerCase());
+    }
+    return (
+      games: games,
+      settings: {
+        for (final row in settings) row['app_system_id'].toString(): row,
+      },
+      extensions: extensionsBySystem,
+    );
+  }
+
+  /// The columns a smart rule can test, plus what the editor preview shows.
+  /// Descriptions and media stay behind so a broad rule never moves the whole
+  /// library's text between isolates.
+  static const _ruleLibraryQuery = '''
+      SELECT
+        ur.filename, ur.rom_path, ur.is_favorite, ur.is_hidden, ur.play_time,
+        ur.last_played, ur.title_name,
+        s.id as system_id, s.real_name as system_real_name,
+        s.folder_name as system_folder_name,
+        COALESCE(usm.real_name, CASE WHEN s.folder_name IN ('android') THEN ur.title_name END, ur.filename) as game_display_name,
+        usm.real_name as ss_real_name,
+        usm.rating,
+        COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
+        COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
+        COALESCE(usm.publisher, CASE WHEN s.folder_name IN ('android') THEN ur.publisher END) as publisher,
+        COALESCE(usm.genre, CASE WHEN s.folder_name IN ('android') THEN ur.genre END) as genre
+      FROM user_roms ur
+      JOIN app_systems s ON ur.app_system_id = s.id
+      LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
+      ''';
+
+  /// Per-system naming settings, so title rules see the displayed name.
+  static const _ruleLibrarySettingsQuery = 'SELECT * FROM user_system_settings';
+
+  static const _ruleLibraryExtensionsQuery =
+      'SELECT system_id, extension FROM app_system_extensions';
+
+  static const _allGamesQuery =
+      '$_allGamesSelect ORDER BY ur.is_favorite DESC, LOWER(game_display_name) ASC';
+
+  static const _allGamesSelect = '''
       SELECT
         ur.filename, ur.rom_path, ur.is_favorite, ur.is_hidden, ur.play_time, ur.last_played,
         ur.cloud_sync_enabled, ur.title_id, ur.title_name,
@@ -4562,6 +5053,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id, usm.video_url,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -4578,10 +5070,7 @@ class SqliteService {
       FROM user_roms ur
       JOIN app_systems s ON ur.app_system_id = s.id
       LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-      ORDER BY ur.is_favorite DESC, LOWER(game_display_name) ASC
-    ''');
-    return results.map((row) => DatabaseGameModel.fromJson(row)).toList();
-  }
+      ''';
 
   /// Every scanned game as `(filename, romname, system folder)` — the columns
   /// the RomM link pass matches on, and nothing else.
@@ -4623,6 +5112,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id, usm.video_url,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -4660,7 +5150,7 @@ class SqliteService {
     return db.rawQuery('''
       SELECT
         c.id, c.name, c.image_path, c.color1, c.color2, c.sort_order,
-        c.created_at, c.updated_at,
+        c.created_at, c.updated_at, c.collection_type, c.rules_json,
         COALESCE(counts.game_count, 0) as game_count
       FROM user_collections c
       LEFT JOIN (
@@ -4679,7 +5169,7 @@ class SqliteService {
       '''
       SELECT
         c.id, c.name, c.image_path, c.color1, c.color2, c.sort_order,
-        c.created_at, c.updated_at,
+        c.created_at, c.updated_at, c.collection_type, c.rules_json,
         (SELECT COUNT(*) FROM user_collection_items ci
           WHERE ci.collection_id = c.id) as game_count
       FROM user_collections c
@@ -4701,6 +5191,7 @@ class SqliteService {
     String? color1,
     String? color2,
     int? sortOrder,
+    String? rulesJson,
   }) async {
     final db = await instance.database;
 
@@ -4713,6 +5204,8 @@ class SqliteService {
     }
 
     await db.insert('user_collections', {
+      'collection_type': rulesJson == null ? 'manual' : 'smart',
+      'rules_json': rulesJson,
       'id': id,
       'name': name,
       'image_path': imagePath,
@@ -4738,6 +5231,7 @@ class SqliteService {
     String? color2,
     bool clearColor2 = false,
     int? sortOrder,
+    String? rulesJson,
   }) async {
     final db = await instance.database;
 
@@ -4745,6 +5239,7 @@ class SqliteService {
       'updated_at': DateTime.now().toIso8601String(),
     };
     if (name != null) values['name'] = name;
+    if (rulesJson != null) values['rules_json'] = rulesJson;
     if (clearImagePath) {
       values['image_path'] = null;
     } else if (imagePath != null) {
@@ -4834,20 +5329,6 @@ class SqliteService {
     return rows.map((r) => r['collection_id'].toString()).toList();
   }
 
-  /// Returns every `rom_path` that belongs to at least one collection.
-  ///
-  /// One query for the whole library, so the games views can badge their rows
-  /// without asking per game: `user_collection_items` holds only what the user
-  /// actually filed, so the set is bounded by their collections, not by the
-  /// ROM count.
-  static Future<Set<String>> getCollectionMemberRomPaths() async {
-    final db = await instance.database;
-    final rows = await db.rawQuery(
-      'SELECT DISTINCT rom_path FROM user_collection_items',
-    );
-    return {for (final row in rows) row['rom_path'].toString()};
-  }
-
   /// Retrieves the games in a collection, in the same shape as
   /// [getFavoriteGames].
   ///
@@ -4872,6 +5353,7 @@ class SqliteService {
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id, usm.video_url,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -4898,24 +5380,206 @@ class SqliteService {
     return results.map((row) => DatabaseGameModel.fromJson(row)).toList();
   }
 
+  /// Retrieves every game the weekly Discovery board can pick from.
+  ///
+  /// Returns raw rows rather than models because each one feeds two things: the
+  /// pick engine's `DiscoveryCandidate` (rating, playtime, genre, achievement
+  /// counts) and `DatabaseGameModel.fromJson` for launching the pick, which is
+  /// the same row shape [getFavoriteGames] returns. The aliases are chosen to
+  /// satisfy both.
+  ///
+  /// The `app_ra_game_list` join goes through a GROUP BY subquery on purpose:
+  /// that table holds **one row per ROM hash**, so several rows share a
+  /// `game_id`, and joining it directly would emit the same game once per hash.
+  /// That does not just duplicate cards — it silently multiplies a game's
+  /// weight in every pool the engine draws from.
+  ///
+  /// `android` and `music` are excluded exactly as [getFavoriteGames] and the
+  /// "all systems" game list do: neither holds games worth recommending.
+  ///
+  /// So are hidden games and every game of a system hidden in Settings: the
+  /// board recommends games, and a system the user has hidden is one they don't
+  /// want offered. The flag is written by folder name, but a system has one
+  /// detection row, so it is matched by system id and doesn't depend on which
+  /// folder name that row holds. A system with no detection row has not been
+  /// hidden, so `NOT EXISTS` rather than a join that would drop it.
+  static Future<List<Map<String, Object?>>> getDiscoveryCandidates() async {
+    final db = await instance.database;
+    return db.rawQuery('''
+      SELECT
+        ur.filename, ur.rom_path, ur.is_favorite, ur.play_time, ur.last_played,
+        ur.cloud_sync_enabled, ur.title_id, ur.title_name, ur.id_ra,
+        ur.app_emulator_unique_id AS emulator_name, ur.box2d_aspect_ratio,
+        s.id AS system_id, s.folder_name AS system_folder_name,
+        s.real_name AS system_real_name, s.short_name AS system_short_name,
+        COALESCE(usm.real_name, ur.title_name, ur.filename) AS game_display_name,
+        usm.real_name AS ss_real_name, usm.rating,
+        COALESCE(usm.genre, ur.genre)         AS genre,
+        COALESCE(usm.release_date, ur.year)   AS year,
+        COALESCE(usm.developer, ur.developer) AS developer,
+        COALESCE(usm.is_fully_scraped, 0)     AS is_fully_scraped,
+        COALESCE(ra.num_achievements, 0)      AS ra_num_achievements,
+        COALESCE(ra.points, 0)                AS ra_points
+      FROM user_roms ur
+      JOIN app_systems s ON ur.app_system_id = s.id
+      LEFT JOIN user_screenscraper_metadata usm
+             ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
+      LEFT JOIN (SELECT game_id, MAX(num_achievements) AS num_achievements, MAX(points) AS points
+                 FROM app_ra_game_list
+                 WHERE game_id IN (SELECT id_ra FROM user_roms WHERE id_ra IS NOT NULL)
+                 GROUP BY game_id) ra
+             ON ra.game_id = ur.id_ra
+      WHERE s.folder_name NOT IN ('android', 'music')
+        AND COALESCE(ur.is_hidden, 0) = 0
+        AND NOT EXISTS (
+          SELECT 1 FROM user_detected_systems uds
+          WHERE uds.app_system_id = ur.app_system_id AND uds.is_hidden = 1
+        )
+    ''');
+  }
+
+  /// Returns the persisted Discovery picks for [weekKey], in board order.
+  static Future<List<Map<String, Object?>>> getDiscoveryPicks(
+    String weekKey,
+  ) async {
+    final db = await instance.database;
+    return db.rawQuery(
+      'SELECT week_key, slot_id, section, genre_bucket, slot_order, rom_path, '
+      'reroll_count FROM user_discovery_picks WHERE week_key = ? '
+      'ORDER BY slot_order ASC, slot_id ASC',
+      [weekKey],
+    );
+  }
+
+  /// Returns the distinct ROM paths picked in any week from [sinceWeekKey] on.
+  ///
+  /// Week keys are fixed-width and zero-padded, so a plain string comparison is
+  /// also a chronological one — the same trick `systems_version` uses.
+  static Future<List<String>> getDiscoveryPickPathsSince(
+    String sinceWeekKey,
+  ) async {
+    final db = await instance.database;
+    final rows = await db.rawQuery(
+      'SELECT DISTINCT rom_path FROM user_discovery_picks WHERE week_key >= ?',
+      [sinceWeekKey],
+    );
+    return rows
+        .map((row) => row['rom_path'] as String?)
+        .whereType<String>()
+        .toList();
+  }
+
+  /// Writes one Discovery pick, replacing whatever occupied that slot.
+  ///
+  /// A single-row write by (week, slot): re-rolling one section must not touch
+  /// the rest of the board, and the secondary Flutter engine shares no memory
+  /// with this one, only the database file.
+  static Future<void> upsertDiscoveryPick({
+    required String weekKey,
+    required String slotId,
+    required String section,
+    required String romPath,
+    String? genreBucket,
+    int slotOrder = 0,
+    int rerollCount = 0,
+  }) async {
+    final db = await instance.database;
+    await db.execute(
+      'INSERT OR REPLACE INTO user_discovery_picks '
+      '(week_key, slot_id, section, genre_bucket, slot_order, rom_path, reroll_count) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [weekKey, slotId, section, genreBucket, slotOrder, romPath, rerollCount],
+    );
+  }
+
+  /// Writes several Discovery picks in one transaction.
+  ///
+  /// The first load of a week fills every slot at once. Writing those rows one
+  /// by one meant one autocommit/fsync per pick, which is what made the very
+  /// first visit to the tab feel slow on Android; the transaction commits them
+  /// together.
+  static Future<void> upsertDiscoveryPicks(
+    Iterable<
+      ({
+        String weekKey,
+        String slotId,
+        String section,
+        String? genreBucket,
+        int slotOrder,
+        String romPath,
+        int rerollCount,
+      })
+    >
+    picks,
+  ) async {
+    final rows = picks.toList(growable: false);
+    if (rows.isEmpty) return;
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      for (final pick in rows) {
+        await txn.execute(
+          'INSERT OR REPLACE INTO user_discovery_picks '
+          '(week_key, slot_id, section, genre_bucket, slot_order, rom_path, reroll_count) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [
+            pick.weekKey,
+            pick.slotId,
+            pick.section,
+            pick.genreBucket,
+            pick.slotOrder,
+            pick.romPath,
+            pick.rerollCount,
+          ],
+        );
+      }
+    });
+  }
+
+  /// Deletes every pick from before [weekKey], keeping the table bounded.
+  static Future<int> pruneDiscoveryPicksBefore(String weekKey) async {
+    final db = await instance.database;
+    return db.rawDelete('DELETE FROM user_discovery_picks WHERE week_key < ?', [
+      weekKey,
+    ]);
+  }
+
+  /// Deletes a single Discovery pick, used when its ROM no longer exists.
+  static Future<void> deleteDiscoveryPick({
+    required String weekKey,
+    required String slotId,
+  }) async {
+    final db = await instance.database;
+    await db.rawDelete(
+      'DELETE FROM user_discovery_picks WHERE week_key = ? AND slot_id = ?',
+      [weekKey, slotId],
+    );
+  }
+
   /// Retrieves a single game record based on its system and filename.
+  ///
+  /// [systemId] may be `android_games`: the game is then its `android` row,
+  /// found only while marked, and reported under the games system as
+  /// [getGamesBySystem] lists it.
   static Future<DatabaseGameModel?> getSingleGame(
     String systemId,
     String filename,
   ) async {
     final db = await instance.database;
+    final isAndroidGames = systemId == SystemFolderNames.androidGames;
+    final (where, args) = _systemRowsFilter(systemId);
     final results = await db.rawQuery(
       '''
       SELECT
         ur.filename, ur.rom_path, ur.is_favorite, ur.is_hidden, ur.play_time, ur.last_played,
         ur.cloud_sync_enabled, ur.title_id, ur.title_name,
         ur.app_emulator_unique_id as emulator_name,
-        s.id as system_id, s.real_name as system_real_name, s.folder_name as system_folder_name,
-        s.short_name as system_short_name,
+        ${isAndroidGames ? 'g' : 's'}.id as system_id, ${isAndroidGames ? 'g' : 's'}.real_name as system_real_name, ${isAndroidGames ? 'g' : 's'}.folder_name as system_folder_name,
+        ${isAndroidGames ? 'g' : 's'}.short_name as system_short_name,
         COALESCE(usm.real_name, CASE WHEN s.folder_name IN ('android') THEN ur.title_name END, ur.filename) as game_display_name,
         usm.real_name as ss_real_name,
         COALESCE(usm.description_en, CASE WHEN s.folder_name IN ('android') THEN ur.description END) as description,
         usm.description_en, usm.description_es, usm.description_fr, usm.description_de, usm.description_it, usm.description_pt,
+        usm.description_ja, usm.description_ko, usm.description_ru, usm.description_zh, usm.description_id, usm.video_url,
         usm.rating,
         COALESCE(usm.release_date, CASE WHEN s.folder_name IN ('android') THEN ur.year END) as year,
         COALESCE(usm.developer, CASE WHEN s.folder_name IN ('android') THEN ur.developer END) as developer,
@@ -4931,11 +5595,12 @@ class SqliteService {
         usm.is_fully_scraped
       FROM user_roms ur
       JOIN app_systems s ON ur.app_system_id = s.id
+      ${isAndroidGames ? "JOIN app_systems g ON g.id = 'android_games'" : ''}
       LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-      WHERE ur.app_system_id = ? AND ur.filename = ?
+      WHERE $where AND ur.filename = ?
       LIMIT 1
       ''',
-      [systemId, filename],
+      [...args, filename],
     );
 
     if (results.isNotEmpty) {
@@ -5084,7 +5749,9 @@ class SqliteService {
     String systemFolderName,
     String filename,
   ) async {
-    final system = await getSystemByFolderName(systemFolderName);
+    final system = await getSystemByFolderName(
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+    );
     final db = await instance.database;
     final results = await db.query(
       'user_roms',
@@ -5105,7 +5772,9 @@ class SqliteService {
     bool enabled,
   ) async {
     final db = await instance.database;
-    final system = await getSystemByFolderName(systemFolderName);
+    final system = await getSystemByFolderName(
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+    );
     await db.update(
       'user_roms',
       {'cloud_sync_enabled': enabled ? 1 : 0},
@@ -5125,7 +5794,9 @@ class SqliteService {
     bool hidden,
   ) async {
     final db = await instance.database;
-    final system = await getSystemByFolderName(systemFolderName);
+    final system = await getSystemByFolderName(
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+    );
     await db.update(
       'user_roms',
       {'is_hidden': hidden ? 1 : 0},
@@ -5137,11 +5808,11 @@ class SqliteService {
   /// Restores every hidden game of [systemId] in one shot.
   static Future<void> unhideAllRomsForSystem(String systemId) async {
     final db = await instance.database;
-    await db.update(
-      'user_roms',
-      {'is_hidden': 0},
-      where: 'app_system_id = ? AND is_hidden = 1',
-      whereArgs: [systemId],
+    final (where, args) = _systemRowsFilter(systemId);
+    await db.rawUpdate(
+      'UPDATE user_roms AS ur SET is_hidden = 0 '
+      'WHERE $where AND ur.is_hidden = 1',
+      args,
     );
   }
 
@@ -5159,8 +5830,10 @@ class SqliteService {
     String? systemId,
   }) async {
     final db = await instance.database;
-    final results = await db.rawQuery(
-      '''
+    final (where, args) = systemId == null
+        ? ('1 = 1', const <Object?>[])
+        : _systemRowsFilter(systemId);
+    final results = await db.rawQuery('''
       SELECT
         ur.filename, ur.rom_path, ur.is_favorite, ur.is_hidden, ur.play_time, ur.last_played,
         ur.cloud_sync_enabled, ur.title_id, ur.title_name,
@@ -5174,12 +5847,9 @@ class SqliteService {
       FROM user_roms ur
       JOIN app_systems s ON ur.app_system_id = s.id
       LEFT JOIN user_screenscraper_metadata usm ON ur.app_system_id = usm.app_system_id AND ur.filename = usm.filename
-      WHERE ur.is_hidden = 1
-        ${systemId == null ? '' : 'AND ur.app_system_id = ?'}
+      WHERE ur.is_hidden = 1 AND $where
       ORDER BY LOWER(system_real_name) ASC, LOWER(game_display_name) ASC
-    ''',
-      [?systemId],
-    );
+    ''', args);
 
     return results.map((row) => DatabaseGameModel.fromJson(row)).toList();
   }
@@ -5194,11 +5864,46 @@ class SqliteService {
       'SELECT app_system_id, COUNT(*) as count FROM user_roms '
       'WHERE is_hidden = 1 GROUP BY app_system_id',
     );
+    // "Android Games" owns no rows, so its hidden games are counted apart.
+    final (gamesWhere, gamesArgs) = _systemRowsFilter(
+      SystemFolderNames.androidGames,
+    );
+    final hiddenGames = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM user_roms ur '
+      'WHERE ur.is_hidden = 1 AND $gamesWhere',
+      gamesArgs,
+    );
+    final hiddenGameCount =
+        int.tryParse(hiddenGames.first['count']?.toString() ?? '0') ?? 0;
     return {
       for (final row in results)
         row['app_system_id'].toString():
             int.tryParse(row['count']?.toString() ?? '0') ?? 0,
+      if (hiddenGameCount > 0) SystemFolderNames.androidGames: hiddenGameCount,
     };
+  }
+
+  /// Marks the installed app [packageName] as a game ([isGame] true), which
+  /// lists it under "Android Games" instead of the Android tab, or sends it
+  /// back.
+  static Future<void> setAndroidGame(String packageName, bool isGame) async {
+    final db = await instance.database;
+    await db.update(
+      'user_roms',
+      {'is_android_game': isGame ? 1 : 0},
+      where: "rom_path = ? AND app_system_id = 'android'",
+      whereArgs: [packageName],
+    );
+  }
+
+  /// The packages of the installed apps the user marked as games.
+  static Future<List<String>> getAndroidGamePackages() async {
+    final db = await instance.database;
+    final rows = await db.rawQuery(
+      "SELECT ur.rom_path FROM user_roms ur WHERE ur.app_system_id = 'android' "
+      'AND $androidGameFlagSql',
+    );
+    return [for (final row in rows) row['rom_path'].toString()];
   }
 
   /// Resets a game's play statistics (time and last played) to zero.
@@ -5207,7 +5912,9 @@ class SqliteService {
     String filename,
   ) async {
     final db = await instance.database;
-    final system = await getSystemByFolderName(systemFolderName);
+    final system = await getSystemByFolderName(
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+    );
     await db.update(
       'user_roms',
       {'play_time': 0, 'last_played': null},
@@ -5224,7 +5931,9 @@ class SqliteService {
     int? emulatorOsId,
   ) async {
     final db = await instance.database;
-    final system = await getSystemByFolderName(systemFolderName);
+    final system = await getSystemByFolderName(
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+    );
     await db.update(
       'user_roms',
       {
@@ -5234,6 +5943,28 @@ class SqliteService {
       where: 'app_system_id = ? AND filename = ?',
       whereArgs: [system.id, filename],
     );
+  }
+
+  /// Every emulator's display name on the current OS, with its system id.
+  static Future<List<({String systemId, String name})>>
+  getEmulatorNamesCurrentOs() async {
+    final db = await instance.database;
+    final results = await db.rawQuery(
+      '''
+      SELECT e.system_id, e.name
+      FROM app_emulators e
+      JOIN app_os os ON e.os_id = os.id
+      WHERE os.name = ?
+      ''',
+      [getCurrentOs()],
+    );
+    return [
+      for (final row in results)
+        (
+          systemId: row['system_id']?.toString() ?? '',
+          name: row['name']?.toString() ?? '',
+        ),
+    ];
   }
 
   /// Retrieves all emulators available for a system on the current operating system.
@@ -5336,7 +6067,7 @@ class SqliteService {
     final db = await instance.database;
     await db.rawUpdate(
       'UPDATE user_roms SET box2d_aspect_ratio = ? WHERE app_system_id = ? AND filename = ?',
-      [ratio, systemId, filename],
+      [ratio, SystemFolderNames.rowSystemFolder(systemId), filename],
     );
   }
 
@@ -5382,6 +6113,29 @@ class SqliteService {
     return results
         .map((row) => (row['extension'].toString()).toLowerCase())
         .toSet();
+  }
+
+  /// Retrieves extensions for several systems in one query.
+  static Future<Map<String, Set<String>>> getExtensionsMapForSystems(
+    Iterable<String> systemIds,
+  ) async {
+    final ids = systemIds.where((id) => id.isNotEmpty).toSet().toList();
+    if (ids.isEmpty) return {};
+    final db = await instance.database;
+    final placeholders = List.filled(ids.length, '?').join(', ');
+    final rows = await db.rawQuery(
+      'SELECT system_id, extension FROM app_system_extensions '
+      'WHERE system_id IN ($placeholders)',
+      ids,
+    );
+    final result = <String, Set<String>>{};
+    for (final row in rows) {
+      final id = row['system_id']?.toString();
+      final extension = row['extension']?.toString().toLowerCase();
+      if (id == null || id.isEmpty || extension == null) continue;
+      result.putIfAbsent(id, () => <String>{}).add(extension);
+    }
+    return result;
   }
 
   /// Generates a mapping of system folder names to their supported file extensions.
@@ -5834,11 +6588,34 @@ class SqliteService {
       await db.transaction((txn) async {
         _log.i('Refreshing local RetroAchievements game database...');
 
+        // A bundled snapshot must never replace downloaded catalogues. Keep
+        // those consoles intact even when an app upgrade changes the seed.
+        final syncTable = await txn.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_ra_catalogue_sync'",
+        );
+        if (syncTable.isNotEmpty) {
+          await txn.execute('''
+            CREATE TEMP TABLE ra_live_seed_backup AS
+            SELECT * FROM app_ra_game_list WHERE console_id IN
+              (SELECT console_id FROM app_ra_catalogue_sync)
+          ''');
+        }
+
         // Purge existing data to ensure a clean sync.
         await txn.execute('DELETE FROM app_ra_game_list');
 
         // Batch insert data from the SQL seed file.
         await _executeSqlFileOptimized(txn, _raSeedAsset, 'ra_insert');
+        if (syncTable.isNotEmpty) {
+          await txn.execute('''
+            DELETE FROM app_ra_game_list WHERE console_id IN
+              (SELECT console_id FROM app_ra_catalogue_sync)
+          ''');
+          await txn.execute(
+            'INSERT INTO app_ra_game_list SELECT * FROM ra_live_seed_backup',
+          );
+          await txn.execute('DROP TABLE ra_live_seed_backup');
+        }
       });
 
       if (assetStamp.isNotEmpty) {

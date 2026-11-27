@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:provider/provider.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/system_model.dart';
@@ -13,7 +14,9 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/sync/i_sync_provider.dart';
 import 'package:neostation/utils/effective_system.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 
 import 'game_settings_emulator_tab.dart';
 import 'game_settings_manage_tab.dart';
@@ -70,7 +73,9 @@ class GameSettingsDialog extends StatefulWidget {
 }
 
 class _GameSettingsDialogState extends State<GameSettingsDialog> {
-  int _currentTab = 0;
+  /// Tab indices, in display order. The emulator tab is index 0 and is left out
+  /// for installed Android apps, which launch directly with no emulator.
+  late int _currentTab = _showEmulatorTab ? 0 : 1;
   late final GamepadNavigation _gamepadNav;
 
   final _emulatorTabKey = GlobalKey<GameSettingsEmulatorTabState>();
@@ -111,11 +116,17 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
     super.dispose();
   }
 
+  /// Whether the Emulator tab applies: Android apps run without one.
+  bool get _showEmulatorTab =>
+      !SystemFolderNames.isAndroidApps(_effectiveSystem.folderName) &&
+      !SystemFolderNames.isAndroidApps(widget.game.systemFolderName);
+
   void _switchTab(int delta) {
     SfxService().playNavSound();
+    final first = _showEmulatorTab ? 0 : 1;
+    final count = _tabCount - first;
     setState(() {
-      _currentTab = (_currentTab + delta) % _tabCount;
-      if (_currentTab < 0) _currentTab += _tabCount;
+      _currentTab = first + (_currentTab - first + delta) % count;
     });
   }
 
@@ -231,67 +242,74 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
     // Resolved once per build so all three tabs agree on the system.
     final effectiveSystem = _effectiveSystem;
 
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 16.r),
-      child: Container(
-        constraints: BoxConstraints(maxWidth: 640.r, maxHeight: 480.r),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: theme.colorScheme.shadow.withValues(alpha: 0.5),
-              blurRadius: 10.r,
-              offset: const Offset(0, 4),
+      child: NeoGlassRim(
+        cornerRadius: radii.radiusExternalRadius,
+        child: Container(
+          constraints: BoxConstraints(maxWidth: 640.r, maxHeight: 480.r),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: radii.radiusExternal,
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.1),
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isKeyboardVisible) ...[
-              _buildHeader(theme, displayName),
-              _buildTabsHeader(theme),
-            ],
-            Expanded(
-              child: IndexedStack(
-                index: _currentTab,
-                children: [
-                  GameSettingsEmulatorTab(
-                    key: _emulatorTabKey,
-                    game: widget.game,
-                    system: effectiveSystem,
-                    isAllMode: widget.isAllMode,
-                    onGameUpdated: widget.onGameUpdated,
-                  ),
-                  GameSettingsScrappingTab(
-                    key: _scrappingTabKey,
-                    game: widget.game,
-                    system: effectiveSystem,
-                    fileProvider: widget.fileProvider,
-                    isAllMode: widget.isAllMode,
-                    onGameUpdated: widget.onGameUpdated,
-                  ),
-                  GameSettingsManageTab(
-                    key: _manageTabKey,
-                    game: widget.game,
-                    system: effectiveSystem,
-                    fileProvider: widget.fileProvider,
-                    syncProvider: widget.syncProvider,
-                    isAllMode: widget.isAllMode,
-                    onGameUpdated: widget.onGameUpdated,
-                    onGameDeleted: _handleGameDeleted,
-                    onGameHidden: _handleGameHidden,
-                  ),
-                ],
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.shadow.withValues(alpha: 0.5),
+                blurRadius: 10.r,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: radii.radiusExternal,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isKeyboardVisible) ...[
+                  _buildHeader(theme, displayName),
+                  _buildTabsHeader(theme),
+                ],
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentTab,
+                    children: [
+                      GameSettingsEmulatorTab(
+                        key: _emulatorTabKey,
+                        game: widget.game,
+                        system: effectiveSystem,
+                        isAllMode: widget.isAllMode,
+                        onGameUpdated: widget.onGameUpdated,
+                      ),
+                      GameSettingsScrappingTab(
+                        key: _scrappingTabKey,
+                        game: widget.game,
+                        system: effectiveSystem,
+                        fileProvider: widget.fileProvider,
+                        isAllMode: widget.isAllMode,
+                        onGameUpdated: widget.onGameUpdated,
+                      ),
+                      GameSettingsManageTab(
+                        key: _manageTabKey,
+                        game: widget.game,
+                        system: effectiveSystem,
+                        fileProvider: widget.fileProvider,
+                        syncProvider: widget.syncProvider,
+                        isAllMode: widget.isAllMode,
+                        onGameUpdated: widget.onGameUpdated,
+                        onGameDeleted: _handleGameDeleted,
+                        onGameHidden: _handleGameHidden,
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isKeyboardVisible) _buildFooter(theme),
+              ],
             ),
-            if (!isKeyboardVisible) _buildFooter(theme),
-          ],
+          ),
         ),
       ),
     );
@@ -377,8 +395,10 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
               colorBlendMode: BlendMode.srcIn,
             ),
           ),
-          _buildTabItem(theme, 0, AppLocale.emulator.getString(context)),
-          SizedBox(width: 16.r),
+          if (_showEmulatorTab) ...[
+            _buildTabItem(theme, 0, AppLocale.emulator.getString(context)),
+            SizedBox(width: 16.r),
+          ],
           _buildTabItem(theme, 1, AppLocale.scraping.getString(context)),
           SizedBox(width: 16.r),
           _buildTabItem(theme, 2, AppLocale.manage.getString(context)),
@@ -437,6 +457,7 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
   }
 
   Widget _buildFooter(ThemeData theme) {
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     return Container(
       padding: EdgeInsets.all(8.r),
       decoration: BoxDecoration(
@@ -444,8 +465,8 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
           alpha: 0.05,
         ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(12.r),
-          bottomRight: Radius.circular(12.r),
+          bottomLeft: radii.radiusExternal.bottomLeft,
+          bottomRight: radii.radiusExternal.bottomRight,
         ),
       ),
       child: Row(
@@ -456,8 +477,8 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
                 GamepadControl(
                   iconPath: 'assets/images/gamepad/Xbox_D-pad_ALL.png',
                   label: AppLocale.navigate.getString(context),
-                  backgroundColor: theme.colorScheme.tertiary,
-                  textColor: theme.colorScheme.onPrimary,
+                  backgroundColor: theme.colorScheme.tertiaryFixed,
+                  textColor: theme.colorScheme.onTertiaryFixed,
                 ),
               ],
             ),
@@ -466,8 +487,8 @@ class _GameSettingsDialogState extends State<GameSettingsDialog> {
           GamepadControl(
             iconPath: 'assets/images/gamepad/Xbox_B_button.png',
             label: AppLocale.close.getString(context),
-            backgroundColor: theme.colorScheme.error,
-            textColor: theme.colorScheme.onError,
+            backgroundColor: theme.colorScheme.tertiary,
+            textColor: theme.colorScheme.onTertiary,
             onTap: () {
               SfxService().playBackSound();
               Navigator.of(context).pop();

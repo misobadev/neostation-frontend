@@ -488,45 +488,102 @@ void main() {
     );
   });
 
-  group('skipping never consumes a remote copy it did not look at', () {
+  // NEO-231: the pull skipped any server copy older than the local file's
+  // time. An emulator that rewrites the same save bumps that time, so the other
+  // device's newer save never arrived, and nothing said so.
+  group('pulls when only the local time moved', () {
+    Future<void> otherDeviceUploads(String bytes) async {
+      svc.savesByRom[1] = [];
+      svc.seedSave(
+        1,
+        'Game.srm',
+        bytes.codeUnits,
+        // After this device's last upload, before the emulator's rewrite of
+        // the local file (`touch`, five minutes ahead).
+        updatedAt: DateTime.now().toUtc().add(const Duration(minutes: 1)),
+      );
+    }
+
     test(
-      'a state another device advanced still arrives after a local skip',
+      'an unchanged save whose time moved takes the newer server copy',
       () async {
-        // The gate's own hazard. A skip taken on the recorded hash proves only
-        // that *this* device stood still; if it banked the matched asset's stamp
-        // it would mark a remote copy seen that nothing compared or fetched, and
-        // `remoteChanged` would read false from then on. States have no server
-        // hash to check, so this is their ordinary two-device case.
-        await localState().writeAsString('STATE-A');
+        await localSave().writeAsString('SAVE-A');
         await provider.syncGameSavesAfterClose(game);
-
-        // The other device pushes a genuinely newer state.
-        svc.statesByRom[1] = [];
-        svc.seedState(
-          1,
-          'Game.state.auto',
-          'STATE-B'.codeUnits,
-          updatedAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
-        );
-
-        // RetroArch rewrites the auto-state on exit; the bytes do not move.
-        await touch(localState());
+        await otherDeviceUploads('SAVE-B');
+        // The emulator rewrites the same save on exit.
+        await touch(localSave());
         await provider.syncGameSavesAfterClose(game);
         expect(
           svc.updates,
           isEmpty,
-          reason: 'unchanged bytes must not be pushed over the newer state',
+          reason: 'the unchanged save was not pushed',
         );
 
         await provider.syncGameSavesBeforeLaunch(game);
 
-        expect(
-          await localState().readAsString(),
-          'STATE-B',
-          reason: 'the skip must leave the newer state there to be pulled',
-        );
+        expect(await localSave().readAsString(), 'SAVE-B');
       },
     );
+
+    test('a save changed here is still not overwritten', () async {
+      await localSave().writeAsString('SAVE-A');
+      await provider.syncGameSavesAfterClose(game);
+      await otherDeviceUploads('SAVE-B');
+      await localSave().writeAsString('SAVE-C');
+      await touch(localSave());
+
+      await provider.syncGameSavesBeforeLaunch(game);
+
+      expect(await localSave().readAsString(), 'SAVE-C');
+    });
+
+    test('with nothing recorded, a newer local file is kept', () async {
+      await otherDeviceUploads('SAVE-B');
+      await localSave().writeAsString('SAVE-X');
+      await touch(localSave());
+
+      await provider.syncGameSavesBeforeLaunch(game);
+
+      expect(await localSave().readAsString(), 'SAVE-X');
+    });
+  });
+
+  group('skipping never consumes a remote copy it did not look at', () {
+    test('a state another device advanced still arrives after a local skip', () async {
+      // The gate's own hazard. A skip taken on the recorded hash proves only
+      // that *this* device stood still; if it banked the matched asset's stamp
+      // it would mark a remote copy seen that nothing compared or fetched, and
+      // `remoteChanged` would read false from then on. States have no server
+      // hash to check, so this is their ordinary two-device case.
+      await localState().writeAsString('STATE-A');
+      await provider.syncGameSavesAfterClose(game);
+
+      // The other device pushes a genuinely newer state.
+      svc.statesByRom[1] = [];
+      svc.seedState(
+        1,
+        'Game.state.auto',
+        'STATE-B'.codeUnits,
+        updatedAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+      );
+
+      // RetroArch rewrites the auto-state on exit; the bytes do not move.
+      await touch(localState());
+      await provider.syncGameSavesAfterClose(game);
+      expect(
+        svc.updates,
+        isEmpty,
+        reason: 'unchanged bytes must not be pushed over the newer state',
+      );
+
+      await provider.syncGameSavesBeforeLaunch(game);
+
+      expect(
+        await localState().readAsString(),
+        'STATE-B',
+        reason: 'the skip must leave the newer state there to be pulled',
+      );
+    });
 
     test('a save the server vouched for does bank its stamp', () async {
       // The other half: when [_serverHoldsSameBytes] answered, the remote copy

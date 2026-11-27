@@ -5,12 +5,18 @@ import '../../utils/switch_title_extractor.dart';
 import 'sqlite_service.dart';
 import 'sqlite_config_service.dart';
 import '../../utils/vita_title_extractor.dart';
+
 import 'package:neostation/services/android_service.dart';
+
+import '../../constants/system_folder_names.dart';
+
 import 'package:neostation/services/saf_directory_service.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:convert';
+
 import 'package:path/path.dart' as path;
 import 'package:flutter/foundation.dart';
 
@@ -47,7 +53,10 @@ class RomEntry {
   /// Base name of the file with extension.
   final String filename;
 
-  /// File size in bytes.
+  /// File size in bytes, where the walk that found the file gets it for free
+  /// (the SAF walks). The desktop walk leaves it at 0: reading it costs a
+  /// `stat` per file, a network round trip each on a mapped share, and nothing
+  /// on desktop reads it.
   final int size;
 
   /// Metadata read while filtering Switch packages before database cleanup.
@@ -169,8 +178,9 @@ class SqliteDatabaseService {
   }) async {
     final initialCount = await SqliteService.getRomCountForSystem(system.id!);
 
-    if (Platform.isAndroid && (system.folderName == 'android')) {
-      await _performAndroidSystemScan(system, system.folderName);
+    if (Platform.isAndroid &&
+        SystemFolderNames.isAndroidApps(system.folderName)) {
+      await _scanAndroidApps(system);
       final finalCount = await SqliteService.getRomCountForSystem(system.id!);
       return ScanSummary(
         added: (finalCount - initialCount).clamp(0, 999999),
@@ -194,42 +204,50 @@ class SqliteDatabaseService {
     final scanTargets =
         <({String dirPath, String canonicalPath, bool useSaf, bool isLink})>[];
 
+    // Folder names are matched ignoring case, and every directory that matches
+    // is scanned: on a case-sensitive filesystem "Xbox" and "xbox" can sit side
+    // by side, and keeping only one of them dropped the other's games.
+    final aliasNames = {
+      for (final name in allPossibleFolderNames) name.toLowerCase(),
+    };
+
     for (final romFolder in romFolders) {
       final bool useSaf =
           Platform.isAndroid && romFolder.startsWith('content://');
       final Map<String, String>? subdirsForRoot = rootFoldersMap?[romFolder];
 
-      for (final folderToScan in allPossibleFolderNames) {
-        try {
-          final String? dirPath;
+      try {
+        final List<String> dirPaths;
 
-          if (subdirsForRoot != null) {
-            dirPath = subdirsForRoot[folderToScan.toLowerCase()];
-          } else if (useSaf) {
-            dirPath = await _resolveSafSubfolderUri(
-              romFolder,
-              folderToScan,
-              ignoreHiddenFiles: ignoreHiddenFiles,
-            );
-          } else {
-            dirPath = await _resolveStandardSubfolderPath(
-              romFolder,
-              folderToScan,
-              ignoreHiddenFiles: ignoreHiddenFiles,
-            );
-          }
+        if (subdirsForRoot != null) {
+          dirPaths = [
+            for (final entry in subdirsForRoot.entries)
+              if (aliasNames.contains(entry.key.toLowerCase())) entry.value,
+          ];
+        } else if (useSaf) {
+          dirPaths = await _resolveSafSubfolderUris(
+            romFolder,
+            aliasNames,
+            ignoreHiddenFiles: ignoreHiddenFiles,
+          );
+        } else {
+          dirPaths = await _resolveStandardSubfolderPaths(
+            romFolder,
+            allPossibleFolderNames,
+            ignoreHiddenFiles: ignoreHiddenFiles,
+          );
+        }
 
-          if (dirPath == null) continue;
-
+        for (final dirPath in dirPaths) {
           scanTargets.add((
             dirPath: dirPath,
             canonicalPath: await _canonicalScanPath(dirPath, useSaf: useSaf),
             useSaf: useSaf,
             isLink: !useSaf && await FileSystemEntity.isLink(dirPath),
           ));
-        } catch (e) {
-          _log.e('Error resolving folder $folderToScan in $romFolder: $e');
         }
+      } catch (e) {
+        _log.e('Error resolving system folders in $romFolder: $e');
       }
     }
 
@@ -254,7 +272,15 @@ class SqliteDatabaseService {
       if (!walkedDirs.add(target.canonicalPath)) continue;
 
       try {
-        final entries = target.useSaf
+        final entries = system.id == 'ps3'
+            ? await scanPs3Path(
+                target.dirPath,
+                validExtensionsSet,
+                system.recursiveScan,
+                useSaf: target.useSaf,
+                ignoreHiddenFiles: ignoreHiddenFiles,
+              )
+            : target.useSaf
             ? await _scanSafUri(
                 target.dirPath,
                 validExtensionsSet,
@@ -1052,8 +1078,45 @@ class SqliteDatabaseService {
     return renames;
   }
 
+  /// When the installed apps were last read, and the read in flight if any.
+  /// "Android" and "Android Games" are scanned as two systems over the same
+  /// rows, so whichever runs second reuses the first one's read.
+  static DateTime? _androidScannedAt;
+  static Future<void>? _androidScanInFlight;
+  static const Duration _androidScanReuse = Duration(seconds: 30);
+
+  /// Refreshes the installed-app rows behind the "Android" system, and so
+  /// behind "Android Games", which only filters them.
+  static Future<void> _scanAndroidApps(SystemModel system) async {
+    final inFlight = _androidScanInFlight;
+    if (inFlight != null) return inFlight;
+
+    final scannedAt = _androidScannedAt;
+    if (scannedAt != null &&
+        DateTime.now().difference(scannedAt) < _androidScanReuse) {
+      return;
+    }
+
+    final androidSystem = system.folderName == SystemFolderNames.android
+        ? system
+        : await SqliteService.getSystemByFolderName(SystemFolderNames.android);
+    if (androidSystem.id == null) return;
+
+    final scan = _performAndroidSystemScan(
+      androidSystem,
+      androidSystem.folderName,
+    );
+    _androidScanInFlight = scan;
+    try {
+      await scan;
+      _androidScannedAt = DateTime.now();
+    } finally {
+      _androidScanInFlight = null;
+    }
+  }
+
   /// Performs a specialized scan of installed Android applications.
-  static Future<List<DatabaseGameModel>> _performAndroidSystemScan(
+  static Future<void> _performAndroidSystemScan(
     SystemModel system,
     String folderName,
   ) async {
@@ -1061,75 +1124,65 @@ class SqliteDatabaseService {
       final installedApps = await AndroidService.getInstalledApps(
         includeSystemApps: true,
       );
-      final List<DatabaseGameModel> scannedGames = [];
-
-      for (var app in installedApps) {
-        final String packageName = app['package'];
-        scannedGames.add(
-          DatabaseGameModel(
-            filename: packageName,
-            romPath: packageName,
-            realName: app['name'],
-            emulatorName: 'Android',
-            systemFolderName: folderName,
-            descriptions: {'en': 'Android Application'},
-          ),
-        );
-      }
+      final apps = installedApps
+          .where((app) => app['package'] is String)
+          .toList();
 
       await _cleanupOrphanedRomsOptimized(
         system.id!,
-        scannedGames.map((g) => g.romPath).toSet(),
+        apps.map((app) => app['package'] as String).toSet(),
       );
-      await _batchInsertAndroidApps(
-        system.folderName,
-        scannedGames,
-        system.id!,
-      );
-      return scannedGames;
+      await _batchInsertAndroidApps(system.folderName, apps, system.id!);
     } catch (e) {
       _log.e('Error scanning Android apps: $e');
-      return [];
     }
   }
 
   /// High-performance batch operation for registering Android applications
   /// in the ROM database.
+  ///
+  /// [apps] are the native app maps. Existing rows keep their user state,
+  /// including `is_android_game`: only the label and description are
+  /// refreshed.
   static Future<void> _batchInsertAndroidApps(
     String folderName,
-    List<DatabaseGameModel> games,
+    List<Map<String, dynamic>> apps,
     String systemId,
   ) async {
     final db = await SqliteService.getDatabase();
-    final batch = db.batch();
 
-    for (final game in games) {
-      final List<Map<String, dynamic>> existing = await db.query(
+    // One read for every existing row instead of one per app.
+    final existing = {
+      for (final row in await db.query(
         'user_roms',
         columns: ['rom_path'],
-        where: 'rom_path = ? AND app_system_id = ?',
-        whereArgs: [game.romPath, systemId],
-      );
-      if (existing.isEmpty) {
+        where: 'app_system_id = ?',
+        whereArgs: [systemId],
+      ))
+        row['rom_path'].toString(),
+    };
+
+    final batch = db.batch();
+    for (final app in apps) {
+      final packageName = app['package'] as String;
+      final label = app['name']?.toString();
+      if (!existing.contains(packageName)) {
         batch.insert('user_roms', {
-          'rom_path': game.romPath,
-          'filename': game.filename,
+          'rom_path': packageName,
+          'filename': packageName,
           'virtual_folder_name': folderName,
           'app_system_id': systemId,
-          'title_name': game.realName,
-          'description': game.descriptions?['en'],
+          'title_name': label,
+          'description': 'Android Application',
           'is_favorite': 0,
           'play_time': 0,
         });
       } else {
         batch.update(
           'user_roms',
-          {
-            'title_name': game.realName,
-            'description': game.descriptions?['en'],
-          },
+          {'title_name': label, 'description': 'Android Application'},
           where: 'rom_path = ? AND app_system_id = ?',
-          whereArgs: [game.romPath, systemId],
+          whereArgs: [packageName, systemId],
         );
       }
     }
@@ -1163,6 +1216,10 @@ class SqliteDatabaseService {
   }
 
   /// Quickly identifies existing subdirectories within multiple ROM root folders.
+  ///
+  /// Each root maps the subdirectory names, spelled as on disk, to their path
+  /// or SAF URI. Names keep their case so that "Xbox" and "xbox" on a
+  /// case-sensitive filesystem stay two entries; match them ignoring case.
   static Future<Map<String, Map<String, String>>> getExistingSubdirectories(
     List<String> romFolders,
   ) async {
@@ -1174,8 +1231,7 @@ class SqliteDatabaseService {
           final children = await SafDirectoryService.listFiles(folder);
           for (final child in children) {
             if (child['isDirectory'] == true) {
-              subdirs[child['name'].toString().toLowerCase()] = child['uri']
-                  .toString();
+              subdirs[child['name'].toString()] = child['uri'].toString();
             }
           }
         } else {
@@ -1184,7 +1240,7 @@ class SqliteDatabaseService {
             final entities = await dir.list().toList();
             for (final entity in entities) {
               if (entity is Directory) {
-                subdirs[path.basename(entity.path).toLowerCase()] = entity.path;
+                subdirs[path.basename(entity.path)] = entity.path;
               }
             }
           }
@@ -1197,29 +1253,28 @@ class SqliteDatabaseService {
     return result;
   }
 
-  /// Locates a system-specific subdirectory within a SAF root URI.
-  static Future<String?> _resolveSafSubfolderUri(
+  /// Lists every subdirectory of a SAF root URI whose name, ignoring case, is
+  /// one of [lowerNames].
+  static Future<List<String>> _resolveSafSubfolderUris(
     String romFolderUri,
-    String folderName, {
+    Set<String> lowerNames, {
     bool ignoreHiddenFiles = true,
   }) async {
     try {
       final children = await SafDirectoryService.listFiles(romFolderUri);
-      if (children.isEmpty) return null;
-      for (final child in children) {
-        if (_shouldSkipSafEntry(child, ignoreHiddenFiles: ignoreHiddenFiles)) {
-          continue;
-        }
-        if (child['isDirectory'] == true &&
-            child['name'].toString().toLowerCase() ==
-                folderName.toLowerCase()) {
-          return child['uri'].toString();
-        }
-      }
-      return null;
+      return [
+        for (final child in children)
+          if (!_shouldSkipSafEntry(
+                child,
+                ignoreHiddenFiles: ignoreHiddenFiles,
+              ) &&
+              child['isDirectory'] == true &&
+              lowerNames.contains(child['name'].toString().toLowerCase()))
+            child['uri'].toString(),
+      ];
     } catch (e) {
-      _log.e('Error resolving SAF folder $romFolderUri for $folderName: $e');
-      return null;
+      _log.e('Error resolving SAF folders in $romFolderUri: $e');
+      return const [];
     }
   }
 
@@ -1364,41 +1419,42 @@ class SqliteDatabaseService {
     return entries;
   }
 
-  /// Locates a system-specific subdirectory within a standard filesystem path.
-  static Future<String?> _resolveStandardSubfolderPath(
+  /// Lists every subdirectory of a standard filesystem path whose name,
+  /// ignoring case, is one of [folderNames].
+  static Future<List<String>> _resolveStandardSubfolderPaths(
     String romFolderPath,
-    String folderName, {
+    List<String> folderNames, {
     bool ignoreHiddenFiles = true,
   }) async {
     try {
       final rootDir = Directory(romFolderPath);
-      if (!await rootDir.exists()) return null;
+      if (!await rootDir.exists()) return const [];
+      final lowerNames = {for (final name in folderNames) name.toLowerCase()};
       try {
         final List<FileSystemEntity> children = await rootDir.list().toList();
-        for (final child in children) {
-          if (_shouldSkipStandardEntity(
-            child,
-            ignoreHiddenFiles: ignoreHiddenFiles,
-          )) {
-            continue;
-          }
-          if (child is Directory &&
-              path.basename(child.path).toLowerCase() ==
-                  folderName.toLowerCase()) {
-            return child.path;
-          }
-        }
+        return [
+          for (final child in children)
+            if (!_shouldSkipStandardEntity(
+                  child,
+                  ignoreHiddenFiles: ignoreHiddenFiles,
+                ) &&
+                child is Directory &&
+                lowerNames.contains(path.basename(child.path).toLowerCase()))
+              child.path,
+        ];
       } catch (e) {
+        // The root can't be listed: try each name as spelled instead.
         _log.e('Error listing standard directory $romFolderPath: $e');
-        final directPath = path.join(romFolderPath, folderName);
-        if (await Directory(directPath).exists()) return directPath;
+        final found = <String>[];
+        for (final name in folderNames) {
+          final directPath = path.join(romFolderPath, name);
+          if (await Directory(directPath).exists()) found.add(directPath);
+        }
+        return found;
       }
-      return null;
     } catch (e) {
-      _log.e(
-        'Error resolving standard folder $romFolderPath for $folderName: $e',
-      );
-      return null;
+      _log.e('Error resolving standard folders in $romFolderPath: $e');
+      return const [];
     }
   }
 
@@ -1416,6 +1472,29 @@ class SqliteDatabaseService {
   ///
   /// Android's SAF walk stays where it is: it reaches the DocumentsProvider
   /// over a platform channel, which is only bound on the root isolate.
+  /// Recognises extracted disc games as a single entry at their outer folder.
+  /// Does not descend into recognised games (including PS3_UPDATE).
+  @visibleForTesting
+  static Future<List<RomEntry>> scanPs3Path(
+    String root,
+    Set<String> extensions,
+    bool recursive, {
+    bool useSaf = false,
+    bool ignoreHiddenFiles = true,
+  }) async {
+    final entries = await SqliteConfigService.scanPs3Path(
+      root,
+      extensions,
+      recursive,
+      useSaf: useSaf,
+      ignoreHiddenFiles: ignoreHiddenFiles,
+    );
+    return [
+      for (final entry in entries)
+        RomEntry(path: entry.path, filename: entry.filename, size: entry.size),
+    ];
+  }
+
   @visibleForTesting
   static Future<List<RomEntry>> scanStandardPath(
     String pathStr,
@@ -1450,29 +1529,41 @@ class SqliteDatabaseService {
   }) async {
     final entries = <RomEntry>[];
     try {
-      final entities = await Directory(
-        pathStr,
-      ).list(recursive: recursive, followLinks: false).toList();
+      final entities = await Directory(pathStr)
+          .list(recursive: recursive, followLinks: false)
+          .toList();
+      // Directory-backed formats such as macOS `.app` bundles are one entry,
+      // and their contents must not be reported as separate games.
+      entities.sort((a, b) => a.path.length.compareTo(b.path.length));
+      final directoryEntries = <String>[];
       for (final entity in entities) {
+        if (directoryEntries.any(
+          (entry) => path.isWithin(entry, entity.path),
+        )) {
+          continue;
+        }
         if (_shouldSkipStandardEntity(
           entity,
           ignoreHiddenFiles: ignoreHiddenFiles,
         )) {
           continue;
         }
-        if (entity is File) {
-          final filename = path.basename(entity.path);
-          final ext = path.extension(filename).toLowerCase();
-          if (validExtensions.contains(ext.replaceAll('.', '')) ||
-              validExtensions.isEmpty) {
+        final filename = path.basename(entity.path);
+        final ext = path.extension(filename).toLowerCase().replaceAll('.', '');
+        final matches =
+            validExtensions.contains(ext) || validExtensions.isEmpty;
+        if (entity is Directory) {
+          // Only `.app` is a directory-backed launchable format today.
+          if (ext == 'app' && validExtensions.contains('app')) {
             entries.add(
-              RomEntry(
-                path: entity.path,
-                filename: filename,
-                size: await entity.length(),
-              ),
+              RomEntry(path: entity.path, filename: filename, size: 0),
             );
+            directoryEntries.add(entity.path);
           }
+          continue;
+        }
+        if (entity is File && matches) {
+          entries.add(RomEntry(path: entity.path, filename: filename));
         }
       }
     } catch (e) {

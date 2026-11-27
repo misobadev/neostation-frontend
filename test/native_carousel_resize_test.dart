@@ -15,25 +15,32 @@ import 'package:neostation/widgets/native_carousel.dart';
 void main() {
   const double viewportWidth = 780;
 
-  Widget carousel(GlobalKey<NativeCarouselState> key, double height) =>
-      MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: SizedBox(
-              width: viewportWidth,
-              height: height,
-              child: NativeCarousel(
-                key: key,
-                itemCount: 200,
-                initialIndex: 0,
-                wrap: true,
-                itemBuilder: (context, index) =>
-                    Container(color: Colors.blue, child: Text('$index')),
-              ),
+  Widget carousel(
+    GlobalKey<NativeCarouselState> key,
+    double height, {
+    CarouselDepth depth = const CarouselDepth(),
+  }) => MaterialApp(
+    home: Scaffold(
+      body: Center(
+        child: SizedBox(
+          width: viewportWidth,
+          height: height,
+          child: NativeCarousel(
+            key: key,
+            itemCount: 200,
+            initialIndex: 0,
+            wrap: true,
+            depth: depth,
+            itemBuilder: (context, index) => Container(
+              key: ValueKey(index),
+              color: Colors.blue,
+              child: Text('$index'),
             ),
           ),
         ),
-      );
+      ),
+    ),
+  );
 
   testWidgets('the centred card stays centred across a height change', (
     tester,
@@ -72,5 +79,30 @@ void main() {
       reason:
           'a stale pitch compounds with distance; 40 pages is where it bites',
     );
+  });
+
+  testWidgets('scale-only neighbors keep their size after a mid-slide resize', (
+    tester,
+  ) async {
+    final key = GlobalKey<NativeCarouselState>();
+    const depth = CarouselDepth(
+      scaleFalloff: 0.7,
+      minScale: 0.55,
+      minOpacity: 1,
+    );
+    await tester.pumpWidget(carousel(key, 490, depth: depth));
+    key.currentState!.jumpToPage(40);
+    await tester.pumpAndSettle();
+
+    key.currentState!.animateToPage(60);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+    await tester.pumpWidget(carousel(key, 452.5, depth: depth));
+    await tester.pumpAndSettle();
+
+    double width(int index) =>
+        tester.getRect(find.byKey(ValueKey(index))).width;
+    expect(width(60), closeTo(452.5, 0.01));
+    expect(width(59), closeTo(452.5 * 0.72, 0.01));
   });
 }

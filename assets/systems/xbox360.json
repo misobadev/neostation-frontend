@@ -2,7 +2,7 @@
   "system": {
     "id": "xbox360",
     "multidisc": true,
-    "name": "Microsoft - XBox 360",
+    "name": "Xbox 360",
     "short_name": "XB360",
     "details": {
       "manufacturer": "Microsoft",
@@ -62,6 +62,17 @@
       "platforms": {
         "android": {
           "launch_arguments": "-n xendroid.compose/.EmulatorHostActivity --es game_uri \"{file.uri}\""
+        }
+      }
+    },
+    {
+      "name": "Xendroid+",
+      "unique_id": "xbox360.xendroid.compose.fork",
+      "description": "Supported extensions: iso, zar.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n xendroid.compose.fork/xendroid.compose.EmulatorHostActivity -a xendroid.intent.action.xendroid --es game_uri \"{file.uri}\""
         }
       }
     },

@@ -46,11 +46,13 @@ void main() {
       expect(scheme.primary, const Color(0xFFFF79C6));
       expect(scheme.onPrimary, const Color(0xFF16050E));
       expect(scheme.secondary, const Color(0xFFBD93F9));
-      expect(scheme.tertiary, const Color(0xFFFFB86C)); // accent -> tertiary
+      expect(scheme.tertiary, scheme.primary);
+      expect(scheme.onTertiary, scheme.onPrimary);
       expect(scheme.surface, const Color(0xFF282A36)); // base-100
       expect(scheme.onSurface, const Color(0xFFF8F8F3)); // base-content
       expect(scheme.outline, const Color(0xFF303241)); // base-300
-      expect(scheme.tertiaryFixed, const Color(0xFF414558)); // neutral
+      expect(scheme.tertiaryFixed, scheme.surface);
+      expect(scheme.onTertiaryFixed, scheme.onSurface);
       expect(scheme.error, const Color(0xFFFF5555));
       expect(theme.themeData.cardColor, const Color(0xFF1F202A)); // base-200
       expect(theme.themeData.scaffoldBackgroundColor, scheme.surface);
@@ -156,6 +158,21 @@ void main() {
       expect(radii.radiusInternalRaw, 0.0);
     });
 
+    test('attaches the theme glass block when present', () {
+      final json = Map<String, dynamic>.from(_daisyJson)
+        ..['glass'] = {'blur': 1, 'transparency': 20, 'borderWidth': 3};
+      final theme = CustomTheme.fromDaisyJson(json);
+      expect(theme.glass, isNotNull);
+      expect(theme.glass!.blur, 1);
+      expect(theme.glass!.transparency, 20);
+      expect(theme.glass!.borderWidth, 3.0);
+    });
+
+    test('glass is null when the json has no glass block', () {
+      final theme = CustomTheme.fromDaisyJson(_daisyJson);
+      expect(theme.glass, isNull);
+    });
+
     test('identical palettes share a signature; different ones do not', () {
       final a = CustomTheme.fromDaisyJson(_daisyJson);
       final renamed = Map<String, dynamic>.from(_daisyJson)
@@ -176,6 +193,81 @@ void main() {
         ..['primary'] = 'rgb(1,2,3)';
       final json = Map<String, dynamic>.from(_daisyJson)..['colors'] = colors;
       expect(() => CustomTheme.fromDaisyJson(json), throwsFormatException);
+    });
+  });
+
+  group('CustomTheme.fromJson, NeoStation format', () {
+    const v2 = {
+      'format': 'neostation-theme',
+      'version': 2,
+      'name': '16 Bits Copy',
+      'id': 'sixteen_copy',
+      'brightness': 'light',
+      'colors': {
+        'background': '#DDDBD6',
+        'surface': '#CBC8C1',
+        'text': '#2A2C31',
+        'border': '#A9A59D',
+        'selection': '#3E4248',
+        'onSelection': '#EDEBE6',
+        'selectedCard': '#2D55B0',
+        'onSelectedCard': '#FFFFFF',
+        'action': '#CC2F38',
+        'onAction': '#FFFFFF',
+        'button': '#CBC8C1',
+        'onButton': '#2A2C31',
+        'success': '#23843F',
+        'warning': '#8A6A00',
+        'error': '#B42A32',
+        'info': '#2D55B0',
+      },
+    };
+
+    test('maps every colour onto the role it is named after', () {
+      final theme = CustomTheme.fromJson(v2);
+      final data = theme.themeData;
+      final scheme = data.colorScheme;
+      expect(theme.brightness, Brightness.light);
+      expect(data.scaffoldBackgroundColor, const Color(0xFFDDDBD6));
+      expect(scheme.surface, const Color(0xFFCBC8C1));
+      expect(scheme.onSurface, const Color(0xFF2A2C31));
+      expect(scheme.outline, const Color(0xFFA9A59D));
+      expect(scheme.primary, const Color(0xFF3E4248));
+      expect(scheme.onPrimary, const Color(0xFFEDEBE6));
+      expect(scheme.secondary, const Color(0xFF2D55B0));
+      expect(scheme.onSecondary, const Color(0xFFFFFFFF));
+      expect(scheme.tertiary, const Color(0xFFCC2F38));
+      expect(scheme.onTertiary, const Color(0xFFFFFFFF));
+      expect(scheme.tertiaryFixed, const Color(0xFFCBC8C1));
+      expect(scheme.onTertiaryFixed, const Color(0xFF2A2C31));
+      expect(theme.customColors.warningColor, const Color(0xFF8A6A00));
+      expect(theme.customColors.batteryFull, const Color(0xFF23843F));
+    });
+
+    test('text on a status colour is the theme colour that reads best', () {
+      final theme = CustomTheme.fromJson(v2);
+      // Dark green, amber and red: the light background reads better than
+      // the dark text on all three.
+      expect(theme.customColors.onSuccessColor, const Color(0xFFDDDBD6));
+      expect(theme.customColors.onErrorColor, const Color(0xFFDDDBD6));
+    });
+
+    test('a missing colour is refused', () {
+      final colors = Map<String, dynamic>.from(v2['colors']! as Map)
+        ..remove('action');
+      final json = Map<String, dynamic>.from(v2)..['colors'] = colors;
+      expect(() => CustomTheme.fromJson(json), throwsFormatException);
+    });
+
+    test('older daisyUI files still import through fromJson', () {
+      final theme = CustomTheme.fromJson(_daisyJson);
+      expect(theme.themeData.colorScheme.primary, const Color(0xFFFF79C6));
+    });
+
+    test('renaming keeps the format', () {
+      final renamed = CustomTheme.fromJson(v2).withId('other');
+      expect(renamed.id, 'other');
+      expect(renamed.themeData.colorScheme.tertiary, const Color(0xFFCC2F38));
     });
   });
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../providers/sqlite_config_provider.dart';
 import 'setup_wizard.dart';
 import 'splash_status_layout.dart';
@@ -60,11 +61,15 @@ class _PermissionCheckWrapperState extends State<PermissionCheckWrapper> {
         await configProvider.initialize();
       }
 
-      final hasRomFolder = configProvider.config.romFolder?.isNotEmpty == true;
+      // Only the wizard's own finish marks setup as done. Having a ROM folder
+      // used to count too, but the folder is picked halfway through: an app
+      // closed or restarted after that step skipped the scan, the ES-DE
+      // import and the art pack, and opened on an empty library. Every
+      // released version saves this flag when the wizard finishes.
       final setupCompleted = configProvider.config.setupCompleted;
 
-      if (hasRomFolder || setupCompleted) {
-        // Backfill the SharedPreferences flag for existing users upgrading.
+      if (setupCompleted) {
+        // Backfill the SharedPreferences flag, which this check reads first.
         await prefs.setBool(PermissionCheckWrapper.setupCompletedKey, true);
         _pushWizardActive(false);
         setState(() {
@@ -100,11 +105,13 @@ class _PermissionCheckWrapperState extends State<PermissionCheckWrapper> {
     ).setSetupWizardActive(active);
   }
 
-  void _completeSetup() async {
+  Future<void> _completeSetup() async {
     final configProvider = Provider.of<SqliteConfigProvider>(
       context,
       listen: false,
     );
+    // A failure here reaches the wizard, which says so and lets the user try
+    // again.
     await configProvider.completeSetup();
 
     // Setup is done — let the secondary display bring in the dock/launcher.
@@ -112,9 +119,16 @@ class _PermissionCheckWrapperState extends State<PermissionCheckWrapper> {
 
     // Persist flag to SharedPreferences so the wizard is never shown again
     // even if the SQLite DB is temporarily inaccessible (e.g. SD card not ready).
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(setupCompletedKey, true);
+    // Setup is already saved as completed in the database, which restores
+    // this flag at the next start if it can't be written now.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(setupCompletedKey, true);
+    } catch (e) {
+      _log.w('Could not save the setup flag to preferences: $e');
+    }
 
+    if (!mounted) return;
     setState(() {
       _needsSetup = false;
     });

@@ -2,35 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 
-const Color _primaryColor = Color(0xFF605dff);
-const Color _onPrimaryColor = Color(0xFFedf1fe);
-const Color _secondaryColor = Color(0xFFf43098);
-const Color _onSecondaryColor = Color(0xFFf9e4f0);
-const Color _tertiaryColor = Color(0xFF00d3bb);
-const Color _onTertiaryColor = Color(0xFF084d49);
-const Color _tertiaryFixedColor = Color(0xFF09090b);
-const Color _onTertiaryFixedColor = Color(0xFFe4e4e7);
-const Color _surfaceColor = Color(0xFF1d232a);
-const Color _onSurfaceColor = Color(0xFFecf9ff);
+const Color _primaryColor = Color(0xFFF1EDE4);
+const Color _onPrimaryColor = Color(0xFF111216);
+const Color _secondaryColor = Color(0xFFF1EDE4);
+const Color _onSecondaryColor = Color(0xFF111216);
+// The one main action of a view: the brand's signal red.
+const Color _tertiaryColor = Color(0xFFFF5A4A);
+const Color _onTertiaryColor = Color(0xFF111216);
+const Color _surfaceColor = Color(0xFF24252D);
+const Color _onSurfaceColor = Color(0xFFF1EDE4);
 
-const Color _outlineColor = Color(0xFF212830);
-const Color _shadowColor = Color(0xFF09090b);
+const Color _outlineColor = Color(0xFF2E3039);
+const Color _shadowColor = Color(0xFF08080A);
 
-const Color _backgroundColor = Color(0xFF15191e);
+const Color _backgroundColor = Color(0xFF111216);
 
-const Color _batteryFull = Color(0xFF00d390);
-const Color _batteryMedium = Color(0xFFfcb700);
-const Color _batteryLow = Color(0xFFff627d);
-const Color _batteryPower = Color(0xFF00bafe);
+const Color _batteryFull = Color(0xFF33C27A);
+const Color _batteryMedium = Color(0xFFF5B83D);
+const Color _batteryLow = Color(0xFFFF5A4A);
+const Color _batteryPower = Color(0xFF4A74FF);
 
-const Color _errorColor = Color(0xFFff627d);
-const Color _onErrorColor = Color(0xFF4d0218);
-const Color _warningColor = Color(0xFFfcb700);
-const Color _onWarningColor = Color(0xFF793205);
-const Color _successColor = Color(0xFF00d390);
-const Color _onSuccessColor = Color(0xFF004c39);
-const Color _infoColor = Color(0xFF00bafe);
-const Color _onInfoColor = Color(0xFF042e49);
+const Color _errorColor = Color(0xFFFF5A4A);
+const Color _onErrorColor = Color(0xFF111216);
+const Color _warningColor = Color(0xFFF5B83D);
+const Color _onWarningColor = Color(0xFF111216);
+const Color _successColor = Color(0xFF33C27A);
+const Color _onSuccessColor = Color(0xFF111216);
+const Color _infoColor = Color(0xFF6E90FF);
+const Color _onInfoColor = Color(0xFF111216);
 
 final ThemeData darkTheme = ThemeData(
   useMaterial3: true,
@@ -38,13 +37,13 @@ final ThemeData darkTheme = ThemeData(
     primary: _primaryColor,
     secondary: _secondaryColor,
     tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
     onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

@@ -168,12 +168,10 @@ void main() {
       test('prefers the absolute-path entry whose subfolder has media', () {
         final mediaRoot = Directory.systemTemp.createTempSync('esde_media_');
         addTearDown(() => mediaRoot.deleteSync(recursive: true));
-        Directory(
-          '${mediaRoot.path}/arcade/covers/MAME SPO',
-        ).createSync(recursive: true);
-        File(
-          '${mediaRoot.path}/arcade/covers/MAME SPO/1on1gov.jpg',
-        ).writeAsStringSync('x');
+        Directory('${mediaRoot.path}/arcade/covers/MAME SPO')
+            .createSync(recursive: true);
+        File('${mediaRoot.path}/arcade/covers/MAME SPO/1on1gov.jpg')
+            .writeAsStringSync('x');
 
         final doc = XmlDocument.parse('''
           <gameList>
@@ -343,19 +341,17 @@ void main() {
       },
     );
 
-    test(
-      'import keys metadata on the scanned ROM filename, not the gamelist casing',
-      () async {
-        // Scanned ROM is lowercase; the gamelist lists it title-cased.
-        await db.execute(
-          "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('sonic.smc', '/roms/snes/sonic.smc', 'snes')",
-        );
+    test('import keys metadata on the scanned ROM filename, not the gamelist casing', () async {
+      // Scanned ROM is lowercase; the gamelist lists it title-cased.
+      await db.execute(
+        "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('sonic.smc', '/roms/snes/sonic.smc', 'snes')",
+      );
 
-        final tempRoot = Directory.systemTemp.createTempSync('esde_test_');
-        addTearDown(() => tempRoot.deleteSync(recursive: true));
-        final systemDir = Directory('${tempRoot.path}/gamelists/snes')
-          ..createSync(recursive: true);
-        File('${systemDir.path}/gamelist.xml').writeAsStringSync('''
+      final tempRoot = Directory.systemTemp.createTempSync('esde_test_');
+      addTearDown(() => tempRoot.deleteSync(recursive: true));
+      final systemDir = Directory('${tempRoot.path}/gamelists/snes')
+        ..createSync(recursive: true);
+      File('${systemDir.path}/gamelist.xml').writeAsStringSync('''
           <gameList>
             <game>
               <path>./Sonic.smc</path>
@@ -365,19 +361,18 @@ void main() {
           </gameList>
         ''');
 
-        final result = await EsdeImportService.import(tempRoot.path);
-        expect(result.gamesImported, 1);
+      final result = await EsdeImportService.import(tempRoot.path);
+      expect(result.gamesImported, 1);
 
-        final rows = await db.rawQuery(
-          'SELECT filename, real_name FROM user_screenscraper_metadata',
-        );
-        expect(rows.length, 1);
-        // Keyed on the scanned casing so the case-sensitive display join
-        // (user_roms.filename = metadata.filename) resolves.
-        expect(rows.first['filename'], 'sonic.smc');
-        expect(rows.first['real_name'], 'Sonic the Hedgehog');
-      },
-    );
+      final rows = await db.rawQuery(
+        'SELECT filename, real_name FROM user_screenscraper_metadata',
+      );
+      expect(rows.length, 1);
+      // Keyed on the scanned casing so the case-sensitive display join
+      // (user_roms.filename = metadata.filename) resolves.
+      expect(rows.first['filename'], 'sonic.smc');
+      expect(rows.first['real_name'], 'Sonic the Hedgehog');
+    });
 
     test(
       'import handles a gamelist with an <alternativeEmulator> root',
@@ -392,8 +387,8 @@ void main() {
           ..createSync(recursive: true);
         // Exactly what ES-DE writes once the user picks a non-default emulator
         // for the system: two root elements in one file.
-        File('${systemDir.path}/gamelist.xml').writeAsStringSync(
-          '''<?xml version="1.0"?>
+        File('${systemDir.path}/gamelist.xml')
+            .writeAsStringSync('''<?xml version="1.0"?>
 <alternativeEmulator>
     <label>Snes9x - Current</label>
 </alternativeEmulator>
@@ -404,8 +399,7 @@ void main() {
         <altemulator>Snes9x - Current</altemulator>
     </game>
 </gameList>
-''',
-        );
+''');
 
         final result = await EsdeImportService.import(tempRoot.path);
         expect(result.systemsSkipped, 0);
@@ -431,12 +425,10 @@ void main() {
       // user moves it: `<tempRoot>/downloaded_media` never exists.
       final mediaDir = Directory.systemTemp.createTempSync('esde_media_');
       addTearDown(() => mediaDir.deleteSync(recursive: true));
-      Directory(
-        '${mediaDir.path}/megadrive/covers',
-      ).createSync(recursive: true);
-      File(
-        '${mediaDir.path}/megadrive/covers/sonic.png',
-      ).writeAsStringSync('x');
+      Directory('${mediaDir.path}/megadrive/covers')
+          .createSync(recursive: true);
+      File('${mediaDir.path}/megadrive/covers/sonic.png')
+          .writeAsStringSync('x');
 
       Directory('${tempRoot.path}/settings').createSync(recursive: true);
       File('${tempRoot.path}/settings/es_settings.xml').writeAsStringSync(
@@ -553,15 +545,12 @@ void main() {
         await db.execute(
           "INSERT INTO app_systems (id, real_name, folder_name, screenscraper_id) VALUES ('nes', 'NES', 'nes', 3)",
         );
-        Directory(
-          '${tempRoot.path}/gamelists/snes',
-        ).createSync(recursive: true);
-        File(
-          '${tempRoot.path}/gamelists/snes/gamelist.xml',
-        ).writeAsStringSync('<gameList></gameList>');
-        Directory(
-          '${tempRoot.path}/downloaded_media/nes/covers',
-        ).createSync(recursive: true);
+        Directory('${tempRoot.path}/gamelists/snes')
+            .createSync(recursive: true);
+        File('${tempRoot.path}/gamelists/snes/gamelist.xml')
+            .writeAsStringSync('<gameList></gameList>');
+        Directory('${tempRoot.path}/downloaded_media/nes/covers')
+            .createSync(recursive: true);
 
         await EsdeImportService.import(tempRoot.path);
 
@@ -573,27 +562,24 @@ void main() {
       },
     );
 
-    test(
-      'import records the nested media subfolder for absolute gamelist paths',
-      () async {
-        await db.execute(
-          "INSERT INTO app_systems (id, real_name, folder_name, screenscraper_id) VALUES ('arcade', 'Arcade', 'arcade', 75)",
-        );
-        await db.execute(
-          "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('1on1gov.zip', '/roms/arcade/MAME SPO/1on1gov.zip', 'arcade')",
-        );
+    test('import records the nested media subfolder for absolute gamelist paths', () async {
+      await db.execute(
+        "INSERT INTO app_systems (id, real_name, folder_name, screenscraper_id) VALUES ('arcade', 'Arcade', 'arcade', 75)",
+      );
+      await db.execute(
+        "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('1on1gov.zip', '/roms/arcade/MAME SPO/1on1gov.zip', 'arcade')",
+      );
 
-        final tempRoot = Directory.systemTemp.createTempSync('esde_test_');
-        addTearDown(() => tempRoot.deleteSync(recursive: true));
-        Directory(
-          '${tempRoot.path}/downloaded_media/arcade/covers/MAME SPO',
-        ).createSync(recursive: true);
-        File(
-          '${tempRoot.path}/downloaded_media/arcade/covers/MAME SPO/1on1gov.jpg',
-        ).writeAsStringSync('x');
-        final systemDir = Directory('${tempRoot.path}/gamelists/arcade')
-          ..createSync(recursive: true);
-        File('${systemDir.path}/gamelist.xml').writeAsStringSync('''
+      final tempRoot = Directory.systemTemp.createTempSync('esde_test_');
+      addTearDown(() => tempRoot.deleteSync(recursive: true));
+      Directory('${tempRoot.path}/downloaded_media/arcade/covers/MAME SPO')
+          .createSync(recursive: true);
+      File(
+        '${tempRoot.path}/downloaded_media/arcade/covers/MAME SPO/1on1gov.jpg',
+      ).writeAsStringSync('x');
+      final systemDir = Directory('${tempRoot.path}/gamelists/arcade')
+        ..createSync(recursive: true);
+      File('${systemDir.path}/gamelist.xml').writeAsStringSync('''
           <gameList>
             <game>
               <path>/storage/E7AB-61FB/Roms/arcade/MAME SPO/1on1gov.zip</path>
@@ -601,6 +587,45 @@ void main() {
             </game>
           </gameList>
         ''');
+
+      await EsdeImportService.import(tempRoot.path);
+
+      final rows = await db.rawQuery(
+        "SELECT esde_media_subdir FROM user_screenscraper_metadata WHERE filename = '1on1gov.zip'",
+      );
+      expect(rows.single['esde_media_subdir'], 'MAME SPO');
+    });
+
+    test(
+      're-importing corrects a subfolder stored from an absolute path',
+      () async {
+        await db.execute(
+          "INSERT INTO app_systems (id, real_name, folder_name, screenscraper_id) VALUES ('arcade', 'Arcade', 'arcade', 75)",
+        );
+        await db.execute(
+          "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('1on1gov.zip', '/roms/arcade/1on1gov.zip', 'arcade')",
+        );
+        // What an import before the fix left behind.
+        await ScraperRepository.mergeEsdeMetadata('arcade', '1on1gov.zip', {
+          'real_name': '1 on 1',
+        }, mediaSubdir: 'storage/E7AB-61FB/Roms/arcade/MAME SPO');
+        final seeded = await db.rawQuery(
+          "SELECT esde_media_subdir FROM user_screenscraper_metadata WHERE filename = '1on1gov.zip'",
+        );
+        expect(
+          seeded.single['esde_media_subdir'],
+          'storage/E7AB-61FB/Roms/arcade/MAME SPO',
+        );
+
+        final tempRoot = Directory.systemTemp.createTempSync('esde_test_');
+        addTearDown(() => tempRoot.deleteSync(recursive: true));
+        final systemDir = Directory('${tempRoot.path}/gamelists/arcade')
+          ..createSync(recursive: true);
+        File('${systemDir.path}/gamelist.xml').writeAsStringSync(
+          '<gameList><game>'
+          '<path>/storage/E7AB-61FB/Roms/arcade/MAME SPO/1on1gov.zip</path>'
+          '<name>1 on 1</name></game></gameList>',
+        );
 
         await EsdeImportService.import(tempRoot.path);
 
@@ -610,42 +635,5 @@ void main() {
         expect(rows.single['esde_media_subdir'], 'MAME SPO');
       },
     );
-
-    test('re-importing corrects a subfolder stored from an absolute path', () async {
-      await db.execute(
-        "INSERT INTO app_systems (id, real_name, folder_name, screenscraper_id) VALUES ('arcade', 'Arcade', 'arcade', 75)",
-      );
-      await db.execute(
-        "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('1on1gov.zip', '/roms/arcade/1on1gov.zip', 'arcade')",
-      );
-      // What an import before the fix left behind.
-      await ScraperRepository.mergeEsdeMetadata('arcade', '1on1gov.zip', {
-        'real_name': '1 on 1',
-      }, mediaSubdir: 'storage/E7AB-61FB/Roms/arcade/MAME SPO');
-      final seeded = await db.rawQuery(
-        "SELECT esde_media_subdir FROM user_screenscraper_metadata WHERE filename = '1on1gov.zip'",
-      );
-      expect(
-        seeded.single['esde_media_subdir'],
-        'storage/E7AB-61FB/Roms/arcade/MAME SPO',
-      );
-
-      final tempRoot = Directory.systemTemp.createTempSync('esde_test_');
-      addTearDown(() => tempRoot.deleteSync(recursive: true));
-      final systemDir = Directory('${tempRoot.path}/gamelists/arcade')
-        ..createSync(recursive: true);
-      File('${systemDir.path}/gamelist.xml').writeAsStringSync(
-        '<gameList><game>'
-        '<path>/storage/E7AB-61FB/Roms/arcade/MAME SPO/1on1gov.zip</path>'
-        '<name>1 on 1</name></game></gameList>',
-      );
-
-      await EsdeImportService.import(tempRoot.path);
-
-      final rows = await db.rawQuery(
-        "SELECT esde_media_subdir FROM user_screenscraper_metadata WHERE filename = '1on1gov.zip'",
-      );
-      expect(rows.single['esde_media_subdir'], 'MAME SPO');
-    });
   });
 }

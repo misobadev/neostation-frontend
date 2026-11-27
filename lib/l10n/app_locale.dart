@@ -18,6 +18,65 @@ part 'app_locale_ja.dart';
 part 'app_locale_ko.dart';
 
 mixin AppLocale {
+  static const String smartMatchesOne = 'smartMatchesOne';
+  static const String smartCollection = 'smartCollection';
+  static const String manualCollection = 'manualCollection';
+  static const String smartEditRules = 'smartEditRules';
+  static const String smartMatchAll = 'smartMatchAll';
+  static const String smartMatchAny = 'smartMatchAny';
+  static const String smartAddRule = 'smartAddRule';
+  static const String smartChooseValue = 'smartChooseValue';
+  static const String smartCustomValue = 'smartCustomValue';
+  static const String smartMatches = 'smartMatches';
+  static const String smartInvalidRules = 'smartInvalidRules';
+  static const String smartInvalidValue = 'smartInvalidValue';
+  static const String smartNoMatches = 'smartNoMatches';
+  static const String smartPreviewError = 'smartPreviewError';
+  static const String smartYes = 'smartYes';
+  static const String smartNo = 'smartNo';
+  static const String smartDone = 'smartDone';
+  static const String smartLower = 'smartLower';
+  static const String smartUpper = 'smartUpper';
+  static const String smartRating = 'smartRating';
+  static const String smartPlayed = 'smartPlayed';
+  static const String smartIs = 'smartIs';
+  static const String smartIsNot = 'smartIsNot';
+  static const String smartContains = 'smartContains';
+  static const String smartNotContains = 'smartNotContains';
+  static const String smartBefore = 'smartBefore';
+  static const String smartAfter = 'smartAfter';
+  static const String smartAtLeast = 'smartAtLeast';
+  static const String smartAtMost = 'smartAtMost';
+  static const String smartBetween = 'smartBetween';
+  static const String smartWithinDays = 'smartWithinDays';
+  static const String smartNotWithinDays = 'smartNotWithinDays';
+  static const String smartDays = 'smartDays';
+  static const String smartDaysOne = 'smartDaysOne';
+  static const String smartDaysFew = 'smartDaysFew';
+  static const String collectionLoadError = 'collectionLoadError';
+  static const String smartRulesOnly = 'smartRulesOnly';
+  static const String customSounds = 'customSounds';
+  static const String customSoundsSubtitle = 'customSoundsSubtitle';
+  static const String customSoundsHint = 'customSoundsHint';
+  static const String customSoundsMovement = 'customSoundsMovement';
+  static const String customSoundsConfirm = 'customSoundsConfirm';
+  static const String customSoundsBack = 'customSoundsBack';
+  static const String customSoundsDefault = 'customSoundsDefault';
+  static const String customSoundsImport = 'customSoundsImport';
+  static const String customSoundsPreview = 'customSoundsPreview';
+  static const String customSoundsReset = 'customSoundsReset';
+  static const String customSoundsClose = 'customSoundsClose';
+  static const String customSoundsSizeError = 'customSoundsSizeError';
+  static const String customSoundsDurationError = 'customSoundsDurationError';
+  static const String customSoundsInvalidError = 'customSoundsInvalidError';
+  static const String customSoundsSaveError = 'customSoundsSaveError';
+
+  static const String ignoreArticlesInGameSort = 'ignoreArticlesInGameSort';
+  static const String ignoreArticlesInGameSortSubtitle =
+      'ignoreArticlesInGameSortSubtitle';
+  static const String videoPreviews = 'videoPreviews';
+  static const String videoPreviewsSubtitle = 'videoPreviewsSubtitle';
+  static const String videoPreviewsOff = 'videoPreviewsOff';
   // ---------------------------------------------------------------------------
   // Navigation / Controls
   // ---------------------------------------------------------------------------
@@ -42,6 +101,16 @@ mixin AppLocale {
   static const String startupStorageUnavailable = 'startup_storage_unavailable';
   static const String startupStorageRetry = 'startup_storage_retry';
   static const String startupStorageUseDefault = 'startup_storage_use_default';
+  static const String startupStorageFolderMissing =
+      'startup_storage_folder_missing';
+  static const String startupStorageStartEmpty = 'startup_storage_start_empty';
+  static const String startupStorageCreateFailed =
+      'startup_storage_create_failed';
+  static const String wizardStepOf = 'wizard_step_of';
+  static const String wizardLanguageTitle = 'wizard_language_title';
+  static const String wizardLanguageBody = 'wizard_language_body';
+  static const String wizardWelcomeBody = 'wizard_welcome_body';
+  static const String wizardStartSetup = 'wizard_start_setup';
 
   // ---------------------------------------------------------------------------
   // Game / Playback
@@ -101,6 +170,8 @@ mixin AppLocale {
   static const String neoglassBorderWidth = 'neoglass_border_width';
   static const String neoglassBorderWidthSubtitle =
       'neoglass_border_width_subtitle';
+  static const String cornerRadius = 'corner_radius';
+  static const String cornerRadiusSubtitle = 'corner_radius_subtitle';
   static const String systemTheme = 'system_theme';
   static const String importTheme = 'import_theme';
   static const String importThemeSuccess = 'import_theme_success';
@@ -142,6 +213,11 @@ mixin AppLocale {
   static const String recursiveScanDisabled = 'recursive_scan_disabled';
   static const String subfolderView = 'subfolder_view';
   static const String subfolderViewSubtitle = 'subfolder_view_subtitle';
+  static const String openOnSecondaryScreen = 'open_on_secondary_screen';
+  static const String openOnSecondaryScreenSubtitle =
+      'open_on_secondary_screen_subtitle';
+  static const String launchScreen = 'launch_screen';
+  static const String mainScreen = 'main_screen';
   static const String subfolderViewAll = 'subfolder_view_all';
   static const String subfolderViewAllSubtitle = 'subfolder_view_all_subtitle';
   static const String subfolderViewAllOverridesNotice =
@@ -169,12 +245,12 @@ mixin AppLocale {
   static const String androidSystemSettingsSubtitle =
       'android_system_settings_subtitle';
   static const String androidApps = 'android_apps';
-  static const String androidAppLayout = 'android_app_layout';
-  static const String androidAppLayoutSubtitle = 'android_app_layout_subtitle';
-  static const String androidAppLayoutSystem = 'android_app_layout_system';
-  static const String androidAppLayoutTab = 'android_app_layout_tab';
   static const String scanOnStartup = 'scan_on_startup';
   static const String scanOnStartupSubtitle = 'scan_on_startup_subtitle';
+  static const String performanceMode = 'performance_mode';
+  static const String performanceModeSubtitle = 'performance_mode_subtitle';
+  static const String performanceModeNeoglassDisabled =
+      'performance_mode_neoglass_disabled';
   static const String nowPlayingDimAfter = 'now_playing_dim_after';
   static const String nowPlayingDimAfterSubtitle =
       'now_playing_dim_after_subtitle';
@@ -192,11 +268,12 @@ mixin AppLocale {
   static const String nowPlayingFanartDimSubtitle =
       'now_playing_fanart_dim_subtitle';
   static const String nowPlayingDimOff = 'now_playing_dim_off';
+  static const String secondaryHideSystemLogo = 'secondary_hide_system_logo';
+  static const String secondaryHideSystemLogoSubtitle =
+      'secondary_hide_system_logo_subtitle';
   static const String secondarySectionNowPlaying =
       'secondary_section_now_playing';
   static const String secondarySectionDock = 'secondary_section_dock';
-  static const String screenshotAccess = 'screenshot_access';
-  static const String screenshotAccessSubtitle = 'screenshot_access_subtitle';
   static const String ignoreHiddenFiles = 'ignore_hidden_files';
   static const String ignoreHiddenFilesSubtitle =
       'ignore_hidden_files_subtitle';
@@ -239,6 +316,9 @@ mixin AppLocale {
   static const String disableSecondaryScreen = 'disable_secondary_screen';
   static const String disableSecondaryScreenSub =
       'disable_secondary_screen_sub';
+  static const String swapScreens = 'swap_screens';
+  static const String swapScreensSub = 'swap_screens_sub';
+  static const String controllerHintTapGame = 'controller_hint_tap_game';
   static const String bartopShutdown = 'bartop_shutdown';
   static const String bartopShutdownSubtitle = 'bartop_shutdown_subtitle';
   static const String showSyncTab = 'show_sync_tab';
@@ -291,8 +371,28 @@ mixin AppLocale {
       'clean_orphaned_metadata_nothing_found';
   static const String cleanOrphanedMetadataDone =
       'clean_orphaned_metadata_done';
+  // The confirmation's counts follow the singular/plural pattern described at
+  // gamesCount; use lib/utils/count_label.dart. The ES-DE note is appended to
+  // another sentence, so it carries its own leading space where the language
+  // puts one between sentences.
+  static const String cleanOrphanedMetadataDelete =
+      'clean_orphaned_metadata_delete';
+  static const String cleanOrphanedMetadataDeleteOne =
+      'clean_orphaned_metadata_delete_one';
   static const String cleanOrphanedMetadataEsdeSkippedSuffix =
       'clean_orphaned_metadata_esde_skipped_suffix';
+  static const String cleanOrphanedMetadataEsdeSkippedSuffixOne =
+      'clean_orphaned_metadata_esde_skipped_suffix_one';
+  // Entries a cleanup couldn't remove; appended like the ES-DE note, so it
+  // carries its own leading space where the language spaces sentences.
+  static const String cleanOrphanedMetadataNotRemoved =
+      'clean_orphaned_metadata_not_removed';
+  static const String cleanOrphanedMetadataNotRemovedOne =
+      'clean_orphaned_metadata_not_removed_one';
+  static const String cleanOrphanedMetadataNothingToDelete =
+      'clean_orphaned_metadata_nothing_to_delete';
+  static const String cleanOrphanedMetadataMediaUnavailable =
+      'clean_orphaned_metadata_media_unavailable';
   static const String cleanOrphanedMetadataFailed =
       'clean_orphaned_metadata_failed';
 
@@ -320,6 +420,7 @@ mixin AppLocale {
 
   static const String rommLinkLibraryStoppedEarly =
       'romm_link_library_stopped_early';
+  static const String rommLinkLibraryPartial = 'romm_link_library_partial';
   static const String rematchAchievementsSubtitle =
       'rematch_achievements_subtitle';
   static const String rematchAchievementsWarning =
@@ -336,6 +437,7 @@ mixin AppLocale {
   static const String rematchAchievementsPaused = 'rematch_achievements_paused';
   static const String rematchAchievementsFailed = 'rematch_achievements_failed';
 
+  static const String raOpenPage = 'ra_open_page';
   static const String raFixMatch = 'ra_fix_match';
   static const String raFixMatchTitle = 'ra_fix_match_title';
   static const String raFixMatchSearchHint = 'ra_fix_match_search_hint';
@@ -362,11 +464,15 @@ mixin AppLocale {
   static const String confirmExit = 'confirm_exit';
   static const String rescanAllFolders = 'rescan_all_folders';
   static const String rescanAllFoldersSubtitle = 'rescan_all_folders_subtitle';
+  static const String pullToRescan = 'pull_to_rescan';
+  static const String releaseToRescan = 'release_to_rescan';
 
   static const String romsFolderSubtitle = 'roms_folder_subtitle';
   static const String pressToRemoveFolder = 'press_to_remove_folder';
   static const String maxRomFoldersReached = 'max_rom_folders_reached';
   static const String romFolderRemoved = 'rom_folder_removed';
+  static const String romFolderRemoveFailed = 'rom_folder_remove_failed';
+  static const String romFolderAlreadyAdded = 'rom_folder_already_added';
   static const String selectRomsFolder = 'select_roms_folder';
   static const String scanningSystem = 'scanning_system';
 
@@ -415,10 +521,12 @@ mixin AppLocale {
   // ---------------------------------------------------------------------------
   // NeoSync
   // ---------------------------------------------------------------------------
-  static const String neoSync = 'neo_sync';
   static const String neoSyncLogin = 'neo_sync_login';
   static const String neoSyncSynchronizing = 'neo_sync_synchronizing';
   static const String neoSyncNotConnected = 'neo_sync_not_connected';
+  static const String neoSyncUnreachable = 'neo_sync_unreachable';
+  static const String neoSyncBillingUnconfirmed =
+      'neo_sync_billing_unconfirmed';
   static const String neoSyncSynchronized = 'neo_sync_synchronized';
   static const String neoSyncSavesSync = 'neo_sync_saves_sync';
   static const String neoSyncNoSave = 'neo_sync_no_save';
@@ -510,6 +618,8 @@ mixin AppLocale {
   static const String backWithB = 'back_with_b';
   static const String cancelSubscription = 'cancel_subscription';
   static const String cancelSubscriptionConfirm = 'cancel_subscription_confirm';
+  static const String subscriptionCancelledKeepPlan =
+      'subscription_cancelled_keep_plan';
   static const String keepSubscription = 'keep_subscription';
   static const String deleteCloudSave = 'delete_cloud_save';
   static const String deleteCloudSaveConfirm = 'delete_cloud_save_confirm';
@@ -528,6 +638,7 @@ mixin AppLocale {
   static const String lastSyncedSave = 'last_synced_save';
   static const String saveListMenu = 'save_list_menu';
   static const String customSaveFoldersMenu = 'custom_save_folders_menu';
+  static const String customSaveFoldersShort = 'custom_save_folders_short';
   static const String updateYourPlanMenu = 'update_your_plan_menu';
   static const String customFoldersSubtitle = 'custom_folders_subtitle';
   static const String noCustomFoldersConfigured =
@@ -649,6 +760,30 @@ mixin AppLocale {
   static const String member = 'member';
   static const String defaultLauncher = 'default_launcher';
   static const String lastPlayed = 'last_played';
+  static const String nowPlayingTitle = 'now_playing_title';
+  static const String nowPlayingSession = 'now_playing_session';
+  static const String nowPlayingLastPlayed = 'now_playing_last_played';
+  static const String launchAnApp = 'launch_an_app';
+  static const String chooseAnApp = 'choose_an_app';
+  static const String noAppsFound = 'no_apps_found';
+  static const String timeNever = 'time_never';
+  static const String timeYesterday = 'time_yesterday';
+  static const String timeDaysAgo = 'time_days_ago';
+  static const String timeHoursAgo = 'time_hours_ago';
+  static const String timeMinutesAgo = 'time_minutes_ago';
+  static const String timeJustNow = 'time_just_now';
+  // A 12-hour clock reading: {time} is "2:09", {period} is clockAm or
+  // clockPm. Languages that put the period first (ja, ko, zh) say so here.
+  static const String clockAm = 'clock_am';
+  static const String clockPm = 'clock_pm';
+  static const String clockTime12h = 'clock_time_12h';
+  // Total play time on the second screen, in the language's short units.
+  static const String playTimeHoursMinutes = 'play_time_hours_minutes';
+  static const String playTimeMinutes = 'play_time_minutes';
+  static const String playTimeUnderMinute = 'play_time_under_minute';
+
+  // "+N this session" banner on the second screen's achievements page.
+  static const String raNewThisSession = 'ra_new_this_session';
   static const String apps = 'apps';
   static const String tracks = 'tracks';
   static const String games = 'games';
@@ -693,6 +828,7 @@ mixin AppLocale {
   static const String gameInfo = 'game_info';
   static const String manage = 'manage';
   static const String forceRescrape = 'force_rescrape';
+  static const String rescrapeFromRomm = 'rescrape_from_romm';
   static const String gameTitle = 'game_title';
   static const String publisher = 'publisher';
   static const String genre = 'genre';
@@ -778,6 +914,68 @@ mixin AppLocale {
   static const String screenScraperTitle = 'screenscraper_title';
   static const String metadata = 'metadata';
   static const String screenScraperLogin = 'screen_scraper_login';
+  // Metadata providers (NeoAssets / ScreenScraper)
+  static const String paste = 'paste';
+  static const String recommended = 'recommended';
+  static const String chooseMetadataProvider = 'choose_metadata_provider';
+  static const String chooseMetadataProviderSub =
+      'choose_metadata_provider_sub';
+  static const String neoAssetsTagline = 'neoassets_tagline';
+  static const String neoAssetsConnect = 'neoassets_connect';
+  static const String screenScraperTagline = 'screenscraper_tagline';
+  static const String metadataProviderOneSession =
+      'metadata_provider_one_session';
+  static const String compareMatching = 'compare_matching';
+  static const String compareMatchingNeoAssets = 'compare_matching_neoassets';
+  static const String compareMatchingScreenScraper =
+      'compare_matching_screenscraper';
+  static const String compareLanguages = 'compare_languages';
+  static const String compareLanguagesNeoAssets = 'compare_languages_neoassets';
+  static const String compareLanguagesScreenScraper =
+      'compare_languages_screenscraper';
+  static const String compareQuota = 'compare_quota';
+  static const String compareQuotaNeoAssets = 'compare_quota_neoassets';
+  static const String compareQuotaScreenScraper = 'compare_quota_screenscraper';
+  static const String compareDownloads = 'compare_downloads';
+  static const String compareDownloadsNeoAssets = 'compare_downloads_neoassets';
+  static const String compareDownloadsScreenScraper =
+      'compare_downloads_screenscraper';
+  static const String compareSignIn = 'compare_sign_in';
+  static const String compareSignInNeoAssets = 'compare_sign_in_neoassets';
+  static const String compareSignInScreenScraper =
+      'compare_sign_in_screenscraper';
+  static const String neoAssetsLogin = 'neoassets_login';
+  static const String neoAssetsApiKey = 'neoassets_api_key';
+  static const String neoAssetsKeyStep1 = 'neoassets_key_step1';
+  static const String neoAssetsKeyStep2 = 'neoassets_key_step2';
+  static const String neoAssetsKeyStep3 = 'neoassets_key_step3';
+  static const String neoAssetsKeyRejected = 'neoassets_key_rejected';
+  static const String neoAssetsEmailNotVerified =
+      'neoassets_email_not_verified';
+  static const String neoAssetsUnreachable = 'neoassets_unreachable';
+  static const String neoAssetsNotConfigured = 'neoassets_not_configured';
+  static const String identifyNeedsScreenScraper =
+      'identify_needs_screenscraper';
+  static const String neoAssetsSystemsSub = 'neoassets_systems_sub';
+  static const String neoAssetsStreamVideo = 'neoassets_stream_video';
+  static const String neoAssetsStreamVideoSub = 'neoassets_stream_video_sub';
+  static const String neoAssetsScrapeSub = 'neoassets_scrape_sub';
+  static const String neoAssetsThreads = 'neoassets_threads';
+  static const String neoAssetsGuest = 'neoassets_guest';
+  static const String neoAssetsContinueAsGuest = 'neoassets_continue_as_guest';
+  static const String neoAssetsGuestNote = 'neoassets_guest_note';
+  static const String neoAssetsGuestHint = 'neoassets_guest_hint';
+  static const String neoAssetsDailyGames = 'neoassets_daily_games';
+  static const String neoAssetsUsedToday = 'neoassets_used_today';
+  static const String neoAssetsResetsIn = 'neoassets_resets_in';
+  static const String neoAssetsUnlimited = 'neoassets_unlimited';
+  static const String neoAssetsRatePerMinute = 'neoassets_rate_per_minute';
+  static const String neoAssetsQuotaExceeded = 'neoassets_quota_exceeded';
+  static const String neoAssetsNoCredentials = 'neoassets_no_credentials';
+  static const String neoAssetsSystemNotMapped = 'neoassets_system_not_mapped';
+  static const String neoAssetsGameNotFound = 'neoassets_game_not_found';
+  static const String switchProvider = 'switch_provider';
+  static const String switchProviderDesc = 'switch_provider_desc';
   static const String scanningSystemsRoms = 'scanning_systems_roms';
   static const String ofSystems = 'of_systems';
   static const String systemsDetected = 'systems_detected';
@@ -786,9 +984,6 @@ mixin AppLocale {
   static const String letsGetSetup = 'lets_get_setup';
   static const String storagePermission = 'storage_permission';
   static const String storagePermissionDesc = 'storage_permission_desc';
-  static const String screenReturnAccess = 'screen_return_access';
-  static const String screenReturnAccessDesc = 'screen_return_access_desc';
-  static const String screenReturnAccessHint = 'screen_return_access_hint';
   static const String selectRomFolder = 'select_rom_folder';
   static const String romFolderSelected = 'rom_folder_selected';
   static const String chooseRomFolderDesc = 'choose_rom_folder_desc';
@@ -892,6 +1087,8 @@ mixin AppLocale {
   static const String hintSelect = 'hint_select';
   static const String hintSettings = 'hint_settings';
   static const String hintBack = 'hint_back';
+  static const String androidGameHint = 'androidGameHint';
+  static const String androidGameMarkApp = 'androidGameMarkApp';
   static const String hintPlay = 'hint_play';
   static const String hintFavorite = 'hint_favorite';
   static const String hintRandom = 'hint_random';
@@ -900,6 +1097,25 @@ mixin AppLocale {
   static const String hintScrape = 'hint_scrape';
   static const String hintMoreActions = 'hint_more_actions';
   static const String hintOptions = 'hint_options';
+  static const String gameOptionsThisGame = 'game_options_this_game';
+  static const String gameOptionsView = 'game_options_view';
+  static const String systemOptionsSelectedSystem =
+      'system_options_selected_system';
+  static const String systemOptionsSystemView = 'system_options_system_view';
+  static const String systemOptionsSystemLayout =
+      'system_options_system_layout';
+  static const String systemOptionsGameSearch = 'system_options_game_search';
+  static const String systemOptionsSystemViewSubtitle =
+      'system_options_system_view_subtitle';
+  static const String systemOptionsSystemSorting =
+      'system_options_system_sorting';
+  static const String systemOptionsSystemSortingSubtitle =
+      'system_options_system_sorting_subtitle';
+  static const String systemOptionsGameSettingsDescription =
+      'system_options_game_settings_description';
+  static const String systemOptionsSearchDescription =
+      'system_options_search_description';
+  static const String systemOptionsNoSystem = 'system_options_no_system';
 
   // ---------------------------------------------------------------------------
   // Game context menu (Y)
@@ -951,15 +1167,45 @@ mixin AppLocale {
   static const String neoSyncLocalSavesOnly = 'neo_sync_local_saves_only';
   static const String neoSyncCloudSavesOnly = 'neo_sync_cloud_saves_only';
   static const String neoSyncSaveConflict = 'neo_sync_save_conflict';
+  static const String neoSyncKeptCloudCopy = 'neo_sync_kept_cloud_copy';
+  static const String neoSyncNewerCloudCopy = 'neo_sync_newer_cloud_copy';
+  static const String neoSyncFirstCardSyncTookCloud =
+      'neo_sync_first_card_sync_took_cloud';
+  static const String keptCopiesTitle = 'kept_copies_title';
+  static const String keptCopiesSubtitle = 'kept_copies_subtitle';
+  static const String keptCopiesCount = 'kept_copies_count';
+  static const String keptCopiesNone = 'kept_copies_none';
+  static const String keptCopyFromOtherDevice = 'kept_copy_from_other_device';
+  static const String keptCopyBeforeDownload = 'kept_copy_before_download';
+  static const String keptCopyFromServer = 'kept_copy_from_server';
+  static const String keptCopyReplaced = 'kept_copy_replaced';
+  static const String keptCopyCurrentSave = 'kept_copy_current_save';
+  static const String keptCopyNoCurrentSave = 'kept_copy_no_current_save';
+  static const String keptCopySameAsSave = 'kept_copy_same_as_save';
+  static const String keptCopyRestore = 'kept_copy_restore';
+  static const String keptCopyRestoreTitle = 'kept_copy_restore_title';
+  static const String keptCopyRestoreBody = 'kept_copy_restore_body';
+  static const String keptCopySharedCard = 'kept_copy_shared_card';
+  static const String keptCopyRestored = 'kept_copy_restored';
+  static const String keptCopyRestoreFailed = 'kept_copy_restore_failed';
+  static const String keptCopyDeleteTitle = 'kept_copy_delete_title';
+  static const String keptCopyDeleteBody = 'kept_copy_delete_body';
+  static const String keptCopyDeleteFailed = 'kept_copy_delete_failed';
+  static const String keptCopyCloseGame = 'kept_copy_close_game';
+  static const String keptCopyWaitForSync = 'kept_copy_wait_for_sync';
   static const String neoSyncCloudSyncDisabled = 'neo_sync_cloud_sync_disabled';
   static const String neoSyncQuotaExceeded = 'neo_sync_quota_exceeded';
   static const String packageNameMissing = 'package_name_missing';
   static const String failedToLaunchAndroidApp = 'failed_to_launch_android_app';
   static const String romFileNotFound = 'rom_file_not_found';
   static const String launchFailed = 'launch_failed';
+  static const String unsupportedGameFormat = 'unsupported_game_format';
+  static const String shortcutResolveFailed = 'shortcut_resolve_failed';
+  static const String invalidPs3Serial = 'invalid_ps3_serial';
   static const String platformNotSupported = 'platform_not_supported';
   static const String coreNotConfigured = 'core_not_configured';
   static const String coreNotInstalled = 'core_not_installed';
+  static const String coreNotInstalledHint = 'core_not_installed_hint';
   static const String retroArchNotFound = 'retroarch_not_found';
   static const String retroArchExecutableNotFound = 'retroarch_exe_not_found';
   static const String coresDirectoryNotFound = 'cores_dir_not_found';
@@ -1062,8 +1308,44 @@ mixin AppLocale {
   static const String systemsUpdateDownloading = 'systems_update_downloading';
   static const String systemsUpdateCancelling = 'systems_update_cancelling';
   static const String systemsUpdateSyncing = 'systems_update_syncing';
+  static const String waitingForRomStorage = 'waiting_for_rom_storage';
+  static const String updatingSystemsList = 'updating_systems_list';
+  static const String romsScanned = 'roms_scanned';
+  static const String errorScanningRoms = 'error_scanning_roms';
+  static const String romStorageNotReady = 'rom_storage_not_ready';
+  // The scan's messages (bell, setup wizard, setup prompt). Each stays on one
+  // line: the wizard shows only the first. Folder counts follow the
+  // singular/plural pattern described at gamesCount; {folders} is the list of
+  // paths and {advice} one of the romFolderAdvice* sentences.
+  // A folder from a temporary portal path reuses wizardRomFolderTemporary.
+  static const String romFolderNotAddedTitle = 'rom_folder_not_added_title';
+  static const String romFolderAddFailed = 'rom_folder_add_failed';
+  static const String romFolderSafMissingTitle = 'rom_folder_saf_missing_title';
+  static const String romFoldersSafMissingTitle =
+      'rom_folders_saf_missing_title';
+  static const String romFolderSafMissing = 'rom_folder_saf_missing';
+  static const String romFoldersSafMissing = 'rom_folders_saf_missing';
+  static const String romStorageAccessRequired = 'rom_storage_access_required';
+  static const String romFolderAccessDenied = 'rom_folder_access_denied';
+  static const String romFolderUnreachableTitle =
+      'rom_folder_unreachable_title';
+  static const String romFoldersUnreachableTitle =
+      'rom_folders_unreachable_title';
+  static const String romFolderUnreachable = 'rom_folder_unreachable';
+  static const String romFoldersUnreachable = 'rom_folders_unreachable';
+  static const String romFolderAdvicePortal = 'rom_folder_advice_portal';
+  static const String romFolderAdviceReconnect = 'rom_folder_advice_reconnect';
+  static const String noRomFolderTitle = 'no_rom_folder_title';
+  static const String noRomFolderConfigured = 'no_rom_folder_configured';
+  static const String errorScanningRomsDetail = 'error_scanning_roms_detail';
   static const String systemsUpdateComplete = 'systems_update_complete';
   static const String systemsUpdateError = 'systems_update_error';
+  static const String checkSystemsUpdates = 'check_systems_updates';
+  static const String systemsUpdateChecking = 'systems_update_checking';
+  static const String systemsUpToDate = 'systems_up_to_date';
+  static const String systemsUpdateCheckFailed = 'systems_update_check_failed';
+  static const String systemsUpdateNeedsNewerApp =
+      'systems_update_needs_newer_app';
 
   // ---------------------------------------------------------------------------
   // Scraper single-game progress & result messages
@@ -1104,6 +1386,8 @@ mixin AppLocale {
   static const String esdeReset = 'esde_reset';
   static const String esdeResetSubtitle = 'esde_reset_subtitle';
   static const String esdeResetComplete = 'esde_reset_complete';
+  static const String esdeImportFailed = 'esde_import_failed';
+  static const String esdeResetFailed = 'esde_reset_failed';
   static const String esdeResetConfirmBody = 'esde_reset_confirm_body';
   static const String esdeImportNotEsdeFolder = 'esde_import_not_esde_folder';
   static const String esdeImportNothingFound = 'esde_import_nothing_found';
@@ -1126,6 +1410,14 @@ mixin AppLocale {
   static const String wizardDownloadArtPack = 'wizard_download_art_pack';
   static const String wizardArtPackInstalled = 'wizard_art_pack_installed';
   static const String wizardArtPackUnavailable = 'wizard_art_pack_unavailable';
+  static const String wizardSaveFailedTitle = 'wizard_save_failed_title';
+  static const String wizardSaveFailedBody = 'wizard_save_failed_body';
+  static const String wizardRomFolderNotAdded = 'wizard_rom_folder_not_added';
+  // Also the scan's message for a folder from a temporary portal path.
+  static const String wizardRomFolderTemporary = 'wizard_rom_folder_temporary';
+  static const String wizardFolderNotUsable = 'wizard_folder_not_usable';
+  static const String wizardArtPackFailed = 'wizard_art_pack_failed';
+  static const String wizardScanFailed = 'wizard_scan_failed';
   static const String userDataLocationDefault = 'user_data_location_default';
   static const String selectUserDataFolder = 'select_user_data_folder';
   static const String folderNotEmptyTitle = 'folder_not_empty_title';
@@ -1133,6 +1425,9 @@ mixin AppLocale {
   static const String folderNotEmptyUseAnyway = 'folder_not_empty_use_anyway';
   static const String userDataFolderNotWritable =
       'user_data_folder_not_writable';
+  static const String userDataFolderCantWrite = 'user_data_folder_cant_write';
+  static const String userDataMoveToCardAppFolder =
+      'user_data_move_to_card_app_folder';
   static const String userDataFolderGrantAllFiles =
       'user_data_folder_grant_all_files';
   static const String moveUserDataTitle = 'move_user_data_title';
@@ -1141,9 +1436,17 @@ mixin AppLocale {
       'move_user_data_dest_not_empty';
   static const String moveUserDataConfirm = 'move_user_data_confirm';
   static const String migratingUserData = 'migrating_user_data';
+  static const String userDataMoveRunning = 'user_data_move_running';
+  static const String userDataMoveRemovingOldCopy =
+      'user_data_move_removing_old_copy';
   static const String migratingUserDataComplete =
       'migrating_user_data_complete';
   static const String migratingUserDataError = 'migrating_user_data_error';
+  static const String userDataMoveBusy = 'user_data_move_busy';
+  static const String userDataMoveNoSpace = 'user_data_move_no_space';
+  static const String userDataMoveBlocked = 'user_data_move_blocked';
+  static const String userDataMoveOverlapping = 'user_data_move_overlapping';
+  static const String userDataMoveFailed = 'user_data_move_failed';
   static const String migratingFiles = 'migrating_files';
   static const String deleteGame = 'delete_game';
   static const String deleteGameConfirm = 'delete_game_confirm';
@@ -1171,6 +1474,7 @@ mixin AppLocale {
   static const String romDirectories = 'rom_directories';
   static const String tools = 'tools';
   static const String toolsSubtitle = 'tools_subtitle';
+  static const String toolsStillRunning = 'tools_still_running';
   static const String addRomFolder = 'add_rom_folder';
   static const String removeRomFolder = 'remove_rom_folder';
 
@@ -1203,6 +1507,21 @@ mixin AppLocale {
   static const String rommTesting = 'romm_testing';
   static const String rommConnectionSuccess = 'romm_connection_success';
   static const String rommConnectionFailed = 'romm_connection_failed';
+  // Why connecting to RomM failed (RommFailure); {error} is the system's reason
+  // or the server's status code.
+  static const String rommErrorTls = 'romm_error_tls';
+  static const String rommErrorUnreachable = 'romm_error_unreachable';
+  static const String rommErrorTimeout = 'romm_error_timeout';
+  static const String rommErrorInvalidApiKey = 'romm_error_invalid_api_key';
+  static const String rommErrorUnexpectedStatus =
+      'romm_error_unexpected_status';
+  static const String rommErrorNotRomm = 'romm_error_not_romm';
+  static const String rommErrorServerStatus = 'romm_error_server_status';
+  // Why loading from a connected RomM server failed, where the connect wording
+  // (check the URL, the password) no longer fits.
+  static const String rommErrorUnreadable = 'romm_error_unreadable';
+  static const String rommErrorLoadFailed = 'romm_error_load_failed';
+  static const String rommErrorSignInRejected = 'romm_error_sign_in_rejected';
   static const String rommConnectedAs = 'romm_connected_as';
   static const String rommCredentialsRequired = 'romm_credentials_required';
   static const String rommAuthPassword = 'romm_auth_password';
@@ -1235,6 +1554,7 @@ mixin AppLocale {
   static const String rommNoSystemMatch = 'romm_no_system_match';
   static const String rommPlatformUnsupported = 'romm_platform_unsupported';
   static const String rommNoWritableFolder = 'romm_no_writable_folder';
+  static const String rommNotEnoughSpace = 'romm_not_enough_space';
   static const String rommNotConnected = 'romm_not_connected';
 
   // Bulk "sync a whole platform/collection".
@@ -1283,9 +1603,10 @@ mixin AppLocale {
   static const String sourceLocal = 'source_local';
   static const String searchRatingLocalOnly = 'search_rating_local_only';
   static const String searchNoRommEquivalent = 'search_no_romm_equivalent';
-  // Destructive-action confirmation prompts
+  // Destructive-action confirmation prompts and their results
   static const String resetPlayTimeConfirm = 'reset_play_time_confirm';
   static const String resetPlayTimeConfirmBody = 'reset_play_time_confirm_body';
+  static const String playTimeResetDone = 'play_time_reset_done';
   static const String removeRomFolderConfirmBody =
       'remove_rom_folder_confirm_body';
   static const String disconnectRaConfirm = 'disconnect_ra_confirm';
@@ -1307,6 +1628,9 @@ mixin AppLocale {
   static const String raEvents = 'raEvents';
   static const String raAotwYearTitle = 'ra_aotw_year_title';
   static const String raAotw = 'raAotw';
+  static const String raOverview = 'raOverview';
+  static const String raStatPlayed = 'raStatPlayed';
+  static const String raStatBeaten = 'raStatBeaten';
   static const String raAwards = 'raAwards';
   static const String raSetOrder = 'raSetOrder';
   static const String raPointsSort = 'raPointsSort';
@@ -1338,6 +1662,7 @@ mixin AppLocale {
   static const String raFilterBeaten = 'ra_filter_beaten';
   static const String raGamesEndOfList = 'ra_games_end_of_list';
   static const String raGamesEmpty = 'ra_games_empty';
+  static const String raCatalogueRefreshFailed = 'ra_catalogue_refresh_failed';
   static const String raErrorLoadGames = 'ra_error_load_games';
   static const String raHardcore = 'ra_hardcore';
   static const String raUnlocksEndOfList = 'ra_unlocks_end_of_list';
@@ -1381,7 +1706,6 @@ mixin AppLocale {
   static const String raAotwEarnedPreviously = 'ra_aotw_earned_previously';
   static const String raAotwNotEarned = 'ra_aotw_not_earned';
   static const String raAotwStatusUnavailable = 'ra_aotw_status_unavailable';
-  static const String raAotwNotInLibrary = 'ra_aotw_not_in_library';
   static const String raAotwWeekStarted = 'ra_aotw_week_started';
   static const String raAotwTrueRatio = 'ra_aotw_true_ratio';
   static const String raAotwParticipation = 'ra_aotw_participation';
@@ -1438,8 +1762,65 @@ mixin AppLocale {
   static const String uploadingCustomFolder = 'uploading_custom_folder';
   static const String customFolderUploadComplete =
       'custom_folder_upload_complete';
+  static const String customFolderUploadLeftForLaunch =
+      'custom_folder_upload_left_for_launch';
   static const String customFolderUploadFailed = 'custom_folder_upload_failed';
+  static const String customFolderUploadConfirm =
+      'custom_folder_upload_confirm';
+  static const String customFolderUploadManyFiles =
+      'custom_folder_upload_many_files';
+  static const String customFolderUploadLargeFiles =
+      'custom_folder_upload_large_files';
+  static const String customFolderUploadOverQuota =
+      'custom_folder_upload_over_quota';
+  static const String customFolderUploadStopped =
+      'custom_folder_upload_stopped';
   static const String customSaveFoldersMigrate = 'custom_save_folders_migrate';
+  // ---------------------------------------------------------------------------
+  // Discovery
+  // ---------------------------------------------------------------------------
+  static const String discovery = 'discovery';
+  static const String showDiscoveryTab = 'show_discovery_tab';
+  static const String showDiscoveryTabSubtitle = 'show_discovery_tab_subtitle';
+  static const String discoveryGameOfTheWeek = 'discovery_game_of_the_week';
+  static const String discoveryHiddenGem = 'discovery_hidden_gem';
+  static const String discoveryHiddenGemSubtitle =
+      'discovery_hidden_gem_subtitle';
+  static const String discoveryAchievementSpotlight =
+      'discovery_achievement_spotlight';
+  static const String discoveryGenrePicks = 'discovery_genre_picks';
+  static const String discoveryReroll = 'discovery_reroll';
+  static const String discoveryRerollHint = 'discovery_reroll_hint';
+  static const String discoveryNeverPlayed = 'discovery_never_played';
+  static const String discoveryEmptyLibrary = 'discovery_empty_library';
+  static const String discoveryNeedsScraping = 'discovery_needs_scraping';
+  static const String discoveryNoPickAvailable = 'discovery_no_pick_available';
+  static const String discoveryWeekOf = 'discovery_week_of';
+  static const String discoveryAchievementsCount =
+      'discovery_achievements_count';
+
+  // Genre shelf labels, one per GenreBucket (lib/utils/genre_buckets.dart).
+  static const String genrePlatform = 'genre_platform';
+  static const String genreRpg = 'genre_rpg';
+  static const String genreShooter = 'genre_shooter';
+  static const String genreFighting = 'genre_fighting';
+  static const String genreRacing = 'genre_racing';
+  static const String genrePuzzle = 'genre_puzzle';
+  static const String genreSports = 'genre_sports';
+  static const String genreAdventure = 'genre_adventure';
+  static const String genreStrategy = 'genre_strategy';
+  static const String genreSimulation = 'genre_simulation';
+  static const String genreAction = 'genre_action';
+  static const String genreArcade = 'genre_arcade';
+  static const String genreOther = 'genre_other';
+  static const String genreBeatEmUp = 'genre_beat_em_up';
+  static const String genreShootEmUp = 'genre_shoot_em_up';
+  static const String genreMusicRhythm = 'genre_music_rhythm';
+  static const String genreBoardCard = 'genre_board_card';
+  static const String genrePinball = 'genre_pinball';
+  static const String genreEducational = 'genre_educational';
+  static const String genreQuiz = 'genre_quiz';
+  static const String genreCompilation = 'genre_compilation';
 
   // RomM manual link picker / Manage tab link rows.
   static const String rommLinkRow = 'romm_link_row';
@@ -1464,6 +1845,35 @@ mixin AppLocale {
   static const String rommUnlinked = 'romm_unlinked';
   static const String rommUnlinkFailed = 'romm_unlink_failed';
 
+  // RomM saves (Saves tab)
+  static const String rommSavesAutoDownload = 'romm_saves_auto_download';
+  static const String rommSaveFile = 'romm_save_file';
+  static const String rommSaveState = 'romm_save_state';
+  static const String rommRetryUploads = 'romm_retry_uploads';
+  static const String rommUploadsFailed = 'romm_uploads_failed';
+  static const String rommUploadsFailedFor = 'romm_uploads_failed_for';
+  // The {games} of rommUploadsFailedFor: names joined by the separator, and
+  // past four, "{games} and {count} more" ({count} is always 2 or more).
+  static const String rommGameListSeparator = 'romm_game_list_separator';
+  static const String rommGameListMore = 'romm_game_list_more';
+  static const String rommSavesHelp = 'romm_saves_help';
+  static const String rommDeleteTitle = 'romm_delete_title';
+  static const String rommDeleteConfirm = 'romm_delete_confirm';
+  static const String rommDeleted = 'romm_deleted';
+  static const String rommDeleteFailed = 'romm_delete_failed';
+  static const String rommDeleteNotSent = 'romm_delete_not_sent';
+  // Deleting a whole game from the game list. Counts follow the singular/plural
+  // pattern described at gamesCount; use lib/utils/count_label.dart.
+  static const String rommSaveFileCount = 'romm_save_file_count';
+  static const String rommSaveFilesCount = 'romm_save_files_count';
+  static const String rommSaveStateCount = 'romm_save_state_count';
+  static const String rommSaveStatesCount = 'romm_save_states_count';
+  static const String rommDeleteGameBothConfirm =
+      'romm_delete_game_both_confirm';
+  static const String rommDeleteGameConfirm = 'romm_delete_game_confirm';
+  static const String rommDeleteKeepsSaves = 'romm_delete_keeps_saves';
+  static const String rommDeleteKeepsStates = 'romm_delete_keeps_states';
+
   // Link action on search results
   static const String searchLinkToRomm = 'search_link_to_romm';
   // ==========================================================================
@@ -1484,8 +1894,8 @@ mixin AppLocale {
 
   /// All locale maps keyed by the language codes the app registers with
   /// `FlutterLocalization` in `main.dart` (and that settings passes to
-  /// `translate`). Note `zh_Hant` is a raw code in this app, not a Flutter
-  /// script subtag, so a plain string match is enough.
+  /// `translate`). Traditional Chinese is registered as `zh` with the `Hant`
+  /// script, so it is keyed here by the app's `zh_Hant` identifier.
   ///
   /// `main.dart` currently duplicates this registry for its two `init`
   /// calls; deriving those `MapLocale` lists from this map is a known
@@ -1534,7 +1944,12 @@ mixin AppLocale {
 /// visible, greppy failure rather than a silent blank.
 extension AppLocaleContextFreeLookup on String {
   String getStringForCurrentLocale() {
-    final language = FlutterLocalization.instance.currentLocale?.languageCode;
+    final locale = FlutterLocalization.instance.currentLocale;
+    final language = locale == null
+        ? null
+        : (locale.scriptCode == 'Hant' || locale.languageCode == 'zh_Hant'
+              ? 'zh_Hant'
+              : locale.languageCode);
     final map = AppLocale._mapsByLanguageCode[language] ?? AppLocale.en;
     return (map[this] ?? AppLocale.en[this] ?? this).toString();
   }

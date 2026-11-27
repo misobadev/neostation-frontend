@@ -157,54 +157,73 @@ void main() {
       expect(reportedItems, ['orphan_a.chd', 'orphan_b.chd']);
     });
 
-    test(
-      'clean removes metadata for individual discs after multi-disc organization',
-      () async {
-        // After organizing multi-disc games, individual disc ROMs are gone and a
-        // playlist remains. Metadata for the old disc filenames becomes orphaned.
-        await db.execute(
-          "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('Final Fantasy VIII.m3u', '/roms/psx/Final Fantasy VIII.m3u', 'psx')",
-        );
-        await db.execute(
-          "INSERT INTO user_screenscraper_metadata (app_system_id, filename, is_fully_scraped) VALUES ('psx', 'Final Fantasy VIII.m3u', 1)",
-        );
-        await db.execute(
-          "INSERT INTO user_screenscraper_metadata (app_system_id, filename, is_fully_scraped) VALUES ('psx', 'Final Fantasy VIII (Disc 1).chd', 1)",
-        );
-        await db.execute(
-          "INSERT INTO user_screenscraper_metadata (app_system_id, filename, is_fully_scraped) VALUES ('psx', 'Final Fantasy VIII (Disc 2).chd', 1)",
-        );
+    test('clean removes metadata for individual discs after multi-disc organization', () async {
+      // After organizing multi-disc games, individual disc ROMs are gone and a
+      // playlist remains. Metadata for the old disc filenames becomes orphaned.
+      await db.execute(
+        "INSERT INTO user_roms (filename, rom_path, app_system_id) VALUES ('Final Fantasy VIII.m3u', '/roms/psx/Final Fantasy VIII.m3u', 'psx')",
+      );
+      await db.execute(
+        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, is_fully_scraped) VALUES ('psx', 'Final Fantasy VIII.m3u', 1)",
+      );
+      await db.execute(
+        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, is_fully_scraped) VALUES ('psx', 'Final Fantasy VIII (Disc 1).chd', 1)",
+      );
+      await db.execute(
+        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, is_fully_scraped) VALUES ('psx', 'Final Fantasy VIII (Disc 2).chd', 1)",
+      );
 
-        final screenshotsDir = Directory(
-          '${tempMediaDir.path}/psx/screenshots',
-        );
-        await screenshotsDir.create(recursive: true);
-        final discOneScreenshot = File(
-          '${screenshotsDir.path}/Final Fantasy VIII (Disc 1).png',
-        );
-        final discTwoScreenshot = File(
-          '${screenshotsDir.path}/Final Fantasy VIII (Disc 2).png',
-        );
-        await discOneScreenshot.writeAsString('disc1');
-        await discTwoScreenshot.writeAsString('disc2');
+      final screenshotsDir = Directory('${tempMediaDir.path}/psx/screenshots');
+      await screenshotsDir.create(recursive: true);
+      final discOneScreenshot = File(
+        '${screenshotsDir.path}/Final Fantasy VIII (Disc 1).png',
+      );
+      final discTwoScreenshot = File(
+        '${screenshotsDir.path}/Final Fantasy VIII (Disc 2).png',
+      );
+      await discOneScreenshot.writeAsString('disc1');
+      await discTwoScreenshot.writeAsString('disc2');
 
-        final result = await MetadataCleanupService.clean(
-          mediaDirectoryPath: '${tempMediaDir.path}/',
-        );
+      final result = await MetadataCleanupService.clean(
+        mediaDirectoryPath: '${tempMediaDir.path}/',
+      );
 
-        expect(result.orphanedItems.length, 2);
-        expect(result.deletedItems.length, 2);
-        expect(result.deletedMediaFiles, 2);
+      expect(result.orphanedItems.length, 2);
+      expect(result.deletedItems.length, 2);
+      expect(result.deletedMediaFiles, 2);
 
-        final remaining = await db.rawQuery(
-          'SELECT filename FROM user_screenscraper_metadata ORDER BY filename',
-        );
-        expect(remaining.map((r) => r['filename']).toList(), [
-          'Final Fantasy VIII.m3u',
-        ]);
-        expect(await discOneScreenshot.exists(), isFalse);
-        expect(await discTwoScreenshot.exists(), isFalse);
-      },
-    );
+      final remaining = await db.rawQuery(
+        'SELECT filename FROM user_screenscraper_metadata ORDER BY filename',
+      );
+      expect(remaining.map((r) => r['filename']).toList(), [
+        'Final Fantasy VIII.m3u',
+      ]);
+      expect(await discOneScreenshot.exists(), isFalse);
+      expect(await discTwoScreenshot.exists(), isFalse);
+    });
+
+    test('a row that fails to delete is counted, the others are cleaned', () async {
+      await db.execute(
+        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, is_fully_scraped) VALUES ('psx', 'good.chd', 1)",
+      );
+      await db.execute(
+        "INSERT INTO user_screenscraper_metadata (app_system_id, filename, is_fully_scraped) VALUES ('psx', 'bad.chd', 1)",
+      );
+      await db.execute(
+        'CREATE TRIGGER fail_one BEFORE DELETE ON user_screenscraper_metadata '
+        "WHEN OLD.filename = 'bad.chd' "
+        "BEGIN SELECT RAISE(ABORT, 'disk failure'); END",
+      );
+
+      final result = await MetadataCleanupService.clean(
+        mediaDirectoryPath: '${tempMediaDir.path}/',
+      );
+
+      expect(result.deletedItems.map((i) => i.filename), ['good.chd']);
+      expect(result.errors, hasLength(1));
+      // The failed row stays, so the next run finds it again.
+      final left = await MetadataCleanupService.analyze();
+      expect(left.orphanedItems.map((i) => i.filename), ['bad.chd']);
+    });
   });
 }

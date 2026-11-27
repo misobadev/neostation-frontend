@@ -3,8 +3,11 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
+
 import 'dart:async';
 import 'dart:io';
+
+import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/responsive.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -12,13 +15,16 @@ import 'package:neostation/themes/app_themes.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/services/permission_service.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
-import 'package:neostation/widgets/header_sort_dropdown.dart';
+import 'package:neostation/services/game_service.dart';
+import 'package:neostation/widgets/header_discovery_reroll.dart';
 import 'package:neostation/widgets/bumper_glyph.dart';
+import 'package:neostation/widgets/core_footer.dart';
 import 'package:neostation/widgets/notification_bell.dart';
 import 'package:neostation/widgets/neo_glass.dart';
-import 'package:neostation/screens/app_screen.dart';
 import 'package:neostation/utils/header_layout.dart';
 import 'package:neostation/utils/nav_tabs.dart';
+import 'package:neostation/sync/sync_manager.dart';
+import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:neostation/utils/time_format.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 
@@ -28,17 +34,21 @@ class Header extends StatefulWidget {
   final int selectedTabIndex;
   final Function(int) onTabSelected;
 
+  /// Touch search entry shown on the Systems tab. Null hides it.
+  final VoidCallback? onSearch;
+
   const Header({
     super.key,
     required this.selectedTabIndex,
     required this.onTabSelected,
+    this.onSearch,
   });
 
   @override
   HeaderState createState() => HeaderState();
 }
 
-class HeaderState extends State<Header> {
+class HeaderState extends State<Header> with WidgetsBindingObserver {
   final Battery _battery = Battery();
   int _batteryLevel = 100;
   BatteryState? _batteryState;
@@ -46,6 +56,10 @@ class HeaderState extends State<Header> {
   bool _isTelevision = false;
   DateTime _now = DateTime.now();
   Timer? _timeUpdateTimer;
+
+  /// False while an emulator owns the foreground; a screen-on edge behind it
+  /// must not restart the ticker.
+  bool _appActive = true;
   late final List<FocusNode> _tabFocusNodes;
 
   /// First slot shown when the tab strip has more visible tabs than it has
@@ -57,14 +71,14 @@ class HeaderState extends State<Header> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    GameService.deviceScreenOn.addListener(_onDeviceScreenPowerChanged);
     _tabFocusNodes = List.generate(
       NavTab.values.length,
       (_) => FocusNode(skipTraversal: true),
     );
-    _getBatteryLevel();
     _listenToBatteryState();
-    _updateTime();
-    _startTimeUpdateTimer();
+    _refreshTimeAndBattery();
     if (Platform.isAndroid) {
       PermissionService.isTelevision().then((isTV) {
         if (mounted && isTV) setState(() => _isTelevision = true);
@@ -74,12 +88,51 @@ class HeaderState extends State<Header> {
 
   @override
   void dispose() {
+    GameService.deviceScreenOn.removeListener(_onDeviceScreenPowerChanged);
+    WidgetsBinding.instance.removeObserver(this);
     _timeUpdateTimer?.cancel();
     _batteryStateSubscription?.cancel();
     for (final node in _tabFocusNodes) {
       node.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Covers desktop suspend and emulator return. On Android the HOME
+      // activity never resumes on unlock — the screen edge below handles it.
+      _appActive = true;
+      _refreshTimeAndBattery();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _appActive = false;
+      _stopTimeUpdateTimer();
+    }
+  }
+
+  /// Re-reads clock and charge and realigns the ticker. Android holds timers
+  /// while asleep and the HOME activity is not paused on lock, so without this
+  /// the header can show pre-lock values long after unlock.
+  void _refreshTimeAndBattery() {
+    _updateTime();
+    _startTimeUpdateTimer();
+  }
+
+  /// Refreshes on wake and stops the ticker while the screen is off.
+  void _onDeviceScreenPowerChanged() {
+    if (!GameService.deviceScreenOn.value) {
+      _stopTimeUpdateTimer();
+    } else if (_appActive) {
+      _refreshTimeAndBattery();
+    }
+  }
+
+  void _stopTimeUpdateTimer() {
+    _timeUpdateTimer?.cancel();
+    _timeUpdateTimer = null;
   }
 
   /// Subscribes to real-time battery state changes (charging/discharging/full).
@@ -91,7 +144,7 @@ class HeaderState extends State<Header> {
         if (mounted) {
           setState(() => _batteryState = state);
         }
-      });
+      }, onError: (_) {});
     } catch (_) {
       // Some platforms don't expose battery state; ignore silently.
     }
@@ -108,23 +161,24 @@ class HeaderState extends State<Header> {
   }
 
   void _startTimeUpdateTimer() {
+    _timeUpdateTimer?.cancel();
+
     // Calculate how many seconds remain until the next minute
     final now = DateTime.now();
     final secondsUntilNextMinute = 60 - now.second;
 
     // Create initial timer that fires at the start of the next minute
-    Future.delayed(Duration(seconds: secondsUntilNextMinute), () {
-      if (mounted) {
-        _updateTime();
-        // Then create a periodic timer every 60 seconds
-        _timeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
-          if (mounted) {
-            _updateTime();
-          } else {
-            timer.cancel();
-          }
-        });
-      }
+    _timeUpdateTimer = Timer(Duration(seconds: secondsUntilNextMinute), () {
+      if (!mounted) return;
+      _updateTime();
+      // Then create a periodic timer every 60 seconds
+      _timeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+        if (mounted) {
+          _updateTime();
+        } else {
+          timer.cancel();
+        }
+      });
     });
   }
 
@@ -162,7 +216,7 @@ class HeaderState extends State<Header> {
       return Symbols.battery_android_frame_bolt;
     }
 
-    if (_batteryLevel >= 90) return Symbols.battery_full;
+    if (_batteryLevel >= 90) return Symbols.battery_android_frame_full;
     if (_batteryLevel >= 75) return Symbols.battery_android_frame_6;
     if (_batteryLevel >= 60) return Symbols.battery_android_frame_5;
     if (_batteryLevel >= 45) return Symbols.battery_android_frame_4;
@@ -186,6 +240,13 @@ class HeaderState extends State<Header> {
 
   @override
   Widget build(BuildContext context) {
+    try {
+      _saveProviderId = context.select<SyncManager, String>(
+        (manager) => manager.activeProviderId,
+      );
+    } on ProviderNotFoundException {
+      _saveProviderId = null;
+    }
     final customColors = AppThemes.getCustomColors(context);
     // Soft horizontal gradient derived from headerColors.background (left->right)
 
@@ -202,6 +263,7 @@ class HeaderState extends State<Header> {
               final clockText = formatClockTime(
                 _now,
                 use12Hour: configProvider.config.use12HourClock,
+                text: (key) => key.getString(context),
               );
               final showBattery =
                   _batteryLevel != -1 &&
@@ -223,13 +285,14 @@ class HeaderState extends State<Header> {
               // Measured against the widest the pill can ever be, so the count
               // cannot flip as the clock ticks past a digit or the battery
               // falls to one.
-              final maxSlots = navStripMaxSlots(
+              final fittingSlots = navStripMaxSlots(
                 totalWidth: constraints.maxWidth,
                 statusPillWidth: statusPillWidth(
                   clockTextWidth: _measureText(
                     context,
                     widestClockText(
                       use12Hour: configProvider.config.use12HourClock,
+                      text: (key) => key.getString(context),
                     ),
                     labelStyle,
                   ),
@@ -243,8 +306,9 @@ class HeaderState extends State<Header> {
                   // glyph second.
                   withClockGlyph: false,
                   horizontalPadding: 10.r,
-                  bell: 14.r,
-                  bellGap: 10.r,
+                  // The bell sits at the far left of the header, not in the pill.
+                  bell: 0,
+                  bellGap: 0,
                   glyph: 14.r,
                   glyphGap: 4.r,
                   batteryGap: 12.r,
@@ -258,6 +322,15 @@ class HeaderState extends State<Header> {
                 gutter: 4.r,
                 minSlots: minNavTabSlots,
               );
+
+              // With a 24-hour clock the pill is narrow, and the bell no
+              // longer sits in it, so every tab is shown and the strip never
+              // scrolls. The pill scales itself down if it still runs short.
+              final maxSlots =
+                  !configProvider.config.use12HourClock &&
+                      visibleTabs.length > fittingSlots
+                  ? visibleTabs.length
+                  : fittingSlots;
 
               final pillAllowance = statusPillMaxWidth(
                 totalWidth: constraints.maxWidth,
@@ -277,44 +350,49 @@ class HeaderState extends State<Header> {
                 gutter: 4.r,
               );
 
-              // The clock glyph is the first thing given up when the tab strip
-              // leaves too little room, and it comes back on its own when a tab
-              // is hidden in settings. It is the right thing to drop first: it
-              // sits immediately before a label that already reads as a time,
-              // so it carries no information the user loses.
-              final showClockGlyph =
-                  statusPillWidth(
-                    clockTextWidth: _measureText(
-                      context,
-                      clockText,
-                      labelStyle,
-                    ),
-                    batteryTextWidth: showBattery
-                        ? _measureText(context, '$_batteryLevel%', labelStyle)
-                        : 0,
-                    withClockGlyph: true,
-                    horizontalPadding: 10.r,
-                    bell: 14.r,
-                    bellGap: 10.r,
-                    glyph: 14.r,
-                    glyphGap: 4.r,
-                    batteryGap: 12.r,
-                    batteryIcon: 16.r,
-                    batteryIconGap: 4.r,
-                  ) <=
-                  pillAllowance;
-
+              // The clock glyph was dropped entirely: it sat immediately before
+              // a label that already reads as a time, so it carried no
+              // information and only cost room the tab strip needed.
               return Stack(
                 alignment: Alignment.center,
                 children: [
-                  if (widget.selectedTabIndex == AppTabs.systems)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [HeaderSortDropdown()],
-                      ),
+                  // Left slot: the notification bell first, at the search
+                  // button's size, then Discovery's Re-roll (that board has no
+                  // footer to put it in) or the touch search entry.
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(left: 8.r),
+                          child: const NotificationBell(),
+                        ),
+                        if (NavTab.values[widget.selectedTabIndex] ==
+                            NavTab.discovery)
+                          const HeaderDiscoveryReroll(),
+                        if (widget.onSearch != null)
+                          Padding(
+                            padding: EdgeInsets.only(left: 8.r),
+                            child: GamepadControl(
+                              iconPath:
+                                  'assets/images/gamepad/Xbox_X_button.png',
+                              label: AppLocale.searchTitle.getString(context),
+                              onTap: () {
+                                SfxService().playNavSound();
+                                widget.onSearch?.call();
+                              },
+                              backgroundColor: Theme.of(context)
+                                  .colorScheme
+                                  .tertiaryFixed,
+                              textColor: Theme.of(context)
+                                  .colorScheme
+                                  .onTertiaryFixed,
+                            ),
+                          ),
+                      ],
                     ),
+                  ),
 
                   // Grouped Tab Navigation with Background (Glass Style)
                   Align(
@@ -332,6 +410,7 @@ class HeaderState extends State<Header> {
                                   .extension<CornerRadii>()
                                   ?.radiusExternalRadius ??
                               8.r,
+                          tint: Theme.of(context).colorScheme.surface,
                           child: SizedBox(
                             height: 32.r,
                             child: Padding(
@@ -375,9 +454,9 @@ class HeaderState extends State<Header> {
                                             width: 32.r,
                                             child: Container(
                                               decoration: BoxDecoration(
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary,
                                                 borderRadius:
                                                     Theme.of(context)
                                                         .extension<
@@ -400,12 +479,11 @@ class HeaderState extends State<Header> {
                                                   child: _buildTabButton(
                                                     context,
                                                     tab.index,
-                                                    navTabSpec(tab).icon,
+                                                    _tabIconPath(tab),
                                                     navTabSpec(tab).labelKey
                                                         .getString(context),
-                                                    iconData: navTabSpec(
-                                                      tab,
-                                                    ).iconData,
+                                                    iconData: navTabSpec(tab)
+                                                        .iconData,
                                                     coverage:
                                                         (1.0 -
                                                                 (slot - index)
@@ -463,64 +541,58 @@ class HeaderState extends State<Header> {
                         alignment: Alignment.centerRight,
                         child: Padding(
                           padding: EdgeInsets.only(right: 8.r),
-                          child: NeoGlass(
-                            cornerRadius:
-                                Theme.of(context)
-                                    .extension<CornerRadii>()
-                                    ?.radiusExternalRadius ??
-                                14.r,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const NotificationBell(),
-                                SizedBox(width: 10.r),
-                                if (showClockGlyph) ...[
-                                  Icon(
-                                    Symbols.schedule,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
-                                    size: 14.r,
-                                  ),
-                                  SizedBox(width: 4.r),
-                                ],
-                                Text(
-                                  clockText,
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
-                                    fontSize: 12.r,
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: 0.3.r,
-                                  ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              NeoGlass(
+                                cornerRadius:
+                                    Theme.of(context)
+                                        .extension<CornerRadii>()
+                                        ?.radiusExternalRadius ??
+                                    14.r,
+                                tint: Theme.of(context).colorScheme.surface,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
                                 ),
-                                if (_batteryLevel != -1 &&
-                                    !_isTelevision &&
-                                    !Responsive.isHandheldXS(context)) ...[
-                                  SizedBox(width: 12.r),
-                                  Icon(
-                                    _getBatteryIconData(),
-                                    color: _getBatteryColor(customColors),
-                                    size: 16.r,
-                                  ),
-                                  SizedBox(width: 4.r),
-                                  Text(
-                                    "$_batteryLevel%",
-                                    style: TextStyle(
-                                      color: _getBatteryColor(customColors),
-                                      fontSize: 12.r,
-                                      fontWeight: FontWeight.w500,
-                                      letterSpacing: 0.3.r,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      clockText,
+                                      style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                        fontSize: 12.r,
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: 0.3.r,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ],
-                            ),
+                                    if (_batteryLevel != -1 &&
+                                        !_isTelevision &&
+                                        !Responsive.isHandheldXS(context)) ...[
+                                      SizedBox(width: 12.r),
+                                      Icon(
+                                        _getBatteryIconData(),
+                                        color: _getBatteryColor(customColors),
+                                        size: 16.r,
+                                      ),
+                                      SizedBox(width: 4.r),
+                                      Text(
+                                        "$_batteryLevel%",
+                                        style: TextStyle(
+                                          color: _getBatteryColor(customColors),
+                                          fontSize: 12.r,
+                                          fontWeight: FontWeight.w500,
+                                          letterSpacing: 0.3.r,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -611,6 +683,23 @@ class HeaderState extends State<Header> {
         ),
       ),
     );
+  }
+
+  /// Who keeps the saves (SyncManager's provider id), read at the top of
+  /// [build] so the saves tab's icon follows it. Null without a SyncManager
+  /// above the header (a test or preview).
+  String? _saveProviderId;
+
+  /// The tab's icon. The saves tab wears NeoSync's isotype while NeoSync
+  /// keeps the saves; with RomM keeping them it keeps the generic cloud, as
+  /// the tab then shows RomM's saves.
+  String _tabIconPath(NavTab tab) {
+    final spec = navTabSpec(tab);
+    if (tab != NavTab.sync) return spec.icon;
+    final provider = _saveProviderId;
+    return provider == null || provider == RomMSyncProvider.kProviderId
+        ? spec.icon
+        : 'assets/images/neosync/neosync_isotype.svg';
   }
 
   // Steam-style tab button.

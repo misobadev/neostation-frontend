@@ -35,46 +35,40 @@ void main() {
       expect(stored?['sfx_enabled'].toString(), '0');
     });
 
-    test(
-      'a whole-config save does not swallow a concurrent theme change',
-      () async {
-        // The real-world shape: a settings toggle persists the whole model while
-        // the user picks a theme. The toggle names no theme at all, so it must
-        // not carry one back from its own read.
-        await ConfigRepository.updateThemeName('system');
+    test('a whole-config save does not swallow a concurrent theme change', () async {
+      // The real-world shape: a settings toggle persists the whole model while
+      // the user picks a theme. The toggle names no theme at all, so it must
+      // not carry one back from its own read.
+      await ConfigRepository.updateThemeName('system');
 
-        final save = SqliteConfigService.saveConfig(
-          const ConfigModel(appLanguage: 'fr'),
-        );
-        final theme = ConfigRepository.updateThemeName('nord');
-        await Future.wait([save, theme]);
+      final save = SqliteConfigService.saveConfig(
+        const ConfigModel(appLanguage: 'fr'),
+      );
+      final theme = ConfigRepository.updateThemeName('nord');
+      await Future.wait([save, theme]);
 
-        expect(await ConfigRepository.getThemeName(), 'nord');
-        final stored = await SqliteService.getUserConfig();
-        expect(stored?['app_language'].toString(), 'fr');
-      },
-    );
+      expect(await ConfigRepository.getThemeName(), 'nord');
+      final stored = await SqliteService.getUserConfig();
+      expect(stored?['app_language'].toString(), 'fr');
+    });
 
-    test(
-      'columns with a single dedicated setter survive a concurrent save',
-      () async {
-        // active_theme (system art), systems_version and ra_user have exactly one
-        // writer each and nothing that would restore them, so a lost update here
-        // is permanent.
-        await Future.wait([
-          SqliteService.updateActiveTheme('neo-dark'),
-          SqliteService.updateSystemsVersion('42'),
-          SqliteService.updateRAUser('androosio'),
-          SqliteConfigService.saveConfig(const ConfigModel(sfxEnabled: false)),
-        ]);
+    test('columns with a single dedicated setter survive a concurrent save', () async {
+      // active_theme (system art), systems_version and ra_user have exactly one
+      // writer each and nothing that would restore them, so a lost update here
+      // is permanent.
+      await Future.wait([
+        SqliteService.updateActiveTheme('neo-dark'),
+        SqliteService.updateSystemsVersion('42'),
+        SqliteService.updateRAUser('androosio'),
+        SqliteConfigService.saveConfig(const ConfigModel(sfxEnabled: false)),
+      ]);
 
-        final stored = await SqliteService.getUserConfig();
-        expect(stored?['active_theme'].toString(), 'neo-dark');
-        expect(stored?['systems_version'].toString(), '42');
-        expect(stored?['ra_user'].toString(), 'androosio');
-        expect(stored?['sfx_enabled'].toString(), '0');
-      },
-    );
+      final stored = await SqliteService.getUserConfig();
+      expect(stored?['active_theme'].toString(), 'neo-dark');
+      expect(stored?['systems_version'].toString(), '42');
+      expect(stored?['ra_user'].toString(), 'androosio');
+      expect(stored?['sfx_enabled'].toString(), '0');
+    });
 
     test('the first write creates the singleton row', () async {
       // Nothing has written user_config yet: the row has to be created before

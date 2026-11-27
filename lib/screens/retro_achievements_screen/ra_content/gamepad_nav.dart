@@ -1,9 +1,15 @@
 part of '../ra_content.dart';
 
+/// The menu row past the sections: logout.
+const int _logoutMenuIndex = 5;
+
 /// Controller handling for the signed-in dashboard and the login form.
-/// Dedicated collections push their own routes and navigation layers.
-/// Dashboard action indices follow the rendered geometry: 0 AOTW, 1–4 the
-/// destination rail, 5 logout, and 6–7 the two lower preview cards.
+///
+/// Signed in, the D-pad is either in the sidebar menu or in the panel. In the
+/// menu, Up/Down walk the sections (the panel follows) down to logout, and
+/// Right or A enter the panel. In the panel the section's own list or grid
+/// takes the D-pad; B, or Left from its first column, comes back to the menu.
+/// L2/R2 change section from either side, and L1/R1 stay the app's tabs.
 extension _GamepadNav on _RAContentState {
   bool get _dashboardPreviewsStacked =>
       _dashboardKey.currentState?.previewsStacked ?? true;
@@ -20,6 +26,8 @@ extension _GamepadNav on _RAContentState {
       onNextTab: AppNavigation.nextTab,
       onLeftBumper: AppNavigation.previousTab,
       onRightBumper: AppNavigation.nextTab,
+      onLeftTrigger: () => _stepSection(-1),
+      onRightTrigger: () => _stepSection(1),
       allowRepeat: false,
       isTextFieldFocused: isAnyFieldFocused,
       onBack: _handleBack,
@@ -32,11 +40,78 @@ extension _GamepadNav on _RAContentState {
     );
   }
 
+  bool get _signedIn => context.read<RetroAchievementsProvider>().isConnected;
+
+  bool _overviewCardSelected(int action) =>
+      !_menuFocused &&
+      _section == RaDashboardSection.overview &&
+      _dashboardActionIndex == action;
+
+  // --- Menu ------------------------------------------------------------------
+
+  /// Puts the menu cursor on [index]; a section row also shows that section.
+  bool _setMenuIndex(int index) {
+    final next = index.clamp(0, _logoutMenuIndex).toInt();
+    if (next == _menuIndex) return false;
+    rebuild(() {
+      _menuIndex = next;
+      if (next < _logoutMenuIndex) {
+        _section = RaDashboardSection.values[next];
+      }
+    });
+    return true;
+  }
+
+  void _showSection(RaDashboardSection section, {required bool focusPanel}) {
+    rebuild(() {
+      _openGame = null;
+      _section = section;
+      _menuIndex = section.index;
+      _menuFocused = !focusPanel;
+      if (focusPanel && section == RaDashboardSection.overview) {
+        _dashboardActionIndex = _firstOverviewCard;
+      }
+    });
+    if (focusPanel && section == RaDashboardSection.overview) {
+      _scrollDashboardToAction(_dashboardActionIndex);
+    }
+  }
+
+  void _tapSection(RaDashboardSection section) {
+    SfxService().playNavSound();
+    _showSection(section, focusPanel: false);
+  }
+
+  /// L2/R2: the section before or after, wrapping, without moving the D-pad
+  /// between the menu and the panel.
+  void _stepSection(int delta) {
+    if (!_signedIn) return;
+    final count = RaDashboardSection.values.length;
+    final next = (_section.index + delta + count) % count;
+    _showSection(RaDashboardSection.values[next], focusPanel: !_menuFocused);
+  }
+
+  int get _firstOverviewCard =>
+      context.read<RetroAchievementsProvider>().gotw != null ? 0 : 6;
+
+  void _focusPanel() => _showSection(_section, focusPanel: true);
+
+  bool _focusMenu() {
+    if (_menuFocused) return false;
+    rebuild(() {
+      _menuFocused = true;
+      _menuIndex = _section.index;
+    });
+    return true;
+  }
+
+  // --- Buttons ---------------------------------------------------------------
+
   void _selectCurrent() {
-    final provider = context.read<RetroAchievementsProvider>();
-    if (!provider.isConnected) {
+    if (!_signedIn) {
       if (focusSelectedField()) return;
-      if (selectedSlot == 2) {
+      // Login sits right under the fields (slot 2), "Get API key" under it.
+      if (selectedSlot == 3) {
         _openRaControlPanel();
         return;
       }
@@ -44,31 +119,33 @@ extension _GamepadNav on _RAContentState {
       return;
     }
 
-    switch (_dashboardActionIndex) {
-      case 0:
-        _dashboardKey.currentState?.selectWeekCard();
-        return;
-      case 1:
-        _openEvents();
-        return;
-      case 2:
-        _openUnlocks();
-        return;
-      case 3:
-        _openGames();
-        return;
-      case 4:
-        _openAwards();
-        return;
-      case 5:
+    if (_menuFocused) {
+      if (_menuIndex == _logoutMenuIndex) {
         _requestDisconnect();
-        return;
-      case 6:
-        _openUnlocks(focusAction: 6);
-        return;
-      case 7:
-        _openGames(focusAction: 7);
-        return;
+      } else {
+        _focusPanel();
+      }
+      return;
+    }
+
+    switch (_section) {
+      case RaDashboardSection.overview:
+        switch (_dashboardActionIndex) {
+          case 0:
+            _dashboardKey.currentState?.selectWeekCard();
+          case 6:
+            _showSection(RaDashboardSection.unlocks, focusPanel: true);
+          case 7:
+            _showSection(RaDashboardSection.games, focusPanel: true);
+        }
+      case RaDashboardSection.aotw:
+        _eventsKey.currentState?.selectCurrent();
+      case RaDashboardSection.unlocks:
+        _unlocksKey.currentState?.activateCurrent();
+      case RaDashboardSection.games:
+        _gamesKey.currentState?.selectCurrent();
+      case RaDashboardSection.awards:
+        _awardsKey.currentState?.selectCurrent();
     }
   }
 
@@ -79,46 +156,22 @@ extension _GamepadNav on _RAContentState {
   }
 
   void _handleBack() {
-    if (!context.read<RetroAchievementsProvider>().isConnected) {
-      exitTextEntry();
-      return;
-    }
+    if (_signedIn && _focusMenu()) return;
     exitTextEntry();
   }
 
+  // --- Overview cards --------------------------------------------------------
+
   bool _setDashboardAction(int action) {
-    if (!mounted) return false;
-    final next = action.clamp(0, 7).toInt();
-    if (_dashboardActionIndex == next) return false;
-    if (next >= 1 && next <= 4) _lastNavigationRailIndex = next;
-    rebuild(() {
-      _dashboardActionIndex = next;
-      _logoutSelected = next == 5;
-      _weekCardSelected = next == 0;
-      _eventsSelected = next == 1;
-      _recentUnlocksSelected = next == 2;
-      _gamesSelected = next == 3;
-      _recentUnlocksPreviewSelected = next == 6;
-      _gamesPreviewSelected = next == 7;
-      _awardsSelected = next == 4;
-    });
-    _scrollDashboardToAction(next);
+    if (!mounted || _dashboardActionIndex == action) return false;
+    rebuild(() => _dashboardActionIndex = action);
+    _scrollDashboardToAction(action);
     return true;
   }
 
   void _scrollDashboardToAction(int action) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (action == 5 || (action >= 1 && action <= 4)) {
-        if (_dashboardScrollController.hasClients) {
-          _dashboardScrollController.animateTo(
-            0,
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
-          );
-        }
-        return;
-      }
       final targetContext = switch (action) {
         0 => _aotwFocusKey.currentContext,
         6 => _recentUnlocksFocusKey.currentContext,
@@ -128,7 +181,7 @@ extension _GamepadNav on _RAContentState {
       if (targetContext != null) {
         Scrollable.ensureVisible(
           targetContext,
-          alignment: action == 0 ? 0.12 : 0.18,
+          alignment: 0.1,
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
         );
@@ -138,80 +191,102 @@ extension _GamepadNav on _RAContentState {
 
   void _resetDashboardSelection() {
     rebuild(() {
+      _openGame = null;
+      _section = RaDashboardSection.overview;
+      _menuIndex = 0;
+      _menuFocused = true;
       _dashboardActionIndex = 0;
-      _lastNavigationRailIndex = 1;
-      _logoutSelected = false;
-      _weekCardSelected = true;
-      _eventsSelected = false;
-      _recentUnlocksSelected = false;
-      _gamesSelected = false;
-      _recentUnlocksPreviewSelected = false;
-      _gamesPreviewSelected = false;
-      _awardsSelected = false;
+      _visitedSections.clear();
     });
   }
 
+  // --- D-pad -----------------------------------------------------------------
+
+  /// Up/Down on the Unlocks grid: a whole row of badges.
+  bool _moveUnlocks({required int rows}) {
+    final unlocks = _unlocksKey.currentState;
+    if (unlocks == null) return false;
+    return unlocks.moveSelection(rows * unlocks.columns);
+  }
+
   bool _handleNavigateUp() {
-    final provider = context.read<RetroAchievementsProvider>();
-    if (!provider.isConnected) return moveSelection(-1);
-    switch (_dashboardActionIndex) {
-      case 1:
-      case 2:
-      case 3:
-      case 4:
-        return _setDashboardAction(5);
-      case 6:
-        return _setDashboardAction(0);
-      case 7:
-        return _setDashboardAction(_dashboardPreviewsStacked ? 6 : 0);
-      case 0:
-        return _setDashboardAction(_lastNavigationRailIndex);
-      default:
-        return false;
-    }
+    if (!_signedIn) return moveSelection(-1);
+    if (_menuFocused) return _setMenuIndex(_menuIndex - 1);
+    return switch (_section) {
+      RaDashboardSection.overview => switch (_dashboardActionIndex) {
+        6 => _setDashboardAction(0),
+        7 => _setDashboardAction(_dashboardPreviewsStacked ? 6 : 0),
+        _ => false,
+      },
+      RaDashboardSection.aotw => _eventsKey.currentState?.move(0, -1) ?? false,
+      RaDashboardSection.unlocks => _moveUnlocks(rows: -1),
+      RaDashboardSection.games =>
+        _gamesKey.currentState?.handleNavigateUp() ?? false,
+      RaDashboardSection.awards =>
+        _awardsKey.currentState?.move(0, -1) ?? false,
+    };
   }
 
   bool _handleNavigateDown() {
-    final provider = context.read<RetroAchievementsProvider>();
-    if (!provider.isConnected) return moveSelection(1);
-    switch (_dashboardActionIndex) {
-      case 5:
-        return _setDashboardAction(_lastNavigationRailIndex);
-      case 1:
-      case 2:
-      case 3:
-      case 4:
-        return _setDashboardAction(0);
-      case 0:
-        return _setDashboardAction(6);
-      case 6:
-        return _dashboardPreviewsStacked ? _setDashboardAction(7) : false;
-      default:
-        return false;
-    }
+    if (!_signedIn) return moveSelection(1);
+    if (_menuFocused) return _setMenuIndex(_menuIndex + 1);
+    return switch (_section) {
+      RaDashboardSection.overview => switch (_dashboardActionIndex) {
+        0 => _setDashboardAction(6),
+        6 => _dashboardPreviewsStacked ? _setDashboardAction(7) : false,
+        _ => false,
+      },
+      RaDashboardSection.aotw => _eventsKey.currentState?.move(0, 1) ?? false,
+      RaDashboardSection.unlocks => _moveUnlocks(rows: 1),
+      RaDashboardSection.games =>
+        _gamesKey.currentState?.handleNavigateDown() ?? false,
+      RaDashboardSection.awards => _awardsKey.currentState?.move(0, 1) ?? false,
+    };
   }
 
   bool _handleNavigateLeft() {
-    final provider = context.read<RetroAchievementsProvider>();
-    if (!provider.isConnected) return false;
-    if (_dashboardActionIndex >= 2 && _dashboardActionIndex <= 4) {
-      return _setDashboardAction(_dashboardActionIndex - 1);
+    if (!_signedIn || _menuFocused) return false;
+    switch (_section) {
+      case RaDashboardSection.overview:
+        if (_dashboardActionIndex == 7 && !_dashboardPreviewsStacked) {
+          return _setDashboardAction(6);
+        }
+        return _focusMenu();
+      case RaDashboardSection.unlocks:
+        final unlocks = _unlocksKey.currentState;
+        if (unlocks == null || unlocks.atRowStart) return _focusMenu();
+        return unlocks.moveSelection(-1);
+      case RaDashboardSection.games:
+        return (_gamesKey.currentState?.handleNavigateLeft() ?? false) ||
+            _focusMenu();
+      case RaDashboardSection.aotw:
+      case RaDashboardSection.awards:
+        final grid = _section == RaDashboardSection.aotw
+            ? _eventsKey.currentState
+            : _awardsKey.currentState;
+        if (grid == null || grid.atRowStart) return _focusMenu();
+        return grid.move(-1, 0);
     }
-    if (_dashboardActionIndex == 7 && !_dashboardPreviewsStacked) {
-      return _setDashboardAction(6);
-    }
-    return false;
   }
 
   bool _handleNavigateRight() {
-    final provider = context.read<RetroAchievementsProvider>();
-    if (!provider.isConnected) return false;
-    if (_dashboardActionIndex >= 1 && _dashboardActionIndex <= 3) {
-      return _setDashboardAction(_dashboardActionIndex + 1);
+    if (!_signedIn) return false;
+    if (_menuFocused) {
+      if (_menuIndex == _logoutMenuIndex) return false;
+      _focusPanel();
+      return true;
     }
-    if (_dashboardActionIndex == 6 && !_dashboardPreviewsStacked) {
-      return _setDashboardAction(7);
-    }
-    return false;
+    return switch (_section) {
+      RaDashboardSection.overview =>
+        _dashboardActionIndex == 6 && !_dashboardPreviewsStacked
+            ? _setDashboardAction(7)
+            : false,
+      RaDashboardSection.aotw => _eventsKey.currentState?.move(1, 0) ?? false,
+      RaDashboardSection.unlocks =>
+        _unlocksKey.currentState?.moveSelection(1) ?? false,
+      RaDashboardSection.games =>
+        _gamesKey.currentState?.handleNavigateRight() ?? false,
+      RaDashboardSection.awards => _awardsKey.currentState?.move(1, 0) ?? false,
+    };
   }
 }

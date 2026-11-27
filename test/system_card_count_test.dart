@@ -3,10 +3,12 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/models/config_model.dart';
 import 'package:neostation/models/my_systems.dart';
 import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/screens/systems_screen/my_systems_section/system_card.dart';
+import 'package:neostation/widgets/system_logo_fallback.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -34,10 +36,16 @@ void main() {
     SystemInfo info, {
     VoidCallback? onLongPress,
     bool showCount = true,
+    bool hideSystemLogos = false,
+    bool isSelected = false,
+    bool showShadow = true,
+    ThemeData? theme,
   }) => MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => NeoAssetsProvider()),
-      ChangeNotifierProvider(create: (_) => SqliteConfigProvider()),
+      ChangeNotifierProvider<SqliteConfigProvider>(
+        create: (_) => _CardConfig(hideSystemLogos),
+      ),
     ],
     child: ScreenUtilInit(
       designSize: const Size(1280, 720),
@@ -48,15 +56,18 @@ void main() {
         localizationsDelegates:
             FlutterLocalization.instance.localizationsDelegates,
         supportedLocales: FlutterLocalization.instance.supportedLocales,
+        theme: theme,
         home: Scaffold(
           body: Center(
             child: SizedBox(
               width: 220,
-              height: 260,
+              height: hideSystemLogos ? 220 : 260,
               child: SystemCard(
                 info: info,
                 onLongPress: onLongPress,
                 showCount: showCount,
+                isSelected: isSelected,
+                showShadow: showShadow,
               ),
             ),
           ),
@@ -69,15 +80,134 @@ void main() {
     required String folderName,
     required int count,
     String title = 'Card',
+    bool isGame = false,
   }) => SystemInfo(
     title: title,
     shortName: title,
     folderName: folderName,
     numOfRoms: count,
     color1: '#7C4DFF',
+    isGame: isGame,
   );
 
   group('SystemCard count', () {
+    testWidgets('a selected system card uses secondary and onSecondary', (
+      tester,
+    ) async {
+      const secondary = Color(0xFF123456);
+      const onSecondary = Color(0xFFABCDEF);
+      final scheme = const ColorScheme.dark().copyWith(
+        secondary: secondary,
+        onSecondary: onSecondary,
+      );
+
+      await tester.pumpWidget(
+        host(
+          system(folderName: 'missing-system', count: 1, title: 'Atari 2600'),
+          isSelected: true,
+          theme: ThemeData.from(colorScheme: scheme),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final chrome = tester.widget<Container>(
+        find
+            .ancestor(
+              of: find.byType(InkWell).first,
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      expect((chrome.decoration as BoxDecoration).color, secondary);
+
+      final logo = tester.widget<Text>(find.text('ATARI 2600'));
+      expect(logo.style?.color, onSecondary);
+    });
+
+    testWidgets(
+      'a selected last-played card also uses secondary and onSecondary',
+      (tester) async {
+        const secondary = Color(0xFF123456);
+        const onSecondary = Color(0xFFABCDEF);
+        final scheme = const ColorScheme.dark().copyWith(
+          secondary: secondary,
+          onSecondary: onSecondary,
+        );
+
+        await tester.pumpWidget(
+          host(
+            system(
+              folderName: 'nes',
+              count: 0,
+              title: 'Last Played',
+              isGame: true,
+            ),
+            isSelected: true,
+            theme: ThemeData.from(colorScheme: scheme),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final chrome = tester.widget<Container>(
+          find
+              .ancestor(
+                of: find.byType(InkWell).first,
+                matching: find.byType(Container),
+              )
+              .first,
+        );
+        expect((chrome.decoration as BoxDecoration).color, secondary);
+
+        final footer = tester.widget<Text>(
+          find.textContaining('TIME PLAYED').first,
+        );
+        expect(footer.style?.color, onSecondary);
+      },
+    );
+
+    testWidgets('the grid can turn off the card drop shadow', (tester) async {
+      await tester.pumpWidget(
+        host(
+          system(folderName: 'nes', count: 1),
+          isSelected: true,
+          showShadow: false,
+        ),
+      );
+      await tester.pump();
+
+      final chrome = tester.widget<Container>(
+        find
+            .ancestor(
+              of: find.byType(InkWell).first,
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      expect((chrome.decoration as BoxDecoration).boxShadow, isNull);
+    });
+
+    testWidgets('hidden logos keep equal artwork insets and square artwork', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        host(system(folderName: 'nes', count: 12), hideSystemLogos: true),
+      );
+      await tester.pump();
+
+      final card = tester.getRect(find.byType(InkWell).first);
+      final artwork = tester.getRect(
+        find
+            .ancestor(of: find.text('12 GAMES'), matching: find.byType(Stack))
+            .first,
+      );
+      final inset = artwork.left - card.left;
+      expect(inset, greaterThan(0));
+      expect(card.right - artwork.right, closeTo(inset, 0.001));
+      expect(artwork.top - card.top, closeTo(inset, 0.001));
+      expect(card.bottom - artwork.bottom, closeTo(inset, 0.001));
+      expect(artwork.height, closeTo(artwork.width, 0.001));
+    });
+
     testWidgets('a system card names its game count', (tester) async {
       await tester.pumpWidget(host(system(folderName: 'nes', count: 12)));
       await tester.pump();
@@ -137,7 +267,11 @@ void main() {
       await tester.pumpWidget(host(system(folderName: 'nes', count: 12)));
       await tester.pump();
 
-      final artwork = tester.getRect(find.byType(AspectRatio).first);
+      final artwork = tester.getRect(
+        find
+            .ancestor(of: find.text('12 GAMES'), matching: find.byType(Stack))
+            .first,
+      );
       final pill = tester.getRect(find.text('12 GAMES'));
 
       expect(pill.bottom, lessThanOrEqualTo(artwork.bottom));
@@ -153,15 +287,17 @@ void main() {
       // pill over the artwork takes the count out of the layout entirely, so
       // the same card renders the same logo either way.
       Rect logoBand(WidgetTester tester) =>
-          tester.getRect(find.byType(FittedBox));
+          tester.getRect(find.byType(SystemLogoFallback));
 
       await tester.pumpWidget(
-        host(system(folderName: 'nes', count: 12), showCount: false),
+        host(system(folderName: 'missing-system', count: 12), showCount: false),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
       final withoutCount = logoBand(tester);
 
-      await tester.pumpWidget(host(system(folderName: 'nes', count: 12)));
+      await tester.pumpWidget(
+        host(system(folderName: 'missing-system', count: 12)),
+      );
       await tester.pump();
 
       expect(logoBand(tester), withoutCount);
@@ -205,4 +341,13 @@ void main() {
       expect(inkWell.onLongPress, isNull);
     });
   });
+}
+
+class _CardConfig extends SqliteConfigProvider {
+  _CardConfig(this.hideLogos);
+
+  final bool hideLogos;
+
+  @override
+  ConfigModel get config => super.config.copyWith(hideSystemLogos: hideLogos);
 }

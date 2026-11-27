@@ -59,7 +59,13 @@ extension _DataLoading on _SystemGamesListState {
   }
 
   Future<void> _loadGames() async {
-    if (!mounted || _isLoadingGames) return;
+    if (!mounted) return;
+    if (_isLoadingGames) {
+      if (SystemFolderNames.isCollection(widget.system.folderName)) {
+        _pendingCollectionRefresh = true;
+      }
+      return;
+    }
     _isLoadingGames = true;
 
     final isInitialLoad = _games.isEmpty;
@@ -68,7 +74,18 @@ extension _DataLoading on _SystemGamesListState {
     }
 
     try {
-      final games = await GameService.loadGamesForSystem(widget.system);
+      final List<GameModel> games;
+      try {
+        games = await GameService.loadGamesForSystem(
+          widget.system,
+          smartPaths: _smartCollectionPaths,
+        );
+      } catch (_) {
+        // Only collections throw; keep what is shown and say why it is stale.
+        if (mounted) rebuild(() => _collectionLoadFailed = true);
+        rethrow;
+      }
+      _collectionLoadFailed = false;
       if (!mounted) return;
 
       // Resolve the per-system "Show Subfolders" setting (fresh source of truth).
@@ -132,7 +149,7 @@ extension _DataLoading on _SystemGamesListState {
       rebuild(() {
         _subfolderViewEnabled = subfolderView;
         _subfolderRoots = subfolderRoots;
-        _allGames = games;
+        _allGames = List<GameModel>.of(games)..sort(_compareGames);
         // A deep link (search "Go to game", the RA dashboard) names a rom path
         // that only exists in [_games] once ITS OWN folder level is built —
         // otherwise the lookup below misses and the user lands at the top of the
@@ -185,14 +202,18 @@ extension _DataLoading on _SystemGamesListState {
             widget.system.folderName != 'music') {
           // Persistent Selection Logic: Retain current index if the game still exists post-reload.
           final selectedIndex = _games.indexWhere(
-            (game) => game.romname == _selectedGame!.romname,
+            (game) => game.romPath == _selectedGame!.romPath,
           );
           if (selectedIndex != -1) {
             _selectedGameIndex = selectedIndex;
             _selectedGame = _games[selectedIndex];
           } else {
-            _selectedGameIndex = 0;
-            _selectedGame = _games.isNotEmpty ? _games.first : null;
+            _selectedGameIndex = _games.isEmpty
+                ? 0
+                : _selectedGameIndex.clamp(0, _games.length - 1);
+            _selectedGame = _games.isNotEmpty
+                ? _games[_selectedGameIndex]
+                : null;
           }
         } else if (_selectedGame == null) {
           _selectedGameIndex = 0;
@@ -219,6 +240,12 @@ extension _DataLoading on _SystemGamesListState {
       if (mounted) {
         rebuild(() => _isLoading = false);
         _isLoadingGames = false;
+        if (_pendingCollectionRefresh &&
+            !_deferFavoriteReseat &&
+            !_isNavigatingBack) {
+          _pendingCollectionRefresh = false;
+          _loadGames();
+        }
       }
     }
   }

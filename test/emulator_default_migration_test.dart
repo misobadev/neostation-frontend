@@ -87,36 +87,36 @@ void main() {
     },
   );
 
-  test('preserves a genuine per-game override (a different emulator)', () async {
-    // User pinned this game to the standalone, which is NOT the is_default core.
-    db.execute(
-      "INSERT INTO user_roms VALUES ('neogeo', 'neogeo.standalone.gemrb', 1, 'kof98.zip', '/roms/kof98.zip')",
-    );
-
-    await runV102();
-
-    final row = rowFor('kof98.zip');
-    expect(row['app_emulator_unique_id'], 'neogeo.standalone.gemrb');
-    expect(row['app_emulator_os_id'], 1);
-  });
-
   test(
-    'preserves a pin to the user is_user_default standalone (never auto-stamped)',
+    'preserves a genuine per-game override (a different emulator)',
     () async {
-      // A row equal to the user's is_user_default standalone can only be a
-      // deliberate pin — the scan never auto-stamps a standalone — so v102 must
-      // NOT reclaim it, even though it is "a default" from another angle.
+      // User pinned this game to the standalone, which is NOT the is_default core.
       db.execute(
-        "INSERT INTO user_roms VALUES ('neogeo', 'neogeo.standalone.gemrb', 1, 'mslug.zip', '/roms/mslug.zip')",
+        "INSERT INTO user_roms VALUES ('neogeo', 'neogeo.standalone.gemrb', 1, 'kof98.zip', '/roms/kof98.zip')",
       );
 
       await runV102();
 
-      final row = rowFor('mslug.zip');
+      final row = rowFor('kof98.zip');
       expect(row['app_emulator_unique_id'], 'neogeo.standalone.gemrb');
       expect(row['app_emulator_os_id'], 1);
     },
   );
+
+  test('preserves a pin to the user is_user_default standalone (never auto-stamped)', () async {
+    // A row equal to the user's is_user_default standalone can only be a
+    // deliberate pin — the scan never auto-stamps a standalone — so v102 must
+    // NOT reclaim it, even though it is "a default" from another angle.
+    db.execute(
+      "INSERT INTO user_roms VALUES ('neogeo', 'neogeo.standalone.gemrb', 1, 'mslug.zip', '/roms/mslug.zip')",
+    );
+
+    await runV102();
+
+    final row = rowFor('mslug.zip');
+    expect(row['app_emulator_unique_id'], 'neogeo.standalone.gemrb');
+    expect(row['app_emulator_os_id'], 1);
+  });
 
   test('leaves an already-inherited (NULL) row untouched', () async {
     db.execute(

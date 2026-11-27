@@ -7,31 +7,20 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/models/config_model.dart';
 import 'package:neostation/services/game_service.dart';
-import 'package:neostation/widgets/core_footer.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 
 import '../themes/corner_radii.dart';
 
-class HeaderSortDropdown extends StatefulWidget {
-  static final GlobalKey<HeaderSortDropdownState> globalKey =
-      GlobalKey<HeaderSortDropdownState>();
+import 'package:neostation/utils/grid_sizes.dart';
 
-  HeaderSortDropdown() : super(key: globalKey);
-
-  @override
-  State<HeaderSortDropdown> createState() => HeaderSortDropdownState();
-}
-
-/// Opens the systems view/sort picker.
+/// Opens the view/sort picker used by the collections browser.
 ///
-/// This is the picker the systems screen's X button reaches, hoisted out of
-/// [HeaderSortDropdownState] so any screen built from the systems grid/carousel
-/// widgets can open the *same* menu rather than growing a lookalike. The
-/// collections browser calls it with [includeSorting] false: view mode and card
-/// size drive its cards exactly as they drive the systems screen's, while
-/// release year / manufacturer describe hardware and mean nothing for a
-/// collection.
+/// The systems screen moved its display and sorting controls into the centered
+/// Options dialog, so this picker is no longer reached from the app header.
+/// Collections still uses it: view mode and card size drive its cards exactly
+/// as they drive the systems screen's, while release year / manufacturer
+/// describe hardware and mean nothing for a collection.
 ///
 /// [includeCardStyle] adds the box-art/fanart row. Systems cards are drawn from
 /// theme artwork and have no such choice, but a collection card previews the
@@ -105,32 +94,6 @@ Future<void> showSystemViewDropdown(
       final style = result.substring('card_style_'.length);
       await configProvider.updateGameCarouselCardStyle(style);
     }
-  }
-}
-
-class HeaderSortDropdownState extends State<HeaderSortDropdown> {
-  final GlobalKey _buttonKey = GlobalKey();
-
-  void showDropdown() {
-    showSystemViewDropdown(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: _buttonKey,
-      margin: EdgeInsets.symmetric(horizontal: 10.r),
-      child: GamepadControl(
-        label: AppLocale.viewMode.getString(context),
-        iconPath: 'assets/images/gamepad/Xbox_X_button.png',
-        onTap: () {
-          SfxService().playNavSound();
-          showSystemViewDropdown(context);
-        },
-        backgroundColor: Theme.of(context).colorScheme.tertiaryFixed,
-        textColor: Theme.of(context).colorScheme.onTertiaryFixed,
-      ),
-    );
   }
 }
 
@@ -216,7 +179,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
   }
 
   /// Index within the card-size row when it is focused. 0=S,1=M,2=L,3=XL
-  int _cardSizeIndex = 1; // default M
+  int _cardSizeIndex = GridSizes.values.indexOf(GridSizes.defaultSize);
 
   /// The two card styles, in the order the row lays them out.
   static const List<String> _cardStyles = ['fanart', 'box'];
@@ -228,9 +191,9 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
   void initState() {
     super.initState();
     final config = context.read<SqliteConfigProvider>().config;
-    final sizes = ['S', 'M', 'L', 'XL'];
+    const sizes = GridSizes.values;
     final idx = sizes.indexOf(config.systemGridColumns);
-    _cardSizeIndex = idx >= 0 ? idx : 1;
+    _cardSizeIndex = idx >= 0 ? idx : sizes.indexOf(GridSizes.defaultSize);
     final styleIdx = _cardStyles.indexOf(config.gameCarouselCardStyle);
     _cardStyleIndex = styleIdx >= 0 ? styleIdx : 0;
 
@@ -308,7 +271,9 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
     final opt = options[_selectedIndex];
     if (opt.isCardSize) {
       setState(() {
-        _cardSizeIndex = (_cardSizeIndex - 1 + 4) % 4;
+        _cardSizeIndex =
+            (_cardSizeIndex - 1 + GridSizes.values.length) %
+            GridSizes.values.length;
       });
       SfxService().playNavSound();
       _applyCardSize();
@@ -328,7 +293,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
     final opt = options[_selectedIndex];
     if (opt.isCardSize) {
       setState(() {
-        _cardSizeIndex = (_cardSizeIndex + 1) % 4;
+        _cardSizeIndex = (_cardSizeIndex + 1) % GridSizes.values.length;
       });
       SfxService().playNavSound();
       _applyCardSize();
@@ -342,8 +307,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
   }
 
   void _applyCardSize() {
-    final sizes = ['S', 'M', 'L', 'XL'];
-    final size = sizes[_cardSizeIndex];
+    final size = GridSizes.values[_cardSizeIndex];
     final configProvider = context.read<SqliteConfigProvider>();
     configProvider.updateSystemGridColumns(size);
   }
@@ -359,10 +323,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
     final opt = options[_selectedIndex];
     if (opt.isCardSize) {
       _applyCardSize();
-      Navigator.pop(
-        context,
-        'card_size_${['S', 'M', 'L', 'XL'][_cardSizeIndex]}',
-      );
+      Navigator.pop(context, 'card_size_${GridSizes.values[_cardSizeIndex]}');
       return;
     }
     if (opt.isCardStyle) {
@@ -528,9 +489,8 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
               style: TextStyle(
                 fontSize: 10.r,
                 letterSpacing: 1.r,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.4),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -543,7 +503,7 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
         // row picks fanart/box art. Same focus, same left/right handling, same
         // paint — only the values and where they are written differ.
         final isSize = opt.isCardSize;
-        final values = isSize ? const ['S', 'M', 'L', 'XL'] : _cardStyles;
+        final values = isSize ? GridSizes.values : _cardStyles;
         final labels = isSize
             ? values
             : [
@@ -574,20 +534,18 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
               padding: EdgeInsets.symmetric(horizontal: 12.r),
               decoration: BoxDecoration(
                 color: isFocused
-                    ? Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.15)
+                    ? Theme.of(context).colorScheme.primary
+                          .withValues(alpha: 0.15)
                     : Colors.transparent,
                 borderRadius:
-                    Theme.of(
-                      context,
-                    ).extension<CornerRadii>()?.radiusExternal ??
+                    Theme.of(context)
+                        .extension<CornerRadii>()
+                        ?.radiusExternal ??
                     BorderRadius.circular(8.r),
                 border: isFocused
                     ? Border.all(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.3),
+                        color: Theme.of(context).colorScheme.primary
+                            .withValues(alpha: 0.3),
                         width: 1,
                       )
                     : null,
@@ -597,9 +555,8 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
                   Icon(
                     opt.icon,
                     size: 14.r,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.5),
+                    color: Theme.of(context).colorScheme.onSurface
+                        .withValues(alpha: 0.5),
                   ),
                   SizedBox(width: 8.r),
                   Expanded(
@@ -633,9 +590,9 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
                           splashColor: Colors.transparent,
                           highlightColor: Colors.transparent,
                           borderRadius:
-                              Theme.of(
-                                context,
-                              ).extension<CornerRadii>()?.radiusInternal ??
+                              Theme.of(context)
+                                  .extension<CornerRadii>()
+                                  ?.radiusInternal ??
                               BorderRadius.circular(4.r),
                           child: Container(
                             padding: EdgeInsets.symmetric(
@@ -647,9 +604,9 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
                                   ? Theme.of(context).colorScheme.primary
                                   : Colors.transparent,
                               borderRadius:
-                                  Theme.of(
-                                    context,
-                                  ).extension<CornerRadii>()?.radiusInternal ??
+                                  Theme.of(context)
+                                      .extension<CornerRadii>()
+                                      ?.radiusInternal ??
                                   BorderRadius.circular(4.r),
                             ),
                             child: Text(
@@ -717,9 +674,8 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
             borderRadius: BorderRadius.circular(8.r),
             border: itemIsFocused
                 ? Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.3),
+                    color: Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.3),
                     width: 1,
                   )
                 : null,
@@ -836,9 +792,9 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius:
-                    Theme.of(
-                      context,
-                    ).extension<CornerRadii>()?.radiusExternal ??
+                    Theme.of(context)
+                        .extension<CornerRadii>()
+                        ?.radiusExternal ??
                     BorderRadius.circular(12.r),
                 border: Border.all(
                   color: Theme.of(context).colorScheme.outline,
@@ -846,9 +802,8 @@ class _SortDropdownOverlayState extends State<SortDropdownOverlay> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.shadow.withValues(alpha: 0.5),
+                    color: Theme.of(context).colorScheme.shadow
+                        .withValues(alpha: 0.5),
                     blurRadius: 4.r,
                     offset: Offset(2.r, 2.r),
                   ),

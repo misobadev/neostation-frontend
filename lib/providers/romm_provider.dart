@@ -1,15 +1,15 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import '../models/game_model.dart';
 import '../models/romm_collection.dart';
 import '../models/romm_platform.dart';
 import '../models/romm_rom.dart';
 import '../models/system_model.dart';
+import '../repositories/game_repository.dart';
 import '../repositories/romm_repository.dart';
 import '../repositories/romm_save_map_repository.dart';
 import '../repositories/retro_achievements_repository.dart';
@@ -18,8 +18,11 @@ import '../repositories/system_repository.dart';
 import '../services/logger_service.dart';
 import '../services/romm_playtime_service.dart';
 import '../services/romm_service.dart';
+import '../services/romm_archive_service.dart';
 import '../services/storage_space_service.dart';
 import '../services/user_data_location_service.dart';
+import '../utils/atomic_file_writer.dart';
+import '../utils/log_redaction.dart';
 import '../utils/romm_local_matcher.dart';
 import 'file_provider.dart';
 import 'romm_bulk_sync.dart';
@@ -44,7 +47,17 @@ class RommRaLookupResult {
 enum RommDownloadStatus { downloading, completed, failed, cancelled }
 
 /// Why a download could not proceed/complete (UI maps these to localized text).
-enum RommDownloadError { none, noSystemMatch, noWritableFolder, network }
+enum RommDownloadError {
+  none,
+  noSystemMatch,
+  noWritableFolder,
+  network,
+  extraction,
+
+  /// The archive's contents don't fit in the free space. The download is
+  /// kept, so freeing space and retrying doesn't need it fetched again.
+  notEnoughSpace,
+}
 
 /// Tracks an in-flight or finished download for a single ROM.
 class RommDownload {
@@ -115,7 +128,23 @@ class RommProvider extends ChangeNotifier {
   /// screen, so a global error would put a failing `/api/collections` under
   /// the search field of a search that worked. Scoped here, the search caption
   /// only ever reports the search.
-  String? _romsError;
+  ///
+  /// Its [RommException.kind] is what the UI says, in the app language; the
+  /// message is English, for the log.
+  RommException? _romsFailure;
+
+  /// The failure of the last [loadPlatforms], or null when it succeeded (or
+  /// has not run), so an empty platform list can say why it is empty.
+  RommException? _platformsFailure;
+
+  /// The failure of the last [loadCollections], as [_platformsFailure].
+  RommException? _collectionsFailure;
+
+  /// Why the saved account was rejected when it was checked at start-up, or
+  /// null. Set only for a definite rejection (see
+  /// [_verifyRestoredConnection]), so the connect screen can say why it is
+  /// showing instead of the library.
+  RommException? _restoreFailure;
 
   String _serverUrl = '';
   String _username = '';
@@ -239,11 +268,27 @@ class RommProvider extends ChangeNotifier {
   RommConnectionStatus get status => _status;
   bool get isConnected => _status == RommConnectionStatus.connected;
   String? get lastError => _lastError;
-  String? get romsError => _romsError;
+  RommException? get romsFailure => _romsFailure;
+  RommException? get platformsFailure => _platformsFailure;
+  RommException? get collectionsFailure => _collectionsFailure;
+  RommException? get restoreFailure => _restoreFailure;
   String get serverUrl => _serverUrl;
   String get username => _username;
 
   List<RommPlatform> get platforms => List.unmodifiable(_platforms);
+
+  /// Human-readable platform name for [rom]: the loaded platform list's name
+  /// for its slug, else the name RomM sent with the ROM, else the upper-cased
+  /// slug. Null when the ROM names no platform at all.
+  String? platformLabel(RommRom rom) {
+    final slug = rom.platformSlug;
+    if (slug.isEmpty) return rom.platformName;
+    for (final platform in _platforms) {
+      if (platform.slug == slug) return platform.name;
+    }
+    return rom.platformName ?? slug.toUpperCase();
+  }
+
   bool get loadingPlatforms => _loadingPlatforms;
 
   /// [loadingPlatforms] under the name the sync layer's guards read it by.
@@ -274,6 +319,19 @@ class RommProvider extends ChangeNotifier {
 
   RommService get service => _service;
   RommDownload? downloadFor(int romId) => _downloads[romId];
+
+  /// Arms the scan that follows a finished download, as a download would.
+  @visibleForTesting
+  void debugScheduleSettle() => _scheduleSettle();
+
+  /// A ROM is downloading, or downloaded ROMs are waiting for (or in) the
+  /// scan that adds them to the library: either writes the library soon.
+  bool get hasDownloadsUnderway =>
+      _downloads.values.any(
+        (download) => download.status == RommDownloadStatus.downloading,
+      ) ||
+      (_settleTimer?.isActive ?? false) ||
+      _settling;
 
   /// Ids transferring right now — at most one per worker, however many ROMs
   /// have been downloaded this session.
@@ -327,6 +385,13 @@ class RommProvider extends ChangeNotifier {
   Future<void> _runSettle() async {
     final handler = onDownloadsSettled;
     if (handler == null) return;
+    // The scan that adds the downloads refuses while the user data moves:
+    // keep them queued for after the move rather than dropping them.
+    if (UserDataLocationService.isMoving) {
+      _settleTimer?.cancel();
+      _settleTimer = Timer(_settleDebounce, _runSettle);
+      return;
+    }
     // Serialize: if a settle is already scanning, wait for it to finish so a
     // long batch never overlaps scans — completions accumulate and get picked
     // up by the next run. Re-arm on the plain debounce rather than through
@@ -430,8 +495,13 @@ class RommProvider extends ChangeNotifier {
   // ── Lifecycle / connection ──────────────────────────────────────────────────
 
   /// Loads any persisted credentials/tokens and configures the service.
-  /// Does not hit the network; status becomes [connected] when a config exists.
+  ///
+  /// A saved account reports [RommConnectionStatus.connected] straight away,
+  /// so the cached library stays usable offline, and is then verified in the
+  /// background (see [_verifyRestoredConnection]).
   Future<void> initialize() async {
+    final epoch = ++_connectionEpoch;
+    _restoreFailure = null;
     try {
       final config = await RommRepository.getConfig();
       if (config == null) {
@@ -458,6 +528,7 @@ class RommProvider extends ChangeNotifier {
       _status = RommConnectionStatus.connected;
       notifyListeners();
       _flushQueuedPlaytime();
+      unawaited(_verifyRestoredConnection(epoch));
     } catch (e) {
       _log.e('RomM initialize failed: $e');
       _status = RommConnectionStatus.disconnected;
@@ -465,47 +536,58 @@ class RommProvider extends ChangeNotifier {
     }
   }
 
-  /// Validates credentials against the server without persisting them.
-  /// Returns null on success, or a user-facing error message.
+  /// Bumped by every [initialize], [connect] and [disconnect], so a
+  /// background check that finishes late cannot overwrite a newer state.
+  int _connectionEpoch = 0;
+
+  /// Confirms a restored account still authenticates.
   ///
-  /// Pass either [username]/[password] or an [apiKey], matching [connect].
-  Future<String?> testConnection({
-    required String serverUrl,
-    String username = '',
-    String password = '',
-    String apiKey = '',
-  }) async {
-    final probe = RommService()
-      ..configure(
-        serverUrl: serverUrl,
-        username: username,
-        password: password,
-        apiKey: apiKey,
-      );
+  /// Only a definite rejection (401/403) reports [RommConnectionStatus.error].
+  /// An unreachable server is normal offline, or before Wi-Fi associates at
+  /// boot, so the account stays connected and the next real call reports
+  /// the problem. A token refreshed along the way is persisted, because the
+  /// server may already have rotated the refresh token the DB holds.
+  Future<void> _verifyRestoredConnection(int epoch) async {
     try {
-      await probe.verifyConnection();
-      return null;
+      await _service.verifyStoredConnection();
+      if (epoch != _connectionEpoch) return;
+      await _persistRefreshedTokens();
     } on RommException catch (e) {
-      return e.message;
+      if (epoch != _connectionEpoch) return;
+      if (e.statusCode == 401 || e.statusCode == 403) {
+        _log.w('RomM: saved account was rejected: ${e.message}');
+        _status = RommConnectionStatus.error;
+        _lastError = e.message;
+        _restoreFailure = e;
+        notifyListeners();
+      } else {
+        _log.w('RomM: could not verify the saved account: ${e.message}');
+      }
     } catch (e) {
-      return 'Connection failed: $e';
+      _log.w('RomM: could not verify the saved account: $e');
     }
   }
 
   /// Authenticates, persists credentials + tokens, and marks the provider
-  /// connected. Returns null on success or a user-facing error message.
+  /// connected. Returns null on success, or the failure: its
+  /// [RommException.kind] says why in a form the UI can translate
+  /// (`rommFailureMessage`), its message is English for the log.
   ///
   /// Pass either [username]/[password] for the OAuth2 password grant or an
   /// [apiKey] for a RomM Client API Token; the mode that isn't used is stored
   /// empty, so reconnecting one way clears the other way's secret.
-  Future<String?> connect({
+  Future<RommException?> connect({
     required String serverUrl,
     String username = '',
     String password = '',
     String apiKey = '',
   }) async {
+    _connectionEpoch++;
     _status = RommConnectionStatus.connecting;
     _lastError = null;
+    // Signing in again is the answer to a rejected saved account; whatever
+    // this attempt says replaces it.
+    _restoreFailure = null;
     notifyListeners();
 
     _service.configure(
@@ -515,17 +597,24 @@ class RommProvider extends ChangeNotifier {
       apiKey: apiKey,
     );
     try {
-      await _service.authenticate();
+      await _service.verifyConnection();
     } on RommException catch (e) {
+      // The user sees a translated message for e.kind; the cause is here.
+      _log.w(
+        'RomM: connecting to ${_service.baseUrl} failed (${e.kind.name}): '
+        '${e.message}'
+        '${e.serverResponse == null ? '' : ' — server answered: ${e.serverResponse}'}',
+      );
       _status = RommConnectionStatus.error;
       _lastError = e.message;
       notifyListeners();
-      return e.message;
+      return e;
     } catch (e) {
+      _log.w('RomM: connecting to ${_service.baseUrl} failed: $e');
       _status = RommConnectionStatus.error;
       _lastError = 'Connection failed: $e';
       notifyListeners();
-      return _lastError;
+      return RommException(_lastError!);
     }
 
     await RommRepository.saveConfig(
@@ -539,12 +628,13 @@ class RommProvider extends ChangeNotifier {
     // Only the password grant produces tokens worth caching; an API key is
     // itself the credential and is already in the config row.
     if (!_service.usesApiKey) {
-      await RommRepository.saveTokens(
+      final saved = await RommRepository.saveTokens(
         accessToken: _service.accessToken!,
         refreshToken: _service.refreshToken,
         tokenExpires: _service.tokenExpiresMs,
       );
-      _lastPersistedAccessToken = _service.accessToken;
+      // Left unmarked when the save failed, so the next call saves it again.
+      if (saved) _lastPersistedAccessToken = _service.accessToken;
     }
 
     _serverUrl = _service.baseUrl;
@@ -576,14 +666,18 @@ class RommProvider extends ChangeNotifier {
     // Stop a bulk sync before the credentials go: its remaining transfers would
     // otherwise keep running (and failing) against a server we just forgot.
     bulkSync.cancel();
+    _connectionEpoch++;
     await RommRepository.clearConfig();
     _status = RommConnectionStatus.disconnected;
     _lastError = null;
+    _restoreFailure = null;
     _serverUrl = '';
     _username = '';
     _platforms = [];
+    _platformsFailure = null;
     _platformIdsBySystemName = null;
     _collections = [];
+    _collectionsFailure = null;
     _currentPlatform = null;
     _currentCollection = null;
     _librarySearch = false;
@@ -610,6 +704,7 @@ class RommProvider extends ChangeNotifier {
     _loadingPlatforms = true;
     final load = _platformsLoad = Completer<void>();
     _lastError = null;
+    _platformsFailure = null;
     notifyListeners();
     try {
       // Via the [service] getter, not [_service], so a test can substitute the
@@ -623,8 +718,10 @@ class RommProvider extends ChangeNotifier {
       unawaited(_loadRaProgression().then((_) => notifyListeners()));
     } on RommException catch (e) {
       _lastError = e.message;
+      _platformsFailure = e;
     } catch (e) {
       _lastError = 'Failed to load platforms: $e';
+      _platformsFailure = RommException(_lastError!);
     } finally {
       _loadingPlatforms = false;
       _platformsLoad = null;
@@ -641,6 +738,7 @@ class RommProvider extends ChangeNotifier {
     if (_collections.isNotEmpty && !force) return;
     _loadingCollections = true;
     _lastError = null;
+    _collectionsFailure = null;
     notifyListeners();
     try {
       final user = await _service.getCollections();
@@ -656,8 +754,10 @@ class RommProvider extends ChangeNotifier {
       await _persistRefreshedTokens();
     } on RommException catch (e) {
       _lastError = e.message;
+      _collectionsFailure = e;
     } catch (e) {
       _lastError = 'Failed to load collections: $e';
+      _collectionsFailure = RommException(_lastError!);
     } finally {
       _loadingCollections = false;
       notifyListeners();
@@ -786,7 +886,7 @@ class RommProvider extends ChangeNotifier {
   /// blocked by a request whose answer is about to be discarded.
   void _resetRoms() {
     _roms = [];
-    _romsError = null;
+    _romsFailure = null;
     _romsOffset = 0;
     _romsHasMore = false;
     _loadingRoms = false;
@@ -813,7 +913,7 @@ class RommProvider extends ChangeNotifier {
     final offset = _romsOffset;
     _loadingRoms = true;
     _lastError = null;
-    _romsError = null;
+    _romsFailure = null;
     notifyListeners();
     try {
       final page = await _service.getRoms(
@@ -851,7 +951,7 @@ class RommProvider extends ChangeNotifier {
         return;
       }
       _lastError = e.message;
-      _romsError = e.message;
+      _romsFailure = e;
     } catch (e) {
       if (generation != _romsGeneration) {
         _log.d(
@@ -861,7 +961,7 @@ class RommProvider extends ChangeNotifier {
         return;
       }
       _lastError = 'Failed to load ROMs: $e';
-      _romsError = _lastError;
+      _romsFailure = RommException(_lastError!);
     } finally {
       // A stale request's loading flag was already released by [_resetRoms];
       // clearing it here would cancel the flag of the load that replaced it.
@@ -1279,22 +1379,17 @@ class RommProvider extends ChangeNotifier {
     }.toList();
   }
 
-  /// Directory of an already-downloaded copy of [rom] under any of the system's
-  /// folder aliases, or null if none exists.
-  ///
-  /// Checking every alias (not just the canonical [folderName]) is what stops a
-  /// re-download from writing a second copy under a different alias — e.g. a ROM
-  /// already sitting in `segacd/` would otherwise be re-fetched into `scd/` and
-  /// show up as a duplicate game once the scan indexes both.
-  Future<String?> _existingRomDir(
-    SystemModel system,
-    RommRom rom,
-    List<String> romFolders,
-  ) async => (await _existingRomFile(system, rom, romFolders))?.directory;
+  /// Lower-cased extensions without their leading dot.
+  static Set<String> _normalizeExtensions(Iterable<String> extensions) =>
+      extensions
+          .map((e) => e.toLowerCase().replaceFirst(RegExp(r'^\.'), ''))
+          .toSet();
 
-  /// The on-disk copy of [rom] under any of [system]'s folder aliases, or null
-  /// if none exists. [_existingRomDir] is this minus the filename; the link
-  /// paths need the name too, because it is what the mapping row is keyed by.
+  static String _extensionOf(String name) =>
+      p.extension(name).toLowerCase().replaceFirst('.', '');
+
+  /// Finds a local copy across system aliases, preferring root files and the
+  /// predictable bundle folder before searching older arbitrary layouts.
   Future<RommLocalCopy?> _existingRomFile(
     SystemModel system,
     RommRom rom,
@@ -1314,35 +1409,79 @@ class RommProvider extends ChangeNotifier {
     if (recorded != null && !candidates.contains(recorded)) {
       candidates.add(recorded);
     }
+    // A root file only counts as the game when the system launches its
+    // format. Otherwise a `Game.zip` kept after a failed install showed as
+    // downloaded, got linked, and was skipped by bulk sync forever.
+    final claimed = _normalizeExtensions(
+      await SystemRepository.getExtensionsForSystem(system.id ?? ''),
+    );
+    bool launchable(String name) => claimed.contains(_extensionOf(name));
     for (final folder in romFolders) {
       final base = _folderToRealBase(folder);
       if (base == null) continue;
       for (final name in _systemFolderNames(system)) {
         final dir = p.join(base, name);
         for (final candidate in candidates) {
+          if (!launchable(candidate)) continue;
           final file = File(p.join(dir, candidate));
           if (await file.exists()) {
             return RommLocalCopy(
               system: system,
               directory: dir,
+              systemDirectory: dir,
               filename: await _onDiskName(file, candidate),
             );
           }
         }
-        // ScummVM game data lives in an ID-named subfolder. The descriptor is
-        // what the scanner indexes, but it is no longer a direct child of the
-        // system folder, so look for it recursively when checking whether this
-        // RomM entry already exists locally. The copy still reports the system
-        // folder as its directory (that is where a download would land), while
-        // the filename is the descriptor's own, which is what the scan indexed
-        // and therefore what a mapping row has to be keyed by.
+        // Probe the predictable bundle folder before a recursive search.
+        final bundleName = RommArchiveService.gameFolderName(rom.fsName);
+        if (isSafeFileName(bundleName)) {
+          for (final candidate in candidates) {
+            if (!isSafeFileName(candidate)) continue;
+            final file = File(p.join(dir, bundleName, candidate));
+            if (await file.exists()) {
+              return RommLocalCopy(
+                system: system,
+                directory: file.parent.path,
+                systemDirectory: dir,
+                filename: await _onDiskName(file, candidate),
+              );
+            }
+          }
+        }
+        // ScummVM data lives in an ID-named folder nothing else predicts, so
+        // its whole system folder is searched. Any other recorded download
+        // can only sit deeper inside its own bundle folder; searching just
+        // that keeps a moved or deleted download from costing a walk of the
+        // whole system folder on every badge probe.
         if (system.folderName == 'scummvm') {
-          final nested = await _findNamedFileRecursively(dir, candidates);
+          final nested = await _findNamedFileRecursively(
+            dir,
+            candidates.where(launchable).toList(),
+          );
           if (nested != null) {
             return RommLocalCopy(
               system: system,
-              directory: dir,
+              directory: nested.parent.path,
+              systemDirectory: dir,
               filename: p.basename(nested.path),
+            );
+          }
+        } else if (recorded != null && isSafeFileName(bundleName)) {
+          final bundleDir = p.join(dir, bundleName);
+          final nested = await _findNamedFileRecursively(
+            bundleDir,
+            candidates.where(launchable).toList(),
+          );
+          if (nested != null) {
+            return RommLocalCopy(
+              system: system,
+              // The bundle folder, not the nested parent: a re-download
+              // installs into the bundle, never into its DLC/ subfolder.
+              directory: bundleDir,
+              systemDirectory: dir,
+              filename: p.basename(nested.path),
+              nestedPath: nested.path,
             );
           }
         }
@@ -1360,17 +1499,25 @@ class RommProvider extends ChangeNotifier {
     List<String> names,
   ) async {
     final wanted = names.map((name) => name.toLowerCase()).toSet();
-    try {
-      await for (final entity in Directory(
-        dir,
-      ).list(recursive: true, followLinks: false)) {
-        if (entity is File &&
-            wanted.contains(p.basename(entity.path).toLowerCase())) {
-          return entity;
+    final pending = [Directory(dir)];
+    while (pending.isNotEmpty) {
+      try {
+        await for (final entity in pending.removeLast().list(
+          followLinks: false,
+        )) {
+          final name = p.basename(entity.path);
+          if (entity is File && wanted.contains(name.toLowerCase())) {
+            return entity;
+          }
+          // Hidden folders include in-flight `.romm_download_*` staging,
+          // whose half-written files are not downloaded copies.
+          if (entity is Directory && !name.startsWith('.')) {
+            pending.add(entity);
+          }
         }
+      } catch (_) {
+        // Missing or unreadable directories are simply not downloaded copies.
       }
-    } catch (_) {
-      // Missing or unreadable directories are simply not downloaded copies.
     }
     return null;
   }
@@ -1424,7 +1571,7 @@ class RommProvider extends ChangeNotifier {
     // a small price next to a wrong row that nothing repairs.
     final cached = _localCopyByRomId[rom.id];
     if (cached != null) {
-      if (await File(p.join(cached.directory, cached.filename)).exists()) {
+      if (await File(cached.path).exists()) {
         return cached;
       }
       _localCopyByRomId.remove(rom.id);
@@ -1517,11 +1664,163 @@ class RommProvider extends ChangeNotifier {
     return true;
   }
 
+  /// Rescrape from RomM: puts the info and art RomM has for [game] — a game
+  /// already on the device and linked to a RomM entry — in place of the
+  /// game's own, and leaves everything RomM lacks as it was. Linking alone
+  /// imports nothing, by design, so without a ScreenScraper account this is
+  /// the only way a game found on disk gets RomM's data.
+  ///
+  /// Unlike a download's import it never blanks a column (only the ones RomM
+  /// has are updated, and the row's scrape state is kept) and never puts a
+  /// stand-in in place of art (no cover as the fanart, no marquee as the
+  /// wheel): each kind of art is replaced only by RomM's own of that kind. An
+  /// entry RomM never identified, carrying no info and no art, changes
+  /// nothing and is a failure.
+  ///
+  /// [system] is the game's own system (not a virtual "All"/collection one).
+  Future<RommRescrapeOutcome> rescrapeFromRomm(
+    GameModel game,
+    SystemModel system,
+    FileProvider fileProvider,
+  ) async {
+    if (!isConnected) return RommRescrapeOutcome.notConnected;
+    final mapping = await RommSaveMapRepository.getMapping(
+      game.romname,
+      system.folderName,
+    );
+    if (mapping == null) return RommRescrapeOutcome.notLinked;
+
+    final systemId = system.id;
+    final romPath = game.romPath;
+    if (systemId == null || romPath == null || romPath.isEmpty) {
+      return RommRescrapeOutcome.failed;
+    }
+    // Keyed as the library joins it: some callers (Discovery, the systems
+    // list) hand over the extension-stripped name.
+    final indexedName = await GameRepository.indexedFilename(systemId, romPath);
+    if (indexedName == null) {
+      _log.w('RomM rescrape: no library row for ${oneLine(romPath)}');
+      return RommRescrapeOutcome.failed;
+    }
+
+    try {
+      final rom = await service.getRom(mapping.rommRomId);
+      final detail = await service.getRomDetail(rom.id);
+      if (detail == null) return RommRescrapeOutcome.failed;
+      // An entry RomM never matched to a metadata provider has a name made
+      // from its file and default values: nothing worth putting in place of
+      // the game's own.
+      if (!_rommIdentified(detail)) {
+        _log.i(
+          'RomM rescrape: entry ${rom.id} is not identified; '
+          '${oneLine(indexedName)} left as it was',
+        );
+        return RommRescrapeOutcome.failed;
+      }
+
+      var wrote = false;
+      final info = _rommInfoFields(detail);
+      if (info.isNotEmpty) {
+        final updated = await ScraperRepository.updateGameMetadata(
+          systemId,
+          indexedName,
+          {
+            'real_name': rom.name,
+            ...info,
+            // No longer ES-DE's row: resetting an ES-DE import deletes
+            // those, which would take RomM's info with it.
+            'esde_imported': 0,
+          },
+        );
+        if (!updated) return RommRescrapeOutcome.failed;
+        wrote = true;
+      }
+
+      final ss =
+          (detail['ss_metadata'] as Map?)?.cast<String, dynamic>() ?? const {};
+      final screenshots =
+          (detail['merged_screenshots'] as List?)
+              ?.whereType<String>()
+              .toList() ??
+          const <String>[];
+      final videoPath =
+          _rommResourcePath(ss['video_path']) ??
+          _rommResourcePath(detail['path_video']);
+      final art = <(String, List<String?>)>[
+        (
+          'box2d',
+          [
+            detail['path_cover_large']?.toString(),
+            detail['path_cover_small']?.toString(),
+            service.coverUrl(rom),
+          ],
+        ),
+        ('fanarts', [_rommResourcePath(ss['fanart_path'])]),
+        ('wheels', [_rommResourcePath(ss['logo_path'])]),
+        ('screenshots', [if (screenshots.isNotEmpty) screenshots.first]),
+      ];
+      for (final (folder, sources) in art) {
+        if (await _saveRommMedia(
+          sources,
+          folder,
+          system,
+          indexedName,
+          fileProvider,
+        )) {
+          wrote = true;
+          // The grid lays a card out by the box art's stored proportions:
+          // cleared, it measures the new cover.
+          if (folder == 'box2d') {
+            await GameRepository.updateBox2dAspectRatio(
+              systemId,
+              indexedName,
+              '',
+            );
+          }
+        }
+      }
+      if (videoPath != null &&
+          await _saveRommMedia(
+            [videoPath],
+            'videos',
+            system,
+            indexedName,
+            fileProvider,
+            forcedExt: videoPath.toLowerCase().contains('.webm')
+                ? 'webm'
+                : 'mp4',
+            siblingExts: const ['mp4', 'webm'],
+            accept: _looksLikeVideo,
+          )) {
+        wrote = true;
+      }
+
+      if (!wrote) {
+        _log.i(
+          'RomM rescrape: entry ${rom.id} has no info or art for '
+          '${oneLine(indexedName)}',
+        );
+        return RommRescrapeOutcome.failed;
+      }
+      _log.i(
+        'RomM rescrape: ${system.folderName}/${oneLine(indexedName)} '
+        'from ${rom.id}',
+      );
+      return RommRescrapeOutcome.done;
+    } catch (e) {
+      _log.w('RomM rescrape: entry ${mapping.rommRomId} failed: $e');
+      return RommRescrapeOutcome.failed;
+    } finally {
+      // As after a download: a token refreshed on the way is kept.
+      await _persistRefreshedTokens();
+    }
+  }
+
   /// True when a file named after [rom] already exists in a configured folder.
   Future<bool> isDownloaded(RommRom rom, List<String> romFolders) async {
     final system = await resolveSystem(rom);
     if (system == null) return false;
-    return await _existingRomDir(system, rom, romFolders) != null;
+    return await _existingRomFile(system, rom, romFolders) != null;
   }
 
   /// Memoized [isDownloaded] for the browse grid (see [_downloadedByRomId]).
@@ -1636,13 +1935,63 @@ class RommProvider extends ChangeNotifier {
     RommRom rom, {
     required List<String> romFolders,
     FileProvider? fileProvider,
-  }) async {
+  }) {
+    // The download folder is per ROM, so one ROM downloads once at a time. A
+    // second press shares the running download's future, so it resolves with
+    // the real outcome instead of a tracker that still says "downloading"
+    // (which Search showed as failed and bulk sync counted as a failure).
+    final running = _inFlightDownloads[rom.id];
+    if (running != null) return running;
     final tracker = RommDownload(romId: rom.id);
     _downloads[rom.id] = tracker;
     _notifyDownloadState();
+    final future =
+        _downloadRom(
+          rom,
+          tracker,
+          romFolders: romFolders,
+          fileProvider: fileProvider,
+        ).catchError((Object e, StackTrace st) {
+          // Anything that escaped the steps below must still end the
+          // download, or the tracker stays "downloading" until the app
+          // restarts. A file-system error there is the ROM folder (unwritable,
+          // or "All files access" revoked); anything else is a bug, reported
+          // as a failed install rather than blamed on the folder.
+          _log.e(
+            'RomM: download of rom ${rom.id} (${oneLine(rom.fsName)}) failed',
+            error: e,
+            stackTrace: st,
+          );
+          tracker
+            ..status = RommDownloadStatus.failed
+            ..error = e is FileSystemException
+                ? RommDownloadError.noWritableFolder
+                : RommDownloadError.extraction
+            ..errorDetail = oneLine('$e');
+          _notifyDownloadState();
+          return tracker;
+        });
+    _inFlightDownloads[rom.id] = future;
+    return future.whenComplete(() => _inFlightDownloads.remove(rom.id));
+  }
+
+  /// The download each ROM id has running, shared by repeat presses.
+  final Map<int, Future<RommDownload>> _inFlightDownloads = {};
+
+  Future<RommDownload> _downloadRom(
+    RommRom rom,
+    RommDownload tracker, {
+    required List<String> romFolders,
+    FileProvider? fileProvider,
+  }) async {
+    final logName = oneLine(rom.fsName);
 
     final system = await resolveSystem(rom);
     if (system == null) {
+      _log.w(
+        'RomM: cannot download rom ${rom.id} ($logName): no system for '
+        'platform "${oneLine(rom.platformSlug)}"',
+      );
       tracker
         ..status = RommDownloadStatus.failed
         ..error = RommDownloadError.noSystemMatch;
@@ -1653,10 +2002,16 @@ class RommProvider extends ChangeNotifier {
     // Reuse the folder an existing copy already lives in (possibly a different
     // alias, e.g. segacd vs scd) so a re-download overwrites in place rather
     // than creating a duplicate the scan would index twice.
-    final destDir =
-        await _existingRomDir(system, rom, romFolders) ??
-        await _resolveDestDir(system, romFolders);
+    final existing = await _existingRomFile(system, rom, romFolders);
+    final existingDir = system.folderName == 'scummvm'
+        ? existing?.systemDirectory ?? existing?.directory
+        : existing?.directory;
+    final destDir = existingDir ?? await _resolveDestDir(system, romFolders);
     if (destDir == null) {
+      _log.w(
+        'RomM: cannot download rom ${rom.id} ($logName): no writable ROM '
+        'folder for ${system.folderName}',
+      );
       tracker
         ..status = RommDownloadStatus.failed
         ..error = RommDownloadError.noWritableFolder;
@@ -1666,10 +2021,9 @@ class RommProvider extends ChangeNotifier {
 
     // Multi-file (multi-disc) ROMs are served by RomM as a single zip archive
     // whose logical fsName may or may not already carry a .zip extension. We
-    // stream it to a .zip first, then always unpack it into the native scan
-    // layout below. A plain .zip neither scans (most disc systems omit it from
-    // their extension list) nor launches (the emulator boots the playlist/disc,
-    // not the archive), so a multi-file ROM must always go through extraction.
+    // stream it to a .zip first, then prepare it for the system below:
+    // playlist-based multi-disc games are unpacked, while other systems keep
+    // the archive only when ZIP is a supported launch format.
     final isArchive = rom.isMultiFile;
     // fsName comes from the server and names the file we create — and, below,
     // the file we replace if it already exists. It must be a plain file name:
@@ -1686,69 +2040,214 @@ class RommProvider extends ChangeNotifier {
     // Only append .zip when fsName doesn't already end in it (avoid foo.zip.zip).
     final appendZipExt =
         isArchive && !rom.fsName.toLowerCase().endsWith('.zip');
-    final destPath = p.join(
-      destDir,
+    final extensions = await SystemRepository.getExtensionsForSystem(
+      system.id ?? '',
+    );
+    final scummVm = system.folderName == 'scummvm';
+    final rootCopy =
+        existing != null &&
+        p.equals(
+          existing.directory,
+          existing.systemDirectory ?? existing.directory,
+        );
+    // Install into the existing copy's folder only when it is a game folder
+    // (a bundle) or the root playlist of an older multi-disc layout; anything
+    // else at the root would spread a bundle loose into the system folder.
+    final reuseExistingDirectory =
+        existing != null &&
+        !scummVm &&
+        (!rootCopy || p.extension(existing.filename).toLowerCase() == '.m3u');
+    // A root file no system extension claims can be an unextracted download
+    // left by older builds (an extensionless `switch/Game Name`). It would
+    // block the `switch/Game Name/` folder, so it is replaced rather than
+    // reused. Only the file the save map records for this ROM qualifies: a
+    // name match alone could be the user's own file, such as a `Game.srm`.
+    final recordedName = await RommSaveMapRepository.getIndexedNameForRomId(
+      rom.id,
+      system.folderName,
+    );
+    final staleCandidate =
+        !scummVm &&
+            recordedName != null &&
+            isSafeFileName(recordedName) &&
+            !_normalizeExtensions(extensions)
+                .contains(_extensionOf(recordedName))
+        ? p.join(destDir, recordedName)
+        : null;
+    final staleRaw =
+        staleCandidate != null &&
+            await FileSystemEntity.type(staleCandidate, followLinks: false) ==
+                FileSystemEntityType.file
+        ? staleCandidate
+        : null;
+    // What this download may replace: the copy found for this ROM (and the
+    // discs its playlist lists) and, for a game kept in its own folder, that
+    // folder. Anything else a server-chosen name collides with is another
+    // game's, and the install refuses it.
+    final replaceRoot = existing != null && !rootCopy
+        ? existing.directory
+        : null;
+    final replaceable = <String>{
+      if (existing != null) existing.path,
+      // The root file an earlier download of this ROM recorded, even in a
+      // format the badge probe no longer counts as the game.
+      if (recordedName != null && isSafeFileName(recordedName))
+        p.join(destDir, recordedName),
+      if (existing != null &&
+          p.extension(existing.filename).toLowerCase() == '.m3u')
+        ...await _playlistEntries(
+          existing.path,
+          _normalizeExtensions(extensions),
+        ),
+    };
+    // Downloads never overwrite library files before extraction is verified.
+    // The folder is named per ROM so a retry after a crash replaces the
+    // leftovers instead of leaving another multi-GB folder behind.
+    final downloadDir = Directory(p.join(destDir, '.romm_download_${rom.id}'));
+    await _sweepDownloadDirs(destDir, rom.id);
+    await downloadDir.create(recursive: true);
+    var destPath = p.join(
+      downloadDir.path,
       appendZipExt ? '${rom.fsName}.zip' : rom.fsName,
     );
-    try {
-      await _service.downloadRom(
-        rom,
-        destFilePath: destPath,
-        onProgress: (received, total) {
-          tracker
-            ..received = received
-            ..total = total;
-          // Progress, not state: this fires per network chunk, so it publishes
-          // only when the rendered percentage moves.
-          _notifyDownloadProgress(tracker);
-        },
-        shouldCancel: () => tracker.cancelRequested,
-      );
-      await _persistRefreshedTokens();
-    } on RommCancelledException {
-      // User-cancelled: a distinct type (not a message-string match) keeps this
-      // from being reported as a network failure if the message ever changes.
-      tracker.status = RommDownloadStatus.cancelled;
-      _notifyDownloadState();
-      return tracker;
-    } on RommException catch (e) {
-      tracker
-        ..status = RommDownloadStatus.failed
-        ..error = RommDownloadError.network
-        ..errorDetail = e.message;
-      _notifyDownloadState();
-      return tracker;
-    } catch (e) {
-      tracker
-        ..status = RommDownloadStatus.failed
-        ..error = RommDownloadError.network
-        ..errorDetail = '$e';
-      _notifyDownloadState();
-      return tracker;
-    }
-
-    // The name the library scan will index for this download. For a single-file
-    // ROM that's the fsName as-downloaded; for an unpacked multi-disc archive it
-    // becomes the playlist (.m3u) we write below. Save-sync and metadata both
-    // key on this, so it must match what the scan records as GameModel.romname.
     var indexedName = p.basename(destPath);
-    if (system.folderName == 'scummvm') {
-      final descriptorName = await extractScummVmDownload(destPath, destDir);
-      if (descriptorName != null) indexedName = descriptorName;
-    } else if (isArchive) {
-      final exts = await SystemRepository.getExtensionsForSystem(
-        system.id ?? '',
-      );
-      // Only unpack for systems that drive multi-disc games via .m3u playlists
-      // (PS1, Saturn, Dreamcast, SegaCD, PCE-CD, 3DO, the m3u home computers…).
-      // Others (e.g. single-disc DVD systems) keep the archive untouched.
-      if (exts.contains('m3u')) {
-        final m3uName = await extractMultiDiscZip(
+    String? staleBackup;
+    try {
+      try {
+        await _service.downloadRom(
+          rom,
+          destFilePath: destPath,
+          onProgress: (received, total) {
+            tracker
+              ..received = received
+              ..total = total;
+            // Progress, not state: this fires per network chunk, so it publishes
+            // only when the rendered percentage moves.
+            _notifyDownloadProgress(tracker);
+          },
+          shouldCancel: () => tracker.cancelRequested,
+        );
+        // The download landed; a token the server refreshed on the way is
+        // worth keeping whatever happens next. Never fails the download: a
+        // failed save is logged by the repository and retried on the next call.
+        await _persistRefreshedTokens();
+        destPath = await RommArchiveService.ensureArchiveExtension(
+          destPath,
+          extensions: extensions,
+          isMultiFile: isArchive,
+        );
+      } on RommCancelledException {
+        // User-cancelled: a distinct type (not a message-string match) keeps this
+        // from being reported as a network failure if the message ever changes.
+        _log.i('RomM: download of rom ${rom.id} ($logName) cancelled');
+        tracker.status = RommDownloadStatus.cancelled;
+        _notifyDownloadState();
+        return tracker;
+      } on RommException catch (e) {
+        // The card only says the download failed; this line is where the
+        // reason (and what the server answered) can be found.
+        final answer = e.serverResponse;
+        _log.w(
+          'RomM: download of rom ${rom.id} ($logName) failed: ${e.message}'
+          '${answer == null || answer.isEmpty ? '' : ' — server answered $answer'}',
+        );
+        tracker
+          ..status = RommDownloadStatus.failed
+          ..error = RommDownloadError.network
+          ..errorDetail = e.message;
+        _notifyDownloadState();
+        return tracker;
+      } catch (e) {
+        _log.e('RomM: download of rom ${rom.id} ($logName) failed', error: e);
+        tracker
+          ..status = RommDownloadStatus.failed
+          ..error = RommDownloadError.network
+          ..errorDetail = '$e';
+        _notifyDownloadState();
+        return tracker;
+      }
+
+      // The name the library scan will index for this download. For a single-file
+      // ROM that's the fsName as-downloaded; for an unpacked multi-disc archive it
+      // becomes the playlist (.m3u) we write below. Save-sync and metadata both
+      // key on this, so it must match what the scan records as GameModel.romname.
+      indexedName = p.basename(destPath);
+      final archiveExtension = p.extension(destPath).toLowerCase();
+      if (scummVm || {'.zip', '.7z', '.rar'}.contains(archiveExtension)) {
+        if (staleRaw != null) {
+          // Moved aside, not deleted, so a failed install can put it back.
+          staleBackup = p.join(downloadDir.path, '.stale');
+          await File(staleRaw).rename(staleBackup);
+        }
+        final extractedName = await RommArchiveService.prepareGameDownload(
           destPath,
           destDir,
           rom.fsName,
+          extensions,
+          reuseExistingDirectory: reuseExistingDirectory,
+          playlistName: existing?.filename,
+          isMultiFile: isArchive,
+          scummVm: scummVm,
+          replaceRoot: replaceRoot,
+          replaceable: replaceable,
+          romId: rom.id,
         );
-        if (m3uName != null) indexedName = m3uName;
+        if (extractedName == null) {
+          _log.w(
+            'RomM: download of rom ${rom.id} ($logName) failed: could not '
+            'extract a playable ROM from the archive',
+          );
+          await _keepFailedDownload(destPath, destDir, staleRaw, staleBackup);
+          tracker
+            ..status = RommDownloadStatus.failed
+            ..error = RommDownloadError.extraction
+            ..errorDetail =
+                'Could not extract a playable ROM from the download';
+          _notifyDownloadState();
+          return tracker;
+        }
+        indexedName = extractedName;
+      } else {
+        final target = p.join(destDir, indexedName);
+        if (await File(target).exists() &&
+            !replaceable.any((path) => p.equals(path, target))) {
+          throw const RommArchiveRefusedException(
+            RommArchiveRefusal.conflict,
+            "it would replace a file that isn't this game's",
+          );
+        }
+        await File(destPath).rename(target);
+      }
+    } on RommArchiveRefusedException catch (e) {
+      // Not installed for a reason the user can fix (space, a file in the
+      // way) or that isn't supported. The download is kept either way, so a
+      // retry after freeing space doesn't download it again.
+      _log.w('RomM: did not install rom ${rom.id} ($logName): ${e.message}');
+      await _keepFailedDownload(destPath, destDir, staleRaw, staleBackup);
+      tracker
+        ..status = RommDownloadStatus.failed
+        ..error = e.reason == RommArchiveRefusal.notEnoughSpace
+            ? RommDownloadError.notEnoughSpace
+            : RommDownloadError.extraction
+        ..errorDetail = 'Not installed: ${e.message}';
+      _notifyDownloadState();
+      return tracker;
+    } catch (e) {
+      _log.e('RomM: installing rom ${rom.id} ($logName) failed', error: e);
+      await _keepFailedDownload(destPath, destDir, staleRaw, staleBackup);
+      tracker
+        ..status = RommDownloadStatus.failed
+        ..error = RommDownloadError.extraction
+        ..errorDetail = '$e';
+      _notifyDownloadState();
+      return tracker;
+    } finally {
+      try {
+        await downloadDir.delete(recursive: true);
+      } catch (e) {
+        // A locked file (Windows AV) must not leave the tracker downloading;
+        // the next download's sweep retries the cleanup.
+        _log.w('RomM: could not remove ${oneLine(downloadDir.path)}: $e');
       }
     }
 
@@ -1786,7 +2285,14 @@ class RommProvider extends ChangeNotifier {
     );
     switch (linked) {
       case RommMappingWriteResult.written:
-        break;
+        // A re-download can land under another name (a playlist where the
+        // raw archive used to be). Older download rows for this ROM would
+        // otherwise still name the old file for the badge and save sync.
+        await RommSaveMapRepository.removeOtherDownloadRows(
+          rom.id,
+          system.folderName,
+          keep: indexedName,
+        );
       case RommMappingWriteResult.kept:
         _log.i(
           'RomM: ${system.folderName}/$indexedName keeps its manual link; '
@@ -1977,190 +2483,88 @@ class RommProvider extends ChangeNotifier {
   /// Mapping rows per transaction in [_writeBulkLinks].
   static const int _linkWriteChunk = 200;
 
-  /// Unpacks a downloaded multi-disc zip ([zipPath]) into NeoStation's native
-  /// multi-disc layout under [destDir]: the `.m3u` playlist and the disc images
-  /// all sit together in the ROM folder root (so the library scan indexes a
-  /// single entry that launches with disc-switching, while the playlist filter
-  /// hides the referenced disc files by basename).
-  ///
-  /// Disc content is streamed entry-by-entry straight to disk, so a multi-GB
-  /// archive never lands wholly in memory. When RomM bundles its own `.m3u` its
-  /// disc ordering is preserved; otherwise a playlist is synthesised from the
-  /// disc files in stable name order, using [fallbackBaseName].
-  ///
-  /// Returns the on-disk `.m3u` filename on success (the name the scan indexes
-  /// and save-sync/metadata key on), or null if the archive holds nothing
-  /// disc-like or extraction fails — in which case the caller leaves the zip
-  /// in place untouched.
-  @visibleForTesting
-  static Future<String?> extractMultiDiscZip(
-    String zipPath,
-    String destDir,
-    String fallbackBaseName,
+  /// The discs the playlist at [path] lists, resolved against its folder.
+  /// Only bare names next to the playlist, in a format the system launches,
+  /// count: a line naming another folder, or a file like a save, is not this
+  /// game's to replace. An oversized file is not a playlist and lists nothing.
+  static Future<List<String>> _playlistEntries(
+    String path,
+    Set<String> extensions,
   ) async {
-    InputFileStream? input;
     try {
-      input = InputFileStream(zipPath);
-      final archive = ZipDecoder().decodeStream(input);
-
-      ArchiveFile? m3uEntry;
-      final discEntries = <ArchiveFile>[];
-      for (final f in archive.files) {
-        if (!f.isFile) continue;
-        final base = p.basename(f.name);
-        if (base.isEmpty) continue;
-        if (p.extension(base).toLowerCase() == '.m3u') {
-          m3uEntry ??= f;
-        } else {
-          discEntries.add(f);
-        }
+      final file = File(path);
+      if (await file.length() > RommArchiveService.maxDescriptorBytes) {
+        return const [];
       }
-      if (discEntries.isEmpty) return null;
-
-      final extractedDiscs = <String>[];
-      for (final f in discEntries) {
-        final base = p.basename(f.name);
-        final out = OutputFileStream(p.join(destDir, base));
-        f.writeContent(out);
-        out.closeSync();
-        extractedDiscs.add(base);
-      }
-
-      // Preserve the bundled playlist's disc order when present; otherwise fall
-      // back to a stable alphabetical order (disc 1, disc 2, …).
-      final String m3uName;
-      List<String> ordered;
-      if (m3uEntry != null) {
-        m3uName = p.basename(m3uEntry.name);
-        final referenced = <String>[];
-        for (final line in utf8.decode(m3uEntry.content).split('\n')) {
-          final t = line.trim();
-          if (t.isEmpty || t.startsWith('#')) continue;
-          final b = p.basename(t);
-          if (extractedDiscs.contains(b)) referenced.add(b);
-        }
-        ordered = referenced.isNotEmpty ? referenced : (extractedDiscs..sort());
-      } else {
-        m3uName = '$fallbackBaseName.m3u';
-        ordered = extractedDiscs..sort();
-      }
-
-      // Reference discs by bare basename: they sit alongside the .m3u in the
-      // ROM folder, and the scan's basename filter hides them so only the .m3u
-      // surfaces as a game entry.
-      final playlist = ordered.join('\n');
-      await File(
-        p.join(destDir, m3uName),
-      ).writeAsString('$playlist\n', flush: true);
-
-      await input.close();
-      input = null;
-      await File(zipPath).delete();
-      return m3uName;
-    } catch (e, st) {
-      _log.e(
-        'RomM multi-disc extract failed for $zipPath',
-        error: e,
-        stackTrace: st,
-      );
-      return null;
-    } finally {
-      await input?.close();
+      final dir = p.dirname(path);
+      return [
+        for (final raw in await file.readAsLines())
+          if (_isBareSibling(raw.trim(), extensions)) p.join(dir, raw.trim()),
+      ];
+    } catch (_) {
+      return const [];
     }
   }
 
-  /// Places a ScummVM download in `<destDir>/<scummvm-id>/`.
-  ///
-  /// RomM serves multi-file games as zip archives, while a shortcut-only game
-  /// is a plain `.scummvm` descriptor. In both cases the descriptor's contents
-  /// are ScummVM's stable target ID, so they are the only safe folder name.
-  /// Archive paths are retained below that folder (apart from a common wrapper
-  /// directory), which keeps games that rely on subdirectories intact.
-  @visibleForTesting
-  static Future<String?> extractScummVmDownload(
-    String downloadPath,
+  static bool _isBareSibling(String line, Set<String> extensions) =>
+      line.isNotEmpty &&
+      !line.startsWith('#') &&
+      isSafeFileName(line) &&
+      extensions.contains(_extensionOf(line));
+
+  /// After a failed install, keeps the downloaded archive in the ROM folder
+  /// (so a multi-GB download is not lost and can be extracted by hand) and
+  /// puts back a stale raw download that was moved aside for the install.
+  /// Best effort: a failure here must not mask the install failure.
+  Future<void> _keepFailedDownload(
+    String archivePath,
     String destDir,
+    String? staleRaw,
+    String? staleBackup,
   ) async {
-    final isZip = p.extension(downloadPath).toLowerCase() == '.zip';
-    InputFileStream? input;
     try {
-      if (!isZip) {
-        final id = _scummVmId(await File(downloadPath).readAsString());
-        if (id == null) return null;
-        final gameDir = Directory(p.join(destDir, id));
-        await gameDir.create(recursive: true);
-        final descriptorName = p.basename(downloadPath);
-        final target = p.join(gameDir.path, descriptorName);
-        if (p.normalize(downloadPath) != p.normalize(target)) {
-          if (await File(target).exists()) await File(target).delete();
-          await File(downloadPath).rename(target);
-        }
-        return descriptorName;
+      if (staleRaw != null &&
+          staleBackup != null &&
+          await File(staleBackup).exists() &&
+          !await File(staleRaw).exists()) {
+        await File(staleBackup).rename(staleRaw);
       }
-
-      input = InputFileStream(downloadPath);
-      final archive = ZipDecoder().decodeStream(input);
-      final files = archive.files.where((file) => file.isFile).toList();
-      final descriptor = files.cast<ArchiveFile?>().firstWhere(
-        (file) =>
-            file != null && p.extension(file.name).toLowerCase() == '.scummvm',
-        orElse: () => null,
+      final kept = p.join(destDir, p.basename(archivePath));
+      if (await File(archivePath).exists() && !await File(kept).exists()) {
+        await File(archivePath).rename(kept);
+      }
+    } catch (e) {
+      _log.w(
+        'RomM: could not keep failed download ${oneLine(archivePath)}: $e',
       );
-      if (descriptor == null) return null;
-      final id = _scummVmId(utf8.decode(descriptor.content));
-      if (id == null) return null;
-
-      final paths = <ArchiveFile, List<String>>{};
-      for (final file in files) {
-        // Entry names are checked with `\` as a separator too: a POSIX-only
-        // check lets `..\..\x` through, and Windows then joins it as a path.
-        final normalized = p.posix.normalize(file.name.replaceAll('\\', '/'));
-        if (safeJoin(destDir, normalized, context: p.posix) == null) {
-          return null;
-        }
-        paths[file] = normalized.split('/');
-      }
-      // RomM archives may include a wrapper directory. Do not duplicate it
-      // under the ID folder when every file shares that first segment.
-      final firstSegments = paths.values
-          .map((segments) => segments.first)
-          .toSet();
-      final stripWrapper =
-          firstSegments.length == 1 &&
-          paths.values.every((segments) => segments.length > 1);
-      final gameDir = Directory(p.join(destDir, id));
-      await gameDir.create(recursive: true);
-      for (final file in files) {
-        final segments = paths[file]!;
-        final relative = (stripWrapper ? segments.skip(1) : segments).join('/');
-        final outputPath = safeJoin(gameDir.path, relative);
-        if (outputPath == null) return null;
-        final output = File(outputPath);
-        await output.parent.create(recursive: true);
-        final stream = OutputFileStream(output.path);
-        file.writeContent(stream);
-        stream.closeSync();
-      }
-      await input.close();
-      input = null;
-      await File(downloadPath).delete();
-      return p.basename(descriptor.name);
-    } catch (e, st) {
-      _log.e(
-        'RomM ScummVM extract failed for $downloadPath',
-        error: e,
-        stackTrace: st,
-      );
-      return null;
-    } finally {
-      await input?.close();
     }
   }
 
-  /// Parses the same target syntax standalone ScummVM accepts at launch.
-  static String? _scummVmId(String contents) {
-    final id = contents.replaceFirst(RegExp(r'^\uFEFF'), '').trim();
-    return RegExp(r'^[A-Za-z0-9_][A-Za-z0-9_-]*$').hasMatch(id) ? id : null;
+  /// Removes `.romm_download_*` folders in [destDir] left by a crash or a
+  /// killed app, including [romId]'s own, except those of other ROMs
+  /// downloading right now.
+  Future<void> _sweepDownloadDirs(String destDir, int romId) async {
+    try {
+      await for (final entity in Directory(destDir).list(followLinks: false)) {
+        final name = p.basename(entity.path);
+        if (entity is! Directory || !name.startsWith('.romm_download_')) {
+          continue;
+        }
+        final id = int.tryParse(name.substring('.romm_download_'.length));
+        if (id != null &&
+            id != romId &&
+            _downloads[id]?.status == RommDownloadStatus.downloading) {
+          continue;
+        }
+        try {
+          await entity.delete(recursive: true);
+        } catch (e) {
+          _log.w('RomM: could not remove stale ${oneLine(entity.path)}: $e');
+        }
+      }
+    } catch (_) {
+      // An unlistable folder fails the download itself, with a clearer error.
+    }
   }
 
   /// Imports RomM's metadata + cover art for [rom] into the same tables/media
@@ -2193,45 +2597,13 @@ class RommProvider extends ChangeNotifier {
     bool importMedia = true,
   }) async {
     try {
-      final detail = await _service.getRomDetail(rom.id);
+      final detail = await service.getRomDetail(rom.id);
       if (detail == null) return;
-      final md =
-          (detail['metadatum'] as Map?)?.cast<String, dynamic>() ?? const {};
-
       final metadata = <String, dynamic>{
         'filename': indexedName,
         'real_name': rom.name,
+        ..._rommInfoFields(detail),
       };
-      final summary = detail['summary']?.toString();
-      if (summary != null && summary.isNotEmpty) {
-        metadata['description_en'] = summary;
-      }
-      final genres = (md['genres'] as List?)?.whereType<String>().toList();
-      if (genres != null && genres.isNotEmpty) {
-        metadata['genre'] = genres.join(', ');
-      }
-      // RomM has a flat company list (no dev/publisher split).
-      final companies = (md['companies'] as List?)
-          ?.whereType<String>()
-          .toList();
-      if (companies != null && companies.isNotEmpty) {
-        metadata['developer'] = companies.join(', ');
-      }
-      final players = md['player_count']?.toString();
-      if (players != null && players.isNotEmpty) {
-        metadata['players'] = players;
-      }
-      final frd = md['first_release_date'];
-      if (frd is num) {
-        final dt = DateTime.fromMillisecondsSinceEpoch(
-          frd.toInt(),
-          isUtc: true,
-        );
-        final y = dt.year.toString().padLeft(4, '0');
-        final m = dt.month.toString().padLeft(2, '0');
-        final d = dt.day.toString().padLeft(2, '0');
-        metadata['release_date'] = '$y-$m-$d';
-      }
 
       // app_system_id is a FK to app_systems(id); skip rather than silently
       // fail the insert if the resolved system somehow has no id.
@@ -2268,7 +2640,7 @@ class RommProvider extends ChangeNotifier {
       final coverSources = <String?>[
         detail['path_cover_large']?.toString(),
         detail['path_cover_small']?.toString(),
-        _service.coverUrl(rom),
+        service.coverUrl(rom),
       ];
       await _saveRommMedia(
         coverSources,
@@ -2346,6 +2718,85 @@ class RommProvider extends ChangeNotifier {
     }
   }
 
+  /// The metadata providers a RomM entry can be matched to; any id set means
+  /// RomM identified the game.
+  static const _rommProviderIds = [
+    'igdb_id',
+    'moby_id',
+    'ss_id',
+    'ra_id',
+    'launchbox_id',
+    'hasheous_id',
+    'tgdb_id',
+    'flashpoint_id',
+    'hltb_id',
+    'gamelist_id',
+  ];
+
+  /// Whether RomM matched entry [detail] to a game. Its own flag decides when
+  /// it sends one (some provider ids, such as TheGamesDB's, are set without
+  /// RomM counting the game as identified); an older server without the flag
+  /// is judged by the metadata provider ids.
+  static bool _rommIdentified(Map<String, dynamic> detail) {
+    final flag = detail['is_identified'];
+    if (flag is bool) return flag;
+    return _rommProviderIds.any((key) {
+      final id = detail[key];
+      return id != null && id.toString().isNotEmpty && id.toString() != '0';
+    });
+  }
+
+  /// The game info RomM's entry [detail] carries, as metadata columns:
+  /// English description, genre, developer (RomM has one company list, no
+  /// developer/publisher split), players and release date. Only what it has.
+  static Map<String, dynamic> _rommInfoFields(Map<String, dynamic> detail) {
+    final md =
+        (detail['metadatum'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final fields = <String, dynamic>{};
+    final summary = detail['summary']?.toString();
+    if (summary != null && summary.isNotEmpty) {
+      fields['description_en'] = summary;
+    }
+    final genres = (md['genres'] as List?)?.whereType<String>().toList();
+    if (genres != null && genres.isNotEmpty) {
+      fields['genre'] = genres.join(', ');
+    }
+    final companies = (md['companies'] as List?)?.whereType<String>().toList();
+    if (companies != null && companies.isNotEmpty) {
+      fields['developer'] = companies.join(', ');
+    }
+    final players = md['player_count']?.toString();
+    if (players != null && players.isNotEmpty) {
+      fields['players'] = players;
+    }
+    final frd = md['first_release_date'];
+    if (frd is num) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(frd.toInt(), isUtc: true);
+      final y = dt.year.toString().padLeft(4, '0');
+      final m = dt.month.toString().padLeft(2, '0');
+      final d = dt.day.toString().padLeft(2, '0');
+      fields['release_date'] = '$y-$m-$d';
+    }
+    return fields;
+  }
+
+  /// Whether [bytes] start like an MP4 (`ftyp` box) or WebM/Matroska (EBML)
+  /// file — not, say, the HTML page RomM answers a missing resource with.
+  static bool _looksLikeVideo(Uint8List bytes) {
+    if (bytes.length >= 8 &&
+        bytes[4] == 0x66 && // f
+        bytes[5] == 0x74 && // t
+        bytes[6] == 0x79 && // y
+        bytes[7] == 0x70) {
+      return true;
+    }
+    return bytes.length >= 4 &&
+        bytes[0] == 0x1A &&
+        bytes[1] == 0x45 &&
+        bytes[2] == 0xDF &&
+        bytes[3] == 0xA3;
+  }
+
   /// Resolves a RomM `ss_metadata` `*_path` value to a server path fetchable by
   /// [RommService.fetchImageBytes]. Those values are relative to
   /// `/assets/romm/resources/`; the bare path (e.g. `roms/36/3625/fanart.png`)
@@ -2418,7 +2869,10 @@ class RommProvider extends ChangeNotifier {
   /// Failures are contained here rather than at the call site: the media types
   /// are independent, and a single unwritable folder or dead URL must not cost
   /// the caller every type queued behind it.
-  Future<void> _saveRommMedia(
+  ///
+  /// Returns whether a file was written. [accept], when given, must pass the
+  /// fetched bytes too (art is already content-checked by the fetch).
+  Future<bool> _saveRommMedia(
     List<String?> sources,
     String folder,
     SystemModel system,
@@ -2426,20 +2880,25 @@ class RommProvider extends ChangeNotifier {
     FileProvider fileProvider, {
     String? forcedExt,
     List<String> siblingExts = const ['png', 'jpg', 'webp'],
+    bool Function(Uint8List bytes)? accept,
   }) async {
     try {
       Uint8List? bytes;
       for (final source in sources) {
         if (source == null || source.isEmpty) continue;
         // A video's bytes are not an image, so only art is content-checked.
-        bytes = await _service.fetchImageBytes(
+        bytes = await service.fetchImageBytes(
           source,
           requireImage: forcedExt == null,
         );
-        if (bytes != null && bytes.isNotEmpty) break;
+        if (bytes != null &&
+            bytes.isNotEmpty &&
+            (accept == null || accept(bytes))) {
+          break;
+        }
         bytes = null;
       }
-      if (bytes == null) return;
+      if (bytes == null) return false;
 
       final ext = forcedExt ?? _mediaExtensionFor(bytes);
       final dest = fileProvider.getMediaPath(
@@ -2448,9 +2907,8 @@ class RommProvider extends ChangeNotifier {
         indexedName,
         ext,
       );
-      final destFile = File(dest);
-      await destFile.parent.create(recursive: true);
-      await destFile.writeAsBytes(bytes);
+      // A file left half-written would count as local art from then on.
+      await writeFileAtomically(File(dest), bytes);
       for (final other in siblingExts) {
         if (other == ext) continue;
         final stale = File(
@@ -2463,8 +2921,10 @@ class RommProvider extends ChangeNotifier {
         );
         if (await stale.exists()) await stale.delete();
       }
+      return true;
     } catch (e) {
       _log.e('RomM media import failed for $folder/$indexedName: $e');
+      return false;
     }
   }
 
@@ -2560,18 +3020,21 @@ class RommProvider extends ChangeNotifier {
   String? _lastPersistedAccessToken;
 
   /// Persists tokens after a call that may have transparently refreshed them —
-  /// but only when the access token actually changed. Browsing calls this after
-  /// every platform/collection/ROM page and every download; without the guard
-  /// each 50-ROM page cost a needless UPDATE on the hot path.
+  /// but only when the access token changed since the last successful save.
+  /// Browsing calls this after every platform/collection/ROM page and every
+  /// download; without the guard each 50-ROM page cost a needless UPDATE on
+  /// the hot path.
   Future<void> _persistRefreshedTokens() async {
     final token = _service.accessToken;
     if (token == null || token == _lastPersistedAccessToken) return;
-    await RommRepository.saveTokens(
+    final saved = await RommRepository.saveTokens(
       accessToken: token,
       refreshToken: _service.refreshToken,
       tokenExpires: _service.tokenExpiresMs,
     );
-    _lastPersistedAccessToken = token;
+    // A failed save is tried again on the next call: the server may already
+    // have rotated the refresh token the database still holds.
+    if (saved) _lastPersistedAccessToken = token;
   }
 
   /// Best-effort fetch of the user's RetroAchievements progress. Failures are
@@ -2585,6 +3048,22 @@ class RommProvider extends ChangeNotifier {
   }
 }
 
+/// What [RommProvider.rescrapeFromRomm] did.
+enum RommRescrapeOutcome {
+  /// RomM's info and art replaced the game's.
+  done,
+
+  /// Not connected to a RomM server: nothing was asked.
+  notConnected,
+
+  /// The game isn't linked to a RomM entry: nothing was asked.
+  notLinked,
+
+  /// RomM's entry couldn't be read, or the import failed; the game keeps what
+  /// it had where nothing was written.
+  failed,
+}
+
 /// An already-downloaded copy of a RomM ROM, as [RommProvider.findLocalCopy]
 /// found it: which local system it belongs to, the directory it sits in, and
 /// the name it sits under.
@@ -2596,14 +3075,26 @@ class RommLocalCopy {
   /// Real filesystem directory holding the file (SAF folders already mapped).
   final String directory;
 
+  /// System root for target-ID-based ScummVM installs.
+  final String? systemDirectory;
+
   /// On-disk basename, in the spelling the library scan indexes as
   /// `user_roms.filename` — `Game.sfc`, or the `.m3u` of a multi-disc game.
   final String filename;
 
+  /// Full path of the file. Usually [filename] in [directory], but a file
+  /// nested inside a bundle's subfolder keeps [directory] at the bundle root.
+  String get path => nestedPath ?? p.join(directory, filename);
+
+  /// The file's own path when it sits below [directory]; null otherwise.
+  final String? nestedPath;
+
   const RommLocalCopy({
     required this.system,
     required this.directory,
+    this.systemDirectory,
     required this.filename,
+    this.nestedPath,
   });
 
   /// [filename] with its extension stripped: the `GameModel.romname` the sync

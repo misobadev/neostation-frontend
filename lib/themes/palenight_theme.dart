@@ -2,16 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/themes/chrome_surface.dart';
 
-const Color _primaryColor = Color(0xFF82AAFF);
-const Color _onPrimaryColor = Color(0xFF292D3E);
-const Color _secondaryColor = Color(0xFFC3E88D);
-const Color _onSecondaryColor = Color(0xFF292D3E);
-const Color _tertiaryColor = Color(0xFF89DDFF);
-const Color _onTertiaryColor = Color(0xFF292D3E);
-const Color _tertiaryFixedColor = Color(0xFF444267);
-const Color _onTertiaryFixedColor = Color(0xFFA6ACCD);
+const Color _primaryColor = Color(0xFF8882FF);
+const Color _onPrimaryColor = Color(0xFF14161F);
+const Color _secondaryColor = Color(0xFFD85C7F);
+const Color _onSecondaryColor = Color(0xFF14161F);
 const Color _surfaceColor = Color(0xFF32374D);
-const Color _onSurfaceColor = Color(0xFFA6ACCD);
+const Color _onSurfaceColor = Color(0xFFC8CCEA);
 const Color _errorColor = Color(0xFFF07178);
 const Color _onErrorColor = Color(0xFF292D3E);
 const Color _outlineColor = Color(0xFF4B5263);
@@ -36,14 +32,14 @@ final ThemeData palenightTheme = ThemeData(
   colorScheme: ColorScheme.dark(
     primary: _primaryColor,
     secondary: _secondaryColor,
-    tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiary: _primaryColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
-    onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiary: _onPrimaryColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

@@ -1,10 +1,11 @@
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
+
 import '../../models/game_model.dart';
 import '../../models/database_game_model.dart';
 import '../../models/system_model.dart';
 import '../../repositories/game_repository.dart';
-import '../../repositories/collection_repository.dart';
+import '../collections/smart_collections_service.dart';
 import '../../repositories/system_repository.dart';
 import '../../constants/system_folder_names.dart';
 
@@ -72,6 +73,24 @@ class GameListService {
     return name;
   }
 
+  /// The name the game lists show for [dbGame] under a system's naming
+  /// [settings] (a `user_system_settings` row) and lower-case [extensions].
+  ///
+  /// Pure, so smart-collection title rules can apply it in a worker isolate
+  /// and match what the user actually sees.
+  static String listDisplayName(
+    DatabaseGameModel dbGame,
+    Map<String, Object?> settings,
+    Set<String> extensions,
+  ) => _resolveListDisplayName(
+    dbGame: dbGame,
+    preferFileName: (settings['prefer_file_name'] ?? 0) == 1,
+    hideExtension: (settings['hide_extension'] ?? 1) == 1,
+    hideParentheses: (settings['hide_parentheses'] ?? 1) == 1,
+    hideBrackets: (settings['hide_brackets'] ?? 1) == 1,
+    validExtensionsSet: extensions,
+  ).name;
+
   /// Resolves the optimal display name for a game considering scraped metadata
   /// and user-defined naming conventions.
   static ({String name, bool showRomFileNameSubtitle}) _resolveListDisplayName({
@@ -123,13 +142,19 @@ class GameListService {
   ///
   /// If the 'all' system is requested, it aggregates games across all supported
   /// emulation systems (excluding Android and Music).
-  static Future<List<GameModel>> loadGamesForSystem(SystemModel system) async {
+  ///
+  /// For a smart collection, [smartPaths] are its already-evaluated matches
+  /// (see [loadGamesForCollection]). Collection load failures propagate so
+  /// the list can show an error instead of an empty collection.
+  static Future<List<GameModel>> loadGamesForSystem(
+    SystemModel system, {
+    Set<String>? smartPaths,
+  }) async {
+    final collectionId = SystemFolderNames.collectionIdOf(system.folderName);
+    if (collectionId != null) {
+      return loadGamesForCollection(collectionId, smartPaths: smartPaths);
+    }
     try {
-      final collectionId = SystemFolderNames.collectionIdOf(system.folderName);
-      if (collectionId != null) {
-        return await loadGamesForCollection(collectionId);
-      }
-
       if (system.folderName == SystemFolderNames.favorites) {
         return await _loadFavoriteGames();
       }
@@ -139,7 +164,7 @@ class GameListService {
             .where(
               (dbGame) =>
                   !dbGame.isHidden &&
-                  dbGame.systemFolderName != 'android' &&
+                  !SystemFolderNames.isAndroidApps(dbGame.systemFolderName) &&
                   dbGame.systemFolderName != 'music',
             )
             .toList();
@@ -151,9 +176,9 @@ class GameListService {
         return [];
       }
 
-      final databaseGames = (await GameRepository.getGamesBySystem(
-        system.id!,
-      )).where((dbGame) => !dbGame.isHidden).toList();
+      final databaseGames = (await GameRepository.getGamesBySystem(system.id!))
+          .where((dbGame) => !dbGame.isHidden)
+          .toList();
       final validExtensions = await SystemRepository.getExtensionsForSystem(
         system.id!,
       );
@@ -184,6 +209,7 @@ class GameListService {
           name: resolved.name,
           showRomFileNameSubtitle: resolved.showRomFileNameSubtitle,
           descriptions: dbGame.descriptions,
+          videoUrl: dbGame.videoUrl,
           year: dbGame.year ?? '',
           developer: dbGame.developer ?? '',
           publisher: dbGame.publisher ?? '',
@@ -230,19 +256,25 @@ class GameListService {
   /// its `systemFolderName`/`systemRealName` — the aggregate-view code path
   /// (launch, details card, secondary display) branches on those being present.
   /// Hidden ROMs are filtered here rather than in SQL, exactly as
-  /// [_loadFavoriteGames] does.
+  /// [_loadFavoriteGames] does. A smart collection given [smartPaths] reads
+  /// only those rows rather than re-evaluating its rules.
+  ///
+  /// Throws on a database failure: an empty list would read as "no games
+  /// match", which is a different thing to tell the user.
   static Future<List<GameModel>> loadGamesForCollection(
-    String collectionId,
-  ) async {
+    String collectionId, {
+    Set<String>? smartPaths,
+  }) async {
     try {
-      final databaseGames = (await CollectionRepository.getGamesInCollection(
+      final databaseGames = (await SmartCollectionsService.gamesFor(
         collectionId,
+        smartPaths: smartPaths,
       )).where((dbGame) => !dbGame.isHidden).toList();
 
       return await _mapAggregateGames(databaseGames);
     } catch (e) {
       _log.e('Error loading games for collection $collectionId: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -256,18 +288,9 @@ class GameListService {
   static Future<List<GameModel>> _mapAggregateGames(
     List<DatabaseGameModel> databaseGames,
   ) async {
-    final systemIds = databaseGames
-        .map((g) => g.appSystemId)
-        .whereType<String>()
-        .toSet();
-
-    final settingsBySystem = <String, Map<String, dynamic>>{};
-    final extensionsBySystem = <String, Set<String>>{};
-    for (final sid in systemIds) {
-      settingsBySystem[sid] = await SystemRepository.getSystemSettings(sid);
-      final exts = await SystemRepository.getExtensionsForSystem(sid);
-      extensionsBySystem[sid] = exts.map((e) => e.toLowerCase()).toSet();
-    }
+    final (:settingsBySystem, :extensionsBySystem) = await _namingBySystem(
+      databaseGames,
+    );
 
     return databaseGames.map((dbGame) {
       final sid = dbGame.appSystemId ?? '';
@@ -293,6 +316,7 @@ class GameListService {
         name: resolved.name,
         showRomFileNameSubtitle: resolved.showRomFileNameSubtitle,
         descriptions: dbGame.descriptions,
+        videoUrl: dbGame.videoUrl,
         year: dbGame.year ?? '',
         developer: dbGame.developer ?? '',
         publisher: dbGame.publisher ?? '',
@@ -317,6 +341,49 @@ class GameListService {
         titleName: dbGame.titleName,
       );
     }).toList();
+  }
+
+  /// The name each of [databaseGames] shows in a list, by `rom_path`, under
+  /// its own system's naming settings.
+  static Future<Map<String, String>> listDisplayNames(
+    List<DatabaseGameModel> databaseGames,
+  ) async {
+    final (:settingsBySystem, :extensionsBySystem) = await _namingBySystem(
+      databaseGames,
+    );
+    return {
+      for (final dbGame in databaseGames)
+        dbGame.romPath: listDisplayName(
+          dbGame,
+          settingsBySystem[dbGame.appSystemId ?? ''] ?? const {},
+          extensionsBySystem[dbGame.appSystemId ?? ''] ?? const {},
+        ),
+    };
+  }
+
+  /// Naming settings and lower-cased valid extensions, read once per distinct
+  /// system among [databaseGames].
+  static Future<
+    ({
+      Map<String, Map<String, dynamic>> settingsBySystem,
+      Map<String, Set<String>> extensionsBySystem,
+    })
+  >
+  _namingBySystem(List<DatabaseGameModel> databaseGames) async {
+    final systemIds = databaseGames
+        .map((g) => g.appSystemId)
+        .whereType<String>()
+        .toSet();
+
+    final settingsBySystem = await SystemRepository.getSystemSettingsMap(
+      systemIds,
+    );
+    final extensionsBySystem =
+        await SystemRepository.getExtensionsMapForSystems(systemIds);
+    return (
+      settingsBySystem: settingsBySystem,
+      extensionsBySystem: extensionsBySystem,
+    );
   }
 
   /// Fetches detailed metadata for a specific game instance.
@@ -357,6 +424,7 @@ class GameListService {
         name: resolved.name,
         showRomFileNameSubtitle: resolved.showRomFileNameSubtitle,
         descriptions: dbGame.descriptions,
+        videoUrl: dbGame.videoUrl,
         year: dbGame.year ?? '',
         developer: dbGame.developer ?? '',
         publisher: dbGame.publisher ?? '',

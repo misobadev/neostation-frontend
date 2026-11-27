@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as path;
+
 import 'config_service.dart';
 import 'logger_service.dart';
 import 'retroachievements_hash_service.dart';
@@ -40,10 +42,53 @@ class SystemsUpdateResult {
 class SystemsUpdateInfo {
   final String currentVersion;
   final String remoteVersion;
+
+  /// System IDs listed by the manifest that announced this update.
+  ///
+  /// Carried with the check so the update dialog can download without asking
+  /// the rate-limited GitHub directory API a second time. Empty when the
+  /// manifest predates the list; [SystemsUpdateService.checkAndUpdate] then
+  /// fetches the manifest (and, finally, the API) itself.
+  final List<String> systems;
+
   const SystemsUpdateInfo({
     required this.currentVersion,
     required this.remoteVersion,
+    this.systems = const [],
   });
+}
+
+/// What [SystemsUpdateService.check] found when it asked for the manifest.
+///
+/// Start-up only needs to know whether there is an update; the manual check in
+/// Settings also has to say why there is nothing to install.
+sealed class SystemsUpdateCheck {
+  const SystemsUpdateCheck();
+}
+
+/// A newer systems version is available and this app can use it.
+final class SystemsUpdateAvailable extends SystemsUpdateCheck {
+  final SystemsUpdateInfo info;
+  const SystemsUpdateAvailable(this.info);
+}
+
+/// The installed systems are the newest ones published.
+final class SystemsUpToDate extends SystemsUpdateCheck {
+  /// The installed systems version.
+  final String version;
+  const SystemsUpToDate(this.version);
+}
+
+/// The manifest could not be fetched or read: offline, a server error, a
+/// timeout, or a response that is not the manifest (a captive portal, say).
+final class SystemsUpdateCheckFailed extends SystemsUpdateCheck {
+  const SystemsUpdateCheckFailed();
+}
+
+/// A newer systems version exists, but its manifest declares a minimum app
+/// version this build does not meet.
+final class SystemsUpdateNeedsNewerApp extends SystemsUpdateCheck {
+  const SystemsUpdateNeedsNewerApp();
 }
 
 /// Service that keeps the bundled system JSON configs up-to-date from the
@@ -199,28 +244,49 @@ class SystemsUpdateService {
     }
   }
 
+  /// The installed systems version, or `''` if none has been recorded yet.
+  static Future<String> currentVersion() => SqliteService.getSystemsVersion();
+
   /// Checks the remote manifest and returns [SystemsUpdateInfo] if an update is
   /// available, without downloading anything.
   static Future<SystemsUpdateInfo?> checkForUpdate() async {
+    final result = await check();
+    return result is SystemsUpdateAvailable ? result.info : null;
+  }
+
+  /// Checks the remote manifest without downloading anything, and reports
+  /// which outcome it reached.
+  ///
+  /// Being up to date is decided before the app's minimum version: a manifest
+  /// this build is too old for still says nothing new about the systems the
+  /// user already has.
+  static Future<SystemsUpdateCheck> check() async {
     try {
       final manifest = await _fetchManifest();
-      if (manifest == null) return null;
-
-      if (!await _appMeetsManifestMinimum(manifest)) return null;
+      if (manifest == null) return const SystemsUpdateCheckFailed();
 
       final remoteVersion = manifest['latest_version']?.toString() ?? '';
-      if (remoteVersion.isEmpty) return null;
+      if (remoteVersion.isEmpty) return const SystemsUpdateCheckFailed();
 
       final localVersion = await SqliteService.getSystemsVersion();
-      if (_meetsMinimumVersion(localVersion, remoteVersion)) return null;
+      if (_meetsMinimumVersion(localVersion, remoteVersion)) {
+        return SystemsUpToDate(localVersion);
+      }
 
-      return SystemsUpdateInfo(
-        currentVersion: localVersion,
-        remoteVersion: remoteVersion,
+      if (!await _appMeetsManifestMinimum(manifest)) {
+        return const SystemsUpdateNeedsNewerApp();
+      }
+
+      return SystemsUpdateAvailable(
+        SystemsUpdateInfo(
+          currentVersion: localVersion,
+          remoteVersion: remoteVersion,
+          systems: _systemsFromManifest(manifest),
+        ),
       );
     } catch (e) {
-      _log.w('SystemsUpdateService: checkForUpdate error: $e');
-      return null;
+      _log.w('SystemsUpdateService: check error: $e');
+      return const SystemsUpdateCheckFailed();
     }
   }
 
@@ -244,6 +310,7 @@ class SystemsUpdateService {
   }) async {
     try {
       // 1. Resolve the target version, unless the caller already has it.
+      Map<String, dynamic>? manifest;
       final String remoteVersion;
       if (knownUpdate != null) {
         remoteVersion = knownUpdate.remoteVersion;
@@ -254,7 +321,7 @@ class SystemsUpdateService {
       } else {
         // Fetching the manifest here doubles as the connectivity check —
         // failure means no internet, so bail silently.
-        final manifest = await _fetchManifest();
+        manifest = await _fetchManifest();
         if (manifest == null) return null;
 
         if (!await _appMeetsManifestMinimum(manifest)) return null;
@@ -272,9 +339,26 @@ class SystemsUpdateService {
         );
       }
 
-      // 3. Get the full list of system files from the GitHub repo directory.
-      final systemIds = await _fetchSystemListFromApi();
-      if (systemIds.isEmpty) return null;
+      // 3. Prefer the manifest's own system list. It arrives with the version
+      // check from raw.githubusercontent, which is not subject to the GitHub
+      // API's 60-requests/hour unauthenticated limit. The API is only a last
+      // resort for a manifest that predates the list.
+      var systemIds = knownUpdate?.systems ?? const <String>[];
+      if (systemIds.isEmpty) {
+        manifest ??= await _fetchManifest();
+        systemIds = _systemsFromManifest(manifest);
+      }
+      if (systemIds.isEmpty) {
+        _log.w(
+          'SystemsUpdateService: manifest has no systems list — falling back '
+          'to the GitHub API',
+        );
+        systemIds = await _fetchSystemListFromApi();
+      }
+      if (systemIds.isEmpty) {
+        _log.w('SystemsUpdateService: no system list available, aborting');
+        return null;
+      }
 
       // 4. Download each file to the local cache.
       final cacheDir = await _getSystemsCachePath();
@@ -371,13 +455,34 @@ class SystemsUpdateService {
     }
   }
 
-  /// Resolves which system IDs to download — always queries GitHub API directly.
+  /// Reads the system IDs carried by [manifest].
+  ///
+  /// Returns an empty list when the manifest predates the `systems` list or
+  /// the field is malformed; callers fall back to the API in that case.
+  static List<String> _systemsFromManifest(Map<String, dynamic>? manifest) {
+    final systems = manifest?['systems'];
+    if (systems is! List) return const [];
+    return {
+      for (final entry in systems)
+        if (entry is String && entry.isNotEmpty) entry,
+    }.toList();
+  }
+
+  /// Last-resort system list from the GitHub directory API.
+  ///
+  /// Unauthenticated calls are capped at 60/hour per IP. The manifest list is
+  /// preferred, so this only runs for an old manifest that does not carry one.
   static Future<List<String>> _fetchSystemListFromApi() async {
     try {
       final response = await http
           .get(Uri.parse(_githubApiUrl))
           .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) {
+        _log.w(
+          'SystemsUpdateService: GitHub API returned ${response.statusCode}',
+        );
+        return [];
+      }
       final entries = json.decode(response.body) as List<dynamic>;
       return entries
           .where((e) => e['name']?.toString().endsWith('.json') == true)

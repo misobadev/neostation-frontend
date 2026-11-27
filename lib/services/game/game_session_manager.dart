@@ -1,14 +1,16 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import '../../models/game_model.dart';
 import '../../models/system_model.dart';
 import '../../repositories/game_repository.dart';
 import '../../repositories/system_repository.dart';
 import '../../sync/sync_manager.dart';
 import '../game_session_persistence.dart';
-import '../retroachievements_hash_service.dart';
+import '../ra_library_match_runner.dart';
 import '../romm_playtime_service.dart';
 import 'playtime_meter.dart';
 
@@ -29,6 +31,14 @@ class GameSessionManager {
   static bool _isGameLaunched = false;
   static bool get isGameLaunched => _isGameLaunched;
 
+  /// Android: the running game opened on the bottom screen of a dual-screen
+  /// handheld, where the native side tracks it and sends `onGameReturned` the
+  /// moment it closes. NeoStation's own window keeps running beside the game,
+  /// so regaining focus (the user tapping it) must not end the session then.
+  static bool _gameOnOtherScreen = false;
+  static bool get gameOnOtherScreen => _gameOnOtherScreen;
+  static void markGameOnOtherScreen() => _gameOnOtherScreen = true;
+
   /// True from the moment a launch is initiated (Now Playing pushed) until the
   /// launch resolves — i.e. [registerGameLaunch] flips [_isGameLaunched], or
   /// the launch fails. Covers the ~2s dialog+handoff window during which
@@ -45,6 +55,7 @@ class GameSessionManager {
   /// the emulator handoff. Cleared by [registerGameLaunch] on success or
   /// [clearLaunchPending] on failure.
   static void beginLaunchPending() {
+    _gameOnOtherScreen = false;
     _launchPending = true;
     _pauseBackgroundHashing();
   }
@@ -56,9 +67,9 @@ class GameSessionManager {
   /// pass is resumable by construction, so nothing is lost: whoever started it
   /// picks it up from where it stopped. A no-op when no pass is running.
   static void _pauseBackgroundHashing() {
-    if (!RetroAchievementsHashService.isRematchRunning) return;
+    if (!RaLibraryMatchRunner.isRunning) return;
     _log.i('Pausing RA match pass for the duration of the game session');
-    RetroAchievementsHashService.requestRematchPause();
+    RaLibraryMatchRunner.requestPause();
   }
 
   /// Closes the launch-pending window (e.g. on launch failure).
@@ -341,6 +352,7 @@ class GameSessionManager {
       }
 
       _isGameLaunched = false;
+      _gameOnOtherScreen = false;
       _gameLaunchTime = null;
       _launchedEmulatorExe = null;
       _currentGameSystem = null;

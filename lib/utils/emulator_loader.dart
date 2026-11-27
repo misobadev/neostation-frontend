@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:neostation/models/core_emulator_model.dart';
 import 'package:neostation/models/system_model.dart';
@@ -45,11 +46,13 @@ Future<List<CoreEmulatorModel>> loadEmulatorsForSystem(
                 e.isRetroArch &&
                 e.coreFilename != null &&
                 e.coreFilename!.isNotEmpty) {
-              final coreInstalled = await ch
-                  .invokeMethod<bool>('isCoreInstalled', {
-                    'packageName': e.androidPackageName,
-                    'coreFilename': e.coreFilename,
-                  });
+              final coreInstalled = await ch.invokeMethod<bool>(
+                'isCoreInstalled',
+                {
+                  'packageName': e.androidPackageName,
+                  'coreFilename': e.coreFilename,
+                },
+              );
               if (coreInstalled != null) installed = coreInstalled;
             }
             updated.add(e.copyWith(isInstalled: installed));

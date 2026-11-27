@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'settings_title.dart';
 
 /// Launcher settings content widget (Android only)

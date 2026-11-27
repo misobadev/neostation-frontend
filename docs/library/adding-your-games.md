@@ -17,6 +17,9 @@ NeoStation builds your local library from the folders listed in **Settings → D
 
 NeoStation supports a maximum of five ROM folders. Removing a configured folder does not remove any ROM files from storage.
 
+![A ROMs folder containing one subfolder per system, such as gba, n64 and psx](/screenshots/rom-folders.webp)
+*A typical ROM folder: one subfolder per system.*
+
 ## Subfolders
 
 The **Show Subfolders** setting controls whether games in subfolders are shown in a system. **Show Subfolders in Every System** applies the current setting across systems; you can still change an individual system afterwards.

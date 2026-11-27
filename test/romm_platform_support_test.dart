@@ -116,6 +116,40 @@ void main() {
     });
   });
 
+  group('platformLabel', () {
+    RommRom rom(String slug, {String? name}) => RommRom.fromJson({
+      'id': 1,
+      'name': 'Game',
+      'platform_slug': slug,
+      'platform_name': ?name,
+    });
+
+    test('the loaded platform list names it first', () async {
+      await localSystem('snes');
+      svc.platforms = [
+        RommPlatform(id: 1, name: 'Super Nintendo', slug: 'snes'),
+      ];
+      await provider.loadPlatforms();
+
+      expect(
+        provider.platformLabel(rom('snes', name: 'Super Famicom')),
+        'Super Nintendo',
+      );
+    });
+
+    test('before the list loads, the name RomM sent with the ROM', () {
+      expect(
+        provider.platformLabel(rom('genesis-slash-megadrive', name: 'Genesis')),
+        'Genesis',
+      );
+    });
+
+    test('with no name anywhere, the slug', () {
+      expect(provider.platformLabel(rom('gba')), 'GBA');
+      expect(provider.platformLabel(rom('', name: '  ')), isNull);
+    });
+  });
+
   group('systemForPlatform', () {
     // Every case seeds some other system first: an empty app_systems table
     // makes SqliteService re-sync from the JSON assets, which is not what a

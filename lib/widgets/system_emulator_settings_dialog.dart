@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -8,33 +9,42 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/app_themes.dart';
 import 'package:provider/provider.dart';
+
 import '../constants/system_folder_names.dart';
 import '../models/core_emulator_model.dart';
 import '../models/database_game_model.dart';
 import '../models/standalone_emulator_model.dart';
 import '../themes/corner_radii.dart';
+import 'neo_glass.dart';
 import 'system_emulator_settings_dialog/models/emulator_list_item.dart';
 import '../models/system_model.dart';
+import '../providers/discovery_provider.dart';
 import '../providers/sqlite_config_provider.dart';
 import '../providers/sqlite_database_provider.dart';
 import '../repositories/system_repository.dart';
 import '../repositories/emulator_repository.dart';
 import '../repositories/game_repository.dart';
 import '../services/config_service.dart';
+import '../services/launch_display_service.dart';
+
 import 'package:neostation/services/logger_service.dart';
+
 import '../utils/gamepad_nav.dart';
 import '../services/game_service.dart' show GamepadNavigationManager;
 import '../utils/centered_scroll_controller.dart';
 import '../utils/emulator_loader.dart';
+
 import 'package:path/path.dart' as path;
 
 import 'custom_notification.dart';
+
 import 'package:neostation/widgets/custom_toggle_switch.dart';
+
 import '../widgets/shaders/shader_gif_widget.dart';
 import '../utils/image_utils.dart';
-import '../widgets/core_footer.dart';
 import '../services/permission_service.dart';
 import '../widgets/tv_directory_picker.dart';
+import '../utils/user_data_move_guard.dart';
 
 part 'system_emulator_settings_dialog/gamepad_nav.dart';
 part 'system_emulator_settings_dialog/row_builders.dart';
@@ -80,8 +90,19 @@ class _SystemEmulatorSettingsDialogState
   int _emulatorActionIndex = 0;
   // 0: Prefer filename, 1: Hide ext, 2: (), 3: [], 4: Recursive (only when
   // [_offersRecursiveScan]), 5: Show subfolders (only when
-  // [_offersSubfolderView]).
+  // [_offersSubfolderView]), 6: Open games on the secondary screen (only when
+  // [_offersLaunchDisplay]).
   late int _totalGeneralItems;
+
+  /// Index of the "Open games on secondary screen" row in the General tab.
+  static const int _launchDisplayIndex = 6;
+
+  /// Set once the display lookup finds a second screen; the row stays hidden
+  /// (and out of the gamepad cycle) on single-screen devices.
+  bool _hasSecondaryDisplay = false;
+
+  /// This system's launch screen setting: true = secondary screen.
+  bool _openOnSecondary = false;
   late List<GlobalKey> _generalItemKeys;
   late List<GlobalKey> _appearanceItemKeys;
 
@@ -120,13 +141,12 @@ class _SystemEmulatorSettingsDialogState
     // 'favorites', 'collections', a single collection) own none, and a
     // collection's id has no `app_systems` row for the setting to be written
     // against at all.
-    _totalGeneralItems =
-        4 + (_offersRecursiveScan ? 1 : 0) + (_offersSubfolderView ? 1 : 0);
+    _totalGeneralItems = _baseGeneralItems;
 
     _generalScrollController = ScrollController();
     _hiddenScrollController = ScrollController();
     _generalItemKeys = List.generate(
-      _totalGeneralItems,
+      _launchDisplayIndex + 1,
       (index) => GlobalKey(
         debugLabel:
             'general_item_${_system.folderName}_${index}_${identityHashCode(this)}',
@@ -143,7 +163,48 @@ class _SystemEmulatorSettingsDialogState
 
     _loadCores();
     _loadHiddenGames();
+    _loadLaunchDisplay();
     _initializeGamepad();
+  }
+
+  /// Reads whether a second screen exists and this system's launch screen.
+  /// Async, so the row (and its gamepad slot) appears once both are known.
+  Future<void> _loadLaunchDisplay() async {
+    final hasSecondary = await LaunchDisplayService.hasSecondaryDisplay();
+    if (!hasSecondary) return;
+    final display = await LaunchDisplayService.getForSystem(_system.folderName);
+    if (!mounted) return;
+    setState(() {
+      _hasSecondaryDisplay = true;
+      _openOnSecondary = display == LaunchDisplay.secondary;
+      _totalGeneralItems = _baseGeneralItems + (_offersLaunchDisplay ? 1 : 0);
+    });
+  }
+
+  /// General-tab rows that do not depend on the display lookup.
+  int get _baseGeneralItems =>
+      4 + (_offersRecursiveScan ? 1 : 0) + (_offersSubfolderView ? 1 : 0);
+
+  /// Whether the General tab offers "Open games on secondary screen".
+  ///
+  /// Needs a second screen, and a real system with its own games: the virtual
+  /// libraries aggregate other systems, whose own setting already applies.
+  /// Tied to both scan rows being present too, because the General tab's
+  /// gamepad indices are fixed (this row is always index 6).
+  bool get _offersLaunchDisplay =>
+      _hasSecondaryDisplay && _offersRecursiveScan && _offersSubfolderView;
+
+  Future<void> _toggleOpenOnSecondary(bool value) async {
+    setState(() => _openOnSecondary = value);
+    try {
+      await LaunchDisplayService.setForSystem(
+        _system.folderName,
+        value ? LaunchDisplay.secondary : null,
+      );
+    } catch (e) {
+      _log.e('Saving the launch screen failed: $e');
+      if (mounted) setState(() => _openOnSecondary = !value);
+    }
   }
 
   @override
@@ -190,6 +251,9 @@ class _SystemEmulatorSettingsDialogState
       final systemToScan = widget.system.copyWith(recursiveScan: value);
 
       if (!mounted) return;
+      // Refused during a user-data move (the setting is saved and applies at
+      // the next scan): an empty result would read as "no changes found".
+      if (refuseWhileUserDataMoves()) return;
 
       // Perform silent scan via provider
       final summary = await context
@@ -379,7 +443,8 @@ class _SystemEmulatorSettingsDialogState
   /// to reach — a Hidden tab there could only ever be empty. Everything else
   /// (music included) goes through the games list, where START opens the game
   /// settings dialog.
-  bool get _systemSupportsHiding => _system.folderName != 'android';
+  bool get _systemSupportsHiding =>
+      _system.folderName != SystemFolderNames.android;
 
   /// Whether the Hidden tab is offered. Kept visible whenever games *are*
   /// hidden even if the system can't hide them, so a row can never end up with
@@ -394,7 +459,7 @@ class _SystemEmulatorSettingsDialogState
     // Emulators belong to a hardware system. An aggregate library has none of
     // its own, so the tab could only ever render empty.
     if (!SystemFolderNames.isAggregate(_system.folderName) &&
-        _system.folderName != 'android')
+        !SystemFolderNames.isAndroidApps(_system.folderName))
       1,
     2,
     if (_showHiddenTab) 3,
@@ -433,8 +498,13 @@ class _SystemEmulatorSettingsDialogState
   Future<void> _unhideGame(DatabaseGameModel game) async {
     final folderName = game.systemFolderName ?? _system.folderName;
     final displayName = game.realName ?? game.filename;
+    // Nullable: not every widget tree provides it (tests, for one).
+    final discoveryProvider = context.read<DiscoveryProvider?>();
     try {
       await GameRepository.setGameHidden(folderName, game.filename, false);
+      // Told straight after the write, so closing the dialog during the
+      // refreshes below can't leave the game off Discovery for the week.
+      discoveryProvider?.markStale();
     } catch (e) {
       _log.e('Error unhiding ${game.filename}: $e');
       return;
@@ -459,6 +529,8 @@ class _SystemEmulatorSettingsDialogState
     final affectedFolders = _hiddenGames
         .map((g) => g.systemFolderName ?? _system.folderName)
         .toSet();
+    // Nullable: not every widget tree provides it (tests, for one).
+    final discoveryProvider = context.read<DiscoveryProvider?>();
     try {
       final scopeId = _hiddenScopeSystemId;
       if (scopeId == null) {
@@ -466,6 +538,8 @@ class _SystemEmulatorSettingsDialogState
       } else {
         await GameRepository.unhideAllGamesForSystem(scopeId);
       }
+      // Told straight after the write, as in [_unhideGame].
+      discoveryProvider?.markStale();
     } catch (e) {
       _log.e('Error unhiding all games: $e');
       return;
@@ -710,8 +784,12 @@ class _SystemEmulatorSettingsDialogState
         );
       }
 
+      if (!mounted) return;
       setState(() {
-        _displayItems = displayItems;
+        _displayItems = groupEmulatorsByAvailability(
+          displayItems,
+          isAndroid: Platform.isAndroid,
+        );
         _totalEmulators = _displayItems.length; // Now strictly UI items
 
         // Find selected index based on default
@@ -1047,47 +1125,53 @@ class _SystemEmulatorSettingsDialogState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(horizontal: 16.r, vertical: 16.r),
-      child: Container(
-        constraints: BoxConstraints(maxWidth: 640.r, maxHeight: 480.r),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+      child: NeoGlassRim(
+        cornerRadius: radii.radiusExternalRadius,
+        child: Container(
+          constraints: BoxConstraints(maxWidth: 640.r, maxHeight: 480.r),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: radii.radiusExternal,
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.1),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.shadow.withValues(alpha: 0.5),
+                blurRadius: 10.r,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(
-                context,
-              ).colorScheme.shadow.withValues(alpha: 0.5),
-              blurRadius: 10.r,
-              offset: const Offset(0, 4),
+          child: ClipRRect(
+            borderRadius: radii.radiusExternal,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildHeader(),
+                _buildTabsHeader(),
+                Expanded(
+                  child: _currentTab == 0
+                      ? _buildGeneralTab()
+                      : _currentTab == 1
+                      ? (_isLoading
+                            ? _buildLoadingState()
+                            : _errorMessage != null
+                            ? _buildErrorState()
+                            : _buildEmulatorsTab())
+                      : _currentTab == 2 || !_showHiddenTab
+                      ? _buildAppearanceTab()
+                      : _buildHiddenGamesTab(),
+                ),
+                _buildFooter(),
+              ],
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildHeader(),
-            _buildTabsHeader(),
-            Expanded(
-              child: _currentTab == 0
-                  ? _buildGeneralTab()
-                  : _currentTab == 1
-                  ? (_isLoading
-                        ? _buildLoadingState()
-                        : _errorMessage != null
-                        ? _buildErrorState()
-                        : _buildEmulatorsTab())
-                  : _currentTab == 2 || !_showHiddenTab
-                  ? _buildAppearanceTab()
-                  : _buildHiddenGamesTab(),
-            ),
-            _buildFooter(),
-          ],
+          ),
         ),
       ),
     );

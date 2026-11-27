@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -12,7 +13,6 @@ import 'package:neostation/utils/effective_system.dart';
 import 'package:neostation/utils/rom_tree.dart';
 import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
-import 'package:neostation/providers/system_background_provider.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
@@ -21,9 +21,10 @@ import 'package:neostation/utils/letter_jump.dart';
 import 'package:neostation/providers/collections_provider.dart';
 import 'package:neostation/widgets/achievements_badge.dart';
 import 'package:neostation/widgets/collection_badge.dart';
-import 'package:neostation/widgets/game_view_mode_dropdown.dart';
 import 'package:neostation/widgets/native_carousel.dart';
+import 'package:neostation/utils/performance_mode.dart';
 import 'package:neostation/widgets/game_view_footer.dart';
+import 'package:neostation/widgets/game_fanart_background.dart';
 import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/models/retro_achievements_game_info.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
@@ -40,7 +41,7 @@ class GamesCarousel extends StatefulWidget {
   final VoidCallback onPlay;
   final VoidCallback? onFavorite;
   final VoidCallback? onRandom;
-  final VoidCallback? onSettings;
+  final VoidCallback? onOptions;
   final VoidCallback? onScrape;
   final Set<String> scrapingGameRomnames;
   final Map<String, double> scrapeProgress;
@@ -80,6 +81,11 @@ class GamesCarousel extends StatefulWidget {
   /// calling [onFavorite] directly — it is a mouse/touch affordance.
   final VoidCallback? onYButton;
 
+  /// The West face button (X on an Xbox pad, Y on a Nintendo-style one) and
+  /// the X button, and the footer hint for West. Opens the library search;
+  /// null leaves them unbound.
+  final VoidCallback? onSearch;
+
   /// Attached to the centred card so the host can anchor the context menu to
   /// it. Null when no anchor is needed.
   final GlobalKey? selectedItemKey;
@@ -110,7 +116,7 @@ class GamesCarousel extends StatefulWidget {
     required this.onPlay,
     this.onFavorite,
     this.onRandom,
-    this.onSettings,
+    this.onOptions,
     this.onScrape,
     this.scrapingGameRomnames = const {},
     this.scrapeProgress = const {},
@@ -120,6 +126,7 @@ class GamesCarousel extends StatefulWidget {
     this.folderCoverResolver,
     this.artworkVersion = 0,
     this.onYButton,
+    this.onSearch,
     this.selectedItemKey,
     this.isSecondaryScreenActive = false,
     this.navLayerId = 'games_carousel',
@@ -139,6 +146,9 @@ class _GamesCarouselState extends State<GamesCarousel> {
   // Set from the config this view already watches in build(); the card builders
   // below read it rather than looking the provider up per card.
   bool _showAchievementsBadge = false;
+
+  /// Set from the config in build; disables decorative effects at render time.
+  bool _performanceMode = false;
 
   /// ROM paths filed in at least one collection, read once per build.
   ///
@@ -167,13 +177,11 @@ class _GamesCarouselState extends State<GamesCarousel> {
   String? _chromeSig;
   Widget? _chromeFooter;
   final Map<String, double> _letterWidthCache = {};
-  final Map<String, bool> _fileExistsCache = {};
 
   /// Folder preview covers, keyed by "relPath|imageType" so box/fanart styles
   /// cache independently. Resolving walks the game list and stats the disk, so
   /// each folder card is computed once.
   final Map<String, List<File>> _folderCoverCache = {};
-  int _lastBgIndex = -1;
 
   static final Map<String, Size?> _imgSizeCache = {};
 
@@ -274,6 +282,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
     widget.games,
     folderCount: widget.folderCount,
     favoritesLabel: _favoritesLabel,
+    ignoreArticles: context
+        .read<SqliteConfigProvider>()
+        .config
+        .ignoreArticlesInGameSort,
   );
 
   /// The bar's group for the entry at [index].
@@ -285,7 +297,13 @@ class _GamesCarouselState extends State<GamesCarousel> {
     if (index < widget.folderCount + _favoritesRunLength) {
       return _favoritesLabel;
     }
-    return letterGroupOf(widget.games[index]);
+    return letterGroupOf(
+      widget.games[index],
+      ignoreArticles: context
+          .read<SqliteConfigProvider>()
+          .config
+          .ignoreArticlesInGameSort,
+    );
   }
 
   int _getFirstGameIndexForLetter(String letter) {
@@ -299,7 +317,16 @@ class _GamesCarouselState extends State<GamesCarousel> {
       i < widget.games.length;
       i++
     ) {
-      if (letterGroupOf(widget.games[i]) == letter) return i;
+      if (letterGroupOf(
+            widget.games[i],
+            ignoreArticles: context
+                .read<SqliteConfigProvider>()
+                .config
+                .ignoreArticlesInGameSort,
+          ) ==
+          letter) {
+        return i;
+      }
     }
     return 0;
   }
@@ -314,7 +341,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
     _initializeGamepad();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToCurrentLetter();
-      _updateBackground();
       _loadAchievementsForSelectedGame();
     });
   }
@@ -332,7 +358,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _carouselKey.currentState?.jumpToPage(_currentIndex);
         _scrollToCurrentLetter();
-        _updateBackground();
       });
       _scheduleAchievementsLoad();
     }
@@ -343,13 +368,9 @@ class _GamesCarouselState extends State<GamesCarousel> {
       }
     }
     if (widget.artworkVersion != oldWidget.artworkVersion) {
-      _fileExistsCache.clear();
-      _lastBgIndex = -1;
       // A scrape can add a preview video to the settled game, which changes
-      // whether the footer's mute pill applies — the cache above no longer
-      // answers it, so let the chrome rebuild against the new media too.
+      // whether the footer's mute pill applies.
       _chromeSig = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _updateBackground());
     }
   }
 
@@ -418,19 +439,20 @@ class _GamesCarouselState extends State<GamesCarousel> {
         }
       },
       onBack: widget.onBack,
-      onFavorite: widget.onYButton ?? widget.onFavorite, // Button Y.
-      onXButton: () {
-        try {
-          GameViewModeDropdown.globalKey.currentState?.showDropdown();
-        } catch (_) {}
-      },
+      onFavorite: null, // Options moved to Start.
+      // Search on West (since #673) and on the button reported as X, so the
+      // X the header shows opens it on every controller: on the AYN controller
+      // West is the button printed Y. (The list view searches on X only and
+      // favourites on Y.)
+      onXButton: widget.onSearch,
+      onWestButton: widget.onSearch,
       onLetterJump: _letterJump, // Held D-pad left/right → alphabet skipping.
       letterJumpAxis: LetterJumpAxis.horizontal,
       onLeftStickClick: widget.onRandom,
       onSelectButton: _toggleVideoMute, // Select tap - Mute preview video.
       onSelectModifierA: widget.onScrape, // Select + A - Scrape.
       onSelectModifierY: widget.onRandom, // Select + Y - Random game.
-      onSettings: widget.onSettings,
+      onSettings: widget.onOptions,
       // The bumpers deliberately bind nothing here. This view lives on a route
       // PUSHED OVER AppScreen, so cycling the app's top-level tabs from it
       // switched the tab underneath a screen that stays on top: the main
@@ -549,7 +571,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
     if (_settledIndex != _currentIndex) {
       setState(() => _settledIndex = _currentIndex);
     }
-    _updateBackground();
   }
 
   /// (Re)builds the footer pill + action-button legend only when the settled
@@ -573,8 +594,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
     // this view is open — a lid opening is exactly that.
     final sig =
         '$_settledIndex|${settledGame.romname}|${settledGame.isFavorite}'
-        '|$hasRa|$loadingRa|${identityHashCode(_currentGameInfo)}'
-        '|${widget.isSecondaryScreenActive}';
+        '|$hasRa|$loadingRa|${identityHashCode(_currentGameInfo)}';
     if (sig == _chromeSig && _chromeFooter != null) {
       return;
     }
@@ -586,8 +606,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
       isLoadingAchievements: loadingRa,
       currentGameInfo: settled ? _currentGameInfo : null,
       onShowAchievements: _showAchievementsDialog,
-      onToggleMute: widget.isSecondaryScreenActive ? null : _toggleVideoMute,
-      hasVideo: !isFolder && _hasVideoFor(settledGame),
       isFolder: isFolder,
       // The game's own system, so the cloud mark reflects the game rather than
       // the placeholder an aggregate view is browsing under.
@@ -715,53 +733,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
     );
   }
 
-  void _updateBackground() {
-    if (!mounted || widget.games.isEmpty) return;
-    if (_currentIndex < 0 || _currentIndex >= widget.games.length) return;
-    if (_lastBgIndex == _currentIndex) return;
-    _lastBgIndex = _currentIndex;
-
-    final game = widget.games[_currentIndex];
-    final folder = _folderForGame(game);
-
-    String imagePath = game.getImagePath(
-      folder,
-      'fanarts',
-      widget.fileProvider,
-    );
-    bool exists = _fileExistsCache.putIfAbsent(
-      imagePath,
-      () => File(imagePath).existsSync(),
-    );
-
-    if (!exists) {
-      imagePath = game.getScreenshotPath(folder, widget.fileProvider);
-      exists = _fileExistsCache.putIfAbsent(
-        imagePath,
-        () => File(imagePath).existsSync(),
-      );
-    }
-
-    final ImageProvider imageProvider;
-    if (exists) {
-      imageProvider = FileImage(File(imagePath));
-    } else {
-      // Fall back to the logo of the system the *game* belongs to, not the
-      // list's. In an aggregate view the list is not a hardware system, and a
-      // collection has no bundled logo at all ('collection:<uuid>.webp' does
-      // not exist), so keying the asset off the list would resolve to nothing.
-      // Mirrors the secondary display's fallback.
-      final path = 'assets/images/logos/${_folderForGame(game)}.webp';
-      imageProvider = AssetImage(path);
-      imagePath = path;
-    }
-
-    context.read<SystemBackgroundProvider>().updateImage(
-      imageProvider,
-      imagePath: imagePath,
-    );
-  }
-
   void _scrollToCurrentLetter() {
     if (!_letterBarController.hasClients || widget.games.isEmpty) return;
 
@@ -826,23 +797,6 @@ class _GamesCarouselState extends State<GamesCarousel> {
     return widget.system.primaryFolderName;
   }
 
-  /// Whether the game has a preview video, so the footer knows whether a mute
-  /// control is worth showing.
-  ///
-  /// Scraped media lives on the plain filesystem (unlike SAF ROM paths), so a
-  /// sync stat is safe, and this only runs when the selection settles — not
-  /// per frame. Cached alongside the background lookups.
-  bool _hasVideoFor(GameModel game) {
-    final videoPath = game.getVideoPath(
-      _folderForGame(game),
-      widget.fileProvider,
-    );
-    return _fileExistsCache.putIfAbsent(
-      videoPath,
-      () => File(videoPath).existsSync(),
-    );
-  }
-
   String _resolveImagePath(GameModel game, String imageType) {
     final path = game.getImagePath(
       _folderForGame(game),
@@ -855,31 +809,25 @@ class _GamesCarouselState extends State<GamesCarousel> {
 
   Widget _buildFanartCard(GameModel game, bool isSelected) {
     final theme = Theme.of(context);
-    final folder = _folderForGame(game);
-    final screenshotPath = game.getScreenshotPath(folder, widget.fileProvider);
-    final hasScreenshot = File(screenshotPath).existsSync();
-    final fanartPath = game.getImagePath(
-      folder,
-      'fanarts',
-      widget.fileProvider,
-    );
-    final hasFanart = File(fanartPath).existsSync();
-    final bgPath = hasFanart
+    final fanartPath = _resolveImagePath(game, 'fanarts');
+    final bgPath = fanartPath.isNotEmpty
         ? fanartPath
-        : (hasScreenshot ? screenshotPath : '');
+        : _resolveImagePath(game, 'screenshots');
 
     return Container(
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.all(5.r),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 8.r,
-            offset: Offset(2.r, 2.r),
-          ),
-        ],
+        boxShadow: _performanceMode
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 8.r,
+                  offset: Offset(2.r, 2.r),
+                ),
+              ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24.r),
@@ -891,7 +839,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
                 File(bgPath),
                 key: ValueKey(bgPath),
                 fit: BoxFit.cover,
-                cacheWidth: 1024,
+                cacheWidth: performanceCacheWidth(
+                  1024,
+                  performanceMode: _performanceMode,
+                ),
                 errorBuilder: (ctx, e, s) => _buildFallbackCard(game, theme),
               )
             else
@@ -1026,13 +977,15 @@ class _GamesCarouselState extends State<GamesCarousel> {
       margin: EdgeInsets.all(5.r),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 8.r,
-            offset: Offset(2.r, 2.r),
-          ),
-        ],
+        boxShadow: _performanceMode
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 8.r,
+                  offset: Offset(2.r, 2.r),
+                ),
+              ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24.r),
@@ -1117,6 +1070,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
           file,
           fit: BoxFit.cover,
           gaplessPlayback: true,
+          cacheWidth: performanceCacheWidth(
+            512,
+            performanceMode: _performanceMode,
+          ),
           errorBuilder: (_, _, _) => const SizedBox.shrink(),
         ),
       ),
@@ -1188,7 +1145,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
           key: ValueKey(wheelPath),
           fit: BoxFit.contain,
           filterQuality: FilterQuality.medium,
-          cacheWidth: 512,
+          cacheWidth: performanceCacheWidth(
+            512,
+            performanceMode: _performanceMode,
+          ),
           errorBuilder: (ctx, e, s) => const SizedBox.shrink(),
         ),
       );
@@ -1274,13 +1234,17 @@ class _GamesCarouselState extends State<GamesCarousel> {
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8.r),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isSelected ? 0.6 : 0.3),
-                  blurRadius: isSelected ? 12.r : 6.r,
-                  offset: Offset(2.r, 2.r),
-                ),
-              ],
+              boxShadow: _performanceMode
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: isSelected ? 0.6 : 0.3,
+                        ),
+                        blurRadius: isSelected ? 12.r : 6.r,
+                        offset: Offset(2.r, 2.r),
+                      ),
+                    ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8.r),
@@ -1291,7 +1255,10 @@ class _GamesCarouselState extends State<GamesCarousel> {
                     File(boxPath),
                     key: ValueKey(boxPath),
                     fit: BoxFit.cover,
-                    cacheWidth: 1024,
+                    cacheWidth: performanceCacheWidth(
+                      1024,
+                      performanceMode: _performanceMode,
+                    ),
                     errorBuilder: (ctx, e, s) => _buildBoxFallback(game, theme),
                   ),
                   if (game.isFavorite == true)
@@ -1348,6 +1315,42 @@ class _GamesCarouselState extends State<GamesCarousel> {
     return _buildFallbackCard(game, theme);
   }
 
+  /// Renders the settled game's fanart over the theme background.
+  /// Missing fanart has no screenshot or system-logo fallback.
+  Widget _buildFanartBackground() {
+    final index = _settledIndex.clamp(0, widget.games.length - 1);
+    final game = widget.games[index];
+    const opacity = 0.20;
+    final fanart = GameFanartBackground(
+      game: _isFolderIndex(index) ? null : game,
+      systemFolder: _folderForGame(game),
+      fileProvider: widget.fileProvider,
+      artworkVersion: widget.artworkVersion,
+      performanceMode: _performanceMode,
+      waitForImage: true,
+      imageOpacity: _performanceMode
+          ? const AlwaysStoppedAnimation(opacity)
+          : null,
+    );
+
+    return IgnorePointer(
+      child: RepaintBoundary(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
+            // Preserve the original group opacity when outgoing and incoming
+            // fanart overlap. The single-image path can apply it at paint time.
+            if (_performanceMode)
+              fanart
+            else
+              Opacity(opacity: opacity, child: fanart),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.games.isEmpty) {
@@ -1362,6 +1365,7 @@ class _GamesCarouselState extends State<GamesCarousel> {
     final config = context.watch<SqliteConfigProvider>().config;
     final isFanart = config.gameCarouselCardStyle != 'box';
     _showAchievementsBadge = config.showAchievementsBadge;
+    _performanceMode = config.performanceMode;
     _collections = SystemFolderNames.isCollection(widget.system.folderName)
         ? null
         : context.watch<CollectionsProvider>();
@@ -1387,15 +1391,17 @@ class _GamesCarouselState extends State<GamesCarousel> {
 
     return Stack(
       children: [
+        Positioned.fill(child: _buildFanartBackground()),
         Column(
           children: [
             // #188 layout: drop the top spacer so the carousel gets the full
             // height (bigger cards sit closer together). Pad symmetrically so
             // the centered card stays centered on-screen while still clearing
-            // the vertical legend on the left.
+            // the vertical legend on the left. The vertical margin keeps the
+            // artwork off the screen edges; this view has no header to clear.
             Expanded(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 60.r),
+                padding: EdgeInsets.symmetric(horizontal: 60.r, vertical: 24.r),
                 child: NativeCarousel(
                   key: _carouselKey,
                   itemCount: widget.games.length,
@@ -1405,6 +1411,15 @@ class _GamesCarouselState extends State<GamesCarousel> {
                   // boundary. Stepping past either end continues from the
                   // other.
                   wrap: true,
+                  depth: _performanceMode
+                      ? const CarouselDepth(
+                          scaleFalloff: 0.7,
+                          minScale: 0.55,
+                          opacityBase: 1,
+                          opacityFalloff: 0,
+                          minOpacity: 1,
+                        )
+                      : const CarouselDepth(),
                   itemBuilder: (context, index) {
                     final isCentred = index == _currentIndex;
                     if (index < widget.folderCount) {

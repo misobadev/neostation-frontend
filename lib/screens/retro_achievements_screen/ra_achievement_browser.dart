@@ -1,8 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+
 import '../../l10n/app_locale.dart';
 import '../../models/retro_achievements_game_info.dart';
 import '../../models/retro_achievement_comment.dart';
@@ -17,12 +20,17 @@ class RaAchievementBrowser extends StatefulWidget {
   final VoidCallback? onLeaderboards;
   final VoidCallback? onFilterChanged;
 
+  /// Shorter rows, smaller badges and filters, for the view drawn inside the
+  /// dashboard panel.
+  final bool dense;
+
   const RaAchievementBrowser({
     super.key,
     required this.info,
     this.highlightId,
     this.onLeaderboards,
     this.onFilterChanged,
+    this.dense = false,
   });
   @override
   State<RaAchievementBrowser> createState() => RaAchievementBrowserState();
@@ -46,7 +54,8 @@ class RaAchievementBrowserState extends State<RaAchievementBrowser> {
   Achievement? get _current =>
       _items.isEmpty ? null : _items[_selected.clamp(0, _items.length - 1)];
   double get _extent =>
-      86.r * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2);
+      (widget.dense ? 46.r : 86.r) *
+      MediaQuery.textScalerOf(context).scale(1).clamp(1, 2);
 
   @override
   void initState() {
@@ -303,7 +312,86 @@ class RaAchievementBrowserState extends State<RaAchievementBrowser> {
         color: selected ? accent : accent.withValues(alpha: .72),
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-      padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
+      padding: widget.dense
+          ? EdgeInsets.symmetric(horizontal: 10.r, vertical: 4.r)
+          : EdgeInsets.symmetric(horizontal: 12.r, vertical: 8.r),
+      minimumSize: widget.dense ? Size(0, 26.r) : null,
+      tapTargetSize: widget.dense ? MaterialTapTargetSize.shrinkWrap : null,
+      textStyle: widget.dense ? theme.textTheme.labelMedium : null,
+    );
+  }
+
+  String _controlLabel(int i) => _s(switch (i) {
+    0 => AppLocale.filterAll,
+    1 => AppLocale.raFilterLocked,
+    2 => AppLocale.raFilterMissables,
+    _ => AppLocale.raSubtabLeaderboards,
+  });
+
+  /// A filter drawn like the Games section's pills, so the game view opened
+  /// from it reads as part of the same panel.
+  Widget _densePill(BuildContext context, int index) {
+    final theme = Theme.of(context);
+    final selected = _filterSelected(index);
+    final focused = _control == index;
+    final accent = theme.colorScheme.primary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _activateControl(index),
+        canRequestFocus: false,
+        focusColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(8.r),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 4.r),
+          decoration: BoxDecoration(
+            color: selected
+                ? accent.withValues(alpha: 0.16)
+                : focused
+                ? accent.withValues(alpha: 0.08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8.r),
+            border: Border.all(
+              color: selected || focused
+                  ? accent.withValues(alpha: 0.85)
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.2),
+              width: focused ? 2.r : 1.2.r,
+            ),
+          ),
+          child: Text(
+            _controlLabel(index),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 8.r,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected
+                  ? accent
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.75),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The Games section's row selection, with the theme's corners.
+  BoxDecoration _denseRowDecoration(BuildContext context, bool selected) {
+    final theme = Theme.of(context);
+    return BoxDecoration(
+      color: selected
+          ? theme.colorScheme.primary.withValues(alpha: 0.10)
+          : Colors.transparent,
+      borderRadius:
+          theme.extension<CornerRadii>()?.radiusInternal ??
+          BorderRadius.circular(10.r),
+      border: Border.all(
+        color: selected
+            ? theme.colorScheme.primary.withValues(alpha: 0.85)
+            : Colors.transparent,
+        width: 1.5.r,
+      ),
     );
   }
 
@@ -311,8 +399,8 @@ class RaAchievementBrowserState extends State<RaAchievementBrowser> {
     casual: a.isUnlocked,
     hardcore: (a.dateEarnedHardcore ?? '').isNotEmpty,
     child: SizedBox(
-      width: 42.r,
-      height: 42.r,
+      width: widget.dense ? 30.r : 42.r,
+      height: widget.dense ? 30.r : 42.r,
       child: a.badgeName.isEmpty
           ? const Icon(Icons.emoji_events_outlined)
           : Image.network(
@@ -327,29 +415,31 @@ class RaAchievementBrowserState extends State<RaAchievementBrowser> {
   Widget build(BuildContext context) => ScrollConfiguration(
     behavior: CustomScrollBehavior(),
     child: Column(
+      crossAxisAlignment: widget.dense
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.center,
       children: [
         if (!_details)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.all(6.r),
+            padding: widget.dense
+                ? EdgeInsets.fromLTRB(0, 4.r, 0, 6.r)
+                : EdgeInsets.all(6.r),
             child: Row(
               children: [
                 for (int i = 0; i < _controlCount; i++)
                   Padding(
                     key: _controlKeys[i],
-                    padding: EdgeInsets.only(left: 6.r),
-                    child: OutlinedButton(
-                      style: _filterStyle(context, i),
-                      onPressed: () => _activateControl(i),
-                      child: Text(
-                        _s(switch (i) {
-                          0 => AppLocale.filterAll,
-                          1 => AppLocale.raFilterLocked,
-                          2 => AppLocale.raFilterMissables,
-                          _ => AppLocale.raSubtabLeaderboards,
-                        }),
-                      ),
+                    padding: EdgeInsets.only(
+                      left: widget.dense && i == 0 ? 0 : 6.r,
                     ),
+                    child: widget.dense
+                        ? _densePill(context, i)
+                        : OutlinedButton(
+                            style: _filterStyle(context, i),
+                            onPressed: () => _activateControl(i),
+                            child: Text(_controlLabel(i)),
+                          ),
                   ),
               ],
             ),
@@ -358,9 +448,20 @@ class RaAchievementBrowserState extends State<RaAchievementBrowser> {
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12.r),
+              padding: EdgeInsets.fromLTRB(
+                widget.dense ? 2.r : 12.r,
+                0,
+                widget.dense ? 2.r : 12.r,
+                widget.dense ? 4.r : 0,
+              ),
               child: Text(
                 '${_items.length} / ${widget.info.achievements.length} ${_s(AppLocale.achievements)}',
+                style: widget.dense
+                    ? Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface
+                            .withValues(alpha: 0.6),
+                      )
+                    : null,
               ),
             ),
           ),
@@ -382,20 +483,33 @@ class RaAchievementBrowserState extends State<RaAchievementBrowser> {
                           child: InkWell(
                             onTap: () => _open(index),
                             child: Container(
-                              padding: EdgeInsets.all(8.r),
+                              padding: widget.dense
+                                  ? EdgeInsets.symmetric(
+                                      horizontal: 8.r,
+                                      vertical: 4.r,
+                                    )
+                                  : EdgeInsets.all(8.r),
                               margin: EdgeInsets.symmetric(
-                                horizontal: 8.r,
-                                vertical: 2.r,
+                                horizontal: widget.dense ? 0 : 8.r,
+                                vertical: widget.dense ? 1.r : 2.r,
                               ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8.r),
-                                border: Border.all(
-                                  color: index == _selected && _control < 0
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Colors.transparent,
-                                  width: 2,
-                                ),
-                              ),
+                              decoration: widget.dense
+                                  ? _denseRowDecoration(
+                                      context,
+                                      index == _selected && _control < 0,
+                                    )
+                                  : BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                      border: Border.all(
+                                        color:
+                                            index == _selected && _control < 0
+                                            ? Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
+                                            : Colors.transparent,
+                                        width: 2,
+                                      ),
+                                    ),
                               child: Row(
                                 children: [
                                   _badge(a),
@@ -411,15 +525,29 @@ class RaAchievementBrowserState extends State<RaAchievementBrowser> {
                                           a.title,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.titleSmall,
+                                          style: widget.dense
+                                              ? Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize: 10.r,
+                                                    )
+                                              : Theme.of(context)
+                                                    .textTheme
+                                                    .titleSmall,
                                         ),
                                         Flexible(
                                           child: Text(
                                             a.description,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
+                                            style: widget.dense
+                                                ? Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                : null,
                                           ),
                                         ),
                                       ],
@@ -427,12 +555,24 @@ class RaAchievementBrowserState extends State<RaAchievementBrowser> {
                                   ),
                                   SizedBox(width: 8.r),
                                   Text('${a.points} ${_s(AppLocale.points)}'),
+                                  if (widget.dense) SizedBox(width: 8.r),
                                   Icon(
                                     a.isUnlocked
                                         ? Icons.lock_open
                                         : Icons.lock_outline,
-                                    size: 18.r,
+                                    size: widget.dense ? 16.r : 18.r,
+                                    color: widget.dense
+                                        ? a.isUnlocked
+                                              ? Theme.of(context)
+                                                    .colorScheme
+                                                    .primary
+                                              : Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withValues(alpha: 0.6)
+                                        : null,
                                   ),
+                                  if (widget.dense) SizedBox(width: 4.r),
                                 ],
                               ),
                             ),

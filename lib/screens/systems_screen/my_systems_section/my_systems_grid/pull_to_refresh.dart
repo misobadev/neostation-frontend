@@ -50,7 +50,9 @@ extension _PullToRefresh on _SystemCardGridViewState {
     }
     if (_activePointers.isEmpty && _pullReady) {
       _pullReady = false;
+      _pullTriggered = true;
       _pullProgress.value = 0.0;
+      _pullExtent.value = 0.0;
       _triggerRefresh();
     }
   }
@@ -62,8 +64,29 @@ extension _PullToRefresh on _SystemCardGridViewState {
     }
     if (_activePointers.isEmpty && _pullReady) {
       _pullReady = false;
+      _pullTriggered = true;
       _pullProgress.value = 0.0;
+      _pullExtent.value = 0.0;
       _triggerRefresh();
+    }
+  }
+
+  /// A trackpad pinch (macOS, Windows precision touchpads) arrives as one
+  /// pan-zoom gesture with a scale rather than as two pointers: every ~15 %
+  /// of scale since the last step changes the size by one.
+  void _handlePanZoomStart(PointerPanZoomStartEvent event) {
+    _panZoomBase = 1.0;
+  }
+
+  void _handlePanZoomUpdate(PointerPanZoomUpdateEvent event) {
+    if (!widget.enablePinchResize) return;
+    final ratio = event.scale / _panZoomBase;
+    if (ratio > 1.15) {
+      _adjustGridDensity(1);
+      _panZoomBase = event.scale;
+    } else if (ratio < 0.87) {
+      _adjustGridDensity(-1);
+      _panZoomBase = event.scale;
     }
   }
 
@@ -85,14 +108,22 @@ extension _PullToRefresh on _SystemCardGridViewState {
   void _adjustGridDensity(int delta) {
     try {
       final provider = context.read<SqliteConfigProvider>();
-      final sizes = ['S', 'M', 'L', 'XL'];
-      final currentIndex = sizes.indexOf(provider.config.systemGridColumns);
+      final sizes = widget.pinchSizes;
+      final currentSize = widget.pinchSize ?? provider.config.systemGridColumns;
+      final currentIndex = sizes.indexOf(currentSize);
       if (currentIndex == -1) return;
       final newIndex = (currentIndex + delta).clamp(0, sizes.length - 1);
       if (newIndex != currentIndex) {
         final newSize = sizes[newIndex];
-        provider.updateSystemGridColumns(newSize);
-        _cols = Responsive.getSystemsCrossAxisCountFromSize(newSize);
+        final onChanged = widget.onPinchSizeChanged;
+        if (onChanged != null) {
+          onChanged(newSize);
+        } else {
+          provider.updateSystemGridColumns(newSize);
+        }
+        _cols =
+            widget.crossAxisCountForSize?.call(newSize) ??
+            Responsive.getSystemsCrossAxisCountFromSize(newSize);
         _cachedVirtualGrid = null;
         _cachedGridCols = null;
         _showCardSizeLabel(newSize);

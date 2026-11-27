@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -7,6 +10,18 @@ import 'package:neostation/widgets/neo_glass.dart';
 
 import '../../../../themes/corner_radii.dart';
 import '../detail_tab.dart';
+
+// Keep desktop controls compact as fullscreen content continues to grow.
+// Smaller windows retain the normal ScreenUtil scale.
+double _controlSize(double value) {
+  final desktop = switch (defaultTargetPlatform) {
+    TargetPlatform.macOS ||
+    TargetPlatform.windows ||
+    TargetPlatform.linux => true,
+    _ => false,
+  };
+  return value * (desktop ? math.min(1.r, 1.5) : 1.r);
+}
 
 /// The tab strip at the card's top right: which section is open, and that
 /// left/right on the D-pad is what walks between them.
@@ -21,6 +36,9 @@ import '../detail_tab.dart';
 /// against the visible list, not against [DetailTab.values].
 class GameDetailsTabsHeader extends StatelessWidget {
   final bool isScreenshotVideoHidden;
+
+  /// The cover tab is left out (installed Android apps have no box art).
+  final bool isBox2dHidden;
   final bool hasRetroAchievements;
   final DetailTab currentTab;
   final ValueChanged<DetailTab> onTabChanged;
@@ -28,6 +46,7 @@ class GameDetailsTabsHeader extends StatelessWidget {
   const GameDetailsTabsHeader({
     super.key,
     required this.isScreenshotVideoHidden,
+    this.isBox2dHidden = false,
     required this.hasRetroAchievements,
     required this.currentTab,
     required this.onTabChanged,
@@ -46,13 +65,15 @@ class GameDetailsTabsHeader extends StatelessWidget {
     // Dynamically calculate the active tab count for layout arbitration.
     final List<DetailTab> visibleTabs = [
       ..._baseTabs.where(
-        (t) => t != DetailTab.screenshotVideo || !isScreenshotVideoHidden,
+        (t) =>
+            (t != DetailTab.screenshotVideo || !isScreenshotVideoHidden) &&
+            (t != DetailTab.box2d || !isBox2dHidden),
       ),
       if (hasRetroAchievements) ...[DetailTab.achievements],
     ];
 
     final int numTabs = visibleTabs.length;
-    final double tabWidth = 36.r;
+    final double tabWidth = _controlSize(36);
     final double totalTabsWidth = numTabs * tabWidth;
 
     // Resolve the visual index for the cursor animation, accounting for hidden tabs.
@@ -64,31 +85,33 @@ class GameDetailsTabsHeader extends StatelessWidget {
 
     return ClipRRect(
       child: Container(
-        height: 46.r,
-        padding: EdgeInsets.only(top: 4.r, right: 8.r),
+        height: _controlSize(46),
+        padding: EdgeInsets.only(top: _controlSize(4), right: _controlSize(8)),
         child: Row(
           children: [
             const Spacer(),
 
             // D-pad glyphs sit outside the pill so the pill reads as a single
             // switch and the hardware hints stay visually distinct from it.
-            const DpadGlyph(isLeft: true),
-            SizedBox(width: 6.r),
+            DpadGlyph(isLeft: true, size: _controlSize(22)),
+            SizedBox(width: _controlSize(6)),
 
             // Tab Navigation Group: Hardware-mapped navigation controls.
             NeoGlass(
               cornerRadius:
-                  Theme.of(
-                    context,
-                  ).extension<CornerRadii>()?.radiusExternalRadius ??
-                  12.r,
+                  Theme.of(context)
+                      .extension<CornerRadii>()
+                      ?.radiusExternalRadius ??
+                  _controlSize(12),
               child: SizedBox(
-                height: 36.r,
+                height: _controlSize(36),
+                // The same inset as the cursor's above and below, so the
+                // selected tab sits evenly inside the pill.
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8.r),
+                  padding: EdgeInsets.symmetric(horizontal: _controlSize(4)),
                   child: SizedBox(
                     width: totalTabsWidth,
-                    height: 36.r,
+                    height: _controlSize(36),
                     child: Stack(
                       children: [
                         // Transition Cursor: Fluidly follows the active selection.
@@ -96,17 +119,17 @@ class GameDetailsTabsHeader extends StatelessWidget {
                           duration: const Duration(milliseconds: 160),
                           curve: Curves.easeInOut,
                           left: visualIndex * tabWidth,
-                          top: 4.r,
-                          bottom: 4.r,
+                          top: _controlSize(4),
+                          bottom: _controlSize(4),
                           width: tabWidth,
                           child: Container(
                             decoration: BoxDecoration(
                               color: theme.colorScheme.primary,
                               borderRadius:
-                                  Theme.of(
-                                    context,
-                                  ).extension<CornerRadii>()?.radiusInternal ??
-                                  BorderRadius.circular(14.r),
+                                  Theme.of(context)
+                                      .extension<CornerRadii>()
+                                      ?.radiusInternal ??
+                                  BorderRadius.circular(_controlSize(14)),
                             ),
                           ),
                         ),
@@ -129,8 +152,8 @@ class GameDetailsTabsHeader extends StatelessWidget {
               ),
             ),
 
-            SizedBox(width: 6.r),
-            const DpadGlyph(isLeft: false),
+            SizedBox(width: _controlSize(6)),
+            DpadGlyph(isLeft: false, size: _controlSize(22)),
           ],
         ),
       ),
@@ -200,11 +223,11 @@ class _TabItem extends StatelessWidget {
         splashColor: theme.colorScheme.onSurface.withValues(alpha: 0.1),
         child: Container(
           width: width,
-          height: 36.r,
+          height: _controlSize(36),
           alignment: Alignment.center,
           child: Icon(
             icon,
-            size: 18.r,
+            size: _controlSize(18),
             color: isSelected
                 ? theme.colorScheme.onPrimary
                 : theme.colorScheme.onSurface,

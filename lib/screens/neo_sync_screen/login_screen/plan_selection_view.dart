@@ -11,8 +11,12 @@ import 'package:neostation/services/neosync/billing_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/centered_scroll_controller.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/utils/neosync_failure_message.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/widgets/core_footer.dart';
+import 'package:neostation/widgets/neo_glass.dart';
+import 'package:neostation/themes/corner_radii.dart';
+
 import '../../app_screen.dart';
 import 'neo_sync_shared.dart';
 
@@ -25,8 +29,8 @@ import 'neo_sync_shared.dart';
 /// previous upgrade dialog with a full view that has its own navigation layer.
 class PlanSelectionView extends StatefulWidget {
   final List<PlanInfo> initialPlans;
-  final Function(String, String) onUpgrade;
-  final Function() onCancel;
+  final Future<void> Function(String, String) onUpgrade;
+  final Future<void> Function() onCancel;
   final IconData Function(String) getPlanIcon;
   final VoidCallback onBack;
 
@@ -37,7 +41,12 @@ class PlanSelectionView extends StatefulWidget {
     required this.onCancel,
     required this.getPlanIcon,
     required this.onBack,
+    this.embedded = false,
   });
+
+  /// Shown inside the NeoSync dashboard's panel, beside its sidebar: no room
+  /// left for the top dock, which the panel already clears.
+  final bool embedded;
 
   @override
   State<PlanSelectionView> createState() => _PlanSelectionViewState();
@@ -50,6 +59,12 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
   String? _errorMessage;
   int _selectedPlanIndex = 0;
 
+  /// Whether an upgrade, downgrade or cancellation started here is still
+  /// running (its confirmation, the request and what it shows after). A, Enter
+  /// and the footer control all reach [_handleSelect]; each press while it ran
+  /// used to send the change again.
+  bool _actionBusy = false;
+
   static const List<String> _planOrder = [
     'free',
     'micro',
@@ -60,6 +75,13 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
 
   List<PlanInfo> get _availablePlans =>
       _plans.where((plan) => plan.name != 'free').toList();
+
+  /// Nothing to choose from: the plans failed to load, or none can be bought.
+  bool get _noPlans => _errorMessage != null || _availablePlans.isEmpty;
+
+  /// Cancelled, but still on its plan until the period ends.
+  static bool _isEnding(User? user) =>
+      user?.stripeSubscriptionStatus == 'canceling';
 
   int _planRank(String planName) {
     final name = planName.toLowerCase().trim();
@@ -88,17 +110,32 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
   }
 
   /// A on the focused plan: current → cancel subscription; otherwise upgrade
-  /// or downgrade depending on how it compares to the user's plan.
-  void _handleSelect() {
+  /// or downgrade depending on how it compares to the user's plan. Ignored
+  /// while the last one is still running.
+  Future<void> _handleSelect() async {
+    // With nothing to choose from, A retries: the Retry button is touch only.
+    if (_noPlans) {
+      if (!_plansLoading) _loadPlans();
+      return;
+    }
+    // A change started from an earlier visit to this view may still be out.
+    if (_actionBusy || context.read<BillingService>().isChangeInFlight) return;
     final plans = _availablePlans;
-    if (plans.isEmpty || _selectedPlanIndex >= plans.length) return;
+    if (_selectedPlanIndex >= plans.length) return;
     final plan = plans[_selectedPlanIndex];
     final user = context.read<AuthService>().currentUser;
+    // Already cancelled: a second cancellation has nothing left to do.
+    if (user?.plan == plan.name && _isEnding(user)) return;
 
-    if (user?.plan == plan.name) {
-      widget.onCancel();
-    } else {
-      widget.onUpgrade(plan.name, 'monthly');
+    setState(() => _actionBusy = true);
+    try {
+      if (user?.plan == plan.name) {
+        await widget.onCancel();
+      } else {
+        await widget.onUpgrade(plan.name, 'monthly');
+      }
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
     }
   }
 
@@ -151,6 +188,9 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
       _gamepadNav.initialize();
       GamepadNavigationManager.pushLayer(
         'neo_sync_plans',
+        // In the NeoSync dashboard's panel the sidebar's menu keeps the
+        // D-pad until the panel is entered: slot in beneath it.
+        background: widget.embedded,
         onActivate: () => _gamepadNav.activate(),
         onDeactivate: () => _gamepadNav.deactivate(),
       );
@@ -190,7 +230,10 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
             _selectedPlanIndex = 0;
           }
         } else {
-          _errorMessage = result['message'];
+          _errorMessage = neoSyncFailureMessage(
+            result,
+            (key) => key.getString(context),
+          );
         }
       });
     }
@@ -223,7 +266,9 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
     final user = context.watch<AuthService>().currentUser;
 
     return Padding(
-      padding: EdgeInsets.only(top: 52.r, left: 8.r, right: 8.r, bottom: 8.r),
+      padding: widget.embedded
+          ? EdgeInsets.zero
+          : EdgeInsets.only(top: 52.r, left: 8.r, right: 8.r, bottom: 8.r),
       child: Column(
         children: [
           NeoSyncSectionHeader(
@@ -234,17 +279,22 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
           ),
           SizedBox(height: 8.r),
           Expanded(
-            child: Container(
-              padding: EdgeInsets.all(12.r),
-              decoration: BoxDecoration(
-                color: theme.cardColor.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                  width: 1.r,
+            child: NeoGlassRim(
+              cornerRadius: (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                  .radiusExternalRadius,
+              child: Container(
+                padding: EdgeInsets.all(12.r),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius:
+                      (theme.extension<CornerRadii>() ?? CornerRadii.m())
+                          .radiusExternal,
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                  ),
                 ),
+                child: _buildPlansContent(context, user),
               ),
-              child: _buildPlansContent(context, user),
             ),
           ),
           SizedBox(height: 6.r),
@@ -307,7 +357,7 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
       );
     }
 
-    if (_plans.isEmpty) {
+    if (_availablePlans.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -339,6 +389,7 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
     return PlanListView(
       plans: _availablePlans,
       currentPlan: currentUser?.plan,
+      currentPlanEnding: _isEnding(currentUser),
       selectedIndex: _selectedPlanIndex,
       getPlanIcon: widget.getPlanIcon,
       onSelectionChanged: (index) {
@@ -349,14 +400,23 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
 
   Widget _buildFooter(BuildContext context, User? user) {
     final theme = Theme.of(context);
+    final changeInFlight = context.watch<BillingService>().isChangeInFlight;
 
-    final String actionLabel;
+    // No action on a plan already cancelled: there is nothing left to end.
+    final String? actionLabel;
     final Color actionColor;
     final Color actionTextColor;
-    if (_focusedPlanIsCurrent) {
-      actionLabel = AppLocale.endSubscription.getString(context);
-      actionColor = theme.colorScheme.error;
-      actionTextColor = theme.colorScheme.onError;
+    if (_noPlans) {
+      // Nothing to retry until the first load has answered.
+      actionLabel = _plansLoading ? null : AppLocale.retry.getString(context);
+      actionColor = theme.colorScheme.primary;
+      actionTextColor = theme.colorScheme.onPrimary;
+    } else if (_focusedPlanIsCurrent) {
+      actionLabel = _isEnding(user)
+          ? null
+          : AppLocale.endSubscription.getString(context);
+      actionColor = theme.colorScheme.tertiaryFixed;
+      actionTextColor = theme.colorScheme.onTertiaryFixed;
     } else if (_focusedPlanIsUpgrade(user?.plan)) {
       actionLabel = AppLocale.upgrade.getString(context);
       actionColor = theme.colorScheme.primary;
@@ -370,14 +430,17 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        GamepadControl(
-          label: actionLabel,
-          iconPath: 'assets/images/gamepad/Xbox_A_button.png',
-          onTap: _handleSelect,
-          textColor: actionTextColor,
-          backgroundColor: actionColor,
-        ),
-        SizedBox(width: 8.r),
+        if (actionLabel != null) ...[
+          GamepadControl(
+            label: actionLabel,
+            iconPath: 'assets/images/gamepad/Xbox_A_button.png',
+            onTap: _handleSelect,
+            textColor: actionTextColor,
+            backgroundColor: actionColor,
+            busy: !_noPlans && (_actionBusy || changeInFlight),
+          ),
+          SizedBox(width: 8.r),
+        ],
         NeoSyncBackButton(onTap: () => widget.onBack()),
       ],
     );
@@ -392,6 +455,9 @@ class _PlanSelectionViewState extends State<PlanSelectionView> {
 class PlanListView extends StatefulWidget {
   final List<PlanInfo> plans;
   final String? currentPlan;
+
+  /// Whether [currentPlan] is cancelled and ends with the billing period.
+  final bool currentPlanEnding;
   final int selectedIndex;
   final IconData Function(String) getPlanIcon;
   final Function(int) onSelectionChanged;
@@ -400,6 +466,7 @@ class PlanListView extends StatefulWidget {
     super.key,
     required this.plans,
     required this.currentPlan,
+    this.currentPlanEnding = false,
     required this.selectedIndex,
     required this.getPlanIcon,
     required this.onSelectionChanged,
@@ -518,7 +585,7 @@ class _PlanListViewState extends State<PlanListView>
               height: itemHeight,
               child: Container(
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.secondary,
+                  color: theme.colorScheme.onSurface,
                   borderRadius: BorderRadius.circular(12.r),
                 ),
               ),
@@ -556,10 +623,10 @@ class _PlanListViewState extends State<PlanListView>
     final isSelected = index == widget.selectedIndex;
 
     final Color primaryColor = isSelected
-        ? theme.colorScheme.onSecondary
+        ? theme.colorScheme.surface
         : theme.colorScheme.primary;
     final Color secondaryColor = isSelected
-        ? theme.colorScheme.onSecondary.withValues(alpha: 0.8)
+        ? theme.colorScheme.surface.withValues(alpha: 0.8)
         : theme.colorScheme.onSurface.withValues(alpha: 0.6);
 
     return Container(
@@ -587,7 +654,7 @@ class _PlanListViewState extends State<PlanListView>
                               ? FontWeight.bold
                               : FontWeight.w600,
                           color: isSelected
-                              ? theme.colorScheme.onSecondary
+                              ? theme.colorScheme.surface
                               : theme.colorScheme.onSurface,
                         ),
                       ),
@@ -604,7 +671,12 @@ class _PlanListViewState extends State<PlanListView>
                           borderRadius: BorderRadius.circular(5.r),
                         ),
                         child: Text(
-                          AppLocale.currentBadge.getString(context),
+                          // In capitals, like the dashboard's pill.
+                          widget.currentPlanEnding
+                              ? AppLocale.subscriptionEnding
+                                    .getString(context)
+                                    .toUpperCase()
+                              : AppLocale.currentBadge.getString(context),
                           style: TextStyle(
                             fontSize: 6.r,
                             fontWeight: FontWeight.w900,
@@ -650,7 +722,7 @@ class _PlanListViewState extends State<PlanListView>
                   fontSize: 15.r,
                   fontWeight: FontWeight.bold,
                   color: isSelected
-                      ? theme.colorScheme.onSecondary
+                      ? theme.colorScheme.surface
                       : theme.colorScheme.onSurface,
                 ),
               ),

@@ -15,6 +15,8 @@ import 'package:neostation/services/notification_service.dart';
 import 'package:neostation/sync/i_sync_provider.dart';
 import 'package:neostation/sync/providers/neo_sync_adapter.dart';
 import 'package:neostation/sync/sync_manager.dart';
+import 'package:neostation/widgets/plan_change_notice.dart';
+import 'package:neostation/widgets/plan_farewell_modal.dart';
 import 'package:neostation/widgets/plan_welcome_modal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -319,6 +321,65 @@ void main() {
     await tester.pump();
 
     expect(find.byType(PlanWelcomeModal), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    service.dispose();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1)); // the socket's close
+  });
+
+  // The event starts a profile reload; until it answers, the loaded plan is
+  // still the old one, which made the change look like no change at all.
+  testWidgets('a plan change reported before the profile reloads names the '
+      'plans the event gives', (tester) async {
+    PlanChangeNotice.debugReset();
+    addTearDown(PlanChangeNotice.debugReset);
+    await FlutterLocalization.instance.ensureInitialized();
+    FlutterLocalization.instance.init(
+      mapLocales: [MapLocale('en', AppLocale.en)],
+      initLanguageCode: 'en',
+    );
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      ScreenUtilInit(
+        designSize: const Size(640, 480),
+        builder: (context, _) => MaterialApp(
+          navigatorKey: navigatorKey,
+          localizationsDelegates:
+              FlutterLocalization.instance.localizationsDelegates,
+          supportedLocales: FlutterLocalization.instance.supportedLocales,
+          home: const SizedBox(),
+        ),
+      ),
+    );
+
+    final authService = (await tester.runAsync(
+      () => auth(body: profile(plan: 'mega')),
+    ))!;
+    addTearDown(authService.dispose);
+    final service = NotificationService(
+      authService: authService,
+      modalContext: () => navigatorKey.currentContext,
+      connectChannel: connectChannel,
+    );
+    await tester.runAsync(pumpEventQueue);
+
+    channels.single.receive({
+      'type': 'notification',
+      'data': {
+        'id': 'n2',
+        'event_type': 'plan.changed',
+        'message': 'Changed',
+        'data': {'old_plan': 'mega', 'new_plan': 'micro'},
+      },
+    });
+    await tester.pump();
+    await tester.pump();
+
+    final farewell = find.byType(PlanFarewellModal);
+    expect(farewell, findsOneWidget);
+    expect(tester.widget<PlanFarewellModal>(farewell).oldPlanName, 'mega');
+    expect(tester.widget<PlanFarewellModal>(farewell).newPlanName, 'micro');
     expect(tester.takeException(), isNull);
 
     service.dispose();

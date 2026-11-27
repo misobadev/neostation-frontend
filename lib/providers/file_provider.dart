@@ -1,5 +1,7 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/data/datasources/sqlite_service.dart';
 import 'package:neostation/repositories/system_repository.dart';
 import 'package:path/path.dart' as path;
@@ -42,6 +44,11 @@ class FileProvider extends ChangeNotifier {
 
   /// Cached map of supported file extensions per system, loaded from the database.
   Map<String, Set<String>> _systemExtensions = {};
+
+  /// Whether [_systemExtensions] came from the database. A failed lookup (the
+  /// database briefly locked at start-up) keeps the paths; the next
+  /// [initialize] tries the lookup again.
+  bool _systemExtensionsLoaded = false;
 
   /// Absolute path to the user's ES-DE application folder, or null if the ES-DE
   /// import is not configured. Used for read-time fallback artwork resolution.
@@ -114,60 +121,79 @@ class FileProvider extends ChangeNotifier {
   ///
   /// On Android, prioritizes Scoped Storage directories and internal app support paths.
   /// On Desktop, uses paths provided by [ConfigService] or current working directory fallbacks.
+  ///
+  /// Does nothing once everything has loaded; after a partial start-up (the
+  /// system extensions couldn't be read) it runs again.
   Future<void> initialize() async {
-    if (_isInitialized) return;
+    if (_isInitialized && _systemExtensionsLoaded) return;
+    await _resolvePaths();
+  }
 
+  /// Resolves every path and loads the system extensions.
+  Future<void> _resolvePaths() async {
+    // Resolved into locals and applied together, so a reader never sees a mix
+    // of old and new folders, and a failed re-resolve keeps the folders that
+    // worked.
+    final String userDataPath;
+    final String mediaPath;
+    final String documentsPath;
     try {
       if (Platform.isAndroid || Platform.isIOS) {
         final appSupportDir = await getApplicationSupportDirectory();
-        _documentsPath = appSupportDir.path;
-        _userDataPath = appSupportDir.path;
-
-        if (Platform.isAndroid) {
-          final userDataPath = await ConfigService.getUserDataPath();
-          _mediaPath = userDataPath;
-        } else {
-          _mediaPath = appSupportDir.path;
-        }
+        documentsPath = appSupportDir.path;
+        userDataPath = appSupportDir.path;
+        mediaPath = Platform.isAndroid
+            ? await ConfigService.getUserDataPath()
+            : appSupportDir.path;
       } else {
-        final userDataPath = await ConfigService.getUserDataPath();
-        final userDataDir = Directory(userDataPath);
-        _userDataPath = userDataDir.path;
-
-        final fullMediaPath = await ConfigService.getMediaPath();
-        _mediaPath = path.dirname(fullMediaPath);
-
-        _documentsPath = path.dirname(userDataDir.path);
+        userDataPath = await ConfigService.getUserDataPath();
+        mediaPath = path.dirname(await ConfigService.getMediaPath());
+        documentsPath = path.dirname(userDataPath);
       }
 
       // Ensure directory structures exist.
-      if (_userDataPath != null) {
-        final userDataDir = Directory(_userDataPath!);
-        if (!await userDataDir.exists()) {
-          await userDataDir.create(recursive: true);
+      for (final dir in [Directory(userDataPath), Directory(mediaPath)]) {
+        if (!await dir.exists()) {
+          await dir.create(recursive: true);
         }
       }
-
-      if (_mediaPath != null) {
-        final mediaDir = Directory(_mediaPath!);
-        if (!await mediaDir.exists()) {
-          await mediaDir.create(recursive: true);
-        }
-      }
-
-      _systemExtensions = await SystemRepository.getSystemExtensionsMap();
-      await _loadEsdeConfig();
-      _isInitialized = true;
-      notifyListeners();
     } catch (e) {
       _log.e('FileProvider: Error initializing: $e');
-      _userDataPath = null;
-      _mediaPath = null;
-      _documentsPath = null;
-      _isInitialized = false;
+      if (!_isInitialized) {
+        _userDataPath = null;
+        _mediaPath = null;
+        _documentsPath = null;
+      }
       notifyListeners();
+      return;
     }
+
+    _userDataPath = userDataPath;
+    _mediaPath = mediaPath;
+    _documentsPath = documentsPath;
+
+    // Kept apart from the paths: on a fresh install the database can be
+    // briefly locked here, and losing every path to that left the whole
+    // session without art. A fresh database has no extensions until its
+    // systems are synced, so an empty list counts as not loaded yet either.
+    try {
+      _systemExtensions = await SystemRepository.getSystemExtensionsMap();
+      _systemExtensionsLoaded = _systemExtensions.isNotEmpty;
+    } catch (e) {
+      _log.w('FileProvider: system extensions not loaded yet: $e');
+    }
+    await _loadEsdeConfig();
+    _isInitialized = true;
+    notifyListeners();
   }
+
+  /// Resolves every path again, after the user-data folder has moved.
+  ///
+  /// The setup wizard moves the user data without a restart. The scraper
+  /// already writes to the new folder, so without this the art it downloads
+  /// isn't found until the next launch, and art written through this provider
+  /// (RomM covers, a replaced image) goes to the old folder and is lost.
+  Future<void> reinitialize() => _resolvePaths();
 
   /// Sanitizes a ROM filename by stripping its extension.
   ///
@@ -301,19 +327,17 @@ class FileProvider extends ChangeNotifier {
     String extension,
   ) {
     final baseName = _stripRomExtension(romName, systemFolderName);
+    // "Android Games" are the android rows marked as games: their art is
+    // scraped into, and read from, the android folder.
+    final folder = SystemFolderNames.rowSystemFolder(systemFolderName);
 
     if (!_isInitialized || _mediaPath == null) {
-      return path.join(
-        mediaFolder,
-        systemFolderName,
-        imageType,
-        '$baseName.$extension',
-      );
+      return path.join(mediaFolder, folder, imageType, '$baseName.$extension');
     }
     return path.join(
       _mediaPath!,
       mediaFolder,
-      systemFolderName,
+      folder,
       imageType,
       '$baseName.$extension',
     );
@@ -532,7 +556,8 @@ class FileProvider extends ChangeNotifier {
   ]) {
     final mediaRoot = _esdeMediaRoot;
     if (mediaRoot == null) return const [];
-    final esdeDir = _esdeSystemDirs[systemFolderName];
+    final esdeDir =
+        _esdeSystemDirs[SystemFolderNames.rowSystemFolder(systemFolderName)];
     if (esdeDir == null) return const [];
     final categories = _esdeMediaCategories[imageType];
     if (categories == null) return const [];
@@ -593,6 +618,7 @@ class FileProvider extends ChangeNotifier {
     _esdeSystemDirs = {};
     _esdeMediaSubdirs = {};
     _isInitialized = false;
+    _systemExtensionsLoaded = false;
     notifyListeners();
   }
 }

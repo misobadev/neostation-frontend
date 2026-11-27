@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:neostation/widgets/brand_logo.dart';
 import 'package:flutter/material.dart';
 
 import 'shimmering_logo.dart';
@@ -36,10 +37,10 @@ class SplashStatusLayout extends StatelessWidget {
   /// Rendered logo width in design space. Matches what the startup and scan
   /// splashes used before the layout was made responsive, so on a screen the
   /// size of the design space nothing moves.
-  static const double _logoWidth = 280;
+  static const double logoWidth = 340;
 
-  /// Aspect ratio of `assets/images/logo_transparent.png` (772×510).
-  static const double _logoAspect = 772 / 510;
+  /// Aspect ratio of the logo, badge and wordmark ([BrandLogo]).
+  static const double _logoAspect = BrandLogo.aspectRatio;
 
   /// Share of the screen width the logo may take, so it stays a logo rather
   /// than a wall on narrow panels.
@@ -47,7 +48,7 @@ class SplashStatusLayout extends StatelessWidget {
 
   /// Share of the screen height the logo may take before it is scaled down.
   /// Chosen so the Thor's ~467dp-tall screen still renders the logo at its
-  /// full [_logoWidth] — only panels shorter than that scale it back.
+  /// full [logoWidth] — only panels shorter than that scale it back.
   static const double _maxLogoHeightFraction = 0.40;
 
   /// Clear space between the logo's bottom edge and the status block.
@@ -112,7 +113,7 @@ class SplashStatusLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = scaleOf(context);
-    final maxLogoWidth = _logoWidth * scale;
+    final maxLogoWidth = logoWidth * scale;
     final gap = _gap * scale;
     final bottomInset = _bottomInset * scale;
 

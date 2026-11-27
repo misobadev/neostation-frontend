@@ -1,6 +1,8 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import '../../../../models/system_model.dart';
 import '../../../../models/game_model.dart';
 import '../../../../providers/file_provider.dart';
@@ -177,10 +179,10 @@ class _GameDetailsBox2dTabState extends State<GameDetailsBox2dTab> {
     final box2dExists = File(box2dPath).existsSync();
 
     return Positioned(
-      left: 12.r,
-      right: 12.r,
-      top: 55.r,
-      bottom: widget.bottomOffset.r,
+      left: 48.r,
+      right: 48.r,
+      top: 72.r,
+      bottom: widget.bottomOffset.r + 20.r,
       child: Center(
         child: Container(
           decoration: BoxDecoration(
@@ -189,9 +191,8 @@ class _GameDetailsBox2dTabState extends State<GameDetailsBox2dTab> {
                 BorderRadius.circular(14.r),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.3),
+                color: Theme.of(context).colorScheme.shadow
+                    .withValues(alpha: 0.3),
                 blurRadius: 3.r,
                 offset: Offset(3.0.r, 3.0.r),
               ),

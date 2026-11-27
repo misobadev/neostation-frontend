@@ -1,3 +1,4 @@
+import 'package:neostation/widgets/brand_logo.dart';
 import 'package:flutter/material.dart';
 
 /// The full-color NeoStation logo with a soft light band sweeping across it.
@@ -135,11 +136,7 @@ class _ShimmeringLogoState extends State<ShimmeringLogo>
           child: child,
         );
       },
-      child: Image.asset(
-        'assets/images/logo_transparent.png',
-        width: widget.width,
-        filterQuality: FilterQuality.medium,
-      ),
+      child: BrandLogo(width: widget.width),
     );
   }
 }

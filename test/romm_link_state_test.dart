@@ -57,8 +57,7 @@ void main() {
     test('Android SAF content URI: decoded basename with extension', () {
       expect(
         rommLinkKeyFor(
-          romPath:
-              'content://com.android.externalstorage.documents/tree/primary%3Aemu/document/primary%3Aemu%2Froms%2Fsnes%2Fct-final.sfc',
+          romPath: 'content://com.android.externalstorage.documents/tree/primary%3Aemu/document/primary%3Aemu%2Froms%2Fsnes%2Fct-final.sfc',
           romname: 'ct-final',
         ),
         'ct-final.sfc',

@@ -50,7 +50,8 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n org.dolphinemu.handheld/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n org.dolphinemu.handheld/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history",
+          "m3u_first_disc": true
         }
       }
     },
@@ -61,7 +62,8 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n org.mm.jr/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n org.mm.jr/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history",
+          "m3u_first_disc": true
         }
       }
     },
@@ -72,7 +74,8 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n org.dolphinemu.mmjr/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n org.dolphinemu.mmjr/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history",
+          "m3u_first_disc": true
         }
       }
     },
@@ -83,7 +86,8 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n org.mm.j/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n org.mm.j/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history",
+          "m3u_first_disc": true
         }
       }
     },
@@ -94,7 +98,8 @@
       "is_retroachievements_compatible": true,
       "platforms": {
         "android": {
-          "launch_arguments": "-n org.dolphinemu.dolphinemu/.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n org.dolphinemu.dolphinemu/.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history",
+          "m3u_first_disc": true
         },
         "windows": {
           "executable": "dolphin.exe",
@@ -119,7 +124,8 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n org.shiiion.primehack/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n org.shiiion.primehack/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history",
+          "m3u_first_disc": true
         },
         "windows": {
           "executable": "primehack.exe",
@@ -143,7 +149,8 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n org.dolphin.ishiirukadark/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n org.dolphin.ishiirukadark/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history",
+          "m3u_first_disc": true
         }
       }
     },
@@ -154,7 +161,8 @@
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n com.joeyos.dolphinemu/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history"
+          "launch_arguments": "-n com.joeyos.dolphinemu/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -d \"{file.uri}\" --activity-clear-task --activity-clear-top --activity-no-history",
+          "m3u_first_disc": true
         }
       }
     },

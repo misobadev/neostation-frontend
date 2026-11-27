@@ -29,16 +29,76 @@
       "exe",
       "desktop",
       "lnk",
+      "app",
+      "appimage",
+      "sh",
       "pcgame",
       "gog",
       "epic",
       "customgame",
       "amazon",
       "steam",
+      "droiddeck",
       "localgameid"
     ]
   },
   "emulators": [
+    {
+      "name": "Desktop shortcut",
+      "unique_id": "windows.desktop.shortcut",
+      "description": "Supported extensions: lnk, desktop, app.",
+      "extensions": [
+        "lnk",
+        "desktop",
+        "app"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        },
+        "linux": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        },
+        "macos": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        }
+      }
+    },
+    {
+      "name": "Desktop executable",
+      "unique_id": "windows.desktop.executable",
+      "description": "Supported extensions: exe, appimage, sh.",
+      "extensions": [
+        "exe",
+        "appimage",
+        "sh"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "launch_mode": "executable",
+          "executable": "{file.path}",
+          "args": "",
+          "working_directory": "{file.dir}"
+        },
+        "linux": {
+          "launch_mode": "executable",
+          "executable": "{file.path}",
+          "args": "",
+          "working_directory": "{file.dir}"
+        },
+        "macos": {
+          "launch_mode": "executable",
+          "executable": "{file.path}",
+          "args": "",
+          "working_directory": "{file.dir}"
+        }
+      }
+    },
     {
       "name": "Standalone Winlator CMod",
       "unique_id": "windows.winlator.cmod",
@@ -311,6 +371,18 @@
       "platforms": {
         "android": {
           "launch_arguments": "-a app.gamenative.LAUNCH_GAME -n app.gamenative/.MainActivity --ei app_id \"{tags.steamappid}\" --es game_source STEAM"
+        }
+      }
+    },
+    {
+      "name": "Standalone DroidDeck",
+      "unique_id": "windows.com.droiddeck.launcher",
+      "is_retroachievements_compatible": false,
+      "description": "Supported extensions: steam, droiddeck. Launch files exported by DroidDeck; the game must be installed in DroidDeck.",
+      "platforms": {
+        "android": {
+          "launch_arguments": "-a android.intent.action.VIEW -n com.droiddeck.launcher/.MainActivity -d \"{file.uri}\" --activity-clear-top",
+          "keep_saf_uri": true
         }
       }
     }

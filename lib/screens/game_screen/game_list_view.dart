@@ -141,6 +141,19 @@ class GameListViewState extends State<GameListView>
     _centeredScrollController.jumpToIndex(index);
   }
 
+  /// Number of complete rows in the current viewport, used for page navigation.
+  int get pageSize {
+    final controller = _centeredScrollController.scrollController;
+    if (!controller.hasClients || !controller.position.hasViewportDimension) {
+      return 1;
+    }
+    final rows =
+        (controller.position.viewportDimension /
+                GameListSize.getRowHeight(widget.listSize).r)
+            .floor();
+    return rows < 1 ? 1 : rows;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -358,15 +371,14 @@ class GameListViewState extends State<GameListView>
                         decoration: BoxDecoration(
                           color: highlightColor,
                           borderRadius:
-                              Theme.of(
-                                context,
-                              ).extension<CornerRadii>()?.radiusInternal ??
+                              Theme.of(context)
+                                  .extension<CornerRadii>()
+                                  ?.radiusInternal ??
                               BorderRadius.circular(14.r),
                           boxShadow: [
                             BoxShadow(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.shadow.withValues(alpha: 0.1),
+                              color: Theme.of(context).colorScheme.shadow
+                                  .withValues(alpha: 0.1),
                               blurRadius: 4.r,
                               offset: Offset(2.0.r, 2.0.r),
                             ),
@@ -517,7 +529,10 @@ class GameListViewState extends State<GameListView>
                                     // A mark among the row's other marks: the
                                     // badges' own size, no chip, and no shadow
                                     // — this row is flat surface, not artwork.
-                                    size: titleFontSize,
+                                    // NeoSyncStatusIcon applies ScreenUtil scaling internally.
+                                    size: GameListSize.getFontSize(
+                                      widget.listSize,
+                                    ),
                                     showBackground: false,
                                     showGlyphShadow: false,
                                     // The selected row's foreground, for the

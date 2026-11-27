@@ -33,16 +33,15 @@ class StorageInfoCard extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium, // Usar tema
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium, // Usar tema
                     ),
                     Text(
                       "$numOfFiles Files",
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.7),
+                        color: Theme.of(context).colorScheme.onSurface
+                            .withValues(alpha: 0.7),
                       ), // Usar tema con transparencia
                     ),
                   ],

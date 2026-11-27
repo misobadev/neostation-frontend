@@ -63,7 +63,7 @@ class CustomThemeService {
           if (json is! Map<String, dynamic>) {
             throw const FormatException('Root is not a JSON object.');
           }
-          result.add(CustomTheme.fromDaisyJson(json));
+          result.add(CustomTheme.fromJson(json));
         } catch (e) {
           complete = false;
           _log.w('CustomThemeService: skipping "${file.path}" ($e).');
@@ -97,7 +97,7 @@ class CustomThemeService {
       throw const FormatException('Root is not a JSON object.');
     }
 
-    var parsed = CustomTheme.fromDaisyJson(decoded);
+    var parsed = CustomTheme.fromJson(decoded);
 
     // Exact re-import: same resolved palette already on disk.
     for (final e in existing) {

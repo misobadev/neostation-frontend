@@ -75,9 +75,15 @@ class LinuxHostProcess {
     String executable,
     List<String> args, {
     Map<String, String>? environment,
+    String? workingDirectory,
   }) {
     final (exe, argv) = command(executable, args);
-    return Process.start(exe, argv, environment: environment);
+    return Process.start(
+      exe,
+      argv,
+      environment: environment,
+      workingDirectory: workingDirectory,
+    );
   }
 
   /// [Process.run], on the host when sandboxed.

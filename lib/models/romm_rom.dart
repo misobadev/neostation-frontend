@@ -36,6 +36,10 @@ class RommRom {
   /// RomM platform slug (e.g. "snes").
   final String platformSlug;
 
+  /// RomM's name for the platform (e.g. "Super Nintendo Entertainment
+  /// System"), or null when the server sent none.
+  final String? platformName;
+
   /// Filesystem name including extension (the download `file_name`).
   final String fsName;
 
@@ -106,6 +110,7 @@ class RommRom {
     required this.name,
     required this.platformId,
     required this.platformSlug,
+    this.platformName,
     required this.fsName,
     required this.fsNameNoExt,
     required this.fsExtension,
@@ -151,6 +156,10 @@ class RommRom {
           json['name']?.toString() ?? json['fs_name']?.toString() ?? 'Unknown',
       platformId: (json['platform_id'] as num?)?.toInt() ?? 0,
       platformSlug: json['platform_slug']?.toString() ?? '',
+      platformName: switch (json['platform_name']?.toString().trim()) {
+        final name? when name.isNotEmpty => name,
+        _ => null,
+      },
       fsName: json['fs_name']?.toString() ?? '',
       fsNameNoExt: json['fs_name_no_ext']?.toString() ?? '',
       fsExtension: json['fs_extension']?.toString() ?? '',

@@ -31,22 +31,27 @@ void main() {
       db.select('PRAGMA user_version;').first.values.first! as int;
 
   group('user_version stamping is atomic with schema creation', () {
-    test('a committed transaction publishes tables and stamp together', () async {
-      final adapter = DatabaseAdapter(db);
+    test(
+      'a committed transaction publishes tables and stamp together',
+      () async {
+        final adapter = DatabaseAdapter(db);
 
-      await adapter.transaction((txn) async {
-        await txn.execute('CREATE TABLE user_config (id INTEGER PRIMARY KEY);');
-        await txn.execute('PRAGMA user_version = 153;');
-      });
+        await adapter.transaction((txn) async {
+          await txn.execute(
+            'CREATE TABLE user_config (id INTEGER PRIMARY KEY);',
+          );
+          await txn.execute('PRAGMA user_version = 153;');
+        });
 
-      expect(userVersion(), 153);
-      expect(
-        db.select(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='user_config';",
-        ),
-        isNotEmpty,
-      );
-    });
+        expect(userVersion(), 153);
+        expect(
+          db.select(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='user_config';",
+          ),
+          isNotEmpty,
+        );
+      },
+    );
 
     test(
       'a failed transaction leaves neither the tables nor the stamp',

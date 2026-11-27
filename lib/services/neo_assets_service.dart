@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
+
 import 'config_service.dart';
 import 'logger_service.dart';
 import '../utils/app_config.dart';
@@ -686,9 +688,17 @@ class NeoAssetsService {
     return path.join(dir, themeFolder, 'backgrounds', '$systemFolderName.$ext');
   }
 
+  /// The name packs give a system's background where it differs from
+  /// NeoStation's folder name. Packs follow ES-DE's system ids, and every
+  /// pack in the catalog names Arcade's background `arcade`, while
+  /// NeoStation's Arcade system is `arc`.
+  @visibleForTesting
+  static const Map<String, String> packSystemAliases = {'arc': 'arcade'};
+
   /// Resolves the cached background path checking both .webp and .gif formats.
-  /// Returns the path to the existing file, preferring .webp over .gif.
-  /// If neither exists, returns the .webp path as default.
+  /// Returns the path to the existing file, preferring .webp over .gif, under
+  /// [systemFolderName] first and then under its pack name
+  /// ([packSystemAliases]). If none exists, returns the .webp path as default.
   static String? resolveBackgroundPathSync(
     String themeFolder,
     String systemFolderName,
@@ -696,21 +706,15 @@ class NeoAssetsService {
     final dir = _cachedThemeDir;
     if (dir == null) return null;
 
-    final webpPath = path.join(
-      dir,
-      themeFolder,
-      'backgrounds',
-      '$systemFolderName.webp',
-    );
-    if (File(webpPath).existsSync()) return webpPath;
-
-    final gifPath = path.join(
-      dir,
-      themeFolder,
-      'backgrounds',
-      '$systemFolderName.gif',
-    );
-    if (File(gifPath).existsSync()) return gifPath;
+    final backgrounds = path.join(dir, themeFolder, 'backgrounds');
+    final webpPath = path.join(backgrounds, '$systemFolderName.webp');
+    final alias = packSystemAliases[systemFolderName];
+    for (final name in [systemFolderName, ?alias]) {
+      for (final ext in const ['webp', 'gif']) {
+        final candidate = path.join(backgrounds, '$name.$ext');
+        if (File(candidate).existsSync()) return candidate;
+      }
+    }
 
     return webpPath;
   }

@@ -13,12 +13,14 @@ import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/widgets/confirm_action_dialog.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/custom_toggle_switch.dart';
+import 'package:neostation/widgets/neo_glass.dart';
+
 import '../settings_title.dart';
 import '../widgets/setting_row.dart';
 import '../widgets/setting_value_chip.dart';
 import '../widgets/settings_section_header.dart';
 import 'scrape_session.dart';
-import 'scraping_progress_panel.dart';
+import '../widgets/scraping_progress_panel.dart';
 import 'screenscraper_account_card.dart';
 import 'screenscraper_login_dialog.dart';
 
@@ -34,9 +36,14 @@ import 'screenscraper_login_dialog.dart';
 class ScreenScraperSettingsContent extends StatefulWidget {
   final bool isContentFocused;
 
+  /// Called after the user signed out, so Settings → Metadata can offer the
+  /// provider choice again.
+  final VoidCallback? onSignedOut;
+
   const ScreenScraperSettingsContent({
     super.key,
     required this.isContentFocused,
+    this.onSignedOut,
   });
 
   @override
@@ -378,6 +385,7 @@ class ScreenScraperSettingsContentState
         _movingRegion = false;
       });
       _scrollToCursor();
+      widget.onSignedOut?.call();
     } else {
       AppNotification.showNotification(
         context,
@@ -541,6 +549,7 @@ class ScreenScraperSettingsContentState
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
                   controller: _scrollController,
+                  padding: EdgeInsets.only(top: 6.r),
                   child: _signedIn
                       ? _buildSignedIn(context)
                       : _buildSignedOut(context),
@@ -561,11 +570,7 @@ class ScreenScraperSettingsContentState
           subtitle: AppLocale.requiresFreeAccount.getString(context),
           focused: _focused(0),
           onTap: _signIn,
-          trailing: Icon(
-            Symbols.login_rounded,
-            size: 20.r,
-            color: theme.colorScheme.primary,
-          ),
+          trailing: Icon(Symbols.login_rounded, size: 20.r),
         ),
         SizedBox(height: 12.r),
         Text(
@@ -580,7 +585,7 @@ class ScreenScraperSettingsContentState
   }
 
   Widget _buildSignedIn(BuildContext context) {
-    final gap = SizedBox(height: 6.r);
+    final gap = SizedBox(height: 12.r);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -642,7 +647,7 @@ class ScreenScraperSettingsContentState
           onTap: _toggleAllSystems,
           trailing: SettingValueChip(
             text:
-                '${_enabledSystems.values.where((v) => v).length} / ${_systems.length}',
+                '${_systems.where((s) => _enabledSystems[s['id'].toString()] == true).length} / ${_systems.length}',
           ),
         ),
         SizedBox(height: 8.r),
@@ -681,6 +686,7 @@ class ScreenScraperSettingsContentState
 
   Widget _buildScrapeRow(BuildContext context) {
     final theme = Theme.of(context);
+    final focused = _focused(_scrapeSlot);
     return Consumer<ScrapingProvider>(
       builder: (context, scraping, _) {
         return Column(
@@ -692,7 +698,7 @@ class ScreenScraperSettingsContentState
               subtitle: scraping.isScraping
                   ? '${AppLocale.scrapingInProgress.getString(context)} ${scraping.maxThreads} threads'
                   : AppLocale.scraperSubtitle.getString(context),
-              focused: _focused(_scrapeSlot),
+              focused: focused,
               onTap: _toggleScraping,
               trailing: ElevatedButton.icon(
                 onPressed: _toggleScraping,
@@ -709,10 +715,16 @@ class ScreenScraperSettingsContentState
                   style: TextStyle(fontSize: 10.r),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: scraping.isScraping
-                      ? theme.colorScheme.error
-                      : theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
+                  backgroundColor: focused
+                      ? theme.colorScheme.surface
+                      : (scraping.isScraping
+                            ? theme.colorScheme.error
+                            : theme.colorScheme.primary),
+                  foregroundColor: focused
+                      ? theme.colorScheme.onSurface
+                      : (scraping.isScraping
+                            ? theme.colorScheme.onError
+                            : theme.colorScheme.onPrimary),
                   padding: EdgeInsets.symmetric(
                     horizontal: 16.r,
                     vertical: 6.r,
@@ -768,6 +780,9 @@ class ScreenScraperSettingsContentState
   }
 
   Widget _buildRegionList(BuildContext context) {
+    final rimWidth = NeoGlass.borderWidthOf(context);
+    final inset = rimWidth > 0 ? (rimWidth / 2 + 0.5).r : 0.0;
+
     return ReorderableListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -782,18 +797,25 @@ class ScreenScraperSettingsContentState
       ),
       itemBuilder: (context, index) {
         final slot = _regionStart + index;
+        final card = KeyedSubtree(
+          key: _keyFor(slot),
+          child: _buildRegionCard(
+            context,
+            index: index,
+            focused: _focused(slot),
+            moving: _movingRegion && _cursor == slot,
+          ),
+        );
         return Padding(
           key: ValueKey('region_${_regions[index]}'),
-          padding: EdgeInsets.only(bottom: 4.r),
-          child: KeyedSubtree(
-            key: _keyFor(slot),
-            child: _buildRegionCard(
-              context,
-              index: index,
-              focused: _focused(slot),
-              moving: _movingRegion && _cursor == slot,
-            ),
-          ),
+          padding: EdgeInsets.fromLTRB(inset, 0, inset, 12.r),
+          child: rimWidth > 0
+              ? NeoGlassRim(
+                  cornerRadius: 8.r,
+                  borderWidth: rimWidth,
+                  child: card,
+                )
+              : card,
         );
       },
     );
@@ -808,6 +830,10 @@ class ScreenScraperSettingsContentState
     final theme = Theme.of(context);
     final code = _regions[index];
     final priority = index + 1;
+    final highlighted = moving || focused;
+    final foreground = highlighted
+        ? theme.colorScheme.surface
+        : theme.colorScheme.onSurface;
 
     return Material(
       color: Colors.transparent,
@@ -835,16 +861,11 @@ class ScreenScraperSettingsContentState
           curve: Curves.easeOut,
           padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 6.r),
           decoration: BoxDecoration(
-            color: moving
-                ? theme.colorScheme.primary.withValues(alpha: 0.2)
+            color: highlighted
+                ? theme.colorScheme.onSurface
                 : theme.colorScheme.surface.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(8.r),
-            border: Border.all(
-              color: moving || focused
-                  ? theme.colorScheme.primary
-                  : Colors.transparent,
-              width: 2,
-            ),
+            border: Border.all(color: Colors.transparent),
           ),
           child: Row(
             children: [
@@ -853,8 +874,8 @@ class ScreenScraperSettingsContentState
                 height: 24.r,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: moving
-                      ? theme.colorScheme.primary
+                  color: highlighted
+                      ? theme.colorScheme.surface
                       : theme.colorScheme.onSurface.withValues(alpha: 0.1),
                 ),
                 child: Center(
@@ -863,8 +884,8 @@ class ScreenScraperSettingsContentState
                     style: theme.textTheme.labelSmall?.copyWith(
                       fontSize: 10.r,
                       fontWeight: FontWeight.bold,
-                      color: moving
-                          ? theme.colorScheme.onPrimary
+                      color: highlighted
+                          ? theme.colorScheme.onSurface
                           : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
@@ -877,9 +898,7 @@ class ScreenScraperSettingsContentState
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w500,
                     fontSize: 12.r,
-                    color: focused
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface,
+                    color: foreground,
                   ),
                 ),
               ),
@@ -887,7 +906,9 @@ class ScreenScraperSettingsContentState
                 code.toUpperCase(),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: 9.r,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                  color: highlighted
+                      ? theme.colorScheme.surface.withValues(alpha: 0.7)
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.4),
                 ),
               ),
               SizedBox(width: 8.r),
@@ -904,8 +925,8 @@ class ScreenScraperSettingsContentState
                           ? Symbols.swap_vert_rounded
                           : Symbols.drag_indicator_rounded,
                       size: 20.r,
-                      color: moving
-                          ? theme.colorScheme.primary
+                      color: highlighted
+                          ? theme.colorScheme.surface
                           : theme.colorScheme.onSurface.withValues(
                               alpha: focused ? 0.5 : 0.2,
                             ),
@@ -955,6 +976,9 @@ class ScreenScraperSettingsContentState
     final theme = Theme.of(context);
     final id = system['id'].toString();
     final enabled = _enabledSystems[id] ?? false;
+    final foreground = focused
+        ? theme.colorScheme.surface
+        : theme.colorScheme.onSurface;
 
     return InkWell(
       canRequestFocus: false,
@@ -970,17 +994,19 @@ class ScreenScraperSettingsContentState
       child: Container(
         padding: EdgeInsets.all(4.r),
         decoration: BoxDecoration(
-          color: enabled
-              ? theme.cardColor.withValues(alpha: 0.6)
-              : theme.cardColor.withValues(alpha: 0.3),
+          color: focused
+              ? theme.colorScheme.onSurface
+              : (enabled
+                    ? theme.cardColor.withValues(alpha: 0.6)
+                    : theme.cardColor.withValues(alpha: 0.3)),
           borderRadius: BorderRadius.circular(8.r),
           border: Border.all(
             color: focused
-                ? theme.colorScheme.primary
-                : enabled
-                ? Colors.greenAccent
-                : theme.colorScheme.outline.withValues(alpha: 0.1),
-            width: focused ? 2.r : 1.5.r,
+                ? Colors.transparent
+                : (enabled
+                      ? Colors.greenAccent
+                      : theme.colorScheme.outline.withValues(alpha: 0.1)),
+            width: 1.5.r,
           ),
         ),
         child: Column(
@@ -991,22 +1017,30 @@ class ScreenScraperSettingsContentState
               height: 24.r,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: enabled
-                    ? Colors.greenAccent.withValues(alpha: 0.25)
-                    : theme.cardColor.withValues(alpha: 0.25),
+                color: focused
+                    ? theme.colorScheme.surface.withValues(alpha: 0.15)
+                    : (enabled
+                          ? Colors.greenAccent.withValues(alpha: 0.25)
+                          : theme.cardColor.withValues(alpha: 0.25)),
                 border: Border.all(
-                  color: enabled
-                      ? Colors.greenAccent
-                      : theme.colorScheme.outline.withValues(alpha: 0.4),
+                  color: focused
+                      ? theme.colorScheme.surface.withValues(alpha: 0.6)
+                      : (enabled
+                            ? Colors.greenAccent
+                            : theme.colorScheme.outline.withValues(alpha: 0.4)),
                   width: 1.5.r,
                 ),
               ),
               child: Center(
                 child: Icon(
                   enabled ? Symbols.check_rounded : Symbols.add_rounded,
-                  color: enabled
-                      ? Colors.greenAccent
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: focused
+                      ? foreground
+                      : (enabled
+                            ? Colors.greenAccent
+                            : theme.colorScheme.onSurface.withValues(
+                                alpha: 0.5,
+                              )),
                   size: 14.r,
                 ),
               ),
@@ -1015,9 +1049,11 @@ class ScreenScraperSettingsContentState
             Text(
               system['name'].toString(),
               style: TextStyle(
-                color: theme.colorScheme.onSurface.withValues(
-                  alpha: enabled ? 0.9 : 0.5,
-                ),
+                color: focused
+                    ? foreground
+                    : theme.colorScheme.onSurface.withValues(
+                        alpha: enabled ? 0.9 : 0.5,
+                      ),
                 fontSize: 9.r,
                 fontWeight: enabled ? FontWeight.w600 : FontWeight.normal,
               ),

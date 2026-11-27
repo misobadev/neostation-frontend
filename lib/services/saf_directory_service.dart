@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import 'logger_service.dart';
 
 /// Service for managing directory and file operations via the Android
@@ -10,34 +13,14 @@ import 'logger_service.dart';
 /// USB storage) on Android 11+ where standard filesystem APIs are restricted
 /// by Scoped Storage.
 class SafDirectoryService {
+  /// Allows directory-channel tests to exercise encoded Android URIs on CI hosts.
+  @visibleForTesting
+  static bool? directoryPlatformIsAndroidOverride;
+
   /// Platform channel for communicating with native Android implementation.
   static const platform = MethodChannel('com.neogamelab.neostation/game');
 
   static final _log = LoggerService.instance;
-
-  /// Initiates the SAF directory picker intent.
-  ///
-  /// Returns a persistent 'content://' URI if successful, or null if cancelled.
-  static Future<String?> requestDirectoryAccess() async {
-    if (!Platform.isAndroid) {
-      return null;
-    }
-
-    try {
-      final String? directoryUri = await platform.invokeMethod(
-        'openDirectoryPicker',
-      );
-
-      if (directoryUri != null) {
-        _log.i('SAF directory URI obtained: $directoryUri');
-      }
-
-      return directoryUri;
-    } on PlatformException catch (e) {
-      _log.e('Error opening SAF directory picker: ${e.message}');
-      return null;
-    }
-  }
 
   /// Checks if the application currently holds persistent permission for a given URI.
   static Future<bool> hasPermission(String uri) async {
@@ -59,35 +42,26 @@ class SafDirectoryService {
     }
   }
 
-  /// Releases persistent permissions for a given URI.
-  static Future<void> releasePermission(String uri) async {
-    if (!Platform.isAndroid) {
-      return;
-    }
-
-    try {
-      await platform.invokeMethod('releasePermission', {'uri': uri});
-    } on PlatformException catch (e) {
-      _log.e('Error releasing SAF permission: ${e.message}');
-    }
-  }
-
-  /// Attempts to resolve a 'content://' URI into a standard filesystem path.
+  /// Releases the persistent permission of the folder tree [uri] names.
   ///
-  /// Note: This is only possible for certain providers and may return null.
-  static Future<String?> uriToPath(String uri) async {
+  /// Returns whether a permission was released. Only that folder's own grant
+  /// goes: a folder inside it or around it, picked on its own, keeps its own.
+  static Future<bool> releasePermission(String uri) async {
     if (!Platform.isAndroid) {
-      return null;
+      return false;
     }
 
     try {
-      final String? path = await platform.invokeMethod('uriToPath', {
+      final bool? released = await platform.invokeMethod('releasePermission', {
         'uri': uri,
       });
-      return path;
+      return released ?? false;
     } on PlatformException catch (e) {
-      _log.e('Error converting SAF URI to path: ${e.message}');
-      return null;
+      _log.e('Error releasing SAF permission: ${e.message}');
+      return false;
+    } on MissingPluginException catch (e) {
+      _log.e('Releasing a SAF permission is unavailable: $e');
+      return false;
     }
   }
 
@@ -121,7 +95,7 @@ class SafDirectoryService {
   /// Each entry in the resulting list is a map containing metadata like
   /// 'name', 'uri', 'is_directory', and 'size'.
   static Future<List<Map<String, dynamic>>> listFiles(String uri) async {
-    if (!Platform.isAndroid) {
+    if (!(directoryPlatformIsAndroidOverride ?? Platform.isAndroid)) {
       return [];
     }
 
@@ -185,13 +159,15 @@ class SafDirectoryService {
     if (_fastWalkAvailable == false) return null;
 
     try {
-      final List<dynamic>? files = await platform
-          .invokeMethod('fastWalkSafTree', {
-            'uri': uri,
-            'recursive': recursive,
-            'extensions': extensions.toList(),
-            'ignoreHiddenFiles': ignoreHiddenFiles,
-          });
+      final List<dynamic>? files = await platform.invokeMethod(
+        'fastWalkSafTree',
+        {
+          'uri': uri,
+          'recursive': recursive,
+          'extensions': extensions.toList(),
+          'ignoreHiddenFiles': ignoreHiddenFiles,
+        },
+      );
 
       if (files == null) {
         _fastWalkAvailable = false;

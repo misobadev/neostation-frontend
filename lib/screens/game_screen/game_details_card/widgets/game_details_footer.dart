@@ -9,6 +9,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/themes/app_themes.dart';
+
 import '../../../../models/system_model.dart';
 import '../../../../models/game_model.dart';
 import '../../../../models/retro_achievements_game_info.dart';
@@ -18,6 +19,7 @@ import '../../../../widgets/neo_glass.dart';
 import '../../../../widgets/monospaced_clock.dart';
 import '../../music/music_player.dart';
 import 'scrolling_status_line.dart';
+
 import 'package:neostation/utils/ra_coverage.dart';
 
 /// A sticky footer component for the game details card that provides actionable controls and status summaries.
@@ -173,8 +175,9 @@ class GameDetailsFooter extends StatelessWidget {
                   SizedBox(
                     height: _bottomRowHeight,
                     // The whole row is touch-only. Every action on it has a
-                    // hardware binding already (A launches, Y opens the context
-                    // menu, Start opens settings), and a focusable widget inside
+                    // hardware binding already (A launches, Y opens the
+                    // context menu, Start opens settings), and a focusable
+                    // widget inside
                     // the card would put a second cursor in a view that owns its
                     // own selection.
                     child: ExcludeFocus(
@@ -298,9 +301,8 @@ class GameDetailsFooter extends StatelessWidget {
                               MediaQuery(
                                 data: playTextScaler == null
                                     ? MediaQuery.of(context)
-                                    : MediaQuery.of(
-                                        context,
-                                      ).copyWith(textScaler: playTextScaler),
+                                    : MediaQuery.of(context)
+                                          .copyWith(textScaler: playTextScaler),
                                 child: SizedBox(
                                   width: playWidth,
                                   child: _buildPlayButton(
@@ -332,7 +334,6 @@ class GameDetailsFooter extends StatelessWidget {
   /// with it, and a games view whose one visible control was an achievements
   /// pill gave touch nothing to press.
   Widget _buildPlayButton(BuildContext context, {required double width}) {
-    final showLabel = width >= 88.r;
     // The one control on the row that keeps the theme's corner. Fully rounded
     // it read as one more chip in the set, and PLAY is not one of the set --
     // it is the row's primary action, and the squarer corner is part of what
@@ -340,18 +341,18 @@ class GameDetailsFooter extends StatelessWidget {
     final BorderRadius radius =
         Theme.of(context).extension<CornerRadii>()?.radiusExternal ??
         BorderRadius.circular(14.r);
+    // The theme's main action colour, the same as Enter elsewhere.
+    final scheme = Theme.of(context).colorScheme;
 
     return Container(
       // The row gives this button whatever width remains after reserving the
-      // achievements pill and the other controls. At its preferred width the
-      // localized label fits; when space is tight the row removes the label
-      // first and keeps the A-button action visible.
+      // achievements pill and the other controls. The localized label is the
+      // whole button now, so tight rows ellipsize rather than dropping it.
       width: width,
       height: _controlSize.r,
       decoration: BoxDecoration(
-        color: const Color(0xFF2ECC71),
+        color: scheme.tertiary,
         borderRadius: radius,
-        border: Border.all(color: const Color(0xFF36F184), width: 1.r),
         boxShadow: [
           BoxShadow(
             color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
@@ -367,52 +368,29 @@ class GameDetailsFooter extends StatelessWidget {
           focusColor: Colors.transparent,
           hoverColor: Colors.transparent,
           highlightColor: Colors.transparent,
-          splashColor: Colors.white.withValues(alpha: 0.1),
+          splashColor: scheme.onTertiary.withValues(alpha: 0.1),
           borderRadius: radius,
           onTap: () {
             SfxService().playEnterSound();
             onPlayGame();
           },
-          child: Padding(
-            // The trailing inset balances the label in the wide button. With
-            // just the A glyph it would shift the glyph off the button centre.
-            padding: EdgeInsets.only(right: showLabel ? 8.r : 0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  'assets/images/gamepad/Xbox_A_button.png',
-                  width: math.min(
-                    28.r,
-                    math.max(0, width - (showLabel ? 8.r : 4.r)),
-                  ),
-                  height: math.min(
-                    28.r,
-                    math.max(0, width - (showLabel ? 8.r : 4.r)),
-                  ),
-                  color: Theme.of(context).colorScheme.onPrimary,
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.r),
+              child: Text(
+                AppLocale.playButton.getString(context),
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: scheme.onTertiary,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13.r,
+                  letterSpacing: 1.0,
+                  height: 1.0,
                 ),
-                if (showLabel) SizedBox(width: 6.r),
-                // The label is localized and the button is a fixed width. Keep
-                // the type size stable and ellipsize labels that are too long.
-                if (showLabel)
-                  Flexible(
-                    child: Text(
-                      AppLocale.playButton.getString(context),
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 13.r,
-                        letterSpacing: 1.0,
-                        height: 1.0,
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
           ),
         ),
@@ -528,12 +506,12 @@ class GameDetailsFooter extends StatelessWidget {
     final double progress = knowsProgress && total > 0 ? awarded / total : 0.0;
 
     final theme = Theme.of(context);
-    // Orange is for a real, known score. An empty bar that is empty only
-    // because nobody has answered yet stays neutral, so the colour arriving is
-    // itself the signal that the number is real.
+    // The theme's warning colour is for a real, known score. An empty bar
+    // that is empty only because nobody has answered yet stays neutral, so the
+    // colour arriving is itself the signal that the number is real.
     final Color statusColor = noAchievements || awaitingProgress
         ? theme.colorScheme.onSurface
-        : Colors.orange;
+        : AppThemes.getCustomColors(context).warningColor as Color;
 
     final String? gameIconUrl = currentGameInfo?.imageIcon.isNotEmpty == true
         ? 'https://media.retroachievements.org${currentGameInfo!.imageIcon}'
@@ -567,13 +545,10 @@ class GameDetailsFooter extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 4.r),
               child: Row(
                 children: [
-                  // RetroAchievements game icon.
-                  ClipRRect(
-                    borderRadius:
-                        Theme.of(
-                          context,
-                        ).extension<CornerRadii>()?.radiusInternal ??
-                        BorderRadius.circular(14.r),
+                  // RetroAchievements game icon, round like the pill around
+                  // it: the row's controls are circles and stadiums, so a
+                  // square icon with the theme's corners looked out of place.
+                  ClipOval(
                     child: Container(
                       width: _pillIconSize,
                       height: _pillIconSize,

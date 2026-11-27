@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
@@ -74,27 +75,56 @@ class NeoGlass extends StatelessWidget {
   /// Reads the user's NeoGlass preferences from [SqliteConfigProvider], falling
   /// back to the feature defaults when the provider is absent (e.g. a preview
   /// subtree built without it).
-  static ({double blur, int transparency, double borderWidth}) _prefs(
-    BuildContext context,
-  ) {
+  static ({
+    double blur,
+    int transparency,
+    double borderWidth,
+    bool performanceMode,
+  })
+  _prefs(BuildContext context) {
     try {
       final config = context.watch<SqliteConfigProvider>().config;
+      // Performance mode only overrides the effects, never the stored
+      // preferences: turning it off restores the user's glass untouched.
+      if (config.performanceMode) {
+        return (
+          blur: 0,
+          transparency: config.neoglassTransparency,
+          borderWidth: 0,
+          performanceMode: true,
+        );
+      }
       return (
         blur: config.neoglassBlur.toDouble(),
         transparency: config.neoglassTransparency,
         borderWidth: config.neoglassBorderWidth,
+        performanceMode: false,
       );
     } catch (_) {
-      return (blur: 0, transparency: 10, borderWidth: 2);
+      return (
+        blur: 0,
+        transparency: 10,
+        borderWidth: 2,
+        performanceMode: false,
+      );
     }
+  }
+
+  /// The rim stroke width NeoGlass will draw: the explicit [override] when
+  /// given, otherwise the user's configured value. `0` means no rim/border.
+  static double borderWidthOf(BuildContext context, {double? override}) {
+    final prefs = _prefs(context);
+    return prefs.performanceMode ? 0.0 : (override ?? prefs.borderWidth);
   }
 
   @override
   Widget build(BuildContext context) {
     final prefs = _prefs(context);
-    final effectiveBlur = blur ?? prefs.blur;
+    final effectiveBlur = prefs.performanceMode ? 0.0 : (blur ?? prefs.blur);
     final effectiveTransparency = transparency ?? prefs.transparency;
-    final effectiveBorderWidth = borderWidth ?? prefs.borderWidth;
+    final effectiveBorderWidth = prefs.performanceMode
+        ? 0.0
+        : (borderWidth ?? prefs.borderWidth);
     // Transparency 0–30 maps to the tint alpha: 0 → opaque (1.0), 30 → the
     // maximum see-through (0.5). The scale never reaches full transparency, so
     // the glass always stays readable against the backdrop.
@@ -104,9 +134,8 @@ class NeoGlass extends StatelessWidget {
     // beneath it) glows with the backdrop's colours.
     final glassTint =
         tint ??
-        Theme.of(
-          context,
-        ).scaffoldBackgroundColor.withValues(alpha: effectiveOpacity);
+        Theme.of(context).scaffoldBackgroundColor
+            .withValues(alpha: effectiveOpacity);
 
     Widget surface = ColoredBox(
       color: glassTint,
@@ -131,6 +160,7 @@ class NeoGlass extends StatelessWidget {
               cornerRadius: cornerRadius,
               intensity: rimIntensity,
               strokeWidth: effectiveBorderWidth,
+              ink: _rimInk(context),
             )
           : null,
       child: ClipRRect(
@@ -141,6 +171,61 @@ class NeoGlass extends StatelessWidget {
   }
 }
 
+/// Paints only the NeoGlass specular rim over [child], using the same
+/// user-configured border width as the full [NeoGlass] surface (or an explicit
+/// [borderWidth] override). When the effective width is `0` no rim is drawn, so
+/// bordered surfaces can be made borderless with the global Glass Border
+/// setting — e.g. the systems grid tiles.
+class NeoGlassRim extends StatelessWidget {
+  const NeoGlassRim({
+    super.key,
+    required this.child,
+    required this.cornerRadius,
+    this.borderWidth,
+    this.intensity = 1,
+  });
+
+  final Widget child;
+
+  /// Corner radius of the surface whose edge the rim traces.
+  final double cornerRadius;
+
+  /// Rim stroke width. When null, the user's configured border width is used.
+  final double? borderWidth;
+
+  /// Strength of the specular highlight (0.0–1.0).
+  final double intensity;
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = NeoGlass._prefs(context);
+    final width = prefs.performanceMode
+        ? 0.0
+        : (borderWidth ?? prefs.borderWidth);
+    return CustomPaint(
+      foregroundPainter: (intensity > 0 && width > 0)
+          ? _GlassRimPainter(
+              cornerRadius: cornerRadius,
+              intensity: intensity,
+              strokeWidth: width,
+              ink: _rimInk(context),
+            )
+          : null,
+      child: child,
+    );
+  }
+}
+
+/// The rim's colour on a light ground: a rim that brightens the edge
+/// disappears there, so it darkens the edge in the theme's ink instead. Null on
+/// a dark ground, where the rim is the white highlight.
+Color? _rimInk(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.scaffoldBackgroundColor.computeLuminance() > 0.4
+      ? theme.colorScheme.onSurface
+      : null;
+}
+
 /// Paints the glass rim: a soft specular highlight sweeping with the light
 /// direction, matching how the liquid-glass packages shade their borders — but
 /// in a single plain-Canvas stroke blended over the backdrop.
@@ -149,15 +234,26 @@ class _GlassRimPainter extends CustomPainter {
     required this.cornerRadius,
     required this.intensity,
     required this.strokeWidth,
-  }) : _colors = [
-         Colors.white.withValues(alpha: 0.96 * intensity),
-         Colors.white.withValues(alpha: 0.64 * intensity),
-         Colors.white.withValues(alpha: 0.16 * intensity),
-       ];
+    this.ink,
+  }) : _colors = ink == null
+           ? [
+               Colors.white.withValues(alpha: 0.08 * intensity),
+               Colors.white.withValues(alpha: 0.05 * intensity),
+               Colors.white.withValues(alpha: 0.012 * intensity),
+             ]
+           : [
+               ink.withValues(alpha: 0.22 * intensity),
+               ink.withValues(alpha: 0.16 * intensity),
+               ink.withValues(alpha: 0.12 * intensity),
+             ];
 
   final double cornerRadius;
   final double intensity;
   final double strokeWidth;
+
+  /// The rim's colour on a light ground, drawn over the edge; null for the
+  /// white highlight added to a dark one.
+  final Color? ink;
 
   // Precomputed, size-independent gradient stops (alpha depends only on
   // [intensity]); the shader itself is built per paint from the panel size.
@@ -179,15 +275,21 @@ class _GlassRimPainter extends CustomPainter {
 
     // Light from the top-left. The rim stays light all around — it only fades
     // in strength towards the far edge, it never turns dark. Blended with
-    // BlendMode.overlay so the edge reads as the backdrop colour lifted
-    // brighter (overlay preserves the hue instead of washing it to white).
+    // BlendMode.plus so the edge reads as the backdrop lifted brighter.
+    //
+    // Not BlendMode.overlay (or screen, or any other advanced blend): Impeller
+    // emulates those on GPUs without framebuffer fetch (Windows' OpenGL ES via
+    // ANGLE), and with a gradient shader that emulation smears the rim's
+    // bottom and right edges to the bottom and right of the window — vertical
+    // bands under every pill that shift with the window size. plus is a
+    // fixed-function blend, so it never takes that path.
     canvas.drawPath(
       path,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..isAntiAlias = true
-        ..blendMode = BlendMode.overlay
+        ..blendMode = ink == null ? BlendMode.plus : BlendMode.srcOver
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -201,5 +303,6 @@ class _GlassRimPainter extends CustomPainter {
   bool shouldRepaint(_GlassRimPainter oldDelegate) =>
       oldDelegate.cornerRadius != cornerRadius ||
       oldDelegate.intensity != intensity ||
-      oldDelegate.strokeWidth != strokeWidth;
+      oldDelegate.strokeWidth != strokeWidth ||
+      oldDelegate.ink != ink;
 }

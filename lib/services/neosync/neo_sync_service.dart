@@ -1,13 +1,22 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show min;
+import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
+import 'package:neostation/utils/kept_save_copy.dart';
+import 'package:neostation/utils/save_changed_here.dart';
 import 'package:neostation/models/neo_sync_models.dart';
+import 'package:neostation/models/sync_models.dart';
 import 'package:neostation/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:crypto/crypto.dart';
 import 'package:neostation/services/credential_store.dart';
+import 'package:neostation/services/neosync/neosync_http.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/log_redaction.dart';
+
 import '../../repositories/sync_repository.dart';
 
 /// Service responsible for communicating with the NeoSync cloud synchronization API.
@@ -15,8 +24,68 @@ import '../../repositories/sync_repository.dart';
 /// Handles file uploads, downloads, quota management, and synchronization
 /// conflict resolution for game save states and configurations.
 class NeoSyncService extends ChangeNotifier {
+  NeoSyncService({
+    http.Client? client,
+    this.requestTimeout = defaultRequestTimeout,
+    this.downloadStallTimeout = defaultDownloadStallTimeout,
+    this.uploadStallTimeout = defaultUploadStallTimeout,
+    this.uploadResponseTimeout = defaultUploadResponseTimeout,
+  }) : _client = client ?? neoSyncHttpClient(requestTimeout),
+       _ownsClient = client == null;
+
   static const String _tokenKey = 'auth_token';
   final _log = LoggerService.instance;
+
+  /// How long a request to the NeoSync API (listing, quota, delete, checks)
+  /// may take. Without a limit, a server that takes the connection and then
+  /// says nothing would keep the save list refreshing and a game's sync
+  /// running for as long as the socket lived.
+  static const Duration defaultRequestTimeout = Duration(seconds: 15);
+
+  /// The limit for each API request (and for connecting, on the default
+  /// client); see [defaultRequestTimeout].
+  final Duration requestTimeout;
+
+  /// How long a save download waits for the next chunk of the file once its
+  /// headers are in (they get [requestTimeout]). There is no limit on the
+  /// whole transfer: a large state over a slow link is fine, as long as it
+  /// keeps arriving.
+  static const Duration defaultDownloadStallTimeout = Duration(seconds: 60);
+
+  /// How long an upload waits for the connection to take the next chunk of
+  /// the file, and later for the next chunk of the answer. There is no limit
+  /// on the whole transfer: a large state over a slow link is fine, as long
+  /// as it keeps moving.
+  ///
+  /// The connection takes chunks in bursts, as the system's send buffer
+  /// drains, not one by one: with a buffer of about 1 MB, at 64 KiB/s about
+  /// every 15 s. So for a file larger than that buffer this sets a floor,
+  /// roughly 8 KiB/s, below which an upload that is still moving fails as
+  /// timed out — well under any link a save would sync over. A smaller file
+  /// fits in the buffer at once and is bounded by
+  /// [defaultUploadResponseTimeout] instead.
+  static const Duration defaultUploadStallTimeout = Duration(seconds: 120);
+
+  /// How long an upload waits for the answer's headers once the whole file
+  /// has been taken. Longer than [defaultUploadStallTimeout]: the last chunk
+  /// counts as taken once it reaches the send buffer, which can hold a few MB
+  /// — a few minutes of a slow link — still to be sent.
+  static const Duration defaultUploadResponseTimeout = Duration(seconds: 300);
+
+  /// [defaultDownloadStallTimeout] for this service's downloads.
+  final Duration downloadStallTimeout;
+
+  /// [defaultUploadStallTimeout] for this service's uploads.
+  final Duration uploadStallTimeout;
+
+  /// [defaultUploadResponseTimeout] for this service's uploads.
+  final Duration uploadResponseTimeout;
+
+  /// The size of the pieces an upload feeds the file to the connection in.
+  static const int _uploadChunkSize = 64 * 1024;
+
+  final http.Client _client;
+  final bool _ownsClient;
 
   bool _isLoading = false;
   String? _lastError;
@@ -24,11 +93,32 @@ class NeoSyncService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get lastError => _lastError;
 
+  @override
+  void dispose() {
+    if (_ownsClient) _client.close();
+    super.dispose();
+  }
+
   void _safeNotifyListeners() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
     });
   }
+
+  /// Sends an API request within [requestTimeout]; see [sendWithTimeout].
+  Future<http.Response> _request(
+    String method,
+    Uri uri, {
+    required Map<String, String> headers,
+    String? body,
+  }) => sendWithTimeout(
+    _client,
+    method,
+    uri,
+    headers: headers,
+    body: body,
+    timeout: requestTimeout,
+  );
 
   /// Computes the MD5 hash of the given byte list.
   String _calculateFileHash(List<int> bytes) {
@@ -88,7 +178,8 @@ class NeoSyncService extends ChangeNotifier {
         requestBody['local_modified_at_timestamp'] = timestampMillis;
       }
 
-      final response = await http.post(
+      final response = await _request(
+        'POST',
         uri,
         headers: headers,
         body: jsonEncode(requestBody),
@@ -107,6 +198,16 @@ class NeoSyncService extends ChangeNotifier {
         _log.e('Check request failed with status: ${response.statusCode}');
         return {'exists': false, 'needs_sync': true, 'remote_newer': false};
       }
+    } on TimeoutException catch (e) {
+      // No answer says nothing about the cloud copy, which may be newer: the
+      // caller must not upload over it on a guess.
+      _log.e('Check request timed out: $e');
+      return {
+        'exists': false,
+        'needs_sync': true,
+        'remote_newer': false,
+        'timed_out': true,
+      };
     } catch (e) {
       _log.e('Check request error: $e');
       return {'exists': false, 'needs_sync': true, 'remote_newer': false};
@@ -121,6 +222,18 @@ class NeoSyncService extends ChangeNotifier {
   /// [systemId] and [emulatorId] are the NeoSync v2 structured metadata: they
   /// let the backend index files without parsing the cloud path. [isState] and
   /// [scope] (shared/game) describe the file kind.
+  ///
+  /// When the check finds a newer copy in the cloud, that copy is downloaded
+  /// over [file] instead. A [file] changed here since its last sync
+  /// ([saveChangedHere]) is first kept as its own dated copy ([keepLocalCopy];
+  /// its path is the result's `keptLocalPath`), and if it can't be, nothing
+  /// is written; one that only fell behind gets the single
+  /// `<file>.neosync.bak` slot. A failed download is a failure, not "in
+  /// sync". [deadline] returns the deadline of a launch the file belongs to,
+  /// if one is running; it is asked once the download is in and again once
+  /// the copy is kept, and when it has passed nothing is written (a dated
+  /// copy is removed) and the result is a failure marked `abandoned`, so the
+  /// game's emulator never has its open save replaced.
   Future<Map<String, dynamic>> syncFile(
     File file,
     String gameName, {
@@ -131,6 +244,7 @@ class NeoSyncService extends ChangeNotifier {
     bool? isState,
     String? scope,
     String? type,
+    SyncDeadline? Function()? deadline,
   }) async {
     _isLoading = true;
     _lastError = null;
@@ -159,6 +273,12 @@ class NeoSyncService extends ChangeNotifier {
         type: fileType,
       );
 
+      if (checkResult['timed_out'] == true) {
+        const error = 'Network error: NeoSync did not answer the file check';
+        _lastError = error;
+        return {'success': false, 'message': error};
+      }
+
       if (!checkResult['needs_sync']) {
         int cloudTime = localModifiedAt.millisecondsSinceEpoch;
         if (checkResult['db_modified_at_timestamp'] != null) {
@@ -185,52 +305,120 @@ class NeoSyncService extends ChangeNotifier {
         // The cloud copy is newer: pull it over the stale local file instead of
         // reporting a false success. The exact local path is known, so no game
         // context is needed and it behaves the same on every OS.
+        //
+        // A download that fails leaves the older local file in place, which is
+        // not "in sync": it is reported as a failure, so the game or folder
+        // shows the sync didn't complete and the next pass asks again.
         final metadata = checkResult['metadata'];
         final cloudId = metadata is Map ? metadata['id']?.toString() : null;
-        if (cloudId != null && cloudId.isNotEmpty) {
-          final download = await downloadFile(cloudId);
-          if (download['success'] == true && download['data'] != null) {
-            final bytes = download['data'] as List<int>;
+        if (cloudId == null || cloudId.isEmpty) {
+          const error = 'NeoSync reported a newer cloud copy without its id';
+          _lastError = error;
+          return {'success': false, 'message': error};
+        }
+        final download = await downloadFile(cloudId);
+        if (download['success'] != true || download['data'] == null) {
+          const error =
+              'Network error: the newer cloud copy could not be downloaded';
+          _lastError = error;
+          return {'success': false, 'message': error};
+        }
+        // Pre-launch deadline guard, as for the provider's own downloads: if
+        // the launch has stopped waiting while the file came in, the game is
+        // running on the local save. Abandon before any write, so the file
+        // the emulator has open is never replaced and nothing is recorded.
+        // Asked now, not when the sync began, so a launch that started during
+        // the download counts.
+        if (deadline?.call()?.isExpired ?? false) {
+          _log.i(
+            'Abandoning the newer cloud copy of ${file.path} '
+            '(launch deadline passed)',
+          );
+          return {
+            'success': false,
+            'abandoned': true,
+            'message': 'Launch deadline passed',
+          };
+        }
+        final bytes = download['data'] as List<int>;
+        // A save changed here since the last sync (or never synced) holds
+        // progress the cloud copy doesn't: it is kept as its own dated copy,
+        // listed in Save history, before the newer cloud copy is written over
+        // it, and if it can't be kept nothing is written. A save that only
+        // fell behind keeps the single before-download slot, which the next
+        // download overwrites.
+        final record = await SyncRepository.getSyncState('neosync', file.path);
+        final changedHere = saveChangedHere(
+          localTime: localModifiedAt.millisecondsSinceEpoch,
+          localHash: fileHash,
+          savedTime: record?['local_modified_at'] as int?,
+          savedHash: record?['file_hash'] as String?,
+        );
+        String? keptLocalPath;
+        if (await file.exists()) {
+          if (changedHere) {
             try {
-              if (await file.exists()) {
-                await file.copy('${file.path}.neosync.bak');
-              }
+              keptLocalPath = await keepLocalCopy(file.path, bytes: fileBytes);
+            } catch (e) {
+              const error =
+                  "Could not keep this device's copy before the newer cloud "
+                  'copy';
+              _log.w('$error of ${file.path}: $e');
+              _lastError = error;
+              return {'success': false, 'message': error};
+            }
+          } else {
+            try {
+              await file.copy('${file.path}.neosync.bak');
             } catch (e) {
               _log.w('Could not back up ${file.path}: $e');
             }
-            await file.parent.create(recursive: true);
-            await file.writeAsBytes(bytes, flush: true);
-
-            int cloudTime = localModifiedAt.millisecondsSinceEpoch;
-            if (metadata is Map &&
-                metadata['file_modified_at_timestamp'] != null) {
-              final ts = metadata['file_modified_at_timestamp'];
-              if (ts is int) cloudTime = ts;
-              if (ts is String) cloudTime = int.tryParse(ts) ?? cloudTime;
-            }
-            final stat = await file.stat();
-            await SyncRepository.saveSyncState(
-              'neosync',
-              file.path,
-              stat.modified.millisecondsSinceEpoch,
-              cloudTime,
-              stat.size,
-              fileHash: metadata is Map
-                  ? metadata['file_hash']?.toString()
-                  : null,
-            );
-            return {
-              'success': true,
-              'skipped': true,
-              'downloaded': true,
-              'message': 'Remote file is newer, downloaded',
-            };
           }
         }
+        // Asked again once the copy is kept, which can take a while for a
+        // large card: a launch that went ahead meanwhile has the save open.
+        if (deadline?.call()?.isExpired ?? false) {
+          if (keptLocalPath != null) {
+            try {
+              await File(keptLocalPath).delete();
+            } on FileSystemException {
+              // Left for the tidy; nothing was written over the save.
+            }
+          }
+          _log.i(
+            'Abandoning the newer cloud copy of ${file.path} '
+            '(launch deadline passed)',
+          );
+          return {
+            'success': false,
+            'abandoned': true,
+            'message': 'Launch deadline passed',
+          };
+        }
+        await file.parent.create(recursive: true);
+        await file.writeAsBytes(bytes, flush: true);
+
+        int cloudTime = localModifiedAt.millisecondsSinceEpoch;
+        if (metadata is Map && metadata['file_modified_at_timestamp'] != null) {
+          final ts = metadata['file_modified_at_timestamp'];
+          if (ts is int) cloudTime = ts;
+          if (ts is String) cloudTime = int.tryParse(ts) ?? cloudTime;
+        }
+        final stat = await file.stat();
+        await SyncRepository.saveSyncState(
+          'neosync',
+          file.path,
+          stat.modified.millisecondsSinceEpoch,
+          cloudTime,
+          stat.size,
+          fileHash: metadata is Map ? metadata['file_hash']?.toString() : null,
+        );
         return {
           'success': true,
           'skipped': true,
-          'message': 'Remote file is newer',
+          'downloaded': true,
+          'keptLocalPath': ?keptLocalPath,
+          'message': 'Remote file is newer, downloaded',
         };
       }
 
@@ -242,41 +430,40 @@ class NeoSyncService extends ChangeNotifier {
       final baseUrl = AppConfig.neoSyncBaseUrl;
       final uri = Uri.parse('$baseUrl/api/v2/upload');
 
-      final request = http.MultipartRequest('POST', uri);
-      request.headers['Authorization'] = 'Bearer $token';
-
-      request.files.add(
-        http.MultipartFile.fromBytes('file', fileBytes, filename: filePath),
-      );
-
       final fileModifiedAtTimestamp = localModifiedAt.millisecondsSinceEpoch;
 
-      request.fields['file_path'] = filePath;
-      request.fields['type'] = fileType;
-      request.fields['game_name'] = gameName;
-      request.fields['file_hash'] = fileHash;
-      request.fields['file_size'] = fileBytes.length.toString();
-      request.fields['file_modified_at_timestamp'] = fileModifiedAtTimestamp
-          .toString();
+      final fields = <String, String>{
+        'file_path': filePath,
+        'type': fileType,
+        'game_name': gameName,
+        'file_hash': fileHash,
+        'file_size': fileBytes.length.toString(),
+        'file_modified_at_timestamp': fileModifiedAtTimestamp.toString(),
+      };
       if (systemId != null && systemId.isNotEmpty) {
-        request.fields['system_id'] = systemId;
+        fields['system_id'] = systemId;
       }
       if (emulatorId != null && emulatorId.isNotEmpty) {
-        request.fields['emulator_id'] = emulatorId;
+        fields['emulator_id'] = emulatorId;
       }
       if (gameHash != null && gameHash.isNotEmpty) {
-        request.fields['game_hash'] = gameHash;
+        fields['game_hash'] = gameHash;
       }
       if (isState != null) {
-        request.fields['is_state'] = isState.toString();
+        fields['is_state'] = isState.toString();
       }
       if (scope != null && scope.isNotEmpty) {
-        request.fields['scope'] = scope;
+        fields['scope'] = scope;
       }
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      final data = jsonDecode(responseBody);
+      final response = await _upload(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+        fields: fields,
+        fileBytes: fileBytes,
+        filename: filePath,
+      );
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         int cloudTime = fileModifiedAtTimestamp;
@@ -331,57 +518,123 @@ class NeoSyncService extends ChangeNotifier {
     };
   }
 
-  /// Forces an upload of a specific file to the cloud.
-  Future<Map<String, dynamic>> uploadFile(
-    File file,
-    String gameName, {
-    String? customFilename,
+  /// Sends [fileBytes] to [uri] as the multipart field `file`, named
+  /// [filename], alongside [fields], and reads back the whole answer.
+  ///
+  /// The transfer fails as timed out when it stops moving, not when it takes
+  /// long: when the connection takes no chunk of the file for
+  /// [uploadStallTimeout] (a server that stops reading leaves the socket
+  /// full, which pauses the file), when the headers take longer than
+  /// [uploadResponseTimeout] after the last chunk, or when the answer goes
+  /// [uploadStallTimeout] without a chunk. A timer measures that rather than
+  /// `Stream.timeout`, which stops counting while its stream is paused — the
+  /// very stall to catch.
+  Future<http.Response> _upload(
+    Uri uri, {
+    required Map<String, String> headers,
+    required Map<String, String> fields,
+    required Uint8List fileBytes,
+    required String filename,
   }) async {
-    _isLoading = true;
-    _lastError = null;
-    _safeNotifyListeners();
+    final abort = Completer<void>();
+    final timedOut = Completer<Never>();
+    Timer? watchdog;
+    var answered = false;
+    var finished = false;
+    StreamSubscription<List<int>>? reading;
+    StreamSubscription<List<int>>? receiving;
 
-    try {
-      final token = await _getToken();
-      if (token == null) {
-        throw Exception('Not authenticated');
+    void arm(Duration limit) {
+      // A chunk can still land after the upload has ended.
+      if (finished || timedOut.isCompleted) return;
+      watchdog?.cancel();
+      watchdog = Timer(limit, () {
+        timedOut.completeError(
+          TimeoutException('NeoSync upload stalled', limit),
+        );
+      });
+    }
+
+    Future<http.Response> exchange() async {
+      // The file is fed to the connection a chunk at a time, and every chunk
+      // it takes restarts the watchdog. The feed follows the request body's
+      // pauses, so it stops when the socket does, and the watchdog, which
+      // nothing pauses, fires.
+      Iterable<List<int>> chunks() sync* {
+        for (var i = 0; i < fileBytes.length; i += _uploadChunkSize) {
+          final end = min(i + _uploadChunkSize, fileBytes.length);
+          yield Uint8List.sublistView(fileBytes, i, end);
+        }
       }
 
-      final baseUrl = AppConfig.neoSyncBaseUrl;
-      final uri = Uri.parse('$baseUrl/api/v2/upload');
-
-      final request = http.MultipartRequest('POST', uri);
-      request.headers['Authorization'] = 'Bearer $token';
-
-      final fileBytes = await file.readAsBytes();
-      final filename =
-          customFilename ?? file.path.split(Platform.pathSeparator).last;
-      request.files.add(
-        http.MultipartFile.fromBytes('file', fileBytes, filename: filename),
+      late final StreamController<List<int>> content;
+      content = StreamController<List<int>>(
+        onListen: () => reading = Stream.fromIterable(chunks()).listen(
+          (chunk) {
+            if (!answered) arm(uploadStallTimeout);
+            content.add(chunk);
+          },
+          onDone: () {
+            if (!answered) arm(uploadResponseTimeout);
+            content.close();
+          },
+        ),
+        onPause: () => reading?.pause(),
+        onResume: () => reading?.resume(),
+        onCancel: () => reading?.cancel(),
       );
+      final request =
+          http.AbortableMultipartRequest(
+              'POST',
+              uri,
+              abortTrigger: abort.future,
+            )
+            ..headers.addAll(headers)
+            ..fields.addAll(fields)
+            ..files.add(
+              http.MultipartFile(
+                'file',
+                content.stream,
+                fileBytes.length,
+                filename: filename,
+              ),
+            );
+      final response = await _client.send(request);
+      answered = true;
+      arm(uploadStallTimeout);
 
-      request.fields['file_name'] = filename;
-      request.fields['game_name'] = gameName;
+      final body = BytesBuilder(copy: false);
+      final received = Completer<void>();
+      receiving = response.stream.listen(
+        (chunk) {
+          arm(uploadStallTimeout);
+          body.add(chunk);
+        },
+        onError: received.completeError,
+        onDone: received.complete,
+        cancelOnError: true,
+      );
+      await received.future;
+      return http.Response.bytes(
+        body.takeBytes(),
+        response.statusCode,
+        headers: response.headers,
+        reasonPhrase: response.reasonPhrase,
+        request: response.request,
+      );
+    }
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      final data = jsonDecode(responseBody);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {'success': true, 'data': data};
-      } else {
-        final error = redactSecrets(data['error'] ?? 'Upload failed');
-        _log.e('Upload failed: $error');
-        return {'success': false, 'message': error};
-      }
-    } catch (e) {
-      final error = redactSecrets('Network error: $e');
-      _log.e('Upload error: $error');
-      _lastError = error;
-      return {'success': false, 'message': error};
+    arm(uploadStallTimeout);
+    try {
+      return await Future.any([exchange(), timedOut.future]);
     } finally {
-      _isLoading = false;
-      _safeNotifyListeners();
+      finished = true;
+      watchdog?.cancel();
+      // Closes the connection of an upload that stopped moving; one answered
+      // in full is unaffected.
+      abort.complete();
+      unawaited(receiving?.cancel());
+      unawaited(reading?.cancel());
     }
   }
 
@@ -404,7 +657,7 @@ class NeoSyncService extends ChangeNotifier {
           ? Uri.parse('$baseUrl/api/v2/files')
           : Uri.parse('$baseUrl/api/v2/files').replace(queryParameters: query);
 
-      final response = await http.get(uri, headers: headers);
+      final response = await _request('GET', uri, headers: headers);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -502,7 +755,7 @@ class NeoSyncService extends ChangeNotifier {
       final baseUrl = AppConfig.neoSyncBaseUrl;
       final uri = Uri.parse('$baseUrl/api/v2/files/$fileId');
 
-      final response = await http.delete(uri, headers: headers);
+      final response = await _request('DELETE', uri, headers: headers);
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         return {'success': true};
@@ -534,7 +787,7 @@ class NeoSyncService extends ChangeNotifier {
       final baseUrl = AppConfig.neoSyncBaseUrl;
       final uri = Uri.parse('$baseUrl/api/v2/quota');
 
-      final response = await http.get(uri, headers: headers);
+      final response = await _request('GET', uri, headers: headers);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -574,7 +827,8 @@ class NeoSyncService extends ChangeNotifier {
 
       final requestBody = {'file_id': fileId};
 
-      final response = await http.post(
+      final response = await _request(
+        'POST',
         uri,
         headers: headers,
         body: jsonEncode(requestBody),
@@ -588,7 +842,16 @@ class NeoSyncService extends ChangeNotifier {
           throw Exception('No download URL in response');
         }
 
-        final fileResponse = await http.get(Uri.parse(downloadUrl));
+        // The URL is signed, so it goes without the account's token, through
+        // the service's own client: the headers are held to the request limit
+        // and each chunk of the file to the stall limit.
+        final fileResponse = await readWithStallTimeout(
+          _client,
+          'GET',
+          Uri.parse(downloadUrl),
+          headerTimeout: requestTimeout,
+          stallTimeout: downloadStallTimeout,
+        );
 
         if (fileResponse.statusCode == 200) {
           return {'success': true, 'data': fileResponse.bodyBytes};

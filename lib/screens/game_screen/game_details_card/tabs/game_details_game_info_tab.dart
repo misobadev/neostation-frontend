@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -6,15 +7,16 @@ import 'package:provider/provider.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/services/sfx_service.dart';
+
 import '../../../../models/system_model.dart';
 import '../../../../models/game_model.dart';
 import '../../../../providers/file_provider.dart';
-import '../../../../services/screenscraper_service.dart';
-import '../../../../themes/chrome_surface.dart';
 import '../../../../themes/corner_radii.dart';
 import '../../../../utils/game_utils.dart';
 import '../widgets/panel_gate_highlight.dart';
 import '../widgets/scrolling_status_line.dart';
+
+import 'package:neostation/services/metadata_provider_service.dart';
 
 class GameDetailsGameInfoTab extends StatefulWidget {
   final SystemModel system;
@@ -50,17 +52,11 @@ class GameDetailsGameInfoTab extends StatefulWidget {
 class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
   /// App language code -> the key the scraper files that language under.
   ///
-  /// Only the two that actually differ are listed. ScreenScraper writes
-  /// Japanese as `jp` where the app calls it `ja`, and it has one Chinese
-  /// bucket where the app offers simplified and traditional separately, so
-  /// both app variants read the same text. Every other app language is its own
-  /// key, and `id` has no bucket at all — it falls through to English like any
-  /// other language a game was not scraped in.
-  static const Map<String, String> _descriptionKeys = {
-    'ja': 'jp',
-    'zh': 'zh',
-    'zh_Hant': 'zh',
-  };
+  /// Only Traditional Chinese differs: there is one Chinese description
+  /// (NeoAssets translates into Simplified), which both app variants read.
+  /// Every other app language is its own key; a language a game has no
+  /// description in falls back through the model's hierarchy.
+  static const Map<String, String> _descriptionKeys = {'zh_Hant': 'zh'};
 
   /// Drives the description pane: the D-pad scrolls it while the panel is
   /// active, and a finger can drag it at any time.
@@ -249,7 +245,7 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
           duration: PanelGateHighlight.duration,
           curve: Curves.easeOut,
           decoration: BoxDecoration(
-            color: ChromeSurface.fill(context),
+            // The glass inside draws the fill.
             borderRadius:
                 Theme.of(context).extension<CornerRadii>()?.radiusExternal ??
                 BorderRadius.circular(14.r),
@@ -263,84 +259,88 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
               context,
               isActive: _isPanelActive,
               resting: BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.25),
+                color: Theme.of(context).colorScheme.shadow
+                    .withValues(alpha: 0.25),
                 blurRadius: 2.r,
                 offset: Offset(2.0.r, 2.0.r),
               ),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(8.r, 8.r, 8.r, 0.r),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Symbols.info_rounded,
-                          color: Theme.of(context).colorScheme.onSurface,
-                          size: 13.r,
-                        ),
-                        // No title: the selected tab in the card's header strip
-                        // is already this icon, so naming the panel again only
-                        // costs the row room. Everything packs to the left into
-                        // the space it used to take.
-                        SizedBox(width: 8.r),
-                        // No gate chip: the panel's own edge carries that now, so
-                        // the row neither spends a slot on it nor re-packs itself
-                        // on the frame the drivability answer lands. The facts
-                        // strip starts at the same x on every game.
-                        // The facts take the rest of the row. A long publisher
-                        // name (or a system whose scrape fills every field) can
-                        // outrun it, so the strip marquees when it genuinely
-                        // overflows and sits still when it does not — the same
-                        // treatment the footer's metadata line gets, rather than
-                        // an overflow stripe or a truncated name.
-                        if (headerFacts.isNotEmpty)
-                          Expanded(
-                            child: SizedBox(
-                              height: _headerFactsHeight,
-                              child: ScrollingStatusLine(
-                                resetKey: widget.game.romname,
-                                children: headerFacts,
+          child: NeoGlass(
+            // Frosted like the game list beside it.
+            cornerRadius:
+                (Theme.of(context).extension<CornerRadii>() ?? CornerRadii.m())
+                    .radiusExternalRadius,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(8.r, 8.r, 8.r, 0.r),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Symbols.info_rounded,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            size: 13.r,
+                          ),
+                          // No title: the selected tab in the card's header strip
+                          // is already this icon, so naming the panel again only
+                          // costs the row room. Everything packs to the left into
+                          // the space it used to take.
+                          SizedBox(width: 8.r),
+                          // No gate chip: the panel's own edge carries that now, so
+                          // the row neither spends a slot on it nor re-packs itself
+                          // on the frame the drivability answer lands. The facts
+                          // strip starts at the same x on every game.
+                          // The facts take the rest of the row. A long publisher
+                          // name (or a system whose scrape fills every field) can
+                          // outrun it, so the strip marquees when it genuinely
+                          // overflows and sits still when it does not — the same
+                          // treatment the footer's metadata line gets, rather than
+                          // an overflow stripe or a truncated name.
+                          if (headerFacts.isNotEmpty)
+                            Expanded(
+                              child: SizedBox(
+                                height: _headerFactsHeight,
+                                child: ScrollingStatusLine(
+                                  resetKey: widget.game.romname,
+                                  children: headerFacts,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                    Divider(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.1),
-                      height: 10.r,
-                    ),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.all(8.r),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // While scraping, the card lays ScrapingProgressPanel over
-                      // this whole region — every tab gets the same feedback, so
-                      // this tab no longer draws its own copy.
-                      return showScrapeView
-                          ? _buildNonScrapedView()
-                          : _buildScrapedView();
-                    },
+                        ],
+                      ),
+                      Divider(
+                        color: Theme.of(context).colorScheme.onSurface
+                            .withValues(alpha: 0.1),
+                        height: 10.r,
+                      ),
+                    ],
                   ),
                 ),
-              ),
 
-              _buildIdentityFooter(),
-            ],
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.all(8.r),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // While scraping, the card lays ScrapingProgressPanel over
+                        // this whole region — every tab gets the same feedback, so
+                        // this tab no longer draws its own copy.
+                        return showScrapeView
+                            ? _buildNonScrapedView()
+                            : _buildScrapedView();
+                      },
+                    ),
+                  ),
+                ),
+
+                _buildIdentityFooter(),
+              ],
+            ),
           ),
         ),
       ),
@@ -375,9 +375,8 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Divider(
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.1),
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.1),
             height: 10.r,
           ),
           if (name.isNotEmpty)
@@ -450,9 +449,8 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
                 AppLocale.scrapeToDownload.getString(context),
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.7),
                   fontSize: 12.r,
                   height: 1.5,
                 ),
@@ -460,7 +458,7 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
             ),
             SizedBox(height: 32.r),
             FutureBuilder<bool>(
-              future: ScreenScraperService.hasSavedCredentials(),
+              future: MetadataProviderService.hasActiveSession(),
               builder: (context, snapshot) {
                 if (widget.system.folderName == 'android-apps') {
                   return Text(
@@ -604,9 +602,8 @@ class _InfoPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = Theme.of(
-      context,
-    ).colorScheme.onSurface.withValues(alpha: alpha);
+    final Color color = Theme.of(context).colorScheme.onSurface
+        .withValues(alpha: alpha);
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 4.r),

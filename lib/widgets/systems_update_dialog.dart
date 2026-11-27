@@ -1,4 +1,5 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_localization/flutter_localization.dart';
@@ -7,6 +8,7 @@ import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/services/game_service.dart';
+
 import '../services/systems_update_service.dart';
 import '../data/datasources/sqlite_service.dart';
 import 'custom_notification.dart';
@@ -14,12 +16,11 @@ import 'core_footer.dart';
 
 /// Signature of [SystemsUpdateService.checkAndUpdate], so tests can drive the
 /// dialog's download states without touching the network.
-typedef SystemsUpdateRunner =
-    Future<SystemsUpdateResult?> Function({
-      SystemsUpdateInfo? knownUpdate,
-      void Function(double progress, String status)? onProgress,
-      bool Function()? shouldCancel,
-    });
+typedef SystemsUpdateRunner = Future<SystemsUpdateResult?> Function({
+  SystemsUpdateInfo? knownUpdate,
+  void Function(double progress, String status)? onProgress,
+  bool Function()? shouldCancel,
+});
 
 class SystemsUpdateDialog extends StatefulWidget {
   final SystemsUpdateInfo updateInfo;
@@ -174,6 +175,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                                     widget.updateInfo.remoteVersion,
                                   ),
                               style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 9.r,
                                 color: theme.colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -208,6 +210,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                                       : widget.updateInfo.currentVersion,
                                 ),
                             style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 9.r,
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
@@ -242,6 +245,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                                         : AppLocale.systemsUpdateDownloading
                                               .getString(context),
                                     style: theme.textTheme.bodySmall?.copyWith(
+                                      fontSize: 9.r,
                                       fontWeight: FontWeight.w500,
                                     ),
                                     overflow: TextOverflow.ellipsis,
@@ -251,6 +255,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                                 Text(
                                   '${(_downloadProgress * 100).toStringAsFixed(0)}%',
                                   style: theme.textTheme.bodySmall?.copyWith(
+                                    fontSize: 9.r,
                                     fontWeight: FontWeight.bold,
                                     color: theme.colorScheme.primary,
                                   ),
@@ -265,7 +270,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                                 label: AppLocale.cancel.getString(context),
                                 onTap: _cancelRequested ? null : _requestCancel,
                                 backgroundColor: theme.colorScheme.tertiary,
-                                textColor: theme.colorScheme.onSurface,
+                                textColor: theme.colorScheme.onTertiary,
                               ),
                             ],
                           ],
@@ -280,7 +285,7 @@ class _SystemsUpdateDialogState extends State<SystemsUpdateDialog> {
                                 label: AppLocale.updateLater.getString(context),
                                 onTap: () => Navigator.of(context).pop(false),
                                 backgroundColor: theme.colorScheme.tertiary,
-                                textColor: theme.colorScheme.onSurface,
+                                textColor: theme.colorScheme.onTertiary,
                               ),
                             ),
                             SizedBox(width: 8.r),

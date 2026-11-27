@@ -1,6 +1,10 @@
 import 'dart:io';
+
 import 'package:path/path.dart' as path;
+
+import '../constants/system_folder_names.dart';
 import '../providers/file_provider.dart';
+import '../utils/android_app_icon_paths.dart';
 import '../utils/ra_coverage.dart';
 import 'database_game_model.dart';
 
@@ -103,6 +107,10 @@ class GameModel {
   /// Box2D image aspect ratio (width/height) for grid display.
   final String? box2dAspectRatio;
 
+  /// The NeoAssets link the preview video streams from when no file is on
+  /// disk; see [DatabaseGameModel.videoUrl].
+  final String? videoUrl;
+
   /// UI hint: Whether to display the [romname] as a subtitle in the details view.
   final bool showRomFileNameSubtitle;
 
@@ -137,6 +145,7 @@ class GameModel {
     this.titleId,
     this.titleName,
     this.box2dAspectRatio,
+    this.videoUrl,
     this.showRomFileNameSubtitle = false,
   });
 
@@ -203,6 +212,7 @@ class GameModel {
       titleId: db.titleId,
       titleName: db.titleName,
       box2dAspectRatio: db.box2dAspectRatio,
+      videoUrl: db.videoUrl,
       showRomFileNameSubtitle: false,
     );
   }
@@ -267,6 +277,7 @@ class GameModel {
     String? titleId,
     String? titleName,
     String? box2dAspectRatio,
+    String? videoUrl,
     bool? showRomFileNameSubtitle,
   }) {
     return GameModel(
@@ -300,6 +311,7 @@ class GameModel {
       titleId: titleId ?? this.titleId,
       titleName: titleName ?? this.titleName,
       box2dAspectRatio: box2dAspectRatio ?? this.box2dAspectRatio,
+      videoUrl: videoUrl ?? this.videoUrl,
       showRomFileNameSubtitle:
           showRomFileNameSubtitle ?? this.showRomFileNameSubtitle,
     );
@@ -342,6 +354,15 @@ class GameModel {
           return candidate;
         }
       }
+
+      // An installed app with no art of its own shows its cached icon.
+      final icon = _cachedAppIconPath(
+        fileProvider,
+        romname,
+        systemFolderName,
+        imageType,
+      );
+      if (icon != null && File(icon).existsSync()) return icon;
 
       return fileProvider.getMediaPath(
         systemFolderName,
@@ -401,38 +422,107 @@ class GameModel {
     String systemFolderName,
     String imageType,
   ) {
+    for (final candidate in _neoStationImageCandidates(
+      fileProvider,
+      romname,
+      systemFolderName,
+      imageType,
+    )) {
+      if (File(candidate).existsSync()) return candidate;
+    }
+    return null;
+  }
+
+  /// Where NeoStation's own [imageType] art for the ROM file [romname] may
+  /// be, in probe order.
+  static Iterable<String> _neoStationImageCandidates(
+    FileProvider fileProvider,
+    String romname,
+    String systemFolderName,
+    String imageType,
+  ) sync* {
     for (final extension in _mediaExtensions) {
-      final candidate = fileProvider.getMediaPath(
+      yield fileProvider.getMediaPath(
         systemFolderName,
         imageType,
         romname,
         extension,
       );
-      if (File(candidate).existsSync()) return candidate;
     }
 
     // Fallback for files with complex extensions (e.g., 'v1.11.zip').
     for (final extension in _mediaExtensions) {
-      final candidate = path.join(
+      yield path.join(
         fileProvider.getMediaDirectoryPath(),
-        systemFolderName,
+        SystemFolderNames.rowSystemFolder(systemFolderName),
         imageType,
         '$romname.$extension',
       );
-      if (File(candidate).existsSync()) return candidate;
     }
+  }
 
+  /// The existing [imageType] art for the ROM file [romname], or null when it
+  /// has none: the file [getImagePath] would find, for a caller that knows the
+  /// game only by its file name. Checks the disk without blocking, so it suits
+  /// lookups made many at a time.
+  static Future<String?> findExistingImagePath({
+    required String romname,
+    required String systemFolderName,
+    required String imageType,
+    required FileProvider fileProvider,
+  }) async {
+    if (!fileProvider.isInitialized) return null;
+    for (final candidate in [
+      ..._neoStationImageCandidates(
+        fileProvider,
+        romname,
+        systemFolderName,
+        imageType,
+      ),
+      // Read-only, as in [getImagePath]: ES-DE's art is never written to.
+      ...fileProvider.getEsdeMediaCandidates(
+        systemFolderName,
+        imageType,
+        romname,
+      ),
+      ?_cachedAppIconPath(fileProvider, romname, systemFolderName, imageType),
+    ]) {
+      if (await fileProvider.fileExists(candidate)) return candidate;
+    }
     return null;
+  }
+
+  /// Where the cached icon of the installed app [romname] (its package name)
+  /// stands in for [imageType] art, or null when no icon applies. Icons fill
+  /// in only box art and wheels, and only for installed apps; the file is not
+  /// checked here.
+  static String? _cachedAppIconPath(
+    FileProvider fileProvider,
+    String romname,
+    String systemFolderName,
+    String imageType,
+  ) {
+    if (!SystemFolderNames.isAndroidApps(systemFolderName) ||
+        !AndroidAppIconPaths.artTypes.contains(imageType) ||
+        romname.isEmpty) {
+      return null;
+    }
+    return AndroidAppIconPaths.iconPath(
+      fileProvider.getMediaDirectoryPath(),
+      romname,
+    );
   }
 
   /// Relative-path lookup used when no initialized [FileProvider] is available.
   /// Resolves inside NeoStation's `media/` folder only.
   String _manualImagePath(String systemFolderName, String imageType) {
     final baseName = _stripRomExtension(romname);
+    // Android Games' art is the android rows' art.
+    final folder = SystemFolderNames.rowSystemFolder(systemFolderName);
 
     final pngRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$baseName.png',
     );
@@ -440,7 +530,7 @@ class GameModel {
 
     final jpgRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$baseName.jpg',
     );
@@ -448,7 +538,7 @@ class GameModel {
 
     final pngFullRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$romname.png',
     );
@@ -456,7 +546,7 @@ class GameModel {
 
     final jpgFullRelativePath = path.join(
       'media',
-      systemFolderName,
+      folder,
       imageType,
       '$romname.jpg',
     );
@@ -506,7 +596,12 @@ class GameModel {
       return master;
     }
     final baseName = _stripRomExtension(romname);
-    return path.join('media', systemFolderName, 'videos', '$baseName.mp4');
+    return path.join(
+      'media',
+      SystemFolderNames.rowSystemFolder(systemFolderName),
+      'videos',
+      '$baseName.mp4',
+    );
   }
 
   /// Verifies if a preview video exists for this game.
@@ -545,10 +640,24 @@ class GameModel {
   String getDescriptionForLanguage(String languageCode) {
     if (descriptions == null || descriptions!.isEmpty) return '';
 
-    const defaultLanguageHierarchy = ['en', 'es', 'fr', 'de', 'it', 'pt', 'jp'];
+    const defaultLanguageHierarchy = [
+      'en',
+      'es',
+      'fr',
+      'de',
+      'it',
+      'pt',
+      'ja',
+      'jp',
+    ];
 
     if (languageCode.isNotEmpty) {
-      final requestedDescription = descriptions![languageCode];
+      // Older ES-DE and ScreenScraper data file Japanese under `jp`.
+      final requestedDescription = languageCode == 'ja'
+          ? (descriptions!['ja']?.isNotEmpty == true
+                ? descriptions!['ja']
+                : descriptions!['jp'])
+          : descriptions![languageCode];
       if (requestedDescription != null && requestedDescription.isNotEmpty) {
         return requestedDescription;
       }

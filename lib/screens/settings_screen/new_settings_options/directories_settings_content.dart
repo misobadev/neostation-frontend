@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
@@ -18,12 +19,18 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/services/user_data_location_service.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/widgets/move_user_data_dialog.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/permission_check_wrapper.dart';
 import 'package:neostation/widgets/restart_required_dialog.dart';
 import 'package:neostation/widgets/tv_directory_picker.dart';
+import 'package:neostation/widgets/user_data_move_progress_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:neostation/utils/user_data_folder_choice.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
+import 'package:neostation/utils/user_data_move_busy.dart';
+import 'package:neostation/utils/user_data_move_failure_message.dart';
+
 import 'settings_title.dart';
 import 'widgets/settings_section_header.dart';
 import 'widgets/settings_action_button.dart';
@@ -63,10 +70,14 @@ class DirectoriesSettingsContentState
   String? _currentUserDataPath;
   bool _isLoading = true;
 
-  // Migration progress state (shown inline, no dialog).
-  bool _isMigrating = false;
-  double _migrationProgress = 0.0;
-  String _migrationFile = '';
+  // A ROM folder removal is running: a second press is ignored rather than
+  // asking again about a folder that may be gone by then.
+  bool _removingRomFolder = false;
+
+  // A ROM folder is being added (picker, save and scan): a second press is
+  // ignored rather than opening another picker whose folder would not be
+  // scanned while the first scan runs.
+  bool _addingRomFolder = false;
 
   // ES-DE import progress state (shown inline, no dialog).
   bool _isImporting = false;
@@ -201,6 +212,13 @@ class DirectoriesSettingsContentState
     final action = item['action'] as String;
     // Disabled ES-DE actions are inert — no toast, no sound, no work.
     if (_isEsdeDisabled(action)) return;
+    // A scan, import or second move started now would write to the data
+    // being moved after its copy was taken. Say so: the screen otherwise
+    // looks ready.
+    if (UserDataLocationService.isMoving) {
+      reportUserDataMoveRunning(context);
+      return;
+    }
     final configProvider = Provider.of<SqliteConfigProvider>(
       context,
       listen: false,
@@ -240,6 +258,8 @@ class DirectoriesSettingsContentState
   Future<void> _selectEsdeFolder() async {
     try {
       String? selected;
+      // A folder from another provider has no path the import can read.
+      var unusable = false;
 
       if (Platform.isAndroid) {
         final isTV = await PermissionService.isTelevision();
@@ -250,14 +270,11 @@ class DirectoriesSettingsContentState
           try {
             final uri = await PermissionService.requestFolderAccess();
             if (uri != null) {
-              final uriStr = uri.toString();
-              final hasFiles = await PermissionService.hasAllFilesAccess();
-              selected =
-                  await UserDataLocationService.resolveAndroidUserDataPath(
-                    uriStr,
-                    hasAllFilesAccess: hasFiles,
-                  ) ??
-                  UserDataLocationService.safUriToRealPath(uriStr);
+              // The folder as picked, never NeoStation's own storage.
+              selected = UserDataLocationService.safUriToRealPath(
+                uri.toString(),
+              );
+              unusable = selected == null;
             }
           } on PlatformException catch (e) {
             if (e.code == 'PICKER_FAILED' && mounted) {
@@ -272,7 +289,16 @@ class DirectoriesSettingsContentState
         );
       }
 
-      if (selected == null || !mounted) return;
+      if (selected == null || !mounted) {
+        if (unusable && mounted) {
+          AppNotification.showNotification(
+            context,
+            AppLocale.wizardFolderNotUsable.getString(context),
+            type: NotificationType.error,
+          );
+        }
+        return;
+      }
       if (selected.endsWith(Platform.pathSeparator)) {
         selected = selected.substring(0, selected.length - 1);
       }
@@ -286,7 +312,9 @@ class DirectoriesSettingsContentState
       if (mounted) {
         AppNotification.showNotification(
           context,
-          '$e',
+          AppLocale.errorConfiguringPath
+              .getString(context)
+              .replaceFirst('{error}', '$e'),
           type: NotificationType.error,
         );
       }
@@ -323,6 +351,21 @@ class DirectoriesSettingsContentState
     final localeEsdeSummarySystems = AppLocale.esdeSummarySystems.getString(
       context,
     );
+    final localeEsdeImportFailed = AppLocale.esdeImportFailed.getString(
+      context,
+    );
+    final localeGrantAllFiles = AppLocale.userDataFolderGrantAllFiles.getString(
+      context,
+    );
+
+    // Without All files access, a folder NeoStation can't read looks empty to
+    // the import; when it finds nothing, say how to grant it.
+    final needsAllFilesAccess =
+        Platform.isAndroid &&
+        !await PermissionService.isTelevision() &&
+        !await PermissionService.hasAllFilesAccess();
+    if (!mounted) return;
+    final allFilesHint = needsAllFilesAccess ? '\n$localeGrantAllFiles' : '';
 
     setState(() {
       _isImporting = true;
@@ -365,7 +408,7 @@ class DirectoriesSettingsContentState
       // Rebuild the fallback map now that esde_media_dir rows exist.
       if (mounted) await context.read<FileProvider>().refreshEsde();
     } catch (e) {
-      error = e.toString();
+      error = localeEsdeImportFailed.replaceFirst('{error}', '$e');
       _log.e('ES-DE import failed: $e');
     }
 
@@ -383,7 +426,7 @@ class DirectoriesSettingsContentState
         // No gamelists/ dir — the picked folder isn't an ES-DE installation.
         GlobalNotificationService().update(
           id: notificationId,
-          message: localeEsdeImportNotEsdeFolder,
+          message: '$localeEsdeImportNotEsdeFolder$allFilesHint',
           type: GlobalNotificationType.error,
           progress: null,
         );
@@ -391,7 +434,7 @@ class DirectoriesSettingsContentState
         // Valid ES-DE folder, but nothing here mapped to a NeoStation system.
         GlobalNotificationService().update(
           id: notificationId,
-          message: localeEsdeImportNothingFound,
+          message: '$localeEsdeImportNothingFound$allFilesHint',
           type: GlobalNotificationType.info,
           progress: null,
         );
@@ -457,7 +500,9 @@ class DirectoriesSettingsContentState
       if (mounted) {
         AppNotification.showNotification(
           context,
-          '$e',
+          AppLocale.esdeResetFailed
+              .getString(context)
+              .replaceFirst('{error}', '$e'),
           type: NotificationType.error,
         );
       }
@@ -469,81 +514,124 @@ class DirectoriesSettingsContentState
   // ---------------------------------------------------------------------------
 
   Future<void> _selectRomFolder() async {
-    final configProvider = Provider.of<SqliteConfigProvider>(
-      context,
-      listen: false,
-    );
-
-    if (configProvider.config.romFolders.length >= 5) {
-      if (mounted) {
-        AppNotification.showNotification(
-          context,
-          AppLocale.maxRomFoldersReached.getString(context),
-          type: NotificationType.info,
-        );
-      }
-      return;
-    }
-
+    if (_addingRomFolder) return;
+    _addingRomFolder = true;
     try {
-      String? selected;
+      final configProvider = Provider.of<SqliteConfigProvider>(
+        context,
+        listen: false,
+      );
 
-      if (Platform.isAndroid) {
-        final isTV = await PermissionService.isTelevision();
-        if (isTV) {
-          if (mounted) selected = await TvDirectoryPicker.show(context);
-        } else {
-          try {
-            final uri = await PermissionService.requestFolderAccess();
-            selected = uri?.toString();
-          } on PlatformException catch (e) {
-            if (e.code == 'PICKER_FAILED' && mounted) {
-              selected = await TvDirectoryPicker.show(context);
+      if (configProvider.config.romFolders.length >= 5) {
+        if (mounted) {
+          AppNotification.showNotification(
+            context,
+            AppLocale.maxRomFoldersReached.getString(context),
+            type: NotificationType.info,
+          );
+        }
+        return;
+      }
+
+      try {
+        String? selected;
+
+        if (Platform.isAndroid) {
+          final isTV = await PermissionService.isTelevision();
+          if (isTV) {
+            if (mounted) selected = await TvDirectoryPicker.show(context);
+          } else {
+            try {
+              final uri = await PermissionService.requestFolderAccess();
+              selected = uri?.toString();
+            } on PlatformException catch (e) {
+              if (e.code == 'PICKER_FAILED' && mounted) {
+                selected = await TvDirectoryPicker.show(context);
+              }
             }
           }
+        } else {
+          selected = await TvDirectoryPicker.pickDirectory(
+            context,
+            dialogTitle: AppLocale.selectRomsFolder.getString(context),
+          );
         }
-      } else {
-        selected = await TvDirectoryPicker.pickDirectory(
-          context,
-          dialogTitle: AppLocale.selectRomsFolder.getString(context),
-        );
-      }
 
-      if (selected != null) {
-        await configProvider.addRomFolder(selected);
+        if (selected == null) return;
+        if (configProvider.config.romFolders.contains(selected)) {
+          if (mounted) {
+            AppNotification.showNotification(
+              context,
+              AppLocale.romFolderAlreadyAdded.getString(context),
+              type: NotificationType.info,
+            );
+          }
+          return;
+        }
+        try {
+          await configProvider.addRomFolder(selected);
+        } catch (e) {
+          _log.e('Failed to add ROM folder: $e');
+          if (mounted) {
+            AppNotification.showNotification(
+              context,
+              AppLocale.romFolderAddFailed
+                  .getString(context)
+                  .replaceFirst('{error}', '$e'.split('\n').first),
+              type: NotificationType.error,
+            );
+          }
+        }
         await _loadCurrentPaths();
+      } catch (e) {
+        _log.e('ROM folder selection failed: $e');
       }
-    } catch (e) {
-      _log.e('ROM folder selection failed: $e');
+    } finally {
+      _addingRomFolder = false;
     }
   }
 
   Future<void> _removeRomFolder(String path) async {
-    final confirmed = await ConfirmActionDialog.show(
-      context,
-      title: AppLocale.removeRomFolder.getString(context),
-      body: AppLocale.removeRomFolderConfirmBody.getString(context),
-      confirmLabel: AppLocale.removeRomFolder.getString(context),
-      icon: Symbols.folder_delete_rounded,
-    );
-    if (!confirmed || !mounted) return;
-
-    final configProvider = Provider.of<SqliteConfigProvider>(
-      context,
-      listen: false,
-    );
+    if (_removingRomFolder) return;
+    _removingRomFolder = true;
     try {
-      await configProvider.removeRomFolder(path);
-      await _loadCurrentPaths();
-      if (mounted) {
-        AppNotification.showNotification(
-          context,
-          AppLocale.romFolderRemoved.getString(context),
-          type: NotificationType.info,
-        );
+      final confirmed = await ConfirmActionDialog.show(
+        context,
+        title: AppLocale.removeRomFolder.getString(context),
+        body: AppLocale.removeRomFolderConfirmBody.getString(context),
+        confirmLabel: AppLocale.removeRomFolder.getString(context),
+        icon: Symbols.folder_delete_rounded,
+      );
+      if (!confirmed || !mounted) return;
+
+      final configProvider = Provider.of<SqliteConfigProvider>(
+        context,
+        listen: false,
+      );
+      try {
+        await configProvider.removeRomFolder(path);
+        if (mounted) {
+          AppNotification.showNotification(
+            context,
+            AppLocale.romFolderRemoved.getString(context),
+            type: NotificationType.info,
+          );
+        }
+      } catch (e) {
+        _log.e('Failed to remove ROM folder: $e');
+        if (mounted) {
+          AppNotification.showNotification(
+            context,
+            AppLocale.romFolderRemoveFailed
+                .getString(context)
+                .replaceFirst('{error}', '$e'.split('\n').first),
+            type: NotificationType.error,
+          );
+        }
       }
-    } catch (e) {
-      _log.e('Failed to remove ROM folder: $e');
+      await _loadCurrentPaths();
+    } finally {
+      _removingRomFolder = false;
     }
   }
 
@@ -551,9 +639,24 @@ class DirectoriesSettingsContentState
   // User data location picker + migration
   // ---------------------------------------------------------------------------
 
+  /// Tells the user the move has to wait, if it does.
+  bool _refuseMoveWhileBusy() {
+    if (!userDataMoveBusy(context)) return false;
+    AppNotification.showNotification(
+      context,
+      AppLocale.userDataMoveBusy.getString(context),
+      type: NotificationType.error,
+    );
+    return true;
+  }
+
   Future<void> _selectUserDataLocation() async {
+    if (_refuseMoveWhileBusy()) return;
     try {
       String? selected;
+      // A folder was picked but the app can't reach it (another provider,
+      // such as Drive), as opposed to the picker being cancelled.
+      var unusable = false;
 
       if (Platform.isAndroid) {
         final isTV = await PermissionService.isTelevision();
@@ -561,20 +664,15 @@ class DirectoriesSettingsContentState
         if (isTV) {
           selected = await TvDirectoryPicker.show(context);
         } else {
-          // Regular Android: SAF picker → resolve to accessible path.
-          // On Android 15+, SD card volumes require app-specific external
-          // storage dirs; resolveAndroidUserDataPath handles this automatically.
+          // Regular Android: the system picker. The folder picked is the one
+          // tried: whether NeoStation can write it is found out below, never
+          // assumed from the permission.
           try {
             final uri = await PermissionService.requestFolderAccess();
             if (uri != null) {
               final uriStr = uri.toString();
-              final hasFiles = await PermissionService.hasAllFilesAccess();
-              selected =
-                  await UserDataLocationService.resolveAndroidUserDataPath(
-                    uriStr,
-                    hasAllFilesAccess: hasFiles,
-                  ) ??
-                  UserDataLocationService.safUriToRealPath(uriStr);
+              selected = UserDataLocationService.safUriToRealPath(uriStr);
+              unusable = selected == null;
             }
           } on PlatformException catch (e) {
             if (e.code == 'PICKER_FAILED' && mounted) {
@@ -590,13 +688,59 @@ class DirectoriesSettingsContentState
         );
       }
 
-      if (selected == null || !mounted) return;
+      if (!mounted) return;
+      if (selected == null) {
+        if (unusable) {
+          AppNotification.showNotification(
+            context,
+            AppLocale.wizardFolderNotUsable.getString(context),
+            type: NotificationType.error,
+          );
+        }
+        return;
+      }
       if (selected.endsWith(Platform.pathSeparator)) {
         selected = selected.substring(0, selected.length - 1);
       }
 
       final current = _currentUserDataPath;
-      if (current == null || selected == current) return;
+      if (current == null) return;
+
+      // Tried before the move is offered: a folder NeoStation can't write
+      // was otherwise only found out once the move had been confirmed and
+      // its progress shown. On an SD card, NeoStation's own folder there is
+      // offered instead of a folder it can't write, and the dialogue says
+      // so; nothing else is ever swapped for the folder picked.
+      String? notice;
+      switch (await chooseUserDataFolder(
+        picked: selected,
+        current: current,
+        canUse: UserDataLocationService.canUseAsUserDataFolder,
+        appDirs: UserDataLocationService.appStorageFolders,
+      )) {
+        case SameUserDataFolder():
+          return;
+        case PickedUserDataFolder(:final path):
+          selected = path;
+        case CardUserDataFolder(:final path):
+          _log.i('User data: $selected can\'t be written; offering $path');
+          selected = path;
+          if (!mounted) return;
+          notice = AppLocale.userDataMoveToCardAppFolder.getString(context);
+        case UnwritableUserDataFolder():
+          final suggestAllFilesAccess = await _shouldSuggestAllFilesAccess();
+          if (!mounted) return;
+          AppNotification.showNotification(
+            context,
+            userDataFolderNotWritableMessage(
+              (key) => key.getString(context),
+              suggestAllFilesAccess: suggestAllFilesAccess,
+            ),
+            type: NotificationType.error,
+          );
+          return;
+      }
+      if (!mounted) return;
 
       // Relocating actually MOVES data (copy + delete of NeoStation's own
       // files), so confirm the source → destination move explicitly, noting
@@ -610,8 +754,11 @@ class DirectoriesSettingsContentState
         fromPath: current,
         toPath: selected,
         destItemCount: entryCount,
+        notice: notice,
       );
       if (!proceed || !mounted) return;
+      // Something may have started while the picker and dialogue were open.
+      if (_refuseMoveWhileBusy()) return;
 
       await _migrateUserData(sourcePath: current, destPath: selected);
     } catch (e) {
@@ -619,10 +766,23 @@ class DirectoriesSettingsContentState
       if (mounted) {
         AppNotification.showNotification(
           context,
-          '${AppLocale.migratingUserDataError.getString(context)}: $e',
+          '${AppLocale.migratingUserDataError.getString(context)}: '
+          '${AppLocale.userDataMoveFailed.getString(context)}',
           type: NotificationType.error,
         );
       }
+    }
+  }
+
+  /// Whether a folder NeoStation can't write might become usable with All
+  /// files access: on Android, when the app doesn't have it.
+  Future<bool> _shouldSuggestAllFilesAccess() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return !await PermissionService.hasAllFilesAccess();
+    } catch (e) {
+      _log.w('Could not check All files access: $e');
+      return false;
     }
   }
 
@@ -631,13 +791,11 @@ class DirectoriesSettingsContentState
     required String destPath,
   }) async {
     if (!mounted) return;
-    String? migrationError;
-
-    setState(() {
-      _isMigrating = true;
-      _migrationProgress = 0.0;
-      _migrationFile = '';
-    });
+    UserDataMoveFailureKind? failure;
+    // The user can leave Settings while the move runs. The move still
+    // finishes and switches the app to the new folder, so its outcome is
+    // shown through the root navigator, which outlives this screen.
+    final navigator = Navigator.of(context, rootNavigator: true);
 
     try {
       final currentMediaPath = await ConfigService.getMediaPath();
@@ -645,48 +803,53 @@ class DirectoriesSettingsContentState
         sourceUserDataPath: sourcePath,
         sourceMediaPath: currentMediaPath,
         destPath: destPath,
-        onProgress: (p, file) {
-          if (mounted) {
-            setState(() {
-              _migrationProgress = p;
-              _migrationFile = file;
-            });
-          }
-        },
       );
-      await UserDataLocationService.setCustomPath(destPath);
-      // Reinforce the SharedPreferences setup flag so that if the new path
-      // (e.g. SD card) is temporarily unavailable on next boot, the wizard
-      // is not shown again.
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(PermissionCheckWrapper.setupCompletedKey, true);
+    } on UserDataMoveFailure catch (e) {
+      failure = e.kind;
+      _log.e('Migration failed: $e');
     } catch (e) {
-      migrationError = e.toString();
+      failure = UserDataMoveFailureKind.other;
       _log.e('Migration failed: $e');
     }
+    // Taps refused during the move said it was running; it isn't any more.
+    clearUserDataMoveRunningNotice();
 
-    if (mounted) setState(() => _isMigrating = false);
-
-    if (migrationError != null) {
-      if (mounted) {
-        AppNotification.showNotification(
-          context,
-          '${AppLocale.migratingUserDataError.getString(context)}: $migrationError',
-          type: NotificationType.error,
-        );
+    if (failure == null) {
+      // migrateData has saved the new folder as the user-data location.
+      // Reinforce the SharedPreferences setup flag so that if the new path
+      // (e.g. SD card) is temporarily unavailable on next boot, the wizard
+      // is not shown again. The data has moved either way, so a failure here
+      // must not be reported as a failed move.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(PermissionCheckWrapper.setupCompletedKey, true);
+      } catch (e) {
+        _log.w('Could not save the setup flag after the move: $e');
       }
+    }
+
+    final suggestAllFilesAccess =
+        failure == UserDataMoveFailureKind.notWritable &&
+        await _shouldSuggestAllFilesAccess();
+    if (!navigator.mounted) return;
+
+    if (failure != null) {
+      AppNotification.showNotification(
+        navigator.context,
+        '${AppLocale.migratingUserDataError.getStringForCurrentLocale()}: '
+        '${userDataMoveFailureMessage(failure, (key) => key.getStringForCurrentLocale(), suggestAllFilesAccess: suggestAllFilesAccess)}',
+        type: NotificationType.error,
+      );
       return;
     }
 
     if (mounted) setState(() => _currentUserDataPath = destPath);
 
-    if (mounted) {
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => const RestartRequiredDialog(),
-      );
-    }
+    await showDialog(
+      context: navigator.context,
+      barrierDismissible: false,
+      builder: (ctx) => const RestartRequiredDialog(),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -704,77 +867,6 @@ class DirectoriesSettingsContentState
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
-
-  Widget _buildMigrationProgress(ThemeData theme) {
-    if (!_isMigrating) return const SizedBox.shrink();
-    final pct = _migrationProgress;
-    final isCopying = pct < 0.5;
-    return Container(
-      margin: EdgeInsets.only(bottom: 12.r),
-      padding: EdgeInsets.all(12.r),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-          width: 1.r,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                isCopying
-                    ? AppLocale.migratingUserData.getString(context)
-                    : '${AppLocale.delete.getString(context)}...',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10.r,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              Text(
-                '${(pct * 100).toInt()}%',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10.r,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8.r),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4.r),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 6.r,
-              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                theme.colorScheme.primary,
-              ),
-            ),
-          ),
-          if (_migrationFile.isNotEmpty) ...[
-            SizedBox(height: 4.r),
-            Text(
-              _migrationFile,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: 9.r,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                fontFamily: 'monospace',
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _buildScanProgress(ThemeData theme, SqliteConfigProvider provider) {
     if (!provider.isScanning) return const SizedBox.shrink();
@@ -871,7 +963,7 @@ class DirectoriesSettingsContentState
               subtitle: AppLocale.configureRomsFolder.getString(context),
             ),
             SizedBox(height: 12.r),
-            _buildMigrationProgress(theme),
+            const UserDataMoveProgressCard(),
             _buildScanProgress(theme, configProvider),
             _buildEsdeProgress(theme),
             _buildEsdeResultSummary(theme),
@@ -902,6 +994,7 @@ class DirectoriesSettingsContentState
                   return ListView.builder(
                     controller: _scrollController,
                     physics: const ClampingScrollPhysics(),
+                    padding: EdgeInsets.only(top: 6.r),
                     itemCount: visualRows.length,
                     itemBuilder: (context, visualIndex) {
                       final row = visualRows[visualIndex];
@@ -922,215 +1015,236 @@ class DirectoriesSettingsContentState
                       final isEsdeDisabled = _isEsdeDisabled(
                         item['action'] as String,
                       );
-                      final borderColor = isSelected
+                      const borderColor = Colors.transparent;
+                      final foreground = isSelected
                           ? (isRemoveItem
                                 ? theme.colorScheme.error
-                                : theme.colorScheme.primary)
-                          : theme.colorScheme.outline.withValues(alpha: 0);
+                                : theme.colorScheme.surface)
+                          : theme.colorScheme.onSurface;
+                      final subtitleForeground = isSelected
+                          ? (isRemoveItem
+                                ? theme.colorScheme.error.withValues(alpha: 0.7)
+                                : theme.colorScheme.surface.withValues(
+                                    alpha: 0.6,
+                                  ))
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.6);
+                      final rimWidth = NeoGlass.borderWidthOf(context);
 
-                      return Opacity(
-                        key: _itemKeys[navIndex],
-                        opacity: isEsdeDisabled ? 0.4 : 1.0,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isSelected && isRemoveItem
-                                ? theme.colorScheme.error.withValues(
-                                    alpha: 0.08,
-                                  )
-                                : theme.cardColor.withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(12.r),
-                            border: Border.all(
-                              color: borderColor,
-                              width: isSelected ? 2.r : 1.r,
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 12.r),
+                        child: Opacity(
+                          key: _itemKeys[navIndex],
+                          opacity: isEsdeDisabled ? 0.4 : 1.0,
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: (rimWidth / 2 + 0.5).r,
                             ),
-                          ),
-                          margin: EdgeInsets.only(bottom: 8.r),
-                          child: InkWell(
-                            onTap: isEsdeDisabled
-                                ? null
-                                : () {
-                                    SfxService().playNavSound();
-                                    _handleItemTap(item);
-                                  },
-                            borderRadius: BorderRadius.circular(12.r),
-                            canRequestFocus: false,
-                            focusColor: Colors.transparent,
-                            hoverColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                            splashColor: Colors.transparent,
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 12.r,
-                                vertical: 8.r,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        _iconFor(item['action'] as String),
-                                        color: isSelected
-                                            ? (isRemoveItem
-                                                  ? theme.colorScheme.error
-                                                  : theme.colorScheme.primary)
-                                            : theme.colorScheme.onSurface,
-                                        size: 20.r,
-                                      ),
-                                      SizedBox(width: 12.r),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                            child: NeoGlassRim(
+                              cornerRadius: 12.r,
+                              borderWidth: rimWidth,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? theme.colorScheme.onSurface
+                                      : theme.colorScheme.surface.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(
+                                    color: borderColor,
+                                    width: isSelected ? 2.r : 1.r,
+                                  ),
+                                ),
+                                child: InkWell(
+                                  onTap: isEsdeDisabled
+                                      ? null
+                                      : () {
+                                          SfxService().playNavSound();
+                                          _handleItemTap(item);
+                                        },
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  canRequestFocus: false,
+                                  focusColor: Colors.transparent,
+                                  hoverColor: Colors.transparent,
+                                  highlightColor: Colors.transparent,
+                                  splashColor: Colors.transparent,
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 12.r,
+                                      vertical: 8.r,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           children: [
-                                            Text(
-                                              isRemoveItem
-                                                  ? (item['title'] as String)
-                                                  : (item['title'] as String)
-                                                        .getString(context),
-                                              style: theme.textTheme.titleSmall
-                                                  ?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: isRemoveItem
-                                                        ? 10.r
-                                                        : 12.r,
-                                                    color: isSelected
-                                                        ? (isRemoveItem
-                                                              ? theme
-                                                                    .colorScheme
-                                                                    .error
-                                                              : theme
-                                                                    .colorScheme
-                                                                    .primary)
-                                                        : theme
-                                                              .colorScheme
-                                                              .onSurface,
-                                                    fontFamily: isRemoveItem
-                                                        ? 'monospace'
-                                                        : null,
-                                                  ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
+                                            Icon(
+                                              _iconFor(
+                                                item['action'] as String,
+                                              ),
+                                              color: foreground,
+                                              size: 20.r,
                                             ),
-                                            SizedBox(height: 2.r),
-                                            Text(
-                                              (item['subtitle'] as String)
-                                                  .getString(context),
-                                              style: theme.textTheme.bodySmall
-                                                  ?.copyWith(
-                                                    color:
-                                                        isSelected &&
-                                                            isRemoveItem
-                                                        ? theme
-                                                              .colorScheme
-                                                              .error
-                                                              .withValues(
-                                                                alpha: 0.7,
-                                                              )
-                                                        : theme
-                                                              .colorScheme
-                                                              .onSurface
-                                                              .withValues(
-                                                                alpha: 0.6,
+                                            SizedBox(width: 12.r),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    isRemoveItem
+                                                        ? (item['title']
+                                                              as String)
+                                                        : (item['title']
+                                                                  as String)
+                                                              .getString(
+                                                                context,
                                                               ),
-                                                    fontSize: 9.r,
+                                                    style: theme
+                                                        .textTheme
+                                                        .titleSmall
+                                                        ?.copyWith(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: isRemoveItem
+                                                              ? 10.r
+                                                              : 12.r,
+                                                          color: foreground,
+                                                          fontFamily:
+                                                              isRemoveItem
+                                                              ? 'monospace'
+                                                              : null,
+                                                        ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
+                                                  SizedBox(height: 2.r),
+                                                  Text(
+                                                    (item['subtitle'] as String)
+                                                        .getString(context),
+                                                    style: theme
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.copyWith(
+                                                          color:
+                                                              subtitleForeground,
+                                                          fontSize: 9.r,
+                                                        ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
+                                            if (isRemoveItem)
+                                              SettingsActionButton(
+                                                icon: Symbols
+                                                    .delete_outline_rounded,
+                                                selected: isSelected,
+                                                isDestructive: true,
+                                              )
+                                            else if (item['action'] ==
+                                                'add_rom')
+                                              SettingsActionButton(
+                                                icon: Symbols.add_rounded,
+                                                selected: isSelected,
+                                              )
+                                            else if (item['action'] == 'rescan')
+                                              SettingsActionButton(
+                                                icon: Symbols.refresh_rounded,
+                                                selected: isSelected,
+                                              )
+                                            else if (isUserData)
+                                              SettingsActionButton(
+                                                icon: Symbols.edit_rounded,
+                                                selected: isSelected,
+                                              )
+                                            else if (item['action'] ==
+                                                'esde_select_folder')
+                                              SettingsActionButton(
+                                                icon: Symbols
+                                                    .folder_special_rounded,
+                                                selected: isSelected,
+                                              )
+                                            else if (item['action'] ==
+                                                'esde_run_import')
+                                              SettingsActionButton(
+                                                icon: Symbols.download_rounded,
+                                                selected: isSelected,
+                                              )
+                                            else if (item['action'] ==
+                                                'esde_reset')
+                                              SettingsActionButton(
+                                                icon:
+                                                    Symbols.restart_alt_rounded,
+                                                selected: isSelected,
+                                                isDestructive: true,
+                                              ),
                                           ],
                                         ),
-                                      ),
-                                      if (isRemoveItem)
-                                        SettingsActionButton(
-                                          icon: Symbols.delete_outline_rounded,
-                                          selected: isSelected,
-                                          isDestructive: true,
-                                        )
-                                      else if (item['action'] == 'add_rom')
-                                        SettingsActionButton(
-                                          icon: Symbols.add_rounded,
-                                          selected: isSelected,
-                                        )
-                                      else if (item['action'] == 'rescan')
-                                        SettingsActionButton(
-                                          icon: Symbols.refresh_rounded,
-                                          selected: isSelected,
-                                        )
-                                      else if (isUserData)
-                                        SettingsActionButton(
-                                          icon: Symbols.edit_rounded,
-                                          selected: isSelected,
-                                        )
-                                      else if (item['action'] ==
-                                          'esde_select_folder')
-                                        SettingsActionButton(
-                                          icon: Symbols.folder_special_rounded,
-                                          selected: isSelected,
-                                        )
-                                      else if (item['action'] ==
-                                          'esde_run_import')
-                                        SettingsActionButton(
-                                          icon: Symbols.download_rounded,
-                                          selected: isSelected,
-                                        )
-                                      else if (item['action'] == 'esde_reset')
-                                        SettingsActionButton(
-                                          icon: Symbols.restart_alt_rounded,
-                                          selected: isSelected,
-                                          isDestructive: true,
-                                        ),
-                                    ],
-                                  ),
-                                  // Show current ES-DE folder under its select item
-                                  if (item['action'] == 'esde_select_folder' &&
-                                      _esdePath.trim().isNotEmpty) ...[
-                                    SizedBox(height: 6.r),
-                                    _buildPathChip(theme, _esdePath),
-                                  ],
-                                  // Show current path under user_data item
-                                  if (isUserData &&
-                                      _currentUserDataPath != null) ...[
-                                    SizedBox(height: 6.r),
-                                    Container(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 8.r,
-                                        vertical: 4.r,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.primary
-                                            .withValues(alpha: 0.06),
-                                        borderRadius: BorderRadius.circular(
-                                          6.r,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Symbols.folder_rounded,
-                                            size: 11.r,
-                                            color: theme.colorScheme.primary
-                                                .withValues(alpha: 0.5),
+                                        // Show current ES-DE folder under its select item
+                                        if (item['action'] ==
+                                                'esde_select_folder' &&
+                                            _esdePath.trim().isNotEmpty) ...[
+                                          SizedBox(height: 6.r),
+                                          _buildPathChip(
+                                            theme,
+                                            _esdePath,
+                                            selected: isSelected,
                                           ),
-                                          SizedBox(width: 6.r),
-                                          Expanded(
-                                            child: Text(
-                                              _currentUserDataPath!,
-                                              style: TextStyle(
-                                                fontSize: 9.r,
-                                                color: theme
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withValues(alpha: 0.55),
-                                                fontFamily: 'monospace',
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
+                                        ],
+                                        // Show current path under user_data item
+                                        if (isUserData &&
+                                            _currentUserDataPath != null) ...[
+                                          SizedBox(height: 6.r),
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8.r,
+                                              vertical: 4.r,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: isSelected
+                                                  ? theme.colorScheme.surface
+                                                        .withValues(alpha: 0.12)
+                                                  : theme
+                                                        .scaffoldBackgroundColor,
+                                              borderRadius:
+                                                  BorderRadius.circular(6.r),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Symbols.folder_rounded,
+                                                  size: 11.r,
+                                                  color: foreground.withValues(
+                                                    alpha: 0.7,
+                                                  ),
+                                                ),
+                                                SizedBox(width: 6.r),
+                                                Expanded(
+                                                  child: Text(
+                                                    _currentUserDataPath!,
+                                                    style: TextStyle(
+                                                      fontSize: 9.r,
+                                                      color: foreground
+                                                          .withValues(
+                                                            alpha: 0.7,
+                                                          ),
+                                                      fontFamily: 'monospace',
+                                                    ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
-                                      ),
+                                      ],
                                     ),
-                                  ],
-                                ],
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -1168,11 +1282,16 @@ class DirectoriesSettingsContentState
     }
   }
 
-  Widget _buildPathChip(ThemeData theme, String path) {
+  Widget _buildPathChip(ThemeData theme, String path, {bool selected = false}) {
+    final foreground = selected
+        ? theme.colorScheme.surface
+        : theme.colorScheme.onSurface;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.r, vertical: 4.r),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.06),
+        color: selected
+            ? theme.colorScheme.surface.withValues(alpha: 0.12)
+            : theme.colorScheme.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(6.r),
       ),
       child: Row(
@@ -1180,7 +1299,7 @@ class DirectoriesSettingsContentState
           Icon(
             Symbols.folder_rounded,
             size: 11.r,
-            color: theme.colorScheme.primary.withValues(alpha: 0.5),
+            color: foreground.withValues(alpha: 0.7),
           ),
           SizedBox(width: 6.r),
           Expanded(
@@ -1188,7 +1307,7 @@ class DirectoriesSettingsContentState
               path,
               style: TextStyle(
                 fontSize: 9.r,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                color: foreground.withValues(alpha: 0.7),
                 fontFamily: 'monospace',
               ),
               maxLines: 2,

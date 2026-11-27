@@ -1,14 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
-import '../models/rom_fingerprint.dart';
+
+import '../constants/system_folder_names.dart';
 import '../models/screenscraper_game_candidate.dart';
 import '../repositories/game_repository.dart';
 import '../repositories/scraper_repository.dart';
-import 'retroachievements_hash_service.dart';
+import 'rom_fingerprint_resolver.dart';
 import 'rom_fingerprint_service.dart';
 import 'screenscraper/region_config.dart';
 import 'screenscraper/rom_hasher.dart';
@@ -151,6 +153,13 @@ class ScreenScraperService {
         response.statusCode,
         response.body,
         endpoint: 'ssuserInfos.php',
+      );
+    } on ScreenscraperQuotaExceededException {
+      // The client throws on HTTP 430 rather than returning the response, so
+      // the status never reaches failureForStatus.
+      _log.w('ScreenScraper refused the sign-in check: daily quota reached');
+      return const ScreenScraperAuthResult.failure(
+        ScreenScraperAuthFailure.quotaExceeded,
       );
     } catch (e) {
       _log.e('Error verifying credentials: $e');
@@ -441,84 +450,6 @@ class ScreenScraperService {
     }
   }
 
-  /// Returns the cached dump identity for [romPath], computing and caching it
-  /// on first use.
-  ///
-  /// [effort] decides whether a ROM that is not already fingerprinted is worth
-  /// reading. Under [FingerprintEffort.cheapOnly] only a cached value or a
-  /// zip's stored crc32 comes back, and a null result means "not worth it yet",
-  /// not "cannot be done" — so nothing is parked.
-  ///
-  /// Never throws: a ROM that genuinely cannot be fingerprinted is parked with
-  /// its reason and the scrape carries on by name, which is what it did before
-  /// hashing existed.
-  static Future<RomFingerprint?> _resolveFingerprint(
-    String romPath,
-    String? systemFolder, {
-    required FingerprintEffort effort,
-  }) async {
-    try {
-      final cached = await ScraperRepository.getRomFingerprint(romPath);
-      if (cached != null) return cached;
-
-      // A ROM parked for a reason that cannot fix itself (disc, oversize, a
-      // corrupt archive) stays parked — re-attempting it every scrape is
-      // exactly what the marker exists to stop, and for extract_failed each
-      // retry is a full extraction. Transient reasons (missing, error) are
-      // allowed through: a re-scrape is the natural retry point, and a fresh
-      // fingerprint clears the marker.
-      final parked = await ScraperRepository.getRomFingerprintSkipReason(
-        romPath,
-      );
-      if (parked != null &&
-          RomFingerprintService.permanentSkipReasons.contains(parked)) {
-        return null;
-      }
-
-      // Arcade sets are identified by their archive, and which systems those
-      // are is declared per system in assets/systems/<sys>.json. Resolved here
-      // (cached per system) rather than inside the fingerprinter, which stays
-      // free of database reads.
-      final policy = await RetroAchievementsHashService.policyForSystem(
-        systemFolder,
-      );
-
-      // The cheap path reads a few hundred bytes, so an isolate hop would cost
-      // more than the work. Only the full read is worth handing off.
-      final attempt = effort == FingerprintEffort.cheapOnly
-          ? await RomFingerprintService.fingerprint(
-              romPath,
-              systemFolder,
-              keepsArchivesPacked: policy.keepsArchivesPacked,
-              effort: FingerprintEffort.cheapOnly,
-            )
-          : await RomFingerprintService.computeInBackground(
-              romPath,
-              systemFolder,
-              keepsArchivesPacked: policy.keepsArchivesPacked,
-            );
-
-      final fingerprint = attempt.fingerprint;
-      if (fingerprint == null) {
-        // Deferring is not a failure — parking the ROM here would hide it from
-        // the full pass that runs a moment later.
-        if (attempt.skipReason != RomFingerprintService.deferredCostly) {
-          await ScraperRepository.markRomFingerprintSkipped(
-            romPath,
-            attempt.skipReason ?? RomFingerprintService.skipError,
-          );
-        }
-        return null;
-      }
-
-      await ScraperRepository.updateRomFingerprint(romPath, fingerprint);
-      return fingerprint;
-    } catch (e) {
-      _log.w('Could not fingerprint $romPath, scraping by name: $e');
-      return null;
-    }
-  }
-
   /// Fetches game information from the API using name or hash.
   ///
   /// [manualGameId] is a game the user identified by hand: it is asked for by
@@ -806,8 +737,47 @@ class ScreenScraperService {
     }
   }
 
+  /// Saves a match keeping what the game already has; see
+  /// [ScraperRepository.fillGameMetadataGaps].
+  static Future<bool> _fillGameMetadataGaps(
+    Map<String, dynamic> metadata,
+    String appSystemId,
+  ) async {
+    try {
+      return await ScraperRepository.fillGameMetadataGaps(
+        metadata,
+        appSystemId,
+      );
+    } catch (e) {
+      _log.e('Error saving metadata for ${metadata['filename']}: $e');
+      return false;
+    }
+  }
+
   /// Scrapes a single game by its filename and updates its local state.
+  ///
+  /// [appSystemId] may be a system that lists another's rows ("Android
+  /// Games"); the metadata is saved under the system that owns the row, where
+  /// the game lists read it.
   static Future<Map<String, dynamic>> scrapeSingleGame({
+    required String appSystemId,
+    required String romName,
+    required String systemFolder,
+    required String romPath,
+    String? gameName,
+    Function(String status, double progress)? onProgress,
+    bool forceOverwrite = false,
+  }) => _scrapeSingleGame(
+    appSystemId: SystemFolderNames.rowSystemFolder(appSystemId),
+    romName: romName,
+    systemFolder: systemFolder,
+    romPath: romPath,
+    gameName: gameName,
+    onProgress: onProgress,
+    forceOverwrite: forceOverwrite,
+  );
+
+  static Future<Map<String, dynamic>> _scrapeSingleGame({
     required String appSystemId,
     required String romName,
     required String systemFolder,
@@ -850,7 +820,9 @@ class ScreenScraperService {
           romName,
           appSystemId: appSystemId,
           maxDailyRequests: 0,
-          gameName: (systemFolder == 'android') ? gameName : null,
+          gameName: SystemFolderNames.isAndroidApps(systemFolder)
+              ? gameName
+              : null,
           manualGameId: manualGameId,
         );
         if (gameInfoResult != null && gameInfoResult['gameInfo'] != null) break;
@@ -865,15 +837,18 @@ class ScreenScraperService {
       final credentials = await getSavedCredentials();
       final preferredLanguage = credentials?['preferred_language'] ?? 'en';
       final scraperConfig = await getScraperConfig();
+      final scrapeMetadata = scraperConfig['scrape_metadata'] as bool? ?? true;
 
-      if (scraperConfig['scrape_metadata'] as bool? ?? true) {
+      if (scrapeMetadata) {
         final metadata = await _mapGameInfoToMetadata(
           romName,
           romPath,
           gameInfo,
           preferredLanguage: preferredLanguage,
         );
-        await _saveGameMetadata(metadata, appSystemId, isFullyScraped: true);
+        // Not finished until its media are in, as in a session: a game whose
+        // media fail stays for "New content only" to fetch them.
+        await _saveGameMetadata(metadata, appSystemId, isFullyScraped: false);
       }
 
       onProgress?.call(AppLocale.downloadingImages, 0.2);
@@ -881,7 +856,19 @@ class ScreenScraperService {
       final allowedMediaTypes = await ScraperRepository.getEnabledMediaTypes();
 
       if (allowedMediaTypes.isEmpty) {
+        // Nothing to fetch; with metadata off too, nothing was scraped.
+        if (scrapeMetadata) {
+          await ScraperRepository.markGameFullyScraped(
+            appSystemId,
+            romName,
+            metadataOnly: true,
+          );
+        }
         return {'success': true, 'message': AppLocale.scrapeSuccessful};
+      }
+
+      if (!scrapeMetadata) {
+        await ScraperRepository.markGameUnfinished(appSystemId, romName);
       }
 
       final medias = gameInfo['medias'] as List<dynamic>? ?? [];
@@ -899,6 +886,10 @@ class ScreenScraperService {
             onProgress: (p) =>
                 onProgress?.call(AppLocale.downloadingImages, 0.2 + (p * 0.8)),
           );
+
+      if (downloadResult['success'] == true) {
+        await ScraperRepository.markGameFullyScraped(appSystemId, romName);
+      }
 
       return {
         'success': downloadResult['success'] == true,
@@ -1034,6 +1025,8 @@ class ScreenScraperService {
     String? gameName,
     Function(String status, double progress)? onProgress,
   }) async {
+    // As in [scrapeSingleGame]: the row's own system holds its metadata.
+    final rowSystemId = SystemFolderNames.rowSystemFolder(appSystemId);
     try {
       // Scraping without the pick stored would fetch the automatic match —
       // the very game the user is correcting — so stop instead.
@@ -1050,12 +1043,19 @@ class ScreenScraperService {
       return {'success': false, 'message': AppLocale.scrapeUnexpectedError};
     }
     await _clearScrapedMedia(
-      appSystemId: appSystemId,
+      appSystemId: rowSystemId,
       romName: romName,
       systemFolder: systemFolder,
     );
+    // Its media are gone now, whatever the scrape does next: if it fails,
+    // "New content only" has to fetch them again.
+    try {
+      await ScraperRepository.markGameUnfinished(rowSystemId, romName);
+    } catch (e) {
+      _log.e('Error clearing the scraped mark for $romName: $e');
+    }
     return scrapeSingleGame(
-      appSystemId: appSystemId,
+      appSystemId: rowSystemId,
       romName: romName,
       systemFolder: systemFolder,
       romPath: romPath,
@@ -1335,9 +1335,11 @@ class ScreenScraperService {
       final manualGameId = await ScraperRepository.getManualScreenScraperGameId(
         romPath,
       );
-      var fingerprint = (systemFolder == 'android' || manualGameId != null)
+      var fingerprint =
+          (SystemFolderNames.isAndroidApps(systemFolder) ||
+              manualGameId != null)
           ? null
-          : await _resolveFingerprint(
+          : await RomFingerprintResolver.resolve(
               romPath,
               systemFolder,
               effort: FingerprintEffort.cheapOnly,
@@ -1351,7 +1353,9 @@ class ScreenScraperService {
         crc: fingerprint?.crc32,
         romSize: fingerprint?.sizeBytes,
         maxDailyRequests: maxDailyRequests,
-        gameName: (systemFolder == 'android') ? titleName : null,
+        gameName: SystemFolderNames.isAndroidApps(systemFolder)
+            ? titleName
+            : null,
         manualGameId: manualGameId,
       );
       var gameInfo = gameResult?['gameInfo'];
@@ -1363,13 +1367,13 @@ class ScreenScraperService {
       // still matches). A name-only retry could never succeed where that
       // request failed, so none is sent.
       if (gameInfo == null &&
-          systemFolder != 'android' &&
+          !SystemFolderNames.isAndroidApps(systemFolder) &&
           manualGameId == null &&
           fingerprint == null) {
         // The name missed and no cheap hash was available, so this is the ROM
         // that earns a full read: hashing is the only thing left to try, and
         // the result is cached so no later scrape repeats it.
-        fingerprint = await _resolveFingerprint(
+        fingerprint = await RomFingerprintResolver.resolve(
           romPath,
           systemFolder,
           effort: FingerprintEffort.full,
@@ -1410,19 +1414,35 @@ class ScreenScraperService {
       );
 
       if (gameInfo != null) {
-        if (scraperConfig['scrape_metadata'] as bool? ?? true) {
+        final scrapeMetadata =
+            scraperConfig['scrape_metadata'] as bool? ?? true;
+        if (scrapeMetadata) {
           final metadata = await _mapGameInfoToMetadata(
             filename,
             romPath,
             gameInfo,
             preferredLanguage: preferredLanguage,
           );
-          await _saveGameMetadata(metadata, appSystemId, isFullyScraped: false);
+          // "New content only" reaches games not yet fully scraped, whose
+          // metadata may be the user's own edits or an ES-DE import: it fills
+          // their gaps. "All" is the user asking for ScreenScraper's.
+          if (scraperConfig['scrape_mode'].toString() == 'new_only') {
+            await _fillGameMetadataGaps(metadata, appSystemId);
+          } else {
+            await _saveGameMetadata(
+              metadata,
+              appSystemId,
+              isFullyScraped: false,
+            );
+          }
         }
 
         final allowedTypes = await ScraperRepository.getEnabledMediaTypes();
 
         if (allowedTypes.isNotEmpty) {
+          if (!scrapeMetadata) {
+            await ScraperRepository.markGameUnfinished(appSystemId, filename);
+          }
           scrapingProvider.updateThreadProgress(
             threadId: threadId,
             gameName: filename,
@@ -1452,8 +1472,16 @@ class ScreenScraperService {
             };
           }
           if (res['success'] == true) {
-            await ScraperRepository.markGameFullyScraped(filename);
+            await ScraperRepository.markGameFullyScraped(appSystemId, filename);
           }
+        } else if (scrapeMetadata) {
+          // With every media type off there's nothing left to fetch, so
+          // "New content only" leaves the game until media are switched on.
+          await ScraperRepository.markGameFullyScraped(
+            appSystemId,
+            filename,
+            metadataOnly: true,
+          );
         }
 
         scrapingProvider.updateThreadProgress(

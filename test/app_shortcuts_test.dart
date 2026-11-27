@@ -11,6 +11,8 @@ import 'package:neostation/utils/app_shortcuts.dart';
 import 'package:neostation/widgets/context_menu/game_context_menu.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'gamepad_test_clock.dart';
+
 /// On desktop the keyboard drives GamepadNavigation, and Flutter's focus system
 /// sees the same keys. The arrow keys must not also move Flutter's focus, or
 /// Enter activates the focused widget as well as the navigation's selection —
@@ -34,7 +36,11 @@ void main() {
     );
   });
 
-  tearDown(() => debugDefaultTargetPlatformOverride = null);
+  setUp(resetGamepadClock);
+  tearDown(() {
+    debugDefaultTargetPlatformOverride = null;
+    restoreGamepadClock();
+  });
 
   group('appShortcuts', () {
     for (final platform in [
@@ -123,12 +129,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // GamepadNavigation drops keys for 150 real ms after a layer activates and
-    // throttles them 128 real ms apart; fake time moves neither.
+    // GamepadNavigation drops keys for 150 ms after a layer activates and
+    // throttles them 128 ms apart.
     Future<void> realPause() async {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 200)),
-      );
+      advanceGamepadClock(const Duration(milliseconds: 200));
       await tester.pumpAndSettle();
     }
 

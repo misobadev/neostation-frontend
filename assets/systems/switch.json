@@ -27,14 +27,17 @@
       "nro",
       "nso",
       "nsp",
-      "xci"
+      "nup",
+      "xci",
+      "nsz",
+      "xcz"
     ]
   },
   "emulators": [
     {
       "name": "Standalone Skyline",
       "unique_id": "switch.skyline.emu",
-      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -46,7 +49,7 @@
       "name": "Standalone Eden",
       "default_standalone": true,
       "unique_id": "switch.dev.eden.eden_emulator",
-      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp, nsz, xcz.",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -66,7 +69,7 @@
     {
       "name": "Standalone Eden Duo",
       "unique_id": "switch.dev.igawa6.edenduo",
-      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp, nsz, xcz",
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -126,6 +129,39 @@
       "platforms": {
         "android": {
           "launch_arguments": "-n dev.eden.eden_emulator.nightly/org.yuzu.yuzu_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d \"{file.uri}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone Lemon",
+      "unique_id": "switch.dev.lemon.lemon_emulator",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n dev.lemon.lemon_emulator/dev.lemon.lemon_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d \"{file.uri}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone Lemon Lite",
+      "unique_id": "switch.dev.lemon.lemon_emulator.lite",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n dev.lemon.lemon_emulator.lite/dev.lemon.lemon_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d \"{file.uri}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone Lemon Lite & Spoofed",
+      "unique_id": "switch.com.antutu.ABenchMark",
+      "description": "Supported extensions: nro, nso, nca, xci, nsp.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.antutu.ABenchMark/dev.lemon.lemon_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d \"{file.uri}\""
         }
       }
     },
@@ -222,6 +258,17 @@
       }
     },
     {
+      "name": "Standalone Peanuts Native",
+      "unique_id": "switch.dev.nxnative.android.peanuts",
+      "description": "Supported extensions: nup.",
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n dev.nxnative.android.peanuts/dev.nxnative.android.peanuts.Launch -e game \"{file.path}\"\n"
+        }
+      }
+    },
+    {
       "name": "Standalone Ryubing",
       "unique_id": "switch.io.ryubing.ryujinx",
       "description": "Supported extensions: nro, nso, nca, xci, nsp.",
@@ -241,17 +288,9 @@
   ],
   "neosync": {
     "sync": true,
-    "android_sync_folder": [
-      "{SWITCH_NAND}"
-    ],
-    "windows_sync_folder": [
-      "{SWITCH_NAND}"
-    ],
-    "linux_sync_folder": [
-      "{SWITCH_NAND}"
-    ],
-    "macos_sync_folder": [
-      "{SWITCH_NAND}"
-    ]
+    "android_sync_folder": [],
+    "windows_sync_folder": [],
+    "linux_sync_folder": [],
+    "macos_sync_folder": []
   }
 }

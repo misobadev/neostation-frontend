@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:pointycastle/export.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import '../services/saf_directory_service.dart';
 
 /// Service responsible for extracting Title IDs and metadata from Nintendo Switch ROMs.
@@ -292,9 +294,8 @@ header_key = aeaab1ca08adf9bef12991f369e3c567d6881e4e4a6a47a51f6e4877062d542d
             if (xmlBytes == null) continue;
             final xmlContent = utf8.decode(xmlBytes);
 
-            final match = RegExp(
-              r'<(TitleId|Id)>0x([0-9a-fA-F]+)</\1>',
-            ).firstMatch(xmlContent);
+            final match = RegExp(r'<(TitleId|Id)>0x([0-9a-fA-F]+)</\1>')
+                .firstMatch(xmlContent);
             if (match != null) {
               titleId = match.group(2)!.toUpperCase();
               break;

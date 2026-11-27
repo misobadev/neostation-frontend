@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:neostation/constants/recent_card_sizes.dart';
+import 'package:neostation/services/saf_directory_service.dart';
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
+
 import '../../models/config_model.dart';
+import '../../models/custom_sfx.dart';
 import '../../models/system_model.dart';
 import '../../models/emulator_model.dart';
 import 'sqlite_service.dart';
@@ -41,22 +45,38 @@ class SqliteConfigService {
     }
 
     try {
+      if (systemId == 'ps3') {
+        return (await scanPs3Path(
+          directoryPath,
+          validExtensions,
+          recursive,
+        )).length;
+      }
       final directory = Directory(directoryPath);
-      final files = await directory
+      final entities = await directory
           .list(recursive: recursive, followLinks: false)
-          .where((entity) => entity is File)
-          .cast<File>()
           .toList();
-
+      // Directory-backed formats such as macOS `.app` bundles count as one
+      // game each, and their contents must not be counted again.
+      entities.sort((a, b) => a.path.length.compareTo(b.path.length));
+      final directoryEntries = <String>[];
       int count = 0;
-      for (final file in files) {
-        String extension = path.extension(file.path).toLowerCase();
+      for (final entity in entities) {
+        if (directoryEntries.any(
+          (entry) => path.isWithin(entry, entity.path),
+        )) {
+          continue;
+        }
+        String extension = path.extension(entity.path).toLowerCase();
         if (extension.startsWith('.')) {
           extension = extension.substring(1);
         }
-        if (validExtensions.contains(extension)) {
-          count++;
+        if (!validExtensions.contains(extension)) continue;
+        if (entity is Directory) {
+          if (extension != 'app') continue;
+          directoryEntries.add(entity.path);
         }
+        count++;
       }
 
       return count;
@@ -64,6 +84,126 @@ class SqliteConfigService {
       _log.e('Error counting ROMs in $directoryPath: $e');
       return 0;
     }
+  }
+
+  /// Lists PS3 disc/PSN folders as single games, retaining ordinary ISO files.
+  ///
+  /// A disc folder contains `PS3_GAME/PARAM.SFO`; an extracted PSN folder has
+  /// `PARAM.SFO` and `USRDIR/EBOOT.BIN` directly inside it. Recognised game
+  /// folders are not traversed, so files below `PS3_GAME` and `PS3_UPDATE` are
+  /// never reported as separate games.
+  static Future<List<({String path, String filename, int size})>> scanPs3Path(
+    String root,
+    Set<String> extensions,
+    bool recursive, {
+    bool useSaf = false,
+    bool ignoreHiddenFiles = true,
+  }) async {
+    final entries = <({String path, String filename, int size})>[];
+
+    Future<List<Map<String, dynamic>>> children(String location) async {
+      if (useSaf) {
+        return SafDirectoryService.listFiles(location);
+      }
+      return [
+        await for (final entity in Directory(location).list(followLinks: false))
+          if (entity is File || entity is Directory)
+            {
+              'name': path.basename(entity.path),
+              'uri': entity.path,
+              'isDirectory': entity is Directory,
+            },
+      ];
+    }
+
+    Future<bool> isGame(List<Map<String, dynamic>> items) async {
+      final hasDirectSfo = items.any(
+        (item) =>
+            item['isDirectory'] != true &&
+            item['name'].toString().toUpperCase() == 'PARAM.SFO',
+      );
+      if (hasDirectSfo) {
+        for (final item in items) {
+          if (item['isDirectory'] == true &&
+              item['name'].toString().toUpperCase() == 'USRDIR') {
+            final executableItems = await children(item['uri'].toString());
+            if (executableItems.any(
+              (child) =>
+                  child['isDirectory'] != true &&
+                  child['name'].toString().toUpperCase() == 'EBOOT.BIN',
+            )) {
+              return true;
+            }
+          }
+        }
+      }
+      for (final item in items) {
+        if (item['isDirectory'] != true ||
+            item['name'].toString().toUpperCase() != 'PS3_GAME') {
+          continue;
+        }
+        final gameItems = await children(item['uri'].toString());
+        if (gameItems.any(
+          (child) =>
+              child['isDirectory'] != true &&
+              child['name'].toString().toUpperCase() == 'PARAM.SFO',
+        )) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    Future<void> visit(String location, String name, bool isRoot) async {
+      final items = await children(location);
+      if (await isGame(items)) {
+        entries.add((path: location, filename: name, size: 0));
+        return;
+      }
+      for (final item in items) {
+        final childName = item['name'].toString();
+        final trimmedName = childName.trim();
+        if (ignoreHiddenFiles &&
+            trimmedName.isNotEmpty &&
+            trimmedName.startsWith('.')) {
+          continue;
+        }
+        final childPath = item['uri'].toString();
+        if (item['isDirectory'] == true) {
+          final upperName = childName.toUpperCase();
+          if (upperName == 'PS3_UPDATE' || upperName == 'PS3_GAME') {
+            continue;
+          }
+          if (recursive) {
+            await visit(childPath, childName, false);
+          } else if (isRoot && await isGame(await children(childPath))) {
+            entries.add((path: childPath, filename: childName, size: 0));
+          }
+        } else {
+          final extension = path
+              .extension(childName)
+              .toLowerCase()
+              .replaceAll('.', '');
+          if (extensions.contains(extension)) {
+            final size = useSaf
+                ? (item['size'] as num?)?.toInt() ?? 0
+                : await File(childPath).length();
+            entries.add((path: childPath, filename: childName, size: size));
+          }
+        }
+      }
+    }
+
+    try {
+      final rootName = useSaf
+          ? path.posix.basename(Uri.parse(root).pathSegments.last)
+          : path.basename(root);
+      await visit(root, rootName, true);
+    } catch (error) {
+      _log.e('Error scanning PS3 folders: $error');
+      rethrow;
+    }
+    return entries;
   }
 
   /// Retrieves the platform-specific user data directory path.
@@ -83,6 +223,10 @@ class SqliteConfigService {
   static Future<ConfigModel> loadConfig() async {
     try {
       final userConfig = await SqliteService.getUserConfig();
+      final rawPreviewDelay = userConfig?['video_preview_delay'];
+      final videoPreviewDelay = rawPreviewDelay != null
+          ? (int.tryParse(rawPreviewDelay.toString()) ?? 2).clamp(-1, 5)
+          : (userConfig?['video_previews'] == 0 ? -1 : 2);
       var romFolders = await SqliteService.getUserRomFolders();
       if (Platform.isAndroid && romFolders.isEmpty) {
         final recoveredFolders =
@@ -149,6 +293,11 @@ class SqliteConfigService {
                 ) ??
                 0) ==
             1,
+        swapScreens:
+            (int.tryParse(userConfig?['swap_screens']?.toString() ?? '0') ??
+                0) ==
+            1,
+        customSfx: CustomSfx.decode(userConfig?['custom_sfx']),
         sfxEnabled:
             (int.tryParse(userConfig?['sfx_enabled']?.toString() ?? '1') ??
                 1) ==
@@ -167,6 +316,9 @@ class SqliteConfigService {
         systemSortBy:
             userConfig?['system_sort_by']?.toString() ?? 'alphabetical',
         systemSortOrder: userConfig?['system_sort_order']?.toString() ?? 'asc',
+        ignoreArticlesInGameSort:
+            userConfig?['ignore_articles_in_game_sort'] == 1,
+        videoPreviewDelay: videoPreviewDelay,
         collectionSortBy:
             userConfig?['collection_sort_by']?.toString() ?? 'name',
         collectionSortOrder:
@@ -176,11 +328,11 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['hide_recent_card']?.toString() ?? '0') ??
                 0) ==
             1,
-        // Missing column/row => the 3x2 block the card has always used.
+        // Missing column/row => the compact card, the default.
         recentCardSize:
             userConfig?['recent_card_size']?.toString().isNotEmpty == true
             ? userConfig!['recent_card_size'].toString()
-            : RecentCardSizes.defaultSize,
+            : RecentCardSizes.twoByOne,
         // Missing column/row => the wheel tab (see migration v110).
         gameDetailsTab:
             userConfig?['game_details_tab']?.toString().isNotEmpty == true
@@ -210,9 +362,9 @@ class SqliteConfigService {
             (int.tryParse(userConfig?['hide_search_card']?.toString() ?? '1') ??
                 1) ==
             1,
-        androidAppsAsTab:
+        hideTabDiscovery:
             (int.tryParse(
-                  userConfig?['android_apps_as_tab']?.toString() ?? '0',
+                  userConfig?['hide_tab_discovery']?.toString() ?? '0',
                 ) ??
                 0) ==
             1,
@@ -230,6 +382,16 @@ class SqliteConfigService {
             1,
         systemGridColumns:
             userConfig?['system_grid_columns']?.toString() ?? 'M',
+        discoveryGridColumns: ConfigModel.normalizeGridColumns(
+          userConfig?['discovery_grid_columns'],
+        ),
+        discoveryViewMode:
+            userConfig?['discovery_view_mode']?.toString() == 'carousel'
+            ? 'carousel'
+            : 'grid',
+        androidGridColumns: ConfigModel.normalizeGridColumns(
+          userConfig?['android_grid_columns'],
+        ),
         gameGridColumns: userConfig?['game_grid_columns']?.toString() ?? 'M',
         gameListSize:
             const {
@@ -245,6 +407,13 @@ class SqliteConfigService {
         dockApps: ConfigModel.normalizeDock(userConfig?['dock_apps']),
         dockEnabled:
             (int.tryParse(userConfig?['dock_enabled']?.toString() ?? '1') ??
+                1) ==
+            1,
+        // Missing column/row => 1 => logo hidden (the default).
+        secondaryHideSystemLogo:
+            (int.tryParse(
+                  userConfig?['secondary_hide_system_logo']?.toString() ?? '1',
+                ) ??
                 1) ==
             1,
         dockSlotCount:
@@ -303,6 +472,11 @@ class SqliteConfigService {
                 ) ??
                 0) ==
             1,
+        // Missing column/row => 0 => off (the default).
+        performanceMode:
+            (int.tryParse(userConfig?['performance_mode']?.toString() ?? '0') ??
+                0) ==
+            1,
         // Missing column/row => 0 => blur off (the default). The frosted blur
         // is only smooth on a powerful GPU, so it starts disabled.
         neoglassBlur:
@@ -321,7 +495,11 @@ class SqliteConfigService {
                       userConfig?['neoglass_border_width']?.toString() ?? '2',
                     ) ??
                     2)
-                .clamp(0.0, 8.0),
+                .clamp(0.0, 2.0),
+        // Missing column/row => 3 => medium corners.
+        cornerRadius:
+            (int.tryParse(userConfig?['corner_radius']?.toString() ?? '3') ?? 3)
+                .clamp(0, 5),
       );
     } catch (e) {
       _log.e('Error applying configuration in loadConfig: $e');
@@ -341,75 +519,115 @@ class SqliteConfigService {
   /// was silently reverted on the next start. The field has since been removed
   /// from the model rather than merely skipped here, so there is no longer a
   /// theme on the model for a caller to believe this method persists.
+  // Custom SFX assignments are written separately by ConfigRepository so an
+  // older whole-config save cannot revert a concurrent import.
   static Future<void> saveConfig(ConfigModel config) async {
     try {
-      await SqliteService.saveUserConfig(
-        lastScan: config.lastScan?.toIso8601String(),
-        gameViewMode: config.gameViewMode,
-        systemViewMode: config.systemViewMode,
-        showGameInfo: config.showGameInfo ? 1 : 0,
-        isFullscreen: config.isFullscreen ? 1 : 0,
-        bartopExitPoweroff: config.bartopExitPoweroff ? 1 : 0,
-        scanOnStartup: config.scanOnStartup ? 1 : 0,
-        ignoreHiddenFiles: config.ignoreHiddenFiles ? 1 : 0,
-        setupCompleted: config.setupCompleted ? 1 : 0,
-        hideBottomScreen: config.hideBottomScreen ? 1 : 0,
-        videoSound: config.videoSound ? 1 : 0,
-        sfxEnabled: config.sfxEnabled ? 1 : 0,
-        sfxVolume: config.sfxVolume,
-        use12HourClock: config.use12HourClock ? 1 : 0,
-        systemSortBy: config.systemSortBy,
-        systemSortOrder: config.systemSortOrder,
-        collectionSortBy: config.collectionSortBy,
-        collectionSortOrder: config.collectionSortOrder,
-        appLanguage: config.appLanguage,
-        hideRecentCard: config.hideRecentCard ? 1 : 0,
-        recentCardSize: config.recentCardSize,
-        gameDetailsTab: config.gameDetailsTab,
-        hideTabSync: config.hideTabSync ? 1 : 0,
-        hideTabAchievements: config.hideTabAchievements ? 1 : 0,
-        hideTabScraper: config.hideTabScraper ? 1 : 0,
-        hideTabRomm: config.hideTabRomm ? 1 : 0,
-        hideSearchCard: config.hideSearchCard ? 1 : 0,
-        androidAppsAsTab: config.androidAppsAsTab ? 1 : 0,
-        activeSyncProvider: config.activeSyncProvider,
-        autoUpdateApp: config.autoUpdateApp ? 1 : 0,
-        autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
-        systemGridColumns: config.systemGridColumns,
-        gameGridColumns: config.gameGridColumns,
-        gameListSize: config.gameListSize,
-        gameCarouselCardStyle: config.gameCarouselCardStyle,
-        dockApps: jsonEncode(config.dockApps),
-        dockEnabled: config.dockEnabled ? 1 : 0,
-        dockSlotCount: config.dockSlotCount,
-        nowPlayingDimDelay: config.nowPlayingDimDelay,
-        nowPlayingDimLevel: config.nowPlayingDimLevel,
-        fanartDimLevel: config.fanartDimLevel,
-        esdeFolderPath: config.esdeFolderPath,
-        showAchievementsBadge: config.showAchievementsBadge ? 1 : 0,
-        showCloudSyncIcon: config.showCloudSyncIcon ? 1 : 0,
-        raMatchOnStartup: config.raMatchOnStartup ? 1 : 0,
-        subfolderViewAll: config.subfolderViewAll ? 1 : 0,
-        hideSystemLogos: config.hideSystemLogos ? 1 : 0,
-        neoglassBlur: config.neoglassBlur,
-        neoglassTransparency: config.neoglassTransparency,
-        neoglassBorderWidth: config.neoglassBorderWidth,
-      );
+      // One transaction, so a save that fails partway (say, the folders after
+      // the settings) stores nothing rather than half the config, and the
+      // provider's revert leaves memory matching the database.
+      final db = await SqliteService.getDatabase();
+      await db.transaction((_) async {
+        await SqliteService.saveUserConfig(
+          lastScan: config.lastScan?.toIso8601String(),
+          gameViewMode: config.gameViewMode,
+          systemViewMode: config.systemViewMode,
+          showGameInfo: config.showGameInfo ? 1 : 0,
+          isFullscreen: config.isFullscreen ? 1 : 0,
+          bartopExitPoweroff: config.bartopExitPoweroff ? 1 : 0,
+          scanOnStartup: config.scanOnStartup ? 1 : 0,
+          ignoreHiddenFiles: config.ignoreHiddenFiles ? 1 : 0,
+          ignoreArticlesInGameSort: config.ignoreArticlesInGameSort ? 1 : 0,
+          videoPreviews: config.videoPreviewDelay >= 0 ? 1 : 0,
+          videoPreviewDelay: config.videoPreviewDelay,
+          setupCompleted: config.setupCompleted ? 1 : 0,
+          hideBottomScreen: config.hideBottomScreen ? 1 : 0,
+          swapScreens: config.swapScreens ? 1 : 0,
+          videoSound: config.videoSound ? 1 : 0,
+          sfxEnabled: config.sfxEnabled ? 1 : 0,
+          sfxVolume: config.sfxVolume,
+          use12HourClock: config.use12HourClock ? 1 : 0,
+          systemSortBy: config.systemSortBy,
+          systemSortOrder: config.systemSortOrder,
+          collectionSortBy: config.collectionSortBy,
+          collectionSortOrder: config.collectionSortOrder,
+          appLanguage: config.appLanguage,
+          hideRecentCard: config.hideRecentCard ? 1 : 0,
+          recentCardSize: config.recentCardSize,
+          gameDetailsTab: config.gameDetailsTab,
+          hideTabSync: config.hideTabSync ? 1 : 0,
+          hideTabAchievements: config.hideTabAchievements ? 1 : 0,
+          hideTabScraper: config.hideTabScraper ? 1 : 0,
+          hideTabRomm: config.hideTabRomm ? 1 : 0,
+          hideSearchCard: config.hideSearchCard ? 1 : 0,
+          hideTabDiscovery: config.hideTabDiscovery ? 1 : 0,
+          activeSyncProvider: config.activeSyncProvider,
+          autoUpdateApp: config.autoUpdateApp ? 1 : 0,
+          autoUpdateSystems: config.autoUpdateSystems ? 1 : 0,
+          systemGridColumns: config.systemGridColumns,
+          discoveryGridColumns: config.discoveryGridColumns,
+          discoveryViewMode: config.discoveryViewMode,
+          androidGridColumns: config.androidGridColumns,
+          gameGridColumns: config.gameGridColumns,
+          gameListSize: config.gameListSize,
+          gameCarouselCardStyle: config.gameCarouselCardStyle,
+          dockApps: jsonEncode(config.dockApps),
+          dockEnabled: config.dockEnabled ? 1 : 0,
+          secondaryHideSystemLogo: config.secondaryHideSystemLogo ? 1 : 0,
+          dockSlotCount: config.dockSlotCount,
+          nowPlayingDimDelay: config.nowPlayingDimDelay,
+          nowPlayingDimLevel: config.nowPlayingDimLevel,
+          fanartDimLevel: config.fanartDimLevel,
+          esdeFolderPath: config.esdeFolderPath,
+          showAchievementsBadge: config.showAchievementsBadge ? 1 : 0,
+          showCloudSyncIcon: config.showCloudSyncIcon ? 1 : 0,
+          raMatchOnStartup: config.raMatchOnStartup ? 1 : 0,
+          subfolderViewAll: config.subfolderViewAll ? 1 : 0,
+          hideSystemLogos: config.hideSystemLogos ? 1 : 0,
+          performanceMode: config.performanceMode ? 1 : 0,
+          neoglassBlur: config.neoglassBlur,
+          neoglassTransparency: config.neoglassTransparency,
+          neoglassBorderWidth: config.neoglassBorderWidth,
+          cornerRadius: config.cornerRadius,
+        );
 
-      await SqliteService.saveUserRomFolders(config.romFolders);
+        await SqliteService.saveUserRomFolders(config.romFolders);
 
-      for (final entry in config.emulators.entries) {
-        if (entry.value.detected && entry.value.path.isNotEmpty) {
-          await SqliteService.saveDetectedEmulatorPath(
-            emulatorName: entry.value.name,
-            emulatorPath: entry.value.path,
-          );
+        for (final entry in config.emulators.entries) {
+          if (entry.value.detected && entry.value.path.isNotEmpty) {
+            await SqliteService.saveDetectedEmulatorPath(
+              emulatorName: entry.value.name,
+              emulatorPath: entry.value.path,
+            );
+          }
         }
-      }
+      });
     } catch (e) {
       _log.e('Error saving config to SQLite: $e');
       rethrow;
     }
+  }
+
+  /// Deletes a ROM folder and its games and saves [config], which must no
+  /// longer list it, in one transaction.
+  ///
+  /// A failure partway stores none of it. Done step by step, a failure could
+  /// leave the games deleted with the folder kept, or the folder row deleted
+  /// while the caller, believing the removal had failed, still listed it, and
+  /// the next config save wrote it back.
+  static Future<void> removeRomFolder(
+    String folderPath,
+    ConfigModel config,
+  ) async {
+    assert(!config.romFolders.contains(folderPath));
+    final db = await SqliteService.getDatabase();
+    await db.transaction((_) async {
+      await SqliteService.deleteRomsByFolderPath(folderPath);
+      // saveConfig can't remove the last folder: saveUserRomFolders ignores an
+      // empty list so a blanket save never wipes the folders.
+      await SqliteService.removeRomFolder(folderPath);
+      await saveConfig(config);
+    });
   }
 
   /// Retrieves all supported systems from the repository.

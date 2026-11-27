@@ -11,9 +11,11 @@ import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/widgets/custom_toggle_switch.dart';
+import 'package:neostation/widgets/neo_glass.dart';
 import 'package:neostation/widgets/system_art_pack_dialog.dart';
 import 'package:neostation/widgets/system_art_pack_tile.dart';
 import 'package:provider/provider.dart';
+
 import 'settings_title.dart';
 import 'widgets/setting_row.dart';
 
@@ -167,6 +169,36 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
       _initKeys(itemCount);
     }
 
+    final rimWidth = NeoGlass.borderWidthOf(context);
+    final inset = rimWidth > 0 ? (rimWidth / 2 + 0.5).r : 0.0;
+
+    Widget buildPackTile(int i) {
+      final tile = SystemArtPackTile(
+        pack: themes[i],
+        isActive: neoAssets.isThemeActive(themes[i].folder),
+        isFocused:
+            widget.isContentFocused && widget.selectedContentIndex == i + 2,
+        onTap: () {
+          SfxService().playNavSound();
+          _onItemTapped(i + 2);
+        },
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.5),
+        margin: EdgeInsets.zero,
+        showBorder: false,
+      );
+      return Padding(
+        key: _itemKeys[i + 2],
+        padding: EdgeInsets.fromLTRB(inset, 0, inset, 12.r),
+        child: rimWidth > 0
+            ? NeoGlassRim(
+                cornerRadius: 10.r,
+                borderWidth: rimWidth,
+                child: tile,
+              )
+            : tile,
+      );
+    }
+
     return SingleChildScrollView(
       controller: _scrollController,
       physics: const ClampingScrollPhysics(),
@@ -187,21 +219,7 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
           else ...[
             _buildHideLogosRow(context, theme, config),
             _buildNoneTile(theme),
-            for (int i = 0; i < themes.length; i++)
-              Container(
-                key: _itemKeys[i + 2],
-                child: SystemArtPackTile(
-                  pack: themes[i],
-                  isActive: neoAssets.isThemeActive(themes[i].folder),
-                  isFocused:
-                      widget.isContentFocused &&
-                      widget.selectedContentIndex == i + 2,
-                  onTap: () {
-                    SfxService().playNavSound();
-                    _onItemTapped(i + 2);
-                  },
-                ),
-              ),
+            for (int i = 0; i < themes.length; i++) buildPackTile(i),
           ],
         ],
       ),
@@ -215,7 +233,7 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
     SqliteConfigProvider config,
   ) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 8.r),
+      padding: EdgeInsets.only(bottom: 12.r),
       child: SettingRow(
         key: _itemKeys.isNotEmpty ? _itemKeys[0] : null,
         onTap: () {
@@ -237,29 +255,24 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
   }
 
   Widget _buildNoneTile(ThemeData theme) {
-    final primary = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
     final isFocused =
         widget.isContentFocused && widget.selectedContentIndex == 1;
     final isActive = context
         .watch<NeoAssetsProvider>()
         .activeThemeFolder
         .isEmpty;
+    final foreground = isFocused ? scheme.surface : scheme.onSurface;
+    final mutedForeground = foreground.withValues(alpha: 0.65);
 
-    return Container(
+    final tile = Container(
       key: _itemKeys.length > 1 ? _itemKeys[1] : null,
-      margin: EdgeInsets.symmetric(vertical: 4.r),
       padding: EdgeInsets.all(8.r),
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: isFocused
+            ? scheme.onSurface
+            : scheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: isFocused
-              ? primary
-              : (isActive
-                    ? Colors.greenAccent.withValues(alpha: 0.7)
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.12)),
-          width: isFocused ? 2.r : 1.r,
-        ),
       ),
       child: InkWell(
         onTap: () {
@@ -272,14 +285,18 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
               width: 64.r,
               height: 64.r,
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
+                color: isFocused
+                    ? scheme.surface.withValues(alpha: 0.12)
+                    : scheme.surface,
                 borderRadius: BorderRadius.circular(8.r),
               ),
               child: Center(
                 child: Icon(
                   Symbols.block_rounded,
                   size: 28.r,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                  color: isFocused
+                      ? scheme.surface.withValues(alpha: 0.75)
+                      : scheme.onSurface.withValues(alpha: 0.3),
                 ),
               ),
             ),
@@ -294,17 +311,13 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontSize: 14.r,
                       fontWeight: FontWeight.bold,
+                      color: foreground,
                     ),
                   ),
                   SizedBox(height: 4.r),
                   Text(
                     AppLocale.systemArtNoneSubtitle.getString(context),
-                    style: TextStyle(
-                      fontSize: 10.r,
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.65,
-                      ),
-                    ),
+                    style: TextStyle(fontSize: 10.r, color: mutedForeground),
                   ),
                 ],
               ),
@@ -313,11 +326,20 @@ class SystemArtSettingsContentState extends State<SystemArtSettingsContent> {
               Icon(
                 Symbols.check_circle_rounded,
                 size: 18.r,
-                color: Colors.greenAccent,
+                color: isFocused ? foreground : Colors.greenAccent,
               ),
           ],
         ),
       ),
+    );
+
+    final rimWidth = NeoGlass.borderWidthOf(context);
+    final inset = rimWidth > 0 ? (rimWidth / 2 + 0.5).r : 0.0;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(inset, 0, inset, 12.r),
+      child: rimWidth > 0
+          ? NeoGlassRim(cornerRadius: 12.r, borderWidth: rimWidth, child: tile)
+          : tile,
     );
   }
 

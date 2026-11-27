@@ -1,11 +1,16 @@
 import 'dart:io';
+
 import 'package:neostation/models/retroarch_config_model.dart';
 import 'package:neostation/services/permission_service.dart';
+
 import '../repositories/emulator_repository.dart';
+
 import 'package:neostation/services/config_service.dart';
 import 'package:path/path.dart' as path;
 import 'package:flutter/foundation.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/utils/rom_tree.dart';
+import 'package:neostation/utils/safe_path.dart';
 
 /// Service responsible for discovering, parsing, and resolving RetroArch
 /// configuration settings across all supported platforms.
@@ -110,6 +115,8 @@ class RetroArchConfigService {
     String? stateDir;
     var sortSaves = false;
     var sortStates = false;
+    var sortSavesByContent = false;
+    var sortStatesByContent = false;
 
     try {
       final lines = await file.readAsLines();
@@ -124,10 +131,19 @@ class RetroArchConfigService {
           saveDir = _extractValue(timmedLine);
         } else if (timmedLine.startsWith('savestate_directory')) {
           stateDir = _extractValue(timmedLine);
-        } else if (timmedLine.startsWith('sort_savefiles_enable')) {
-          sortSaves = _extractBool(timmedLine);
-        } else if (timmedLine.startsWith('sort_savestates_enable')) {
-          sortStates = _extractBool(timmedLine);
+        } else {
+          // The sort settings by their exact key, so a longer key that
+          // starts with one of these names never sets it.
+          switch (_keyOf(timmedLine)) {
+            case 'sort_savefiles_enable':
+              sortSaves = _extractBool(timmedLine);
+            case 'sort_savestates_enable':
+              sortStates = _extractBool(timmedLine);
+            case 'sort_savefiles_by_content_enable':
+              sortSavesByContent = _extractBool(timmedLine);
+            case 'sort_savestates_by_content_enable':
+              sortStatesByContent = _extractBool(timmedLine);
+          }
         }
       }
     } catch (e) {
@@ -142,9 +158,18 @@ class RetroArchConfigService {
       savestateDirectory: _normalizePath(stateDir, configPath),
       sortSavefilesByCore: sortSaves,
       sortSavestatesByCore: sortStates,
+      sortSavefilesByContent: sortSavesByContent,
+      sortSavestatesByContent: sortStatesByContent,
+      settingsRead: true,
     );
 
     return resolvedConfig;
+  }
+
+  /// The key of a `key = value` line.
+  static String _keyOf(String line) {
+    final eq = line.indexOf('=');
+    return (eq == -1 ? line : line.substring(0, eq)).trim();
   }
 
   /// Reads a RetroArch boolean setting, which the config file writes as a
@@ -175,6 +200,32 @@ class RetroArchConfigService {
     ).firstMatch(emulatorName.trim());
     final core = match?.group(1)?.trim();
     return (core == null || core.isEmpty) ? null : core;
+  }
+
+  /// The subfolder of RetroArch's saves or states folder that a game's files
+  /// go in when RetroArch sorts them: the name of the folder the content is
+  /// in ([contentDir]), then the core's ([core]), each only when given.
+  /// Empty for the folder itself.
+  ///
+  /// The order is RetroArch's own (`path_set_redirect` in `runloop.c`): it
+  /// appends the content folder first and the core's library name after it.
+  static String saveSubfolder({String? contentDir, String? core}) => [
+    if (contentDir != null && contentDir.isNotEmpty) contentDir,
+    if (core != null && core.isNotEmpty) core,
+  ].join('/');
+
+  /// The name RetroArch gives the content folder of the game at [romPath]
+  /// when it sorts saves by content folder: the name of the folder the ROM is
+  /// in. Null when there is none, or it isn't a plain folder name.
+  ///
+  /// RetroArch gets a real path; on Android NeoStation holds a content URI,
+  /// whose document id carries the same path.
+  static String? contentDirName(String? romPath) {
+    if (romPath == null || romPath.isEmpty) return null;
+    final parts = normalizeRomPath(romPath).split('/');
+    if (parts.length < 2) return null;
+    final name = parts[parts.length - 2];
+    return isSafeFileName(name) ? name : null;
   }
 
   /// Extracts the configuration value from a line, stripping quotes and
@@ -433,32 +484,28 @@ class RetroArchConfigService {
   void _logResolution(RetroArchConfig cfg) {
     final signature =
         '${cfg.configPath}|${cfg.savefileDirectory}|${cfg.savestateDirectory}|'
-        '${cfg.sortSavefilesByCore}|${cfg.sortSavestatesByCore}';
+        '${cfg.sortSavefilesByCore}|${cfg.sortSavestatesByCore}|'
+        '${cfg.sortSavefilesByContent}|${cfg.sortSavestatesByContent}|'
+        '${cfg.settingsRead}';
     if (signature == _lastLoggedResolution) return;
     _lastLoggedResolution = signature;
     _log.i(
       'RetroArch config resolved: cfg="${cfg.configPath}" '
       'saves="${cfg.savefileDirectory}" states="${cfg.savestateDirectory}" '
       'sortSaves=${cfg.sortSavefilesByCore} '
-      'sortStates=${cfg.sortSavestatesByCore}',
+      'sortStates=${cfg.sortSavestatesByCore} '
+      'sortSavesByContent=${cfg.sortSavefilesByContent} '
+      'sortStatesByContent=${cfg.sortSavestatesByContent} '
+      'settingsRead=${cfg.settingsRead}',
     );
   }
+
+  /// Uses [config] as the resolved configuration until [clearCache].
+  @visibleForTesting
+  void debugSetConfig(RetroArchConfig config) => _cachedConfig = config;
 
   /// Clears the in-memory configuration cache.
   void clearCache() {
     _cachedConfig = null;
-  }
-
-  /// Returns the expected absolute paths for the 4 Dreamcast VMU save files
-  /// based on the provided RetroArch system directory.
-  List<String> getDreamcastSavePaths(String systemDir) {
-    final dcFolder = path.join(systemDir, 'dc');
-
-    return [
-      path.join(dcFolder, 'vmu_save_A1.bin'),
-      path.join(dcFolder, 'vmu_save_B1.bin'),
-      path.join(dcFolder, 'vmu_save_C1.bin'),
-      path.join(dcFolder, 'vmu_save_D1.bin'),
-    ];
   }
 }

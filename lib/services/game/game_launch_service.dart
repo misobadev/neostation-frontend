@@ -1,15 +1,20 @@
 import 'dart:io';
+
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:path/path.dart' as path;
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/services/launch_display_service.dart';
+
+import '../../constants/system_folder_names.dart';
 import '../../models/game_model.dart';
 import '../../models/system_model.dart';
 import '../../models/emulator_model.dart';
 import '../../models/core_emulator_model.dart';
 import '../../repositories/emulator_repository.dart';
+import '../../repositories/game_repository.dart';
 import '../../utils/emulator_loader.dart';
 import '../config_service.dart';
 import '../android_service.dart';
@@ -19,6 +24,7 @@ import '../windows_emulator_discovery.dart';
 import '../linux_host_process.dart';
 import '../macos_application_service.dart';
 import 'emulator_launch_diagnostics.dart';
+import 'shortcut_resolver.dart';
 import 'favorites_service.dart';
 import 'game_session_manager.dart';
 import '../gamepad/gamepad_navigation_manager.dart';
@@ -67,7 +73,8 @@ class GameLaunchService {
     GameModel game,
   ) async {
     try {
-      if (Platform.isAndroid && (system.folderName == 'android')) {
+      if (Platform.isAndroid &&
+          SystemFolderNames.isAndroidApps(system.folderName)) {
         if (game.romPath == null) {
           return GameLaunchResult.failure(
             AppLocale.packageNameMissing.getString(context),
@@ -89,14 +96,13 @@ class GameLaunchService {
         }
       }
 
-      bool romExists = false;
-      if (game.romPath != null) {
-        if (Platform.isAndroid && game.romPath!.startsWith('content://')) {
-          romExists = true;
-        } else {
-          romExists = await File(game.romPath!).exists();
-        }
-      }
+      final romExists = await GameRepository.launchPathExists(
+        game.romPath,
+        allowDirectory:
+            system.id == 'ps3' ||
+            system.folderName == 'ps3' ||
+            (game.romPath?.toLowerCase().endsWith('.app') ?? false),
+      );
       if (!context.mounted) return GameLaunchResult.failure('', '');
 
       if (!romExists) {
@@ -115,26 +121,43 @@ class GameLaunchService {
       // distinguishes a choice the user actually made (a per-game override, or a
       // system default they set) from one we guessed for them — only the former
       // is worth failing the launch over.
-      String? preferredPlayerId = game.emulatorName;
-      bool isExplicitChoice = preferredPlayerId != null;
-      String source = isExplicitChoice ? 'per-game override' : 'none';
+      final preference = await _preferredEmulator(system, game);
+      String? preferredPlayerId = preference.uniqueId;
+      final bool isExplicitChoice = preference.explicit;
+      String source = preference.source;
 
-      if (preferredPlayerId == null && system.id != null) {
-        final userDefault =
-            await EmulatorRepository.getUserDefaultEmulatorForSystem(
-              system.id!,
-            );
-        if (userDefault != null) {
-          preferredPlayerId = userDefault.uniqueId;
-          isExplicitChoice = true;
-          source = 'system default (user-selected)';
-        } else {
-          final defaultEmu = await _resolveDefaultInstalledEmulator(system);
-          if (defaultEmu != null) {
-            preferredPlayerId = defaultEmu.uniqueId;
-            source = 'auto-resolved default';
-          }
-        }
+      // Formats a system can launch are not interchangeable: a PS3 shortcut is
+      // not an ISO, and a native port is not an emulator ROM. Pick the installed
+      // emulator that declares the game's extension before building the command.
+      final extensionResolution = await _resolveExtensionAwareEmulator(
+        system,
+        game,
+        preferredPlayerId,
+        isExplicitChoice,
+      );
+      final gameExtension = _gameExtension(game);
+      if (extensionResolution.unsupported) {
+        if (!context.mounted) return GameLaunchResult.failure('', '');
+        return GameLaunchResult.failure(
+          '${AppLocale.unsupportedGameFormat.getString(context)} '
+              '(${gameExtension.toUpperCase()})',
+          'No installed emulator for ${system.folderName} declares '
+              '.$gameExtension support.',
+        );
+      }
+      if (extensionResolution.explicitMismatch) {
+        if (!context.mounted) return GameLaunchResult.failure('', '');
+        return GameLaunchResult.failure(
+          '${AppLocale.unsupportedGameFormat.getString(context)} '
+              '(${gameExtension.toUpperCase()})',
+          'The selected emulator "${preferredPlayerId ?? ''}" does not launch '
+              '.$gameExtension files.',
+        );
+      }
+      if (extensionResolution.uniqueId != null &&
+          extensionResolution.uniqueId != preferredPlayerId) {
+        source = 'extension match (.$gameExtension)';
+        preferredPlayerId = extensionResolution.uniqueId;
       }
 
       // Emulator selection has been the source of repeated, hard-to-reproduce
@@ -184,6 +207,10 @@ class GameLaunchService {
                 launchCmd,
                 game,
               );
+              await LauncherService.instance.resolveLaunchContent(
+                launchCmd,
+                game,
+              );
               GamepadNavigationManager.reactivate();
               await platform.invokeMethod('setGamepadBlock', {'block': true});
 
@@ -221,20 +248,40 @@ class GameLaunchService {
                 system,
               );
 
-              final result = await platform
-                  .invokeMethod('launchGenericIntent', {
-                    'package': packageName,
-                    'activity': activityName,
-                    'action': action,
-                    'category': category,
-                    'data': data,
-                    'type': type,
-                    'extras': extrasList,
-                    'activity_flags': launchCmd['activity_flags'] != null
-                        ? List<String>.from(launchCmd['activity_flags'] as List)
-                        : <String>[],
-                    'keep_saf_uri': launchCmd['keep_saf_uri'] == true,
-                  });
+              final libretroCore = _libretroCoreFromExtras(extrasList);
+              if (libretroCore != null) {
+                if (!context.mounted) {
+                  return GameLaunchResult.failure('', '');
+                }
+                final coreFailure = await _retroArchCoreFailure(
+                  context,
+                  platform: platform,
+                  packageName: packageName,
+                  coreName: libretroCore,
+                );
+                if (coreFailure != null) return coreFailure;
+              }
+
+              final result = await platform.invokeMethod(
+                'launchGenericIntent',
+                {
+                  'package': packageName,
+                  'activity': activityName,
+                  'action': action,
+                  'category': category,
+                  'data': data,
+                  'type': type,
+                  'extras': extrasList,
+                  'activity_flags': launchCmd['activity_flags'] != null
+                      ? List<String>.from(launchCmd['activity_flags'] as List)
+                      : <String>[],
+                  'keep_saf_uri': launchCmd['keep_saf_uri'] == true,
+                  'launch_display': await LaunchDisplayService.resolveForLaunch(
+                    system,
+                    game,
+                  ),
+                },
+              );
 
               if (result == true) {
                 GameSessionManager.registerGameLaunch(system, game);
@@ -244,12 +291,24 @@ class GameLaunchService {
               return await failLaunch();
             } catch (e) {
               _log.e('JSON Launch Error: $e');
+              if (e is FormatException) {
+                GamepadNavigationManager.reactivate();
+                await platform.invokeMethod('setGamepadBlock', {
+                  'block': false,
+                });
+                if (!context.mounted) return GameLaunchResult.failure('', '');
+                return GameLaunchResult.failure(
+                  AppLocale.invalidPs3Serial.getString(context),
+                  e.message,
+                );
+              }
               return await failLaunch();
             }
           }
 
           if ((Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
-              launchCmd.containsKey('executable')) {
+              (launchCmd.containsKey('executable') ||
+                  launchCmd['launch_mode'] == 'shortcut')) {
             if (!context.mounted) return GameLaunchResult.failure('', '');
             return await _launchGameDesktopFromConfig(
               context,
@@ -365,6 +424,250 @@ class GameLaunchService {
     }
   }
 
+  /// The game's launch format: `folder` for directories, otherwise the
+  /// lower-case extension without the dot.
+  static String _gameExtension(GameModel game) {
+    final romPath = game.romPath;
+    if (romPath == null || romPath.isEmpty) return '';
+    try {
+      if (FileSystemEntity.isDirectorySync(romPath)) {
+        // `.app` is a directory-backed executable, not a folder game.
+        final directoryExtension = path
+            .extension(romPath)
+            .toLowerCase()
+            .replaceAll('.', '');
+        return directoryExtension == 'app' ? 'app' : 'folder';
+      }
+    } catch (_) {
+      // Fall through to the file extension.
+    }
+    final extension = path.extension(romPath).toLowerCase();
+    return extension.startsWith('.') ? extension.substring(1) : extension;
+  }
+
+  /// Resolves directories as the synthetic `folder` format.
+  ///
+  /// Android SAF folder URIs do not expose `FileSystemEntity.isDirectory`, so a
+  /// PSN folder named `NPEB00913.ps3` would otherwise be mistaken for a serial
+  /// descriptor. Ask the document provider instead.
+  static Future<String> _gameExtensionForSelection(GameModel game) async {
+    final romPath = game.romPath;
+    if (romPath == null || romPath.isEmpty) return '';
+    if (romPath.startsWith('content://')) {
+      try {
+        if (await GameRepository.isLaunchDirectory(romPath)) {
+          final decoded = Uri.parse(romPath).pathSegments.last;
+          return decoded.toLowerCase().endsWith('.app') ? 'app' : 'folder';
+        }
+      } catch (_) {
+        // Fall back to the URI extension below.
+      }
+    }
+    return _gameExtension(game);
+  }
+
+  /// Chooses the installed emulator that declares [game]'s extension.
+  ///
+  /// Emulators with no `supported_extensions` declaration stay compatible with
+  /// every system extension, preserving the behaviour of older system JSONs.
+  static Future<({String? uniqueId, bool unsupported, bool explicitMismatch})>
+  _resolveExtensionAwareEmulator(
+    SystemModel system,
+    GameModel game,
+    String? preferredId,
+    bool explicitChoice,
+  ) async {
+    final extension = await _gameExtensionForSelection(game);
+    if (system.id == null || extension.isEmpty) {
+      return (
+        uniqueId: preferredId,
+        unsupported: false,
+        explicitMismatch: false,
+      );
+    }
+
+    List<CoreEmulatorModel> emulators;
+    try {
+      emulators = await loadEmulatorsForSystem(system);
+    } catch (error) {
+      _log.w('Could not load emulators for extension selection: $error');
+      return (
+        uniqueId: preferredId,
+        unsupported: false,
+        explicitMismatch: false,
+      );
+    }
+
+    return selectEmulatorForExtension(
+      extension: extension,
+      emulators: emulators,
+      preferredId: preferredId,
+      explicitChoice: explicitChoice,
+    );
+  }
+
+  /// Pure extension-selection rule shared by the launch path and its tests.
+  ///
+  /// Emulators that declare no extensions remain wildcards. A user-selected
+  /// emulator that cannot launch the format fails instead of silently picking
+  /// another one; an automatic/default pick falls through to the best match.
+  @visibleForTesting
+  static ({String? uniqueId, bool unsupported, bool explicitMismatch})
+  selectEmulatorForExtension({
+    required String extension,
+    required List<CoreEmulatorModel> emulators,
+    String? preferredId,
+    required bool explicitChoice,
+  }) {
+    final declaresExtensions = emulators.any(
+      (emulator) => emulator.supportedExtensions.isNotEmpty,
+    );
+    if (!declaresExtensions) {
+      return (
+        uniqueId: preferredId,
+        unsupported: false,
+        explicitMismatch: false,
+      );
+    }
+
+    bool supports(CoreEmulatorModel emulator) {
+      if (emulator.supportedExtensions.isEmpty) return true;
+      return emulator.supportedExtensions.contains(extension) ||
+          emulator.supportedExtensions.contains('*');
+    }
+
+    if (preferredId != null) {
+      CoreEmulatorModel? preferred;
+      for (final emulator in emulators) {
+        if (emulator.uniqueId == preferredId) {
+          preferred = emulator;
+          break;
+        }
+      }
+      if (preferred != null && supports(preferred)) {
+        return (
+          uniqueId: preferredId,
+          unsupported: false,
+          explicitMismatch: false,
+        );
+      }
+      if (explicitChoice) {
+        return (
+          uniqueId: preferredId,
+          unsupported: false,
+          explicitMismatch: true,
+        );
+      }
+    }
+
+    final matches = emulators.where(supports).toList();
+    if (matches.isEmpty) {
+      return (uniqueId: null, unsupported: true, explicitMismatch: false);
+    }
+    matches.sort((a, b) {
+      final aInstalled = a.isInstalled ? 0 : 1;
+      final bInstalled = b.isInstalled ? 0 : 1;
+      return aInstalled - bInstalled;
+    });
+    return (
+      uniqueId: matches.first.uniqueId,
+      unsupported: false,
+      explicitMismatch: false,
+    );
+  }
+
+  /// Aborts a RetroArch launch when its exported core receiver positively
+  /// reports the requested core as missing. Returns null when the launch may
+  /// proceed (installed, receiver unavailable, or query timed out).
+  ///
+  /// RetroArch's cores live in its private data dir, so the frontend cannot
+  /// read them; the receiver is the only non-root way to check. A null answer
+  /// means the installed RetroArch predates that receiver (1.22.x), and the
+  /// launch must fail open.
+  static Future<GameLaunchResult?> _retroArchCoreFailure(
+    BuildContext context, {
+    required MethodChannel platform,
+    required String packageName,
+    required String coreName,
+  }) async {
+    if (!packageName.startsWith('com.retroarch')) return null;
+
+    bool? installed;
+    try {
+      installed = await platform.invokeMethod<bool>('isCoreInstalled', {
+        'packageName': packageName,
+        'coreFilename': coreName,
+        'forceRefresh': true,
+      });
+    } catch (e) {
+      _log.w('Could not query RetroArch installed cores: $e');
+    }
+    _log.i(
+      '[CoreCheck] package=$packageName core=$coreName '
+      'installed=${installed ?? "unknown"}',
+    );
+    if (installed != false) return null;
+
+    _log.w(
+      '[CoreCheck] $packageName does not have the core "$coreName" '
+      'installed; aborting launch',
+    );
+    GamepadNavigationManager.reactivate();
+    try {
+      await platform.invokeMethod('setGamepadBlock', {'block': false});
+    } catch (e) {
+      _log.w('Could not release the gamepad block after a missing core: $e');
+    }
+    if (!context.mounted) return GameLaunchResult.failure('', '');
+    return GameLaunchResult.failure(
+      AppLocale.coreNotInstalled
+          .getString(context)
+          .replaceFirst('{name}', coreName),
+      AppLocale.coreNotInstalledHint.getString(context),
+    );
+  }
+
+  /// The LIBRETRO extra of an Android JSON launch, if present.
+  static String? _libretroCoreFromExtras(List<Map<String, dynamic>> extras) {
+    for (final extra in extras) {
+      if (extra['key']?.toString() == 'LIBRETRO') {
+        final value = extra['value']?.toString() ?? '';
+        if (value.isNotEmpty) return value;
+      }
+    }
+    return null;
+  }
+
+  /// The `-L` / `--libretro` core argument of a desktop RetroArch launch.
+  static String? _retroArchCoreFromArgs(List<String> args) {
+    for (var i = 0; i < args.length; i++) {
+      final arg = args[i];
+      if (arg == '-L' || arg == '--libretro') {
+        if (i + 1 < args.length && args[i + 1].isNotEmpty) return args[i + 1];
+      } else if (arg.startsWith('--libretro=')) {
+        final value = arg.substring('--libretro='.length);
+        if (value.isNotEmpty) return value;
+      }
+    }
+    return null;
+  }
+
+  /// Whether a desktop RetroArch launch should stop because its core is
+  /// positively missing.
+  ///
+  /// Only an absolute core path is authoritative here. A relative name is
+  /// resolved by RetroArch from its own `libretro_directory`, which the
+  /// frontend cannot read; probing a guessed cores directory and aborting was
+  /// the 0.16.0 regression that broke working Linux installs.
+  @visibleForTesting
+  static bool desktopCoreIsPositivelyMissing({
+    required String coreArg,
+    required bool coreFileExists,
+  }) {
+    if (coreArg.isEmpty) return false;
+    return path.isAbsolute(coreArg) && !coreFileExists;
+  }
+
   /// Internal logic for launching RetroArch cores on Android.
   static Future<GameLaunchResult> _launchGameAndroid(
     BuildContext context,
@@ -408,14 +711,24 @@ class GameLaunchService {
         }
       }
 
-      const platform = MethodChannel('com.neogamelab.neostation/game');
-      GamepadNavigationManager.reactivate();
-      await platform.invokeMethod('setGamepadBlock', {'block': true});
-
       String packageName = 'com.retroarch.aarch64';
       if (packages.isNotEmpty) {
         packageName = packages.first;
       }
+
+      const platform = MethodChannel('com.neogamelab.neostation/game');
+      if (!context.mounted) return GameLaunchResult.failure('', '');
+
+      final coreFailure = await _retroArchCoreFailure(
+        context,
+        platform: platform,
+        packageName: packageName,
+        coreName: coreName,
+      );
+      if (coreFailure != null) return coreFailure;
+
+      GamepadNavigationManager.reactivate();
+      await platform.invokeMethod('setGamepadBlock', {'block': true});
 
       final activityName =
           'com.retroarch.browser.retroactivity.RetroActivityFuture';
@@ -435,6 +748,10 @@ class GameLaunchService {
           },
           {'key': 'LIBRETRO', 'value': coreName, 'type': 'string'},
         ],
+        'launch_display': await LaunchDisplayService.resolveForLaunch(
+          system,
+          game,
+        ),
       });
 
       if (result == true) {
@@ -656,6 +973,88 @@ class GameLaunchService {
     }
   }
 
+  /// Launches a resolved `.lnk`/`.desktop`/`.app` shortcut on desktop.
+  ///
+  /// Resolution is required: a shell wrapper exits as soon as the handoff is
+  /// done, so the session monitor would think the game had closed. Launching
+  /// the real target keeps the existing process polling correct.
+  static Future<GameLaunchResult> _launchShortcutFromConfig(
+    BuildContext context,
+    Map<String, dynamic> launchCmd,
+    SystemModel system,
+    GameModel game,
+  ) async {
+    final resolved = await ShortcutResolver.resolve(game.romPath ?? '');
+    if (resolved == null) {
+      if (!context.mounted) return GameLaunchResult.failure('', '');
+      return GameLaunchResult.failure(
+        AppLocale.shortcutResolveFailed.getString(context),
+        game.romPath ?? '',
+      );
+    }
+
+    try {
+      final env = Map<String, String>.from(Platform.environment);
+      if (Platform.isMacOS) {
+        env['HOME'] = ConfigService.getRealHomePath();
+      }
+      if (resolved.environment != null) {
+        env.addAll(resolved.environment!);
+      }
+
+      final process = await LinuxHostProcess.start(
+        resolved.executable,
+        resolved.args,
+        environment: env,
+        workingDirectory: resolved.workingDirectory,
+      );
+
+      GamepadNavigationManager.deactivateAll();
+
+      final diagnostics = EmulatorLaunchDiagnostics.attach(
+        process,
+        resolved.executable,
+        resolved.args,
+      );
+
+      process.exitCode
+          .then((exitCode) async {
+            _log.i('Shortcut target exited with code: $exitCode');
+            diagnostics.reportExit(exitCode);
+            await Future.delayed(const Duration(seconds: 2));
+            var stillRunning = false;
+            if (GameSessionManager.launchedEmulatorExe != null) {
+              stillRunning = await _isProcessRunning(
+                GameSessionManager.launchedEmulatorExe!,
+              );
+            }
+            if (!stillRunning) {
+              GameSessionManager.endGameSession();
+            }
+          })
+          .catchError((error) {
+            _log.e('Error monitoring shortcut target: $error');
+            GameSessionManager.endGameSession();
+          });
+
+      final exeName = path.basename(resolved.executable);
+      final launchedExeName = exeName.toLowerCase().contains('retroarch')
+          ? null
+          : exeName;
+      GameSessionManager.registerGameLaunch(system, game, launchedExeName);
+      await FavoritesService.recordGamePlayed(game);
+      return GameLaunchResult.success();
+    } catch (error) {
+      _log.e('Error launching shortcut $resolved: $error');
+      GamepadNavigationManager.reactivate();
+      if (!context.mounted) return GameLaunchResult.failure('', '');
+      return GameLaunchResult.failure(
+        AppLocale.shortcutResolveFailed.getString(context),
+        error.toString(),
+      );
+    }
+  }
+
   /// Internal logic for launching games using a custom JSON configuration profile.
   static Future<GameLaunchResult> _launchGameDesktopFromConfig(
     BuildContext context,
@@ -664,11 +1063,32 @@ class GameLaunchService {
     GameModel game,
   ) async {
     try {
+      try {
+        await LauncherService.instance.resolveLaunchContent(launchCmd, game);
+      } on FormatException catch (error) {
+        if (!context.mounted) return GameLaunchResult.failure('', '');
+        return GameLaunchResult.failure(
+          AppLocale.invalidPs3Serial.getString(context),
+          error.message,
+        );
+      }
+      final launchMode =
+          launchCmd['launch_mode']?.toString().trim().toLowerCase() ??
+          'executable';
+      if (launchMode == 'shortcut') {
+        if (!context.mounted) return GameLaunchResult.failure('', '');
+        return await _launchShortcutFromConfig(
+          context,
+          launchCmd,
+          system,
+          game,
+        );
+      }
+
       String executable = launchCmd['executable'].toString();
+      final detected = await EmulatorRepository.getUserDetectedEmulators();
 
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        final detected = await EmulatorRepository.getUserDetectedEmulators();
-
         if (executable.toLowerCase().contains('retroarch')) {
           final ra = detected['RetroArch'];
           if (ra != null &&
@@ -782,6 +1202,33 @@ class GameLaunchService {
       var processExecutable = executable;
       var launchedViaOpen = false;
 
+      // Desktop RetroArch resolves a relative `-L core_libretro.so` from its
+      // own `libretro_directory`, which the frontend cannot read. Only an
+      // absolute core path can be checked here; aborting a relative one after
+      // probing a guessed directory broke working Linux installs in 0.16.0.
+      if (executable.toLowerCase().contains('retroarch')) {
+        final coreArg = _retroArchCoreFromArgs(args);
+        if (coreArg != null) {
+          final coreExists = path.isAbsolute(coreArg)
+              ? await File(coreArg).exists()
+              : true; // Unknown: leave it for RetroArch to resolve.
+          if (desktopCoreIsPositivelyMissing(
+            coreArg: coreArg,
+            coreFileExists: coreExists,
+          )) {
+            if (!context.mounted) return GameLaunchResult.failure('', '');
+            _log.w('[CoreCheck] RetroArch core "$coreArg" is missing');
+            return GameLaunchResult.failure(
+              AppLocale.coreNotInstalled
+                  .getString(context)
+                  .replaceFirst('{name}', coreArg),
+              '${AppLocale.coreNotInstalledHint.getString(context)}\n'
+              'Core: $coreArg',
+            );
+          }
+        }
+      }
+
       // The systems JSON names cores by filename alone (`-L snes9x_libretro.so`),
       // which RetroArch resolves against the working directory — ours, not its
       // own. macOS already rewrote these to absolute paths; Linux did not, and
@@ -832,6 +1279,7 @@ class GameLaunchService {
         processExecutable,
         args,
         environment: env,
+        workingDirectory: launchCmd['working_directory']?.toString(),
       );
 
       GamepadNavigationManager.deactivateAll();
@@ -892,6 +1340,62 @@ class GameLaunchService {
         e.toString(),
       );
     }
+  }
+
+  /// The emulator [game] is meant to launch with, before the extension rule:
+  /// its per-game override, else the system default the user picked, else the
+  /// best installed default ([_resolveDefaultInstalledEmulator]). [explicit]
+  /// marks a choice the user made, which the launch fails on rather than
+  /// replaces.
+  static Future<({String? uniqueId, bool explicit, String source})>
+  _preferredEmulator(SystemModel system, GameModel game) async {
+    final perGame = game.emulatorName;
+    if (perGame != null) {
+      return (uniqueId: perGame, explicit: true, source: 'per-game override');
+    }
+    if (system.id == null) {
+      return (uniqueId: null, explicit: false, source: 'none');
+    }
+    final userDefault =
+        await EmulatorRepository.getUserDefaultEmulatorForSystem(system.id!);
+    if (userDefault != null) {
+      return (
+        uniqueId: userDefault.uniqueId,
+        explicit: true,
+        source: 'system default (user-selected)',
+      );
+    }
+    final defaultEmu = await _resolveDefaultInstalledEmulator(system);
+    if (defaultEmu != null) {
+      return (
+        uniqueId: defaultEmu.uniqueId,
+        explicit: false,
+        source: 'auto-resolved default',
+      );
+    }
+    return (uniqueId: null, explicit: false, source: 'none');
+  }
+
+  /// The unique id of the emulator [game] would launch with, chosen the way
+  /// [launchGame] chooses it (per-game override, system default, best installed
+  /// default, then the extension rule). Null when nothing resolves, or when no
+  /// emulator could launch the game's format.
+  ///
+  /// For code that has to act on the game's emulator without launching it,
+  /// such as placing a downloaded save where that emulator reads it.
+  static Future<String?> resolveLaunchEmulatorId(
+    SystemModel system,
+    GameModel game,
+  ) async {
+    final preference = await _preferredEmulator(system, game);
+    final resolution = await _resolveExtensionAwareEmulator(
+      system,
+      game,
+      preference.uniqueId,
+      preference.explicit,
+    );
+    if (resolution.unsupported || resolution.explicitMismatch) return null;
+    return resolution.uniqueId ?? preference.uniqueId;
   }
 
   /// Resolves which emulator to auto-select when a game has no per-game
@@ -1208,6 +1712,10 @@ class GameLaunchService {
         'data': dataUri,
         'activity_flags': <String>[],
         'keep_saf_uri': false,
+        'launch_display': await LaunchDisplayService.resolveForLaunch(
+          system,
+          game,
+        ),
       });
 
       if (result == true) {
@@ -1585,9 +2093,8 @@ class GameLaunchService {
 
       // Nothing exists yet; hand back the most likely location so the caller's
       // "cores directory not found" message names somewhere actionable.
-      return LinuxEmulatorDiscovery.retroArchCoresDirCandidates(
-        retroArch.path,
-      ).first;
+      return LinuxEmulatorDiscovery.retroArchCoresDirCandidates(retroArch.path)
+          .first;
     } else if (Platform.isMacOS) {
       final homeDir = ConfigService.getRealHomePath();
       return path.join(homeDir, 'Library/Application Support/RetroArch/cores');
@@ -1685,6 +2192,8 @@ class GameLaunchService {
   static Future<void> handleAppResumed() async {
     if (GameSessionManager.isGameLaunched) {
       if (Platform.isLinux) return;
+      // The game runs on the other screen and the native side reports its end.
+      if (GameSessionManager.gameOnOtherScreen) return;
 
       final isDesktop =
           Platform.isWindows || Platform.isLinux || Platform.isMacOS;

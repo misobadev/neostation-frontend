@@ -86,6 +86,23 @@ class EsdeImportService {
     String esdeRoot, {
     void Function(double progress, String label)? onProgress,
   }) async {
+    _running++;
+    try {
+      return await _import(esdeRoot, onProgress: onProgress);
+    } finally {
+      _running--;
+    }
+  }
+
+  static int _running = 0;
+
+  /// An import is running, from the setup wizard or Settings.
+  static bool get isRunning => _running > 0;
+
+  static Future<EsdeImportResult> _import(
+    String esdeRoot, {
+    void Function(double progress, String label)? onProgress,
+  }) async {
     var result = const EsdeImportResult();
     _mediaIndexCache.clear();
     final mediaRoot = resolveMediaRoot(esdeRoot);
@@ -431,9 +448,8 @@ class EsdeImportService {
         'genre': _text(game, 'genre'),
         'players': _text(game, 'players'),
         'rating': _parseRating(_text(game, 'rating')),
-        'release_date': _parseEsdeDateTime(
-          _text(game, 'releasedate'),
-        )?.toIso8601String(),
+        'release_date': _parseEsdeDateTime(_text(game, 'releasedate'))
+            ?.toIso8601String(),
       };
       final existingMeta = metaByName[canonicalFilename.toLowerCase()];
       final metaWrite = ScraperRepository.buildEsdeMetadataWrite(

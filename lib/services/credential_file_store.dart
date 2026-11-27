@@ -23,8 +23,8 @@ import 'logger_service.dart';
 /// of a backup, a synced folder, or a user-data directory copied to another
 /// machine — not from someone who already has the user's account. That is still
 /// strictly better than the plaintext SharedPreferences fallback the macOS
-/// build has always used, and it is only ever reached once the real keychain
-/// has failed.
+/// build has always used. SteamOS uses this store by default; other desktops
+/// use it when the real keychain fails.
 class CredentialFileStore implements CredentialBackend {
   CredentialFileStore(this.directory);
 
@@ -56,9 +56,10 @@ class CredentialFileStore implements CredentialBackend {
 
   /// Returns the stored value for [key], or null when nothing is stored.
   ///
-  /// Throws on an unreadable file so the caller can tell "no credential" from
-  /// "could not look", which is what stops a transient failure being treated as
-  /// a sign-out.
+  /// Throws when the file cannot be read right now (an I/O error), so the
+  /// caller can tell "no credential" from "could not look" and a transient
+  /// failure is not treated as a sign-out. A file that can never be read again
+  /// is set aside instead; see [_quarantine].
   @override
   Future<String?> read(String key) async {
     final entries = await _readAll();
@@ -85,34 +86,60 @@ class CredentialFileStore implements CredentialBackend {
     final file = _file;
     if (!await file.exists()) return <String, dynamic>{};
 
-    final envelope = jsonDecode(await file.readAsString());
-    if (envelope is! Map || envelope['v'] != _formatVersion) {
-      _log.w('CredentialFileStore: unrecognised credential file, ignoring it');
-      return <String, dynamic>{};
-    }
-
-    final salt = base64Decode(envelope['salt'] as String);
-    final nonce = base64Decode(envelope['nonce'] as String);
-    final payload = base64Decode(envelope['data'] as String);
-
+    // Bytes, not readAsString: invalid UTF-8 is a damaged file, and
+    // readAsString would report it as an I/O error.
+    final bytes = await file.readAsBytes();
     try {
+      final envelope = jsonDecode(utf8.decode(bytes));
+      if (envelope is! Map || envelope['v'] != _formatVersion) {
+        throw const FormatException('Unrecognised credential file format');
+      }
+
+      final salt = base64Decode(envelope['salt'] as String);
+      final nonce = base64Decode(envelope['nonce'] as String);
+      final payload = base64Decode(envelope['data'] as String);
+
       final plaintext = _cipher(
         forEncryption: false,
         key: await _deriveKey(salt),
         nonce: nonce,
       ).process(payload);
       final decoded = jsonDecode(utf8.decode(plaintext));
-      return decoded is Map
-          ? Map<String, dynamic>.from(decoded)
-          : <String, dynamic>{};
+      if (decoded is! Map) {
+        throw const FormatException('Invalid credential payload');
+      }
+      return Map<String, dynamic>.from(decoded);
+    } on FileSystemException {
+      // The key file could not be read right now; that is not a verdict on
+      // the credentials.
+      rethrow;
     } catch (e) {
-      // Undecryptable is indistinguishable from tampered, and both mean the
-      // key material this file was written with is gone (a reinstalled OS
-      // changes /etc/machine-id). Report "nothing stored" rather than an
-      // unreadable store: the user signs in again and the next write replaces
-      // the file, whereas a throw here would retry forever with no way out.
-      _log.w('CredentialFileStore: credential file could not be decrypted: $e');
+      // Damaged, tampered, written by a newer build, or encrypted with key
+      // material that is gone (a reinstalled OS changes /etc/machine-id).
+      // None of these become readable by retrying, and failing every read,
+      // write and delete would leave the user unable to sign in again. Set
+      // the file aside and carry on with an empty store.
+      await _quarantine(e);
       return <String, dynamic>{};
+    }
+  }
+
+  /// Moves the unreadable credential file, and its key, to timestamped
+  /// `.bak` names. Nothing is deleted: a file from a newer build is readable
+  /// again after an upgrade, and the user can restore it by hand.
+  Future<void> _quarantine(Object reason) async {
+    final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(
+      RegExp(r'[^0-9]'),
+      '',
+    );
+    _log.w(
+      'CredentialFileStore: credential file is unreadable ($reason); '
+      'setting it aside as $_fileName.$stamp.bak and starting a new one',
+    );
+    for (final file in [_file, _deviceKeyFile]) {
+      if (await file.exists()) {
+        await file.rename('${file.path}.$stamp.bak');
+      }
     }
   }
 
@@ -184,9 +211,12 @@ class CredentialFileStore implements CredentialBackend {
     if (await file.exists()) {
       final existing = await file.readAsBytes();
       if (existing.length == _deviceKeyLength) return existing;
-      _log.w('CredentialFileStore: device key is malformed, regenerating it');
+      throw const FormatException('Credential device key is malformed');
     }
 
+    if (await _file.exists()) {
+      throw StateError('Device key missing for existing encrypted credentials');
+    }
     final secret = _randomBytes(_deviceKeyLength);
     await Directory(directory).create(recursive: true);
     await file.writeAsBytes(secret, flush: true);

@@ -1,15 +1,45 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:neostation/services/logger_service.dart';
+
+import '../constants/system_folder_names.dart';
 import '../models/database_game_model.dart';
 import '../models/romm_link_row.dart';
 import '../data/datasources/sqlite_database_service.dart';
 import '../data/datasources/sqlite_service.dart';
+export '../data/datasources/sqlite_service.dart' show RuleLibraryRows;
 import '../providers/file_provider.dart';
 import '../services/saf_directory_service.dart';
 
 /// Repository for game data access operations.
 class GameRepository {
+  /// Folder-backed systems may launch directories; ordinary ROM systems may not.
+  static Future<bool> launchPathExists(
+    String? location, {
+    bool allowDirectory = false,
+  }) async {
+    if (location == null || location.isEmpty) return false;
+    // SAF permission/reading errors are surfaced by the Android launch bridge.
+    if (location.startsWith('content://')) return true;
+    final localPath = location.startsWith('file://')
+        ? Uri.parse(location).toFilePath()
+        : location;
+    return await File(localPath).exists() ||
+        (allowDirectory && await Directory(localPath).exists());
+  }
+
+  /// Used only by emulators declaring an alternate directory launch command.
+  static Future<bool> isLaunchDirectory(String location) async {
+    if (location.startsWith('content://')) {
+      return (await SafDirectoryService.listFiles(location)).isNotEmpty;
+    }
+    final directory = location.startsWith('file://')
+        ? Directory.fromUri(Uri.parse(location))
+        : Directory(location);
+    return directory.exists();
+  }
+
   /// Reads a small text launch descriptor through SAF or the local filesystem.
   static Future<String> readLaunchDescriptor(String location) async {
     const limit = 4096;
@@ -208,8 +238,89 @@ class GameRepository {
     String filename,
   ) => SqliteService.getSingleGame(systemId, filename);
 
+  /// The filename the library indexes the game at [romPath] under in
+  /// [appSystemId] — `user_roms.filename`, extension included — or null when
+  /// the library has no such row. Metadata rows join the library on it, so
+  /// a scrape keyed by anything else (the extension-stripped
+  /// `GameModel.romname`, for one) never shows.
+  static Future<String?> indexedFilename(
+    String appSystemId,
+    String romPath,
+  ) async {
+    try {
+      final db = await SqliteService.getDatabase();
+      final rows = await db.query(
+        'user_roms',
+        columns: ['filename'],
+        where: 'app_system_id = ? AND rom_path = ?',
+        whereArgs: [SystemFolderNames.rowSystemFolder(appSystemId), romPath],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      final name = rows.first['filename']?.toString();
+      return name == null || name.isEmpty ? null : name;
+    } catch (e) {
+      LoggerService.instance.e('Error reading the indexed filename: $e');
+      return null;
+    }
+  }
+
+  static Object? _revisionDatabase;
+
+  /// Tracks local library writes without invalidating on settings notifications.
+  /// TEMP objects belong to this connection and leave the persisted schema alone.
+  /// data_version also detects commits made by the secondary Flutter engine.
+  static Future<Object> smartLibraryRevision() async {
+    final db = await SqliteService.getDatabase();
+    if (!identical(_revisionDatabase, db)) {
+      await db.execute(
+        'CREATE TEMP TABLE IF NOT EXISTS smart_library_revision (value INTEGER NOT NULL)',
+      );
+      await db.execute(
+        'INSERT INTO smart_library_revision SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM smart_library_revision)',
+      );
+      for (final table in [
+        'user_roms',
+        'user_screenscraper_metadata',
+        'app_systems',
+        // Naming settings decide the title a rule matches against.
+        'user_system_settings',
+        'app_system_extensions',
+      ]) {
+        for (final operation in ['INSERT', 'UPDATE', 'DELETE']) {
+          await db.execute(
+            'CREATE TEMP TRIGGER IF NOT EXISTS smart_revision_${table}_$operation '
+            'AFTER $operation ON main.$table BEGIN '
+            'UPDATE smart_library_revision SET value = value + 1; END',
+          );
+        }
+      }
+      _revisionDatabase = db;
+    }
+    final local = await db.rawQuery('SELECT value FROM smart_library_revision');
+    final external = await db.rawQuery('PRAGMA data_version');
+    return (db, local.single['value'], external.single.values.single);
+  }
+
+  /// Marks the installed app [packageName] as a game, or sends it back.
+  static Future<void> setAndroidGame(String packageName, bool isGame) =>
+      SqliteService.setAndroidGame(packageName, isGame);
+
+  /// The packages of the installed apps the user marked as games.
+  static Future<List<String>> getAndroidGamePackages() =>
+      SqliteService.getAndroidGamePackages();
+
   static Future<List<DatabaseGameModel>> getAllGames() =>
       SqliteService.getAllGames();
+
+  /// Runs [compute] over the slim smart-rule rows off the UI isolate.
+  static Future<T> readRuleLibrary<T>(
+    T Function(RuleLibraryRows rows) compute,
+  ) => SqliteService.readRuleLibrary(compute);
+
+  static Future<List<DatabaseGameModel>> getGamesByRomPaths(
+    Iterable<String> romPaths,
+  ) => SqliteService.getGamesByRomPaths(romPaths);
 
   static Future<List<DatabaseGameModel>> getFavoriteGames() =>
       SqliteService.getFavoriteGames();

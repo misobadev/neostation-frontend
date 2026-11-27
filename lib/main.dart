@@ -1,12 +1,21 @@
+import 'dart:ui' show PlatformDispatcher;
+
+import 'package:neostation/widgets/brand_logo.dart';
+import 'package:neostation/services/startup_language.dart';
+import 'package:neostation/widgets/west_button_glyph.dart';
+import 'package:neostation/utils/gamepad_nav.dart';
+import 'package:neostation/utils/user_data_startup_check.dart';
 import 'package:neostation/providers/menu_app_provider.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/providers/sqlite_database_provider.dart';
 import 'package:neostation/providers/file_provider.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/providers/scraping_provider.dart';
+import 'package:neostation/providers/discovery_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/providers/romm_provider.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
+import 'package:neostation/providers/recent_games_cycler.dart';
 import 'package:neostation/screens/main_screen.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
@@ -34,23 +43,32 @@ import 'package:neostation/utils/desktop_window_focus.dart';
 import 'package:neostation/utils/display_metrics_log.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/themes/anta_text_theme.dart';
+import 'package:neostation/themes/corner_radii.dart';
 import 'package:neostation/services/config_service.dart';
 import 'package:neostation/services/logger_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:neostation/utils/image_cache_budget.dart';
 import 'package:neostation/services/sfx_service.dart';
+
+import 'models/custom_sfx.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
 import 'dart:async';
 import 'dart:io';
+
 import 'package:fvp/fvp.dart';
 import 'package:fullscreen_window/fullscreen_window.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:neostation/screens/secondary_screen/secondary_screen.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:file_picker/file_picker.dart';
 
 // Politica personalizada para deshabilitar navegacion por teclado
 class NoFocusTraversalPolicy extends FocusTraversalPolicy {
@@ -121,16 +139,18 @@ class ToggleFullscreenAction extends Action<ToggleFullscreenIntent> {
       // Notificar el cambio de fullscreen
       FullscreenNotifier().notifyFullscreenChanged(newState);
     } else if (Platform.isMacOS) {
-      final isFullscreen = await windowManager.isFullScreen();
-      LoggerService.instance.i(
-        'Toggle fullscreen (macOS): current=$isFullscreen, setting=${!isFullscreen}',
-      );
-      await windowManager.setFullScreen(!isFullscreen);
+      final window = WindowManager.instance.getCurrent();
+      if (window != null) {
+        final isFullscreen = window.isFullScreen;
+        LoggerService.instance.i(
+          'Toggle fullscreen (macOS): current=$isFullscreen, setting=${!isFullscreen}',
+        );
+        window.isFullScreen = !isFullscreen;
 
-      // Notificar el cambio de fullscreen
-      await Future.delayed(const Duration(milliseconds: 100));
-      final newState = await windowManager.isFullScreen();
-      FullscreenNotifier().notifyFullscreenChanged(newState);
+        // Notify the fullscreen change.
+        await Future.delayed(const Duration(milliseconds: 100));
+        FullscreenNotifier().notifyFullscreenChanged(window.isFullScreen);
+      }
     }
     return;
   }
@@ -193,6 +213,76 @@ Future<void> _configureImageCache() async {
 /// created them. Used by [AppNotification] for progress notifications.
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// ` v1.0.0-rc.2+3002`, or empty when the platform can't say. Written on the
+/// startup line so every session in app.log names the build it ran.
+Future<String> _appVersionLabel() async {
+  try {
+    final info = await PackageInfo.fromPlatform();
+    return ' v${info.version}+${info.buildNumber}';
+  } catch (_) {
+    return '';
+  }
+}
+
+/// Sends framework and uncaught async errors to app.log.
+///
+/// They used to reach the console only, so a user's log showed nothing about
+/// an error even when the app misbehaved right after it.
+void _installErrorLogging(LoggerService log) {
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.dumpErrorToConsole(details);
+    log.e(
+      'Flutter error${details.library != null ? ' (${details.library})' : ''}',
+      error: details.exception,
+      stackTrace: details.stack,
+    );
+  };
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    log.e('Uncaught error', error: error, stackTrace: stack);
+    // Handled: an uncaught async error must not take the app down.
+    return true;
+  };
+}
+
+/// Logs why Android ended the previous session (crash, native crash, ANR,
+/// killed for memory, ...).
+///
+/// A native crash or a kill by the system never reaches app.log: the session
+/// just stops. Android keeps the reason, so it is read back here and the log
+/// says what happened to the session above it.
+Future<void> _logPreviousExitReason(LoggerService log) async {
+  if (!Platform.isAndroid) return;
+  try {
+    final info = await const MethodChannel('com.neogamelab.neostation/game')
+        .invokeMapMethod<String, Object?>('getLastExitInfo');
+    if (info == null) return;
+    final reason = info['reason'] as String? ?? 'UNKNOWN';
+    final time = info['timestamp'] is int
+        ? TimestampedPrinter.formatTime(
+            DateTime.fromMillisecondsSinceEpoch(info['timestamp'] as int),
+          )
+        : '?';
+    final description = info['description'] as String?;
+    final pss = info['pssKb'];
+    final message =
+        'Previous session ended: $reason at $time'
+        '${description != null && description.isNotEmpty ? ' ($description)' : ''}'
+        '${pss is int && pss > 0 ? ', memory ${pss ~/ 1024} MB' : ''}';
+    const clean = {'EXIT_SELF', 'USER_REQUESTED', 'USER_STOPPED'};
+    if (clean.contains(reason)) {
+      log.i(message);
+    } else {
+      log.w(message);
+    }
+    final trace = info['trace'] as String?;
+    if (trace != null && trace.isNotEmpty) {
+      log.w('Previous session crash trace:\n$trace');
+    }
+  } catch (e) {
+    log.w('Could not read previous exit reason: $e');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -202,37 +292,47 @@ void main() async {
   runApp(const StartupLoadingApp());
   await WidgetsBinding.instance.endOfFrame;
 
+  // Resolve the user-data location before anything reads it, so the cold-boot
+  // wait happens once (behind the loading screen) rather than once per caller,
+  // and a folder that is missing is reported, on every platform, before
+  // anything (app.log first of all) could create it empty.
+  final storageNotes = await _awaitUserDataStorage();
+
+  // After the check: app.log lives in the user-data folder, and a logger
+  // opened before it was usable stayed off the file for the whole session.
   final log = LoggerService.instance;
   await log.init();
-  log.i('Starting NeoStation...');
+  log.i('Starting NeoStation...${await _appVersionLabel()}');
+  _installErrorLogging(log);
+  await _logPreviousExitReason(log);
+  for (final note in storageNotes) {
+    log.w(note);
+  }
 
   // After log.init(): this used to run before it, so the budget it picked was
   // never visible in app.log.
   await _configureImageCache();
 
-  // Resolve the user-data location before anything reads it, so the cold-boot
-  // wait happens once (behind the loading screen) rather than once per caller.
-  if (Platform.isAndroid) {
-    await _awaitUserDataStorage();
+  // The App Sandbox is disabled on macOS (see Release.entitlements), so the
+  // `files.user-selected.*` entitlements are gone. file_picker_darwin still
+  // checks for them before every dialog and fails with ENTITLEMENT_NOT_FOUND
+  // instead of opening one, which left every folder/file picker dead (#614).
+  if (Platform.isMacOS) {
+    await FilePicker.skipEntitlementsChecks();
   }
 
-  // Inicializar window_manager para desktop con tamano minimo 640x480
+  // Initialize window_manager for desktop with a 640x480 minimum size.
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-    await windowManager.ensureInitialized();
+    final window = WindowManager.instance.getCurrent();
 
-    WindowOptions windowOptions = WindowOptions(
-      size: const Size(1280, 720),
-      alwaysOnTop: false,
-      skipTaskbar: false,
-      minimumSize: const Size(640, 480),
-    );
+    window?.minimumSize = const Size(640, 480).toNative();
+    window?.setSize(const Size(1280, 720).toNative(), false);
+    window?.isAlwaysOnTop = false;
+    window?.isVisibleInTaskbar = true;
+    window?.show();
+    window?.focus();
 
-    await windowManager.waitUntilReadyToShow(windowOptions, () async {
-      await windowManager.show();
-      await windowManager.focus();
-    });
-
-    // Cargar configuracion de fullscreen
+    // Load the fullscreen configuration.
     bool isFullscreen = true;
     try {
       final config = await ConfigRepository.getUserConfig();
@@ -247,20 +347,20 @@ void main() async {
       if (Platform.isWindows || Platform.isLinux) {
         FullScreenWindow.setFullScreen(true);
       } else if (Platform.isMacOS) {
-        await windowManager.setFullScreen(true);
+        window?.isFullScreen = true;
       }
       FullscreenNotifier().notifyFullscreenChanged(true);
     } else {
       if (Platform.isWindows || Platform.isLinux) {
         FullScreenWindow.setFullScreen(false);
       } else if (Platform.isMacOS) {
-        await windowManager.setFullScreen(false);
+        window?.isFullScreen = false;
       }
       FullscreenNotifier().notifyFullscreenChanged(false);
     }
 
-    // Gamepad input follows window focus from here on. Must come after
-    // ensureInitialized() above, which owns the channel it listens on.
+    // Gamepad input follows window focus from here on. Must come after the
+    // window has been created and shown.
     await DesktopWindowFocus.initialize();
 
     log.i('Window manager initialized');
@@ -268,14 +368,6 @@ void main() async {
 
   // Inicializar fvp para soporte extendido de video (Windows, Linux, etc.)
   registerWith();
-
-  // Configurar manejo global de errores para evitar crashes
-  FlutterError.onError = (FlutterErrorDetails details) {
-    // Para otros errores, usar el handler por defecto en debug
-    if (details.stack != null) {
-      FlutterError.dumpErrorToConsole(details);
-    }
-  };
 
   // Configure fullscreen for mobile platforms
   if (Platform.isAndroid || Platform.isIOS) {
@@ -317,7 +409,7 @@ void main() async {
       MapLocale('pt', AppLocale.pt),
       MapLocale('ru', AppLocale.ru),
       MapLocale('zh', AppLocale.zh),
-      MapLocale('zh_Hant', AppLocale.zhHant),
+      MapLocale('zh', AppLocale.zhHant, scriptCode: 'Hant'),
       MapLocale('fr', AppLocale.fr),
       MapLocale('de', AppLocale.de),
       MapLocale('it', AppLocale.it),
@@ -352,10 +444,16 @@ void main() async {
     log.e('Error initializing database providers: $e');
   }
 
+  // FileProvider started before the database was open. On a fresh install
+  // that can find it briefly locked, and its system-extension lookup (or, on
+  // an earlier failure, every path) is still missing: try again now. Does
+  // nothing when it already finished.
+  await fileProvider.initialize();
+
   // Inicializar listener de Android para tracking de tiempo de juego
   if (Platform.isAndroid) {
     try {
-      GameService.initializeAndroidGameListener();
+      await GameService.initializeAndroidGameListener();
       // Verificar si hay una sesion de juego pendiente (app fue matada)
       await GameService.checkPendingGameSession();
     } catch (e) {
@@ -471,12 +569,15 @@ void main() async {
   // suspend. This engine's screen-power truth is GameService.deviceScreenOn.
   SfxService.isScreenOn = () => GameService.deviceScreenOn.value;
 
-  // Initialize SFX service for navigation sounds (fire-and-forget).
-  SfxService().init().then((_) {
-    // Apply persisted SFX preferences immediately.
-    SfxService().setVolume(sqliteConfigProvider.config.sfxVolume);
-    SfxService().setEnabled(sqliteConfigProvider.config.sfxEnabled);
-  });
+  // Seed settings before initialization so the first interaction uses them.
+  final sfx = SfxService();
+  sfx.setVolume(sqliteConfigProvider.config.sfxVolume);
+  sfx.setEnabled(sqliteConfigProvider.config.sfxEnabled);
+  unawaited(
+    sfx.setCustomSounds(sqliteConfigProvider.config.customSfx).then((_) async {
+      if (sfx.isEnabled) await sfx.init();
+    }),
+  );
 }
 
 /// Startup strings for the current device locale.
@@ -488,8 +589,9 @@ void main() async {
 /// missing keys degrade to an empty string rather than crashing the very
 /// first frame.
 Map<String, dynamic> _startupStrings() {
-  final locale = WidgetsBinding.instance.platformDispatcher.locale;
-  final languageTag = locale.toLanguageTag().replaceAll('-', '_');
+  final language = supportedLanguageFor(
+    WidgetsBinding.instance.platformDispatcher.locale,
+  );
   const translations = <String, Map<String, dynamic>>{
     'en': appLocaleEn,
     'es': appLocaleEs,
@@ -504,9 +606,7 @@ Map<String, dynamic> _startupStrings() {
     'ja': appLocaleJa,
     'ko': appLocaleKo,
   };
-  return translations[languageTag] ??
-      translations[locale.languageCode] ??
-      appLocaleEn;
+  return translations[language] ?? appLocaleEn;
 }
 
 String _startupString(String key) {
@@ -523,10 +623,13 @@ String _startupString(String key) {
 /// intro in the user's theme rather than always-dark chrome.
 class _StartupScaffold extends StatefulWidget {
   const _StartupScaffold({
-    required this.childrenBuilder,
+    this.childrenBuilder = _noChildren,
     this.onKeyEvent,
     this.animatedLogo = false,
   });
+
+  static List<Widget> _noChildren(BuildContext _, StartupThemeColors _) =>
+      const [];
 
   /// Builds the status area, given the resolved startup palette.
   ///
@@ -541,9 +644,10 @@ class _StartupScaffold extends StatefulWidget {
   /// screen keeps the static logo (a shine would imply progress).
   final bool animatedLogo;
 
-  /// Raw key handler used by the error screen. The gamepad navigation manager
-  /// is not running this early, so gamepad buttons are read straight from the
-  /// key events instead.
+  /// Raw key handler used by the error screen, for keyboard keys and remote
+  /// buttons. Gamepads reach it through its own [GamepadNavigation] instead:
+  /// on Android and desktop alike a gamepad's buttons never arrive as key
+  /// events.
   final KeyEventResult Function(KeyEvent)? onKeyEvent;
 
   @override
@@ -569,10 +673,8 @@ class _StartupScaffoldState extends State<_StartupScaffold> {
   Widget build(BuildContext context) {
     // Same factor the shimmering splash uses, so the logo and the spacing
     // around it grow instead of being stranded at design size on a desktop
-    // window. The wordmark takes the damped text scale — grown by the full
-    // factor it reads as a banner rather than a caption under the glyph.
+    // window.
     final scale = SplashStatusLayout.scaleOf(context);
-    final textScale = SplashStatusLayout.textScaleOf(context);
     final children = widget.childrenBuilder(context, _colors);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -595,29 +697,24 @@ class _StartupScaffoldState extends State<_StartupScaffold> {
           child: widget.animatedLogo
               ? SplashStatusLayout(children: children)
               : Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32 * scale),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          'assets/images/logo_transparent.png',
-                          width: 112 * scale,
-                          height: 112 * scale,
-                        ),
-                        SizedBox(height: 24 * scale),
-                        Text(
-                          'NeoStation',
-                          style: TextStyle(
-                            color: _colors.foreground,
-                            fontSize: 28 * textScale,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.2,
+                  // Scaled down, never up, when the screen is too short for
+                  // it: on a handheld (the AYN Thor is 832x468) the logo,
+                  // message and buttons overflowed the bottom.
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Padding(
+                      padding: EdgeInsets.all(32 * scale),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          BrandLogo(
+                            width: 300 * scale,
+                            brightness: _colors.brightness,
                           ),
-                        ),
-                        SizedBox(height: 24 * scale),
-                        ...children,
-                      ],
+                          SizedBox(height: 28 * scale),
+                          ...children,
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -692,34 +789,106 @@ class _StartupLoadingAppState extends State<StartupLoadingApp> {
   }
 }
 
-/// Shown when the configured user-data volume never appeared. Without this the
-/// failure was swallowed by the catch-alls in `main()` and the app booted onto
-/// an empty database, looking freshly installed.
-class StartupStorageErrorApp extends StatelessWidget {
+/// Shown when the configured user-data folder can't be used: its drive never
+/// appeared, or the folder was moved, renamed or deleted. Without this the
+/// failure was swallowed by the catch-alls in `main()` (or an empty folder was
+/// created in its place) and the app booted onto an empty database, looking
+/// freshly installed.
+///
+/// The buttons are fixed to A (Retry), B (Continue without it) and the West
+/// face button (Start with an empty folder), each shown with its glyph, and
+/// take no focus: A on a focused "Start with an empty folder" used to Retry.
+class StartupStorageErrorApp extends StatefulWidget {
   const StartupStorageErrorApp({
     super.key,
     required this.storagePath,
     required this.onRetry,
     required this.onUseDefault,
+    this.problem = UserDataProblem.volumeMissing,
+    this.onStartEmpty,
+    this.createFailed = false,
   });
 
   final String? storagePath;
   final VoidCallback onRetry;
   final VoidCallback onUseDefault;
 
+  /// What is missing: the drive, or the folder on it.
+  final UserDataProblem problem;
+
+  /// Creates the missing folder, empty. Offered only for a missing folder: on
+  /// a drive that isn't there it would create a lookalike path.
+  final VoidCallback? onStartEmpty;
+
+  /// The last "Start with an empty folder" could not create the folder.
+  final bool createFailed;
+
+  @override
+  State<StartupStorageErrorApp> createState() => _StartupStorageErrorAppState();
+}
+
+class _StartupStorageErrorAppState extends State<StartupStorageErrorApp> {
+  late final GamepadNavigation _gamepad;
+
+  /// UI sounds are off while this screen is up: the user's sound setting is
+  /// in the database, which isn't open yet.
+  late final bool _sfxWasEnabled;
+
+  VoidCallback? get _startEmpty =>
+      widget.problem == UserDataProblem.folderMissing
+      ? widget.onStartEmpty
+      : null;
+
+  @override
+  void initState() {
+    super.initState();
+    _sfxWasEnabled = SfxService().isEnabled;
+    SfxService().setEnabled(false);
+    // Gamepads reach the app through the gamepads plugin, not as key events,
+    // on Android as on desktop. Enter, Backspace and Escape come through here
+    // too.
+    _gamepad = GamepadNavigation(
+      onSelectItem: () => widget.onRetry(),
+      onBack: () => widget.onUseDefault(),
+      // Start, Escape and a TV remote's menu button, the remote's only way
+      // to continue (MainActivity keeps Back from the app).
+      onSettings: () => widget.onUseDefault(),
+      onWestButton: () => _startEmpty?.call(),
+      playSelectSound: false,
+      allowRepeat: false,
+    );
+    _gamepad.initialize();
+    _gamepad.activate();
+  }
+
+  @override
+  void dispose() {
+    _gamepad.dispose();
+    SfxService().setEnabled(_sfxWasEnabled);
+    super.dispose();
+  }
+
+  /// Keys [GamepadNavigation] doesn't act on here: keys from devices Android
+  /// doesn't class as gamepads (a TV remote's centre button arrives as
+  /// select), and from a keyboard Space and X.
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.gameButtonA ||
-        key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.select ||
         key == LogicalKeyboardKey.space) {
-      onRetry();
+      widget.onRetry();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.gameButtonB ||
-        key == LogicalKeyboardKey.escape) {
-      onUseDefault();
+    if (key == LogicalKeyboardKey.gameButtonB) {
+      widget.onUseDefault();
+      return KeyEventResult.handled;
+    }
+    final startEmpty = _startEmpty;
+    if (startEmpty != null &&
+        (key == LogicalKeyboardKey.gameButtonX ||
+            key == LogicalKeyboardKey.keyX)) {
+      startEmpty();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -727,11 +896,23 @@ class StartupStorageErrorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final startEmpty = _startEmpty;
     return _StartupScaffold(
       onKeyEvent: _handleKey,
       childrenBuilder: (context, colors) {
         final scale = SplashStatusLayout.scaleOf(context);
         final textScale = SplashStatusLayout.textScaleOf(context);
+        Widget glyph(String asset) =>
+            Image.asset(asset, width: 20 * textScale, height: 20 * textScale);
+        Widget label(Widget icon, String key) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            icon,
+            SizedBox(width: 8 * scale),
+            Text(_startupString(key)),
+          ],
+        );
+        final storagePath = widget.storagePath;
         return [
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: 520 * scale),
@@ -739,17 +920,21 @@ class StartupStorageErrorApp extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _startupString(AppLocale.startupStorageUnavailable),
+                  _startupString(
+                    widget.problem == UserDataProblem.folderMissing
+                        ? AppLocale.startupStorageFolderMissing
+                        : AppLocale.startupStorageUnavailable,
+                  ),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: colors.foreground.withValues(alpha: 0.8),
                     fontSize: 16 * textScale,
                   ),
                 ),
-                if (storagePath != null && storagePath!.isNotEmpty) ...[
+                if (storagePath != null && storagePath.isNotEmpty) ...[
                   SizedBox(height: 12 * scale),
                   Text(
-                    storagePath!,
+                    storagePath,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: colors.foreground.withValues(alpha: 0.55),
@@ -757,24 +942,52 @@ class StartupStorageErrorApp extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (widget.createFailed) ...[
+                  SizedBox(height: 12 * scale),
+                  Text(
+                    _startupString(AppLocale.startupStorageCreateFailed),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 14 * textScale,
+                    ),
+                  ),
+                ],
                 SizedBox(height: 24 * scale),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ElevatedButton(
-                      onPressed: onRetry,
-                      child: Text(
-                        _startupString(AppLocale.startupStorageRetry),
+                // No focus: the buttons answer to their own controller
+                // buttons, and touch or a mouse still press them.
+                ExcludeFocus(
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 16 * scale,
+                    runSpacing: 8 * scale,
+                    children: [
+                      ElevatedButton(
+                        onPressed: widget.onRetry,
+                        child: label(
+                          glyph('assets/images/gamepad/Xbox_A_button.png'),
+                          AppLocale.startupStorageRetry,
+                        ),
                       ),
-                    ),
-                    SizedBox(width: 16 * scale),
-                    TextButton(
-                      onPressed: onUseDefault,
-                      child: Text(
-                        _startupString(AppLocale.startupStorageUseDefault),
+                      TextButton(
+                        onPressed: widget.onUseDefault,
+                        child: label(
+                          glyph('assets/images/gamepad/Xbox_B_button.png'),
+                          AppLocale.startupStorageUseDefault,
+                        ),
                       ),
-                    ),
-                  ],
+                      if (startEmpty != null)
+                        TextButton(
+                          onPressed: startEmpty,
+                          child: label(
+                            WestButtonGlyph(
+                              builder: (context, asset) => glyph(asset),
+                            ),
+                            AppLocale.startupStorageStartEmpty,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -792,13 +1005,25 @@ class StartupStorageErrorApp extends StatelessWidget {
 /// one could serially block for the full cold-boot timeout. Doing it here means
 /// the wait happens exactly once and its failure is visible to the user
 /// instead of being degraded into an empty library by downstream catch-alls.
-Future<void> _awaitUserDataStorage() async {
+///
+/// Runs before the log file opens (the log lives in the user-data folder), so
+/// it returns what it has to say for [LoggerService] to record once it has.
+Future<List<String>> _awaitUserDataStorage() async {
+  final notes = <String>[];
+  var createFailed = false;
   while (!await ConfigService.ensureUserDataStorageReady()) {
     final decision = Completer<void>();
     var useDefault = false;
+    var startEmpty = false;
+    final problem =
+        ConfigService.userDataProblem ?? UserDataProblem.volumeMissing;
+    final path = ConfigService.unavailableStoragePath;
+    notes.add('User-data folder unusable at startup (${problem.name}): $path');
     runApp(
       StartupStorageErrorApp(
-        storagePath: ConfigService.unavailableStoragePath,
+        storagePath: path,
+        problem: problem,
+        createFailed: createFailed,
         onRetry: () {
           ConfigService.resetStorageAvailability();
           if (!decision.isCompleted) decision.complete();
@@ -807,15 +1032,36 @@ Future<void> _awaitUserDataStorage() async {
           useDefault = true;
           if (!decision.isCompleted) decision.complete();
         },
+        onStartEmpty: () {
+          startEmpty = true;
+          if (!decision.isCompleted) decision.complete();
+        },
       ),
     );
     await decision.future;
     runApp(const StartupLoadingApp());
+    createFailed = false;
     if (useDefault) {
-      ConfigService.continueWithDefaultUserDataPath();
-      return;
+      notes.add('Continuing without it: the default folder, this session only');
+      await ConfigService.continueWithDefaultUserDataPath();
+      return notes;
+    }
+    if (startEmpty && problem == UserDataProblem.folderMissing) {
+      try {
+        await ConfigService.createMissingUserDataFolder();
+        notes.add('Started with an empty folder at $path');
+      } catch (e) {
+        // Shown again with a line saying so, as the next check still finds
+        // it missing.
+        notes.add('Could not create the user-data folder: $e');
+        createFailed = true;
+        ConfigService.resetStorageAvailability();
+      }
+    } else {
+      notes.add('Retrying');
     }
   }
+  return notes;
 }
 
 @pragma('vm:entry-point')
@@ -873,6 +1119,9 @@ Future<void> subDisplay() async {
     SfxService().setVolume(
       double.tryParse(rawConfig?['sfx_volume']?.toString() ?? '0.75') ?? 0.75,
     );
+    await SfxService().setCustomSounds(
+      CustomSfx.decode(rawConfig?['custom_sfx']),
+    );
   } catch (e) {
     debugPrint('Secondary display could not load saved config: $e');
   }
@@ -884,7 +1133,7 @@ Future<void> subDisplay() async {
       MapLocale('pt', AppLocale.pt),
       MapLocale('ru', AppLocale.ru),
       MapLocale('zh', AppLocale.zh),
-      MapLocale('zh_Hant', AppLocale.zhHant),
+      MapLocale('zh', AppLocale.zhHant, scriptCode: 'Hant'),
       MapLocale('fr', AppLocale.fr),
       MapLocale('de', AppLocale.de),
       MapLocale('it', AppLocale.it),
@@ -960,15 +1209,24 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _locale = FlutterLocalization.instance.currentLocale;
-    FlutterLocalization.instance.onTranslatedLanguage = (Locale? locale) {
-      if (mounted) setState(() => _locale = locale);
-    };
+    FlutterLocalization.instance.addListener(_handleLocaleChanged);
     // Once the main UI has painted its first frame, tell the secondary display
     // the app is ready so it can slide the app dock into place (rather than
     // showing it fully-formed while the app is still cold-starting).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.sqliteConfigProvider.markAppReady();
     });
+  }
+
+  void _handleLocaleChanged() {
+    if (!mounted) return;
+    setState(() => _locale = FlutterLocalization.instance.currentLocale);
+  }
+
+  @override
+  void dispose() {
+    FlutterLocalization.instance.removeListener(_handleLocaleChanged);
+    super.dispose();
   }
 
   @override
@@ -1006,13 +1264,27 @@ class _MyAppState extends State<MyApp> {
         ),
         ChangeNotifierProvider.value(value: widget.rommProvider),
         ChangeNotifierProvider(create: (context) => SystemBackgroundProvider()),
+        // Lazy: the board is a full library scan, and it must not run at
+        // startup for the many users who never open the tab.
+        ChangeNotifierProvider(create: (context) => DiscoveryProvider()),
+        ChangeNotifierProvider(create: (context) => RecentGamesCycler()),
         ChangeNotifierProvider(
           // Eager: the systems carousel/grid paints the Collections card's game
           // count on the first frame it builds, and that card is on the very
           // first screen. A lazy create would leave the count at zero until
           // something else read the provider.
           lazy: false,
-          create: (context) => CollectionsProvider()..load(),
+          create: (context) {
+            final scraping = context.read<ScrapingProvider>();
+            return CollectionsProvider(
+              sources: [
+                context.read<SqliteDatabaseProvider>(),
+                context.read<SqliteConfigProvider>(),
+                scraping,
+              ],
+              isBusy: () => scraping.isScraping,
+            )..load();
+          },
         ),
         ChangeNotifierProvider(
           // Eager: the theme manifest is a network fetch, and during first-run
@@ -1028,6 +1300,9 @@ class _MyAppState extends State<MyApp> {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
+          final cornerStep = context.select<SqliteConfigProvider, int>(
+            (config) => config.config.cornerRadius,
+          );
           return ScreenUtilInit(
             designSize: const Size(640, 480),
             minTextAdapt: true,
@@ -1082,28 +1357,33 @@ class _MyAppState extends State<MyApp> {
                           ),
                         );
                       },
-                      theme: themeProvider.currentTheme.copyWith(
-                        textTheme: GoogleFonts.antaTextTheme(
-                          themeProvider.currentTheme.textTheme,
-                        ),
-                        iconTheme: const IconThemeData(fill: 1.0),
-                        visualDensity: VisualDensity.adaptivePlatformDensity,
-                        materialTapTargetSize: MaterialTapTargetSize.padded,
-                        pageTransitionsTheme: PageTransitionsTheme(
-                          builders: {
-                            TargetPlatform.android:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.iOS:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.windows:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.macOS:
-                                FadeUpwardsPageTransitionsBuilder(),
-                            TargetPlatform.linux:
-                                FadeUpwardsPageTransitionsBuilder(),
-                          },
-                        ),
-                      ),
+                      theme:
+                          CornerRadii.applyStep(
+                            themeProvider.currentTheme,
+                            cornerStep,
+                          ).copyWith(
+                            textTheme: antaTextTheme(
+                              themeProvider.currentTheme.textTheme,
+                            ),
+                            iconTheme: const IconThemeData(fill: 1.0),
+                            visualDensity:
+                                VisualDensity.adaptivePlatformDensity,
+                            materialTapTargetSize: MaterialTapTargetSize.padded,
+                            pageTransitionsTheme: PageTransitionsTheme(
+                              builders: {
+                                TargetPlatform.android:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.iOS:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.windows:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.macOS:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                                TargetPlatform.linux:
+                                    FadeUpwardsPageTransitionsBuilder(),
+                              },
+                            ),
+                          ),
                       home: PermissionCheckWrapper(
                         child: AppLifecycleHandler(child: MainScreen()),
                       ),

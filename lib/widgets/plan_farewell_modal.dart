@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
+import 'package:neostation/utils/gamepad_nav.dart';
 
 /// Farewell modal displayed after a plan downgrade
 class PlanFarewellModal extends StatefulWidget {
@@ -42,35 +44,61 @@ class PlanFarewellModal extends StatefulWidget {
 class PlanFarewellModalState extends State<PlanFarewellModal> {
   late FocusNode _focusNode;
 
+  /// The modal can open over any screen, so it takes the controller with its
+  /// own navigation layer (A, B and Start close it) instead of leaving the
+  /// screen underneath to handle the buttons. Modal, so a screen that mounts
+  /// behind it can't take the controller back; per instance, as a welcome and
+  /// a farewell modal can be open together.
+  late final GamepadNavigation _gamepadNav;
+  late final String _layerId = 'plan_farewell_modal#${identityHashCode(this)}';
+  bool _closed = false;
+
   @override
   void initState() {
     super.initState();
     _focusNode = FocusNode();
+    _gamepadNav = GamepadNavigation(
+      onSelectItem: _handleClose,
+      onBack: _handleClose,
+      onSettings: _handleClose,
+    );
 
-    // Auto-focus to capture gamepad key events
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Keyboard focus for Space (see _handleKeyPress).
       _focusNode.requestFocus();
+      _gamepadNav.initialize();
+      GamepadNavigationManager.pushLayer(
+        _layerId,
+        onActivate: _gamepadNav.activate,
+        onDeactivate: _gamepadNav.deactivate,
+        modal: true,
+      );
     });
   }
 
   @override
   void dispose() {
+    GamepadNavigationManager.popLayer(_layerId);
+    _gamepadNav.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
   void _handleClose() {
+    // Two inputs can arrive for the same close, and after a barrier tap the
+    // layer stays registered until the exit animation ends: a press then must
+    // not pop the screen underneath.
+    if (_closed || ModalRoute.of(context)?.isCurrent != true) return;
+    _closed = true;
     widget.onClose?.call();
   }
 
   void _handleKeyPress(KeyEvent event) {
-    if (event is KeyDownEvent) {
-      // Escape, Enter, or Space to close
-      if (event.logicalKey == LogicalKeyboardKey.escape ||
-          event.logicalKey == LogicalKeyboardKey.enter ||
-          event.logicalKey == LogicalKeyboardKey.space) {
-        _handleClose();
-      }
+    // Space closes too; Enter, Backspace and Escape arrive through the
+    // navigation layer.
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.space) {
+      _handleClose();
     }
   }
 
@@ -162,9 +190,8 @@ class PlanFarewellModalState extends State<PlanFarewellModal> {
               RichText(
                 textAlign: TextAlign.center,
                 text: TextSpan(
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(fontSize: 11.sp),
+                  style: Theme.of(context).textTheme.bodyLarge
+                      ?.copyWith(fontSize: 11.sp),
                   children: [
                     TextSpan(
                       text: AppLocale.planFarewellMessagePre.getString(context),
@@ -204,17 +231,14 @@ class PlanFarewellModalState extends State<PlanFarewellModal> {
                   color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(6.w),
                   border: Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.outline.withValues(alpha: 0.2),
+                    color: Theme.of(context).colorScheme.outline
+                        .withValues(alpha: 0.2),
                   ),
                 ),
                 child: Text(
                   AppLocale.planUpgradeAnytime.getString(context),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    fontSize: 10.sp,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(fontStyle: FontStyle.italic, fontSize: 10.sp),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -251,9 +275,8 @@ class PlanFarewellModalState extends State<PlanFarewellModal> {
               Text(
                 AppLocale.pressToClose.getString(context),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.6),
                   fontSize: 9.sp,
                 ),
                 textAlign: TextAlign.center,

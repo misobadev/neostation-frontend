@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/l10n/app_locale.dart';
+import 'package:neostation/models/database_game_model.dart';
 import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/my_systems.dart';
 import 'package:neostation/providers/collections_provider.dart';
 import 'package:neostation/providers/file_provider.dart';
+import 'package:neostation/providers/recent_games_cycler.dart';
 import 'package:neostation/providers/sqlite_config_provider.dart';
 import 'package:neostation/providers/sqlite_database_provider.dart';
 import 'package:provider/provider.dart';
@@ -29,13 +31,19 @@ List<SystemInfo> buildSystemsList({
       collectionsProvider ??
       Provider.of<CollectionsProvider>(context, listen: false);
   final collectionGames = collections.totalGameCount;
-  const recentCount = 1;
+  // One recent card, showing whichever of the last few played games the
+  // shared cycler is on. Looked up nullable so a host without one (tests, a
+  // pushed screen) still gets the most recent game.
   final hideRecent = configProvider.config.hideRecentCard;
   final recentDbGames = hideRecent
-      ? dbProvider.getRecentlyPlayedGames(0)
-      : dbProvider.getRecentlyPlayedGames(recentCount);
+      ? const <DatabaseGameModel>[]
+      : dbProvider.getRecentlyPlayedGames(RecentGamesCycler.maxGames);
+  final cycler = Provider.of<RecentGamesCycler?>(context, listen: false);
+  final shown = cycler?.pick([for (final g in recentDbGames) g.romPath]) ?? 0;
 
   final recentGames = recentDbGames
+      .skip(shown)
+      .take(1)
       .map((dbGame) => GameModel.fromDatabaseModel(dbGame))
       .map((game) => SystemInfo.fromGameModel(game, fileProvider))
       .toList();
@@ -45,11 +53,9 @@ List<SystemInfo> buildSystemsList({
 
   final detectedSystems = configProvider.detectedSystems
       .where((s) => !hiddenFolders.contains(s.folderName))
-      .where(
-        (s) =>
-            !(configProvider.config.androidAppsAsTab &&
-                s.folderName == SystemFolderNames.android),
-      )
+      // Installed apps live only in the Android tab; the Systems grid shows
+      // just the Android Games card, once the user has marked a game.
+      .where((s) => s.folderName != SystemFolderNames.android)
       .where(
         (s) =>
             !(s.folderName == SystemFolderNames.favorites &&
@@ -92,46 +98,5 @@ List<SystemInfo> buildSystemsList({
         return info;
       });
 
-  final systems = configProvider.config.hideSearchCard
-      ? detectedSystems
-      : withSearchCard(
-          detectedSystems.toList(),
-          _searchCard(context, configProvider.totalGames),
-        );
-
-  return [...recentGames, ...systems];
-}
-
-/// [systems] with [searchCard] placed right after All Games, the list it
-/// searches. With no All Games card (a library of apps or music only) it leads
-/// the systems instead. Not gated on a game count: search also reaches the
-/// RomM library.
-@visibleForTesting
-List<SystemInfo> withSearchCard(
-  List<SystemInfo> systems,
-  SystemInfo searchCard,
-) {
-  final allIndex = systems.indexWhere(
-    (s) => s.folderName == SystemFolderNames.all,
-  );
-  return [...systems]..insert(allIndex + 1, searchCard);
-}
-
-/// The Search card, which opens `SearchScreen` rather than a games list.
-///
-/// It carries the whole library's game count, since that is what it searches.
-/// Its logo is the bundled `assets/images/logos/search.webp`, resolved from the
-/// folder name like every other card's, and a theme can give it a background
-/// by shipping one for `search`.
-SystemInfo _searchCard(BuildContext context, int totalGames) {
-  final title = AppLocale.searchTitle.getString(context);
-  return SystemInfo(
-    title: title,
-    shortName: title,
-    folderName: SystemFolderNames.search,
-    numOfRoms: totalGames,
-    color1: '#26A69A',
-    color2: '#B0BEC5',
-    percentage: 0,
-  );
+  return [...recentGames, ...detectedSystems];
 }

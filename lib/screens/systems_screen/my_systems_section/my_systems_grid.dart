@@ -1,5 +1,8 @@
 import 'dart:io';
 import 'dart:async';
+
+import 'package:flutter/gestures.dart'
+    show PointerPanZoomStartEvent, PointerPanZoomUpdateEvent;
 import 'package:flutter/material.dart';
 import 'package:neostation/constants/recent_card_sizes.dart';
 import 'package:neostation/l10n/app_locale.dart';
@@ -11,33 +14,47 @@ import 'package:neostation/models/system_model.dart';
 import 'package:neostation/screens/app_screen.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:provider/provider.dart';
-import '../../../themes/corner_radii.dart';
+
 import '../../../utils/gamepad_nav.dart';
+import '../../../utils/spring_scroller.dart';
 import '../../../services/game_service.dart';
 import '../../../utils/game_launch_utils.dart';
 import 'system_card.dart';
 import '../../../providers/sqlite_config_provider.dart';
 import '../../../providers/sqlite_database_provider.dart';
 import '../../../providers/file_provider.dart';
-import '../../../widgets/system_scan_progress_widget.dart';
+import '../../../providers/recent_games_cycler.dart';
 import '../../game_screen/my_games_list.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+
 import 'grid_geometry.dart';
 import 'widgets/grid_loading_state.dart';
-import '../../../services/ra_library_match_runner.dart';
 import 'widgets/grid_empty_state.dart';
+
+import 'package:neostation/themes/corner_radii.dart';
+import 'package:neostation/widgets/neo_glass.dart';
+import 'package:material_symbols_icons/symbols.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
+
+import 'widgets/recent_card_cycle.dart';
+
+import 'package:neostation/widgets/spring_selected_card.dart';
+
 import 'my_systems_carousel.dart';
+
 import 'package:neostation/widgets/custom_notification.dart';
+import 'package:neostation/widgets/launch_failure_dialog.dart';
 import 'package:neostation/widgets/systems_grid_footer.dart';
 import 'package:neostation/widgets/system_emulator_settings_dialog.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/providers/theme_provider.dart';
+
 import '../../collections_screen/collections_browser_screen.dart';
 import '../../search_screen/search_screen.dart';
 import '../../game_screen/android_apps/android_apps_grid.dart';
-import 'package:neostation/widgets/header_sort_dropdown.dart';
-import 'package:neostation/widgets/context_menu/anchored_context_menu.dart';
-import 'package:material_symbols_icons/symbols.dart';
+import 'widgets/system_options_dialog.dart';
 
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/models/secondary_display_state.dart';
@@ -45,7 +62,11 @@ import 'package:neostation/providers/neo_assets_provider.dart';
 import 'package:neostation/providers/system_background_provider.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/services/secondary_achievements_controller.dart';
+
 import 'system_list_builder.dart';
+import '../../../utils/user_data_move_guard.dart';
+
+import 'package:neostation/utils/grid_sizes.dart';
 
 part 'my_systems_grid/gamepad_grid_nav.dart';
 part 'my_systems_grid/theme_background.dart';
@@ -56,12 +77,6 @@ part 'my_systems_grid/pull_to_refresh.dart';
 /// A default, not a constant every caller shares: see
 /// [SystemCardGridView.navLayerId].
 const String kSystemsGridNavLayerId = 'my_systems_list';
-
-const String _menuSettings = 'settings';
-const String _menuSearch = 'search';
-const String _menuViewMode = 'view_mode';
-const String _menuViewGrid = 'view_grid';
-const String _menuViewCarousel = 'view_carousel';
 
 /// Primary widget for the 'My Systems' view, supporting both Grid and Carousel layouts.
 ///
@@ -75,13 +90,15 @@ class MySystems extends StatelessWidget {
   /// Static lock to prevent race conditions during heavy navigation transitions.
   static bool isNavigating = false;
 
+  /// Guards the Options panel against a second Start press landing before the
+  /// dialog's own navigation layer is registered.
+  ///
+  /// Without it a quick double Start opened two stacked dialogs; closing the
+  /// top one exposed the other for a frame and could leave the screen black.
+  static bool _optionsDialogOpen = false;
+
   /// Notifier to hide the systems grid while a game launch dialog is active.
   static final gridLaunchNotifier = ValueNotifier<bool>(false);
-
-  /// Anchor for the card context menu: both layouts move this key onto
-  /// whichever card is selected, so the menu opens beside that card rather
-  /// than in the middle of the screen.
-  static final GlobalKey _cardAnchorKey = GlobalKey();
 
   /// Currently selected system index in the active layout (Grid or Carousel).
   final int selectedIndex;
@@ -92,10 +109,13 @@ class MySystems extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop:
-          false, // Maintain application flow by preventing raw hardware back navigation.
+      canPop: false, // Maintain application flow by preventing raw hardware back navigation.
       child: Consumer2<SqliteConfigProvider, SqliteDatabaseProvider>(
         builder: (context, configProvider, dbProvider, child) {
+          // The recent card's game comes from the shared cycler, so this host
+          // (and the footer it builds) repaints whenever the card moves on.
+          final cycler = context.watch<RecentGamesCycler?>();
+
           // PHASE 1: Blocking Initialization.
           // If a high-priority system scan is active (e.g., first run), show a blocking status.
           if (configProvider.isGlobalScanning) {
@@ -115,22 +135,38 @@ class MySystems extends StatelessWidget {
             final currentSystem = selectedIndex < allSystems.length
                 ? allSystems[selectedIndex]
                 : allSystems[0];
+            cycler?.setFocused(currentSystem.isGame);
 
             systemsWidget = Column(
               children: [
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.only(top: 42.r),
+                    padding: EdgeInsets.only(top: 56.r),
                     child: MySystemsCarousel(
                       selectedIndex: selectedIndex,
                       onCardTapped: onCardTapped,
-                      selectedItemKey: _cardAnchorKey,
+                      onLeftTrigger: () =>
+                          _cycleRecent(cycler, currentSystem, -1),
+                      onRightTrigger: () =>
+                          _cycleRecent(cycler, currentSystem, 1),
                       hideSystemLogos: configProvider.config.hideSystemLogos,
-                      onYPressed: () => _openSystemContextMenu(
+                      bindYButton: false,
+                      onOptions: (index) {
+                        final selected = index >= 0 && index < allSystems.length
+                            ? allSystems[index]
+                            : currentSystem;
+                        _openSystemOptions(context, selected, configProvider);
+                      },
+                      onYPressed: () => _openSystemOptions(
                         context,
                         currentSystem,
                         configProvider,
                       ),
+                      // Search on West, and on the button reported as X: on
+                      // the AYN controller West is the button printed Y, and
+                      // the header shows X for Search.
+                      onWestPressed: () => _openSearch(context),
+                      onXPressed: () => _openSearch(context),
                     ),
                   ),
                 ),
@@ -140,7 +176,7 @@ class MySystems extends StatelessWidget {
                     SfxService().playEnterSound();
                     _navigateToSystem(context, currentSystem, configProvider);
                   },
-                  onOptions: () => _openSystemContextMenu(
+                  onOptions: () => _openSystemOptions(
                     context,
                     currentSystem,
                     configProvider,
@@ -152,40 +188,11 @@ class MySystems extends StatelessWidget {
             systemsWidget = _buildSystemsGrid(context, configProvider);
           }
 
-          // If a non-blocking background scan is active, overlay a progress
-          // toast. The RetroAchievements pass that runs after the scan gets the
-          // same treatment: it is the other half of "the library is still
-          // settling", and it is deliberately on this branch and not the
-          // isGlobalScanning one above, so it never blocks the grid.
-          return ValueListenableBuilder<RaMatchProgress?>(
-            valueListenable: RaLibraryMatchRunner.progress,
-            builder: (context, raProgress, _) {
-              // A splash-holding pass is never seen here — the startup screen
-              // is still up. This row is for the pass that resumes after a game
-              // session, which runs against a library already on screen.
-              final showRaRow = raProgress != null && !raProgress.holdsSplash;
-              if (!configProvider.isScanning && !showRaRow) {
-                return systemsWidget;
-              }
-              return Column(
-                children: [
-                  if (configProvider.isScanning)
-                    const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: SystemScanProgressWidget(),
-                    ),
-                  Expanded(child: systemsWidget),
-                  // Below the grid, not above it: the header floats over the
-                  // top of this column and would clip the row out of sight.
-                  if (showRaRow)
-                    const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: SystemScanProgressWidget(),
-                    ),
-                ],
-              );
-            },
-          );
+          // No scan progress of its own here: a scan puts the library back
+          // behind the centred NeoStation splash (see SystemContent), which
+          // already shows the progress. A second panel up here only flashed
+          // over the header while the splash faded in.
+          return systemsWidget;
         },
       ),
     );
@@ -217,17 +224,16 @@ class MySystems extends StatelessWidget {
     final currentSystem = selectedIndex < allSystems.length
         ? allSystems[selectedIndex]
         : allSystems[0];
+    final cycler = Provider.of<RecentGamesCycler?>(context, listen: false);
+    cycler?.setFocused(currentSystem.isGame);
 
     return Column(
       children: [
         Expanded(
           child: Padding(
-            padding: EdgeInsets.only(
-              left: 6.0.r,
-              right: 6.0.r,
-              top: 46.r,
-              bottom: 0.r,
-            ),
+            // Room for the selected card, which grows past its slot, to
+            // stay clear of the screen's edges and the header dock.
+            padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 52.r),
             child: SystemCardGridView(
               crossAxisCount: Responsive.getSystemsCrossAxisCountFromSize(
                 configProvider.config.systemGridColumns,
@@ -238,13 +244,16 @@ class MySystems extends StatelessWidget {
               recentCardSize: configProvider.config.recentCardSize,
               selectedIndex: selectedIndex,
               onCardTapped: onCardTapped,
-              selectedItemKey: _cardAnchorKey,
               systems: allSystems,
-              onYPressed: () => _openSystemContextMenu(
-                context,
-                currentSystem,
-                configProvider,
-              ),
+              bindYButton: false,
+              onLeftTrigger: () => _cycleRecent(cycler, currentSystem, -1),
+              onRightTrigger: () => _cycleRecent(cycler, currentSystem, 1),
+              onYPressed: () =>
+                  _openSystemOptions(context, currentSystem, configProvider),
+              // Search on West, and on the button reported as X (see the
+              // carousel above).
+              onWestPressed: () => _openSearch(context),
+              onXPressed: () => _openSearch(context),
               onEnterPressed: () {
                 final current = selectedIndex < allSystems.length
                     ? allSystems[selectedIndex]
@@ -255,7 +264,7 @@ class MySystems extends StatelessWidget {
                 final current = selectedIndex < allSystems.length
                     ? allSystems[selectedIndex]
                     : allSystems[0];
-                _openSystemSettings(context, current, configProvider);
+                _openSystemOptions(context, current, configProvider);
               },
             ),
           ),
@@ -268,107 +277,63 @@ class MySystems extends StatelessWidget {
             _navigateToSystem(context, currentSystem, configProvider);
           },
           onOptions: () =>
-              _openSystemContextMenu(context, currentSystem, configProvider),
+              _openSystemOptions(context, currentSystem, configProvider),
         ),
       ],
     );
   }
 
-  /// The card context menu, opened by Y or by a long press on the card.
+  /// LT/RT: steps the recent card through the last few played games, but only
+  /// while it is the focused card. Elsewhere the triggers do nothing, as they
+  /// did before the card cycled.
+  static void _cycleRecent(
+    RecentGamesCycler? cycler,
+    SystemInfo current,
+    int delta,
+  ) {
+    if (!current.isGame) return;
+    cycler?.step(delta);
+  }
+
+  /// Opens the centered Options dialog for [system].
   ///
-  /// It exists because the screen's footer does not: the footer carried the
-  /// only touch route to a system's settings, so removing it to give the cards
-  /// the vertical space needed somewhere else for that action to live. Start
-  /// still opens the settings dialog directly, so the pad keeps its one-press
-  /// route and this is purely an addition.
-  ///
-  /// `Settings` is the first row on every card, as it is in the games view's
-  /// own Y menu. It used to be omitted on a recent-game card, on the grounds
-  /// that such a card has no system to configure — but it does: the game on it
-  /// belongs to one, and [_openSystemSettings] now resolves it the same way
-  /// [_navigateToSystem] does. That left `View mode` as the top row on exactly
-  /// one kind of card, so the menu's first entry moved depending on which card
-  /// the cursor happened to be on.
-  ///
-  /// `Search` follows it, so the library search is one Y press away wherever
-  /// the cursor is. The Search card itself gets neither: it has no system to
-  /// configure, and A on it already opens search, so its menu is View mode
-  /// alone.
-  Future<void> _openSystemContextMenu(
+  /// Start and the footer's Options control both land here, and the touch
+  /// long-press uses the same route. The dialog itself owns the library
+  /// display and sorting changes; it reports back only the two actions that
+  /// need this screen's navigation, Game Settings and Search.
+  Future<void> _openSystemOptions(
     BuildContext context,
     SystemInfo system,
     SqliteConfigProvider configProvider,
   ) async {
+    if (_optionsDialogOpen) return;
+    _optionsDialogOpen = true;
+
     SfxService().playNavSound();
 
-    final isCarousel = configProvider.config.systemViewMode == 'carousel';
-    final isSearchCard = system.folderName == SystemFolderNames.search;
+    SystemOptionsAction? action;
+    try {
+      action = await showSystemOptionsDialog(context: context, system: system);
+    } finally {
+      _optionsDialogOpen = false;
+    }
 
-    final items = <ContextMenuItem>[
-      if (!isSearchCard) ...[
-        ContextMenuItem(
-          id: _menuSettings,
-          label: AppLocale.settings.getString(context),
-          icon: Symbols.settings_rounded,
-        ),
-        ContextMenuItem(
-          id: _menuSearch,
-          label: AppLocale.searchTitle.getString(context),
-          icon: Symbols.search_rounded,
-        ),
-      ],
-      ContextMenuItem(
-        id: _menuViewMode,
-        label: AppLocale.viewMode.getString(context),
-        icon: Symbols.grid_view_rounded,
-        separatorBefore: !isSearchCard,
-        children: [
-          ContextMenuItem(
-            id: _menuViewGrid,
-            label: AppLocale.gridView.getString(context),
-            icon: Symbols.grid_view_rounded,
-            selected: !isCarousel,
-          ),
-          ContextMenuItem(
-            id: _menuViewCarousel,
-            label: AppLocale.carouselView.getString(context),
-            icon: Symbols.view_carousel_rounded,
-            selected: isCarousel,
-          ),
-        ],
-      ),
-    ];
+    if (action == null || !context.mounted) return;
 
-    final result = await showAnchoredContextMenu(
-      context: context,
-      items: items,
-      // Falls back to the screen centre when no card is mounted: the key
-      // resolves to null and the menu centres itself.
-      anchorKey: _cardAnchorKey.currentContext != null ? _cardAnchorKey : null,
-      alignment: ContextMenuAlignment.overAnchor,
-      layerId: 'system_context_menu',
-      submenuLayerId: 'system_context_submenu',
-    );
-
-    if (result == null || !context.mounted) return;
-
-    switch (result) {
-      case _menuSettings:
+    switch (action) {
+      case SystemOptionsAction.gameSettings:
         _openSystemSettings(context, system, configProvider);
-      case _menuSearch:
+      case SystemOptionsAction.search:
         // A recent-game card is not a system, so it searches everything.
         await _openSearch(
           context,
           systemFolder: system.isGame ? null : system.folderName,
         );
-      case _menuViewGrid:
-        await configProvider.updateSystemViewMode('grid');
-      case _menuViewCarousel:
-        await configProvider.updateSystemViewMode('carousel');
     }
   }
 
-  /// Opens search from the Y menu of any card, filtered to [systemFolder].
+  /// Opens the library search from the Options dialog, or library-wide from
+  /// the West face button.
   ///
   /// The same hand-off [_navigateToSystem] makes for the Search card, minus
   /// its secondary-display refresh: that would repaint the second screen for
@@ -461,6 +426,13 @@ class MySystems extends StatelessWidget {
         return;
       }
 
+      // Refused during a user-data move: a zipped game unpacks into the user
+      // data's temp folder, which the move is copying.
+      if (refuseWhileUserDataMoves()) {
+        MySystems.isNavigating = false;
+        return;
+      }
+
       try {
         GamepadNavigationManager.deactivateAll();
         GamepadNavigationManager.rememberFocusOwner('my_systems_list');
@@ -515,6 +487,22 @@ class MySystems extends StatelessWidget {
           onLaunchFailed: (ctx, r) async {
             achievementsController.stop(hidePanel: true);
             MySystems.gridLaunchNotifier.value = false;
+            if (ctx.mounted) {
+              await LaunchFailureDialog.show(
+                ctx,
+                title: AppLocale.launchGameFailed.getString(ctx),
+                intro: AppLocale.unableToLaunch
+                    .getString(ctx)
+                    .replaceFirst(
+                      '{name}',
+                      systemInfo.gameModel?.name ?? systemInfo.title ?? '',
+                    ),
+                message: r.errorMessage?.isNotEmpty == true
+                    ? r.errorMessage!
+                    : AppLocale.unknownError.getString(ctx),
+                details: r.errorDetails,
+              );
+            }
             GamepadNavigationManager.restoreFocusOwner();
           },
         );
@@ -719,10 +707,14 @@ class SystemCardGridView extends StatefulWidget {
     this.selectedIndex = 0,
     this.onCardTapped,
     this.onEnterPressed,
+    this.onLeftTrigger,
+    this.onRightTrigger,
     this.onEscapePressed,
     this.onYPressed,
     this.onBackPressed,
     this.onXPressed,
+    this.onWestPressed,
+    this.bindYButton = true,
     this.systems = const [],
     this.recentCardSize = RecentCardSizes.defaultSize,
     this.navLayerId = kSystemsGridNavLayerId,
@@ -730,6 +722,10 @@ class SystemCardGridView extends StatefulWidget {
     this.enableTabBumpers = true,
     this.enablePullToRescan = true,
     this.enablePinchResize = true,
+    this.pinchSizes = GridSizes.values,
+    this.pinchSize,
+    this.onPinchSizeChanged,
+    this.crossAxisCountForSize,
     this.enableSecondaryDisplay = true,
     this.enableThemeAssets = true,
     this.selectedItemKey,
@@ -750,21 +746,40 @@ class SystemCardGridView extends StatefulWidget {
   final int selectedIndex;
   final Function(int index)? onCardTapped;
   final VoidCallback? onEnterPressed;
+
+  /// LT and RT. Read on every press, like [onYPressed], so the host can rebind
+  /// them around the currently selected card.
+  final VoidCallback? onLeftTrigger;
+  final VoidCallback? onRightTrigger;
+
+  /// Start. Opens the centered Options dialog on the systems screen; the
+  /// collections browser opens its card menu with it.
   final VoidCallback? onEscapePressed;
 
-  /// Y. Unbound on the systems screen; the collections browser opens its
-  /// per-collection menu with it (Start does the same, through
-  /// [onEscapePressed]).
+  /// Options entry point for pad Y (when [bindYButton]) and the touch
+  /// long-press. The systems screen binds only the long-press now that Options
+  /// moved to Start; the collections browser still uses Y for its menu.
   final VoidCallback? onYPressed;
 
   /// B. Unbound on the systems screen, which is a root tab and has nothing to
   /// go back to. A pushed host (the collections browser) pops itself here.
   final VoidCallback? onBackPressed;
 
-  /// X. Defaults to the header's view/sort picker, which is what the systems
-  /// screen wants; a host without a header passes [showSystemViewDropdown]
-  /// itself so both reach the same menu.
+  /// X. Search on the systems screen (with West, for AYN pads, whose West is
+  /// the button printed Y); the collections browser opens its view picker
+  /// with it.
   final VoidCallback? onXPressed;
+
+  /// The West face button (X on an Xbox pad, Y on a Nintendo-style one). The
+  /// systems screen opens the library search with it.
+  final VoidCallback? onWestPressed;
+
+  /// Whether the gamepad's Y button fires [onYPressed].
+  ///
+  /// The systems screen turns this off now that Options moved to Start. The
+  /// callback itself stays bound to the touch long-press route, which is why
+  /// the two are separate.
+  final bool bindYButton;
 
   final List<dynamic> systems;
 
@@ -790,6 +805,22 @@ class SystemCardGridView extends StatefulWidget {
   /// the systems screen, so a host that reads the same setting keeps it.
   final bool enablePinchResize;
 
+  /// Sizes the pinch gesture cycles through. Hosts that persist their own
+  /// scale pass their own list; the default is the systems grid's S/M/L/XL.
+  final List<String> pinchSizes;
+
+  /// The stored value the pinch starts from. When null the systems grid's
+  /// `config.systemGridColumns` is used.
+  final String? pinchSize;
+
+  /// Persists a pinch result. When null the systems grid's column setting is
+  /// updated; Discovery passes its own setter.
+  final ValueChanged<String>? onPinchSizeChanged;
+
+  /// Column count for a pinch size, used to lay the grid out on the same
+  /// frame. When null the systems mapping is used.
+  final int Function(String size)? crossAxisCountForSize;
+
   /// Whether the selection is pushed to a dual-screen device's second display.
   /// Off for hosts whose entries are not systems: the secondary screen shows
   /// the system the *systems* screen has selected.
@@ -810,8 +841,16 @@ class SystemCardGridView extends StatefulWidget {
   State<SystemCardGridView> createState() => _SystemCardGridViewState();
 }
 
-class _SystemCardGridViewState extends State<SystemCardGridView> {
+class _SystemCardGridViewState extends State<SystemCardGridView>
+    with SingleTickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
+
+  /// Keeps a card in view as the selection moves, on a spring that carries
+  /// its speed from one press to the next (see [SpringScroller]).
+  late final SpringScroller _springScroller = SpringScroller(
+    _scrollController,
+    this,
+  );
 
   /// Orchestrator for hardware input.
   late GamepadNavigation _gamepadNav;
@@ -834,8 +873,19 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   double? _lastPinchDistance;
   DateTime? _lastPinchTime;
 
+  /// The trackpad pinch's scale at its last size step.
+  double _panZoomBase = 1.0;
+
   /// Pull-to-refresh progress notifier (0.0 to 1.0).
   final ValueNotifier<double> _pullProgress = ValueNotifier(0.0);
+
+  /// How far the grid is pulled past its top, in pixels: the gap the pull
+  /// opens above the cards, which the rescan pill sits in.
+  final ValueNotifier<double> _pullExtent = ValueNotifier(0.0);
+
+  /// Set when a release triggers the rescan, so the pill does not come back
+  /// while the grid springs back to the top. Cleared when that scroll ends.
+  bool _pullTriggered = false;
   static const double _maxPull = 75.0;
   bool _pullReady = false;
 
@@ -856,6 +906,17 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   /// Cached conversion of widget.systems to SystemInfo list, rebuilt only on systems change.
   late List<SystemInfo> _systemCards;
 
+  /// The card the selection left on the latest move. Only this card runs the
+  /// settle animation; all earlier cards snap back to rest.
+  int? _previousSelectedIndex;
+
+  /// Set from the config in build; disables decorative effects at render time.
+  bool _performanceMode = false;
+
+  /// The liquid selection's motion, shared by its layers behind and on top of
+  /// the cards.
+  final GooeyMotion _gooeyMotion = GooeyMotion();
+
   /// Cached ThemeData with scrollbar overrides — rebuilt only in didChangeDependencies.
   ThemeData? _cachedThemeData;
   ScrollBehavior? _cachedScrollBehavior;
@@ -869,13 +930,13 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   /// (`State.setState` is `@protected`).
   void rebuild(VoidCallback fn) => setState(fn);
 
-  /// Touch route to the card menu: select the pressed card, then open the menu
-  /// a frame later.
+  /// Touch route to Options: select the pressed card, then open the dialog a
+  /// frame later.
   ///
-  /// The wait is not cosmetic. The menu anchors to the *selected* card's key,
-  /// and the host only moves that key onto this card once the selection has
-  /// been rebuilt, so opening in the same frame anchors the menu to whichever
-  /// card was selected before the press.
+  /// The wait is not cosmetic. The host resolves the dialog's system from its
+  /// selected index, and that index only moves once the selection has been
+  /// rebuilt, so opening in the same frame would show the previous card's
+  /// system.
   void _openMenuFor(int index) {
     widget.onCardTapped?.call(index);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -929,9 +990,8 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
         radius: Radius.circular(3.r),
       ),
     );
-    _cachedScrollBehavior = ScrollConfiguration.of(
-      context,
-    ).copyWith(scrollbars: false);
+    _cachedScrollBehavior = ScrollConfiguration.of(context)
+        .copyWith(scrollbars: false);
   }
 
   @override
@@ -945,11 +1005,23 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
       _systemCards = _toSystemCards(widget.systems);
     }
     if (oldWidget.selectedIndex != widget.selectedIndex) {
+      _previousSelectedIndex = oldWidget.selectedIndex;
       if (mounted && _scrollController.hasClients) {
         _ensureSelectedItemVisibleUniversal();
       }
       _updateSecondaryScreenName();
+    } else if (_selectedGamePath(oldWidget) != _selectedGamePath(widget)) {
+      // Same slot, different game: the recent card cycled while focused.
+      _updateSecondaryScreenName();
     }
+  }
+
+  /// ROM path of the game on the selected card, or null for a system card.
+  static String? _selectedGamePath(SystemCardGridView view) {
+    final i = view.selectedIndex;
+    if (i < 0 || i >= view.systems.length) return null;
+    final item = view.systems[i];
+    return item is SystemInfo ? item.gameModel?.romPath : null;
   }
 
   @override
@@ -959,7 +1031,9 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
     // Shared singleton — detach our listener, never dispose the instance.
     _secondaryDisplayState?.removeListener(_onSecondaryStateChanged);
     _cleanupGamepad();
+    _springScroller.dispose();
     _scrollController.dispose();
+    _gooeyMotion.dispose();
     super.dispose();
   }
 
@@ -1017,6 +1091,9 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
         final isScanning = context.select<SqliteConfigProvider, bool>(
           (p) => p.isScanning,
         );
+        _performanceMode = context.select<SqliteConfigProvider, bool>(
+          (p) => p.config.performanceMode,
+        );
         if (neoThemeFolder != _lastThemeFolder) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _loadThemeAssetsForSystems();
@@ -1056,17 +1133,26 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
             onNotification: (notification) {
               if (notification is ScrollUpdateNotification) {
                 final pixels = notification.metrics.pixels;
-                if (pixels < 0) {
-                  _pullProgress.value = (-pixels / _maxPull).clamp(0.0, 1.0);
-                  if (_pullProgress.value >= 1.0) {
-                    _pullReady = true;
+                if (_pullTriggered) {
+                  // Springing back after a rescan was triggered.
+                } else if (pixels < 0) {
+                  final progress = (-pixels / _maxPull).clamp(0.0, 1.0);
+                  if (progress >= 1.0) _pullReady = true;
+                  // Once armed it stays armed until release, so the pill
+                  // keeps saying "release" rather than flipping back.
+                  _pullProgress.value = _pullReady ? 1.0 : progress;
+                  _pullExtent.value = -pixels;
+                } else {
+                  if (_pullProgress.value > 0 && !_pullReady) {
+                    _pullProgress.value = 0.0;
                   }
-                } else if (_pullProgress.value > 0 && !_pullReady) {
-                  _pullProgress.value = 0.0;
+                  _pullExtent.value = 0.0;
                 }
               } else if (notification is ScrollEndNotification) {
                 _pullReady = false;
+                _pullTriggered = false;
                 _pullProgress.value = 0.0;
+                _pullExtent.value = 0.0;
               }
               return false;
             },
@@ -1074,41 +1160,112 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
           );
         }
 
+        // A finger on the grid takes the scroll over from the spring at once,
+        // before it has moved anything, so the two never fight over it.
+        grid = Listener(
+          onPointerDown: (_) => _springScroller.stop(),
+          behavior: HitTestBehavior.translucent,
+          child: grid,
+        );
+
         // The pointer listener drives both gestures: the pinch directly, and
         // the pull's release edge (the pull only ever arms itself through the
         // scroll notifier above, so a host with rescan off can keep the pinch
         // without the pull arming).
-        if (Platform.isAndroid &&
-            (widget.enablePinchResize || widget.enablePullToRescan)) {
-          grid = Listener(
-            onPointerDown: _handlePointerDown,
-            onPointerMove: _handlePointerMove,
-            onPointerUp: _handlePointerUp,
-            onPointerCancel: _handlePointerCancel,
-            behavior: HitTestBehavior.translucent,
-            child: grid,
+        // The pinch works wherever there is a touchscreen or a trackpad; the
+        // pull to rescan stays on Android.
+        if (widget.enablePinchResize ||
+            (Platform.isAndroid && widget.enablePullToRescan)) {
+          final cards = grid;
+          // The whole space the grid is given takes the gesture, not only
+          // its rows: with a few cards (a new collection list) those are one
+          // strip at the top, and a pinch below them did nothing.
+          grid = LayoutBuilder(
+            builder: (context, constraints) => Listener(
+              onPointerDown: _handlePointerDown,
+              onPointerMove: _handlePointerMove,
+              onPointerUp: _handlePointerUp,
+              onPointerCancel: _handlePointerCancel,
+              onPointerPanZoomStart: _handlePanZoomStart,
+              onPointerPanZoomUpdate: _handlePanZoomUpdate,
+              behavior: HitTestBehavior.translucent,
+              child: constraints.hasBoundedWidth && constraints.hasBoundedHeight
+                  ? ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: constraints.maxWidth,
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: cards,
+                    )
+                  : cards,
+            ),
           );
         }
 
         return Stack(
           children: [
             grid,
+            // The rescan pill sits centred in the gap the pull opens above
+            // the cards, so it travels with them instead of floating over
+            // them, and fades in only once the gap is tall enough to hold it.
             ValueListenableBuilder<double>(
-              valueListenable: _pullProgress,
-              builder: (context, progress, child) {
-                return AnimatedOpacity(
-                  opacity: progress > 0 ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 150),
+              valueListenable: _pullExtent,
+              builder: (context, extent, child) {
+                if (extent <= 0) return const SizedBox.shrink();
+                final pillHeight = 32.r;
+                final ready = _pullProgress.value >= 1.0;
+                final colors = Theme.of(context).colorScheme;
+                return Positioned(
+                  top: ((extent - pillHeight) / 2).clamp(0.0, double.infinity),
+                  left: 0,
+                  right: 0,
                   child: IgnorePointer(
-                    child: Container(
-                      alignment: Alignment.topCenter,
-                      padding: EdgeInsets.only(top: 16.r),
-                      child: SizedBox(
-                        width: 32.r,
-                        height: 32.r,
-                        child: CircularProgressIndicator(
-                          value: progress >= 1.0 ? null : progress,
-                          strokeWidth: 3,
+                    child: Opacity(
+                      opacity: ((extent - pillHeight) / pillHeight).clamp(
+                        0.0,
+                        1.0,
+                      ),
+                      child: Center(
+                        child: NeoGlass(
+                          cornerRadius:
+                              Theme.of(context)
+                                  .extension<CornerRadii>()
+                                  ?.radiusExternalRadius ??
+                              14.r,
+                          tint: colors.surface,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14.r,
+                            vertical: 6.r,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Turns with the pull, one full turn to armed.
+                              Transform.rotate(
+                                angle: _pullProgress.value * 2 * 3.14159265,
+                                child: Icon(
+                                  Symbols.refresh_rounded,
+                                  size: 16.r,
+                                  color: ready
+                                      ? colors.primary
+                                      : colors.onSurface,
+                                ),
+                              ),
+                              SizedBox(width: 6.r),
+                              Text(
+                                (ready
+                                        ? AppLocale.releaseToRescan
+                                        : AppLocale.pullToRescan)
+                                    .getString(context),
+                                style: TextStyle(
+                                  color: colors.onSurface,
+                                  fontSize: 12.r,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.3.r,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1131,17 +1288,16 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
                                 vertical: 10.r,
                               ),
                               decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primary.withValues(alpha: 0.9),
+                                color: Theme.of(context).colorScheme.primary
+                                    .withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(24.r),
                               ),
                               child: Text(
                                 label,
                                 style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimary,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onPrimary,
                                   fontSize: 18.r,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 2.r,
@@ -1165,6 +1321,112 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
   /// System cards can now have per-card aspect ratios (e.g. 1:1 when the system
   /// logo is hidden). Each row's height is derived from the tallest card in that
   /// row, eliminating empty footer space inside the card itself.
+  Widget _buildCardNode({
+    required Widget cardWidget,
+    required SystemInfo card,
+    required int cardIdx,
+    required bool cardIsSelected,
+  }) {
+    // The liquid selector draws the frame of the selected card, and of the
+    // card it is leaving, behind them; everywhere else the card draws its own.
+    final liquid =
+        !_performanceMode &&
+        (cardIsSelected || cardIdx == _previousSelectedIndex);
+    final drag = _performanceMode
+        ? null
+        : cardIsSelected
+        ? true
+        : cardIdx == _previousSelectedIndex
+        ? false
+        : null;
+    return GooeyCardDrag(
+      motion: _gooeyMotion,
+      role: drag,
+      child: GooeyCardChrome(
+        enabled: !_performanceMode,
+        liquid: liquid,
+        selected: cardIsSelected,
+        child: SpringSelectedCard(
+          key: ValueKey('spring_card_${card.title}_$cardIdx'),
+          selected: cardIsSelected,
+          previouslySelected: cardIdx == _previousSelectedIndex,
+          animate: !_performanceMode,
+          child: RepaintBoundary(
+            // The anchor is a sibling overlay, never a wrapper around the card.
+            // Wrapping only the selected card changes that card's subtree shape as
+            // the selection travels, which remounts `SystemCard` and reloads its
+            // artwork — a visible flicker on every D-pad press. Here the tree is
+            // identical for every card and only the `SizedBox`'s key moves; a
+            // `SizedBox` has no state to lose. `passthrough` hands the card exactly
+            // the constraints it had before the Stack existed.
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                cardWidget,
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: SizedBox.expand(
+                      key: cardIsSelected ? widget.selectedItemKey : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The liquid selection behind the cards. Each card sits in its slot inside
+  /// a 2.r padding, and the selected one is raised by [SpringSelectedCard], so
+  /// the frames are the slots inset by that padding, the selected one scaled
+  /// up the same way.
+  Widget _buildGooeySelector(BuildContext context, Map<int, Rect> slots) {
+    final slot = slots[widget.selectedIndex];
+    if (slot == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final radius = theme.extension<CornerRadii>()?.radiusExternalRadius ?? 14.r;
+    Rect frame(Rect slot) => slot.deflate(2.r);
+    Rect raised(Rect rect) => Rect.fromCenter(
+      center: rect.center,
+      width: rect.width * SpringSelectedCard.raisedScale,
+      height: rect.height * SpringSelectedCard.raisedScale,
+    );
+    final previous = _previousSelectedIndex == null
+        ? null
+        : slots[_previousSelectedIndex];
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: GooeySelector(
+          motion: _gooeyMotion,
+          selection: widget.selectedIndex,
+          target: raised(frame(slot)),
+          color: theme.colorScheme.secondary,
+          baseColor: theme.colorScheme.surface,
+          radius: radius * SpringSelectedCard.raisedScale,
+          baseRects: [frame(slot), if (previous != null) frame(previous)],
+        ),
+      ),
+    );
+  }
+
+  /// The liquid ring on top of the cards while the selection travels. Its
+  /// width is the selected card's visible frame: the card's inset around its
+  /// artwork.
+  Widget _buildGooeyRing(BuildContext context) {
+    final theme = Theme.of(context);
+    final radius = theme.extension<CornerRadii>()?.radiusExternalRadius ?? 14.r;
+    return Positioned.fill(
+      child: GooeySelectorRing(
+        motion: _gooeyMotion,
+        color: theme.colorScheme.secondary,
+        radius: radius * SpringSelectedCard.raisedScale,
+        ringWidth: 4.r * SpringSelectedCard.raisedScale,
+      ),
+    );
+  }
+
   Widget _buildWideCardGrid(
     BuildContext context,
     List<SystemInfo> systemCards,
@@ -1222,9 +1484,9 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
         final (recentW, recentH) = recentCardSpan(widget.recentCardSize, cols);
 
         final List<Widget> cardWidgets = [];
+        final Map<int, Rect> slots = {};
         final Set<int> placedIndices = {};
-
-        double? selLeft, selTop, selWidth, selHeight;
+        var animationPosition = 0;
 
         for (int r = 0; r < grid.length; r++) {
           for (int c = 0; c < grid[r].length; c++) {
@@ -1252,13 +1514,6 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
               // Center the card vertically inside the row band.
               final rowItemHeight = rowItemHeights[r];
               top = rowTop(r) + (rowItemHeight - cardHeight) / 2;
-            }
-
-            if (cardIdx == widget.selectedIndex) {
-              selLeft = left;
-              selTop = top;
-              selWidth = width;
-              selHeight = cardHeight;
             }
 
             final bool cardIsSelected = cardIdx == widget.selectedIndex;
@@ -1296,106 +1551,86 @@ class _SystemCardGridViewState extends State<SystemCardGridView> {
                   key: ValueKey('system_card_${card.title}_$cardIdx'),
                   info: card,
                   isSelected: cardIsSelected,
+                  showShadow: false,
+                  isCompact:
+                      card.isGame &&
+                      widget.recentCardSize == RecentCardSizes.twoByOne,
                   onTap: handleTap,
                   onLongPress: widget.onYPressed == null
                       ? null
                       : () => _openMenuFor(cardIdx),
                 );
+            // The recent card slides between the last few played games. Only
+            // on the systems screen, the one host that binds the triggers:
+            // other hosts (Discovery's Game of the Week) also have game cards.
+            final Widget shownCard =
+                card.isGame && widget.onRightTrigger != null
+                ? RecentCardCycle(
+                    gameKey: card.gameModel?.romPath,
+                    card: cardWidget,
+                  )
+                : cardWidget;
 
+            slots[cardIdx] = Rect.fromLTWH(left, top, width, cardHeight);
             cardWidgets.add(
               Positioned(
                 left: left,
                 top: top,
                 width: width,
                 height: cardHeight,
-                child: RepaintBoundary(
-                  // The anchor is a sibling overlay, never a wrapper around the
-                  // card. Wrapping only the selected card changes that card's
-                  // subtree shape as the selection travels, which remounts
-                  // `SystemCard` and reloads its artwork — a visible flicker on
-                  // every D-pad press. Here the tree is identical for every
-                  // card and only the `SizedBox`'s key moves; a `SizedBox` has
-                  // no state to lose. `passthrough` hands the card exactly the
-                  // constraints it had before the Stack existed.
-                  child: Stack(
-                    fit: StackFit.passthrough,
-                    children: [
-                      cardWidget,
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: SizedBox.expand(
-                            key: cardIsSelected ? widget.selectedItemKey : null,
+                child: _performanceMode
+                    ? _buildCardNode(
+                        cardWidget: shownCard,
+                        card: card,
+                        cardIdx: cardIdx,
+                        cardIsSelected: cardIsSelected,
+                      )
+                    : AnimationConfiguration.staggeredGrid(
+                        position: animationPosition,
+                        columnCount: cols,
+                        duration: const Duration(milliseconds: 360),
+                        delay: const Duration(milliseconds: 32),
+                        child: FadeInAnimation(
+                          duration: const Duration(milliseconds: 360),
+                          child: SlideAnimation(
+                            verticalOffset: 18.r,
+                            child: ScaleAnimation(
+                              scale: 0.97,
+                              child: _buildCardNode(
+                                cardWidget: shownCard,
+                                card: card,
+                                cardIdx: cardIdx,
+                                cardIsSelected: cardIsSelected,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
               ),
             );
 
             placedIndices.add(cardIdx);
+            animationPosition++;
           }
         }
 
-        final focusIndicator =
-            (selLeft != null &&
-                selTop != null &&
-                selWidth != null &&
-                selHeight != null)
-            ? AnimatedPositioned(
-                key: const ValueKey('focus_indicator'),
-                duration: const Duration(milliseconds: 256),
-                curve: Curves.fastOutSlowIn,
-                left: selLeft + 1.r,
-                top: selTop + 1.r,
-                width: selWidth - 2.r,
-                height: selHeight - 2.r,
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius:
-                          Theme.of(
-                            context,
-                          ).extension<CornerRadii>()?.radiusExternal ??
-                          BorderRadius.circular(14.r),
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          Theme.of(
-                            context,
-                          ).colorScheme.primary.withValues(alpha: 0.28),
-                          Theme.of(
-                            context,
-                          ).colorScheme.primary.withValues(alpha: 0.08),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.35, 1.0],
-                      ),
-                      border: Border.all(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.55),
-                        width: 2.r,
-                      ),
-                    ),
-                  ),
-                ),
-              )
-            : const SizedBox.shrink();
-
-        return SingleChildScrollView(
-          controller: _scrollController,
-          clipBehavior: Clip.none,
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          child: SizedBox(
-            height: totalHeight,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [...cardWidgets, focusIndicator],
+        return AnimationLimiter(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            clipBehavior: Clip.none,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            child: SizedBox(
+              height: totalHeight,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  if (!_performanceMode) _buildGooeySelector(context, slots),
+                  ...cardWidgets,
+                  if (!_performanceMode) _buildGooeyRing(context),
+                ],
+              ),
             ),
           ),
         );

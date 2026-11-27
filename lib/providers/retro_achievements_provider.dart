@@ -217,6 +217,20 @@ class RetroAchievementsProvider extends ChangeNotifier {
   String? get error => _error;
   String get username => _username;
   String get apiKey => _apiKey;
+
+  /// Catalogue sync can start before the profile auto-login request finishes.
+  /// Use this user's persisted credentials without waiting for that request,
+  /// and never authenticate with an orphaned legacy key.
+  Future<String> catalogueApiKey() async {
+    if (_apiKey.isNotEmpty) return _apiKey;
+    final user = await _readRAUserFromConfig();
+    final key = await _readRAApiKeyFromConfig();
+    return resolveRaAutoLoginAction(user: user, apiKey: key) ==
+            RaAutoLoginAction.attemptLogin
+        ? key.value!
+        : '';
+  }
+
   Future<Map<String, dynamic>> getEventCatalogue(int year) =>
       RaEventCatalogueRepository.load(year);
   Future<GameInfoAndUserProgress?> getAnnualEventProgress(int year) async {

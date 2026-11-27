@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import '../models/database_game_model.dart';
 import '../models/system_model.dart';
 import '../data/datasources/sqlite_database_service.dart';
@@ -108,9 +110,9 @@ class SqliteDatabaseProvider extends ChangeNotifier {
     String systemFolderName,
   ) async {
     try {
-      final games = (await GameRepository.loadGamesForSystem(
-        systemFolderName,
-      )).where((game) => !game.isHidden).toList();
+      final games = (await GameRepository.loadGamesForSystem(systemFolderName))
+          .where((game) => !game.isHidden)
+          .toList();
       _database[systemFolderName] = games;
       notifyListeners();
       return games;
@@ -264,12 +266,22 @@ class SqliteDatabaseProvider extends ChangeNotifier {
     return favoriteGames;
   }
 
+  /// Systems whose items are not games, so they never count as recently
+  /// played: installed apps the user has not marked as games, and music
+  /// tracks. Apps marked as games are listed under "Android Games" and do
+  /// count.
+  static const Set<String> _notGameSystems = {
+    SystemFolderNames.android,
+    SystemFolderNames.music,
+  };
+
   /// Returns a list of recently played games across all systems, sorted by timestamp.
   List<DatabaseGameModel> getRecentlyPlayedGames([int limit = 10]) {
     final playedGames = <DatabaseGameModel>[];
 
-    for (final games in _database.values) {
-      playedGames.addAll(games.where((game) => game.lastPlayed != null));
+    for (final entry in _database.entries) {
+      if (_notGameSystems.contains(entry.key)) continue;
+      playedGames.addAll(entry.value.where((game) => game.lastPlayed != null));
     }
 
     playedGames.sort((a, b) => b.lastPlayed!.compareTo(a.lastPlayed!));

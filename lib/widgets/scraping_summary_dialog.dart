@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import '../l10n/app_locale.dart';
 import '../utils/gamepad_nav.dart';
 import '../services/game_service.dart';
 
@@ -89,14 +92,12 @@ class _ScrapingSummaryDialogState extends State<ScrapingSummaryDialog> {
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(vertical: 8.h),
                 decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).scaffoldBackgroundColor.withValues(alpha: 0.2),
+                  color: Theme.of(context).scaffoldBackgroundColor
+                      .withValues(alpha: 0.2),
                   border: Border(
                     bottom: BorderSide(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.outline.withValues(alpha: 0.1),
+                      color: Theme.of(context).colorScheme.outline
+                          .withValues(alpha: 0.1),
                       width: 1.r,
                     ),
                   ),
@@ -158,13 +159,13 @@ class _ScrapingSummaryDialogState extends State<ScrapingSummaryDialog> {
                     onPressed: () => Navigator.of(context).pop(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8.r),
                       ),
                     ),
                     child: Text(
-                      'OK',
+                      AppLocale.ok.getString(context),
                       style: TextStyle(
                         fontSize: 12.r,
                         fontWeight: FontWeight.bold,

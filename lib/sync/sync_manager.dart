@@ -16,6 +16,7 @@
 library;
 
 import 'package:flutter/foundation.dart';
+
 import 'i_sync_provider.dart';
 import 'providers/neo_sync_adapter.dart';
 

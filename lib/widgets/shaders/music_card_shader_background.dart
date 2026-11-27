@@ -191,8 +191,8 @@ class _MusicCardShaderPainter extends CustomPainter {
     shader.setFloat(8, coverImage.height.toDouble());
     shader.setFloat(9, diskImage.width.toDouble());
     shader.setFloat(10, diskImage.height.toDouble());
-    shader.setImageSampler(0, coverImage);
-    shader.setImageSampler(1, diskImage);
+    shader.setImageSampler(0, coverImage, filterQuality: FilterQuality.medium);
+    shader.setImageSampler(1, diskImage, filterQuality: FilterQuality.medium);
 
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }

@@ -33,7 +33,7 @@ void main() {
     );
   });
 
-  testWidgets('rows render: title, game line, hardcore chip, points', (
+  testWidgets('the grid shows the selected unlock in the card under it', (
     tester,
   ) async {
     final provider = _TabProvider(
@@ -43,12 +43,21 @@ void main() {
     final tabKey = GlobalKey<RaUnlocksTabState>();
     await _pumpTab(tester, provider, tabKey);
 
+    // A badge per unlock; only the selected one is named, in the card, with
+    // its game, its points and, earned in hardcore, a Hardcore pill.
+    expect(
+      find.byKey(const ValueKey('ra-unlock-tile-0-2026-09-01 10:00:00')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('ra-unlock-tile-2-2026-09-01 10:00:00')),
+      findsOneWidget,
+    );
     expect(find.text('Unlock 0'), findsOneWidget);
-    expect(find.text('Unlock 2'), findsOneWidget);
-    expect(find.text('Game 0 • NES'), findsOneWidget);
-    // Only the two hardcore rows carry the chip.
-    expect(find.text('Hardcore'), findsNWidgets(2));
-    expect(find.text('5 pts'), findsNWidgets(3));
+    expect(find.text('Unlock 2'), findsNothing);
+    expect(find.text('Game 0'), findsOneWidget);
+    expect(find.text('Hardcore'), findsOneWidget);
+    expect(find.text('5 pts'), findsOneWidget);
     // More pages exist, so the end-of-list label must not.
     expect(find.text(raUnlocksEndOfListText), findsNothing);
     // The first row holds the cursor.
@@ -112,7 +121,9 @@ void main() {
     // Park the cursor on the last row by tap: taps place the cursor without
     // prefetching, so the only thing that can ask for a page here is the
     // wall press itself.
-    await tester.tap(find.text('Unlock 11'));
+    await tester.tap(
+      find.byKey(const ValueKey('ra-unlock-tile-11-2026-09-01 10:00:00')),
+    );
     await tester.pump();
     expect(provider.fetchLog, isEmpty);
 
@@ -137,18 +148,17 @@ void main() {
 
     final state = tabKey.currentState!;
     // Up at the first row parks on the strip (the shell's rule).
-    expect(state.moveSelection(-1), isFalse);
+    expect(state.moveSelection(-state.columns), isFalse);
     state.moveSelection(1);
     state.moveSelection(1);
     expect(state.moveSelection(1), isFalse);
+    expect(state.moveSelection(state.columns), isFalse);
     expect(provider.fetchLog, isEmpty);
-    // The end-of-list footer is the honest answer at the wall.
-    expect(find.text(raUnlocksEndOfListText), findsOneWidget);
 
     await _disposeTab(tester);
   });
 
-  testWidgets('tapping a row moves the cursor there and activates it', (
+  testWidgets('a tap selects an unlock and a second tap opens its game', (
     tester,
   ) async {
     final provider = _TabProvider(
@@ -159,7 +169,15 @@ void main() {
     final activated = <RetroAchievementRecentUnlockItem>[];
     await _pumpTab(tester, provider, tabKey, activated: activated);
 
-    await tester.tap(find.text('Unlock 3'));
+    await tester.tap(
+      find.byKey(const ValueKey('ra-unlock-tile-3-2026-09-01 10:00:00')),
+    );
+    await tester.pump();
+    expect(activated, isEmpty);
+    expect(find.text('Unlock 3'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('ra-unlock-tile-3-2026-09-01 10:00:00')),
+    );
     await tester.pump();
     expect(activated.single.title, 'Unlock 3');
 
@@ -213,7 +231,7 @@ void main() {
     final tabKey = GlobalKey<RaUnlocksTabState>();
     await _pumpTab(tester, provider, tabKey);
 
-    expect(find.text('Unlock 1'), findsOneWidget);
+    expect(find.text('Unlock 0'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     await _disposeTab(tester);
@@ -230,8 +248,8 @@ void main() {
     final tabKey = GlobalKey<RaUnlocksTabState>();
     await _pumpTab(tester, provider, tabKey);
 
-    // Rows stay on screen; the error lives in the footer, not over the rows.
-    expect(find.text('Unlock 1'), findsOneWidget);
+    // The grid stays on screen; the error lives in the footer, not over it.
+    expect(find.text('Unlock 0'), findsOneWidget);
     expect(find.text('Error loading recent unlocks: Boom'), findsOneWidget);
 
     // The footer retry resumes the append rather than resetting the list.
@@ -370,11 +388,11 @@ class _TabProvider extends RetroAchievementsProvider {
   /// way the real provider's does. Everything else stays pinned per test.
   _TabProvider({
     this.items = const [],
-    bool loaded = false,
+    this._loaded = false,
     this.loading = false,
     this.hasMore = true,
     this.error,
-  }) : _loaded = loaded;
+  });
 
   List<RetroAchievementRecentUnlockItem> items;
   bool _loaded;

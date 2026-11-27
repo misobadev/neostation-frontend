@@ -2,10 +2,13 @@ import 'dart:io';
 
 import 'package:path/path.dart' as path;
 import 'package:neostation/services/logger_service.dart';
+import 'package:neostation/utils/atomic_file_writer.dart';
+
 import 'region_config.dart';
 import 'rom_hasher.dart';
 import 'media_resolver.dart';
 import 'screenscraper_client.dart';
+import 'screenscraper_exceptions.dart';
 
 /// Media asset downloader for ScreenScraper.
 ///
@@ -14,7 +17,7 @@ import 'screenscraper_client.dart';
 /// media types to folders, and skipping assets already on disk. Delegates
 /// transport to [ScreenscraperClient], resolution to [ScreenscraperMediaResolver]
 /// / [ScreenscraperRegionConfig], and ROM naming to [ScreenscraperRomHasher].
-/// Extracted verbatim from [ScreenScraperService]; behaviour is unchanged.
+/// Extracted from [ScreenScraperService].
 /// Stateless — holds only the shared logger.
 class ScreenscraperMediaDownloader {
   ScreenscraperMediaDownloader._();
@@ -45,13 +48,16 @@ class ScreenscraperMediaDownloader {
         maxDailyRequests: maxDailyRequests,
       );
       if (response.statusCode == 200) {
-        await file.create(recursive: true);
-        await file.writeAsBytes(response.bodyBytes);
+        // A file left half-written would count as downloaded from then on.
+        await writeFileAtomically(file, response.bodyBytes);
         return true;
       } else {
         _log.e('Error downloading media (${response.statusCode}): $url');
         return false;
       }
+    } on ScreenscraperQuotaExceededException {
+      // Every later request would be refused too; the caller says why.
+      rethrow;
     } catch (e) {
       _log.e('Error downloading media: $e');
       return false;
@@ -59,6 +65,10 @@ class ScreenscraperMediaDownloader {
   }
 
   /// Downloads multiple media assets for a game, managing concurrency.
+  ///
+  /// Throws [ScreenscraperQuotaExceededException] when ScreenScraper refuses a
+  /// download because the day's quota is used up: the batch under way
+  /// finishes, and no later batch is requested.
   static Future<Map<String, dynamic>> downloadGameMedia(
     String systemFolder,
     String romName,
@@ -73,11 +83,7 @@ class ScreenscraperMediaDownloader {
     int? maxDailyRequests,
   }) async {
     if (medias.isEmpty) {
-      return {
-        'success': true,
-        'downloadedTypes': <String>[],
-        'cancelled': false,
-      };
+      return {'success': true, 'cancelled': false};
     }
 
     final userDataDir = await ScreenscraperMediaResolver.getMediaDirectory();
@@ -114,17 +120,12 @@ class ScreenscraperMediaDownloader {
         downloadTasks.add({
           'url': bestMedia['url'].toString(),
           'relativePath': relativePath,
-          'mediaType': mediaType,
         });
       }
     }
 
     if (downloadTasks.isEmpty) {
-      return {
-        'success': true,
-        'downloadedTypes': <String>[],
-        'cancelled': false,
-      };
+      return {'success': true, 'cancelled': false};
     }
 
     final batches = <List<Map<String, dynamic>>>[];
@@ -135,8 +136,7 @@ class ScreenscraperMediaDownloader {
       batches.add(downloadTasks.sublist(i, end));
     }
 
-    final downloadedTypes = <String>[];
-    final existingTypes = <String>[];
+    int succeeded = 0;
     bool wasCancelled = false;
 
     int completedTasks = 0;
@@ -146,38 +146,18 @@ class ScreenscraperMediaDownloader {
         break;
       }
 
-      final futures = batch.map((task) async {
-        final success = await _downloadMediaFileSmart(
-          task['url'],
-          task['relativePath'],
-          userDataDir,
-          forceOverwrite: forceOverwrite,
-          maxDailyRequests: maxDailyRequests,
-        );
-        return {
-          'mediaType': task['mediaType'],
-          'success': success,
-          'wasExisting':
-              !forceOverwrite &&
-              success &&
-              await ScreenscraperMediaResolver.checkFileExists(
-                task['relativePath'],
-                userDataDir,
-              ),
-        };
-      });
-
-      final results = await Future.wait(futures);
-
-      for (final result in results) {
-        if (result['success'] == true) {
-          if (result['wasExisting'] as bool) {
-            existingTypes.add(result['mediaType'] as String);
-          } else {
-            downloadedTypes.add(result['mediaType'] as String);
-          }
-        }
-      }
+      final results = await Future.wait(
+        batch.map(
+          (task) => _downloadMediaFileSmart(
+            task['url'],
+            task['relativePath'],
+            userDataDir,
+            forceOverwrite: forceOverwrite,
+            maxDailyRequests: maxDailyRequests,
+          ),
+        ),
+      );
+      succeeded += results.where((ok) => ok).length;
 
       completedTasks += batch.length;
       if (onProgress != null) onProgress(completedTasks / downloadTasks.length);
@@ -187,11 +167,8 @@ class ScreenscraperMediaDownloader {
       }
     }
 
-    final totalAvailable = downloadedTypes.length + existingTypes.length;
     return {
-      'success': totalAvailable == downloadTasks.length && !wasCancelled,
-      'downloadedTypes': downloadedTypes,
-      'existingTypes': existingTypes,
+      'success': succeeded == downloadTasks.length && !wasCancelled,
       'cancelled': wasCancelled,
     };
   }

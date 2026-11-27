@@ -29,6 +29,22 @@ class SystemArtPackTile extends StatelessWidget {
   /// Row tap (touch) handler.
   final VoidCallback? onTap;
 
+  /// Optional fill override. The settings panel passes the same surface tone as
+  /// its other rows; the setup wizard keeps the default card colour.
+  final Color? backgroundColor;
+
+  /// Optional outer margin override. The settings panel wraps the tile in its
+  /// own NeoGlass rim and spacing, so it passes zero here.
+  final EdgeInsetsGeometry? margin;
+
+  /// Whether to draw the tile's own outline. The settings panel disables it so
+  /// the NeoGlass rim is the only border; the setup wizard keeps it.
+  final bool showBorder;
+
+  /// Just the mosaic, the name and the author: no stats and no arrow. The
+  /// setup wizard lays the packs out two a row, where those don't fit.
+  final bool compact;
+
   const SystemArtPackTile({
     super.key,
     required this.pack,
@@ -37,59 +53,77 @@ class SystemArtPackTile extends StatelessWidget {
     this.isSelected = false,
     this.mosaicSize = 56,
     this.onTap,
+    this.backgroundColor,
+    this.margin,
+    this.showBorder = true,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
     final highlighted = isFocused || isSelected;
+    final foreground = highlighted ? scheme.surface : scheme.onSurface;
+    final mutedForeground = foreground.withValues(
+      alpha: highlighted ? 0.72 : 0.65,
+    );
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: EdgeInsets.symmetric(vertical: 2.r),
-        padding: EdgeInsets.all(6.r),
+        margin: margin ?? EdgeInsets.symmetric(vertical: 2.r),
+        padding: EdgeInsets.all(compact ? 3.r : 6.r),
         decoration: BoxDecoration(
-          color: theme.cardColor,
+          color: highlighted
+              ? scheme.onSurface
+              : (backgroundColor ?? theme.cardColor),
           borderRadius: BorderRadius.circular(10.r),
-          border: Border.all(
-            color: highlighted
-                ? primary
-                : (isActive
-                      ? Colors.greenAccent.withValues(alpha: 0.7)
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.12)),
-            width: highlighted ? 2.r : 1.r,
-          ),
-          boxShadow: highlighted
-              ? [
-                  BoxShadow(
-                    color: primary.withValues(alpha: 0.25),
-                    blurRadius: 8.r,
-                    spreadRadius: 1.r,
-                  ),
-                ]
+          border: showBorder
+              ? Border.all(
+                  color: highlighted
+                      ? Colors.transparent
+                      : (isActive
+                            ? Colors.greenAccent.withValues(alpha: 0.7)
+                            : scheme.onSurface.withValues(alpha: 0.12)),
+                  width: highlighted ? 2.r : 1.r,
+                )
               : null,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SystemArtPackMosaic(images: pack.mosaicImages, size: mosaicSize),
-            SizedBox(width: 10.r),
-            Expanded(child: _buildDetails(context, theme)),
-            Icon(
-              Symbols.chevron_right_rounded,
-              size: 18.r,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+            SizedBox(width: compact ? 6.r : 10.r),
+            Expanded(
+              child: _buildDetails(
+                context,
+                theme,
+                foreground: foreground,
+                mutedForeground: mutedForeground,
+                highlighted: highlighted,
+              ),
             ),
+            if (!compact)
+              Icon(
+                Symbols.chevron_right_rounded,
+                size: 18.r,
+                color: foreground.withValues(alpha: 0.45),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetails(BuildContext context, ThemeData theme) {
-    final onSurface = theme.colorScheme.onSurface;
+  Widget _buildDetails(
+    BuildContext context,
+    ThemeData theme, {
+    required Color foreground,
+    required Color mutedForeground,
+    required bool highlighted,
+  }) {
+    final scheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -104,7 +138,7 @@ class SystemArtPackTile extends StatelessWidget {
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontSize: 12.r,
                   fontWeight: FontWeight.bold,
-                  color: onSurface,
+                  color: foreground,
                 ),
               ),
             ),
@@ -113,17 +147,21 @@ class SystemArtPackTile extends StatelessWidget {
                 margin: EdgeInsets.only(left: 6.r),
                 padding: EdgeInsets.symmetric(horizontal: 6.r, vertical: 1.r),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.62),
+                  color: highlighted
+                      ? scheme.surface
+                      : Colors.black.withValues(alpha: 0.62),
                   borderRadius: BorderRadius.circular(999.r),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.35),
+                    color: highlighted
+                        ? scheme.onSurface.withValues(alpha: 0.25)
+                        : Colors.white.withValues(alpha: 0.35),
                     width: 1.r,
                   ),
                 ),
                 child: Text(
                   'AI',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: highlighted ? scheme.onSurface : Colors.white,
                     fontSize: 8.r,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.4,
@@ -136,7 +174,7 @@ class SystemArtPackTile extends StatelessWidget {
                 child: Icon(
                   Symbols.check_circle_rounded,
                   size: 15.r,
-                  color: Colors.greenAccent,
+                  color: highlighted ? foreground : Colors.greenAccent,
                 ),
               ),
           ],
@@ -155,32 +193,33 @@ class SystemArtPackTile extends StatelessWidget {
           ].join('  ·  '),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 9.r,
-            color: onSurface.withValues(alpha: 0.65),
+          style: TextStyle(fontSize: 9.r, color: mutedForeground),
+        ),
+        if (!compact) ...[
+          SizedBox(height: 4.r),
+          Wrap(
+            spacing: 5.r,
+            runSpacing: 3.r,
+            children: [
+              if (pack.systemsCovered > 0)
+                SystemArtPackChip(
+                  icon: Symbols.devices_rounded,
+                  label: AppLocale.systemArtSystemsCovered
+                      .getString(context)
+                      .replaceAll('{count}', '${pack.systemsCovered}'),
+                  foreground: foreground,
+                ),
+              if (pack.downloads > 0)
+                SystemArtPackChip(
+                  icon: Symbols.download_rounded,
+                  label: AppLocale.systemArtDownloads
+                      .getString(context)
+                      .replaceAll('{count}', '${pack.downloads}'),
+                  foreground: foreground,
+                ),
+            ],
           ),
-        ),
-        SizedBox(height: 4.r),
-        Wrap(
-          spacing: 5.r,
-          runSpacing: 3.r,
-          children: [
-            if (pack.systemsCovered > 0)
-              SystemArtPackChip(
-                icon: Symbols.devices_rounded,
-                label: AppLocale.systemArtSystemsCovered
-                    .getString(context)
-                    .replaceAll('{count}', '${pack.systemsCovered}'),
-              ),
-            if (pack.downloads > 0)
-              SystemArtPackChip(
-                icon: Symbols.download_rounded,
-                label: AppLocale.systemArtDownloads
-                    .getString(context)
-                    .replaceAll('{count}', '${pack.downloads}'),
-              ),
-          ],
-        ),
+        ],
       ],
     );
   }
@@ -270,16 +309,26 @@ class SystemArtPackChip extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const SystemArtPackChip({super.key, required this.icon, required this.label});
+  /// Text colour for the chip. Defaults to the theme's `onSurface`; list rows
+  /// pass their inverted foreground when selected so the chip stays legible.
+  final Color? foreground;
+
+  const SystemArtPackChip({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.foreground,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = theme.colorScheme.onSurface.withValues(alpha: 0.7);
+    final color =
+        foreground ?? theme.colorScheme.onSurface.withValues(alpha: 0.7);
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 5.r, vertical: 1.r),
       decoration: BoxDecoration(
-        color: theme.colorScheme.onSurface.withValues(alpha: 0.06),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999.r),
       ),
       child: Row(

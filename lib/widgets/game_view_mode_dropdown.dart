@@ -8,6 +8,7 @@ import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import 'package:neostation/utils/grid_sizes.dart';
 
 class GameViewModeDropdown extends StatefulWidget {
   static final GlobalKey<GameViewModeDropdownState> globalKey =
@@ -130,18 +131,21 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
   int _cardStyleIndex = 0;
   int _listSizeIndex = 0;
 
+  /// The game list's text sizes (the grid's card sizes are [GridSizes]).
+  static const List<String> _listSizes = ['S', 'M', 'L', 'XL'];
+
   @override
   void initState() {
     super.initState();
     final config = context.read<SqliteConfigProvider>().config;
-    final sizes = ['S', 'M', 'L', 'XL'];
+    const sizes = GridSizes.values;
     final idx = sizes.indexOf(config.gameGridColumns);
-    _cardSizeIndex = idx >= 0 ? idx : 1;
+    _cardSizeIndex = idx >= 0 ? idx : sizes.indexOf(GridSizes.defaultSize);
 
     final cardStyles = ['fanart', 'box'];
     final styleIdx = cardStyles.indexOf(config.gameCarouselCardStyle);
     _cardStyleIndex = styleIdx >= 0 ? styleIdx : 0;
-    final listSizeIdx = sizes.indexOf(config.gameListSize);
+    final listSizeIdx = _listSizes.indexOf(config.gameListSize);
     _listSizeIndex = listSizeIdx >= 0 ? listSizeIdx : 0;
 
     if (config.gameViewMode == 'carousel') {
@@ -221,7 +225,9 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
     final opt = options[_selectedIndex];
     if (opt.isCardSize) {
       setState(() {
-        _cardSizeIndex = (_cardSizeIndex - 1 + 4) % 4;
+        _cardSizeIndex =
+            (_cardSizeIndex - 1 + GridSizes.values.length) %
+            GridSizes.values.length;
       });
       SfxService().playNavSound();
       _applyCardSize();
@@ -244,7 +250,7 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
     final opt = options[_selectedIndex];
     if (opt.isCardSize) {
       setState(() {
-        _cardSizeIndex = (_cardSizeIndex + 1) % 4;
+        _cardSizeIndex = (_cardSizeIndex + 1) % GridSizes.values.length;
       });
       SfxService().playNavSound();
       _applyCardSize();
@@ -262,8 +268,7 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
   }
 
   void _applyCardSize() {
-    final sizes = ['S', 'M', 'L', 'XL'];
-    final size = sizes[_cardSizeIndex];
+    final size = GridSizes.values[_cardSizeIndex];
     final configProvider = context.read<SqliteConfigProvider>();
     configProvider.updateGameGridColumns(size);
   }
@@ -286,10 +291,7 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
     final opt = options[_selectedIndex];
     if (opt.isCardSize) {
       _applyCardSize();
-      Navigator.pop(
-        context,
-        'card_size_${['S', 'M', 'L', 'XL'][_cardSizeIndex]}',
-      );
+      Navigator.pop(context, 'card_size_${GridSizes.values[_cardSizeIndex]}');
       return;
     }
     if (opt.isCardStyle) {
@@ -405,9 +407,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.2),
+                  color: Theme.of(context).colorScheme.primary
+                      .withValues(alpha: 0.2),
                   width: 1,
                 ),
                 boxShadow: [
@@ -450,9 +451,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
             Divider(
               height: 4.r,
               thickness: 1,
-              color: Theme.of(
-                context,
-              ).colorScheme.outline.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.outline
+                  .withValues(alpha: 0.1),
             ),
           );
         }
@@ -465,9 +465,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
                 fontSize: 10.r,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.r,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.5),
               ),
             ),
           ),
@@ -478,7 +477,7 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
       if (opt.isCardSize || opt.isCardStyle || opt.isListSize) {
         final isSize = opt.isCardSize || opt.isListSize;
         final isListSize = opt.isListSize;
-        final sizes = ['S', 'M', 'L', 'XL'];
+        final sizes = isListSize ? _listSizes : GridSizes.values;
         final styles = ['fanart', 'box'];
         final styleLabels = [
           AppLocale.fanartCard.getString(context),
@@ -514,16 +513,14 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
               padding: EdgeInsets.symmetric(horizontal: 12.r),
               decoration: BoxDecoration(
                 color: isFocused
-                    ? Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.15)
+                    ? Theme.of(context).colorScheme.primary
+                          .withValues(alpha: 0.15)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(8.r),
                 border: isFocused
                     ? Border.all(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.3),
+                        color: Theme.of(context).colorScheme.primary
+                            .withValues(alpha: 0.3),
                         width: 1,
                       )
                     : null,
@@ -533,9 +530,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
                   Icon(
                     opt.icon,
                     size: 14.r,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.9),
+                    color: Theme.of(context).colorScheme.onSurface
+                        .withValues(alpha: 0.9),
                   ),
                   SizedBox(width: 8.r),
                   Expanded(
@@ -633,9 +629,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
             borderRadius: BorderRadius.circular(8.r),
             border: itemIsFocused
                 ? Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.3),
+                    color: Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.3),
                     width: 1,
                   )
                 : null,
@@ -664,9 +659,8 @@ class _GameViewModeOverlayState extends State<GameViewModeOverlay> {
                     size: 14.r,
                     color: isSelected
                         ? Theme.of(context).colorScheme.secondary
-                        : Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.9),
+                        : Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: 0.9),
                   ),
                   SizedBox(width: 8.r),
                   Expanded(

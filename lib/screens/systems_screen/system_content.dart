@@ -7,6 +7,7 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/providers/theme_provider.dart';
 import 'package:neostation/widgets/splash_status_layout.dart';
+
 import '../../../providers/sqlite_config_provider.dart';
 import 'my_systems_section/my_systems_grid.dart';
 import 'my_systems_section/initial_setup_widget.dart';
@@ -141,9 +142,8 @@ class _SystemContentState extends State<SystemContent> {
                     ? (raProgress.done ?? 0) / raProgress.total!
                     : null,
                 minHeight: 3.r,
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.12),
+                backgroundColor: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.12),
               ),
             ),
           ),
@@ -157,9 +157,8 @@ class _SystemContentState extends State<SystemContent> {
                 : AppLocale.raMatchProgressBusy.getString(context),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontSize: 17 * SplashStatusLayout.textScaleOf(context),
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.6),
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -173,9 +172,8 @@ class _SystemContentState extends State<SystemContent> {
               child: LinearProgressIndicator(
                 value: configProvider.scanProgress,
                 minHeight: 3.r,
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.12),
+                backgroundColor: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.12),
               ),
             ),
           ),
@@ -188,9 +186,8 @@ class _SystemContentState extends State<SystemContent> {
             // bodySmall (12) reads too small at couch distance.
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontSize: 17 * SplashStatusLayout.textScaleOf(context),
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.6),
             ),
             textAlign: TextAlign.center,
             maxLines: 1,

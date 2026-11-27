@@ -273,9 +273,9 @@ void main() {
       expect(backgroundFile('gb').existsSync(), isTrue);
       expect(backgroundFile('snes').existsSync(), isTrue);
 
-      final parts = Directory(
-        path.join(tempDir.path, 'neostation'),
-      ).listSync(recursive: true).where((e) => e.path.endsWith('.part'));
+      final parts = Directory(path.join(tempDir.path, 'neostation'))
+          .listSync(recursive: true)
+          .where((e) => e.path.endsWith('.part'));
       expect(parts, isEmpty);
     });
 
@@ -373,6 +373,54 @@ void main() {
       expect(
         File(path.join(cache.path, 'neostation', 'gb.webp')).existsSync(),
         isTrue,
+      );
+    });
+  });
+
+  // Packs name Arcade's background after ES-DE ("arcade"); NeoStation's
+  // Arcade system is "arc", so its background resolves through the alias.
+  group('resolveBackgroundPathSync', () {
+    late String backgrounds;
+
+    setUp(() {
+      NeoAssetsService.debugConfigure(cacheDir: tempDir.path);
+      backgrounds = path.join(tempDir.path, 'pack', 'backgrounds');
+      Directory(backgrounds).createSync(recursive: true);
+    });
+
+    void file(String name) =>
+        File(path.join(backgrounds, name)).writeAsBytesSync([0]);
+
+    test('finds Arcade under the pack name "arcade"', () {
+      file('arcade.webp');
+      expect(
+        NeoAssetsService.resolveBackgroundPathSync('pack', 'arc'),
+        path.join(backgrounds, 'arcade.webp'),
+      );
+    });
+
+    test("prefers a file under the system's own name", () {
+      file('arc.gif');
+      file('arcade.webp');
+      expect(
+        NeoAssetsService.resolveBackgroundPathSync('pack', 'arc'),
+        path.join(backgrounds, 'arc.gif'),
+      );
+    });
+
+    test('keeps webp before gif for a plain system', () {
+      file('snes.gif');
+      file('snes.webp');
+      expect(
+        NeoAssetsService.resolveBackgroundPathSync('pack', 'snes'),
+        path.join(backgrounds, 'snes.webp'),
+      );
+    });
+
+    test("falls back to the system's own webp path when nothing exists", () {
+      expect(
+        NeoAssetsService.resolveBackgroundPathSync('pack', 'arc'),
+        path.join(backgrounds, 'arc.webp'),
       );
     });
   });

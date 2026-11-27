@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import 'package:neostation/constants/system_folder_names.dart';
+
 import '../../../models/system_model.dart';
 
 /// A premium informational sidebar component displaying system metadata.
@@ -35,14 +38,12 @@ class SystemDetailsState extends State<SystemDetails> {
               width: double.infinity,
               padding: EdgeInsets.all(12.r),
               decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outline.withValues(alpha: 0.1),
+                  color: Theme.of(context).colorScheme.outline
+                      .withValues(alpha: 0.1),
                   width: 1.r,
                 ),
               ),
@@ -51,9 +52,8 @@ class SystemDetailsState extends State<SystemDetails> {
                     ? neoStationDescription
                     : widget.selectedSystem!.description!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.8),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.8),
                   fontSize: 11.r,
                 ),
                 maxLines: 7,
@@ -116,14 +116,7 @@ class SystemDetailsState extends State<SystemDetails> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Theme.of(context).colorScheme.surface,
-            Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16.r),
         border: Border.all(
           color: widget.selectedSystem != null
@@ -139,9 +132,8 @@ class SystemDetailsState extends State<SystemDetails> {
           ),
           if (widget.selectedSystem != null)
             BoxShadow(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary
+                  .withValues(alpha: 0.1),
               blurRadius: 16.r,
               spreadRadius: 1.r,
             ),
@@ -207,7 +199,7 @@ class SystemDetailsState extends State<SystemDetails> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12.r),
                   child: Image.asset(
-                    'assets/images/systems/grid/${isEmptyState ? 'all' : widget.selectedSystem!.folderName}-detail-background.webp',
+                    'assets/images/systems/grid/${isEmptyState ? 'all' : SystemFolderNames.artFolderName(widget.selectedSystem!.folderName)}-detail-background.webp',
                     fit: BoxFit.fill,
                     errorBuilder: (context, error, stackTrace) =>
                         Container(color: headerColor.withValues(alpha: 0.12)),
@@ -261,9 +253,8 @@ class SystemDetailsState extends State<SystemDetails> {
       width: double.infinity,
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest
+            .withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12.r),
         border: Border.all(
           color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),

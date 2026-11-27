@@ -139,7 +139,10 @@ void main() {
     await tester.pump();
 
     final selectedCard = find.byWidgetPredicate(
-      (widget) => widget is Semantics && widget.properties.selected == true,
+      (widget) =>
+          widget is Semantics &&
+          widget.properties.selected == true &&
+          (widget.properties.label ?? '').startsWith('ACHIEVEMENT OF THE WEEK'),
     );
     expect(selectedCard, findsOneWidget);
 
@@ -191,15 +194,21 @@ void main() {
     String two(int v) => v.toString().padLeft(2, '0');
 
     expect(find.text('Earned this week · Hardcore'), findsOneWidget);
-    expect(find.text('12 True Ratio'), findsOneWidget);
-    expect(find.text('4 of 10 players · 40%'), findsOneWidget);
+    // The facts share one line under the achievement.
+    final facts = find.textContaining('12 True Ratio');
+    expect(facts, findsOneWidget);
+    final line = tester.widget<Text>(facts).data!;
+    expect(line, contains('4 of 10 players · 40%'));
     expect(
-      find.text(
+      line,
+      contains(
         'Week started ${weekStart.year}-${two(weekStart.month)}-${two(weekStart.day)}',
       ),
-      findsOneWidget,
     );
-    expect(find.text('Not in your library'), findsOneWidget);
+    // A game that is nowhere to be had leaves the card without a line saying
+    // so, and without a RomM sign-in button.
+    expect(find.text('Not in your library'), findsNothing);
+    expect(find.text('RomM Login'), findsNothing);
   });
 
   testWidgets('keeps AOTW focusable when it is not local or in RomM', (
@@ -234,7 +243,10 @@ void main() {
     await tester.pump();
 
     final selected = find.byWidgetPredicate(
-      (widget) => widget is Semantics && widget.properties.selected == true,
+      (widget) =>
+          widget is Semantics &&
+          widget.properties.selected == true &&
+          (widget.properties.label ?? '').startsWith('ACHIEVEMENT OF THE WEEK'),
     );
     expect(selected, findsOneWidget);
     expect(tester.widget<Semantics>(selected).properties.button, isTrue);
@@ -272,7 +284,7 @@ void main() {
     expect(find.text('No current Achievement of the Week'), findsOneWidget);
   });
 
-  testWidgets('shows the mode-appropriate games beaten pill', (tester) async {
+  testWidgets('shows the mode-appropriate games beaten count', (tester) async {
     final awards = RetroAchievementsUserAwards(
       totalAwardsCount: 0,
       hiddenAwardsCount: 0,
@@ -313,7 +325,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('7 games beaten'), findsOneWidget);
+    expect(find.bySemanticsLabel('7 Beaten'), findsOneWidget);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -343,6 +355,6 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('11 games beaten'), findsOneWidget);
+    expect(find.bySemanticsLabel('11 Beaten'), findsOneWidget);
   });
 }

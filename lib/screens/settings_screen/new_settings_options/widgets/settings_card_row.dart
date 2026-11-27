@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/widgets/custom_toggle_switch.dart';
+import 'package:neostation/widgets/neo_glass.dart';
+
+import 'settings_action_button.dart';
 
 /// Actionable settings tile: a bordered card with a leading icon, a
 /// title/subtitle block and a trailing control (toggle or action button).
@@ -56,20 +60,23 @@ class SettingsCardRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final borderColor = selected
-        ? theme.colorScheme.primary
-        : theme.colorScheme.outline.withValues(alpha: 0);
+    const borderColor = Colors.transparent;
     final foreground = selected
-        ? theme.colorScheme.primary
+        ? theme.colorScheme.surface
         : theme.colorScheme.onSurface.withValues(alpha: disabled ? 0.4 : 1.0);
+    final subtitleForeground = selected
+        ? theme.colorScheme.surface.withValues(alpha: disabled ? 0.25 : 0.6)
+        : theme.colorScheme.onSurface.withValues(alpha: disabled ? 0.25 : 0.6);
 
-    return Container(
+    final trailingTheme = _settingsTrailingTheme(context, focused: selected);
+    final row = Container(
       decoration: BoxDecoration(
-        color: theme.cardColor.withValues(alpha: 0.25),
+        color: selected
+            ? theme.colorScheme.onSurface
+            : theme.colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: borderColor, width: selected ? 2.r : 1.r),
       ),
-      margin: EdgeInsets.only(bottom: 8.r),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12.r),
@@ -107,9 +114,7 @@ class SettingsCardRow extends StatelessWidget {
                             subtitle,
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontSize: 9.r,
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: disabled ? 0.25 : 0.6,
-                              ),
+                              color: subtitleForeground,
                             ),
                             maxLines: subtitleMaxLines,
                             overflow: TextOverflow.ellipsis,
@@ -119,7 +124,11 @@ class SettingsCardRow extends StatelessWidget {
                     ),
                   ),
                   if (trailing != null) SizedBox(width: 12.r),
-                  ?trailing,
+                  if (trailing is SettingsActionButton ||
+                      trailing is CustomToggleSwitch)
+                    trailing!
+                  else if (trailing != null)
+                    Theme(data: trailingTheme, child: trailing!),
                 ],
               ),
               ?belowContent,
@@ -128,5 +137,37 @@ class SettingsCardRow extends StatelessWidget {
         ),
       ),
     );
+
+    final rimWidth = NeoGlass.borderWidthOf(context);
+    final inset = rimWidth > 0 ? (rimWidth / 2 + 0.5).r : 0.0;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(inset, 0, inset, 12.r),
+      child: rimWidth > 0
+          ? NeoGlassRim(cornerRadius: 12.r, borderWidth: rimWidth, child: row)
+          : row,
+    );
   }
+}
+
+/// Themes the trailing control with the row's current text colour.
+///
+/// Chips, action buttons and glyphs must stay visible on both the normal surface
+/// and the inverted selected row, so their primary/onSurface accents follow the
+/// row foreground instead of the global accent.
+ThemeData _settingsTrailingTheme(
+  BuildContext context, {
+  required bool focused,
+}) {
+  final theme = Theme.of(context);
+  final scheme = theme.colorScheme;
+  final foreground = focused ? scheme.surface : scheme.onSurface;
+  final background = focused ? scheme.onSurface : scheme.surface;
+  return theme.copyWith(
+    colorScheme: scheme.copyWith(
+      primary: foreground,
+      onPrimary: background,
+      onSurface: foreground,
+    ),
+    iconTheme: IconThemeData(color: foreground),
+  );
 }

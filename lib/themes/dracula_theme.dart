@@ -4,12 +4,8 @@ import 'package:neostation/themes/chrome_surface.dart';
 
 const Color _primaryColor = Color(0xFFff79c6);
 const Color _onPrimaryColor = Color(0xFF16050e);
-const Color _secondaryColor = Color(0xFFbd93f9);
-const Color _onSecondaryColor = Color(0xFF0d0815);
-const Color _tertiaryColor = Color(0xFFffb86c);
-const Color _onTertiaryColor = Color(0xFF160d04);
-const Color _tertiaryFixedColor = Color(0xFF414558);
-const Color _onTertiaryFixedColor = Color(0xFFd6d7db);
+const Color _secondaryColor = Color(0xFFC1AFDA);
+const Color _onSecondaryColor = Color(0xFF0E0819);
 const Color _surfaceColor = Color(0xFF282a36);
 const Color _onSurfaceColor = Color(0xFFf8f8f3);
 
@@ -37,14 +33,14 @@ final ThemeData draculaTheme = ThemeData(
   colorScheme: ColorScheme.dark(
     primary: _primaryColor,
     secondary: _secondaryColor,
-    tertiary: _tertiaryColor,
-    tertiaryFixed: _tertiaryFixedColor,
+    tertiary: _primaryColor,
+    tertiaryFixed: _surfaceColor,
     surface: _surfaceColor,
 
     onPrimary: _onPrimaryColor,
     onSecondary: _onSecondaryColor,
-    onTertiary: _onTertiaryColor,
-    onTertiaryFixed: _onTertiaryFixedColor,
+    onTertiary: _onPrimaryColor,
+    onTertiaryFixed: _onSurfaceColor,
     onSurface: _onSurfaceColor,
 
     error: _errorColor,

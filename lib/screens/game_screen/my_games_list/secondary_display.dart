@@ -11,6 +11,14 @@ part of '../my_games_list.dart';
 /// host [rebuild] bridge and the host static `_log` is qualified as
 /// `_SystemGamesListState._log` (both required from an extension).
 extension _SecondaryDisplay on _SystemGamesListState {
+  /// Whether the user allows preview videos on either screen.
+  bool get _videoPreviewsEnabled =>
+      mounted &&
+      context.read<SqliteConfigProvider>().config.videoPreviewDelay >= 0;
+
+  int get _videoPreviewDelaySeconds =>
+      context.read<SqliteConfigProvider>().config.videoPreviewDelay;
+
   /// Hard reset of the video preview system.
   void _resetVideoState() {
     _videoTimer?.cancel();
@@ -19,6 +27,7 @@ extension _SecondaryDisplay on _SystemGamesListState {
     if (_videoController != null) {
       final controller = _videoController!;
       _videoController = null;
+      _videoControllerGame = null;
       try {
         controller.dispose();
       } catch (e) {
@@ -33,6 +42,7 @@ extension _SecondaryDisplay on _SystemGamesListState {
         _showVideo = false;
         _isVideoLoading = false;
       });
+      _updateMusicDucking();
     }
   }
 
@@ -44,6 +54,7 @@ extension _SecondaryDisplay on _SystemGamesListState {
     if (_videoController != null) {
       final controller = _videoController!;
       _videoController = null;
+      _videoControllerGame = null;
       try {
         controller.dispose();
       } catch (e) {
@@ -114,6 +125,20 @@ extension _SecondaryDisplay on _SystemGamesListState {
     );
   }
 
+  /// Clears an already-playing secondary video without waiting for the
+  /// media-dedup pass, which would otherwise skip an unchanged selection.
+  void _clearSecondaryDisplayVideo() {
+    final state = _secondaryDisplayState;
+    if (state == null) return;
+    // ignore: unawaited_futures
+    state.updateState(
+      gameVideo: null,
+      clearVideo: true,
+      videoPreviewDeadlineMillis: 0,
+    );
+    _updateMusicDucking();
+  }
+
   /// Synchronizes selection metadata and assets with secondary hardware displays.
   ///
   /// [forceMediaRefresh] forces a push even when every media path is unchanged
@@ -158,14 +183,14 @@ extension _SecondaryDisplay on _SystemGamesListState {
       _fileProvider,
     );
 
-    final videoPath = _getVideoPath(game);
-    final videoExists = await _fileProvider.fileExists(videoPath);
+    final videoPath = await _previewVideoSource(game);
+    final videoExists = videoPath != null;
 
     final configProvider = mounted
         ? context.read<SqliteConfigProvider>()
         : null;
     final isVideoMuted = !configProvider!.config.videoSound;
-    final isScraperLoggedIn = await ScreenScraperService.hasSavedCredentials();
+    final isScraperLoggedIn = await MetadataProviderService.hasActiveSession();
 
     final isMusicSystem = widget.system.folderName == 'music';
 
@@ -198,7 +223,11 @@ extension _SecondaryDisplay on _SystemGamesListState {
                 ? null
                 : (File(wheelPath).existsSync() ? wheelPath : null)) ||
         currentState.isVideoMuted != isVideoMuted ||
-        currentState.isGameLaunching != _isGameLaunching;
+        currentState.isGameLaunching != _isGameLaunching ||
+        currentState.videoPreviewDelay !=
+            configProvider.config.videoPreviewDelay ||
+        currentState.videoPreviewDeadlineMillis !=
+            (_videoPreviewDeadline?.millisecondsSinceEpoch ?? 0);
 
     if (shouldUpdate && !_isNavigatingBack) {
       final bool hasFanart = !isMusicSystem && File(fanartPath).existsSync();
@@ -217,6 +246,11 @@ extension _SecondaryDisplay on _SystemGamesListState {
         clearWheel: !hasWheel,
         gameVideo: null, // Reset video state during active scrolling.
         clearVideo: true,
+        videoPreviewDelay: configProvider.config.videoPreviewDelay,
+        videoPreviewDeadlineMillis:
+            _videoPreviewDeadline?.millisecondsSinceEpoch ?? 0,
+        videoPreviewFileChecked: _videoPreviewFileChecked,
+        videoPreviewFileExists: _videoPreviewFileExists,
         gameImageBytes: null,
         clearImageBytes: isMusicSystem
             ? (MusicPlayerService().activeTrack == null)
@@ -298,19 +332,35 @@ extension _SecondaryDisplay on _SystemGamesListState {
 
   /// Pushes specific video path updates to the secondary screen.
   Future<void> _updateSecondaryDisplayVideo(GameModel game) async {
-    if (_secondaryDisplayState == null ||
+    final secondary = _secondaryDisplayState?.value;
+    if (secondary == null ||
+        !secondary.isSecondaryActive ||
         _isNavigatingBack ||
-        _selectedGame != game) {
+        _selectedGame != game ||
+        !_videoPreviewsEnabled) {
       return;
     }
 
-    final videoPath = _getVideoPath(game);
-    final videoExists = await _fileProvider.fileExists(videoPath);
+    final videoPath = await _previewVideoSource(game);
+    final videoExists = videoPath != null;
+    if (!mounted || !_videoPreviewsEnabled) return;
 
-    if (videoExists && !_isNavigatingBack && _selectedGame == game) {
+    if (mounted && _selectedGame == game) {
+      rebuild(() {
+        _videoPreviewFileChecked = true;
+        _videoPreviewFileExists = videoExists;
+      });
+    }
+
+    if (!_isNavigatingBack && _selectedGame == game) {
       // ignore: unawaited_futures
-      _secondaryDisplayState?.updateState(gameVideo: videoPath);
-      _updateMusicDucking();
+      _secondaryDisplayState?.updateState(
+        gameVideo: videoExists ? videoPath : null,
+        clearVideo: !videoExists,
+        videoPreviewFileChecked: true,
+        videoPreviewFileExists: videoExists,
+      );
+      if (videoExists) _updateMusicDucking();
     }
   }
 
@@ -329,7 +379,8 @@ extension _SecondaryDisplay on _SystemGamesListState {
     }
 
     // Condition 2: Video is actually playing on primary
-    bool primaryIsPlaying = _showVideo && !_isGameLaunching;
+    bool primaryIsPlaying =
+        _videoController?.value.isPlaying == true && !_isGameLaunching;
 
     // Condition 3: Secondary screen is active and actually playing a video
     final secondaryState = _secondaryDisplayState?.value;
@@ -344,7 +395,11 @@ extension _SecondaryDisplay on _SystemGamesListState {
   void _updateBackground(GameModel game) {
     // Aggregate views keep their own backdrop: the list's folder name is not a
     // hardware system, so there is no per-system art to swap in.
-    if (!mounted || SystemFolderNames.isAggregate(widget.system.folderName)) {
+    // The carousel also resolves and paints its own backdrop.
+    if (!mounted ||
+        SystemFolderNames.isAggregate(widget.system.folderName) ||
+        (widget.system.folderName != 'music' &&
+            _configProvider.config.gameViewMode == 'carousel')) {
       return;
     }
 
@@ -374,7 +429,7 @@ extension _SecondaryDisplay on _SystemGamesListState {
           ? game.systemFolderName!
           : widget.system.id;
       final path =
-          'assets/images/logos/$sysId.webp'; // Correcting to logo fallback for grid consistency.
+          'assets/images/logos/${SystemFolderNames.artFolderName(sysId.toString())}.webp'; // Correcting to logo fallback for grid consistency.
       imageProvider = AssetImage(path);
       imagePath = path;
     }
@@ -385,36 +440,106 @@ extension _SecondaryDisplay on _SystemGamesListState {
     );
   }
 
+  /// Checks whether the selected game has a preview video (a file, or a
+  /// NeoAssets link when streaming) without creating a controller. The visual
+  /// countdown must not run for a game that only has a screenshot.
+  Future<void> _checkVideoPreviewFile(GameModel game) async {
+    if (_videoPreviewFileChecked || _videoPreviewFileCheckGame == game) return;
+    _videoPreviewFileCheckGame = game;
+    try {
+      final localPath = _getVideoPath(game);
+      final exists =
+          await PreviewVideoSource.resolve(
+            localPath: localPath,
+            localExists: _fileProvider.isInitialized
+                ? await _fileProvider.fileExists(localPath)
+                : await File(localPath).exists(),
+            videoUrl: game.videoUrl,
+          ) !=
+          null;
+      if (!mounted || _selectedGame != game) return;
+      rebuild(() {
+        _videoPreviewFileChecked = true;
+        _videoPreviewFileExists = exists;
+      });
+      _secondaryDisplayState?.updateState(
+        videoPreviewFileChecked: true,
+        videoPreviewFileExists: exists,
+      );
+    } finally {
+      if (_videoPreviewFileCheckGame == game) {
+        _videoPreviewFileCheckGame = null;
+      }
+    }
+  }
+
   /// Initiates the media preview sequence for the primary and secondary displays.
   void _startVideoTimer() {
+    if (!mounted || _isGameLaunching || !_videoPreviewsEnabled) return;
+
+    final viewMode = context.read<SqliteConfigProvider>().config.gameViewMode;
+    final secondaryActive =
+        _secondaryDisplayState?.value?.isSecondaryActive ?? false;
+    if (viewMode != 'list' && !secondaryActive) {
+      _videoPreviewDeadline = null;
+      _resetVideoState();
+      return;
+    }
+
+    // The selection path runs this once immediately and again when rapid
+    // navigation settles. Reuse an already prepared controller, or let the
+    // in-flight preparation finish, instead of disposing and recreating it.
+    final game = _selectedGame;
+    if (game != null &&
+        _videoController?.value.isInitialized == true &&
+        _videoControllerGame == game) {
+      return;
+    }
+    if (_isVideoLoading) return;
+
+    if (game != null) unawaited(_checkVideoPreviewFile(game));
+
     _videoTimer?.cancel();
-    if (!mounted || _isGameLaunching) return;
+    final delay = _videoPreviewDelaySeconds;
+    _videoPreviewSelectedAt ??= DateTime.now();
+    _videoPreviewDeadline ??= _videoPreviewSelectedAt!.add(
+      Duration(seconds: delay),
+    );
 
-    _videoTimer = Timer(_SystemGamesListState._videoDelay, () async {
+    final deadline = _videoPreviewDeadline;
+    final wait = deadline?.difference(DateTime.now()) ?? Duration.zero;
+    late final Timer timer;
+    timer = Timer(wait.isNegative ? Duration.zero : wait, () async {
+      if (identical(_videoTimer, timer)) _videoTimer = null;
       if (!mounted) return;
-      if (mounted && _selectedGame != null) {
-        // Always attempt secondary display video update.
-        await _updateSecondaryDisplayVideo(_selectedGame!);
-        if (!mounted) return;
+      final game = _selectedGame;
+      if (game == null) return;
 
-        // Primary display video is conditional based on user preference for 'Game Info'.
-        final showGameInfo = context
-            .read<SqliteConfigProvider>()
-            .config
-            .showGameInfo;
-        if (showGameInfo) {
-          await _initializeVideo(_selectedGame!);
-        }
+      final config = context.read<SqliteConfigProvider>().config;
+      final secondaryActive =
+          _secondaryDisplayState?.value?.isSecondaryActive ?? false;
+
+      if (secondaryActive) {
+        await _updateSecondaryDisplayVideo(game);
+        if (!mounted) return;
+      }
+
+      // The primary preview only exists in the list view's media tab.
+      if (config.gameViewMode == 'list' && config.showGameInfo) {
+        await _initializeVideo(game);
       }
     });
+    _videoTimer = timer;
   }
 
   /// Initializes the video player for the primary UI, including volume and loop management.
   Future<void> _initializeVideo(GameModel game) async {
     if (!mounted ||
+        context.read<SqliteConfigProvider>().config.gameViewMode != 'list' ||
         _selectedGame == null ||
         _selectedGame != game ||
-        _isVideoLoading) {
+        _isVideoLoading ||
+        !_videoPreviewsEnabled) {
       return;
     }
 
@@ -430,21 +555,42 @@ extension _SecondaryDisplay on _SystemGamesListState {
       return;
     }
 
+    // A second timer may fire for the same selection (for example when the
+    // fast-navigation settle timer asks for background work again). Reuse the
+    // controller already ready for this game instead of disposing and starting
+    // it again, which showed as a visible restart at 0 s.
+    if (_videoController?.value.isInitialized == true &&
+        _videoControllerGame == game) {
+      return;
+    }
+
     rebuild(() => _isVideoLoading = true);
 
-    final videoPath = _getVideoPath(game);
-    final file = File(videoPath);
-    final fileExists = _fileProvider.isInitialized
-        ? await _fileProvider.fileExists(videoPath)
-        : file.existsSync();
+    final localPath = _getVideoPath(game);
+    final videoSource = await PreviewVideoSource.resolve(
+      localPath: localPath,
+      localExists: _fileProvider.isInitialized
+          ? await _fileProvider.fileExists(localPath)
+          : await File(localPath).exists(),
+      videoUrl: game.videoUrl,
+    );
+    final fileExists = videoSource != null;
 
-    if (!mounted || _selectedGame != game) {
+    if (!mounted || _selectedGame != game || !_videoPreviewsEnabled) {
       if (mounted) {
         rebuild(() {
+          _showVideo = false;
           _isVideoLoading = false;
         });
       }
       return;
+    }
+
+    if (mounted && _selectedGame == game) {
+      rebuild(() {
+        _videoPreviewFileChecked = true;
+        _videoPreviewFileExists = fileExists;
+      });
     }
 
     if (!fileExists) {
@@ -473,16 +619,35 @@ extension _SecondaryDisplay on _SystemGamesListState {
         _videoController = null;
       }
 
-      final mainController = VideoPlayerController.file(
-        file,
+      final mainController = PreviewVideoSource.controllerFor(
+        videoSource,
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
       );
 
-      await mainController.initialize();
+      try {
+        await PreviewVideoSource.initialize(mainController, videoSource);
+      } catch (_) {
+        // A stream that can't start (offline, slow network) leaves the image.
+        mainController.dispose();
+        rethrow;
+      }
+
+      // The setting can be turned off while the decoder initializes.
+      if (!mounted || _selectedGame != game || !_videoPreviewsEnabled) {
+        mainController.dispose();
+        if (mounted) {
+          rebuild(() {
+            _showVideo = false;
+            _isVideoLoading = false;
+          });
+        }
+        return;
+      }
 
       if (mounted && _selectedGame == game && _selectedGame != null) {
         rebuild(() {
           _videoController = mainController;
+          _videoControllerGame = game;
           _showVideo = true;
           _isVideoLoading = false;
         });
@@ -492,10 +657,9 @@ extension _SecondaryDisplay on _SystemGamesListState {
         if (!mounted || _videoController != mainController) return;
         await mainController.setLooping(true);
         if (!mounted || _videoController != mainController) return;
-        await mainController.play();
-        if (!mounted || _videoController != mainController) return;
-
-        _updateMusicDucking();
+        // Playback starts from GameDetailsCardList once the selection deadline
+        // has elapsed and the player is visible, so audio cannot lead the
+        // screenshot.
       } else {
         mainController.dispose();
         if (mounted) {
@@ -512,9 +676,21 @@ extension _SecondaryDisplay on _SystemGamesListState {
         rebuild(() {
           _showVideo = false;
           _isVideoLoading = false;
+          if (_selectedGame == game) _videoPreviewFileExists = false;
         });
       }
     }
+  }
+
+  /// The preview's source for [game]: its video file, or its NeoAssets link
+  /// when streaming; null when it has neither.
+  Future<String?> _previewVideoSource(GameModel game) async {
+    final localPath = _getVideoPath(game);
+    return PreviewVideoSource.resolve(
+      localPath: localPath,
+      localExists: await _fileProvider.fileExists(localPath),
+      videoUrl: game.videoUrl,
+    );
   }
 
   /// Resolves the absolute filesystem path for the targeted game video.

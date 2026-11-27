@@ -15,18 +15,18 @@ typedef RommPlatformLister = Future<List<RommPlatform>> Function();
 
 /// Resolves a RomM platform to the local system its ROMs belong to, or null
 /// when this build has no system for it.
-typedef RommPlatformResolver =
-    Future<SystemModel?> Function(RommPlatform platform);
+typedef RommPlatformResolver = Future<SystemModel?> Function(
+  RommPlatform platform,
+);
 
 /// One page of a platform's ROMs. Offset/limit paging only, like
 /// `RommPageFetcher`; the platform is bound per call because the pass walks
 /// several.
-typedef RommPlatformPageFetcher =
-    Future<RommRomPage> Function({
-      required int platformId,
-      required int limit,
-      required int offset,
-    });
+typedef RommPlatformPageFetcher = Future<RommRomPage> Function({
+  required int platformId,
+  required int limit,
+  required int offset,
+});
 
 /// The local library index — the scanned games table, never the disk, and
 /// only the columns the matching reads (see [RommLinkRow]).
@@ -37,8 +37,9 @@ typedef RommRomIdIndexLoader = Future<RommRomIdIndex> Function();
 
 /// Insert-if-absent for a batch of links; reports the rows actually written
 /// and whether the batch failed outright (which is not "already present").
-typedef RommMappingWriter =
-    Future<RommMappingBatchResult> Function(List<RommSaveMapEntry> entries);
+typedef RommMappingWriter = Future<RommMappingBatchResult> Function(
+  List<RommSaveMapEntry> entries,
+);
 
 /// Polled between platforms and between pages; true ends the pass.
 typedef RommStopCheck = bool Function();
@@ -125,8 +126,22 @@ class RommLinkPassSummary {
 
   /// Multi-platform system groups written nothing because one of their
   /// platforms failed: the surviving platforms' matches could not be checked
-  /// for ambiguity against the failed one, so none were written.
+  /// for ambiguity against the failed one, so none were written. Single-
+  /// platform groups that failed are not counted here (they had nothing to
+  /// write); [systemsFailed] counts every failed system.
   final int groupsSkipped;
+
+  /// Local systems with games still to link that this run could not finish:
+  /// a platform of theirs failed to page, or their links could not be saved.
+  /// What the Tools row reports as systems that couldn't be read. A failed
+  /// platform on a system with nothing to link (no games there, or all already
+  /// linked) is not counted: it cost the user nothing.
+  final int systemsFailed;
+
+  /// What the first failed platform threw, so a run where every platform
+  /// failed can say why (a [RommException] carries the reason). Null when no
+  /// platform failed.
+  final Object? firstFailure;
 
   /// Distinct local files the pass indexed, and how long that read took.
   /// Reported so the cost of the library half of a pass is visible in the log
@@ -177,6 +192,8 @@ class RommLinkPassSummary {
     this.platformsUnresolved = 0,
     this.platformFailures = 0,
     this.groupsSkipped = 0,
+    this.systemsFailed = 0,
+    this.firstFailure,
     this.libraryRows = 0,
     this.libraryReadMs = 0,
     this.romsEnumerated = 0,
@@ -265,22 +282,16 @@ class RommLibraryLinker {
   bool _running = false;
 
   RommLibraryLinker({
-    required RommPlatformLister listPlatforms,
-    required RommPlatformResolver resolveSystem,
-    required RommPlatformPageFetcher fetchPage,
-    required RommLocalLibraryLister listGames,
-    required RommRomIdIndexLoader loadRomIdIndex,
-    required RommMappingWriter putMappingsIfAbsent,
+    required this._listPlatforms,
+    required this._resolveSystem,
+    required this._fetchPage,
+    required this._listGames,
+    required this._loadRomIdIndex,
+    required this._putMappingsIfAbsent,
     RommStopCheck? shouldStop,
     DateTime Function()? clock,
     LoggerService? logger,
-  }) : _listPlatforms = listPlatforms,
-       _resolveSystem = resolveSystem,
-       _fetchPage = fetchPage,
-       _listGames = listGames,
-       _loadRomIdIndex = loadRomIdIndex,
-       _putMappingsIfAbsent = putMappingsIfAbsent,
-       _shouldStop = shouldStop ?? _neverStop,
+  }) : _shouldStop = shouldStop ?? _neverStop,
        _clock = clock ?? DateTime.now,
        _log = logger ?? _defaultLog;
 
@@ -374,6 +385,8 @@ class RommLibraryLinker {
     var processed = 0, failures = 0, enumerated = 0;
     var reported = 0;
     var added = 0, alreadyPresent = 0, groupsSkipped = 0, writeFailures = 0;
+    var systemsFailed = 0;
+    Object? firstFailure;
     var stopped = false;
     final ambiguities = <RommLinkAmbiguity>[];
     final conflicts = <RommLinkConflict>[];
@@ -395,7 +408,7 @@ class RommLibraryLinker {
           break;
         }
         final platformClaims = <_LocalGame, Map<int, String>>{};
-        final result = await _pagePlatform(platform, (rom) {
+        final (result, error) = await _pagePlatform(platform, (rom) {
           enumerated++;
           for (final candidate in RommLocalMatcher.candidateNames(rom)) {
             final key = RommLocalMatcher.normalizeName(candidate);
@@ -418,6 +431,7 @@ class RommLibraryLinker {
             // is the only outcome that can't link the wrong ROM.
             failures++;
             groupFailed = true;
+            firstFailure ??= error;
           case _PageResult.stopped:
             stopped = true;
         }
@@ -435,6 +449,7 @@ class RommLibraryLinker {
       // A stop mid-group leaves the group unwritten: the ambiguity check needs
       // every platform in it, and the contract is "no further rows".
       if (stopped) break;
+      if (groupFailed && aliases.any(index.hasUnlinkedIn)) systemsFailed++;
       // Likewise a failed platform in a multi-platform group: a file the
       // surviving platforms claim once may also be claimed by a ROM on the
       // platform that threw, and a guess written now is permanent (rows are
@@ -509,6 +524,7 @@ class RommLibraryLinker {
         // linked when none of it is; they are named so the next pass's retry
         // has something to compare against.
         writeFailures += entries.length;
+        systemsFailed++;
         _log.w(
           'RomM link pass could not write ${entries.length} row(s) for '
           'system "${group.system.folderName}"; they stay unlinked',
@@ -535,6 +551,8 @@ class RommLibraryLinker {
       platformsUnresolved: unresolvedSlugs.length,
       platformFailures: failures,
       groupsSkipped: groupsSkipped,
+      systemsFailed: systemsFailed,
+      firstFailure: firstFailure,
       romsEnumerated: enumerated,
       rowsAdded: added,
       rowsAlreadyPresent: alreadyPresent,
@@ -567,14 +585,17 @@ class RommLibraryLinker {
   /// page cap guards one that never stops. The stop check runs before every
   /// request so a dispose or disconnect ends the pass before the next round
   /// trip.
-  Future<_PageResult> _pagePlatform(
+  ///
+  /// A failed platform's error comes back with [_PageResult.failed], so the
+  /// summary can say why when nothing could be read.
+  Future<(_PageResult, Object?)> _pagePlatform(
     RommPlatform platform,
     void Function(RommRom rom) onRom,
   ) async {
     var offset = 0;
     var total = 0;
     for (var page = 0; page < pageCap; page++) {
-      if (_shouldStop()) return _PageResult.stopped;
+      if (_shouldStop()) return (_PageResult.stopped, null);
 
       final RommRomPage result;
       try {
@@ -590,7 +611,7 @@ class RommLibraryLinker {
           'RomM link pass platform "${platform.slug}" (id ${platform.id}) '
           'failed at offset $offset, skipping it: $e',
         );
-        return _PageResult.failed;
+        return (_PageResult.failed, e);
       }
 
       if (result.total > 0) total = result.total;
@@ -599,14 +620,14 @@ class RommLibraryLinker {
       }
 
       offset += result.items.length;
-      if (result.items.length < pageSize) return _PageResult.completed;
-      if (total > 0 && offset >= total) return _PageResult.completed;
+      if (result.items.length < pageSize) return (_PageResult.completed, null);
+      if (total > 0 && offset >= total) return (_PageResult.completed, null);
     }
     _log.w(
       'RomM link pass platform "${platform.slug}" hit the $pageCap-page cap, '
       'matched what was seen',
     );
-    return _PageResult.completed;
+    return (_PageResult.completed, null);
   }
 
   /// Every folder name a system's ROMs are indexed under, normalized the way
@@ -747,7 +768,14 @@ class _LocalIndex {
   final Map<String, _LocalGame> _byKey;
   final int unlinkedCount;
 
-  const _LocalIndex._(this._byKey, this.unlinkedCount);
+  /// Normalized system folders holding at least one unlinked game.
+  final Set<String> _unlinkedFolders;
+
+  const _LocalIndex._(this._byKey, this.unlinkedCount, this._unlinkedFolders);
+
+  /// Whether the system folder [normalizedFolder] has a game still to link.
+  bool hasUnlinkedIn(String normalizedFolder) =>
+      _unlinkedFolders.contains(normalizedFolder);
 
   /// Distinct local files indexed, for the summary log.
   int get size => _byKey.length;
@@ -757,13 +785,15 @@ class _LocalIndex {
 
   static _LocalIndex build(List<RommLinkRow> games, RommRomIdIndex romIds) {
     final byKey = <String, _LocalGame>{};
+    final unlinkedFolders = <String>{};
     var unlinked = 0;
     for (final game in games) {
       final folder = game.systemFolder;
       final filename = game.filename;
       if (folder.isEmpty || filename.isEmpty) continue;
+      final normalizedFolder = RommLibraryLinker._normalizeFolder(folder);
       final key = _keyFor(
-        RommLibraryLinker._normalizeFolder(folder),
+        normalizedFolder,
         RommLocalMatcher.normalizeName(filename),
       );
       if (byKey.containsKey(key)) continue;
@@ -779,6 +809,7 @@ class _LocalIndex {
       }
       if (existingRomId == null) {
         unlinked++;
+        unlinkedFolders.add(normalizedFolder);
       }
       byKey[key] = _LocalGame(
         filename: filename,
@@ -790,7 +821,7 @@ class _LocalIndex {
             : romIds.sourceFor(spelling, folder),
       );
     }
-    return _LocalIndex._(byKey, unlinked);
+    return _LocalIndex._(byKey, unlinked, unlinkedFolders);
   }
 
   /// The indexed file named [normalizedName] under [normalizedFolder].

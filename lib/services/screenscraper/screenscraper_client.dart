@@ -4,8 +4,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:neostation/services/logger_service.dart';
+
+import '../scraping/app_software_name.dart';
 import 'screenscraper_exceptions.dart';
 import '../../utils/semaphore.dart';
 
@@ -24,38 +25,8 @@ class ScreenscraperClient {
 
   static final _log = LoggerService.instance;
 
-  static String? _appVersion;
-
-  /// Retrieves the application version and platform to identify requests to the API.
-  static Future<String> getSoftname() async {
-    if (_appVersion != null) return _appVersion!;
-
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      final name = packageInfo.appName.isNotEmpty
-          ? packageInfo.appName
-          : 'neostation';
-      final version = packageInfo.version;
-
-      String platform = '';
-      if (Platform.isAndroid) {
-        platform = 'android';
-      } else if (Platform.isIOS) {
-        platform = 'ios';
-      } else if (Platform.isWindows) {
-        platform = 'windows';
-      } else if (Platform.isLinux) {
-        platform = 'linux';
-      } else if (Platform.isMacOS) {
-        platform = 'macos';
-      }
-      _appVersion = '$name-$version-$platform';
-      return _appVersion!;
-    } catch (e) {
-      _appVersion = 'neostation';
-      return _appVersion!;
-    }
-  }
+  /// The software name identifying NeoStation to the API.
+  static Future<String> getSoftname() => AppSoftwareName.get();
 
   /// Persistent HTTP client shared by every ScreenScraper request.
   static final http.Client _httpClient = createHttpClient();

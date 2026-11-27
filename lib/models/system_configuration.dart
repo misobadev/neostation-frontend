@@ -18,6 +18,13 @@ class EmulatorDefinition {
   /// Map containing platform-specific execution details (e.g., 'android', 'windows').
   final Map<String, dynamic> platforms;
 
+  /// File extensions this emulator can launch, without dots and lower-case.
+  ///
+  /// Empty means no declaration: the emulator is treated as compatible with
+  /// every extension of its system, preserving the behaviour of older JSON
+  /// entries that only spell the formats out in [description].
+  final List<String> extensions;
+
   /// Whether this RetroArch core is the recommended default core for the system.
   final bool isDefaultCore;
 
@@ -37,6 +44,7 @@ class EmulatorDefinition {
     required this.uniqueId,
     required this.description,
     required this.platforms,
+    this.extensions = const [],
     this.isDefaultCore = false,
     this.isDefaultStandalone = false,
     this.isretroAchievementsCompatible,
@@ -52,6 +60,14 @@ class EmulatorDefinition {
       platforms: json['platforms'] is Map
           ? Map<String, dynamic>.from(json['platforms'])
           : {},
+      extensions: json['extensions'] is List
+          ? (json['extensions'] as List)
+                .map(
+                  (e) => e.toString().trim().toLowerCase().replaceAll('.', ''),
+                )
+                .where((e) => e.isNotEmpty)
+                .toList()
+          : const [],
       isDefaultCore:
           (json['default_core'] ?? false).toString().toLowerCase() == 'true',
       isDefaultStandalone:

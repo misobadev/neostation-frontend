@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:neostation/screens/retro_achievements_screen/ra_cover_square.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:neostation/models/retro_achievements_game_info.dart';
@@ -11,7 +12,9 @@ import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/screens/game_screen/game_details_card/tabs/game_details_leaderboards_tab.dart';
 import 'package:neostation/services/gamepad/gamepad_navigation_manager.dart';
 import 'package:neostation/widgets/ra_earned_badge.dart';
+
 import 'ra_achievement_browser.dart';
+
 import 'package:neostation/utils/gamepad_nav.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -24,11 +27,17 @@ class RaGameAchievementsPage extends StatefulWidget {
   final String? fallbackTitle;
   final int? highlightAchievementId;
 
+  /// When set, the view is drawn inside its host (the dashboard panel) with a
+  /// compact header instead of as a page of its own, and backing out of it
+  /// calls this instead of popping a route.
+  final VoidCallback? onClose;
+
   const RaGameAchievementsPage({
     super.key,
     required this.gameId,
     this.fallbackTitle,
     this.highlightAchievementId,
+    this.onClose,
   });
 
   @override
@@ -220,6 +229,10 @@ class _RaGameAchievementsPageState extends State<RaGameAchievementsPage> {
       return;
     }
     if (_browserKey.currentState?.back() == true) return;
+    if (widget.onClose case final close?) {
+      close();
+      return;
+    }
     Navigator.of(context).maybePop();
   }
 
@@ -233,6 +246,20 @@ class _RaGameAchievementsPageState extends State<RaGameAchievementsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final info = _gameInfo;
+    final content = Expanded(
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _handleContentScroll,
+        child: _leaderboardsView
+            ? _buildLeaderboards(context)
+            : _buildAchievements(context, info),
+      ),
+    );
+    if (widget.onClose != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [_buildCompactHeader(context, info), content],
+      );
+    }
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -268,14 +295,112 @@ class _RaGameAchievementsPageState extends State<RaGameAchievementsPage> {
                 ? _buildGameHeader(context, info)
                 : const SizedBox.shrink(),
           ),
+          content,
+        ],
+      ),
+    );
+  }
+
+  /// The way back out of the game, drawn like the panel's pills so it reads
+  /// on every theme.
+  Widget _compactBackButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = theme.colorScheme.primary;
+    return Tooltip(
+      message: AppLocale.back.getString(context),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _handleBack,
+          canRequestFocus: false,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 30.r,
+            height: 30.r,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accent.withValues(alpha: 0.12),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.55),
+                width: 1.2.r,
+              ),
+            ),
+            child: Icon(Symbols.arrow_back_rounded, size: 16.r, color: accent),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The header the view has inside the dashboard panel: one row with the
+  /// way back, a small cover, the title and the progress bar.
+  Widget _buildCompactHeader(
+    BuildContext context,
+    GameInfoAndUserProgress? info,
+  ) {
+    final theme = Theme.of(context);
+    final title =
+        info?.title ??
+        widget.fallbackTitle ??
+        AppLocale.achievements.getString(context);
+    final guide = info?.guideUrl;
+    return Container(
+      padding: EdgeInsets.fromLTRB(0, 0, 4.r, 8.r),
+      margin: EdgeInsets.only(bottom: 2.r),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          _compactBackButton(context),
+          SizedBox(width: 8.r),
+          RaCoverSquare(url: _imageUrl(info?.imageBoxArt ?? ''), size: 48.r),
+          SizedBox(width: 10.r),
           Expanded(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: _handleContentScroll,
-              child: _leaderboardsView
-                  ? _buildLeaderboards(context)
-                  : _buildAchievements(context, info),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if ((info?.consoleName ?? '').isNotEmpty)
+                  Text(
+                    info!.consoleName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: .7),
+                    ),
+                  ),
+                SizedBox(height: 4.r),
+                if (info == null && _loading)
+                  const LinearProgressIndicator()
+                else if (info != null)
+                  _combinedProgressMeter(context, info),
+              ],
             ),
           ),
+          if (guide != null && _isHttpUrl(guide))
+            IconButton(
+              tooltip: AppLocale.raGuide.getString(context),
+              onPressed: () => launchUrl(Uri.parse(guide)),
+              visualDensity: VisualDensity.compact,
+              iconSize: 18.r,
+              color: _headerActionFocused('guide')
+                  ? theme.colorScheme.primary
+                  : null,
+              icon: const Icon(Symbols.menu_book_rounded),
+            ),
         ],
       ),
     );
@@ -454,13 +579,18 @@ class _RaGameAchievementsPageState extends State<RaGameAchievementsPage> {
     return award;
   }
 
-  Widget _boxArt(BuildContext context, String path) {
+  Widget _boxArt(
+    BuildContext context,
+    String path, {
+    double? width,
+    double? height,
+  }) {
     final url = _imageUrl(path);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8.r),
+      borderRadius: BorderRadius.circular(width == null ? 8.r : 6.r),
       child: SizedBox(
-        width: 82.r,
-        height: 104.r,
+        width: width ?? 82.r,
+        height: height ?? 104.r,
         child: url.isEmpty
             ? Icon(Symbols.videogame_asset_rounded, size: 28.r)
             : Image.network(
@@ -528,6 +658,7 @@ class _RaGameAchievementsPageState extends State<RaGameAchievementsPage> {
       key: _browserKey,
       info: info,
       highlightId: widget.highlightAchievementId,
+      dense: widget.onClose != null,
       onLeaderboards: _showLeaderboards,
       onFilterChanged: () {
         if (!_gameHeaderVisible) _headerRevealArmed = false;

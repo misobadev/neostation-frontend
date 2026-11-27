@@ -3,5 +3,5 @@
     <color name="ic_launcher_background">#1d2024</color>
     <!-- Matches the Flutter dark theme scaffold (and the startup screens),
          so the native splash hands off without a background jump. -->
-    <color name="splash_background">#15191e</color>
+    <color name="splash_background">#121212</color>
 </resources>

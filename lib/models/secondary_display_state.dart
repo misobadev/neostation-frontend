@@ -1,8 +1,13 @@
 import 'dart:io';
+
+import 'custom_sfx.dart';
+
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:sub_screen/shared_state_manager.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import 'secondary_achievement_item.dart';
 
 /// Data structure representing the current state of the secondary/bottom display.
@@ -11,6 +16,11 @@ import 'secondary_achievement_item.dart';
 /// the main screen and a connected secondary display (e.g., in dual-screen
 /// handhelds like the Ayaneo Flip DS).
 class SecondaryDisplayStateData {
+  /// The system name pushed before any system is focused. A language-neutral
+  /// token in the shared state; the second screen shows it as its translated
+  /// welcome text.
+  static const String welcomeSystemName = 'WELCOME';
+
   /// Name of the system currently being browsed.
   final String systemName;
 
@@ -26,6 +36,21 @@ class SecondaryDisplayStateData {
   /// Absolute path to the current game's preview video.
   final String? gameVideo;
 
+  /// Preview delay in seconds shared with the primary engine. -1 disables
+  /// previews; 0 starts as soon as the decoder is ready; 1..5 holds the
+  /// screenshot.
+  final int videoPreviewDelay;
+
+  /// Absolute deadline for the preview countdown, in milliseconds since epoch.
+  /// 0 means there is no active countdown.
+  final int videoPreviewDeadlineMillis;
+
+  /// Whether the primary engine has checked for a preview file for this game.
+  final bool videoPreviewFileChecked;
+
+  /// Whether that check found a preview file.
+  final bool videoPreviewFileExists;
+
   /// Raw image bytes for dynamic display (used when path resolution isn't possible).
   final Uint8List? gameImageBytes;
 
@@ -40,14 +65,6 @@ class SecondaryDisplayStateData {
 
   /// Trigger value used to notify the secondary display of mute state changes.
   final int muteToggleTrigger;
-
-  /// Monotonic counter bumped by the secondary display to request a system
-  /// screenshot of the main screen. The main engine watches for increments.
-  final int screenshotTrigger;
-
-  /// Whether the screenshot accessibility service is granted. Pushed by the main
-  /// engine so the secondary display can hide the screenshot button when off.
-  final bool screenshotAccessEnabled;
 
   /// Solid background color for the secondary display.
   final int? backgroundColor;
@@ -193,6 +210,11 @@ class SecondaryDisplayStateData {
   /// main engine.
   final bool dockEnabled;
 
+  /// Whether the system logo (and the name shown in its place) is hidden while
+  /// browsing, leaving only the background art. User setting, pushed by the
+  /// main engine.
+  final bool hideSystemLogo;
+
   /// How many dock slots are visible (1–5). User setting, pushed by the main
   /// engine; slots beyond it stay in [dockApps] but are hidden.
   final int dockSlotCount;
@@ -223,6 +245,7 @@ class SecondaryDisplayStateData {
   /// UI navigation sound volume (0.0–[SfxService.maxVolume]). User setting,
   /// pushed by the main engine for the same cross-engine reason as [sfxEnabled].
   final double sfxVolume;
+  final Map<SfxAction, CustomSfx> customSfx;
 
   /// Whether clocks use the 12-hour (AM/PM) form. User setting, pushed by the
   /// main engine so the Now Playing corner clock matches the primary header.
@@ -238,13 +261,15 @@ class SecondaryDisplayStateData {
     this.gameScreenshot,
     this.gameWheel,
     this.gameVideo,
+    this.videoPreviewDelay = 2,
+    this.videoPreviewDeadlineMillis = 0,
+    this.videoPreviewFileChecked = false,
+    this.videoPreviewFileExists = false,
     this.gameImageBytes,
     this.isGameSelected = false,
     this.isVideoMuted = false,
     this.hideBottomScreen = false,
     this.muteToggleTrigger = 0,
-    this.screenshotTrigger = 0,
-    this.screenshotAccessEnabled = false,
     this.backgroundColor,
     this.themeName,
     this.isSecondaryActive = false,
@@ -293,6 +318,7 @@ class SecondaryDisplayStateData {
     this.dockApps = const ['', '', '', '', ''],
     this.dockEditTrigger = 0,
     this.dockEnabled = true,
+    this.hideSystemLogo = true,
     this.dockSlotCount = 3,
     this.appReady = false,
     this.setupWizardActive = false,
@@ -301,6 +327,7 @@ class SecondaryDisplayStateData {
     // like the persisted setting rather than silently muting or blasting.
     this.sfxEnabled = true,
     this.sfxVolume = 0.75,
+    this.customSfx = const {},
     this.use12HourClock,
   });
 
@@ -315,14 +342,16 @@ class SecondaryDisplayStateData {
     bool clearWheel = false,
     String? gameVideo,
     bool clearVideo = false,
+    int? videoPreviewDelay,
+    int? videoPreviewDeadlineMillis,
+    bool? videoPreviewFileChecked,
+    bool? videoPreviewFileExists,
     Uint8List? gameImageBytes,
     bool clearImageBytes = false,
     bool? isGameSelected,
     bool? isVideoMuted,
     bool? hideBottomScreen,
     int? muteToggleTrigger,
-    int? screenshotTrigger,
-    bool? screenshotAccessEnabled,
     int? backgroundColor,
     String? themeName,
     bool? isSecondaryActive,
@@ -377,11 +406,13 @@ class SecondaryDisplayStateData {
     List<String>? dockApps,
     int? dockEditTrigger,
     bool? dockEnabled,
+    bool? hideSystemLogo,
     int? dockSlotCount,
     bool? appReady,
     bool? setupWizardActive,
     bool? sfxEnabled,
     double? sfxVolume,
+    Map<SfxAction, CustomSfx>? customSfx,
     bool? use12HourClock,
   }) {
     return SecondaryDisplayStateData(
@@ -392,6 +423,13 @@ class SecondaryDisplayStateData {
           : (gameScreenshot ?? this.gameScreenshot),
       gameWheel: clearWheel ? null : (gameWheel ?? this.gameWheel),
       gameVideo: clearVideo ? null : (gameVideo ?? this.gameVideo),
+      videoPreviewDelay: videoPreviewDelay ?? this.videoPreviewDelay,
+      videoPreviewDeadlineMillis:
+          videoPreviewDeadlineMillis ?? this.videoPreviewDeadlineMillis,
+      videoPreviewFileChecked:
+          videoPreviewFileChecked ?? this.videoPreviewFileChecked,
+      videoPreviewFileExists:
+          videoPreviewFileExists ?? this.videoPreviewFileExists,
       gameImageBytes: clearImageBytes
           ? null
           : (gameImageBytes ?? this.gameImageBytes),
@@ -399,9 +437,6 @@ class SecondaryDisplayStateData {
       isVideoMuted: isVideoMuted ?? this.isVideoMuted,
       hideBottomScreen: hideBottomScreen ?? this.hideBottomScreen,
       muteToggleTrigger: muteToggleTrigger ?? this.muteToggleTrigger,
-      screenshotTrigger: screenshotTrigger ?? this.screenshotTrigger,
-      screenshotAccessEnabled:
-          screenshotAccessEnabled ?? this.screenshotAccessEnabled,
       backgroundColor: backgroundColor ?? this.backgroundColor,
       themeName: themeName ?? this.themeName,
       isSecondaryActive: isSecondaryActive ?? this.isSecondaryActive,
@@ -459,11 +494,13 @@ class SecondaryDisplayStateData {
       dockApps: dockApps ?? this.dockApps,
       dockEditTrigger: dockEditTrigger ?? this.dockEditTrigger,
       dockEnabled: dockEnabled ?? this.dockEnabled,
+      hideSystemLogo: hideSystemLogo ?? this.hideSystemLogo,
       dockSlotCount: dockSlotCount ?? this.dockSlotCount,
       appReady: appReady ?? this.appReady,
       setupWizardActive: setupWizardActive ?? this.setupWizardActive,
       sfxEnabled: sfxEnabled ?? this.sfxEnabled,
       sfxVolume: sfxVolume ?? this.sfxVolume,
+      customSfx: customSfx ?? this.customSfx,
       use12HourClock: use12HourClock ?? this.use12HourClock,
     );
   }
@@ -476,6 +513,12 @@ class SecondaryDisplayStateData {
       gameScreenshot: json['gameScreenshot'] as String?,
       gameWheel: json['gameWheel'] as String?,
       gameVideo: json['gameVideo'] as String?,
+      videoPreviewDelay: json['videoPreviewDelay'] as int? ?? 2,
+      videoPreviewDeadlineMillis:
+          json['videoPreviewDeadlineMillis'] as int? ?? 0,
+      videoPreviewFileChecked:
+          json['videoPreviewFileChecked'] as bool? ?? false,
+      videoPreviewFileExists: json['videoPreviewFileExists'] as bool? ?? false,
       gameImageBytes: json['gameImageBytes'] != null
           ? base64Decode(json['gameImageBytes'] as String)
           : null,
@@ -483,9 +526,6 @@ class SecondaryDisplayStateData {
       isVideoMuted: json['isVideoMuted'] as bool? ?? false,
       hideBottomScreen: json['hideBottomScreen'] as bool? ?? false,
       muteToggleTrigger: json['muteToggleTrigger'] as int? ?? 0,
-      screenshotTrigger: json['screenshotTrigger'] as int? ?? 0,
-      screenshotAccessEnabled:
-          json['screenshotAccessEnabled'] as bool? ?? false,
       backgroundColor: json['backgroundColor'] as int?,
       themeName: json['themeName'] as String?,
       isSecondaryActive: json['isSecondaryActive'] as bool? ?? false,
@@ -543,11 +583,13 @@ class SecondaryDisplayStateData {
           : const ['', '', '', '', ''],
       dockEditTrigger: (json['dockEditTrigger'] as num?)?.toInt() ?? 0,
       dockEnabled: json['dockEnabled'] as bool? ?? true,
+      hideSystemLogo: json['hideSystemLogo'] as bool? ?? true,
       dockSlotCount: (json['dockSlotCount'] as num?)?.toInt() ?? 3,
       appReady: json['appReady'] as bool? ?? false,
       setupWizardActive: json['setupWizardActive'] as bool? ?? false,
       sfxEnabled: json['sfxEnabled'] as bool? ?? true,
       sfxVolume: (json['sfxVolume'] as num?)?.toDouble() ?? 0.75,
+      customSfx: CustomSfx.decode(json['customSfx']),
       use12HourClock: json['use12HourClock'] as bool?,
     );
   }
@@ -560,6 +602,10 @@ class SecondaryDisplayStateData {
       'gameScreenshot': gameScreenshot,
       'gameWheel': gameWheel,
       'gameVideo': gameVideo,
+      'videoPreviewDelay': videoPreviewDelay,
+      'videoPreviewDeadlineMillis': videoPreviewDeadlineMillis,
+      'videoPreviewFileChecked': videoPreviewFileChecked,
+      'videoPreviewFileExists': videoPreviewFileExists,
       'gameImageBytes': gameImageBytes != null
           ? base64Encode(gameImageBytes!)
           : null,
@@ -567,8 +613,6 @@ class SecondaryDisplayStateData {
       'isVideoMuted': isVideoMuted,
       'hideBottomScreen': hideBottomScreen,
       'muteToggleTrigger': muteToggleTrigger,
-      'screenshotTrigger': screenshotTrigger,
-      'screenshotAccessEnabled': screenshotAccessEnabled,
       'backgroundColor': backgroundColor,
       'themeName': themeName,
       'isSecondaryActive': isSecondaryActive,
@@ -610,11 +654,13 @@ class SecondaryDisplayStateData {
       'dockApps': dockApps,
       'dockEditTrigger': dockEditTrigger,
       'dockEnabled': dockEnabled,
+      'hideSystemLogo': hideSystemLogo,
       'dockSlotCount': dockSlotCount,
       'appReady': appReady,
       'setupWizardActive': setupWizardActive,
       'sfxEnabled': sfxEnabled,
       'sfxVolume': sfxVolume,
+      'customSfx': jsonDecode(CustomSfx.encode(customSfx)),
       'use12HourClock': use12HourClock,
     };
   }
@@ -665,14 +711,16 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     bool clearWheel = false,
     String? gameVideo,
     bool clearVideo = false,
+    int? videoPreviewDelay,
+    int? videoPreviewDeadlineMillis,
+    bool? videoPreviewFileChecked,
+    bool? videoPreviewFileExists,
     Uint8List? gameImageBytes,
     bool clearImageBytes = false,
     bool? isGameSelected,
     bool? isVideoMuted,
     bool? hideBottomScreen,
     int? muteToggleTrigger,
-    int? screenshotTrigger,
-    bool? screenshotAccessEnabled,
     int? backgroundColor,
     String? themeName,
     bool? isSecondaryActive,
@@ -727,11 +775,13 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     List<String>? dockApps,
     int? dockEditTrigger,
     bool? dockEnabled,
+    bool? hideSystemLogo,
     int? dockSlotCount,
     bool? appReady,
     bool? setupWizardActive,
     bool? sfxEnabled,
     double? sfxVolume,
+    Map<SfxAction, CustomSfx>? customSfx,
     bool? use12HourClock,
   }) async {
     if (!Platform.isAndroid) return;
@@ -739,7 +789,10 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
     try {
       final current =
           value ??
-          SecondaryDisplayStateData(systemName: systemName ?? 'WELCOME');
+          SecondaryDisplayStateData(
+            systemName:
+                systemName ?? SecondaryDisplayStateData.welcomeSystemName,
+          );
       setState(
         current.copyWith(
           systemName: systemName,
@@ -751,14 +804,16 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
           clearWheel: clearWheel,
           gameVideo: gameVideo,
           clearVideo: clearVideo,
+          videoPreviewDelay: videoPreviewDelay,
+          videoPreviewDeadlineMillis: videoPreviewDeadlineMillis,
+          videoPreviewFileChecked: videoPreviewFileChecked,
+          videoPreviewFileExists: videoPreviewFileExists,
           gameImageBytes: gameImageBytes,
           clearImageBytes: clearImageBytes,
           isGameSelected: isGameSelected,
           isVideoMuted: isVideoMuted,
           hideBottomScreen: hideBottomScreen,
           muteToggleTrigger: muteToggleTrigger,
-          screenshotTrigger: screenshotTrigger,
-          screenshotAccessEnabled: screenshotAccessEnabled,
           backgroundColor: backgroundColor,
           themeName: themeName,
           isSecondaryActive: isSecondaryActive,
@@ -813,11 +868,13 @@ class SecondaryDisplayState extends SharedState<SecondaryDisplayStateData> {
           dockApps: dockApps,
           dockEditTrigger: dockEditTrigger,
           dockEnabled: dockEnabled,
+          hideSystemLogo: hideSystemLogo,
           dockSlotCount: dockSlotCount,
           appReady: appReady,
           setupWizardActive: setupWizardActive,
           sfxEnabled: sfxEnabled,
           sfxVolume: sfxVolume,
+          customSfx: customSfx,
           use12HourClock: use12HourClock,
         ),
       );

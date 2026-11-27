@@ -24,7 +24,12 @@
       "#9e9e9e"
     ],
     "extensions": [
-      "iso"
+      "iso",
+      "ps3",
+      "pkg",
+      "chd",
+      "lnk",
+      "desktop"
     ]
   },
   "emulators": [
@@ -32,18 +37,28 @@
       "name": "Standalone aPS3e",
       "default_standalone": true,
       "unique_id": "ps3.aenu.aps3e",
-      "description": "Supported extensions: iso.",
+      "description": "Supported extensions: iso, folder.",
+      "extensions": [
+        "iso",
+        "folder"
+      ],
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
-          "launch_arguments": "-n aenu.aps3e/aenu.aps3e.EmulatorActivity -a aenu.intent.action.APS3E -e iso_uri \"{file.uri}\""
+          "launch_arguments": "-n aenu.aps3e/aenu.aps3e.EmulatorActivity -a aenu.intent.action.APS3E -e iso_uri \"{file.uri}\"",
+          "directory_launch_arguments": "-n aenu.aps3e/aenu.aps3e.EmulatorActivity -a aenu.intent.action.APS3E -e game_dir \"{file.path}\""
         }
       }
     },
     {
-      "name": "Standalone ARMSX3",
+      "name": "Standalone ARMSX3 ISO",
       "unique_id": "ps3.com.armsx3",
-      "description": "Supported extensions: iso.",
+      "description": "Supported extensions: iso, chd, folder.",
+      "extensions": [
+        "iso",
+        "chd",
+        "folder"
+      ],
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -52,9 +67,85 @@
       }
     },
     {
+      "name": "Standalone ARMSX3 PKG",
+      "unique_id": "ps3.com.armsx3.pkg",
+      "description": "Supported extensions: pkg.",
+      "extensions": [
+        "pkg"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.armsx3/com.armsx2.Main -a android.intent.action.VIEW -e path \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone ARMSX3 Serial",
+      "unique_id": "ps3.com.armsx3.serial",
+      "description": "Supported extensions: ps3. Launches an installed PKG by its serial descriptor.",
+      "extensions": [
+        "ps3"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.armsx3/com.armsx2.Main -a android.intent.action.VIEW --es title_id \"{file.content}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone ARMSX3 (Play Store)",
+      "unique_id": "ps3.com.armsx3.play",
+      "description": "Supported extensions: iso, chd, folder.",
+      "extensions": [
+        "iso",
+        "chd",
+        "folder"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.armsx3.play/com.armsx2.Main -a android.intent.action.VIEW -e path \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone ARMSX3 PKG (Play Store)",
+      "unique_id": "ps3.com.armsx3.play.pkg",
+      "description": "Supported extensions: pkg.",
+      "extensions": [
+        "pkg"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.armsx3.play/com.armsx2.Main -a android.intent.action.VIEW -e path \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "Standalone ARMSX3 Serial (Play Store)",
+      "unique_id": "ps3.com.armsx3.play.serial",
+      "description": "Supported extensions: ps3. Launches an installed PKG by its serial descriptor.",
+      "extensions": [
+        "ps3"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "android": {
+          "launch_arguments": "-n com.armsx3.play/com.armsx2.Main -a android.intent.action.VIEW --es title_id \"{file.content}\""
+        }
+      }
+    },
+    {
       "name": "Standalone EMUCOREC",
       "unique_id": "ps3.com.sbro.emucorec",
-      "description": "Supported extensions: iso.",
+      "description": "Supported extensions: iso, folder.",
+      "extensions": [
+        "iso",
+        "folder"
+      ],
       "is_retroachievements_compatible": false,
       "platforms": {
         "android": {
@@ -65,7 +156,11 @@
     {
       "name": "Standalone RPCS3",
       "unique_id": "ps3.rpcs3",
-      "description": "Supported extensions: iso.",
+      "description": "Supported extensions: iso, folder.",
+      "extensions": [
+        "iso",
+        "folder"
+      ],
       "is_retroachievements_compatible": false,
       "platforms": {
         "windows": {
@@ -81,6 +176,30 @@
         "macos": {
           "executable": "rpcs3",
           "args": "--no-gui \"{file.path}\""
+        }
+      }
+    },
+    {
+      "name": "Desktop shortcut",
+      "unique_id": "ps3.shortcut",
+      "description": "Supported extensions: lnk, desktop.",
+      "extensions": [
+        "lnk",
+        "desktop"
+      ],
+      "is_retroachievements_compatible": false,
+      "platforms": {
+        "windows": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        },
+        "linux": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
+        },
+        "macos": {
+          "launch_mode": "shortcut",
+          "executable": "{file.path}"
         }
       }
     }

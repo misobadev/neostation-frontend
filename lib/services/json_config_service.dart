@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:neostation/services/logger_service.dart';
 import 'package:neostation/services/systems_update_service.dart';
 import 'package:path/path.dart' as p;
+
+import '../constants/system_folder_names.dart';
 import '../models/system_model.dart';
 import '../models/system_configuration.dart';
 
@@ -101,9 +104,10 @@ class JsonConfigService {
               'raId': systemData['ids']?['retroachievements'],
               'raHashAlgo': raHash?['algo'],
               'raHashMode': raHash?['mode'],
-              'iconImage': 'assets/images/systems/${systemData['id']}-icon.png',
+              'iconImage':
+                  'assets/images/systems/${SystemFolderNames.artFolderName(systemData['id'].toString())}-icon.png',
               'backgroundImage':
-                  'assets/images/systems/${systemData['id']}-bg.jpg',
+                  'assets/images/systems/${SystemFolderNames.artFolderName(systemData['id'].toString())}-bg.jpg',
               'color1':
                   (systemData['colors'] is List &&
                       (systemData['colors'] as List).isNotEmpty)

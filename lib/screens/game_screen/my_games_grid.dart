@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:async';
+
+import 'package:flutter/gestures.dart' show PointerPanZoomUpdateEvent;
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:provider/provider.dart';
 import 'package:neostation/sync/sync_manager.dart';
 import 'package:neostation/models/game_model.dart';
@@ -18,17 +21,21 @@ import 'package:neostation/utils/game_utils.dart';
 import 'package:neostation/providers/collections_provider.dart';
 import 'package:neostation/widgets/achievements_badge.dart';
 import 'package:neostation/widgets/collection_badge.dart';
-import 'package:neostation/widgets/game_view_mode_dropdown.dart';
 import 'package:neostation/services/game_service.dart';
 import 'package:neostation/repositories/game_repository.dart';
 import 'package:neostation/l10n/app_locale.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:neostation/widgets/game_view_footer.dart';
+import 'package:neostation/widgets/gooey_selector.dart';
+import 'package:neostation/widgets/spring_selected_card.dart';
+import 'package:neostation/utils/spring_scroller.dart';
+import 'package:neostation/utils/performance_mode.dart';
 import 'package:neostation/constants/system_folder_names.dart';
 import 'package:neostation/models/retro_achievements_game_info.dart';
 import 'package:neostation/providers/retro_achievements_provider.dart';
 import 'package:neostation/services/retro_achievements_helper.dart';
 import 'package:neostation/screens/game_screen/game_details_card/dialogs/game_achievements_dialog.dart';
+import 'package:neostation/utils/grid_sizes.dart';
 
 class GamesGrid extends StatefulWidget {
   final SystemModel system;
@@ -40,7 +47,7 @@ class GamesGrid extends StatefulWidget {
   final VoidCallback onPlay;
   final VoidCallback onFavorite;
   final VoidCallback onRandom;
-  final VoidCallback? onSettings;
+  final VoidCallback? onOptions;
   final VoidCallback? onScrape;
   final Set<String> scrapingGameRomnames;
   final Map<String, double> scrapeProgress;
@@ -82,6 +89,11 @@ class GamesGrid extends StatefulWidget {
   /// calling [onFavorite] directly — it is a mouse/touch affordance.
   final VoidCallback? onYButton;
 
+  /// The West face button (X on an Xbox pad, Y on a Nintendo-style one) and
+  /// the X button, and the footer hint for West. Opens the library search;
+  /// null leaves them unbound.
+  final VoidCallback? onSearch;
+
   /// Attached to the selected card so the host can anchor the context menu to
   /// it. Null when no anchor is needed.
   final GlobalKey? selectedItemKey;
@@ -112,7 +124,7 @@ class GamesGrid extends StatefulWidget {
     required this.onPlay,
     required this.onFavorite,
     required this.onRandom,
-    this.onSettings,
+    this.onOptions,
     this.onScrape,
     this.scrapingGameRomnames = const {},
     this.scrapeProgress = const {},
@@ -122,6 +134,7 @@ class GamesGrid extends StatefulWidget {
     this.folderCoverResolver,
     this.artworkVersion = 0,
     this.onYButton,
+    this.onSearch,
     this.selectedItemKey,
     this.isSecondaryScreenActive = false,
     this.navLayerId = 'games_grid',
@@ -131,10 +144,33 @@ class GamesGrid extends StatefulWidget {
   State<GamesGrid> createState() => _GamesGridState();
 }
 
-class _GamesGridState extends State<GamesGrid> {
+class _GamesGridState extends State<GamesGrid> with TickerProviderStateMixin {
   late GamepadNavigation _gamepadNav;
   final ScrollController _scrollController = ScrollController();
+
+  /// Keeps the selected game in view on a spring that carries its speed from
+  /// one press to the next (see [SpringScroller]).
+  late final SpringScroller _springScroller = SpringScroller(
+    _scrollController,
+    this,
+  );
+
+  /// The liquid ring the selection travels as between games: the same motion
+  /// as the systems grid's. It lives in the scroll content's coordinates and
+  /// is drawn on top of the list, shifted by [_ringOffset] as it scrolls.
+  final GooeyMotion _gooeyMotion = GooeyMotion();
+  late final GooeyMotionTicker _gooeyTicker = GooeyMotionTicker(
+    _gooeyMotion,
+    this,
+  );
+  final ValueNotifier<Offset> _ringOffset = ValueNotifier(const Offset(16, 12));
+
+  /// Whether the ring was travelling at the last build: the selected card
+  /// hides its own border while it does.
+  bool _ringWasMoving = false;
   int _selectedIndex = 0;
+  int? _previousSelectedIndex;
+  late int _lastRenderedSelectedIndex;
   int _crossAxisCount = 5;
   bool _isNavigatingFast = false;
 
@@ -172,9 +208,6 @@ class _GamesGridState extends State<GamesGrid> {
   static const Duration _chromeSettleDelay = Duration(milliseconds: 160);
   String? _chromeSig;
   Widget? _chromeFooter;
-
-  // Preview-video existence per resolved media path — see _hasVideoFor.
-  final Map<String, bool> _videoExistsCache = {};
 
   // Memoized grid rows. buildRow→_buildCard is a pure function of layout
   // (`_layoutGen`), `targetWidth`, `theme`, and per-card favorite/scrape state —
@@ -230,6 +263,9 @@ class _GamesGridState extends State<GamesGrid> {
   List<double> _cardHOverW = [];
   bool _needsMeasure = true;
 
+  /// Set from the config in build; disables decorative effects at render time.
+  bool _performanceMode = false;
+
   // Image dimension cache
   static final Map<String, Size?> _imageSizeCache = {};
 
@@ -247,6 +283,9 @@ class _GamesGridState extends State<GamesGrid> {
   final Map<int, Offset> _activePointers = {};
   double? _lastPinchDistance;
   DateTime? _lastPinchTime;
+
+  /// The trackpad pinch's scale at its last size step.
+  double _panZoomBase = 1.0;
 
   // Card size label
   final ValueNotifier<String?> _cardSizeLabel = ValueNotifier(null);
@@ -318,24 +357,6 @@ class _GamesGridState extends State<GamesGrid> {
     return widget.system.primaryFolderName;
   }
 
-  /// Whether the game has a preview video, so the footer knows whether a mute
-  /// control is worth showing.
-  ///
-  /// Scraped media lives on the plain filesystem (unlike SAF ROM paths), so a
-  /// sync stat is safe, and this only runs when the selection settles — not
-  /// per frame. Memoized because a back-and-forth between two games would
-  /// otherwise re-stat both every time.
-  bool _hasVideoFor(GameModel game) {
-    final videoPath = game.getVideoPath(
-      _folderForGame(game),
-      widget.fileProvider,
-    );
-    return _videoExistsCache.putIfAbsent(
-      videoPath,
-      () => File(videoPath).existsSync(),
-    );
-  }
-
   String _box2dPath(int index) {
     final game = widget.games[index];
     return game.getImagePath(
@@ -396,6 +417,9 @@ class _GamesGridState extends State<GamesGrid> {
   /// `_cardWidth * _heightRatioFor(i)`.
   double _heightRatioFor(int index) {
     if (_isFanart) return 1.0;
+    // Header reads are the expensive part of this lookup; performance mode
+    // uses the square fallback rather than opening every box-art file.
+    if (_performanceMode) return 1.0;
 
     // Folder tiles are always square (no box art to measure).
     if (index < widget.folderCount) return 1.0;
@@ -431,6 +455,11 @@ class _GamesGridState extends State<GamesGrid> {
     final n = widget.games.length;
     _cardHOverW = List<double>.filled(n, 1.0);
     _loadedDims.clear();
+    if (_performanceMode) {
+      _loadedDims.addAll(List<int>.generate(n, (i) => i));
+      _needsMeasure = false;
+      return;
+    }
     if (!_isFanart) {
       for (int i = 0; i < n; i++) {
         _cardHOverW[i] = _heightRatioFor(i);
@@ -479,8 +508,8 @@ class _GamesGridState extends State<GamesGrid> {
   /// Cheap positioning pass: turns cached aspect ratios + a target width into
   /// card rects and row bounds. No image reads, one allocation per card.
   void _positionCards(double availableWidth) {
-    final spX = 6.0.r;
-    final spY = 6.0.r;
+    final spX = 12.0.r;
+    final spY = 12.0.r;
     _spX = spX;
     _spY = spY;
 
@@ -548,7 +577,7 @@ class _GamesGridState extends State<GamesGrid> {
 
   // Lazy dimension loading for newly visible cards
   void _ensureDims(int index) {
-    if (_isFanart) return;
+    if (_isFanart || _performanceMode) return;
     if (_loadedDims.contains(index)) return;
     final path = _box2dPath(index);
     final hadBefore = _imageSizeCache.containsKey(path);
@@ -574,8 +603,11 @@ class _GamesGridState extends State<GamesGrid> {
       (widget.games.length - 1).clamp(0, 999999),
     );
     _settledIndex = _selectedIndex;
+    _lastRenderedSelectedIndex = _selectedIndex;
     _updateCrossAxisCount();
     _initializeGamepad();
+    _scrollController.addListener(_syncRingOffset);
+    _gooeyMotion.addListener(_onRingMotion);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -594,22 +626,7 @@ class _GamesGridState extends State<GamesGrid> {
   void _updateCrossAxisCount() {
     try {
       final config = context.read<SqliteConfigProvider>().config;
-      switch (config.gameGridColumns) {
-        case 'S':
-          _crossAxisCount = 7;
-          break;
-        case 'M':
-          _crossAxisCount = 6;
-          break;
-        case 'L':
-          _crossAxisCount = 5;
-          break;
-        case 'XL':
-          _crossAxisCount = 4;
-          break;
-        default:
-          _crossAxisCount = 6;
-      }
+      _crossAxisCount = GridSizes.columns(config.gameGridColumns);
     } catch (_) {
       _crossAxisCount = 5;
     }
@@ -627,7 +644,7 @@ class _GamesGridState extends State<GamesGrid> {
   void _adjustGameGridDensity(int delta) {
     try {
       final provider = context.read<SqliteConfigProvider>();
-      final sizes = ['S', 'M', 'L', 'XL'];
+      const sizes = GridSizes.values;
       final currentIndex = sizes.indexOf(provider.config.gameGridColumns);
       if (currentIndex == -1) return;
       final newIndex = (currentIndex + delta).clamp(0, sizes.length - 1);
@@ -653,7 +670,23 @@ class _GamesGridState extends State<GamesGrid> {
     });
   }
 
+  /// A trackpad pinch (macOS, Windows precision touchpads) arrives as one
+  /// pan-zoom gesture with a scale rather than as two pointers: every ~15 %
+  /// of scale since the last step changes the size by one.
+  void _handlePanZoomUpdate(PointerPanZoomUpdateEvent event) {
+    final ratio = event.scale / _panZoomBase;
+    if (ratio > 1.15) {
+      _adjustGameGridDensity(1);
+      _panZoomBase = event.scale;
+    } else if (ratio < 0.87) {
+      _adjustGameGridDensity(-1);
+      _panZoomBase = event.scale;
+    }
+  }
+
   void _handlePointerDown(PointerDownEvent event) {
+    // A finger on the grid takes the scroll over from the spring at once.
+    _springScroller.stop();
     _activePointers[event.pointer] = event.position;
   }
 
@@ -723,7 +756,6 @@ class _GamesGridState extends State<GamesGrid> {
     // whether the footer's mute pill applies. Drop the stat cache and the
     // chrome signature so the footer is rebuilt against the new media.
     if (widget.artworkVersion != oldWidget.artworkVersion) {
-      _videoExistsCache.clear();
       _chromeSig = null;
     }
     if (widget.selectedIndex != oldWidget.selectedIndex) {
@@ -747,17 +779,18 @@ class _GamesGridState extends State<GamesGrid> {
       onNavigateRight: _navigateRight,
       onSelectItem: widget.onPlay,
       onBack: widget.onBack,
-      onFavorite: widget.onYButton ?? widget.onFavorite, // Button Y.
-      onXButton: () {
-        try {
-          GameViewModeDropdown.globalKey.currentState?.showDropdown();
-        } catch (_) {}
-      },
+      onFavorite: null, // Options moved to Start.
+      // Search on West (since #673) and on the button reported as X, so the
+      // X the header shows opens it on every controller: on the AYN controller
+      // West is the button printed Y. (The list view searches on X only and
+      // favourites on Y.)
+      onXButton: widget.onSearch,
+      onWestButton: widget.onSearch,
       onLeftStickClick: widget.onRandom,
       onSelectButton: _toggleVideoMute, // Select tap - Mute preview video.
       onSelectModifierA: widget.onScrape, // Select + A - Scrape.
       onSelectModifierY: widget.onRandom, // Select + Y - Random game.
-      onSettings: widget.onSettings,
+      onSettings: widget.onOptions,
     );
   }
 
@@ -801,6 +834,10 @@ class _GamesGridState extends State<GamesGrid> {
     final pos = _scrollController.position;
     final target = _centerTargetFor(rect, pos.viewportDimension);
     if ((pos.pixels - target).abs() <= 1.0) return;
+    if (!_performanceMode) {
+      _springScroller.animateTo(target);
+      return;
+    }
     _scrollController.animateTo(
       target,
       duration: const Duration(milliseconds: 350),
@@ -816,6 +853,10 @@ class _GamesGridState extends State<GamesGrid> {
     _cardSizeLabel.dispose();
     GamepadNavigationManager.popLayer(widget.navLayerId);
     _gamepadNav.dispose();
+    _springScroller.dispose();
+    _gooeyTicker.dispose();
+    _gooeyMotion.dispose();
+    _ringOffset.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -1054,6 +1095,12 @@ class _GamesGridState extends State<GamesGrid> {
     // selection by many rows; a synchronous jump keeps the selected card centred
     // every frame. The trailing (settled) move still animates smoothly.
     // Exact model offsets (SliverVariedExtentList) make both land correctly.
+    if (!_performanceMode) {
+      // The spring keeps its speed through a burst of presses, so it follows
+      // the selection without restarting on each one.
+      _springScroller.animateTo(target);
+      return;
+    }
     if (_isNavigatingFast) {
       _scrollController.jumpTo(target);
       return;
@@ -1065,6 +1112,33 @@ class _GamesGridState extends State<GamesGrid> {
     );
   }
 
+  /// Where the scroll content's origin sits in the grid's box: the list's
+  /// padding, less how far it has scrolled.
+  void _syncRingOffset() {
+    final scrolled = _scrollController.hasClients
+        ? _scrollController.offset
+        : 0.0;
+    _ringOffset.value = Offset(16, 12 - scrolled);
+  }
+
+  /// Rebuilds once when the ring starts or stops travelling, so the selected
+  /// card hides or shows its own border.
+  void _onRingMotion() {
+    if (_gooeyMotion.moving != _ringWasMoving && mounted) setState(() {});
+  }
+
+  /// The selected card's frame in the scroll content, raised the way
+  /// [SpringSelectedCard] raises the card.
+  Rect? _ringTarget() {
+    if (_cardRects.isEmpty) return null;
+    final rect = _cardRects[_selectedIndex.clamp(0, _cardRects.length - 1)];
+    return Rect.fromCenter(
+      center: Offset(rect.left + rect.width / 2, rect.top + rect.height / 2),
+      width: rect.width * SpringSelectedCard.raisedScale,
+      height: rect.height * SpringSelectedCard.raisedScale,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // `select` rather than `watch`: the grid is the perf-sensitive view, and
@@ -1073,6 +1147,14 @@ class _GamesGridState extends State<GamesGrid> {
     _showAchievementsBadge = context.select<SqliteConfigProvider, bool>(
       (p) => p.config.showAchievementsBadge,
     );
+    final performanceMode = context.select<SqliteConfigProvider, bool>(
+      (p) => p.config.performanceMode,
+    );
+    if (performanceMode != _performanceMode) {
+      _performanceMode = performanceMode;
+      // Turning it off must re-read the box-art ratios the mode skipped.
+      _needsMeasure = true;
+    }
     _collections = SystemFolderNames.isCollection(widget.system.folderName)
         ? null
         : context.watch<CollectionsProvider>();
@@ -1085,23 +1167,26 @@ class _GamesGridState extends State<GamesGrid> {
             Icon(
               Icons.videogame_asset_rounded,
               size: 64.r,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.5),
             ),
             SizedBox(height: 16.r),
             Text(
               AppLocale.selectAGame.getString(context),
               style: TextStyle(
                 fontSize: 18.r,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                color: Theme.of(context).colorScheme.onSurface
+                    .withValues(alpha: 0.7),
               ),
             ),
           ],
         ),
       );
+    }
+
+    if (_lastRenderedSelectedIndex != _selectedIndex) {
+      _previousSelectedIndex = _lastRenderedSelectedIndex;
+      _lastRenderedSelectedIndex = _selectedIndex;
     }
 
     _buildSettledChrome();
@@ -1114,6 +1199,17 @@ class _GamesGridState extends State<GamesGrid> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   _computeLayout(constraints.maxWidth);
+
+                  // Point the ring at the selected card. Done here, after the
+                  // layout and before the rows are built, so the rows know
+                  // whether it is travelling.
+                  final ringTarget = _performanceMode ? null : _ringTarget();
+                  if (ringTarget != null) {
+                    _gooeyMotion.retarget(_selectedIndex, ringTarget);
+                    _gooeyTicker.sync();
+                  }
+                  final ringMoving = ringTarget != null && _gooeyMotion.moving;
+                  _ringWasMoving = ringMoving;
 
                   // The layout just changed for a non-scroll reason (card
                   // size cycle, fanart↔box2d). Once this new layout is
@@ -1167,10 +1263,13 @@ class _GamesGridState extends State<GamesGrid> {
                     // with the selection), so we skip the cache for just that
                     // row; every other row stays cached and the fast-scroll perf
                     // is preserved.
-                    final hasSelection =
-                        _selectedIndex >= row.startIndex &&
-                        _selectedIndex < row.startIndex + row.count;
-                    if (!hasSelection) {
+                    bool rowContains(int? index) =>
+                        index != null &&
+                        index >= row.startIndex &&
+                        index < row.startIndex + row.count;
+                    final hasSelection = rowContains(_selectedIndex);
+                    final hasSettling = rowContains(_previousSelectedIndex);
+                    if (!hasSelection && !hasSettling) {
                       final cached = _rowCache[rowIndex];
                       if (cached != null) return cached;
                     }
@@ -1186,7 +1285,9 @@ class _GamesGridState extends State<GamesGrid> {
                         targetWidth,
                         theme,
                       );
-                      if (idx == _selectedIndex) {
+                      // While the ring travels it is the selection; the card
+                      // shows its own border again once the ring lands.
+                      if (idx == _selectedIndex && !ringMoving) {
                         cell = Stack(
                           children: [
                             cell,
@@ -1210,6 +1311,45 @@ class _GamesGridState extends State<GamesGrid> {
                           ],
                         );
                       }
+                      final identity = idx < widget.folderCount
+                          ? 'folder_$idx'
+                          : widget.games[idx].romname;
+                      cell = SpringSelectedCard(
+                        key: ValueKey('spring_game_$identity'),
+                        selected: idx == _selectedIndex,
+                        previouslySelected: idx == _previousSelectedIndex,
+                        animate: !_performanceMode,
+                        child: cell,
+                      );
+                      // Every card gets the same wrapper so the subtree keeps
+                      // its shape; only the selected card and the one just
+                      // left are dragged by the ring.
+                      cell = GooeyCardDrag(
+                        motion: _gooeyMotion,
+                        role: _performanceMode
+                            ? null
+                            : idx == _selectedIndex
+                            ? true
+                            : idx == _previousSelectedIndex
+                            ? false
+                            : null,
+                        child: cell,
+                      );
+                      if (!_performanceMode) {
+                        cell = AnimationConfiguration.staggeredGrid(
+                          position: idx,
+                          columnCount: _cols,
+                          duration: const Duration(milliseconds: 320),
+                          delay: const Duration(milliseconds: 24),
+                          child: FadeInAnimation(
+                            duration: const Duration(milliseconds: 320),
+                            child: SlideAnimation(
+                              verticalOffset: 14.r,
+                              child: ScaleAnimation(scale: 0.98, child: cell),
+                            ),
+                          ),
+                        );
+                      }
                       cards.add(
                         SizedBox(
                           width: rect.width,
@@ -1225,7 +1365,9 @@ class _GamesGridState extends State<GamesGrid> {
                         children: _interleaveSpacing(cards, _spX),
                       ),
                     );
-                    if (!hasSelection) _rowCache[rowIndex] = built;
+                    if (!hasSelection && !hasSettling) {
+                      _rowCache[rowIndex] = built;
+                    }
                     return built;
                   }
 
@@ -1234,42 +1376,57 @@ class _GamesGridState extends State<GamesGrid> {
                     onPointerMove: _handlePointerMove,
                     onPointerUp: _handlePointerUp,
                     onPointerCancel: _handlePointerCancel,
+                    onPointerPanZoomStart: (_) => _panZoomBase = 1.0,
+                    onPointerPanZoomUpdate: _handlePanZoomUpdate,
                     behavior: HitTestBehavior.translucent,
                     child: Stack(
                       children: [
-                        CustomScrollView(
-                          controller: _scrollController,
-                          slivers: [
-                            SliverPadding(
-                              padding: EdgeInsets.only(
-                                top: 12,
-                                bottom: 80,
-                                left: 16,
-                                right: 16,
+                        AnimationLimiter(
+                          child: CustomScrollView(
+                            controller: _scrollController,
+                            slivers: [
+                              SliverPadding(
+                                padding: EdgeInsets.only(
+                                  top: 12,
+                                  bottom: 80,
+                                  left: 16,
+                                  right: 16,
+                                ),
+                                // Exact per-row extents (known from
+                                // _positionCards) let the sliver compute exact
+                                // absolute offsets and maxScrollExtent for the
+                                // WHOLE list without building rows — no lazy
+                                // estimate, so model-based centring
+                                // (_centerTargetFor) always lands. This is what
+                                // fixes the "selection off-screen after resize /
+                                // fast-scroll" divergence while keeping lazy row
+                                // rendering.
+                                sliver: SliverVariedExtentList.builder(
+                                  itemCount: _rows.length,
+                                  itemExtentBuilder: (index, _) {
+                                    if (index < 0 || index >= _rows.length) {
+                                      return 0;
+                                    }
+                                    return _rows[index].height + _spY;
+                                  },
+                                  itemBuilder: buildRow,
+                                ),
                               ),
-                              // Exact per-row extents (known from
-                              // _positionCards) let the sliver compute exact
-                              // absolute offsets and maxScrollExtent for the
-                              // WHOLE list without building rows — no lazy
-                              // estimate, so model-based centring
-                              // (_centerTargetFor) always lands. This is what
-                              // fixes the "selection off-screen after resize /
-                              // fast-scroll" divergence while keeping lazy row
-                              // rendering.
-                              sliver: SliverVariedExtentList.builder(
-                                itemCount: _rows.length,
-                                itemExtentBuilder: (index, _) {
-                                  if (index < 0 || index >= _rows.length) {
-                                    return 0;
-                                  }
-                                  return _rows[index].height + _spY;
-                                },
-                                itemBuilder: buildRow,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        // Selection cursor is drawn in-cell (see buildRow).
+                        // Selection cursor is drawn in-cell (see buildRow); the
+                        // ring only while it travels between cards.
+                        if (!_performanceMode)
+                          Positioned.fill(
+                            child: GooeySelectorRing(
+                              motion: _gooeyMotion,
+                              color: borderColor,
+                              radius: 12.r * SpringSelectedCard.raisedScale,
+                              ringWidth: 4.r * SpringSelectedCard.raisedScale,
+                              offset: _ringOffset,
+                            ),
+                          ),
                         ValueListenableBuilder<String?>(
                           valueListenable: _cardSizeLabel,
                           builder: (context, label, child) => AnimatedOpacity(
@@ -1344,8 +1501,7 @@ class _GamesGridState extends State<GamesGrid> {
     // this view is open — a lid opening is exactly that.
     final sig =
         '$_settledIndex|${settledGame.romname}|${settledGame.isFavorite}'
-        '|$hasRa|$loadingRa|${identityHashCode(_currentGameInfo)}'
-        '|${widget.isSecondaryScreenActive}';
+        '|$hasRa|$loadingRa|${identityHashCode(_currentGameInfo)}';
     if (sig == _chromeSig && _chromeFooter != null) {
       return;
     }
@@ -1357,8 +1513,6 @@ class _GamesGridState extends State<GamesGrid> {
       isLoadingAchievements: loadingRa,
       currentGameInfo: settled ? _currentGameInfo : null,
       onShowAchievements: _showAchievementsDialog,
-      onToggleMute: widget.isSecondaryScreenActive ? null : _toggleVideoMute,
-      hasVideo: !isFolder && _hasVideoFor(settledGame),
       isFolder: isFolder,
       // The game's own system, so the cloud mark reflects the game rather than
       // the placeholder an aggregate view is browsing under.
@@ -1447,20 +1601,16 @@ class _GamesGridState extends State<GamesGrid> {
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 2.r,
-                    offset: Offset(2.r, 2.r),
-                  ),
-                ],
               ),
               clipBehavior: Clip.antiAlias,
               child: _GameCardImage(
                 key: ValueKey('img_${game.romname}_${widget.artworkVersion}'),
                 box2dPath: box2dPath,
                 game: game,
-                targetWidth: targetWidth,
+                targetWidth: performanceCacheWidth(
+                  targetWidth,
+                  performanceMode: _performanceMode,
+                ),
               ),
             ),
             if (game.isFavorite == true)
@@ -1584,16 +1734,7 @@ class _GamesGridState extends State<GamesGrid> {
       child: RepaintBoundary(
         child: Container(
           clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12.r),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 2.r,
-                offset: Offset(2.r, 2.r),
-              ),
-            ],
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12.r)),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12.r),
             child: Stack(
@@ -1604,7 +1745,10 @@ class _GamesGridState extends State<GamesGrid> {
                     File(bgPath),
                     key: ValueKey('fanart_bg_${game.romname}'),
                     fit: BoxFit.cover,
-                    cacheWidth: 388,
+                    cacheWidth: performanceCacheWidth(
+                      388,
+                      performanceMode: _performanceMode,
+                    ),
                     errorBuilder: (ctx, e, s) =>
                         _buildFallbackCard(game, theme),
                   )
@@ -1639,7 +1783,10 @@ class _GamesGridState extends State<GamesGrid> {
                         File(wheelsPath),
                         key: ValueKey('wheel_${game.romname}'),
                         fit: BoxFit.contain,
-                        cacheWidth: 388,
+                        cacheWidth: performanceCacheWidth(
+                          388,
+                          performanceMode: _performanceMode,
+                        ),
                         errorBuilder: (ctx, e, s) => const SizedBox.shrink(),
                       ),
                     ),
@@ -1757,6 +1904,10 @@ class _GamesGridState extends State<GamesGrid> {
         file,
         fit: BoxFit.cover,
         gaplessPlayback: true,
+        cacheWidth: performanceCacheWidth(
+          512,
+          performanceMode: _performanceMode,
+        ),
         errorBuilder: (_, _, _) => const SizedBox.shrink(),
       ),
     );
@@ -1923,9 +2074,8 @@ class _Placeholder extends StatelessWidget {
             Icon(
               Icons.videogame_asset_rounded,
               size: 32.r,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.4),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.4),
             ),
             SizedBox(height: 4.r),
             Padding(
@@ -1939,9 +2089,8 @@ class _Placeholder extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 7.r,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.5),
                 ),
               ),
             ),

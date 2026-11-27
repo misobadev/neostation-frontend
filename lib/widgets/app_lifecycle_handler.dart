@@ -1,16 +1,18 @@
 import 'dart:io';
 import 'dart:ui' show AppExitResponse;
+
 import 'package:flutter/material.dart';
 import 'package:neostation/services/logger_service.dart';
+
 import '../services/notification_service.dart';
 import '../services/neosync/auth_service.dart';
 import '../sync/sync_manager.dart';
 import '../sync/providers/neo_sync_adapter.dart';
-import '../widgets/plan_welcome_modal.dart';
-import '../widgets/plan_farewell_modal.dart';
+import '../widgets/plan_change_notice.dart';
 import '../services/game_service.dart';
 import '../services/music_player_service.dart';
 import '../providers/sqlite_config_provider.dart';
+
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -25,34 +27,13 @@ class AppLifecycleHandler extends StatefulWidget {
 }
 
 class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
-    with WidgetsBindingObserver, WindowListener {
+    with WidgetsBindingObserver {
   String? _lastKnownPlan;
   AppLifecycleListener? _exitListener;
+  Window? _window;
+  ListenerId? _windowListenerId;
 
   static final _log = LoggerService.instance;
-
-  /// Determines the level of a plan (higher number = better plan)
-  int _getPlanLevel(String planName) {
-    switch (planName.toLowerCase()) {
-      case 'free':
-        return 0;
-      case 'micro':
-        return 1;
-      case 'mini':
-        return 2;
-      case 'mega':
-        return 3;
-      case 'ultra':
-        return 4;
-      default:
-        return 0;
-    }
-  }
-
-  /// Determines whether the plan change is an upgrade or downgrade
-  bool _isUpgrade(String oldPlan, String newPlan) {
-    return _getPlanLevel(newPlan) > _getPlanLevel(oldPlan);
-  }
 
   @override
   void initState() {
@@ -63,7 +44,13 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
     // Windows, parking the window fires no lifecycle state at all. window_manager
     // is the only signal for it, so the off-screen handling is hung off both.
     if (_isDesktop) {
-      windowManager.addListener(this);
+      final window = WindowManager.instance.getCurrent();
+      if (window != null) {
+        _window = window;
+        _windowListenerId = window.addListener((event) {
+          if (event is WindowMinimizedEvent) _onWindowMinimize();
+        });
+      }
     }
 
     // Register exit listener to clean up native resources (SoLoud audio threads)
@@ -112,7 +99,13 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
     _exitListener?.dispose();
     GameService.onScreenStateChanged = null;
     if (_isDesktop) {
-      windowManager.removeListener(this);
+      final window = _window;
+      final listenerId = _windowListenerId;
+      if (window != null && listenerId != null) {
+        window.removeListener(listenerId);
+      }
+      _window = null;
+      _windowListenerId = null;
     }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -159,12 +152,6 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
           listen: false,
         );
         configProvider.reapplySecondaryDisplay();
-        // Re-push accessibility (Screen Return) state to the secondary display:
-        // the user may have just enabled it in system Settings (e.g. via the
-        // in-game launcher's nudge), which controls the screenshot button and
-        // the launcher's warning badge.
-        // ignore: unawaited_futures
-        configProvider.refreshSecondaryScreenshotAccess();
       }
 
       // ignore: unawaited_futures
@@ -190,8 +177,7 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
   /// Only minimising counts. Losing focus to another window happens constantly
   /// while alt-tabbing, and re-decoding the visible artwork every time would
   /// cost more than it saves; minimising is the user actually parking the app.
-  @override
-  void onWindowMinimize() {
+  void _onWindowMinimize() {
     _releaseDecodedImages();
   }
 
@@ -267,18 +253,18 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
         if (_lastKnownPlan != null &&
             currentPlan != null &&
             _lastKnownPlan != currentPlan) {
-          final isUpgrade = _isUpgrade(_lastKnownPlan!, currentPlan);
+          // Read now: the known plan is updated below, before the delay ends.
+          final previousPlan = _lastKnownPlan!;
 
           // Delay to ensure the UI updates first
           Future.delayed(Duration(milliseconds: 1000), () {
             if (mounted) {
-              if (isUpgrade) {
-                // Show welcome modal for upgrades
-                PlanWelcomeModal.show(context, currentPlan);
-              } else {
-                // Show farewell modal for downgrades
-                PlanFarewellModal.show(context, _lastKnownPlan!, currentPlan);
-              }
+              PlanChangeNotice.show(
+                context,
+                account: currentUser?.id,
+                from: previousPlan,
+                to: currentPlan,
+              );
             }
           });
         }

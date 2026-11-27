@@ -1,8 +1,10 @@
 import '../../../widgets/ra_earned_badge.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
+
 import '../../../l10n/app_locale.dart';
 import '../../../models/secondary_achievement_item.dart';
 import '../../../models/secondary_display_state.dart';
@@ -136,7 +138,8 @@ class AchievementPanel extends StatelessWidget {
                   ),
                   SizedBox(width: 12.r),
                   Text(
-                    '${value.raPoints}/${value.raPointsTotal}p',
+                    '${value.raPoints}/${value.raPointsTotal} '
+                    '${AppLocale.raPointsAbbrev.getString(l10nContext ?? context)}',
                     style: TextStyle(
                       color: const Color(0xFFFFC107),
                       fontSize: 16.r,
@@ -237,7 +240,9 @@ class AchievementPanel extends StatelessWidget {
                     ),
                     SizedBox(width: 8.r),
                     Text(
-                      '+${newlyEarned.length} this session',
+                      AppLocale.raNewThisSession
+                          .getString(l10nContext ?? context)
+                          .replaceFirst('{count}', '${newlyEarned.length}'),
                       style: TextStyle(
                         color: Colors.black,
                         fontSize: 16.r,
@@ -390,7 +395,8 @@ class AchievementPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${a.points}p',
+                      '${a.points} '
+                      '${AppLocale.raPointsAbbrev.getString(l10nContext ?? context)}',
                       style: TextStyle(
                         color: const Color(0xFFFFC107),
                         fontSize: 13.r,

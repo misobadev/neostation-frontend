@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import '../../../l10n/app_locale.dart';
 import '../../../models/retro_achievement_comment.dart';
 import '../../../models/secondary_achievement_item.dart';
@@ -103,7 +104,8 @@ class AchievementCommentsPage extends StatelessWidget {
                           ),
                         SizedBox(width: 10.r),
                         Text(
-                          '${achievement.points}p',
+                          '${achievement.points} '
+                          '${AppLocale.raPointsAbbrev.getString(l10nContext ?? context)}',
                           style: TextStyle(
                             color: const Color(0xFFFFC107),
                             fontSize: 15.r,

@@ -51,6 +51,10 @@ void main() {
     'KEYCODE_BUTTON_MODE': GamepadInputType.buttonHome,
     'KEYCODE_BUTTON_A': GamepadInputType.buttonA,
     'KEYCODE_BUTTON_B': GamepadInputType.buttonB,
+    // The ≡ button of many generic Bluetooth pads, and of Amazon's Fire TV
+    // controller: Android's Menu key, not a gamepad button keycode. It is the
+    // pad's Start, which opens the Options panel.
+    'KEYCODE_MENU': GamepadInputType.buttonStart,
   };
 
   group('a tap', () {
@@ -74,6 +78,7 @@ void main() {
   group('a hold', () {
     for (final key in [
       'KEYCODE_BUTTON_START',
+      'KEYCODE_MENU',
       'KEYCODE_BUTTON_A',
       'KEYCODE_BUTTON_B',
     ]) {
