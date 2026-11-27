@@ -59,14 +59,21 @@ class RomEntry {
   /// on desktop reads it.
   final int size;
 
-  /// Metadata read while filtering Switch packages before database cleanup.
+  /// Switch metadata read by [SqliteDatabaseService.classifySwitchContent],
+  /// before the insert transaction.
   final SwitchGameInfo? switchInfo;
+
+  /// Whether this scan classified the Switch package as a standalone update
+  /// or DLC. Null when it was not classified this scan (not a Switch package,
+  /// already classified in the database, or unidentifiable).
+  final bool? switchAdditionalContent;
 
   RomEntry({
     required this.path,
     required this.filename,
     this.size = 0,
     this.switchInfo,
+    this.switchAdditionalContent,
   });
 }
 
@@ -328,19 +335,18 @@ class SqliteDatabaseService {
       ..addAll(deduplicatedEntries);
 
     if (system.id == 'switch' || system.id == 'nintendo-switch') {
-      final filtered = await filterSwitchContent(
+      final classified = await classifySwitchContent(
         romEntries,
-        storedTitleIds: await _storedTitleIds(system.id!),
+        classifiedPaths: await _classifiedSwitchPaths(system.id!),
       );
       romEntries
         ..clear()
-        ..addAll(filtered);
+        ..addAll(classified);
     }
 
-    // Clean orphaned entries (files deleted from disk or excluded by filters).
-    // Rows under a root that is not mounted right now are left alone: a
-    // missing SD card lists as an empty root, and without this every game on
-    // it would read as deleted.
+    // Clean orphaned entries (files deleted from disk). Rows under a root that
+    // is not mounted right now are left alone: a missing SD card lists as an
+    // empty root, and without this every game on it would read as deleted.
     final offlineRoots = offlineRomRoots(
       rootFoldersMap ?? await getExistingSubdirectories(romFolders),
     );
@@ -559,41 +565,36 @@ class SqliteDatabaseService {
   /// known, so an extraction that failed once — unreadable file, missing Switch
   /// keys — is retried later instead of being frozen out by the path diff.
   static bool _needsMetadataExtraction(String systemId, RomEntry entry) {
-    // Switch packages are read by filterSwitchContent before this point; only
-    // entries it actually read carry metadata worth writing.
+    // Switch packages are read by classifySwitchContent before this point;
+    // only entries it actually read carry something worth writing.
     if (systemId == 'switch' || systemId == 'nintendo-switch') {
-      return entry.switchInfo != null;
+      return entry.switchInfo != null || entry.switchAdditionalContent != null;
     }
     final lower = entry.filename.toLowerCase();
     return lower.endsWith('.psvita') || lower.endsWith('.steam');
   }
 
-  /// Excludes standalone updates and DLC before path reconciliation so a
-  /// rescan also removes their old library rows. Unidentified files are kept.
+  /// Reads Switch packages and classifies standalone updates and DLC.
+  ///
+  /// Nothing is removed: the insert hides an update/DLC row the first time it
+  /// is classified, so the user's data for it survives and a wrong guess can
+  /// be undone from the hidden games list. Unidentified files stay visible.
   ///
   /// All Switch file reads happen here, outside any database transaction.
-  /// [storedTitleIds] maps known `rom_path`s to the base-game Title ID already
-  /// stored for them: those files are not read again, which keeps a rescan of
-  /// a large SAF library from re-reading every header. A stored update/DLC ID
-  /// is not trusted on its own (older builds could store one for a bundle
-  /// holding the base game), so that file is read again before it is dropped.
+  /// Files in [classifiedPaths] were classified by an earlier scan and are not
+  /// read again, which keeps a rescan of a large SAF library quick.
   @visibleForTesting
-  static Future<List<RomEntry>> filterSwitchContent(
+  static Future<List<RomEntry>> classifySwitchContent(
     List<RomEntry> entries, {
-    Map<String, String> storedTitleIds = const {},
+    Set<String> classifiedPaths = const {},
   }) async {
-    final games = <RomEntry>[];
+    final result = <RomEntry>[];
     for (final entry in entries) {
       final extension = path.extension(entry.filename).toLowerCase();
       final isPackage = extension == '.nsp' || extension == '.nsz';
-      if (!isPackage && extension != '.xci') {
-        games.add(entry);
-        continue;
-      }
-      final storedId = storedTitleIds[entry.path];
-      if (storedId != null &&
-          !SwitchTitleExtractor.isAdditionalContent(storedId)) {
-        games.add(entry);
+      if ((!isPackage && extension != '.xci') ||
+          classifiedPaths.contains(entry.path)) {
+        result.add(entry);
         continue;
       }
 
@@ -607,43 +608,47 @@ class SqliteDatabaseService {
         _log.e('Error reading Switch package ${entry.path}: $e');
       }
 
-      // Cartridge images can bundle updates alongside the base game. Their
-      // HEAD header does not contain an application title ID; keep them
-      // intact and only carry the metadata through to the insert.
+      bool? additionalContent;
       if (isPackage) {
+        // Package metadata wins over a Title ID in the filename.
         final filenameId = RegExp(
           r'(?<![0-9a-fA-F])0100[0-9a-fA-F]{12}(?![0-9a-fA-F])',
         ).firstMatch(entry.filename)?.group(0);
         final titleId = info?.titleId ?? filenameId;
-        if (SwitchTitleExtractor.isAdditionalContent(titleId)) continue;
+        if (titleId != null) {
+          additionalContent = SwitchTitleExtractor.isAdditionalContent(titleId);
+        }
+      } else if (info != null) {
+        // Cartridge images can bundle updates alongside the base game, and
+        // their HEAD header holds no application Title ID: always a game.
+        additionalContent = false;
       }
-      games.add(
+
+      result.add(
         RomEntry(
           path: entry.path,
           filename: entry.filename,
           size: entry.size,
           switchInfo: info,
+          switchAdditionalContent: additionalContent,
         ),
       );
     }
-    return games;
+    return result;
   }
 
-  /// The Title IDs already stored for [systemId], keyed by `rom_path`.
-  static Future<Map<String, String>> _storedTitleIds(String systemId) async {
+  /// Paths of [systemId]'s rows an earlier scan already classified.
+  static Future<Set<String>> _classifiedSwitchPaths(String systemId) async {
     try {
       final db = await SqliteService.getDatabase();
       final rows = await db.rawQuery(
-        'SELECT rom_path, title_id FROM user_roms '
-        'WHERE app_system_id = ? AND title_id IS NOT NULL',
+        'SELECT rom_path FROM user_roms '
+        'WHERE app_system_id = ? AND switch_additional_content IS NOT NULL',
         [systemId],
       );
-      return {
-        for (final row in rows)
-          row['rom_path'].toString(): row['title_id'].toString(),
-      };
+      return {for (final row in rows) row['rom_path'].toString()};
     } catch (e) {
-      _log.e('Error loading stored Switch Title IDs: $e');
+      _log.e('Error loading classified Switch rows: $e');
       return const {};
     }
   }
@@ -679,16 +684,27 @@ class SqliteDatabaseService {
       // the installed-aware default resolution at launch.
       const sql = '''
         INSERT INTO user_roms
-        (app_system_id, app_emulator_unique_id, app_emulator_os_id, filename, rom_path, title_id, title_name, created_at)
+        (app_system_id, app_emulator_unique_id, app_emulator_os_id, filename, rom_path, title_id, title_name, is_hidden, switch_additional_content, created_at)
         VALUES (
           ?,
           NULL,
           NULL,
-          ?, ?, ?, ?, datetime('now')
+          ?, ?, ?, ?, ?, ?, datetime('now')
         )
         ON CONFLICT(rom_path) DO UPDATE SET
           title_id = COALESCE(EXCLUDED.title_id, title_id),
           title_name = COALESCE(EXCLUDED.title_name, title_name),
+          -- A Switch update/DLC is hidden only the first time it is
+          -- classified, so a user who unhides it keeps it visible.
+          is_hidden = CASE
+            WHEN user_roms.switch_additional_content IS NULL
+              AND EXCLUDED.switch_additional_content = 1 THEN 1
+            ELSE user_roms.is_hidden
+          END,
+          switch_additional_content = COALESCE(
+            EXCLUDED.switch_additional_content,
+            user_roms.switch_additional_content
+          ),
           updated_at = datetime('now')
       ''';
 
@@ -697,7 +713,7 @@ class SqliteDatabaseService {
         String? titleId;
         String? titleName;
 
-        // Switch metadata was read by filterSwitchContent, outside this
+        // Switch metadata was read by classifySwitchContent, outside this
         // transaction; nothing is read from the file here.
         final switchInfo = isSwitch ? entry.switchInfo : null;
         if (switchInfo != null) {
@@ -766,12 +782,15 @@ class SqliteDatabaseService {
           }
         }
 
+        final additionalContent = entry.switchAdditionalContent;
         batch.rawInsert(sql, [
           systemId,
           entry.filename,
           entry.path,
           titleId,
           titleName,
+          additionalContent == true ? 1 : 0,
+          additionalContent == null ? null : (additionalContent ? 1 : 0),
         ]);
       }
       await batch.commit(noResult: true);

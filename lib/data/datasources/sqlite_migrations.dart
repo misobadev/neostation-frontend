@@ -749,6 +749,9 @@ class SqliteMigrations {
       case 198:
         await _migrateToVersion198(db);
         break;
+      case 199:
+        await _migrateToVersion199(db);
+        break;
       default:
         _log.w('No migration defined for version $version');
     }
@@ -7953,6 +7956,31 @@ class SqliteMigrations {
     } catch (e, stackTrace) {
       _log.e('Error in migration v198: $e');
       _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v199: `user_roms.switch_additional_content`, which records
+  /// whether a Switch package is a standalone update or DLC. The scan hides
+  /// such rows once instead of deleting them, so a wrong guess can be undone
+  /// from the hidden games list, and the stored value saves re-reading the
+  /// file on every rescan. NULL means "not classified yet": existing rows are
+  /// classified by the next scan, so no backfill is needed.
+  static Future<void> _migrateToVersion199(Database db) async {
+    _log.i('Migration v199: Switch update/DLC classification');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_roms)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isNotEmpty &&
+          !columns.contains('switch_additional_content')) {
+        db.execute(
+          'ALTER TABLE user_roms ADD COLUMN switch_additional_content INTEGER',
+        );
+      }
+    } catch (e) {
+      _log.e('Migration v199 failed: $e');
       rethrow;
     }
   }

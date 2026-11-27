@@ -471,7 +471,7 @@ class SqliteService {
   SqliteService._internal();
 
   // Database configuration
-  static const int _databaseVersion = 198;
+  static const int _databaseVersion = 199;
 
   /// SQL predicate (over `user_roms` aliased `ur`) for an installed app the
   /// user marked as a game. See migration v191.
@@ -2098,6 +2098,9 @@ class SqliteService {
         -- Android apps only: 1 = the user marked it a game, listed under
         -- "Android Games" instead of the Android tab. See migration v191.
         is_android_game INTEGER DEFAULT 0,
+        -- Switch only: NULL = not classified yet, 0 = a game, 1 = a standalone
+        -- update or DLC (hidden once when first detected). See migration v199.
+        switch_additional_content INTEGER,
         id_ra INTEGER,
         ra_match_source TEXT,
         ra_hash_skipped TEXT,

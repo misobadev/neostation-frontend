@@ -236,7 +236,22 @@ void main() {
     });
   });
 
-  group('filterSwitchContent', () {
+  group('classifySwitchContent', () {
+    Future<Map<String, bool?>> classify(
+      List<RomEntry> entries, {
+      Set<String> classifiedPaths = const {},
+    }) async {
+      final result = await SqliteDatabaseService.classifySwitchContent(
+        entries,
+        classifiedPaths: classifiedPaths,
+      );
+      expect(result, hasLength(entries.length), reason: 'nothing is removed');
+      return {
+        for (final entry in result)
+          entry.filename: entry.switchAdditionalContent,
+      };
+    }
+
     test(
       'filename fallback handles compressed packages conservatively',
       () async {
@@ -250,17 +265,19 @@ void main() {
           'Cartridge [01007EF00011E800].xci',
           'Invalid [01007EF00011E8000].nsp',
         ];
-        final entries = names
-            .map(
-              (name) =>
-                  RomEntry(path: '${root.path}/missing/$name', filename: name),
-            )
-            .toList();
-        final kept = await SqliteDatabaseService.filterSwitchContent(entries);
-        expect(kept.map((entry) => entry.filename), [
-          names[0],
-          ...names.skip(3),
+        final result = await classify([
+          for (final name in names)
+            RomEntry(path: '${root.path}/missing/$name', filename: name),
         ]);
+        expect(result, {
+          names[0]: false,
+          names[1]: true,
+          names[2]: true,
+          names[3]: null,
+          names[4]: null,
+          names[5]: null,
+          names[6]: null,
+        });
       },
     );
 
@@ -271,78 +288,132 @@ void main() {
           'Game [01007EF00011E800].nsp',
           ticketNsp(['01007EF00011E000']),
         );
-        final kept = await SqliteDatabaseService.filterSwitchContent([
+        final result = await SqliteDatabaseService.classifySwitchContent([
           RomEntry(path: file.path, filename: 'Game [01007EF00011E800].nsp'),
         ]);
-        expect(kept, hasLength(1));
-        expect(kept.single.switchInfo?.titleId, '01007EF00011E000');
+        expect(result.single.switchAdditionalContent, isFalse);
+        expect(result.single.switchInfo?.titleId, '01007EF00011E000');
       },
     );
 
-    test('a stored base Title ID skips reading the file', () async {
-      // The file does not exist: a read would find nothing, and the filename
-      // alone would mark it as an update.
+    test('a cartridge image is always a game', () async {
+      final bytes = Uint8List(0x200);
+      bytes.setRange(0x100, 0x104, 'HEAD'.codeUnits);
+      final file = await writeRom('Cart.xci', bytes);
+      final result = await classify([
+        RomEntry(path: file.path, filename: 'Cart.xci'),
+      ]);
+      expect(result, {'Cart.xci': false});
+    });
+
+    test('an already classified file is not read again', () async {
+      // The filename alone would mark it as an update; a stored
+      // classification leaves it untouched.
       final entry = RomEntry(
         path: '${root.path}/missing/Game [01007EF00011E800].nsp',
         filename: 'Game [01007EF00011E800].nsp',
       );
-      final kept = await SqliteDatabaseService.filterSwitchContent(
+      final result = await SqliteDatabaseService.classifySwitchContent(
         [entry],
-        storedTitleIds: {entry.path: '01007EF00011E000'},
+        classifiedPaths: {entry.path},
       );
-      expect(kept, hasLength(1));
-      expect(kept.single.switchInfo, isNull);
+      expect(result.single, same(entry));
     });
-
-    test(
-      'a stored update ID is checked against the file before dropping it',
-      () async {
-        final file = await writeRom(
-          'Bundle.nsp',
-          ticketNsp(['01007EF00011E800', '01007EF00011E000']),
-        );
-        final kept = await SqliteDatabaseService.filterSwitchContent(
-          [RomEntry(path: file.path, filename: 'Bundle.nsp')],
-          storedTitleIds: {file.path: '01007EF00011E800'},
-        );
-        expect(kept.single.switchInfo?.titleId, '01007EF00011E000');
-      },
-    );
   });
 
-  test('scan keeps base games and removes previously indexed update and DLC rows', () async {
-    final titles = {
-      'Base.nsp': ['01007EF00011E000'],
-      'Patch.nsp': ['01007EF00011E800'],
-      'Extra.nsp': ['01007EF00011F001'],
-      'Bundle.nsp': ['0100AAAA00010800', '0100AAAA00010000'],
-    };
-    for (final entry in titles.entries) {
-      final file = await writeRom(entry.key, ticketNsp(entry.value));
-      await db.execute(
-        "INSERT INTO user_roms (app_system_id, filename, rom_path) VALUES (?, ?, ?)",
-        ['switch', entry.key, file.path],
-      );
+  group('scan', () {
+    Future<void> seed(Map<String, List<String>> titles) async {
+      for (final entry in titles.entries) {
+        final file = await writeRom(entry.key, ticketNsp(entry.value));
+        await db.execute(
+          'INSERT INTO user_roms (app_system_id, filename, rom_path, is_favorite, play_time) '
+          'VALUES (?, ?, ?, 1, 120)',
+          ['switch', entry.key, file.path],
+        );
+      }
     }
-    await SqliteDatabaseService.scanSystemRoms(system, [root.path]);
-    final rows = await db.rawQuery(
-      'SELECT filename, title_id, title_name FROM user_roms ORDER BY filename',
+
+    Future<List<Map<String, Object?>>> rows() => db.rawQuery(
+      'SELECT filename, title_id, title_name, is_hidden, '
+      'switch_additional_content, is_favorite, play_time '
+      'FROM user_roms ORDER BY filename',
     );
-    expect(rows, [
-      {
-        'filename': 'Base.nsp',
-        'title_id': '01007EF00011E000',
-        'title_name': 'Base',
+
+    test(
+      'hides indexed updates and DLC instead of deleting them, once',
+      () async {
+        await seed({
+          'Base.nsp': ['01007EF00011E000'],
+          'Bundle.nsp': ['0100AAAA00010800', '0100AAAA00010000'],
+          'Extra.nsp': ['01007EF00011F001'],
+          'Patch.nsp': ['01007EF00011E800'],
+        });
+        await SqliteDatabaseService.scanSystemRoms(system, [root.path]);
+        expect(await rows(), [
+          {
+            'filename': 'Base.nsp',
+            'title_id': '01007EF00011E000',
+            'title_name': 'Base',
+            'is_hidden': 0,
+            'switch_additional_content': 0,
+            'is_favorite': 1,
+            'play_time': 120,
+          },
+          {
+            'filename': 'Bundle.nsp',
+            'title_id': '0100AAAA00010000',
+            'title_name': 'Bundle',
+            'is_hidden': 0,
+            'switch_additional_content': 0,
+            'is_favorite': 1,
+            'play_time': 120,
+          },
+          {
+            'filename': 'Extra.nsp',
+            'title_id': '01007EF00011F001',
+            'title_name': 'Extra',
+            'is_hidden': 1,
+            'switch_additional_content': 1,
+            'is_favorite': 1,
+            'play_time': 120,
+          },
+          {
+            'filename': 'Patch.nsp',
+            'title_id': '01007EF00011E800',
+            'title_name': 'Patch',
+            'is_hidden': 1,
+            'switch_additional_content': 1,
+            'is_favorite': 1,
+            'play_time': 120,
+          },
+        ]);
+
+        // The user unhides the update: a rescan must not hide it again.
+        await db.execute(
+          "UPDATE user_roms SET is_hidden = 0 WHERE filename = 'Patch.nsp'",
+        );
+        await SqliteDatabaseService.scanSystemRoms(system, [root.path]);
+        final after = await rows();
+        expect(after.map((r) => r['is_hidden']), [0, 0, 1, 0]);
+        expect(after, hasLength(4));
       },
-      {
-        'filename': 'Bundle.nsp',
-        'title_id': '0100AAAA00010000',
-        'title_name': 'Bundle',
-      },
-    ]);
-    expect(await File('${root.path}/switch/Patch.nsp').exists(), isTrue);
-    expect(await File('${root.path}/switch/Extra.nsp').exists(), isTrue);
-    await SqliteDatabaseService.scanSystemRoms(system, [root.path]);
-    expect(await db.rawQuery('SELECT filename FROM user_roms'), hasLength(2));
+    );
+
+    test('a newly added update is hidden on its first scan', () async {
+      await writeRom('Base.nsp', ticketNsp(['01007EF00011E000']));
+      await writeRom('Patch.nsp', ticketNsp(['01007EF00011E800']));
+      await SqliteDatabaseService.scanSystemRoms(system, [root.path]);
+      final result = await rows();
+      expect(result.map((r) => r['filename']), ['Base.nsp', 'Patch.nsp']);
+      expect(result.map((r) => r['is_hidden']), [0, 1]);
+    });
+
+    test('an unidentified package stays visible and unclassified', () async {
+      await writeRom('Mystery.nsp', [1, 2, 3]);
+      await SqliteDatabaseService.scanSystemRoms(system, [root.path]);
+      final result = await rows();
+      expect(result.single['is_hidden'], 0);
+      expect(result.single['switch_additional_content'], isNull);
+    });
   });
 }
