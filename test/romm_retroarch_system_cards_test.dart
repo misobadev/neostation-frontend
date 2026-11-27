@@ -422,6 +422,27 @@ void main() {
         expect(stray.readAsStringSync(), 'OLD DOWNLOAD');
       });
 
+      // A card in RetroArch's system folder is counted as if in the saves
+      // folder's root: a copy in a saves subfolder must not hide it.
+      test('a card of the same kind in a saves subfolder is left out: only the '
+          'system folder\'s goes up', () async {
+        writeCard(systemCard(), 'SYSTEM CARD');
+        final stray = writeCard(
+          File(p.join(saves, 'old', cardName)),
+          'OLD DOWNLOAD',
+          at: now.add(const Duration(minutes: 1)),
+        );
+
+        await provider.syncGameSavesAfterClose(gameX);
+
+        expect(svc.uploads, ['1/$cardName']);
+        expect(
+          String.fromCharCodes(svc.serverBytes(1, cardName)!),
+          'SYSTEM CARD',
+        );
+        expect(stray.readAsStringSync(), 'OLD DOWNLOAD');
+      });
+
       test('a standalone emulator\'s card of the same name is left out of a '
           'RetroArch game\'s sync', () async {
         final folder = p.join(root.path, 'standalone');

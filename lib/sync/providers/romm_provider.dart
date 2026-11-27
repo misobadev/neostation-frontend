@@ -26,7 +26,9 @@ import 'package:neostation/models/game_model.dart';
 import 'package:neostation/models/neo_sync_models.dart';
 import 'package:neostation/models/romm_asset.dart';
 import 'package:neostation/models/romm_platform.dart';
+import 'package:neostation/models/retroarch_config_model.dart';
 import 'package:neostation/models/romm_rom.dart';
+import 'package:neostation/models/system_model.dart';
 import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/repositories/emulator_repository.dart';
 import 'package:neostation/repositories/neosync_save_folder_repository.dart';
@@ -87,6 +89,23 @@ typedef ListSaveFolders = Future<List<String>> Function(
 /// and no folder is configured for it.
 typedef ResolveStandaloneSaveFolder =
     Future<({bool standalone, String? folder})> Function(GameModel game);
+
+/// RetroArch's folder name for the core [game] launches with, or null when
+/// it launches with something else or that can't be told.
+typedef ResolveLaunchCoreFolder = Future<String?> Function(GameModel game);
+
+/// RetroArch's folder names for the cores of every system but [game]'s, in
+/// lower case (a core several systems share, [game]'s among them, is not one).
+typedef ResolveOtherSystemsCoreFolders = Future<Set<String>> Function(
+  GameModel game,
+);
+
+/// The emulator a game launches with, and the system's emulators.
+typedef _LaunchEmulator = ({
+  SystemModel system,
+  String uniqueId,
+  List<CoreEmulatorModel> emulators,
+});
 
 /// Outcome of the pre-upload check that protects a remote copy the local one is
 /// about to replace.
@@ -194,6 +213,11 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// from this device's own RetroArch configuration — see [_localSubfolder].
   static const String _assetLabel = 'neostation';
 
+  /// Tests: whether folder names differing only in case are one folder, in
+  /// place of the platform's answer.
+  @visibleForTesting
+  static bool? debugFoldersIgnoreCase;
+
   /// RomM `slot` sent with every save we create.
   ///
   /// A slot opts the save into RomM's `(rom_id, slot)` pairing, which is how
@@ -229,6 +253,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   final ListLocalGames? _listGamesOverride;
   final ListSaveFolders? _saveFoldersOverride;
   final ResolveStandaloneSaveFolder? _standaloneFolderOverride;
+  final ResolveLaunchCoreFolder? _launchCoreFolderOverride;
+  final ResolveOtherSystemsCoreFolders? _otherSystemsCoreFoldersOverride;
   final ResolveSystemCardHome? _systemCardHomeOverride;
   final ResolveSystemCardTarget? _systemCardTargetOverride;
 
@@ -247,6 +273,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     @visibleForTesting ListLocalGames? listGames,
     @visibleForTesting ListSaveFolders? saveFolders,
     @visibleForTesting ResolveStandaloneSaveFolder? standaloneSaveFolder,
+    @visibleForTesting ResolveLaunchCoreFolder? launchCoreFolder,
+    @visibleForTesting ResolveOtherSystemsCoreFolders? otherSystemsCoreFolders,
     @visibleForTesting ResolveSystemCardHome? systemCardHome,
     @visibleForTesting ResolveSystemCardTarget? systemCardTarget,
     @visibleForTesting this._autoSweep = true,
@@ -257,6 +285,8 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
        _listGamesOverride = listGames,
        _saveFoldersOverride = saveFolders,
        _standaloneFolderOverride = standaloneSaveFolder,
+       _launchCoreFolderOverride = launchCoreFolder,
+       _otherSystemsCoreFoldersOverride = otherSystemsCoreFolders,
        _systemCardHomeOverride = systemCardHome,
        _systemCardTargetOverride = systemCardTarget,
        _startupDelay = sweepStartupDelay {
@@ -291,16 +321,26 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   Future<List<LocalSaveFile>> _locateSaves(GameModel game) =>
       (_locateOverride ?? _neoSync.locateGameSaveFiles)(game);
 
-  /// Where [game]'s downloads go (see [_Placement]).
-  _Placement _placementFor(GameModel game) => _Placement(
-    folders: () async {
-      final system = game.systemFolderName;
-      return system == null || system.isEmpty
-          ? const <String>[]
-          : _saveFolders(system);
-    },
-    standalone: () => _standaloneSaveFolder(game),
-  );
+  /// Where [game]'s downloads go (see [_Placement]). The emulator the game
+  /// launches with is looked up once for both questions that need it.
+  _Placement _placementFor(GameModel game) {
+    Future<_LaunchEmulator?>? launch;
+    Future<_LaunchEmulator?> launchEmulator() =>
+        launch ??= _launchEmulator(game);
+    return _Placement(
+      folders: () async {
+        final system = game.systemFolderName;
+        return system == null || system.isEmpty
+            ? const <String>[]
+            : _saveFolders(system);
+      },
+      standalone: () => _standaloneSaveFolder(game, launchEmulator),
+      coreFolder: () => _launchCoreFolder(game, launchEmulator),
+      otherSystemsCores: () => _otherSystemsCoreFolders(game),
+      retroArchConfig: () => RetroArchConfigService().getMergedConfig(),
+      contentDir: RetroArchConfigService.contentDirName(game.romPath),
+    );
+  }
 
   /// [game]'s saves a sync of it looks at: the syncable ones found for it,
   /// with the memory cards that every game of its system shares narrowed to
@@ -319,7 +359,11 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     GameModel game,
     _Placement placement,
   ) async {
-    final saves = syncableSaves(game, await _locateSaves(game));
+    final saves = await _readByRetroArch(
+      game,
+      syncableSaves(game, await _locateSaves(game)),
+      placement,
+    );
     final system = game.systemFolderName;
     if (!sharesMemoryCards(system)) return saves;
     bool cardNamed(LocalSaveFile s) =>
@@ -356,6 +400,107 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     ];
   }
 
+  /// [saves] without the files in RetroArch's saves and states folders that
+  /// RetroArch doesn't read for [game]. They stay on disk as they are.
+  ///
+  /// Where RetroArch sorts saves into folders, two kinds of file sit beside
+  /// the ones it reads, with the same names (NEO-281):
+  /// - another game's save in another content folder, when it sorts by the
+  ///   folder the game is in. Paired by name, the server's copy of this
+  ///   game's save would be written over it.
+  /// - a copy in the folder's root, which an older version downloaded there
+  ///   before it knew of that sorting. Paired, it would compete with the real
+  ///   save for the same server copy.
+  ///
+  /// With RetroArch's settings read, they decide. Without them (Android), a
+  /// root copy is left out only when a namesake sits in one of this game's
+  /// own folders (see [_RetroArchLayout.reads]) and the copy is still exactly
+  /// what NeoStation wrote: a root save RetroArch has written since is the
+  /// one it uses, and keeps syncing.
+  Future<List<LocalSaveFile>> _readByRetroArch(
+    GameModel game,
+    List<LocalSaveFile> saves,
+    _Placement placement,
+  ) async {
+    final RetroArchConfig config;
+    try {
+      config = await RetroArchConfigService().getMergedConfig();
+    } catch (e) {
+      _log.w('RomM: could not read RetroArch settings: $e');
+      return saves;
+    }
+    final layout = await placement.retroArch(config);
+    final where = Map<LocalSaveFile, String?>.identity();
+    for (final s in saves) {
+      where[s] = layout.subfolderOf(s);
+    }
+    // Nothing in a subfolder: nothing to tell apart (the common case, and a
+    // highlight's status check runs this for every game).
+    if (where.values.every((sub) => sub == null || sub.isEmpty)) return saves;
+
+    bool isState(LocalSaveFile s) => s.relativePath.startsWith('states/');
+    Future<bool> rootCopyLeftOut(LocalSaveFile copy) async {
+      final name = path.basename(copy.filePath);
+      final namesakes = <LocalSaveFile>[];
+      for (final other in saves) {
+        final sub = where[other];
+        if (identical(other, copy) || sub == null || sub.isEmpty) continue;
+        if (isState(other) != isState(copy)) continue;
+        if (path.basename(other.filePath) != name) continue;
+        if (await layout.reads(sub, isState(copy))) namesakes.add(other);
+      }
+      if (namesakes.isEmpty) return false;
+      // With the settings read, RetroArch reads one place: the namesake's.
+      if (config.settingsRead) return true;
+      // Without them, the root copy is a leftover only while RetroArch has
+      // written the namesake since and the copy is as last synced: a root
+      // save RetroArch uses is the newer one.
+      final copyMs = copy.lastModified.millisecondsSinceEpoch;
+      return namesakes.any(
+            (n) =>
+                n.lastModified.millisecondsSinceEpoch >
+                copyMs + _mtimeToleranceMs,
+          ) &&
+          await _unchangedSinceLastSync(copy.filePath);
+    }
+
+    final kept = <LocalSaveFile>[];
+    for (final s in saves) {
+      final sub = where[s];
+      final bool notThisGames, leftOver;
+      try {
+        notThisGames =
+            sub != null && await layout.anotherGames(sub, isState(s));
+        leftOver =
+            !notThisGames &&
+            sub != null &&
+            sub.isEmpty &&
+            await rootCopyLeftOut(s);
+      } catch (e) {
+        // Where RetroArch reads can't be told: kept, as before.
+        _log.w('RomM ${game.romname}: could not place ${s.filePath}: $e');
+        kept.add(s);
+        continue;
+      }
+      if (notThisGames) {
+        _log.d(
+          'RomM ${game.romname}: ${s.filePath} left out (another game\'s '
+          'folder)',
+        );
+        continue;
+      }
+      if (leftOver) {
+        _log.d(
+          'RomM ${game.romname}: ${s.filePath} left out (RetroArch reads the '
+          'copy in a subfolder)',
+        );
+        continue;
+      }
+      kept.add(s);
+    }
+    return kept;
+  }
+
   Future<String?> _systemCardHome(String? system) =>
       (_systemCardHomeOverride ?? _neoSync.retroArchSystemCardHome)(system);
 
@@ -380,30 +525,97 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     return folders.values.toList();
   }
 
-  Future<({bool standalone, String? folder})> _standaloneSaveFolder(
-    GameModel game,
-  ) async {
-    final override = _standaloneFolderOverride;
-    if (override != null) return override(game);
-    const notStandalone = (standalone: false, folder: null);
+  /// The emulator [game] launches with, so a save lands where the emulator
+  /// that will open it reads it. Null when that can't be told.
+  Future<_LaunchEmulator?> _launchEmulator(GameModel game) async {
     final folderName = game.systemFolderName;
-    if (folderName == null || folderName.isEmpty) return notStandalone;
+    if (folderName == null || folderName.isEmpty) return null;
     final system = await SystemRepository.getSystemByFolderName(folderName);
-    if (system == null) return notStandalone;
-    // The emulator the game launches with, so the save lands where the
-    // emulator that will open it reads it.
+    if (system == null) return null;
     final uniqueId = await GameLaunchService.resolveLaunchEmulatorId(
       system,
       game,
     );
-    if (uniqueId == null) return notStandalone;
-    return standaloneSaveFolderFor(
+    if (uniqueId == null) return null;
+    return (
+      system: system,
       uniqueId: uniqueId,
       emulators: await loadEmulatorsForSystem(system),
+    );
+  }
+
+  Future<({bool standalone, String? folder})> _standaloneSaveFolder(
+    GameModel game,
+    Future<_LaunchEmulator?> Function() launchEmulator,
+  ) async {
+    final override = _standaloneFolderOverride;
+    if (override != null) return override(game);
+    final launch = await launchEmulator();
+    if (launch == null) return (standalone: false, folder: null);
+    return standaloneSaveFolderFor(
+      uniqueId: launch.uniqueId,
+      emulators: launch.emulators,
       folders: await NeoSyncSaveFolderRepository.getFoldersForSystem(
-        system.folderName,
+        launch.system.folderName,
       ),
     );
+  }
+
+  /// RetroArch's folder name for the core [game] launches with (NEO-279),
+  /// or null when it launches with a standalone emulator or that can't be
+  /// told.
+  Future<String?> _launchCoreFolder(
+    GameModel game,
+    Future<_LaunchEmulator?> Function() launchEmulator,
+  ) async {
+    final override = _launchCoreFolderOverride;
+    if (override != null) return override(game);
+    final launch = await launchEmulator();
+    if (launch == null) return null;
+    return launchCoreFolderFor(
+      uniqueId: launch.uniqueId,
+      emulators: launch.emulators,
+    );
+  }
+
+  /// RetroArch's folder name for the emulator [uniqueId] among [emulators]:
+  /// its core's name, or null when it isn't a RetroArch core or isn't listed.
+  @visibleForTesting
+  static String? launchCoreFolderFor({
+    required String uniqueId,
+    required List<CoreEmulatorModel> emulators,
+  }) => RetroArchConfigService.coreFolderName(
+    emulators.where((e) => e.uniqueId == uniqueId).firstOrNull?.name,
+  );
+
+  Future<Set<String>> _otherSystemsCoreFolders(GameModel game) async {
+    final override = _otherSystemsCoreFoldersOverride;
+    if (override != null) return override(game);
+    final folderName = game.systemFolderName;
+    if (folderName == null || folderName.isEmpty) return const {};
+    final system = await SystemRepository.getSystemByFolderName(folderName);
+    if (system?.id == null) return const {};
+    return otherSystemsCoreFoldersFor(
+      systemId: system!.id!,
+      emulators: await EmulatorRepository.getEmulatorNamesCurrentOs(),
+    );
+  }
+
+  /// RetroArch's folder names for the cores of every system but [systemId]
+  /// among [emulators], leaving out any core [systemId] has too. In lower
+  /// case: systems spell one core differently (`Picodrive`, `PicoDrive`).
+  @visibleForTesting
+  static Set<String> otherSystemsCoreFoldersFor({
+    required String systemId,
+    required List<({String systemId, String name})> emulators,
+  }) {
+    final mine = <String>{}, others = <String>{};
+    for (final e in emulators) {
+      final folder = RetroArchConfigService.coreFolderName(e.name);
+      if (folder == null) continue;
+      (e.systemId == systemId ? mine : others).add(folder.toLowerCase());
+    }
+    return others.difference(mine);
   }
 
   /// Whether the emulator [uniqueId] is standalone, and the save folder
@@ -496,6 +708,20 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       // Empty when something is already in its place: nothing is written.
       final target = await _systemCardTarget(system, localName);
       if (target != null) return target;
+    }
+    // The save this device has, where it is one RetroArch reads for this
+    // game (NEO-281): exactly the file, even when the settings can't say
+    // which subfolder RetroArch uses.
+    if (paired != null) {
+      try {
+        final layout = await placement.retroArch();
+        final sub = layout.subfolderOf(paired);
+        if (sub != null && await layout.reads(sub, asset.isState)) {
+          return [paired.filePath];
+        }
+      } catch (e) {
+        _log.w('RomM download: could not tell where RetroArch reads: $e');
+      }
     }
     return _resolveTargets(game, relativeName);
   }
@@ -1400,14 +1626,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     return remote.where(kept.contains).toList();
   }
 
-  String _subfolderOf(LocalSaveFile local) {
-    final parts = local.relativePath.split('/');
-    if (parts.length <= 2) return '';
-    return parts.sublist(1, parts.length - 1).join('/');
-  }
-
   /// The subfolder a downloaded file belongs in under *this* device's RetroArch
-  /// save/state directory — its per-core folder, or `''` for the directory root.
+  /// save/state directory, or `''` for the directory root. A file this device
+  /// already has where RetroArch reads it is written there instead (see
+  /// [_downloadTargets]).
   ///
   /// Placement is a local question and is answered locally. The alternative,
   /// replaying a subfolder recorded on the server, breaks the moment two
@@ -1416,47 +1638,119 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// with it off wants the root — and whichever uploaded first would dictate a
   /// path the other's emulator never reads.
   ///
-  /// The RetroArch setting decides *whether* there is a subfolder; the core
-  /// name is taken from an existing local file of the same kind when one is
-  /// present (ground truth, and immune to core renames) and derived from the
-  /// emulator's name otherwise.
+  /// RetroArch's settings decide the shape (see
+  /// [RetroArchConfigService.saveSubfolder]): the name of the folder the game
+  /// is in when it sorts by content folder (NEO-281), then the core's when it
+  /// sorts by core. The core's name is taken from where this game's other
+  /// files of the same kind already are, when they are in that shape (ground
+  /// truth, and immune to core renames), and from the emulator the game
+  /// launches with otherwise (NEO-279). With the settings unread, the launch
+  /// core's folder is used where RetroArch has already made one (see
+  /// [_coreFolderInUse]).
   Future<String> _localSubfolder(
     GameModel game,
     bool isState,
     List<LocalSaveFile> localFiles,
+    _Placement placement,
   ) async {
     try {
-      final cfg = await RetroArchConfigService().getMergedConfig();
-      final sorts = isState
+      final layout = await placement.retroArch();
+      final cfg = layout.config;
+      if (!cfg.settingsRead) {
+        return await _coreFolderInUse(layout, isState, placement);
+      }
+      final byCore = isState
           ? cfg.sortSavestatesByCore
           : cfg.sortSavefilesByCore;
-      if (!sorts) return '';
+      final byContent = isState
+          ? cfg.sortSavestatesByContent
+          : cfg.sortSavefilesByContent;
+      if (!byCore && !byContent) return '';
 
-      final prefix = isState ? 'states/' : 'saves/';
-      for (final f in localFiles) {
-        if (!f.relativePath.startsWith(prefix) || f.inRetroArchSystemFolder) {
-          continue;
-        }
-        final sub = _subfolderOf(f);
-        if (sub.isNotEmpty) return sub;
+      final contentDir = byContent ? layout.contentDir : null;
+      if (!byCore) {
+        return RetroArchConfigService.saveSubfolder(contentDir: contentDir);
       }
 
-      final folder = game.systemFolderName;
-      if (folder == null || folder.isEmpty) return '';
-      final system = await SystemRepository.getSystemByFolderName(folder);
-      if (system?.id == null) return '';
-      final emulator =
-          await EmulatorRepository.getUserDefaultEmulatorForSystem(
-            system!.id!,
-          ) ??
-          await EmulatorRepository.getDefaultEmulatorForSystem(system.id!);
-      return RetroArchConfigService.coreFolderName(emulator?.name) ?? '';
+      String? core;
+      for (final f in localFiles) {
+        if (f.relativePath.startsWith('states/') != isState) continue;
+        final sub = layout.subfolderOf(f);
+        if (sub == null || sub.isEmpty) continue;
+        if (!await layout.reads(sub, isState)) continue;
+        core = sub.split('/').last;
+        break;
+      }
+      core ??= await placement.coreFolder();
+      return RetroArchConfigService.saveSubfolder(
+        contentDir: contentDir,
+        core: core,
+      );
     } catch (e) {
       // Placement is a best-effort refinement; the directory root is always a
       // valid destination and must never be the reason a sync fails.
       _log.w('RomM: could not resolve local save subfolder: $e');
       return '';
     }
+  }
+
+  /// Where RetroArch seems to sort this game's saves (or states) by core,
+  /// when its settings couldn't be read (Android, usually): the folder named
+  /// after the core the game launches with, if RetroArch's folder already has
+  /// one with something in it, inside the game's content folder first. `''`
+  /// when it has none.
+  ///
+  /// RetroArch makes that folder when it sorts by core, so one in use is the
+  /// best sign there is without the setting. It is not proof: a folder left
+  /// from when sorting was on reads the same. An empty one is not counted, nor
+  /// is a content folder alone: its name is the user's own, and may be there
+  /// for any reason. The name is returned as it is on disk, which can differ
+  /// in case from the emulator's name where the file system ignores case.
+  Future<String> _coreFolderInUse(
+    _RetroArchLayout layout,
+    bool isState,
+    _Placement placement,
+  ) async {
+    final cfg = layout.config;
+    final dir = isState ? cfg.savestateDirectory : cfg.savefileDirectory;
+    if (dir == null || dir.isEmpty) return '';
+    final core = await placement.coreFolder();
+    if (core == null || !isSafeFileName(core)) return '';
+    final content = layout.contentDir;
+    if (content != null) {
+      final contentOnDisk = await _childFolderNamed(dir, content);
+      if (contentOnDisk != null) {
+        final coreOnDisk = await _childFolderNamed(
+          path.join(dir, contentOnDisk),
+          core,
+          inUse: true,
+        );
+        if (coreOnDisk != null) return '$contentOnDisk/$coreOnDisk';
+      }
+    }
+    return await _childFolderNamed(dir, core, inUse: true) ?? '';
+  }
+
+  /// The name, as it is on disk, of the folder called [name] directly inside
+  /// [parent], or null when there is none. With [inUse], an empty folder
+  /// doesn't count.
+  static Future<String?> _childFolderNamed(
+    String parent,
+    String name, {
+    bool inUse = false,
+  }) async {
+    try {
+      await for (final entity in Directory(parent).list(followLinks: false)) {
+        if (entity is! Directory) continue;
+        final onDisk = path.basename(entity.path);
+        if (!_RetroArchLayout.sameName(onDisk, name)) continue;
+        if (inUse && await entity.list().isEmpty) continue;
+        return onDisk;
+      }
+    } on FileSystemException {
+      // Not there, or not readable: no sign either way.
+    }
+    return null;
   }
 
   /// A `403` that reaches the provider is a *persistent* permission denial: the
@@ -1955,7 +2249,12 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       // datetime tag is server-side versioning, and a file written under it is
       // one the emulator will never load.
       final prefix = asset.isState ? 'states' : 'saves';
-      final sub = await _localSubfolder(game, asset.isState, localFiles);
+      final sub = await _localSubfolder(
+        game,
+        asset.isState,
+        localFiles,
+        placement,
+      );
       final localName = localNameForAsset(asset);
       final relativeName = sub.isNotEmpty
           ? '$prefix/$sub/$localName'
@@ -3023,14 +3322,30 @@ class _Placement {
   _Placement({
     required Future<List<String>> Function() folders,
     required Future<({bool standalone, String? folder})> Function() standalone,
+    required Future<String?> Function() coreFolder,
+    required Future<Set<String>> Function() otherSystemsCores,
+    required Future<RetroArchConfig> Function() retroArchConfig,
+    required this.contentDir,
   }) : _foldersLookup = folders,
-       _standaloneLookup = standalone;
+       _standaloneLookup = standalone,
+       _coreFolderLookup = coreFolder,
+       _otherSystemsCoresLookup = otherSystemsCores,
+       _retroArchConfigLookup = retroArchConfig;
 
   final Future<List<String>> Function() _foldersLookup;
   final Future<({bool standalone, String? folder})> Function()
   _standaloneLookup;
   Future<List<String>>? _folders;
   Future<({bool standalone, String? folder})>? _standalone;
+  final Future<String?> Function() _coreFolderLookup;
+  Future<String?>? _coreFolder;
+  final Future<Set<String>> Function() _otherSystemsCoresLookup;
+  Future<Set<String>>? _otherSystemsCores;
+  final Future<RetroArchConfig> Function() _retroArchConfigLookup;
+  Future<_RetroArchLayout>? _retroArch;
+
+  /// The name RetroArch gives the game's content folder, if any.
+  final String? contentDir;
 
   /// The game's system's configured standalone save folders.
   Future<List<String>> folders() => _folders ??= _foldersLookup();
@@ -3043,4 +3358,135 @@ class _Placement {
   /// Whether the game launches with a standalone emulator, and its folder.
   Future<({bool standalone, String? folder})> standalone() =>
       _standalone ??= _standaloneLookup();
+
+  /// RetroArch's folder name for the core the game launches with, if any.
+  Future<String?> coreFolder() => _coreFolder ??= _coreFolderLookup();
+
+  /// RetroArch's folder names for other systems' cores (not the game's).
+  Future<Set<String>> otherSystemsCores() =>
+      _otherSystemsCores ??= _otherSystemsCoresLookup();
+
+  /// RetroArch's folders as the game sees them, from [config] when the
+  /// caller already has it.
+  Future<_RetroArchLayout> retroArch([
+    RetroArchConfig? config,
+  ]) => _retroArch ??=
+      (config != null ? Future.value(config) : _retroArchConfigLookup()).then(
+        (c) => _RetroArchLayout(c, contentDir, coreFolder, otherSystemsCores),
+      );
+}
+
+/// RetroArch's saves and states folders as a sync of one game sees them.
+class _RetroArchLayout {
+  _RetroArchLayout(
+    this.config,
+    this.contentDir,
+    this._launchCore,
+    this._otherSystemsCores,
+  );
+
+  final RetroArchConfig config;
+
+  /// The name RetroArch gives the game's content folder, if it has one (see
+  /// [RetroArchConfigService.contentDirName]).
+  final String? contentDir;
+
+  /// RetroArch's folder name for the core the game launches with.
+  final Future<String?> Function() _launchCore;
+
+  /// RetroArch's folder names for other systems' cores, in lower case (see
+  /// [RomMSyncProvider.otherSystemsCoreFoldersFor]).
+  final Future<Set<String>> Function() _otherSystemsCores;
+
+  /// Whether folder names are the same regardless of case, as they are on
+  /// the file systems Windows and macOS use and on Android's shared storage.
+  static bool get _caseInsensitive =>
+      RomMSyncProvider.debugFoldersIgnoreCase ??
+      (Platform.isWindows || Platform.isMacOS || Platform.isAndroid);
+
+  static bool sameName(String a, String b) =>
+      _caseInsensitive ? a.toLowerCase() == b.toLowerCase() : a == b;
+
+  Future<bool> _anotherSystemsCore(String folder) async =>
+      (await _otherSystemsCores()).contains(folder.toLowerCase());
+
+  bool _byCore(bool isState) =>
+      isState ? config.sortSavestatesByCore : config.sortSavefilesByCore;
+
+  bool _byContent(bool isState) =>
+      isState ? config.sortSavestatesByContent : config.sortSavefilesByContent;
+
+  /// Where [file] sits in RetroArch's saves or states folder, whichever is
+  /// its kind: the subfolder, `''` for the folder itself, or null when it is
+  /// somewhere else (RetroArch's system folder, a standalone emulator's
+  /// folder, any other). Told from the file's own path: a file found outside
+  /// the folder a [LocalSaveFile.relativePath] is counted from is given a
+  /// `saves/<name>` one, the same as a file in the folder's root.
+  String? subfolderOf(LocalSaveFile file) {
+    if (file.inRetroArchSystemFolder || file.customFolderEmulator != null) {
+      return null;
+    }
+    final dir = file.relativePath.startsWith('states/')
+        ? config.savestateDirectory
+        : config.savefileDirectory;
+    if (dir == null || dir.isEmpty) return null;
+    final root = path.normalize(path.absolute(dir));
+    final parent = path.normalize(path.absolute(path.dirname(file.filePath)));
+    if (path.equals(root, parent)) return '';
+    if (!path.isWithin(root, parent)) return null;
+    return path.split(path.relative(parent, from: root)).join('/');
+  }
+
+  /// Whether RetroArch reads this game's saves (or states, [isState]) from
+  /// [subfolder] of its folder.
+  ///
+  /// With its settings read, that is the one subfolder they make (see
+  /// [RetroArchConfigService.saveSubfolder]), whatever the core's name. Without
+  /// them, any this game's files can be in under one of RetroArch's sortings:
+  /// the folder itself, its content folder, the folder of the core it
+  /// launches with, or that core's folder inside its content folder.
+  Future<bool> reads(String subfolder, bool isState) async {
+    final parts = subfolder.isEmpty ? const <String>[] : subfolder.split('/');
+    if (config.settingsRead) {
+      final content = _byContent(isState) ? contentDir : null;
+      final depth = (content == null ? 0 : 1) + (_byCore(isState) ? 1 : 0);
+      if (parts.length != depth) return false;
+      if (content != null && !sameName(parts.first, content)) return false;
+      return !_byCore(isState) || !await _anotherSystemsCore(parts.last);
+    }
+    final content = contentDir;
+    if (parts.isEmpty) return true;
+    if (parts.length == 1 &&
+        content != null &&
+        sameName(parts.first, content)) {
+      return true;
+    }
+    if (parts.length > 2) return false;
+    final core = await _launchCore();
+    if (core == null || core.isEmpty) return false;
+    return parts.length == 1
+        ? sameName(parts.first, core)
+        : content != null &&
+              sameName(parts.first, content) &&
+              sameName(parts.last, core);
+  }
+
+  /// Whether [subfolder] holds another game's files, with RetroArch's
+  /// settings read: it is under another content folder when RetroArch sorts
+  /// this kind by the folder the game is in, or another system's core folder
+  /// when it sorts by core.
+  Future<bool> anotherGames(String subfolder, bool isState) async {
+    if (!config.settingsRead || subfolder.isEmpty) return false;
+    final parts = subfolder.split('/');
+    final content = contentDir;
+    if (_byContent(isState) &&
+        content != null &&
+        !sameName(parts.first, content)) {
+      return true;
+    }
+    if (!_byCore(isState)) return false;
+    final coreAt = _byContent(isState) && content != null ? 1 : 0;
+    return parts.length == coreAt + 1 &&
+        await _anotherSystemsCore(parts[coreAt]);
+  }
 }
