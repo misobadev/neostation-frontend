@@ -182,5 +182,140 @@ sort_savestates_enable = "true"
       expect(cfg.sortSavefilesByCore, isFalse);
       expect(cfg.sortSavestatesByCore, isTrue);
     });
+
+    // NEO-281: RetroArch can also sort by the folder the content is in, on its
+    // own or together with the core.
+    test('reads content-directory sorting for saves and states', () async {
+      final f = await writeCfg('''
+sort_savefiles_enable = "false"
+sort_savefiles_by_content_enable = "true"
+sort_savestates_enable = "true"
+sort_savestates_by_content_enable = "false"
+''');
+
+      final cfg = await RetroArchConfigService().parseConfig(f.path);
+
+      expect(cfg.sortSavefilesByCore, isFalse);
+      expect(cfg.sortSavefilesByContent, isTrue);
+      // Read from the file, so the settings can be followed (NEO-281).
+      expect(cfg.settingsRead, isTrue);
+      expect(cfg.sortSavestatesByCore, isTrue);
+      expect(cfg.sortSavestatesByContent, isFalse);
+    });
+
+    test('content-directory sorting defaults to off', () async {
+      final f = await writeCfg('sort_savefiles_enable = "true"\n');
+
+      final cfg = await RetroArchConfigService().parseConfig(f.path);
+
+      expect(cfg.sortSavefilesByContent, isFalse);
+      expect(cfg.sortSavestatesByContent, isFalse);
+    });
+
+    test('a setting is read only from its own key', () async {
+      // Each key is a prefix-free match: a longer key that starts with a
+      // shorter one's name must not set it.
+      final f = await writeCfg('''
+sort_savefiles_enable_extra = "true"
+sort_savestates_by_content_enable_extra = "true"
+''');
+
+      final cfg = await RetroArchConfigService().parseConfig(f.path);
+
+      expect(cfg.sortSavefilesByCore, isFalse);
+      expect(cfg.sortSavestatesByContent, isFalse);
+    });
+  });
+
+  // NEO-281: where RetroArch keeps a game's saves when it sorts them, as
+  // `path_set_redirect` (runloop.c) builds it: the content folder's name, then
+  // the core's.
+  group('saveSubfolder', () {
+    test('content folder only', () {
+      expect(
+        RetroArchConfigService.saveSubfolder(contentDir: 'snes', core: null),
+        'snes',
+      );
+    });
+
+    test('core only', () {
+      expect(
+        RetroArchConfigService.saveSubfolder(contentDir: null, core: 'Snes9x'),
+        'Snes9x',
+      );
+    });
+
+    test('both: the content folder, then the core', () {
+      expect(
+        RetroArchConfigService.saveSubfolder(
+          contentDir: 'snes',
+          core: 'Snes9x',
+        ),
+        'snes/Snes9x',
+      );
+    });
+
+    test('neither: the folder itself', () {
+      expect(
+        RetroArchConfigService.saveSubfolder(contentDir: null, core: null),
+        '',
+      );
+      expect(
+        RetroArchConfigService.saveSubfolder(contentDir: '', core: ''),
+        '',
+      );
+    });
+  });
+
+  group('contentDirName', () {
+    String? name(String? romPath) =>
+        RetroArchConfigService.contentDirName(romPath);
+
+    test('the name of the folder the ROM is in', () {
+      expect(name('/home/deck/Emulation/roms/snes/EarthBound.sfc'), 'snes');
+      expect(name('/roms/snes/RPGs/EarthBound.sfc'), 'RPGs');
+    });
+
+    test('Windows paths', () {
+      expect(name(r'D:\Games\roms\snes\EarthBound.sfc'), 'snes');
+    });
+
+    test('an Android content URI, primary storage and SD card', () {
+      expect(
+        name(
+          'content://com.android.externalstorage.documents/tree/'
+          'primary%3Aemu/document/primary%3Aemu%2Froms%2Fnes%2FZelda.nes',
+        ),
+        'nes',
+      );
+      expect(
+        name(
+          'content://com.android.externalstorage.documents/tree/'
+          '3734-3464%3Aroms/document/3734-3464%3Aroms%2Fsnes%2FGame.sfc',
+        ),
+        'snes',
+      );
+    });
+
+    test('an encoded name is decoded', () {
+      expect(
+        name(
+          'content://com.android.externalstorage.documents/tree/'
+          'primary%3Aroms/document/primary%3Aroms%2FSuper%20Nintendo%2FG.sfc',
+        ),
+        'Super Nintendo',
+      );
+    });
+
+    test('none for a ROM with no folder name, or one that isn\'t a plain '
+        'folder name', () {
+      expect(name(null), isNull);
+      expect(name(''), isNull);
+      expect(name('Game.sfc'), isNull);
+      expect(name('/Game.sfc'), isNull);
+      expect(name('C:/Game.sfc'), isNull);
+      expect(name('/roms/../Game.sfc'), isNull);
+      expect(name('/roms/./Game.sfc'), isNull);
+    });
   });
 }

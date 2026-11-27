@@ -527,6 +527,100 @@ void main() {
     );
   });
 
+  // NEO-279: a save this device lacks goes in the folder of the core the
+  // game launches with.
+  group('launchCoreFolderFor', () {
+    CoreEmulatorModel emu(String id, String name) => CoreEmulatorModel(
+      uniqueId: id,
+      osId: 1,
+      systemId: 'snes',
+      name: name,
+      isStandalone: false,
+      isDefault: false,
+      isretroAchievementsCompatible: false,
+    );
+    final emulators = [
+      emu('snes.ra.snes9x', 'RetroArch Snes9x'),
+      emu('snes.ra64.bsnes', 'RetroArch64 bsnes (64-bit)'),
+      emu('snes.xyz.standalone', 'Standalone SNES'),
+    ];
+
+    test('the core of the emulator the game launches with', () {
+      expect(
+        RomMSyncProvider.launchCoreFolderFor(
+          uniqueId: 'snes.ra64.bsnes',
+          emulators: emulators,
+        ),
+        'bsnes',
+      );
+      expect(
+        RomMSyncProvider.launchCoreFolderFor(
+          uniqueId: 'snes.ra.snes9x',
+          emulators: emulators,
+        ),
+        'Snes9x',
+      );
+    });
+
+    test('none for a standalone emulator or one not listed', () {
+      for (final id in ['snes.xyz.standalone', 'snes.ra.missing']) {
+        expect(
+          RomMSyncProvider.launchCoreFolderFor(
+            uniqueId: id,
+            emulators: emulators,
+          ),
+          isNull,
+          reason: id,
+        );
+      }
+    });
+  });
+
+  group('otherSystemsCoreFoldersFor', () {
+    test('other systems\' RetroArch cores, not this one\'s, nor a core both '
+        'have', () {
+      expect(
+        RomMSyncProvider.otherSystemsCoreFoldersFor(
+          systemId: 'gg',
+          emulators: [
+            (systemId: 'gg', name: 'RetroArch Genesis Plus GX'),
+            (systemId: 'sms', name: 'RetroArch Genesis Plus GX'),
+            (systemId: 'gb', name: 'RetroArch64 Gambatte (64-bit)'),
+            (systemId: 'gb', name: 'Standalone GB'),
+            (systemId: 'nes', name: 'RetroArch FCEUmm'),
+          ],
+        ),
+        {'gambatte', 'fceumm'},
+      );
+    });
+
+    // The systems' files spell some cores differently; one spelling is one
+    // core.
+    test('a core this system has under another spelling is not another '
+        'system\'s', () {
+      final emulators = [
+        (systemId: 'pico', name: 'RetroArch Picodrive'),
+        (systemId: 'md', name: 'RetroArch PicoDrive'),
+        (systemId: 'gb', name: 'RetroArch Bsnes'),
+        (systemId: 'snes', name: 'RetroArch bsnes'),
+      ];
+      expect(
+        RomMSyncProvider.otherSystemsCoreFoldersFor(
+          systemId: 'pico',
+          emulators: emulators,
+        ),
+        {'bsnes'},
+      );
+      expect(
+        RomMSyncProvider.otherSystemsCoreFoldersFor(
+          systemId: 'snes',
+          emulators: emulators,
+        ),
+        {'picodrive'},
+      );
+    });
+  });
+
   group('standaloneSaveFolderFor', () {
     CoreEmulatorModel emu(String id, {required bool standalone}) =>
         CoreEmulatorModel(

@@ -5945,6 +5945,28 @@ class SqliteService {
     );
   }
 
+  /// Every emulator's display name on the current OS, with its system id.
+  static Future<List<({String systemId, String name})>>
+  getEmulatorNamesCurrentOs() async {
+    final db = await instance.database;
+    final results = await db.rawQuery(
+      '''
+      SELECT e.system_id, e.name
+      FROM app_emulators e
+      JOIN app_os os ON e.os_id = os.id
+      WHERE os.name = ?
+      ''',
+      [getCurrentOs()],
+    );
+    return [
+      for (final row in results)
+        (
+          systemId: row['system_id']?.toString() ?? '',
+          name: row['name']?.toString() ?? '',
+        ),
+    ];
+  }
+
   /// Retrieves all emulators available for a system on the current operating system.
   ///
   /// The returned models carry `isInstalled = false`: a database row cannot say
