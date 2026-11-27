@@ -205,17 +205,22 @@ class NeoAssetsScrapeClient {
 
   /// Looks a ROM up by hash first, falling back to its [name].
   ///
+  /// An installed Android app is looked up by its [package] instead, which the
+  /// server matches exactly before falling back to [name] (the app's label).
+  ///
   /// Returns null when NeoAssets has no match (the API answers 200 with a null
   /// game rather than 404). Counts as one of today's lookups.
   static Future<NeoAssetsGame?> lookupGame({
     required NeoAssetsSystemSelector selector,
     required String? apiKey,
     String? name,
+    String? package,
     String? crc,
     String? md5,
   }) async {
     final query = <String, String>{
       selector.param: selector.value,
+      if (package != null && package.isNotEmpty) 'package': package,
       if (crc != null && crc.isNotEmpty) 'crc': crc,
       if (md5 != null && md5.isNotEmpty) 'md5': md5,
       if (name != null && name.isNotEmpty) 'name': name,
