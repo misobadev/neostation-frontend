@@ -11,11 +11,12 @@ import 'package:neostation/services/sfx_service.dart';
 import '../../../../models/system_model.dart';
 import '../../../../models/game_model.dart';
 import '../../../../providers/file_provider.dart';
-import '../../../../services/screenscraper_service.dart';
 import '../../../../themes/corner_radii.dart';
 import '../../../../utils/game_utils.dart';
 import '../widgets/panel_gate_highlight.dart';
 import '../widgets/scrolling_status_line.dart';
+
+import 'package:neostation/services/metadata_provider_service.dart';
 
 class GameDetailsGameInfoTab extends StatefulWidget {
   final SystemModel system;
@@ -51,17 +52,11 @@ class GameDetailsGameInfoTab extends StatefulWidget {
 class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
   /// App language code -> the key the scraper files that language under.
   ///
-  /// Only the two that actually differ are listed. ScreenScraper writes
-  /// Japanese as `jp` where the app calls it `ja`, and it has one Chinese
-  /// bucket where the app offers simplified and traditional separately, so
-  /// both app variants read the same text. Every other app language is its own
-  /// key, and `id` has no bucket at all — it falls through to English like any
-  /// other language a game was not scraped in.
-  static const Map<String, String> _descriptionKeys = {
-    'ja': 'jp',
-    'zh': 'zh',
-    'zh_Hant': 'zh',
-  };
+  /// Only Traditional Chinese differs: there is one Chinese description
+  /// (NeoAssets translates into Simplified), which both app variants read.
+  /// Every other app language is its own key; a language a game has no
+  /// description in falls back through the model's hierarchy.
+  static const Map<String, String> _descriptionKeys = {'zh_Hant': 'zh'};
 
   /// Drives the description pane: the D-pad scrolls it while the panel is
   /// active, and a finger can drag it at any time.
@@ -463,7 +458,7 @@ class GameDetailsGameInfoTabState extends State<GameDetailsGameInfoTab> {
             ),
             SizedBox(height: 32.r),
             FutureBuilder<bool>(
-              future: ScreenScraperService.hasSavedCredentials(),
+              future: MetadataProviderService.hasActiveSession(),
               builder: (context, snapshot) {
                 if (widget.system.folderName == 'android-apps') {
                   return Text(

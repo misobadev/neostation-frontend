@@ -117,6 +117,10 @@ class DatabaseGameModel {
   /// Box2D image aspect ratio (width/height) for grid display.
   final String? box2dAspectRatio;
 
+  /// The NeoAssets link the game's video streams from, when it was scraped
+  /// with "Streaming video" (or kept alongside a downloaded file).
+  final String? videoUrl;
+
   DatabaseGameModel({
     this.appSystemId,
     required this.filename,
@@ -151,6 +155,7 @@ class DatabaseGameModel {
     this.titleName,
     this.screenscraperRealName,
     this.box2dAspectRatio,
+    this.videoUrl,
   });
 
   /// Internal helper to parse multi-language descriptions from raw JSON data.
@@ -160,7 +165,19 @@ class DatabaseGameModel {
     }
 
     final Map<String, String?> descriptions = {};
-    const languages = ['en', 'es', 'fr', 'de', 'it', 'pt'];
+    const languages = [
+      'en',
+      'es',
+      'fr',
+      'de',
+      'it',
+      'pt',
+      'ja',
+      'ko',
+      'ru',
+      'zh',
+      'id',
+    ];
 
     bool hasAnyDescription = false;
 
@@ -275,6 +292,7 @@ class DatabaseGameModel {
           json['ss_real_name']?.toString() ??
           json['screenscraper_real_name']?.toString(),
       box2dAspectRatio: json['box2d_aspect_ratio']?.toString(),
+      videoUrl: json['video_url']?.toString(),
     );
   }
 
@@ -315,6 +333,7 @@ class DatabaseGameModel {
       'titleName': titleName,
       'screenscraper_real_name': screenscraperRealName,
       'box2d_aspect_ratio': box2dAspectRatio,
+      'video_url': videoUrl,
     };
   }
 
@@ -353,6 +372,7 @@ class DatabaseGameModel {
     String? titleName,
     String? screenscraperRealName,
     String? box2dAspectRatio,
+    String? videoUrl,
   }) {
     return DatabaseGameModel(
       appSystemId: appSystemId ?? this.appSystemId,
@@ -389,6 +409,7 @@ class DatabaseGameModel {
       screenscraperRealName:
           screenscraperRealName ?? this.screenscraperRealName,
       box2dAspectRatio: box2dAspectRatio ?? this.box2dAspectRatio,
+      videoUrl: videoUrl ?? this.videoUrl,
     );
   }
 
@@ -407,10 +428,24 @@ class DatabaseGameModel {
   String getDescriptionForLanguage(String languageCode) {
     if (descriptions == null || descriptions!.isEmpty) return '';
 
-    const defaultLanguageHierarchy = ['en', 'es', 'fr', 'de', 'it', 'pt', 'jp'];
+    const defaultLanguageHierarchy = [
+      'en',
+      'es',
+      'fr',
+      'de',
+      'it',
+      'pt',
+      'ja',
+      'jp',
+    ];
 
     if (languageCode.isNotEmpty) {
-      final requestedDescription = descriptions![languageCode];
+      // Older ES-DE and ScreenScraper data file Japanese under `jp`.
+      final requestedDescription = languageCode == 'ja'
+          ? (descriptions!['ja']?.isNotEmpty == true
+                ? descriptions!['ja']
+                : descriptions!['jp'])
+          : descriptions![languageCode];
       if (requestedDescription != null && requestedDescription.isNotEmpty) {
         return requestedDescription;
       }

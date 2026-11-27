@@ -25,6 +25,7 @@ import 'package:neostation/utils/artwork_cache.dart';
 import 'package:neostation/widgets/custom_notification.dart';
 import 'package:neostation/utils/user_data_move_guard.dart';
 import 'package:provider/provider.dart';
+import 'package:neostation/services/metadata_provider_service.dart';
 
 /// Sub-tabs inside the Scrapping tab of [GameSettingsDialog].
 enum _ScrappingSubTab { data, media }
@@ -332,7 +333,7 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
               gameName: widget.game.name,
               onProgress: onProgress,
             )
-          : await ScreenScraperService.scrapeSingleGame(
+          : await MetadataProviderService.scrapeSingleGame(
               appSystemId: systemId,
               romName: widget.game.romname,
               systemFolder: targetSystem.primaryFolderName,
@@ -477,6 +478,16 @@ class GameSettingsScrappingTabState extends State<GameSettingsScrappingTab> {
     final romPath = widget.game.romPath;
     final systemId = _systemId;
     if (_busy || romPath == null || romPath.isEmpty || systemId == null) {
+      return;
+    }
+
+    if (!await MetadataProviderService.supportsIdentify()) {
+      if (!mounted) return;
+      AppNotification.showNotification(
+        context,
+        AppLocale.identifyNeedsScreenScraper.getString(context),
+        type: NotificationType.info,
+      );
       return;
     }
 

@@ -132,6 +132,9 @@ Create a `.env` file from `.env.example` for local development.
 |----------|-------------|
 | `SCREENSCRAPER_DEV_ID` | ScreenScraper developer ID |
 | `SCREENSCRAPER_DEV_PASSWORD` | ScreenScraper developer password |
+| `NEOASSETS_CLIENT_ID` | NeoAssets developer application client id (`nsapp_…`) |
+| `NEOASSETS_CLIENT_SECRET` | NeoAssets developer application secret |
+| `NEOASSETS_SCRAPE_URL` | Optional NeoAssets API base URL (default `https://api.neoassets.dev`); use `http://10.0.2.2:8090` to reach a local instance from the Android emulator |
 
 > RetroAchievements no longer uses a build-time key. Each user signs in with their own RetroAchievements username and web API key (from [retroachievements.org/controlpanel.php](https://retroachievements.org/controlpanel.php)) inside the app.
 
@@ -165,6 +168,8 @@ The release workflow (`.github/workflows/build-and-deploy.yml`) reads build secr
 |-------------------|-------------|
 | `SCREENSCRAPER_DEV_ID` | ScreenScraper developer ID |
 | `SCREENSCRAPER_DEV_PASSWORD` | ScreenScraper developer password |
+| `NEOASSETS_CLIENT_ID` | NeoAssets developer application client id (`nsapp_…`) |
+| `NEOASSETS_CLIENT_SECRET` | NeoAssets developer application secret |
 
 **Required for Android release signing:**
 

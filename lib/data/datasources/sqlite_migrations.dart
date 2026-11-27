@@ -740,8 +740,14 @@ class SqliteMigrations {
       case 193:
         await _migrateToVersion193(db);
         break;
+      case 194:
+        await _migrateToVersion194(db);
+        break;
       case 197:
         await _migrateToVersion197(db);
+        break;
+      case 198:
+        await _migrateToVersion198(db);
         break;
       default:
         _log.w('No migration defined for version $version');
@@ -7840,6 +7846,53 @@ class SqliteMigrations {
     }
   }
 
+  /// Columns v194 adds to `user_screenscraper_metadata`.
+  static const Map<String, String> v194MetadataColumns = {
+    'description_ja': 'TEXT',
+    'description_ko': 'TEXT',
+    'description_ru': 'TEXT',
+    'description_zh': 'TEXT',
+    'description_id': 'TEXT',
+    'regional_names': 'TEXT',
+  };
+
+  /// Migration v194: room for every language NeoAssets translates into.
+  ///
+  /// NeoAssets returns each description in all of NeoStation's UI languages
+  /// and a game's title per release region, so the metadata table gains a
+  /// description column for the five languages it lacked and
+  /// `regional_names` (JSON, region → title), from which the title shown is
+  /// picked to match the app language. Idempotent: each column is added only
+  /// when missing.
+  static Future<void> _migrateToVersion194(Database db) async {
+    _log.i('Migration v194: NeoAssets languages and regional names');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_screenscraper_metadata)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i(
+          'v194: user_screenscraper_metadata is not present, nothing to do',
+        );
+        return;
+      }
+      for (final entry in v194MetadataColumns.entries) {
+        if (!columns.contains(entry.key)) {
+          db.execute(
+            'ALTER TABLE user_screenscraper_metadata '
+            'ADD COLUMN ${entry.key} ${entry.value}',
+          );
+        }
+      }
+      _log.i('Migration v194 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v194: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
   /// Migration v197: `user_config.swap_screens`, the dual-screen "Swap
   /// screens" setting (main interface on the bottom screen). Off by default.
   ///
@@ -7870,6 +7923,35 @@ class SqliteMigrations {
       _log.i('Migration v197 completed');
     } catch (e, stackTrace) {
       _log.e('Error in migration v197: $e');
+      _log.e('   StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Migration v198: `user_screenscraper_metadata.video_url`, the NeoAssets
+  /// link a game's video streams from when "Streaming video" keeps it off the
+  /// disk. Idempotent: the column is added only when missing.
+  static Future<void> _migrateToVersion198(Database db) async {
+    _log.i('Migration v198: NeoAssets video links');
+    try {
+      final columns = db
+          .select('PRAGMA table_info(user_screenscraper_metadata)')
+          .map((c) => c['name'].toString())
+          .toSet();
+      if (columns.isEmpty) {
+        _log.i(
+          'v198: user_screenscraper_metadata is not present, nothing to do',
+        );
+        return;
+      }
+      if (!columns.contains('video_url')) {
+        db.execute(
+          'ALTER TABLE user_screenscraper_metadata ADD COLUMN video_url TEXT',
+        );
+      }
+      _log.i('Migration v198 completed');
+    } catch (e, stackTrace) {
+      _log.e('Error in migration v198: $e');
       _log.e('   StackTrace: $stackTrace');
       rethrow;
     }

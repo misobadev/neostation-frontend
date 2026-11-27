@@ -16,6 +16,7 @@ import 'package:neostation/utils/adaptive_scroll.dart';
 import 'package:neostation/utils/nav_tabs.dart';
 
 import '../../../providers/sqlite_config_provider.dart';
+import '../../../providers/sqlite_database_provider.dart';
 import '../../../repositories/retro_achievements_repository.dart';
 import '../../../repositories/system_repository.dart';
 import '../../../widgets/info_dialog.dart';
@@ -25,6 +26,8 @@ import 'widgets/setting_row.dart';
 import 'widgets/setting_value_chip.dart';
 import 'widgets/language_picker_overlay.dart';
 import 'widgets/custom_sounds_dialog.dart';
+import '../../../providers/scraping_provider.dart';
+import '../../../services/metadata_provider_service.dart';
 import '../../../services/permission_service.dart';
 import '../../../services/sfx_service.dart';
 import '../../../services/systems_update_service.dart';
@@ -1261,7 +1264,18 @@ class GeneralSettingsContentState extends State<GeneralSettingsContent>
     );
 
     if (result != null && mounted) {
-      context.read<SqliteConfigProvider>().updateAppLanguage(result);
+      final scraping = context.read<ScrapingProvider>();
+      final games = context.read<SqliteDatabaseProvider>();
+      await context.read<SqliteConfigProvider>().updateAppLanguage(result);
+      // Game titles from NeoAssets follow the app language.
+      final retitled = await MetadataProviderService.syncTitlesToLanguage(
+        result,
+      );
+      if (retitled > 0) {
+        // The home screen's recent card reads the cached games.
+        await games.loadDatabase();
+        scraping.markArtworkUpdated();
+      }
     }
   }
 }

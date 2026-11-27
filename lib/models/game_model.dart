@@ -107,6 +107,10 @@ class GameModel {
   /// Box2D image aspect ratio (width/height) for grid display.
   final String? box2dAspectRatio;
 
+  /// The NeoAssets link the preview video streams from when no file is on
+  /// disk; see [DatabaseGameModel.videoUrl].
+  final String? videoUrl;
+
   /// UI hint: Whether to display the [romname] as a subtitle in the details view.
   final bool showRomFileNameSubtitle;
 
@@ -141,6 +145,7 @@ class GameModel {
     this.titleId,
     this.titleName,
     this.box2dAspectRatio,
+    this.videoUrl,
     this.showRomFileNameSubtitle = false,
   });
 
@@ -207,6 +212,7 @@ class GameModel {
       titleId: db.titleId,
       titleName: db.titleName,
       box2dAspectRatio: db.box2dAspectRatio,
+      videoUrl: db.videoUrl,
       showRomFileNameSubtitle: false,
     );
   }
@@ -271,6 +277,7 @@ class GameModel {
     String? titleId,
     String? titleName,
     String? box2dAspectRatio,
+    String? videoUrl,
     bool? showRomFileNameSubtitle,
   }) {
     return GameModel(
@@ -304,6 +311,7 @@ class GameModel {
       titleId: titleId ?? this.titleId,
       titleName: titleName ?? this.titleName,
       box2dAspectRatio: box2dAspectRatio ?? this.box2dAspectRatio,
+      videoUrl: videoUrl ?? this.videoUrl,
       showRomFileNameSubtitle:
           showRomFileNameSubtitle ?? this.showRomFileNameSubtitle,
     );
@@ -632,10 +640,24 @@ class GameModel {
   String getDescriptionForLanguage(String languageCode) {
     if (descriptions == null || descriptions!.isEmpty) return '';
 
-    const defaultLanguageHierarchy = ['en', 'es', 'fr', 'de', 'it', 'pt', 'jp'];
+    const defaultLanguageHierarchy = [
+      'en',
+      'es',
+      'fr',
+      'de',
+      'it',
+      'pt',
+      'ja',
+      'jp',
+    ];
 
     if (languageCode.isNotEmpty) {
-      final requestedDescription = descriptions![languageCode];
+      // Older ES-DE and ScreenScraper data file Japanese under `jp`.
+      final requestedDescription = languageCode == 'ja'
+          ? (descriptions!['ja']?.isNotEmpty == true
+                ? descriptions!['ja']
+                : descriptions!['jp'])
+          : descriptions![languageCode];
       if (requestedDescription != null && requestedDescription.isNotEmpty) {
         return requestedDescription;
       }
