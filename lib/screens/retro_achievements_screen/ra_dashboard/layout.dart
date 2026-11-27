@@ -69,7 +69,7 @@ extension _Layout on RADashboardHubState {
               context,
               icon: section.icon,
               label: section.menuLabel(context),
-              current: widget.section == section,
+              current: !widget.logoutSelected && widget.section == section,
               onTap: () => widget.onSectionTap?.call(section),
             ),
           ),
@@ -127,10 +127,7 @@ extension _Layout on RADashboardHubState {
     final theme = Theme.of(context);
     final radii = theme.extension<CornerRadii>() ?? CornerRadii.m();
     final scheme = theme.colorScheme;
-    // One filled row at a time: with the cursor on Logout the section on
-    // show drops to its tint, as it does while the panel has the D-pad.
-    final filled =
-        current && widget.menuFocused && (danger || !widget.logoutSelected);
+    final filled = current && widget.menuFocused;
     // The app's selection everywhere: the theme's text colour as the fill,
     // its surface as the text (the NeoSync menu, the option rows).
     final background = filled
@@ -144,7 +141,7 @@ extension _Layout on RADashboardHubState {
         ? scheme.error
         : scheme.onSurface.withValues(alpha: current ? 1 : 0.75);
     return _KeepVisible(
-      active: current && widget.menuFocused,
+      active: filled,
       child: Semantics(
         button: true,
         selected: current,
