@@ -1053,6 +1053,10 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.keptCopyDeleteFailed: '無法刪除版本。',
   AppLocale.keptCopyCloseGame: '請先關閉遊戲，然後重試。',
   AppLocale.keptCopyWaitForSync: '請等待存檔同步完成，然後重試。',
+  AppLocale.keptCopyGameMayBeOpen:
+      "此遊戲可能仍在 {emulator} 中開啟。請先在那裡結束遊戲，否則模擬器可能會用自己的副本覆寫還原的存檔。",
+  AppLocale.openGameIgnoredDownload:
+      "遊戲仍在模擬器中開啟，模擬器繼續使用自己的存檔副本，因此啟動時下載的存檔未被使用，也未上傳任何內容。請在模擬器中結束遊戲，然後重新啟動。",
   AppLocale.neoSyncCloudSyncDisabled: 'NeoSync: 雲端同步已停用',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: 儲存空間已滿',
   AppLocale.packageNameMissing: '缺少套件名稱',
@@ -1471,6 +1475,7 @@ const Map<String, dynamic> appLocaleZhHant = {
   AppLocale.uploadingCustomFolder: '正在上傳 {folder} 中的存檔...',
   AppLocale.customFolderUploadComplete:
       '獨立資料夾已同步：已上傳 {uploaded} 個，{skipped} 個已是最新',
+  AppLocale.customFolderUploadSavesLeftForLaunch: "將在其遊戲下次啟動時使用雲端副本的存檔：{left}",
   AppLocale.customFolderUploadLeftForLaunch:
       "尚未從此裝置同步過的記憶卡，留待下次啟動使用它們的遊戲時處理（屆時使用雲端的記憶卡，此裝置上的記憶卡則保留在存檔歷史中）：{left}",
   AppLocale.customFolderUploadFailed: '獨立資料夾同步失敗',

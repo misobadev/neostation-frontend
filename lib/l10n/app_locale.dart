@@ -1193,6 +1193,8 @@ mixin AppLocale {
   static const String keptCopyDeleteFailed = 'kept_copy_delete_failed';
   static const String keptCopyCloseGame = 'kept_copy_close_game';
   static const String keptCopyWaitForSync = 'kept_copy_wait_for_sync';
+  static const String keptCopyGameMayBeOpen = 'kept_copy_game_may_be_open';
+  static const String openGameIgnoredDownload = 'open_game_ignored_download';
   static const String neoSyncCloudSyncDisabled = 'neo_sync_cloud_sync_disabled';
   static const String neoSyncQuotaExceeded = 'neo_sync_quota_exceeded';
   static const String packageNameMissing = 'package_name_missing';
@@ -1764,6 +1766,8 @@ mixin AppLocale {
       'custom_folder_upload_complete';
   static const String customFolderUploadLeftForLaunch =
       'custom_folder_upload_left_for_launch';
+  static const String customFolderUploadSavesLeftForLaunch =
+      'custom_folder_upload_saves_left_for_launch';
   static const String customFolderUploadFailed = 'custom_folder_upload_failed';
   static const String customFolderUploadConfirm =
       'custom_folder_upload_confirm';

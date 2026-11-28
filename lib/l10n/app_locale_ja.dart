@@ -1078,6 +1078,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.keptCopyDeleteFailed: 'バージョンを削除できませんでした。',
   AppLocale.keptCopyCloseGame: '先にゲームを終了してから、もう一度お試しください。',
   AppLocale.keptCopyWaitForSync: 'セーブの同期が終わるまで待ってから、もう一度お試しください。',
+  AppLocale.keptCopyGameMayBeOpen: "このゲームは{emulator}でまだ開いている可能性があります。先にそちらでゲームを終了してください。終了しないと、エミュレーターが復元したセーブデータの上に自身のコピーを書き込むことがあります。",
+  AppLocale.openGameIgnoredDownload: "ゲームがエミュレーターでまだ開いていたため、エミュレーターは自身のセーブデータのコピーを使い続けました。起動時にダウンロードしたセーブデータは使われず、何もアップロードされていません。エミュレーターでゲームを終了してから、もう一度起動してください。",
   AppLocale.neoSyncCloudSyncDisabled: 'NeoSync: クラウド同期無効',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: ストレージ容量超過',
   AppLocale.packageNameMissing: 'パッケージ名がありません',
@@ -1511,6 +1513,8 @@ const Map<String, dynamic> appLocaleJa = {
   AppLocale.uploadingCustomFolder: '{folder} からセーブをアップロード中...',
   AppLocale.customFolderUploadComplete:
       'スタンドアロンフォルダーを同期しました：{uploaded}件アップロード、{skipped}件は既に最新',
+  AppLocale.customFolderUploadSavesLeftForLaunch:
+      "次にゲームを起動したときにクラウドのコピーを使うセーブデータ: {left}",
   AppLocale.customFolderUploadLeftForLaunch: "この端末からまだ同期されていないメモリーカード（次にそのカードを使うゲームを起動したときにクラウドのカードを使用し、この端末のカードはセーブ履歴に保管します）：{left}",
   AppLocale.customFolderUploadFailed: 'スタンドアロンフォルダーの同期に失敗しました',
   AppLocale.customFolderUploadConfirm:

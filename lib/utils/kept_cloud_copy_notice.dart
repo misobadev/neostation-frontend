@@ -56,3 +56,22 @@ void reportFirstCardSyncTookCloud({
         .getStringForCurrentLocale(),
   );
 }
+
+/// Tells the user, in the notification bell, that a save of [gameName] that
+/// a launch downloaded holds what it held before again: the game was still
+/// open in the emulator, which ignored the download and wrote its own copy
+/// back. Nothing was uploaded over the cloud's copy, which the next launch
+/// downloads again once the game has been quit in the emulator.
+///
+/// One entry per save, updated in place if it happens again.
+void reportIgnoredLaunchDownload({
+  required String gameName,
+  required String savePath,
+  GlobalNotificationService? notifications,
+}) {
+  (notifications ?? GlobalNotificationService()).show(
+    id: 'open-game-ignored-download-$savePath',
+    title: gameName,
+    message: AppLocale.openGameIgnoredDownload.getStringForCurrentLocale(),
+  );
+}

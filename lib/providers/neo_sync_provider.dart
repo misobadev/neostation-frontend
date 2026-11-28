@@ -26,6 +26,8 @@ import '../utils/save_file_listing.dart';
 import '../services/config_service.dart';
 import '../services/retroarch_config_service.dart';
 import '../services/retroachievements_hash_service.dart';
+import '../sync/open_game_guard.dart';
+import '../sync/open_game_return.dart';
 import '../utils/auto_folder_upload_notice.dart';
 import '../utils/cloud_copy_backup_name.dart';
 import '../utils/kept_cloud_copy_notice.dart';
@@ -115,11 +117,36 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Low-level network service for NeoSync API interactions.
   final NeoSyncService _neoSyncService;
 
-  NeoSyncProvider(this._neoSyncService, {DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+  NeoSyncProvider(
+    this._neoSyncService, {
+    DateTime Function()? now,
+    @visibleForTesting OpenGameGuard? openGames,
+  }) : _now = now ?? DateTime.now,
+       _openGamesOverride = openGames;
 
   /// The clock the cloud list's age is measured with; tests pass their own.
   final DateTime Function() _now;
+
+  final OpenGameGuard? _openGamesOverride;
+
+  /// Which games may still be open in an emulator: no sync but a launch's
+  /// writes their saves (see [OpenGameGuard]).
+  OpenGameGuard get _openGames => _openGamesOverride ?? OpenGameGuard.instance;
+
+  /// Checks the saves launches downloaded while their games may have been
+  /// open ([OpenGameReturn.checkLaunchDownloads]), when there are any, before
+  /// a sync that could upload one the emulator wrote back over its download.
+  Future<void> _checkLaunchDownloads() async {
+    if (_openGames.downloads.isEmpty) return;
+    await OpenGameReturn.checkLaunchDownloads(guard: _openGames);
+  }
+
+  /// What [_launchDeadlineFor] answers for a game that may still be open in
+  /// an emulator while no launch of it is running: already passed, so every
+  /// download of its saves is abandoned before it writes. Told apart from a
+  /// launch's own deadline by identity: a save left by it is left for the
+  /// next launch, not a failed sync.
+  static final SyncDeadline _gameMayBeOpen = SyncDeadline.passed();
 
   /// Whether a global synchronization task is currently active.
   bool _isSyncing = false;
@@ -157,6 +184,12 @@ class NeoSyncProvider extends ChangeNotifier {
   /// next launch: never synced from this device, and not the same as the
   /// cloud's.
   int _leftForLaunchFiles = 0;
+
+  /// Count of saves a standalone folder's upload left for their game's next
+  /// launch, which takes the cloud's copy: the game may still be open in an
+  /// emulator and the cloud's copy is newer, or the emulator wrote its old
+  /// save back over the copy its launch downloaded.
+  int _savesLeftForLaunchFiles = 0;
 
   /// Count of files successfully downloaded from the cloud.
   int _downloadedFiles = 0;
@@ -268,6 +301,10 @@ class NeoSyncProvider extends ChangeNotifier {
   /// Memory cards the last standalone folder upload left for a game's next
   /// launch (see [_leftForLaunchFiles]).
   int get leftForLaunchFiles => _leftForLaunchFiles;
+
+  /// Saves the last standalone folder upload left for their game's next
+  /// launch (see [_savesLeftForLaunchFiles]).
+  int get savesLeftForLaunchFiles => _savesLeftForLaunchFiles;
   int get downloadedFiles => _downloadedFiles;
   List<String> get processedItems => _processedItems;
 
@@ -361,14 +398,91 @@ class NeoSyncProvider extends ChangeNotifier {
     _quotaExceededAttempts = 0;
   }
 
-  /// The deadline of a running launch of the game [romName] or, when
-  /// [sharedCardsSystem] names the game's system because its games share
-  /// memory cards, of any running launch on that system.
-  SyncDeadline? _launchDeadlineFor(String romName, String? sharedCardsSystem) =>
-      _launchDeadlines[romName] ??
-      (sharedCardsSystem == null
-          ? null
-          : _launchDeadlines[_systemLaunchKey(sharedCardsSystem)]);
+  /// The deadline of a running launch of the game [romName] (of
+  /// [systemFolder]) or, when its system's games share memory cards, of any
+  /// running launch on that system.
+  ///
+  /// With no such launch running, a game that may still be open in an
+  /// emulator ([OpenGameGuard.mayBeOpen]) gets [_gameMayBeOpen], which has
+  /// passed: only a launch writes its saves.
+  SyncDeadline? _launchDeadlineFor(String? romName, String? systemFolder) {
+    final sharedCardsSystem = _sharesMemoryCards(systemFolder)
+        ? systemFolder
+        : null;
+    final running =
+        (romName == null ? null : _launchDeadlines[romName]) ??
+        (sharedCardsSystem == null
+            ? null
+            : _launchDeadlines[_systemLaunchKey(sharedCardsSystem)]);
+    if (running != null) return running;
+    final mayBeOpen =
+        (romName != null && _openGames.mayBeOpen(romName, systemFolder)) ||
+        (sharedCardsSystem != null &&
+            _openGames.cardsMayBeOpen(sharedCardsSystem));
+    return mayBeOpen ? _gameMayBeOpen : null;
+  }
+
+  /// Whether a launch of the game [romName] (of [systemFolder]) is running
+  /// while it may still be open in an emulator, so a download now is one the
+  /// emulator may ignore (see [_keptAtOpenGameLaunch]). For a memory card
+  /// every game of its system shares ([savePath]), any game of that system
+  /// counts. Doesn't ask whether that launch's deadline has passed: callers
+  /// have checked it before writing.
+  bool _launchOfOpenGame(
+    String romName,
+    String? systemFolder,
+    String savePath,
+  ) {
+    final deadline = _launchDeadlineFor(romName, systemFolder);
+    if (deadline == null || identical(deadline, _gameMayBeOpen)) return false;
+    return _openGames.openIn(romName, systemFolder, savePath: savePath) != null;
+  }
+
+  /// Keeps the cloud's copy [cloudBytes] of the save at [savePath] in Save
+  /// history ([neoSyncLaunchCopyPath]: from another device, the same kind of
+  /// copy; one per save, replaced by the next such launch), and records that
+  /// a launch of [romName] (of [systemFolder]) wrote it over a save hashing
+  /// to [before] while the game may still have been open in an emulator.
+  /// That emulator may ignore it and later write its own copy back; when
+  /// NeoStation comes back to the front, the record tells. [unsyncedHere]:
+  /// the save held changes made here and not yet synced. The copy is written
+  /// after the save, so the tidy doesn't take it for one the save already
+  /// holds.
+  Future<void> _keptAtOpenGameLaunch({
+    required String romName,
+    required String? systemFolder,
+    required String gameName,
+    required String savePath,
+    required String before,
+    required List<int> cloudBytes,
+    required bool unsyncedHere,
+  }) async {
+    final downloaded = _neoSyncService.calculateFileHash(cloudBytes);
+    // The cloud's copy held this device's bytes (its checksum, when the list
+    // has none, couldn't tell before the download): nothing to keep or check.
+    if (before == downloaded) return;
+    final copy = neoSyncLaunchCopyPath(savePath);
+    try {
+      if (await writeLaunchCopy(copy, cloudBytes)) {
+        _log.w(
+          '$romName may still be open in an emulator: kept the cloud copy of '
+          '${path.basename(savePath)} as ${path.basename(copy)}',
+        );
+      }
+    } catch (e) {
+      _log.w('Could not keep the cloud copy of $savePath as $copy: $e');
+    }
+    await _openGames.recordDownload(
+      providerId: kSyncProviderId,
+      romname: romName,
+      systemFolder: systemFolder,
+      path: savePath,
+      beforeHash: before,
+      downloadedHash: downloaded,
+      gameName: gameName,
+      unsyncedHere: unsyncedHere,
+    );
+  }
 
   static String _systemLaunchKey(String systemFolderName) =>
       'system:$systemFolderName';
@@ -383,11 +497,17 @@ class NeoSyncProvider extends ChangeNotifier {
   ///
   /// With [backUpFirst] false the local file isn't copied to the single
   /// before-download slot first (the caller kept a copy of it already).
+  ///
+  /// [game] names the game the save belongs to: when a launch of it is
+  /// running while it may still be open in an emulator, the cloud's copy is
+  /// also kept in Save history and the download recorded
+  /// ([_keptAtOpenGameLaunch]).
   Future<bool> _downloadCloudFile(
     NeoSyncFile cloudFile,
     File localFile, {
     SyncDeadline? Function()? deadline,
     bool backUpFirst = true,
+    ({String romName, String? systemFolder, String gameName})? game,
   }) async {
     _log.i('Download: starting ${cloudFile.fileName} -> ${localFile.path}');
     final result = await _neoSyncService.downloadFile(cloudFile.id);
@@ -404,9 +524,38 @@ class NeoSyncProvider extends ChangeNotifier {
       }
 
       final bytes = result['data'] as List<int>;
+      final openLaunch =
+          game != null &&
+          _launchOfOpenGame(game.romName, game.systemFolder, localFile.path);
+      List<int>? beforeBytes;
+      var unsyncedHere = false;
+      if (openLaunch && await localFile.exists()) {
+        try {
+          beforeBytes = await localFile.readAsBytes();
+          final record = await _syncRecord(localFile.path);
+          unsyncedHere = saveChangedHere(
+            localTime: (await localFile.stat()).modified.millisecondsSinceEpoch,
+            localHash: _neoSyncService.calculateFileHash(beforeBytes),
+            savedTime: record?['local_modified_at'] as int?,
+            savedHash: record?['file_hash'] as String?,
+          );
+        } on FileSystemException {
+          beforeBytes = null;
+        }
+      }
       try {
         await localFile.parent.create(recursive: true);
         if (backUpFirst) await _backupLocalFile(localFile);
+        // Asked again right before the write: reading the save and backing
+        // it up take time on the launch path, and a launch that went ahead
+        // meanwhile has the save open.
+        if (deadline?.call()?.isExpired ?? false) {
+          _log.i(
+            'Abandoning download of ${cloudFile.fileName} (launch deadline '
+            'passed before writing it)',
+          );
+          return false;
+        }
         await localFile.writeAsBytes(bytes, flush: true);
         _log.i('Download: OK ${bytes.length} bytes -> ${localFile.path}');
       } on FileSystemException catch (e) {
@@ -432,6 +581,17 @@ class NeoSyncProvider extends ChangeNotifier {
         );
       } catch (e) {
         _log.w('Could not save sync state for ${localFile.path}: $e');
+      }
+      if (game != null && beforeBytes != null) {
+        await _keptAtOpenGameLaunch(
+          romName: game.romName,
+          systemFolder: game.systemFolder,
+          gameName: game.gameName,
+          savePath: localFile.path,
+          before: _neoSyncService.calculateFileHash(beforeBytes),
+          cloudBytes: bytes,
+          unsyncedHere: unsyncedHere,
+        );
       }
       return true;
     } else {

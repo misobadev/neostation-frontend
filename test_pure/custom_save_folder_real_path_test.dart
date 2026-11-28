@@ -84,7 +84,8 @@ void main() {
       'notSignedIn': 'AppLocale.neoSyncNotConnected',
       'quotaExceeded': 'AppLocale.neoSyncQuotaExceeded',
       'failed': 'AppLocale.customFolderUploadFailed',
-      'uploaded': 'AppLocale.customFolderUploadComplete',
+      // Its counts, in [customFolderUploadedMessage].
+      'uploaded': 'customFolderUploadedMessage(',
     };
     expected.forEach((outcome, message) {
       expect(outcomeBranch(body, outcome), contains(message), reason: outcome);
@@ -100,7 +101,7 @@ void main() {
       ),
     );
     expect(
-      'AppLocale.customFolderUploadComplete'.allMatches(body).length,
+      'customFolderUploadedMessage('.allMatches(body).length,
       1,
       reason: 'only an upload that ran reports its counts',
     );

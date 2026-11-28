@@ -1145,6 +1145,8 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.keptCopyCloseGame: 'Tutup game terlebih dahulu, lalu coba lagi.',
   AppLocale.keptCopyWaitForSync:
       'Tunggu hingga sinkronisasi simpanan selesai, lalu coba lagi.',
+  AppLocale.keptCopyGameMayBeOpen: "Game ini mungkin masih terbuka di {emulator}. Tutup dulu di sana, atau emulator bisa menimpa simpanan yang dipulihkan dengan salinannya sendiri.",
+  AppLocale.openGameIgnoredDownload: "Game masih terbuka di emulator, yang tetap memakai salinan simpanannya sendiri, jadi simpanan yang diunduh saat game dijalankan tidak dipakai dan tidak ada yang diunggah. Tutup game di emulator, lalu jalankan lagi.",
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync: Sinkronisasi cloud dinonaktifkan',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Kuota penyimpanan terlampaui',
@@ -1614,6 +1616,7 @@ const Map<String, dynamic> appLocaleId = {
   AppLocale.removeCustomFolderConfirm: 'Hapus folder simpanan standalone ini? File lokal tidak akan dihapus, hanya dilepas dari sinkronisasi.',
   AppLocale.uploadingCustomFolder: 'Mengunggah simpanan dari {folder}...',
   AppLocale.customFolderUploadComplete: 'Folder standalone disinkronkan: {uploaded} diunggah, {skipped} sudah terbaru',
+  AppLocale.customFolderUploadSavesLeftForLaunch: "Simpanan yang menunggu game-nya dijalankan berikutnya, yang akan memakai salinan dari cloud: {left}",
   AppLocale.customFolderUploadLeftForLaunch: "Kartu memori yang belum pernah disinkronkan dari perangkat ini, ditunda hingga game yang memakainya dijalankan berikutnya; saat itu kartu dari cloud dipakai dan kartu perangkat ini disimpan di Riwayat simpanan: {left}",
   AppLocale.customFolderUploadFailed: 'Gagal menyinkronkan folder standalone',
   AppLocale.customFolderUploadConfirm:

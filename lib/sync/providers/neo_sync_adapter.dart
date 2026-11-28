@@ -197,6 +197,14 @@ class NeoSyncAdapter extends ChangeNotifier implements ISyncProvider {
     await _provider.updateGameCloudSyncEnabled(gameId, enabled);
   }
 
+  @override
+  Future<bool> rebaselineIgnoredDownload(String path, {String? expectedHash}) =>
+      _provider.rebaselineIgnoredDownload(path, expectedHash: expectedHash);
+
+  @override
+  Future<bool> markChangedOnBothSides(String path) =>
+      _provider.markChangedOnBothSides(path);
+
   // ── Optional Capabilities ──────────────────────────────────────────────────
 
   @override

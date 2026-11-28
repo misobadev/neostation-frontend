@@ -1353,4 +1353,88 @@ void main() {
       expect(neoSyncCopy.existsSync(), isTrue);
     });
   });
+
+  // NEO-285: a launch of a game that may still be open in an
+  // emulator keeps the server's copy. One per save, and never at the cost of
+  // a conflict copy or a copy of this device's save.
+  group('a launch copy', () {
+    late Directory root;
+    late String save;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('launch_copy_');
+      save = p.join(root.path, 'Zelda.srm');
+      File(save).writeAsBytesSync([0]);
+    });
+
+    tearDown(() => root.delete(recursive: true));
+
+    test('reads as the kind of copy each provider keeps from the server', () {
+      final neoSync = parseKeptCopyPath(neoSyncLaunchCopyPath(save))!;
+      expect(neoSync.source, KeptCopySource.otherDevice);
+      expect(neoSync.launch, isTrue);
+      expect(neoSync.savePath, save);
+      final romm = parseKeptCopyPath(rommLaunchCopyPath(save))!;
+      expect(romm.source, KeptCopySource.serverConflict);
+      expect(romm.launch, isTrue);
+      final dated = parseKeptCopyPath(
+        '$save.romm-conflict-2026-11-06_18-32-44',
+      );
+      expect(dated!.launch, isFalse);
+    });
+
+    test('the next one replaces it', () async {
+      final copy = rommLaunchCopyPath(save);
+      expect(await writeLaunchCopy(copy, [1]), isTrue);
+      expect(await writeLaunchCopy(copy, [2]), isTrue);
+      expect(File(copy).readAsBytesSync(), [2]);
+      expect(
+        root.listSync().where((e) => isKeptCopyPath(e.path)),
+        hasLength(1),
+      );
+    });
+
+    test('a link at its name is left alone and not written through', () async {
+      final target = File(p.join(root.path, 'elsewhere'))
+        ..writeAsBytesSync([7]);
+      final copy = neoSyncLaunchCopyPath(save);
+      Link(copy).createSync(target.path);
+
+      expect(await writeLaunchCopy(copy, [1]), isFalse);
+      expect(target.readAsBytesSync(), [7]);
+      expect(FileSystemEntity.isLinkSync(copy), isTrue);
+    });
+
+    test(
+      'doesn\'t count towards the limit: three conflict copies stay',
+      () async {
+        for (var i = 1; i <= 3; i++) {
+          File('$save.romm-conflict-2026-11-0${i}_10-00-00')
+            ..writeAsBytesSync([10 + i])
+            ..setLastModifiedSync(DateTime(2026, 11, i));
+        }
+        await writeLaunchCopy(rommLaunchCopyPath(save), [99]);
+
+        final removed = await tidyKeptCopies(
+          save,
+          sources: rommKeptCopySources,
+          justKept: {rommLaunchCopyPath(save)},
+        );
+
+        expect(removed, isEmpty);
+      },
+    );
+
+    test('holding a conflict copy\'s bytes, it is the one that goes', () async {
+      final conflict = File('$save.romm-conflict-2026-11-01_10-00-00')
+        ..writeAsBytesSync([5])
+        ..setLastModifiedSync(DateTime(2026, 11, 1));
+      await writeLaunchCopy(rommLaunchCopyPath(save), [5]);
+
+      final removed = await tidyKeptCopies(save, sources: rommKeptCopySources);
+
+      expect(removed, [rommLaunchCopyPath(save)]);
+      expect(conflict.existsSync(), isTrue);
+    });
+  });
 }

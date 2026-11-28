@@ -428,6 +428,21 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
         }
     }
 
+    /// Something that changes with every boot, for Dart's record of the games
+    /// that may still be open in an emulator (cleared by a reboot):
+    /// `count:<n>` from Settings.Global.BOOT_COUNT, or `time:<ms>` (when the
+    /// device started, worked out from the clock) where that can't be read.
+    private fun bootMarker(): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                return "count:" + Settings.Global.getInt(contentResolver, Settings.Global.BOOT_COUNT)
+            } catch (e: Exception) {
+                // Not set on this device: fall back to the boot time.
+            }
+        }
+        return "time:" + (System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime())
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
@@ -473,6 +488,9 @@ class MainActivity: MultiDisplayFlutterActivity(), GamepadsCompatibleActivity {
                 }
                 "getGameLaunchTimestamp" -> {
                     result.success(gameLaunchTimestamp)
+                }
+                "getBootMarker" -> {
+                    result.success(bootMarker())
                 }
 
                 "isPackageInstalled" -> {

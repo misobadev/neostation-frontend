@@ -409,6 +409,9 @@ extension NeoSyncCore on NeoSyncProvider {
     if (!isNeoSyncAuthenticated) {
       return;
     }
+    // A save the emulator wrote back over a launch's download would read as
+    // a change to upload: told apart first (a launch has done so already).
+    if (pass != _GameSyncPass.preLaunch) await _checkLaunchDownloads();
     if (game.cloudSyncEnabled != true) {
       // Si el sync está deshabilitado para este juego, no hacer nada
       _updateGameSyncState(
@@ -441,6 +444,17 @@ extension NeoSyncCore on NeoSyncProvider {
       // Identificar si es un sistema de "memory cards compartidas"
       final system = await _getSystemForGame(game);
       final isSharedSystem = _sharesMemoryCards(system?.folderName);
+      // A game that may still be open in an emulator (on Android, NeoStation
+      // coming back to the front doesn't mean it closed): a save written now
+      // would be ignored, then overwritten by the emulator's own copy. Only
+      // its launch downloads; every other pass leaves the cloud's copies for
+      // that launch ("left for a launch") and still uploads.
+      final noPulls =
+          pass != _GameSyncPass.preLaunch &&
+          _openGames.mayBeOpen(
+            game.romname,
+            system?.folderName ?? game.systemFolderName,
+          );
 
       // Verificar si hay configuración de emulador válida en Windows.
       //
@@ -484,6 +498,21 @@ extension NeoSyncCore on NeoSyncProvider {
           return;
         }
 
+        if (cloudFiles.isNotEmpty && noPulls) {
+          NeoSyncProvider._log.i(
+            'Cloud saves of ${game.name} left for the next launch: the game '
+            'may still be open in an emulator',
+          );
+          if (_gameSyncStates[game.romname]?.status !=
+              neo_sync.GameSyncStatus.quotaExceeded) {
+            _updateGameSyncState(
+              game.romname,
+              game.name,
+              neo_sync.GameSyncStatus.cloudOnly,
+            );
+          }
+          return;
+        }
         if (cloudFiles.isNotEmpty) {
           // Descargar todos los archivos de la nube
           bool allDownloadsSucceeded = true;
@@ -588,8 +617,12 @@ extension NeoSyncCore on NeoSyncProvider {
           } else if (cloudFile.fileName.isEmpty) {
             // No existe en la nube, subir
             try {
-              final uploadSuccess = await _autoUploadLocalSave(game, localFile);
-              if (!uploadSuccess) {
+              final result = await _autoUploadLocalSaveResult(game, localFile);
+              if (result['leftForLaunch'] == true) {
+                // The cloud had one after all, newer: the next launch's.
+                takeLeftForLaunch = true;
+                leftForLaunch = true;
+              } else if (result['success'] != true) {
                 allUploadsSucceeded = false;
                 transferFailed = true;
               }
@@ -672,7 +705,11 @@ extension NeoSyncCore on NeoSyncProvider {
                   if (backupPath != null && keptLocal is String) {
                     keptThisPass[localFile.filePath]!.add(keptLocal);
                   }
-                  if (result['success'] != true) {
+                  if (result['leftForLaunch'] == true) {
+                    // The cloud's copy proved newer: the next launch's.
+                    takeLeftForLaunch = true;
+                    leftForLaunch = true;
+                  } else if (result['success'] != true) {
                     allUploadsSucceeded = false;
                     transferFailed = true;
                   } else if (backupPath != null && result['skipped'] != true) {
@@ -689,6 +726,14 @@ extension NeoSyncCore on NeoSyncProvider {
                 quotaExceededDuringProcessing = true;
                 allUploadsSucceeded = false;
               }
+            } else if (syncStatus == neo_sync.GameSyncStatus.cloudOnly &&
+                noPulls) {
+              takeLeftForLaunch = true;
+              leftForLaunch = true;
+              NeoSyncProvider._log.i(
+                'Cloud copy of ${localFile.filePath} left for the next '
+                'launch: the game may still be open in an emulator',
+              );
             } else if (syncStatus == neo_sync.GameSyncStatus.cloudOnly) {
               try {
                 // A card matched by its cloud path is updated where it is,
@@ -757,6 +802,13 @@ extension NeoSyncCore on NeoSyncProvider {
               localPaths.any((target) => path.equals(target, lf.filePath)),
         );
 
+        if (!existsLocally && noPulls) {
+          // Placed by the next launch: the game may still be open. Not even
+          // fetched, as a download would be abandoned before its write and
+          // the game shown as failed.
+          takeLeftForLaunch = true;
+          continue;
+        }
         if (!existsLocally) {
           // Claimed like a local card, so a sync alongside doesn't fetch it too.
           if (isSharedSystem) {
@@ -828,15 +880,11 @@ extension NeoSyncCore on NeoSyncProvider {
     return romname;
   }
 
-  Future<bool> _autoUploadLocalSave(
-    GameModel game,
-    LocalSaveFile localSave,
-  ) async =>
-      (await _autoUploadLocalSaveResult(game, localSave))['success'] == true;
-
-  /// [_autoUploadLocalSave] with the upload's own answer, which says whether
-  /// it was `skipped` (already in sync, or the cloud copy was newer and was
-  /// downloaded instead).
+  /// Uploads [localSave] of [game], with the upload's own answer, which says
+  /// whether it was `skipped` (already in sync, or the cloud copy was newer
+  /// and was downloaded instead) or, with `success` false, `leftForLaunch`
+  /// (the cloud copy was newer, and the game may still be open in an
+  /// emulator, so only its launch takes it).
   ///
   /// [alsoKept] names copies of the save this pass kept just before (the
   /// other device's), which the tidy after a newer cloud copy keeps too.
@@ -864,7 +912,7 @@ extension NeoSyncCore on NeoSyncProvider {
         file,
         alsoKept: alsoKept,
       );
-      if (result['success'] == true) {
+      if (result['success'] == true || result['leftForLaunch'] == true) {
         return result;
       }
       final errorMessage = result['message']?.toString() ?? '';
@@ -1106,13 +1154,46 @@ extension NeoSyncCore on NeoSyncProvider {
     }
     // A newer cloud copy the upload finds is only written while no launch of
     // this game (or, where its system's games share memory cards, of that
-    // system) has gone ahead without it. Asked when the copy is in, so a
-    // launch that started during the upload counts.
-    final sharedCardsSystem = _sharesMemoryCards(system.folderName)
-        ? system.folderName
-        : null;
+    // system) has gone ahead without it, and, while the game may still be
+    // open in an emulator, only by its launch. Asked when the copy is in, so
+    // a launch that started during the upload counts.
     SyncDeadline? deadline() =>
-        _launchDeadlineFor(game.romname, sharedCardsSystem);
+        _launchDeadlineFor(game.romname, system.folderName);
+    Future<Map<String, dynamic>> afterUpload(
+      Map<String, dynamic> result,
+    ) async {
+      if (result['abandoned'] == true &&
+          identical(deadline(), NeoSyncProvider._gameMayBeOpen)) {
+        // Not a failed sync: the newer cloud copy waits for the next launch.
+        NeoSyncProvider._log.i(
+          'Newer cloud copy of ${file.path} left for the next launch: the '
+          'game may still be open in an emulator',
+        );
+        return {...result, 'leftForLaunch': true};
+      }
+      final before = result['replacedHash'];
+      if (result['downloaded'] == true &&
+          before is String &&
+          _launchOfOpenGame(game.romname, system.folderName, file.path)) {
+        // The upload took a newer cloud copy at a launch of a game that may
+        // still be open: kept, and recorded, as a launch's own download is.
+        try {
+          final now = await file.readAsBytes();
+          await _keptAtOpenGameLaunch(
+            romName: game.romname,
+            systemFolder: system.folderName,
+            gameName: game.name,
+            savePath: file.path,
+            before: before,
+            cloudBytes: now,
+            unsyncedHere: result['replacedChangedHere'] == true,
+          );
+        } on FileSystemException catch (e) {
+          NeoSyncProvider._log.w('Could not read ${file.path} back: $e');
+        }
+      }
+      return result;
+    }
 
     // 1. Standalone custom folder takes priority over everything else.
     final customInfo = await customFolderSyncInfo(system, file);
@@ -1122,16 +1203,18 @@ extension NeoSyncCore on NeoSyncProvider {
         '(${customInfo.systemFolderName}/${customInfo.emulatorUniqueId})',
       );
       return _afterNewerCloudCopy(
-        await _neoSyncService.syncFile(
-          file,
-          game.name,
-          customFilename: customInfo.relativePath,
-          systemId: customInfo.systemFolderName,
-          emulatorId: customInfo.emulatorUniqueId,
-          gameHash: await _resolveGameHashForUpload(game),
-          isState: false,
-          type: 'custom',
-          deadline: deadline,
+        await afterUpload(
+          await _neoSyncService.syncFile(
+            file,
+            game.name,
+            customFilename: customInfo.relativePath,
+            systemId: customInfo.systemFolderName,
+            emulatorId: customInfo.emulatorUniqueId,
+            gameHash: await _resolveGameHashForUpload(game),
+            isState: false,
+            type: 'custom',
+            deadline: deadline,
+          ),
         ),
         game.name,
         file.path,
@@ -1177,17 +1260,19 @@ extension NeoSyncCore on NeoSyncProvider {
         await _resolveRetroArchEmulatorSlug(file, basePath) ??
         _retroArchCoreSlugFromGame(game);
     return _afterNewerCloudCopy(
-      await _neoSyncService.syncFile(
-        file,
-        game.name,
-        customFilename: relativePath,
-        systemId: parsed?.system ?? game.systemFolderName,
-        emulatorId: emulatorId,
-        gameHash: await _resolveGameHashForUpload(game),
-        isState: isState,
-        scope: parsed?.scope,
-        type: _syncTypeForFile(file, isState: isState),
-        deadline: deadline,
+      await afterUpload(
+        await _neoSyncService.syncFile(
+          file,
+          game.name,
+          customFilename: relativePath,
+          systemId: parsed?.system ?? game.systemFolderName,
+          emulatorId: emulatorId,
+          gameHash: await _resolveGameHashForUpload(game),
+          isState: isState,
+          scope: parsed?.scope,
+          type: _syncTypeForFile(file, isState: isState),
+          deadline: deadline,
+        ),
       ),
       game.name,
       file.path,
@@ -1264,9 +1349,7 @@ extension NeoSyncCore on NeoSyncProvider {
       NeoSyncProvider._log.i(
         'Auto-download: ${cloudSave.fileName} -> ${localPaths.join(', ')}',
       );
-      final sharedCardsSystem = _sharesMemoryCards(system?.folderName)
-          ? system!.folderName
-          : null;
+      final systemFolder = system?.folderName ?? game.systemFolderName;
       bool allWritten = true;
       for (final localPath in localPaths) {
         final localFile = File(localPath);
@@ -1278,8 +1361,13 @@ extension NeoSyncCore on NeoSyncProvider {
         final wrote = await _downloadCloudFile(
           cloudSave,
           localFile,
-          deadline: () => _launchDeadlineFor(game.romname, sharedCardsSystem),
+          deadline: () => _launchDeadlineFor(game.romname, systemFolder),
           backUpFirst: backUpFirst,
+          game: (
+            romName: game.romname,
+            systemFolder: systemFolder,
+            gameName: game.name,
+          ),
         );
         if (!wrote) allWritten = false;
       }
@@ -2024,6 +2112,41 @@ extension NeoSyncCore on NeoSyncProvider {
   /// Descarga un archivo de la nube a un archivo local (método público)
   Future<void> downloadCloudFile(NeoSyncFile cloudFile, File localFile) async {
     await _downloadCloudFile(cloudFile, localFile);
+  }
+
+  /// See [ISyncProvider.rebaselineIgnoredDownload] and
+  /// [SyncRepository.resetToFile].
+  Future<bool> rebaselineIgnoredDownload(
+    String savePath, {
+    String? expectedHash,
+  }) async {
+    try {
+      return await SyncRepository.resetToFile(
+        NeoSyncProvider.kSyncProviderId,
+        savePath,
+        expectedHash: expectedHash,
+      );
+    } catch (e) {
+      NeoSyncProvider._log.w(
+        'Could not reset the sync record of $savePath: $e',
+      );
+      return false;
+    }
+  }
+
+  /// See [ISyncProvider.markChangedOnBothSides].
+  Future<bool> markChangedOnBothSides(String savePath) async {
+    try {
+      return await SyncRepository.markChangedOnBothSides(
+        NeoSyncProvider.kSyncProviderId,
+        savePath,
+      );
+    } catch (e) {
+      NeoSyncProvider._log.w(
+        'Could not update the sync record of $savePath: $e',
+      );
+      return false;
+    }
   }
 
   /// Helper to calculate relative path for sync, with special handling for Dreamcast

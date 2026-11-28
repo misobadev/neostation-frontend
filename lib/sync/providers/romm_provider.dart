@@ -47,10 +47,13 @@ import 'package:neostation/services/romm_playtime_service.dart';
 import 'package:neostation/services/romm_service.dart';
 
 import '../i_sync_provider.dart';
+import '../open_game_guard.dart';
+import '../open_game_return.dart';
 import '../retroarch_state_signature.dart';
 import '../sync_manager.dart';
 import '../../utils/emulator_loader.dart';
 import '../../utils/kept_cloud_copy_notice.dart';
+import '../../utils/rom_stem.dart';
 import '../../utils/safe_path.dart';
 
 /// Locates the local save/state files belonging to a game.
@@ -173,8 +176,11 @@ typedef _DownloadOutcome = ({bool wrote, bool coreMismatch, bool failed});
 /// Identifies a game in the library. Two systems can each hold a `Same.zip`.
 typedef _GameKey = ({String? system, String romname});
 
+///
+/// By [romStem], so "Game.iso" (a game list's) and "Game" (a library row's)
+/// are one game.
 _GameKey _keyOf(GameModel game) =>
-    (system: game.systemFolderName, romname: game.romname);
+    (system: game.systemFolderName, romname: romStem(game.romname));
 
 /// The saves [RomMSyncProvider] could not upload, for the app to report.
 class RommUploadFailures {
@@ -280,7 +286,9 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     @visibleForTesting this._autoSweep = true,
     @visibleForTesting RommLibraryLinker? linker,
     @visibleForTesting Duration sweepStartupDelay = _sweepStartupDelay,
+    @visibleForTesting OpenGameGuard? openGames,
   }) : _locateOverride = locateSaves,
+       _openGamesOverride = openGames,
        _resolveTargetsOverride = resolveTargets,
        _listGamesOverride = listGames,
        _saveFoldersOverride = saveFolders,
@@ -299,6 +307,23 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     // usually already happened and there is no transition left to listen for.
     if (_wasConnected) _scheduleSweep();
   }
+
+  final OpenGameGuard? _openGamesOverride;
+
+  /// Which games may still be open in an emulator: no pass but a launch's
+  /// downloads their saves (see [OpenGameGuard]).
+  OpenGameGuard get _openGames => _openGamesOverride ?? OpenGameGuard.instance;
+
+  /// Whether the save at [target] of [game] may be open in an emulator: the
+  /// game may be, or, for a memory card every game of its system shares, any
+  /// game of that system may be.
+  bool _saveMayBeOpen(GameModel game, String target) =>
+      _openGames.openIn(
+        game.romname,
+        game.systemFolderName,
+        savePath: target,
+      ) !=
+      null;
 
   /// Whether the connect-triggered sweep is wired up. Off in tests, which drive
   /// [retryPendingUploads] directly rather than waiting out a timer.
@@ -876,6 +901,16 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     // finding the game's emulator enumerates the system's emulators.
     final placement = _placementFor(game);
 
+    // A game that may still be open in an emulator (on Android, NeoStation
+    // coming back to the front doesn't mean it closed): a save written now
+    // would be ignored, then overwritten by the emulator's own copy. Only a
+    // launch downloads its saves; this pass leaves them for the next one
+    // ("left for a launch") and still uploads.
+    final noPulls =
+        deadline == null &&
+        !statusOnly &&
+        _openGames.mayBeOpen(game.romname, game.systemFolderName);
+
     // The two listings are independent GETs; fetch them concurrently so the
     // launch-blocking sync pays one round-trip, not two serial ones. Each is
     // also independent in failure: RomM can fail one (its states route, say)
@@ -1182,6 +1217,14 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           await _recordSynced(local, match.updatedAtMs, pullDigest);
           continue;
         }
+        if (noPulls) {
+          takeLeftForLaunch = true;
+          _log.i(
+            'RomM: ${path.basename(local.filePath)} left for the next launch '
+            '— the game may still be open in an emulator',
+          );
+          continue;
+        }
         countDownload(
           await _download(
             game,
@@ -1312,6 +1355,11 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
       if (statusOnly || uploadOnly) break;
       if (matchedRemote.contains(a.key)) continue;
       if (cardsToPlace != null && placeable(a)) continue;
+      if (noPulls) {
+        // As above: the next launch places it.
+        takeLeftForLaunch = true;
+        continue;
+      }
       countDownload(
         await _download(
           game,
@@ -1513,15 +1561,7 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
 
   /// Drops a single trailing extension, matching how the library indexes a
   /// ROM's name. Only the last one: a title may contain dots of its own.
-  static String _romNameWithoutExtension(String romname) {
-    final dot = romname.lastIndexOf('.');
-    if (dot <= 0) return romname;
-    final ext = romname.substring(dot);
-    // Guard against clipping a title that simply ends in a period ("Mr. Do.").
-    return RegExp(r'^\.[A-Za-z0-9]{1,5}$').hasMatch(ext)
-        ? romname.substring(0, dot)
-        : romname;
-  }
+  static String _romNameWithoutExtension(String romname) => romStem(romname);
 
   /// RomM's server-applied version tag, copied verbatim from its own
   /// `DATETIME_TAG_PATTERN` (`backend/endpoints/saves.py`, RomM 5.1.0).
@@ -2040,6 +2080,88 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
     }
   }
 
+  /// A launch of [game] wrote the server's copy ([bytes], hashing to
+  /// [downloaded]) over the save at [target], which held [before], while the
+  /// game may still have been open in an emulator. That emulator may ignore
+  /// the save and later write its own copy back over it, so the server's copy
+  /// is kept in Save history ([rommLaunchCopyPath]: from the server, before
+  /// an upload, the same kind of copy; one per save, replaced by the next
+  /// such launch), and the download is recorded for NeoStation to check when
+  /// it comes back to the front. [unsyncedHere]: the save held changes made
+  /// here and not yet synced. The copy is written after the save, so the tidy
+  /// doesn't take it for one the save already holds.
+  Future<void> _keptAtOpenGameLaunch(
+    GameModel game,
+    String target,
+    Uint8List bytes, {
+    required Digest before,
+    required Digest downloaded,
+    required bool unsyncedHere,
+  }) async {
+    // The server's copy held this device's bytes (a state has no hash to
+    // tell before the download): nothing to keep or to check.
+    if (before == downloaded) return;
+    final copy = rommLaunchCopyPath(target);
+    try {
+      if (await writeLaunchCopy(copy, bytes)) {
+        _log.w(
+          'RomM download: ${game.romname} may still be open in an emulator — '
+          'kept the server\'s copy of ${path.basename(target)} as '
+          '${path.basename(copy)}',
+        );
+      }
+    } catch (e) {
+      _log.e('RomM download: could not keep the server\'s copy as $copy: $e');
+    }
+    await _openGames.recordDownload(
+      providerId: kProviderId,
+      romname: game.romname,
+      systemFolder: game.systemFolderName,
+      path: target,
+      beforeHash: before.toString(),
+      downloadedHash: downloaded.toString(),
+      gameName: game.name,
+      unsyncedHere: unsyncedHere,
+    );
+  }
+
+  @override
+  Future<bool> rebaselineIgnoredDownload(
+    String savePath, {
+    String? expectedHash,
+  }) async {
+    try {
+      return await SyncRepository.resetToFile(
+        kProviderId,
+        savePath,
+        expectedHash: expectedHash,
+      );
+    } catch (e) {
+      _log.w('RomM: could not reset the sync record of $savePath: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> markChangedOnBothSides(String savePath) async {
+    try {
+      return await SyncRepository.markChangedOnBothSides(kProviderId, savePath);
+    } catch (e) {
+      _log.w('RomM: could not update the sync record of $savePath: $e');
+      return false;
+    }
+  }
+
+  /// [OpenGameReturn.checkLaunchDownloads], when there is anything to check.
+  Future<void> _checkLaunchDownloads() async {
+    if (_openGames.downloads.isEmpty) return;
+    await OpenGameReturn.checkLaunchDownloads(
+      guard: _openGames,
+      providerFor: (id) =>
+          id == kProviderId ? this : SyncManager.instance.provider(id),
+    );
+  }
+
   /// `2026-08-21_19-30-00`, for a conflict backup's filename.
   ///
   /// Local time, colon-free and sortable: it is read by a person looking in
@@ -2508,6 +2630,19 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
           // bytes are already in memory.
           fileHash: serverDigest.toString(),
         );
+        if (deadline != null &&
+            localBytes != null &&
+            _saveMayBeOpen(game, target)) {
+          await _keptAtOpenGameLaunch(
+            game,
+            target,
+            bytes,
+            before: md5.convert(localBytes),
+            downloaded: serverDigest,
+            // A card's first sync from here: never synced, so unsynced.
+            unsyncedHere: changedHere || firstCardSync,
+          );
+        }
       }
       return (
         wrote: wroteAny,
@@ -2887,6 +3022,10 @@ class RomMSyncProvider extends ChangeNotifier implements ISyncProvider {
   /// post-close sync that fails behind it, for a game it has already passed,
   /// is still reported once it ends.
   Future<SyncResult> _sweepPendingUploads() async {
+    // A save the emulator wrote back over a launch's download would read as
+    // a change to upload (on a cold start, say, after Android closed
+    // NeoStation behind the emulator): told apart first.
+    await _checkLaunchDownloads();
     final index = await RommSaveMapRepository.getRomIdIndex();
     if (index.isEmpty) {
       _log.i('RomM upload sweep: no linked games');

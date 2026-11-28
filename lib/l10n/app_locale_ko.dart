@@ -1085,6 +1085,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.keptCopyDeleteFailed: '버전을 삭제할 수 없습니다.',
   AppLocale.keptCopyCloseGame: '먼저 게임을 종료한 후 다시 시도하세요.',
   AppLocale.keptCopyWaitForSync: '세이브 동기화가 끝날 때까지 기다린 후 다시 시도하세요.',
+  AppLocale.keptCopyGameMayBeOpen: "이 게임이 아직 {emulator}에서 열려 있을 수 있습니다. 먼저 거기에서 게임을 종료하세요. 그렇지 않으면 에뮬레이터가 복원된 세이브 위에 자체 사본을 덮어쓸 수 있습니다.",
+  AppLocale.openGameIgnoredDownload: "게임이 에뮬레이터에서 아직 열려 있어 에뮬레이터가 이 세이브의 자체 사본을 계속 사용했습니다. 그래서 실행 시 다운로드한 세이브는 사용되지 않았고 아무것도 업로드되지 않았습니다. 에뮬레이터에서 게임을 종료한 다음 다시 실행하세요.",
   AppLocale.neoSyncCloudSyncDisabled: 'NeoSync: 클라우드 동기화가 비활성화되었습니다',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: 저장 용량 초과',
   AppLocale.packageNameMissing: '패키지 이름이 누락되었습니다',
@@ -1502,6 +1504,8 @@ const Map<String, dynamic> appLocaleKo = {
   AppLocale.uploadingCustomFolder: '{folder}에서 세이브 업로드 중...',
   AppLocale.customFolderUploadComplete:
       '독립형 폴더 동기화 완료: {uploaded}개 업로드, {skipped}개는 이미 최신',
+  AppLocale.customFolderUploadSavesLeftForLaunch:
+      "다음에 게임을 실행할 때 클라우드의 사본을 받을 세이브: {left}",
   AppLocale.customFolderUploadLeftForLaunch: "이 기기에서 동기화한 적 없는 메모리 카드(다음에 이 카드를 쓰는 게임을 실행할 때 클라우드의 카드를 사용하고 이 기기의 카드는 세이브 기록에 보관합니다): {left}",
   AppLocale.customFolderUploadFailed: '독립형 폴더 동기화 실패',
   AppLocale.customFolderUploadConfirm:

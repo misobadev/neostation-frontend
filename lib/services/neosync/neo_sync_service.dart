@@ -316,6 +316,20 @@ class NeoSyncService extends ChangeNotifier {
           _lastError = error;
           return {'success': false, 'message': error};
         }
+        // Already passed (a launch that went ahead, or a game that may still
+        // be open in an emulator, which only its launch writes): nothing
+        // would be written, so nothing is fetched.
+        if (deadline?.call()?.isExpired ?? false) {
+          _log.i(
+            'Not fetching the newer cloud copy of ${file.path} (launch '
+            'deadline passed)',
+          );
+          return {
+            'success': false,
+            'abandoned': true,
+            'message': 'Launch deadline passed',
+          };
+        }
         final download = await downloadFile(cloudId);
         if (download['success'] != true || download['data'] == null) {
           const error =
@@ -418,6 +432,11 @@ class NeoSyncService extends ChangeNotifier {
           'skipped': true,
           'downloaded': true,
           'keptLocalPath': ?keptLocalPath,
+          // What the file held before, and whether it had changed here since
+          // its last sync: a launch of a game that may still be open in an
+          // emulator records the download.
+          'replacedHash': fileHash,
+          'replacedChangedHere': changedHere,
           'message': 'Remote file is newer, downloaded',
         };
       }

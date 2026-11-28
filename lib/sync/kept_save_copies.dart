@@ -4,6 +4,7 @@ import 'package:neostation/providers/neo_sync_provider.dart';
 import 'package:neostation/services/game/game_session_manager.dart';
 import 'package:neostation/utils/kept_save_copy.dart';
 
+import 'open_game_guard.dart';
 import 'providers/neo_sync_adapter.dart';
 import 'providers/romm_provider.dart';
 import 'sync_manager.dart';
@@ -57,7 +58,9 @@ class KeptSaveCopies {
     Future<List<String>> Function()? cardFolders,
     bool Function()? gameRunning,
     bool Function(String providerId, GameModel? game)? syncing,
-  }) : _activeProviderId =
+    OpenGameGuard? openGames,
+  }) : _openGamesOverride = openGames,
+       _activeProviderId =
            activeProviderId ?? (() => SyncManager.instance.activeProviderId),
        _locateSaves =
            locateSaves ??
@@ -85,6 +88,20 @@ class KeptSaveCopies {
   final Future<List<String>> Function() _cardFolders;
   final bool Function() _gameRunning;
   final bool Function(String providerId, GameModel? game) _syncing;
+  final OpenGameGuard? _openGamesOverride;
+
+  OpenGameGuard get _openGames => _openGamesOverride ?? OpenGameGuard.instance;
+
+  /// The emulator that may still have [game] open, with the save at
+  /// [savePath] (for a memory card every game of its system shares, any game
+  /// of that system counts): its name, or an empty string when it isn't
+  /// known. Null when the game isn't open. A restore is still allowed, but
+  /// that emulator may write its own copy over the restored save.
+  String? mayBeOpenIn(GameModel game, String savePath) => _openGames.openIn(
+    game.romname,
+    game.systemFolderName,
+    savePath: savePath,
+  );
 
   Set<KeptCopySource> get _sources => keptCopySourcesFor(_activeProviderId());
 
@@ -167,6 +184,9 @@ class KeptSaveCopies {
     if (refusal != null) throw KeptCopyRefused(refusal);
     final sources = _sources;
     final result = await restoreKeptCopy(copyPath);
+    // Put back on purpose: not the emulator ignoring a launch's download,
+    // whatever it holds now.
+    await _openGames.forgetDownload(result.savePath);
     await tidyKeptCopies(
       result.savePath,
       sources: sources,

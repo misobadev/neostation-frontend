@@ -1147,6 +1147,8 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.keptCopyDeleteFailed: 'No se pudo eliminar la versión.',
   AppLocale.keptCopyCloseGame: 'Cierra el juego primero y vuelve a intentarlo.',
   AppLocale.keptCopyWaitForSync: 'Espera a que termine la sincronización de partidas y vuelve a intentarlo.',
+  AppLocale.keptCopyGameMayBeOpen: "Puede que este juego siga abierto en {emulator}. Ciérralo allí primero, o el emulador podría escribir su propia copia sobre la partida restaurada.",
+  AppLocale.openGameIgnoredDownload: "El juego seguía abierto en el emulador, que siguió usando su propia copia de esta partida, así que la partida descargada al iniciarlo no se usó y no se subió nada. Cierra el juego en el emulador y vuelve a iniciarlo.",
   AppLocale.neoSyncCloudSyncDisabled: 'NeoSync: Sincronización desactivada',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Cuota de almacenamiento superada',
   AppLocale.packageNameMissing: 'Falta el nombre del paquete',
@@ -1617,6 +1619,7 @@ const Map<String, dynamic> appLocaleEs = {
   AppLocale.removeCustomFolderConfirm: '¿Eliminar esta carpeta de guardado standalone? Sus archivos locales no se borrarán, solo se desvinculará de la sincronización.',
   AppLocale.uploadingCustomFolder: 'Subiendo guardados de {folder}...',
   AppLocale.customFolderUploadComplete: 'Carpeta standalone sincronizada: {uploaded} subidos, {skipped} ya actualizados',
+  AppLocale.customFolderUploadSavesLeftForLaunch: "Partidas que esperan al próximo inicio de su juego, que usará la copia de la nube: {left}",
   AppLocale.customFolderUploadLeftForLaunch: "Tarjetas de memoria nunca sincronizadas desde este dispositivo, pendientes para el próximo inicio de un juego que las use, que usará la de la nube y guardará la de este dispositivo en el Historial de partidas: {left}",
   AppLocale.customFolderUploadFailed:
       'Error al sincronizar la carpeta standalone',

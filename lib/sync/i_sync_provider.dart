@@ -132,6 +132,28 @@ abstract class ISyncProvider {
   /// Updates whether cloud sync is enabled for a specific game.
   Future<void> updateGameCloudSyncEnabled(String gameId, bool enabled) async {}
 
+  /// The save at [path] holds again what it held before a launch downloaded
+  /// the server's copy over it: the emulator still had the game open, ignored
+  /// the download and wrote its own copy back. Its sync record is set to the
+  /// file as it is now, with no server copy seen, so nothing here reads as a
+  /// change to upload and the next launch downloads the server's copy again.
+  /// With [expectedHash], only while the file still hashes to it (MD5 hex).
+  ///
+  /// Returns whether the record was written. False by default: a provider
+  /// that records no launch downloads is never asked.
+  Future<bool> rebaselineIgnoredDownload(
+    String path, {
+    String? expectedHash,
+  }) async => false;
+
+  /// The save at [path] held changes made here, not yet synced, when a
+  /// launch downloaded the server's copy over it, and the emulator wrote them
+  /// back. Its sync record is set to "changed here and on the server", so the
+  /// next sync handles it as any save changed on both sides: this device's
+  /// copy goes up, and the server's is kept first in Save history.
+  /// Returns whether the record was written; false by default, as above.
+  Future<bool> markChangedOnBothSides(String path) async => false;
+
   // ── Optional Capabilities (override as needed) ─────────────────────────────
 
   /// Storage quota info. Return null if the provider has no quota concept.

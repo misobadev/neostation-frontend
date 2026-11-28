@@ -202,6 +202,19 @@ class _KeptCopiesViewState extends State<KeptCopiesView> {
     if (isSharedMemoryCard(group.savePath)) {
       body = '$body\n\n${AppLocale.keptCopySharedCard.getString(context)}';
     }
+    // The emulator may still have the game open: restoring is allowed, but
+    // it may write its own copy over the restored save. The list of every
+    // game's copies keeps the general advice the body already gives.
+    final game = widget.game;
+    final openIn = game == null
+        ? null
+        : _copies.mayBeOpenIn(game, group.savePath);
+    if (openIn != null && openIn.isNotEmpty) {
+      final warning = AppLocale.keptCopyGameMayBeOpen
+          .getString(context)
+          .replaceFirst('{emulator}', openIn);
+      body = '$body\n\n$warning';
+    }
     final confirmed = await ConfirmActionDialog.show(
       context,
       title: AppLocale.keptCopyRestoreTitle.getString(context),

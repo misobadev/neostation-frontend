@@ -151,6 +151,18 @@ void main() {
       expect(await recorded(), isNull);
     });
 
+    test('already passed before the fetch: the file is not even fetched '
+        '(NEO-285)', () async {
+      final requested = Completer<void>();
+
+      final result = await service(requested: requested)
+          .syncFile(file, 'Game', deadline: () => SyncDeadline.passed());
+
+      expect(result['abandoned'], isTrue);
+      expect(requested.isCompleted, isFalse);
+      expect(await file.readAsString(), 'LOCAL SAVE');
+    });
+
     test('is asked about once the file is in, so a launch that started '
         'during the download counts', () async {
       final fetched = Completer<void>();

@@ -81,7 +81,11 @@ class GameLaunchService {
           );
         }
 
-        GameSessionManager.registerGameLaunch(system, game, 'android_app');
+        GameSessionManager.registerGameLaunch(
+          system,
+          game,
+          emulatorExeName: 'android_app',
+        );
         await FavoritesService.recordGamePlayed(game);
 
         final success = await AndroidService.launchPackage(game.romPath!);
@@ -284,7 +288,12 @@ class GameLaunchService {
               );
 
               if (result == true) {
-                GameSessionManager.registerGameLaunch(system, game);
+                GameSessionManager.registerGameLaunch(
+                  system,
+                  game,
+                  androidPackage: packageName,
+                  emulatorName: launchCmd['player_name']?.toString(),
+                );
                 await FavoritesService.recordGamePlayed(game);
                 return GameLaunchResult.success();
               }
@@ -756,7 +765,12 @@ class GameLaunchService {
 
       if (result == true) {
         await FavoritesService.recordGamePlayed(game);
-        GameSessionManager.registerGameLaunch(system, game);
+        GameSessionManager.registerGameLaunch(
+          system,
+          game,
+          androidPackage: packageName,
+          emulatorName: 'RetroArch',
+        );
         return GameLaunchResult.success();
       } else {
         GamepadNavigationManager.reactivate();
@@ -1041,7 +1055,11 @@ class GameLaunchService {
       final launchedExeName = exeName.toLowerCase().contains('retroarch')
           ? null
           : exeName;
-      GameSessionManager.registerGameLaunch(system, game, launchedExeName);
+      GameSessionManager.registerGameLaunch(
+        system,
+        game,
+        emulatorExeName: launchedExeName,
+      );
       await FavoritesService.recordGamePlayed(game);
       return GameLaunchResult.success();
     } catch (error) {
@@ -1328,7 +1346,11 @@ class GameLaunchService {
         launchedExeName = path.basename(executable);
       }
 
-      GameSessionManager.registerGameLaunch(system, game, launchedExeName);
+      GameSessionManager.registerGameLaunch(
+        system,
+        game,
+        emulatorExeName: launchedExeName,
+      );
 
       return GameLaunchResult.success();
     } catch (e) {
@@ -1720,7 +1742,12 @@ class GameLaunchService {
 
       if (result == true) {
         await FavoritesService.recordGamePlayed(game);
-        GameSessionManager.registerGameLaunch(system, game);
+        GameSessionManager.registerGameLaunch(
+          system,
+          game,
+          androidPackage: packageName,
+          emulatorName: emulator['name']?.toString(),
+        );
         return GameLaunchResult.success();
       } else {
         _log.e('Failed to launch standalone emulator on Android');
@@ -1828,7 +1855,11 @@ class GameLaunchService {
           });
 
       final exeName = path.basename(emulatorPath);
-      GameSessionManager.registerGameLaunch(system, game, exeName);
+      GameSessionManager.registerGameLaunch(
+        system,
+        game,
+        emulatorExeName: exeName,
+      );
       await FavoritesService.recordGamePlayed(game);
 
       return GameLaunchResult.success();

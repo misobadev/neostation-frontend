@@ -1160,6 +1160,8 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.keptCopyCloseGame: "Fermez d'abord le jeu, puis réessayez.",
   AppLocale.keptCopyWaitForSync:
       'Attendez la fin de la synchronisation des sauvegardes, puis réessayez.',
+  AppLocale.keptCopyGameMayBeOpen: "Ce jeu est peut-être encore ouvert dans {emulator}. Quittez-le d'abord, sinon l'émulateur risque d'écrire sa propre copie par-dessus la sauvegarde restaurée.",
+  AppLocale.openGameIgnoredDownload: "Le jeu était encore ouvert dans l'émulateur, qui a continué d'utiliser sa propre copie de cette sauvegarde : la sauvegarde téléchargée au lancement n'a donc pas été utilisée, et rien n'a été envoyé. Quittez le jeu dans l'émulateur, puis relancez-le.",
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync : Synchronisation cloud désactivée',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync : Quota de stockage dépassé',
@@ -1634,6 +1636,7 @@ const Map<String, dynamic> appLocaleFr = {
   AppLocale.uploadingCustomFolder:
       'Téléversement des sauvegardes de {folder}...',
   AppLocale.customFolderUploadComplete: 'Dossier standalone synchronisé : {uploaded} téléversés, {skipped} déjà à jour',
+  AppLocale.customFolderUploadSavesLeftForLaunch: "Sauvegardes laissées pour le prochain lancement de leur jeu, qui prendra la copie du cloud : {left}",
   AppLocale.customFolderUploadLeftForLaunch: "Cartes mémoire jamais synchronisées depuis cet appareil, laissées pour le prochain lancement d'un jeu qui les utilise, qui utilisera celle du cloud et conservera celle de cet appareil dans l'Historique des sauvegardes : {left}",
   AppLocale.customFolderUploadFailed:
       'Échec de la synchronisation du dossier personnalisé',

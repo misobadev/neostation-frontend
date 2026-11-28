@@ -38,6 +38,32 @@ import '../../../utils/auto_folder_upload_notice.dart';
 /// backgrounding while the SAF picker is open), and each configured folder can
 /// be re-synced or removed. Replaces the inline panel with its own navigation
 /// layer.
+/// What a standalone folder's upload that went through says: what it
+/// uploaded and found in sync, then, when there are any, the memory cards
+/// left for a game's next launch (never synced from here) and the saves left
+/// for their game's next launch, which takes the cloud's copy.
+@visibleForTesting
+String customFolderUploadedMessage(
+  BuildContext context, {
+  required int uploaded,
+  required int skipped,
+  required int cardsLeftForLaunch,
+  required int savesLeftForLaunch,
+}) => [
+  AppLocale.customFolderUploadComplete
+      .getString(context)
+      .replaceFirst('{uploaded}', '$uploaded')
+      .replaceFirst('{skipped}', '$skipped'),
+  if (cardsLeftForLaunch > 0)
+    AppLocale.customFolderUploadLeftForLaunch
+        .getString(context)
+        .replaceFirst('{left}', '$cardsLeftForLaunch'),
+  if (savesLeftForLaunch > 0)
+    AppLocale.customFolderUploadSavesLeftForLaunch
+        .getString(context)
+        .replaceFirst('{left}', '$savesLeftForLaunch'),
+].join('\n');
+
 class CustomSaveFoldersView extends StatefulWidget {
   final VoidCallback onBack;
 
@@ -354,18 +380,14 @@ class _CustomSaveFoldersViewState extends State<CustomSaveFoldersView> {
           case CustomFolderUploadOutcome.uploaded:
             // Went through: the automatic upload's failure entry is stale.
             clearAutoFolderUploadNotice(system, emulatorSlug);
-            final left = provider.leftForLaunchFiles;
             show(
-              [
-                AppLocale.customFolderUploadComplete
-                    .getString(context)
-                    .replaceFirst('{uploaded}', '${provider.uploadedFiles}')
-                    .replaceFirst('{skipped}', '${provider.skippedFiles}'),
-                if (left > 0)
-                  AppLocale.customFolderUploadLeftForLaunch
-                      .getString(context)
-                      .replaceFirst('{left}', '$left'),
-              ].join('\n'),
+              customFolderUploadedMessage(
+                context,
+                uploaded: provider.uploadedFiles,
+                skipped: provider.skippedFiles,
+                cardsLeftForLaunch: provider.leftForLaunchFiles,
+                savesLeftForLaunch: provider.savesLeftForLaunchFiles,
+              ),
               custom.NotificationType.success,
             );
           case CustomFolderUploadOutcome.cancelled:

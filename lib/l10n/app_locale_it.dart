@@ -1161,6 +1161,8 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.keptCopyCloseGame: 'Chiudi prima il gioco, poi riprova.',
   AppLocale.keptCopyWaitForSync:
       'Attendi la fine della sincronizzazione dei salvataggi, poi riprova.',
+  AppLocale.keptCopyGameMayBeOpen: "Questo gioco potrebbe essere ancora aperto in {emulator}. Chiudilo prima lì, altrimenti l'emulatore potrebbe scrivere la propria copia sopra il salvataggio ripristinato.",
+  AppLocale.openGameIgnoredDownload: "Il gioco era ancora aperto nell'emulatore, che ha continuato a usare la propria copia di questo salvataggio: il salvataggio scaricato all'avvio non è stato usato e non è stato caricato nulla. Chiudi il gioco nell'emulatore, poi avvialo di nuovo.",
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync : Sincronizzazione cloud disabilitata',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync : Quota di archiviazione superata',
@@ -1631,6 +1633,7 @@ const Map<String, dynamic> appLocaleIt = {
   AppLocale.removeCustomFolderConfirm: 'Rimuovere questa cartella di salvataggio standalone? I file locali non verranno eliminati, solo scollegati dalla sincronizzazione.',
   AppLocale.uploadingCustomFolder: 'Caricamento dei salvataggi da {folder}...',
   AppLocale.customFolderUploadComplete: 'Cartella standalone sincronizzata: {uploaded} caricati, {skipped} già aggiornati',
+  AppLocale.customFolderUploadSavesLeftForLaunch: "Salvataggi lasciati al prossimo avvio del loro gioco, che userà la copia nel cloud: {left}",
   AppLocale.customFolderUploadLeftForLaunch: "Memory card mai sincronizzate da questo dispositivo, rimandate al prossimo avvio di un gioco che le usa, che userà quella del cloud e conserverà quella di questo dispositivo nella Cronologia dei salvataggi: {left}",
   AppLocale.customFolderUploadFailed:
       'Sincronizzazione della cartella personalizzata fallita',

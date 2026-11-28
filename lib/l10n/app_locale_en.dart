@@ -1140,6 +1140,8 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.keptCopyCloseGame: 'Close the game first, then try again.',
   AppLocale.keptCopyWaitForSync:
       'Wait until the save sync has finished, then try again.',
+  AppLocale.keptCopyGameMayBeOpen: "This game may still be open in {emulator}. Quit it there first, or the emulator may write its own copy over the restored save.",
+  AppLocale.openGameIgnoredDownload: "The game was still open in the emulator, which kept using its own copy of this save, so the save downloaded at launch wasn't used and nothing was uploaded. Quit the game in the emulator, then launch it again.",
   AppLocale.neoSyncCloudSyncDisabled: 'NeoSync: Cloud sync disabled',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Storage quota exceeded',
   AppLocale.packageNameMissing: 'Package name is missing',
@@ -1590,6 +1592,7 @@ const Map<String, dynamic> appLocaleEn = {
   AppLocale.removeCustomFolderConfirm: 'Remove this standalone save folder? Its local files will not be deleted, only unlinked from sync.',
   AppLocale.uploadingCustomFolder: 'Uploading saves from {folder}...',
   AppLocale.customFolderUploadComplete: 'Standalone folder synced: {uploaded} uploaded, {skipped} already up to date',
+  AppLocale.customFolderUploadSavesLeftForLaunch: "Saves left for their game's next launch, which takes the cloud's copy: {left}",
   AppLocale.customFolderUploadLeftForLaunch: "Memory cards never synced from this device, left for the next launch of a game that uses them, which uses the cloud's card and keeps this device's in Save history: {left}",
   AppLocale.customFolderUploadFailed: 'Failed to sync standalone folder',
   AppLocale.customFolderUploadConfirm:
